@@ -1,0 +1,27 @@
+# Node artifact files
+node_modules/
+dist/
+
+# Custom directories
+/xxx
+/xxx-pass
+/storage/docker/elasticsearch/
+/shopingo/
+
+# Compiled Java class files
+*.class
+
+# Compiled Python bytecode
+*.py[cod]
+
+# Log files
+*.log
+
+# Package files
+*.jar
+
+# Maven
+target/
+
+# JetBrains IDE
+.idea/
