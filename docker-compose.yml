@@ -1,0 +1,65 @@
+version: "3.9"
+services:
+    traefik:
+        image: traefik:3.3
+        command:
+            --providers.docker=true
+            --providers.docker.exposedByDefault=false
+            --entryPoints.http.address=:80
+        ports:
+            - "80:80"
+            - "8080:8080"
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=traefik-public
+        networks:
+            - traefik-public
+    site:
+        build:
+            context: site/docker
+            dockerfile: development/nginx/Dockerfile
+        volumes:
+            - ./site:/app
+        networks:
+            - traefik-public
+            - default
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=traefik-public
+            - traefik.http.routers.site.rule=Host(`localhost`)
+            - traefik.http.routers.site.entryPoints=http
+            - traefik.http.services.site.loadBalancer.server.port=80
+    site-php-fpm:
+        build: ./site/docker/development/php-fpm
+        container_name: symfony-php-fpm
+        volumes:
+          - ./site:/app
+    site-php-cli:
+        build: ./site/docker/development/php-cli
+        container_name: symfony-cli
+        working_dir: /app
+        volumes:
+            - ./site:/app
+        command: php bin/console
+    site-postgres:
+        image: postgres:15-alpine
+        container_name: symfony-postgres
+        restart: always
+        environment:
+            POSTGRES_DB: app
+            POSTGRES_USER: app
+            POSTGRES_PASSWORD: secret
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+    redis:
+        image: redis:alpine
+        container_name: symfony-redis
+        restart: always
+volumes:
+    postgres_data:
+networks:
+    traefik-public:
+        name: traefik-public
+        driver: bridge
