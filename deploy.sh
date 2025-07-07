@@ -7,9 +7,7 @@
 SERVER_USER=root                # Имя пользователя SSH
 SERVER_HOST=217.198.13.171      # IP или домен сервера
 SERVER_DIR=/srv/2bstock-app     # Путь к проекту на сервере
-ENV_FILE=".env.prod"            # Локальный файл с env
-APP_SECRET=025fabad4717bf4f8803be725d7c9740
-DB_PASSWORD=025be725d7c9740~! # Сикрет к БД Постгрес
+ENV_FILE=.env.prod            # Локальный файл с env
 
 # =======================================
 # 📦 Шаг 1: Создаём архив без vendor/ и var/
@@ -57,8 +55,8 @@ ssh $SERVER_USER@$SERVER_HOST << EOF
   unzip -o app.zip -d ./current
   rm app.zip
 
-  echo "📄 Копирую .env.prod в .env..."
-  cp $ENV_FILE ./current/.env
+  echo "📄 Копирую .env.prod внутрь каталога site/"
+  cp $ENV_FILE ./current/site/.env
 
   echo "✅ Структура после распаковки:"
   ls -la ./current
@@ -71,7 +69,7 @@ ssh $SERVER_USER@$SERVER_HOST << EOF
 
   echo "🐳 Запускаю docker-compose.prod.yml..."
   cd ./current
-  docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+  docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
 
   echo "✅ Деплой и запуск завершены!"
 EOF
