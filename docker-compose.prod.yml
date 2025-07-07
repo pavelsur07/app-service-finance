@@ -35,7 +35,7 @@ services:
     site:
         build:
             context: site
-            dockerfile: site/docker/production/nginx/Dockerfile
+            dockerfile: docker/production/nginx/Dockerfile
         container_name: nginx
         restart: always
         depends_on:
