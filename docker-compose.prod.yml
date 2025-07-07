@@ -45,7 +45,7 @@ services:
             - default
         labels:
             - traefik.enable=true
-            - traefik.http.routers.frontend.rule=Host(`2bstock.ru`) || Host(`www.2bstock.ru`)
+            - traefik.http.routers.frontend.rule=Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
             - traefik.http.routers.frontend.entrypoints=https
             - traefik.http.routers.frontend.tls=true
             - traefik.http.routers.frontend.tls.certresolver=letsEncrypt
@@ -60,9 +60,24 @@ services:
         restart: always
         networks:
             - default
-
+        environment:
+            APP_ENV: prod
+#            APP_SECRET: ${APP_SECRET}
+#        depends_on:
+#            - site-postgres
+#    site-postgres:
+#        image: postgres:15-alpine
+#        container_name: symfony-postgres
+#        restart: always
+#        environment:
+#            POSTGRES_DB: app
+#            POSTGRES_USER: app
+#            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#        volumes:
+#            - postgres_data:/var/lib/postgresql/data
 volumes:
     traefik-public-certs:
+    postgres_data:
 
 networks:
     traefik-public:
