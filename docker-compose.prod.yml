@@ -62,19 +62,20 @@ services:
             - default
         environment:
             APP_ENV: prod
-#            APP_SECRET: ${APP_SECRET}
-#        depends_on:
-#            - site-postgres
-#    site-postgres:
-#        image: postgres:15-alpine
-#        container_name: symfony-postgres
-#        restart: always
-#        environment:
-#            POSTGRES_DB: app
-#            POSTGRES_USER: app
-#            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-#        volumes:
-#            - postgres_data:/var/lib/postgresql/data
+            APP_SECRET: ${APP_SECRET}
+            DATABASE_URL: pgsql://app:${DB_PASSWORD}@site-postgres:5432/app
+        depends_on:
+            - site-postgres
+    site-postgres:
+        image: postgres:15-alpine
+        container_name: symfony-postgres
+        restart: always
+        environment:
+            POSTGRES_DB: app
+            POSTGRES_USER: app
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
 volumes:
     traefik-public-certs:
     postgres_data:
