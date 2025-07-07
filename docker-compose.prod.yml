@@ -47,7 +47,7 @@ services:
     
     site:
         build:
-            context: .
+            context: site
             dockerfile: site/docker/production/nginx/Dockerfile
         container_name: nginx
         restart: always
@@ -71,8 +71,8 @@ services:
     
     site-php-fpm:
         build:
-            context: .
-            dockerfile: site/docker/production/php-fpm/Dockerfile
+            context: site
+            dockerfile: docker/production/php-fpm/Dockerfile
         container_name: php-fpm
         restart: always
         environment:
@@ -83,8 +83,8 @@ services:
             - default
     site-php-cli:
         build:
-            context: .
-            dockerfile: site/docker/production/php-cli/Dockerfile
+            context: site
+            dockerfile: docker/production/php-cli/Dockerfile
         container_name: php-cli
         environment:
             APP_ENV: '8affc494c0c4b238cf80aa8c4eb47ef6'
