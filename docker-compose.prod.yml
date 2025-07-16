@@ -15,6 +15,7 @@ services:
             - --certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http
             - --certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru
             - --certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json
+            - --log.level=INFO
         ports:
             - "80:80"
             - "443:443"
@@ -25,10 +26,12 @@ services:
             - traefik-public-certs:/certs
         labels:
             - traefik.enable=true
+            
             # HTTP catch-all redirect to HTTPS
             - traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
             - traefik.http.routers.http-catchall.entrypoints=http
             - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+            
             - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
             - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
     
@@ -45,18 +48,29 @@ services:
             - default
         labels:
             - traefik.enable=true
-            - traefik.http.routers.frontend.rule=Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
-            - traefik.http.routers.frontend.entrypoints=https
-            - traefik.http.routers.frontend.tls=true
-            - traefik.http.routers.frontend.tls.certresolver=letsEncrypt
-            - traefik.http.routers.frontend.middlewares=secure-headers
-            - traefik.http.services.frontend.loadbalancer.server.port=80
+            
+            # HTTP Router
+            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-http.entrypoints=http
+            - traefik.http.routers.myapp-http.middlewares=redirect-to-https
+            
+            # HTTPS Router
+            - traefik.http.routers.myapp-https.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-https.entrypoints=https
+            - traefik.http.routers.myapp-https.tls.certresolver=letsEncrypt
+            
+            # Service
+            - traefik.http.services.myapp.loadbalancer.server.port=80
     
     site-php-fpm:
         build:
             context: site
             dockerfile: docker/production/php-fpm/Dockerfile
         container_name: php-fpm
+        environment:
+            DATABASE_URL: postgresql://app:025~25d7c9740~!@127.0.0.1:5432/app?serverVersion=16&charset=utf8
+            APP_ENV: PROD
+            APP_SECRET: 025fabad4717bf4f8803be725d7c9740
         restart: always
         networks:
             - default
@@ -69,7 +83,7 @@ services:
         environment:
             POSTGRES_DB: app
             POSTGRES_USER: app
-            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_PASSWORD: 025~25d7c9740~!
         volumes:
             - postgres_data:/var/lib/postgresql/data
 volumes:

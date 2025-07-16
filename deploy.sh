@@ -57,6 +57,7 @@ ssh $SERVER_USER@$SERVER_HOST << EOF
 
   echo "📄 Копирую .env.prod внутрь каталога site/"
   cp $ENV_FILE ./current/site/.env
+  cp $ENV_FILE ./current/.env
 
   echo "✅ Структура после распаковки:"
   ls -la ./current
