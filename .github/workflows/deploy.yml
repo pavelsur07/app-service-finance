@@ -1,0 +1,63 @@
+# .github/workflows/deploy.yml
+
+name: 🚀 Deploy to Production
+
+on:
+    push:
+        branches:
+            - main
+
+jobs:
+    deploy:
+        runs-on: ubuntu-latest
+        
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+            
+            - name: Install SSH & zip
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y zip
+            
+            - name: Setup SSH key
+              uses: webfactory/ssh-agent@v0.8.0
+              with:
+                  ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+            
+            - name: Create deploy archive
+              run: |
+                  zip -r app.zip . \
+                    -x "vendor/*" \
+                    -x "var/*" \
+                    -x "node_modules/*" \
+                    -x "app.zip"
+            
+            - name: Upload project files to server
+              run: |
+                  scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
+            
+            - name: Run remote deploy script
+              run: |
+                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
+                    set -e
+                  
+                    cd ${{ secrets.SERVER_DIR }}
+                    rm -rf ./current
+                    mkdir -p ./current
+                    unzip -o app.zip -d ./current
+                    rm app.zip
+                  
+                    if [ ! -f "./.env.prod" ]; then
+                      echo "❌ .env.prod not found! Abort."
+                      exit 1
+                    fi
+                  
+                    cp .env.prod ./current/.env
+                    cp .env.prod ./current/site/.env
+                  
+                    cd ./current
+                    docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
+                  
+                    echo "✅ Deploy finished!"
+                  EOF
