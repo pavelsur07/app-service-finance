@@ -97,7 +97,7 @@ volumes:
 
 networks:
     traefik-public:
-        external: false
+        external: true
         driver: bridge
     default:
         driver: bridge
