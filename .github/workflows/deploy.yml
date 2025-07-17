@@ -45,15 +45,15 @@ jobs:
                   
                     # 🛠 Генерируем .env файл из GitHub Secrets
                     cat <<EOT > ./current/.env
-    APP_ENV=${{ secrets.APP_ENV }}
-    APP_SECRET=${{ secrets.APP_SECRET }}
-    DATABASE_URL=${{ secrets.DATABASE_URL }}
-    EOT
-    
-    cp ./current/.env ./current/site/.env
-    
-    cd ./current
-    docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
-    
-    echo "✅ Deploy complete"
-    EOF
+                    APP_ENV=${{ secrets.APP_ENV }}
+                    APP_SECRET=${{ secrets.APP_SECRET }}
+                    DATABASE_URL=${{ secrets.DATABASE_URL }}
+                    EOT
+                    
+                    cp ./current/.env ./current/site/.env
+                    
+                    cd ./current
+                    docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
+                    
+                    echo "✅ Deploy complete"
+                    EOF
