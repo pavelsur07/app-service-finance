@@ -6,47 +6,35 @@ services:
         container_name: traefik
         restart: always
         command:
-            # Включаем Dashboard (опционально)
             - --api.dashboard=true
-            
-            # Включаем провайдера Docker
             - --providers.docker=true
             - --providers.docker.exposedByDefault=false
-            
-            # Настраиваем точки входа
             - --entrypoints.http.address=:80
             - --entrypoints.https.address=:443
-            
-            # Настройка Let’s Encrypt
             - --certificatesresolvers.letsEncrypt.acme.httpChallenge=true
             - --certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http
             - --certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru
             - --certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json
-            
-            # Логи Traefik
             - --log.level=INFO
-        
         ports:
             - "80:80"
             - "443:443"
-        
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - traefik-public-certs:/certs
-        
         networks:
             - traefik-public
-        
         labels:
             - traefik.enable=true
             
-            # ✅ HTTP catch-all для редиректа на HTTPS
+            # ❗️ВРЕМЕННО: отключить редирект HTTP → HTTPS, чтобы выдать сертификат
             #- traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
             #- traefik.http.routers.http-catchall.entrypoints=http
             #- traefik.http.routers.http-catchall.middlewares=redirect-to-https
             
-            #- traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-            #- traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+    
     site:
         build:
             context: site
@@ -62,9 +50,19 @@ services:
             - "80"
         labels:
             - traefik.enable=true
+            
+            # ✅ HTTP router — ВРЕМЕННО, для получения сертификата
+            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-http.entrypoints=http
+            - traefik.http.routers.myapp-http.service=myapp
+            - traefik.http.routers.myapp-http.middlewares=redirect-to-https
+            
+            # ✅ HTTPS router с Let's Encrypt
             - traefik.http.routers.myapp-https.rule=Host(`app.2bstock.ru`)
             - traefik.http.routers.myapp-https.entrypoints=https
             - traefik.http.routers.myapp-https.tls.certresolver=letsEncrypt
+            
+            # Сервис
             - traefik.http.services.myapp.loadbalancer.server.port=80
     
     site-php-fpm:
@@ -72,15 +70,16 @@ services:
             context: site
             dockerfile: docker/production/php-fpm/Dockerfile
         container_name: php-fpm
+        restart: always
         environment:
             DATABASE_URL: postgresql://app:025~25d7c9740~!@127.0.0.1:5432/app?serverVersion=16&charset=utf8
             APP_ENV: PROD
             APP_SECRET: 025fabad4717bf4f8803be725d7c9740
-        restart: always
         networks:
             - default
         depends_on:
             - site-postgres
+    
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -91,6 +90,7 @@ services:
             POSTGRES_PASSWORD: 025~25d7c9740~!
         volumes:
             - postgres_data:/var/lib/postgresql/data
+
 volumes:
     traefik-public-certs:
     postgres_data:
