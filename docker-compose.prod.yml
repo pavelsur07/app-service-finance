@@ -41,12 +41,12 @@ services:
             - traefik.enable=true
             
             # ✅ HTTP catch-all для редиректа на HTTPS
-            - traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
-            - traefik.http.routers.http-catchall.entrypoints=http
-            - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+            #- traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
+            #- traefik.http.routers.http-catchall.entrypoints=http
+            #- traefik.http.routers.http-catchall.middlewares=redirect-to-https
             
-            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-            - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
+            #- traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            #- traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
     site:
         build:
             context: site
