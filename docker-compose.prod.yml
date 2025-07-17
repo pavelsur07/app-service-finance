@@ -58,8 +58,8 @@ services:
         networks:
             - traefik-public
             - default
-        ports:
-            - "80:80"
+        expose:
+            - "80"
         labels:
             - traefik.enable=true
             - traefik.http.routers.myapp-https.rule=Host(`app.2bstock.ru`)
