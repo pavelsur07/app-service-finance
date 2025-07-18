@@ -34,7 +34,7 @@ jobs:
             
             - name: Deploy on server
               run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} <<EOF
+                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
                     set -e
                   
                     cd ${{ secrets.SERVER_DIR }}
@@ -43,7 +43,7 @@ jobs:
                     unzip -o app.zip -d ./current
                     rm app.zip
                   
-                    echo "🔐 Создаю .env из GitHub Secrets"
+                    # 🛠 Генерируем .env файл из GitHub Secrets
                     cat <<EOT > ./current/.env
                     APP_ENV=${{ secrets.APP_ENV }}
                     APP_SECRET=${{ secrets.APP_SECRET }}
