@@ -21,7 +21,8 @@ services:
             - "443:443"
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
-            - traefik-certs:/certs
+            #- traefik-certs:/certs
+            - ./traefik-certs:/certs  # ✅ Путь к локальной папке,
         networks:
             - traefik-public
         labels:
