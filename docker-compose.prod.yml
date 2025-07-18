@@ -65,9 +65,11 @@ services:
         container_name: php-fpm
         restart: always
         environment:
-            DATABASE_URL: postgresql://app:025~25d7c9740~!@127.0.0.1:5432/app?serverVersion=16&charset=utf8
+            #DATABASE_URL: postgresql://app:025~25d7c9740~!@127.0.0.1:5432/app?serverVersion=16&charset=utf8
+            DATABASE_URL: ${DATABASE_URL}
             APP_ENV: PROD
-            APP_SECRET: 025fabad4717bf4f8803be725d7c9740
+            #APP_SECRET: 025fabad4717bf4f8803be725d7c9740
+            APP_SECRET: ${APP_SECRET}
         networks:
             - default
         depends_on:
