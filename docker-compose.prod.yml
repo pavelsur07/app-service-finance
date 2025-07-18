@@ -82,7 +82,8 @@ services:
         environment:
             POSTGRES_DB: app
             POSTGRES_USER: app
-            POSTGRES_PASSWORD: 025~25d7c9740~!
+            #POSTGRES_PASSWORD: 025~25d7c9740~!
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
         volumes:
             - postgres_data:/var/lib/postgresql/data
 

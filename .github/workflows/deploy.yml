@@ -48,6 +48,7 @@ jobs:
                     APP_ENV=${{ secrets.APP_ENV }}
                     APP_SECRET=${{ secrets.APP_SECRET }}
                     DATABASE_URL=${{ secrets.DATABASE_URL }}
+                    POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
                     EOT
                     
                     cp ./current/.env ./current/site/.env
