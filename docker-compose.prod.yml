@@ -89,6 +89,7 @@ services:
 
 volumes:
     postgres_data:
+    traefik-certs:
 
 networks:
     traefik-public:
