@@ -32,29 +32,28 @@ jobs:
               run: |
                   scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
             
-            - name: Deploy on server
+            - name: Remote Deploy on Server
               run: |
-                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} <<EOF
+                  ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
                     set -e
                   
                     cd ${{ secrets.SERVER_DIR }}
+                  
+                    echo "📦 Распаковка архива"
                     rm -rf ./current
                     mkdir -p ./current
                     unzip -o app.zip -d ./current
                     rm app.zip
                   
-                    echo "🔐 Создаю .env из GitHub Secrets"
-                    cat <<EOT > ./current/.env
-                    APP_ENV=${{ secrets.APP_ENV }}
-                    APP_SECRET=${{ secrets.APP_SECRET }}
-                    DATABASE_URL=${{ secrets.DATABASE_URL }}
-                    POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-                    EOT
-                    
-                    cp ./current/.env ./current/site/.env
-                    
+                    echo "🚀 Запуск docker-compose"
                     cd ./current
-                    docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
-                    
-                    echo "✅ Deploy complete"
-                    EOF
+                  
+                    # передаём переменные как ENV-флаги напрямую
+                    APP_ENV="${{ secrets.APP_ENV }}" \
+                    APP_SECRET="${{ secrets.APP_SECRET }}" \
+                    DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                    POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+                    docker compose -f docker-compose.prod.yml up -d --build
+                  
+                    echo "✅ Деплой завершён"
+                  EOF
