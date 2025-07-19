@@ -49,7 +49,10 @@ services:
         labels:
             - traefik.enable=true
             
-            # Основной роутер по HTTPS
+            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-http.entrypoints=http
+            - traefik.http.routers.myapp-http.service=myapp
+            
             - traefik.http.routers.myapp.rule=Host(`app.2bstock.ru`)
             - traefik.http.routers.myapp.entrypoints=https
             - traefik.http.routers.myapp.tls=true
