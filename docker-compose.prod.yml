@@ -4,19 +4,32 @@ services:
         container_name: traefik
         restart: always
         command:
-            - --api.dashboard=true
-            - --providers.docker=true
-            - --providers.docker.exposedByDefault=false
-            - --entrypoints.http.address=:80
-            - --log.level=INFO
+            - "--api.dashboard=true"
+            - "--log.level=INFO"
+            - "--providers.docker=true"
+            - "--providers.docker.exposedByDefault=false"
+            - "--entrypoints.http.address=:80"
+            - "--entrypoints.https.address=:443"
+            - "--certificatesresolvers.letsEncrypt.acme.httpChallenge=true"
+            - "--certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http"
+            - "--certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru"
+            - "--certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json"
         ports:
             - "80:80"
+            - "443:443"
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
+            - traefik-certs:/certs
         networks:
             - traefik-public
         labels:
             - traefik.enable=true
+            # редирект с HTTP на HTTPS
+            - traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
+            - traefik.http.routers.http-catchall.entrypoints=http
+            - traefik.http.routers.http-catchall.middlewares=redirect-to-https
+            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+
     
     site:
         build:
@@ -33,8 +46,19 @@ services:
             - "80"
         labels:
             - traefik.enable=true
-            - traefik.http.routers.myapp.rule=Host(`app.2bstock.ru`)
-            - traefik.http.routers.myapp.entrypoints=http
+            
+            # HTTP роутер (нужен для выдачи сертификата Let's Encrypt)
+            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-http.entrypoints=http
+            - traefik.http.routers.myapp-http.service=myapp
+            
+            # HTTPS роутер
+            - traefik.http.routers.myapp-https.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp-https.entrypoints=https
+            - traefik.http.routers.myapp-https.tls=true
+            - traefik.http.routers.myapp-https.tls.certresolver=letsEncrypt
+            
+            # сервис
             - traefik.http.services.myapp.loadbalancer.server.port=80
     
     site-php-fpm:
