@@ -4,31 +4,45 @@ services:
         container_name: traefik
         restart: always
         command:
-            - "--api.dashboard=true"
-            - "--log.level=INFO"
-            - "--providers.docker=true"
-            - "--providers.docker.exposedByDefault=false"
-            - "--entrypoints.http.address=:80"
-            - "--entrypoints.https.address=:443"
-            - "--certificatesresolvers.letsEncrypt.acme.httpChallenge=true"
-            - "--certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http"
-            - "--certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru"
-            - "--certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json"
+            --providers.docker=true
+            --providers.docker.watch=true
+            --providers.docker.swarmMode=true
+            --providers.docker.exposedByDefault=false
+            --entryPoints.http.address=:80
+            --entryPoints.https.address=:443
+            --certificatesresolvers.letsEncrypt.acme.httpChallenge=true
+            --certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http
+            --certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru
+            --certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json
         ports:
-            - "80:80"
-            - "443:443"
-        volumes:
-            - /var/run/docker.sock:/var/run/docker.sock:ro
-            - traefik-certs:/certs
+            -   target: 80
+                published: 80
+                protocol: tcp
+                mode: host
+            -   target: 443
+                published: 443
+                protocol: tcp
+                mode: host
         networks:
             - traefik-public
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+            - traefik-public-certs:/certs
         labels:
             - traefik.enable=true
-            # редирект с HTTP на HTTPS
+            - traefik.docker.network=traefik-public
+            
             - traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
-            - traefik.http.routers.http-catchall.entrypoints=http
+            - traefik.http.routers.http-catchall.entryPoints=http
             - traefik.http.routers.http-catchall.middlewares=redirect-to-https
-            - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+            - traefik.http.services.http-catchall.loadBalancer.server.port=80
+            
+            - traefik.http.middlewares.redirect-to-https.redirectScheme.scheme=https
+            - traefik.http.middlewares.redirect-to-https.redirectScheme.permanent=true
+            
+            - traefik.http.middlewares.secure-headers.headers.sslRedirect=true
+            - traefik.http.middlewares.secure-headers.headers.stsSeconds=31536000
+            - traefik.http.middlewares.secure-headers.headers.contentSecurityPolicy=block-all-mixed-content
 
     
     site:
@@ -42,24 +56,18 @@ services:
         networks:
             - traefik-public
             - default
-        expose:
-            - "80"
         labels:
             - traefik.enable=true
-            
-            # HTTP роутер (нужен для выдачи сертификата Let's Encrypt)
-            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
-            - traefik.http.routers.myapp-http.entrypoints=http
-            - traefik.http.routers.myapp-http.service=myapp
-            
-            # HTTPS роутер
-            - traefik.http.routers.myapp-https.rule=Host(`app.2bstock.ru`)
-            - traefik.http.routers.myapp-https.entrypoints=https
-            - traefik.http.routers.myapp-https.tls=true
-            - traefik.http.routers.myapp-https.tls.certresolver=letsEncrypt
-            
-            # сервис
-            - traefik.http.services.myapp.loadbalancer.server.port=80
+            - traefik.docker.network=traefik-public
+            - traefik.http.routers.frontend.rule=Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
+            - traefik.http.services.frontend.loadBalancer.server.port=80
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.regex=^(https?://)www.app.2bstock.ru/(.*)$$
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.replacement=$${1}app.2bstock.ru/$${2}
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.permanent=true
+            - traefik.http.routers.frontend.middlewares=frontend-redirect,secure-headers
+            - traefik.http.routers.frontend.entryPoints=https
+            - traefik.http.routers.frontend.tls=true
+            - traefik.http.routers.frontend.tls.certResolver=letsEncrypt
     
     site-php-fpm:
         build:
@@ -89,7 +97,7 @@ services:
 
 volumes:
     postgres_data:
-    traefik-certs:
+    traefik-public-certs:
 
 networks:
     traefik-public:
