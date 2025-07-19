@@ -17,6 +17,7 @@ services:
         ports:
             - "80:80"
             - "443:443"
+            - "8080:8080"  # только временно, чтобы зайти в Dashboard
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - traefik-certs:/certs
@@ -24,15 +25,10 @@ services:
             - traefik-public
         labels:
             - traefik.enable=true
-            
-            # HTTP → HTTPS редирект
             - traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
             - traefik.http.routers.http-catchall.entrypoints=http
             - traefik.http.routers.http-catchall.middlewares=redirect-to-https
-            
             - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
-            - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
-    
     site:
         build:
             context: site
@@ -48,16 +44,10 @@ services:
             - "80"
         labels:
             - traefik.enable=true
-            
-            - traefik.http.routers.myapp-http.rule=Host(`app.2bstock.ru`)
-            - traefik.http.routers.myapp-http.entrypoints=http
-            - traefik.http.routers.myapp-http.service=myapp
-            
             - traefik.http.routers.myapp.rule=Host(`app.2bstock.ru`)
             - traefik.http.routers.myapp.entrypoints=https
             - traefik.http.routers.myapp.tls=true
             - traefik.http.routers.myapp.tls.certresolver=letsEncrypt
-            
             - traefik.http.services.myapp.loadbalancer.server.port=80
     
     site-php-fpm:
