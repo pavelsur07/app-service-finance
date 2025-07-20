@@ -33,7 +33,7 @@ services:
         build:
             context: site
             dockerfile: docker/production/nginx/Dockerfile
-        container_name: nginx
+        container_name: site-nginx
         restart: always
         depends_on:
             - site-php-fpm
