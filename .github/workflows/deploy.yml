@@ -76,6 +76,10 @@ jobs:
                     echo "🚧 Выполняем миграции"
                     cd ${{ secrets.SERVER_DIR }}/current
                   
+                    APP_ENV="${{ secrets.APP_ENV }}" \
+                    APP_SECRET="${{ secrets.APP_SECRET }}" \
+                    DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                    POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
                     docker compose -f docker-compose.prod.yml exec -T site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"
                   EOF
