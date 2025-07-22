@@ -1,9 +1,9 @@
-# .github/workflows/deploy.yml
 name: 🚀 Deploy to Production
 
 on:
     push:
         branches: [ master ]
+
 jobs:
     deploy:
         runs-on: ubuntu-latest
@@ -12,10 +12,8 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v4
             
-            - name: Install SSH & zip
-              run: |
-                  sudo apt-get update
-                  sudo apt-get install -y zip
+            - name: Install zip
+              run: sudo apt-get install -y zip
             
             - name: Setup SSH key
               uses: webfactory/ssh-agent@v0.8.0
@@ -30,31 +28,32 @@ jobs:
                     -x "node_modules/*" \
                     -x "app.zip"
             
-            - name: Upload project files to server
+            - name: Upload archive to server
               run: |
                   scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
             
-            - name: Run remote deploy script
+            - name: Remote Deploy on Server
               run: |
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << EOF
                     set -e
                   
                     cd ${{ secrets.SERVER_DIR }}
+                  
+                    echo "📦 Распаковка архива"
                     rm -rf ./current
                     mkdir -p ./current
                     unzip -o app.zip -d ./current
                     rm app.zip
                   
-                    if [ ! -f "./.env.prod" ]; then
-                      echo "❌ .env.prod not found! Abort."
-                      exit 1
-                    fi
-                  
-                    cp .env.prod ./current/.env
-                    cp .env.prod ./current/site/.env
-                  
+                    echo "🚀 Запуск docker-compose"
                     cd ./current
-                    docker compose -f docker-compose.prod.yml --env-file ./site/.env up -d --build
                   
-                    echo "✅ Deploy finished!"
+                    # передаём переменные как ENV-флаги напрямую
+                    APP_ENV="${{ secrets.APP_ENV }}" \
+                    APP_SECRET="${{ secrets.APP_SECRET }}" \
+                    DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                    POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+                    docker compose -f docker-compose.prod.yml up -d --build
+                  
+                    echo "✅ Деплой завершён"
                   EOF
