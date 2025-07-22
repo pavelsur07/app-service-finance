@@ -79,7 +79,7 @@ services:
         container_name: site-php-cli
         environment:
             #DATABASE_URL: ${DATABASE_URL}
-            DATABASE_URL: "pgsql://app:025~25d7c9740~!@site-postgres:5432/app"
+            DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
         networks:
