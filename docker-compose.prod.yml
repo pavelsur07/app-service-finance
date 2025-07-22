@@ -78,7 +78,8 @@ services:
             dockerfile: docker/production/php-cli/Dockerfile
         container_name: site-php-cli
         environment:
-            DATABASE_URL: ${DATABASE_URL}
+            #DATABASE_URL: ${DATABASE_URL}
+            DATABASE_URL: "pgsql://app:025~25d7c9740~!@site-postgres:5432/app"
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
         networks:
