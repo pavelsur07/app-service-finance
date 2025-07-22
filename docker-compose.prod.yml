@@ -72,7 +72,7 @@ services:
             - default
         depends_on:
             - site-postgres
-    site-php-cli:
+    site-cli-fpm:
         build:
             context: site
             dockerfile: docker/production/php-cli/Dockerfile
