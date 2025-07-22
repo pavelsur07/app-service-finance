@@ -14,9 +14,6 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/bin --fil
 WORKDIR /app
 
 COPY ./composer.json ./composer.lock ./
-RUN mkdir -p var/cache var/log \
- && chown -R www-data:www-data var \
- && chmod -R 775 var
 
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
