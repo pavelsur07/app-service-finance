@@ -72,11 +72,11 @@ services:
             - default
         depends_on:
             - site-postgres
-    site-cli-fpm:
+    site-php-cli:
         build:
             context: site
             dockerfile: docker/production/php-cli/Dockerfile
-        container_name: php-cli
+        container_name: site-php-cli
         environment:
             DATABASE_URL: ${DATABASE_URL}
             APP_ENV: ${APP_ENV:-prod}
