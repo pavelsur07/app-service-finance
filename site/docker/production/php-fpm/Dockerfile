@@ -37,9 +37,6 @@ COPY --from=builder /app ./
 COPY ./ ./
 
 RUN chown www-data:www-data ./var -R
-RUN mkdir -p var/cache var/log \
- && chown -R www-data:www-data var \
- && chmod -R 775 var
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=1s \
     CMD REDIRECT_STATUS=true SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET \
