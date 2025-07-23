@@ -1,0 +1,30 @@
+{% extends 'security/base.html.twig' %}
+
+{% block title %}Register{% endblock %}
+
+{% block body %}
+
+    {{ form_errors(registrationForm) }}
+
+    {{ form_start(registrationForm, { attr: { class: 'card card-md' } }) }}
+    {% for flash_error in app.flashes('verify_email_error') %}
+        <div class="alert alert-danger" role="alert">{{ flash_error }}</div>
+    {% endfor %}
+
+        <div class="card-body">
+            <h2 class="card-title text-center mb-4">Создайте новую учетную запись</h2>
+                {{ form_row(registrationForm.email) }}
+                {{ form_row(registrationForm.plainPassword, {
+                    label: 'Password'
+                }) }}
+                {{ form_row(registrationForm.agreeTerms) }}
+
+            <div class="form-footer mt-3">
+                <button type="submit" class="btn btn-primary w-100">Вход</button>
+            </div>
+        </div>
+
+    {{ form_end(registrationForm) }}
+
+
+{% endblock %}
