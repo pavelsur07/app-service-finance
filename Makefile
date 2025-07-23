@@ -14,7 +14,7 @@ docker-build:
 site-clear:
 	docker run --rm -v ${PWD}/site:/app -w /app alpine sh -c 'rm -rf  .ready var/cache/* var/log/* var/test/*'
 
-site-init: site-composer-install site-wait-db site-migrations
+site-init: site-composer-install site-wait-db site-migrations site-fixtures
 
 site-composer-install:
 	docker-compose run --rm site-php-cli composer install
@@ -26,7 +26,7 @@ site-migrations:
 	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction
 
 site-fixtures:
-	docker-compose run --rm php-cli php bin/console doctrine:fixtures:load --no-interaction
+	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction
 
 build: build-site
 
