@@ -16,9 +16,9 @@ COPY ./composer.json ./composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
+RUN php bin/console asset-map:compile
 
 ### FPM ###
-
 FROM php:8.2-fpm-alpine
 
 RUN apk add --no-cache libpq-dev fcgi \
