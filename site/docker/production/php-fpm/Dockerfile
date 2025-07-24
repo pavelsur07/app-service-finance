@@ -31,12 +31,18 @@ COPY ./docker/common/php/conf.d /usr/local/etc/php/conf.d
 COPY ./docker/common/php/php-fpm.d /usr/local/etc/php-fpm.d
 COPY ./docker/production/php/conf.d /usr/local/etc/php/conf.d
 
+
 WORKDIR /app
 
 COPY --from=builder /app ./
 COPY ./ ./
 
 RUN chown www-data:www-data ./var -R
+
+# ✅ Устанавливаем права перед запуском под пользователем
+RUN mkdir -p var/cache var/log \
+ && chown -R app:app var \
+ && chmod -R 775 var
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=1s \
     CMD REDIRECT_STATUS=true SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET \
