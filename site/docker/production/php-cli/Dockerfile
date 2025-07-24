@@ -35,14 +35,14 @@ RUN chmod 555 /usr/local/bin/wait-for-it
 
 RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
 
+# ✅ Устанавливаем права перед запуском под пользователем
+RUN mkdir -p var/cache var/log \
+ && chown -R app:app var \
+ && chmod -R 775 var \
+
 WORKDIR /app
 
 COPY --from=builder /app ./
 COPY ./ ./
-
-# ✅ Устанавливаем права перед запуском под пользователем
-RUN mkdir -p var/cache var/log \
- && chown -R app:app var \
- && chmod -R 775 var
 
 USER app
