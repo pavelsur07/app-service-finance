@@ -12,6 +12,11 @@ RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/bin --fil
 
 WORKDIR /app
 
+# ✅ Устанавливаем права перед запуском под пользователем
+RUN mkdir -p var/cache var/log \
+ && chown -R app:app var \
+ && chmod -R 775 var \
+
 COPY ./composer.json ./composer.lock ./
 
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
@@ -33,12 +38,7 @@ COPY ./docker/production/php/conf.d /usr/local/etc/php/conf.d
 COPY ./docker/common/wait-for-it.sh /usr/local/bin/wait-for-it
 RUN chmod 555 /usr/local/bin/wait-for-it
 
-RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
-
-# ✅ Устанавливаем права перед запуском под пользователем
-RUN mkdir -p var/cache var/log \
- && chown -R app:app var \
- && chmod -R 775 var \
+yhn RUN addgroup -g 1000 app && adduser -u 1000 -G app -s /bin/sh -D app
 
 WORKDIR /app
 
