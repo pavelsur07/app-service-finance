@@ -19,7 +19,7 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 
 ### CLI ###
 
-FROM php:8.2-fpm-alpine
+FROM php:8.2-cli-alpine
 
 RUN apk add --no-cache libpq-dev bash coreutils \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \

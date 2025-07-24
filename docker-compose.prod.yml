@@ -62,7 +62,7 @@ services:
         build:
             context: site
             dockerfile: docker/production/php-fpm/Dockerfile
-        container_name: php-fpm
+        container_name: site-php-fpm
         restart: always
         environment:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
