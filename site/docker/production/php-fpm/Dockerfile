@@ -31,11 +31,6 @@ COPY ./docker/common/php/conf.d /usr/local/etc/php/conf.d
 COPY ./docker/common/php/php-fpm.d /usr/local/etc/php-fpm.d
 COPY ./docker/production/php/conf.d /usr/local/etc/php/conf.d
 
-# ✅ Устанавливаем права перед запуском под пользователем
-RUN mkdir -p var/cache var/log \
- && chown -R app:app var \
- && chmod -R 775 var
-
 WORKDIR /app
 
 COPY --from=builder /app ./
