@@ -16,7 +16,6 @@ COPY ./composer.json ./composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
-RUN php /app/bin/console asset-map:compile
 
 ### FPM ###
 FROM php:8.2-fpm-alpine
@@ -35,6 +34,8 @@ WORKDIR /app
 
 COPY --from=builder /app ./
 COPY ./ ./
+
+RUN php /app/bin/console asset-map:compile
 
 RUN chown www-data:www-data ./var -R
 
