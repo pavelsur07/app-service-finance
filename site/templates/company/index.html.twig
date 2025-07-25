@@ -1,0 +1,56 @@
+{% extends 'base.html.twig' %}
+{% block title %}Компании{% endblock %}
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Компании</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('company_new') }}" class="btn btn-primary">
+                        + Добавить компанию
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Наименование</th>
+                        <th>Wildberries API</th>
+                        <th>Ozon Seller ID</th>
+                        <th>Ozon API</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for company in companies %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a>
+                            </td>
+                            <td>{{ company.wildberriesApiKey }}</td>
+                            <td>{{ company.ozonSellerId }}</td>
+                            <td>{{ company.ozonApiKey }}</td>
+                            <td>
+                                <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                <form method="post" action="{{ path('company_delete', {'id': company.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ company.id) }}">
+                                    <button class="btn btn-sm btn-danger">🗑</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center">Нет компаний.</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

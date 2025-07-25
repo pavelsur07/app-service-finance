@@ -15,9 +15,9 @@ class UserFixtures extends Fixture
     public function load(ObjectManager $manager): void
     {
         $usersData = [
-            ['admin@example.com', 'password', ['ROLE_ADMIN']],
-            ['manager@example.com', 'password', ['ROLE_MANAGER']],
-            ['user@example.com', 'password', ['ROLE_USER']],
+            ['admin@app.ru', 'password', ['ROLE_ADMIN']],
+            ['manager@app.ru', 'password', ['ROLE_MANAGER']],
+            ['user@app.ru', 'password', ['ROLE_USER']],
         ];
 
         foreach ($usersData as [$email, $plainPassword, $roles]) {

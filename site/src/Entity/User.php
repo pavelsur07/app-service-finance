@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -39,6 +41,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?string $password = null;
 
+
+    #[ORM\OneToMany(targetEntity: Company::class, mappedBy: 'user', orphanRemoval: true)]
+    private Collection $companies;
+
     /**
      * @param string $id
      */
@@ -46,6 +52,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         Assert::uuid($id);
         $this->id = $id;
+        $this->companies = new ArrayCollection();
     }
 
 
@@ -124,6 +131,24 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $data;
     }
 
+    public function addCompany(Company $company): self
+    {
+        if (!$this->companies->contains($company)) {
+            $this->companies[] = $company;
+            $company->setUser($this);
+        }
+        return $this;
+    }
+
+    public function removeCompany(Company $company): self
+    {
+        if ($this->companies->removeElement($company)) {
+            if ($company->getUser() === $this) {
+                $company->setUser(null);
+            }
+        }
+        return $this;
+    }
     #[\Deprecated]
     public function eraseCredentials(): void
     {

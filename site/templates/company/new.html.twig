@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+{% block title %}{{ company is defined ? 'Редактировать' : 'Добавить' }} компанию{% endblock %}
+{% block body %}
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-header"><b>{{ company is defined ? 'Редактировать' : 'Добавить' }} компанию</b></div>
+            <div class="card-body">
+                {{ form_start(form) }}
+                <div class="mb-3">
+                    {{ form_label(form.name) }}
+                    {{ form_widget(form.name, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.name) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.wildberriesApiKey) }}
+                    {{ form_widget(form.wildberriesApiKey, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.wildberriesApiKey) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.ozonSellerId) }}
+                    {{ form_widget(form.ozonSellerId, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.ozonSellerId) }}
+                </div>
+                <div class="mb-3">
+                    {{ form_label(form.ozonApiKey) }}
+                    {{ form_widget(form.ozonApiKey, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.ozonApiKey) }}
+                </div>
+                <button class="btn btn-primary">{{ company is defined ? 'Сохранить' : 'Создать' }}</button>
+                <a href="{{ path('company_index') }}" class="btn btn-secondary">Назад</a>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}

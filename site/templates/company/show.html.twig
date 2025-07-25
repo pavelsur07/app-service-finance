@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+{% block title %}Детали компании{% endblock %}
+{% block body %}
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">{{ company.name }}</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">Wildberries API ключ</dt>
+                    <dd class="col-sm-8">{{ company.wildberriesApiKey }}</dd>
+                    <dt class="col-sm-4">Ozon Seller ID</dt>
+                    <dd class="col-sm-8">{{ company.ozonSellerId }}</dd>
+                    <dt class="col-sm-4">Ozon API ключ</dt>
+                    <dd class="col-sm-8">{{ company.ozonApiKey }}</dd>
+                </dl>
+                <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-warning">Редактировать</a>
+                <a href="{{ path('company_index') }}" class="btn btn-secondary">Назад</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
