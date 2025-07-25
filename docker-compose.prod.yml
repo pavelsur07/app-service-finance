@@ -32,7 +32,9 @@ services:
             #- traefik.http.routers.http-catchall.rule=HostRegexp(`{host:.+}`)
             - traefik.http.routers.http-catchall.rule=HostRegexp(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
             - traefik.http.routers.http-catchall.entrypoints=http
-            - traefik.http.middlewares.frontend-redirect.redirectRegex.regex=^(https?://)www.app.2bstock.ru/(.*)$$ #
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.regex=^(https?://)www.app.2bstock.ru/(.*)$$ # test
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.replacement=$${1}app.2bstock.ru/$${2} #test
+            - traefik.http.middlewares.frontend-redirect.redirectRegex.permanent=true #test
             
             - traefik.http.routers.http-catchall.middlewares=redirect-to-https
             - traefik.http.routers.http-catchall.priority=1              # Низкий приоритет, чтобы не мешать ACME
