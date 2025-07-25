@@ -80,6 +80,6 @@ jobs:
                     APP_SECRET="${{ secrets.APP_SECRET }}" \
                     DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                     POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
-                    docker compose -f docker-compose.prod.yml run --rm site-php-cli site-php-cli bin/console doctrine:migrations:migrate --no-interaction
+                    docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"
                   EOF
