@@ -73,7 +73,7 @@ services:
         restart: always
         environment:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
-            APP_ENV: prod
+            APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
         networks:
             - default
@@ -86,7 +86,7 @@ services:
         container_name: site-php-cli
         environment:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
-            APP_ENV: prod
+            APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
         networks:
             - default
