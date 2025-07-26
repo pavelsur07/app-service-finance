@@ -69,7 +69,7 @@ class OzonApiClient
                 $allProducts[] = [
                     'id'           => $product['id'] ?? '',
                     'offer_id'          => $product['offer_id'] ?? '',
-                    'sku'          => isset($product['sku']) ? (string)$product['sku'] : '', // sku Ozon, только цифры
+                    'sku'       => isset($product['sources'][0]['sku']) ? (string)$product['sources'][0]['sku'] : '',
                     'name'         => $product['name'] ?? '',
                     'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
                     'barcode'      => $product['barcodes'][0] ?? '',
@@ -133,8 +133,8 @@ class OzonApiClient
             foreach (($infoData['items'] ?? []) as $product) {
                 $allProducts[] = [
                     'id'           => $product['id'] ?? '',
-                    'offer_id'          => $product['offer_id'] ?? '',
-                    'sku'          => isset($product['sku']) ? (string)$product['sku'] : '', // sku Ozon, только цифры
+                    'offer_id'     => $product['offer_id'] ?? '',
+                    'sku'       => isset($product['sources'][0]['sku']) ? (string)$product['sources'][0]['sku'] : '',
                     'name'         => $product['name'] ?? '',
                     'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
                     'barcode'      => $product['barcodes'][0] ?? '',
