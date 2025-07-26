@@ -149,6 +149,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         }
         return $this;
     }
+
+    public function getCompanies(): Collection
+    {
+        return $this->companies;
+    }
+
+
     #[\Deprecated]
     public function eraseCredentials(): void
     {

@@ -4,22 +4,24 @@ namespace App\Api\Ozon;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
-class OzonApiClient
+readonly class OzonApiClient
 {
     public function __construct(
+        private string              $clientId,
+        private string              $apiKey,
         private HttpClientInterface $http
     ) {}
 
-    private function headers(string $clientId, string $apiKey): array
+    private function headers(): array
     {
         return [
-            'Client-Id' => $clientId,
-            'Api-Key' => $apiKey,
+            'Client-Id' => $this->clientId,
+            'Api-Key' => $this->apiKey,
             'Content-Type' => 'application/json',
         ];
     }
 
-    public function getAllProducts(string $clientId, string $apiKey): array
+    public function getAllProducts(): array
     {
         $result = [];
         $lastId = '';
@@ -27,7 +29,7 @@ class OzonApiClient
 
         do {
             $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/list', [
-                'headers' => $this->headers($clientId, $apiKey),
+                'headers' => $this->headers(),
                 'json' => ['limit' => $limit, 'last_id' => $lastId],
             ]);
 
@@ -36,7 +38,7 @@ class OzonApiClient
 
             foreach ($items as $item) {
                 $details = $this->http->request('POST', 'https://api-seller.ozon.ru/v2/product/info', [
-                    'headers' => $this->headers($clientId, $apiKey),
+                    'headers' => $this->headers(),
                     'json' => ['product_id' => $item['product_id']],
                 ])->toArray(false);
 
