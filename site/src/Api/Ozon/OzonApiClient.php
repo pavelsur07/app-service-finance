@@ -26,46 +26,59 @@ class OzonApiClient
 
     public function getAllProducts(string $clientId, string $apiKey): array
     {
-        $result = [];
         $lastId = '';
         $limit = 1000;
+        $productIds = [];
 
+        // 1. Получаем все product_id через /v3/product/list
         do {
             $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/list', [
                 'headers' => $this->headers($clientId, $apiKey),
                 'json' => [
-                    'filter' => (object)[], // <<=== Исправление здесь!
+                    'filter' => (object)[],  // обязателен!
                     'limit' => $limit,
-                    'last_id' => $lastId
+                    'last_id' => $lastId,
                 ],
             ]);
-
             $data = $response->toArray(false);
             $items = $data['result']['items'] ?? [];
-
-            // после получения $items = $data['result']['items'] ?? [];
-            file_put_contents('/tmp/ozon_debug.txt', print_r($items, true), FILE_APPEND);
-
             foreach ($items as $item) {
-                $details = $this->http->request('POST', 'https://api-seller.ozon.ru/v2/product/info', [
-                    'headers' => $this->headers($clientId, $apiKey),
-                    'json' => ['product_id' => $item['product_id']],
-                ])->toArray(false);
-
-                $result[] = [
-                    'sku' => $details['result']['sku'],
-                    'manufacturerSku' => $details['result']['barcode'] ?? '',
-                    'name' => $details['result']['name'],
-                    'price' => $details['result']['price'] ?? 0,
-                    'image_url' => $details['result']['images'][0] ?? null,
-                    'archived' => $item['archived'] ?? false,
-                ];
+                if (!empty($item['product_id'])) {
+                    $productIds[] = (int)$item['product_id'];
+                }
             }
-
             $lastId = $data['result']['last_id'] ?? '';
         } while (!empty($items) && !empty($lastId));
 
-        return $result;
+        if (!$productIds) {
+            return [];
+        }
+
+        // 2. Пакетно получаем подробную информацию
+        $allProducts = [];
+        $chunks = array_chunk($productIds, 100);
+
+        foreach ($chunks as $chunk) {
+            $infoResponse = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/info/list', [
+                'headers' => $this->headers($clientId, $apiKey),
+                'json' => ['product_id' => $chunk],
+            ]);
+            $infoData = $infoResponse->toArray(false);
+
+            foreach (($infoData['items'] ?? []) as $product) {
+                $allProducts[] = [
+                    'id'           => $product['id'] ?? '',
+                    'sku'          => $product['offer_id'] ?? '',
+                    'name'         => $product['name'] ?? '',
+                    'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
+                    'barcode'      => $product['barcodes'][0] ?? '',
+                    'image_url'    => $product['images'][0] ?? null,
+                    'archived'     => $product['is_archived'] ?? false,
+                ];
+            }
+        }
+
+        return $allProducts;
     }
 
     /**
@@ -80,42 +93,56 @@ class OzonApiClient
         $result = [];
         $lastId = '';
         $limit = 1000;
+        $productIds = [];
 
-
+        // 1. Получаем все product_id через /v3/product/list
+        do {
             $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/list', [
                 'headers' => $this->headers($clientId, $apiKey),
                 'json' => [
-                    'filter' => (object)[], // <<=== Исправление здесь!
+                    'filter' => (object)[],  // обязателен!
                     'limit' => $limit,
-                    'last_id' => $lastId
+                    'last_id' => $lastId,
                 ],
             ]);
-
             $data = $response->toArray(false);
             $items = $data['result']['items'] ?? [];
-
-            // после получения $items = $data['result']['items'] ?? [];
-            file_put_contents('/tmp/ozon_debug.txt', print_r($items, true), FILE_APPEND);
-
             foreach ($items as $item) {
-                $details = $this->http->request('POST', 'https://api-seller.ozon.ru/v2/product/info', [
-                    'headers' => $this->headers($clientId, $apiKey),
-                    'json' => (object)[
-                        'product_id' => (int)$item['product_id']
-                    ],
-                ])->toArray(false);
+                if (!empty($item['product_id'])) {
+                    $productIds[] = (int)$item['product_id'];
+                }
+            }
+            $lastId = $data['result']['last_id'] ?? '';
+        } while (!empty($items) && !empty($lastId));
 
-                $result[] = [
-                    'sku' => $details['result']['sku'],
-                    'manufacturerSku' => $details['result']['barcode'] ?? '',
-                    'name' => $details['result']['name'],
-                    'price' => $details['result']['price'] ?? 0,
-                    'image_url' => $details['result']['images'][0] ?? null,
-                    'archived' => $item['archived'] ?? false,
+        if (!$productIds) {
+            return [];
+        }
+
+        // 2. Пакетно получаем подробную информацию
+        $allProducts = [];
+        $chunks = array_chunk($productIds, 100);
+
+        foreach ($chunks as $chunk) {
+            $infoResponse = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/info/list', [
+                'headers' => $this->headers($clientId, $apiKey),
+                'json' => ['product_id' => $chunk],
+            ]);
+            $infoData = $infoResponse->toArray(false);
+
+            foreach (($infoData['items'] ?? []) as $product) {
+                $allProducts[] = [
+                    'id'           => $product['id'] ?? '',
+                    'sku'          => $product['offer_id'] ?? '',
+                    'name'         => $product['name'] ?? '',
+                    'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
+                    'barcode'      => $product['barcodes'][0] ?? '',
+                    'image_url'    => $product['images'][0] ?? null,
+                    'archived'     => $product['is_archived'] ?? false,
                 ];
             }
+        }
 
-
-        return $items;
+        return $allProducts;
     }
 }

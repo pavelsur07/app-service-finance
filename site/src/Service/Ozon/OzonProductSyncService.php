@@ -6,6 +6,7 @@ use App\Api\Ozon\OzonApiClient;
 use App\Entity\Company;
 use App\Entity\Ozon\OzonProduct;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 
 readonly class OzonProductSyncService
 {
@@ -30,7 +31,7 @@ readonly class OzonProductSyncService
             $product = $this->em->getRepository(OzonProduct::class)->findOneBy([
                 'ozonSku' => $data['sku'],
                 'company' => $company,
-            ]) ?? new OzonProduct();
+            ]) ?? new OzonProduct(id: Uuid::uuid4()->toString(), company: $company);
 
             $product->setOzonSku($data['sku']);
             $product->setManufacturerSku($data['manufacturerSku'] ?? '');
