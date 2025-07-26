@@ -5,6 +5,7 @@ namespace App\Controller\Ozon;
 use App\Api\Ozon\OzonApiClient;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Service\Ozon\OzonProductSyncService;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -55,6 +56,25 @@ class OzonProductController extends AbstractController
         $company = $this->getUser()->getCompanies()[0];
         $syncService->sync($company);
         $this->addFlash('success', 'Ozon-товары обновлены!');
+        return $this->redirectToRoute('ozon_products');
+    }
+
+    #[Route('/ozon/products/clear', name: 'ozon_products_clear', methods: ['POST'])]
+    public function clear(
+        OzonProductRepository $repo,
+        EntityManagerInterface $em,
+        Request $request
+    ): Response {
+        $company = $this->getUser()->getCompanies()[0];
+
+        /*$em = $this->getDoctrine()->getManager();*/
+        $products = $repo->findBy(['company' => $company]);
+        foreach ($products as $product) {
+            $em->remove($product);
+        }
+        $em->flush();
+
+        $this->addFlash('success', 'Все товары Ozon удалены!');
         return $this->redirectToRoute('ozon_products');
     }
 }

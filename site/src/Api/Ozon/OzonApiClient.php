@@ -68,7 +68,8 @@ class OzonApiClient
             foreach (($infoData['items'] ?? []) as $product) {
                 $allProducts[] = [
                     'id'           => $product['id'] ?? '',
-                    'sku'          => $product['offer_id'] ?? '',
+                    'offer_id'          => $product['offer_id'] ?? '',
+                    'sku'          => isset($product['sku']) ? (string)$product['sku'] : '', // sku Ozon, только цифры
                     'name'         => $product['name'] ?? '',
                     'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
                     'barcode'      => $product['barcodes'][0] ?? '',
@@ -90,7 +91,6 @@ class OzonApiClient
      */
     public function getAllProductsTest(string $clientId, string $apiKey): array
     {
-        $result = [];
         $lastId = '';
         $limit = 1000;
         $productIds = [];
@@ -133,7 +133,8 @@ class OzonApiClient
             foreach (($infoData['items'] ?? []) as $product) {
                 $allProducts[] = [
                     'id'           => $product['id'] ?? '',
-                    'sku'          => $product['offer_id'] ?? '',
+                    'offer_id'          => $product['offer_id'] ?? '',
+                    'sku'          => isset($product['sku']) ? (string)$product['sku'] : '', // sku Ozon, только цифры
                     'name'         => $product['name'] ?? '',
                     'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
                     'barcode'      => $product['barcodes'][0] ?? '',

@@ -33,8 +33,8 @@ readonly class OzonProductSyncService
                 'company' => $company,
             ]) ?? new OzonProduct(id: Uuid::uuid4()->toString(), company: $company);
 
-            $product->setOzonSku($data['sku']);
-            $product->setManufacturerSku($data['manufacturerSku'] ?? '');
+            $product->setOzonSku($data['sku'] ?? '');
+            $product->setManufacturerSku($data['offer_id'] ?? '');
             $product->setName($data['name']);
             $product->setPrice($data['price']);
             $product->setImageUrl($data['image_url']);
