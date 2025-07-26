@@ -22,6 +22,7 @@ readonly class OzonProductSyncService
         );
 
         foreach ($products as $data) {
+
             if ($data['archived']) {
                 continue;
             }

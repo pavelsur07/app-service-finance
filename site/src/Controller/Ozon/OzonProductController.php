@@ -2,6 +2,7 @@
 
 namespace App\Controller\Ozon;
 
+use App\Api\Ozon\OzonApiClient;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Service\Ozon\OzonProductSyncService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,22 @@ class OzonProductController extends AbstractController
             'limit' => $limit,
             'total' => $total,
         ]);
+    }
+
+    #[Route('/ozon/products-test', name: 'ozon_products_test')]
+    public function indexTest(
+        OzonProductRepository $repo,
+        OzonApiClient         $client,
+        Request $request
+    ): Response {
+        $company = $this->getUser()->getCompanies()[0];
+
+        $products = $client->getAllProductsTest(
+            $company->getOzonSellerId(),
+            $company->getOzonApiKey()
+        );
+
+        return $this->json($products);
     }
 
     #[Route('/ozon/products/sync', name: 'ozon_products_sync')]
