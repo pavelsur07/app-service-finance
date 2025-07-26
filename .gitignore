@@ -6,7 +6,7 @@
 # Node artifact files
 node_modules/
 dist/
-/xxx
+/XXX
 # Compiled Java class files
 *.class
 /site/.ready

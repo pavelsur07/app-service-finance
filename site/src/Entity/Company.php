@@ -2,7 +2,9 @@
 
 namespace App\Entity;
 
-use App\Repository\CompanyRepository;
+use App\Entity\Ozon\OzonProduct;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 use App\Entity\User;
@@ -31,14 +33,16 @@ class Company
     #[ORM\JoinColumn(nullable: false)]
     private User $user;
 
-    /**
-     * @param User $user
-     */
+    #[ORM\OneToMany(targetEntity: OzonProduct::class, mappedBy: 'company', orphanRemoval: true)]
+    private Collection $ozonProducts;
+
+
     public function __construct(string $id, User $user)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->user = $user;
+        $this->ozonProducts = new ArrayCollection();
     }
 
 
@@ -64,5 +68,10 @@ class Company
     public function getUser(): ?User { return $this->user; }
     public function setUser(?User $user): self {
         $this->user = $user; return $this;
+    }
+
+    public function getOzonProducts(): Collection
+    {
+        return $this->ozonProducts;
     }
 }
