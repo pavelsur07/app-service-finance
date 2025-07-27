@@ -154,7 +154,11 @@ class OzonApiClient
             'json' => [],
         ]);
 
-        $data = $response->toArray(false);
+        try {
+            $data = $response->toArray(false);
+        } catch (DecodingExceptionInterface) {
+            return [];
+        }
 
         return $data['result'] ?? [];
     }
