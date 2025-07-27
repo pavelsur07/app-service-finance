@@ -3,6 +3,8 @@
 {% block body %}
     <h1>Ozon Товары</h1>
     <a href="{{ path('ozon_products_sync') }}" class="btn btn-primary mb-2">Обновить</a>
+    <a href="{{ path('ozon_products_update_stocks') }}" class="btn btn-primary mb-2">Остатки</a>
+    <a href="{{ path('ozon_products_update_sales') }}" class="btn btn-primary mb-2">Продажи (30 дней)</a>
     <form action="{{ path('ozon_products_clear') }}" method="post" style="display:inline;" onsubmit="return confirm('Точно удалить все товары?');">
         <button type="submit" class="btn btn-danger mb-2">Очистить всё</button>
     </form>

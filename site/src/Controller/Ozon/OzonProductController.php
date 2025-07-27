@@ -5,6 +5,8 @@ namespace App\Controller\Ozon;
 use App\Api\Ozon\OzonApiClient;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Service\Ozon\OzonProductSyncService;
+use App\Service\Ozon\OzonProductStockService;
+use App\Service\Ozon\OzonProductSalesService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -75,6 +77,33 @@ class OzonProductController extends AbstractController
         $em->flush();
 
         $this->addFlash('success', 'Все товары Ozon удалены!');
+        return $this->redirectToRoute('ozon_products');
+    }
+
+    #[Route('/ozon/products/stocks/update', name: 'ozon_products_update_stocks')]
+    public function updateStocks(
+        OzonProductStockService $stockService
+    ): Response {
+        $company = $this->getUser()->getCompanies()[0];
+        $stockService->updateStocks($company);
+        $this->addFlash('success', 'Остатки обновлены!');
+        return $this->redirectToRoute('ozon_products');
+    }
+
+    #[Route('/ozon/products/sales/update', name: 'ozon_products_update_sales')]
+    public function updateSales(
+        OzonProductSalesService $salesService
+    ): Response {
+        $company = $this->getUser()->getCompanies()[0];
+
+        $to = new \DateTimeImmutable('today');
+        $from = $to->modify('-30 days');
+
+        $reportId = $salesService->createSalesReport($company, $from, $to);
+        $rows = $salesService->downloadAndParseReport($company, $reportId);
+        $salesService->saveSales($company, $rows, $from, $to);
+
+        $this->addFlash('success', 'Продажи за 30 дней обновлены!');
         return $this->redirectToRoute('ozon_products');
     }
 }
