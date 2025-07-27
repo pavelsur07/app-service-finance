@@ -146,4 +146,50 @@ class OzonApiClient
 
         return $allProducts;
     }
+
+    public function getStocks(string $clientId, string $apiKey): array
+    {
+        $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v1/product/info/stocks', [
+            'headers' => $this->headers($clientId, $apiKey),
+            'json' => [],
+        ]);
+
+        $data = $response->toArray(false);
+
+        return $data['result'] ?? [];
+    }
+
+    public function createSalesReport(string $clientId, string $apiKey, \DateTimeImmutable $from, \DateTimeImmutable $to): string
+    {
+        $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v1/analytics/create', [
+            'headers' => $this->headers($clientId, $apiKey),
+            'json' => [
+                'date_from' => $from->format('Y-m-d'),
+                'date_to' => $to->format('Y-m-d'),
+                'metrics' => ['sku', 'sales'],
+                'dimension' => ['sku'],
+                'with_detail' => true,
+            ],
+        ]);
+
+        $data = $response->toArray(false);
+
+        return (string) ($data['result']['task_id'] ?? '');
+    }
+
+    public function downloadSalesReport(string $clientId, string $apiKey, string $taskId): string
+    {
+        $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v1/analytics/report/info', [
+            'headers' => $this->headers($clientId, $apiKey),
+            'json' => ['task_id' => $taskId],
+        ]);
+        $data = $response->toArray(false);
+
+        $url = $data['result']['file'] ?? null;
+        if (!$url) {
+            return '';
+        }
+
+        return $this->http->request('GET', $url)->getContent();
+    }
 }
