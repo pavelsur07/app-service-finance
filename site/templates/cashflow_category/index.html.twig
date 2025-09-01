@@ -2,18 +2,18 @@
 {% block title %}Статьи ДДС{% endblock %}
 
 {% macro render_items(items, level) %}
-    <ul class="list-unstyled">
+    <ul class="list-unstyled mb-0">
     {% for item in items %}
         <li>
-            <div style="margin-left: {{ (level - 1) * 20 }}px;">
-                {{ item.name }}
-                <span class="float-end">
+            <div class="d-flex align-items-center">
+                <span class="flex-grow-1" style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
+                <div class="ms-auto d-flex gap-1 m-0 p-0">
                     <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                    <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
+                    <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="m-0" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
                         <button class="btn btn-sm btn-danger">🗑</button>
                     </form>
-                </span>
+                </div>
             </div>
             {% if item.children|length > 0 %}
                 {{ _self.render_items(item.children, level + 1) }}
