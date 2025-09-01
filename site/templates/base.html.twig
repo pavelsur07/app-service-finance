@@ -56,6 +56,11 @@
                             <span class="nav-link-title">Компании</span>
                         </a>
                     </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ path('cashflow_category_index') }}">
+                            <span class="nav-link-title">ДДС</span>
+                        </a>
+                    </li>
                 </ul>
                 {% if app.user and app.user.companies|length > 0 %}
                     <form method="post" action="{{ path('company_set_active') }}">
