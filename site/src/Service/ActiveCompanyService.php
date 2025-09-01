@@ -5,7 +5,7 @@ namespace App\Service;
 use App\Entity\Company;
 use App\Repository\CompanyRepository;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\Security\Core\Security;
+use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ActiveCompanyService
