@@ -1,0 +1,22 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Accounts{% endblock %}
+
+{% block body %}
+<h1>Money Accounts</h1>
+<table class="table">
+    <thead>
+        <tr><th>Name</th><th>Type</th><th>Currency</th></tr>
+    </thead>
+    <tbody>
+    {% for acc in accounts %}
+        <tr>
+            <td>{{ acc.name }}</td>
+            <td>{{ acc.type.value }}</td>
+            <td>{{ acc.currency }}</td>
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+<a href="{{ path('money_account_new') }}" class="btn btn-primary">Create</a>
+{% endblock %}

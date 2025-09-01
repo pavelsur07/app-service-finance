@@ -1,0 +1,72 @@
+<?php
+
+namespace App\Repository;
+
+use App\Entity\Company;
+use App\Entity\MoneyAccount;
+use App\Enum\MoneyAccountType;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+use Ramsey\Uuid\UuidInterface;
+
+/**
+ * @extends ServiceEntityRepository<MoneyAccount>
+ */
+class MoneyAccountRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, MoneyAccount::class);
+    }
+
+    /**
+     * @return MoneyAccount[]
+     */
+    public function findByFilters(Company $company, ?MoneyAccountType $type, ?array $currencies, ?bool $active, ?string $q, array $sort): array
+    {
+        $qb = $this->createQueryBuilder('m')
+            ->andWhere('m.company = :company')
+            ->setParameter('company', $company);
+
+        if ($type) {
+            $qb->andWhere('m.type = :type')->setParameter('type', $type);
+        }
+
+        if ($currencies) {
+            $qb->andWhere('m.currency IN (:currencies)')->setParameter('currencies', $currencies);
+        }
+
+        if ($active !== null) {
+            $qb->andWhere('m.isActive = :active')->setParameter('active', $active);
+        }
+
+        if ($q) {
+            $qb->andWhere('LOWER(m.name) LIKE :q OR LOWER(m.bankName) LIKE :q OR LOWER(m.accountNumber) LIKE :q OR LOWER(m.walletId) LIKE :q')
+               ->setParameter('q', '%'.strtolower($q).'%');
+        }
+
+        foreach ($sort as $field => $direction) {
+            $qb->addOrderBy('m.'.$field, $direction);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    public function unsetDefaultForCurrency(Company $company, string $currency, ?UuidInterface $exceptId = null): void
+    {
+        $qb = $this->createQueryBuilder('m')
+            ->update()
+            ->set('m.isDefault', ':false')
+            ->andWhere('m.company = :company')
+            ->andWhere('m.currency = :currency')
+            ->setParameter('false', false)
+            ->setParameter('company', $company)
+            ->setParameter('currency', strtoupper($currency));
+
+        if ($exceptId) {
+            $qb->andWhere('m.id != :except')->setParameter('except', $exceptId->toString());
+        }
+
+        $qb->getQuery()->execute();
+    }
+}
