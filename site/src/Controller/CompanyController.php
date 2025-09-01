@@ -25,6 +25,21 @@ class CompanyController extends AbstractController
         ]);
     }
 
+    #[Route('/active', name: 'company_set_active', methods: ['POST'])]
+    public function setActive(Request $request, CompanyRepository $companyRepository): Response
+    {
+        $id = $request->request->get('company_id');
+        $company = $companyRepository->find($id);
+
+        if (!$company || $company->getUser() !== $this->getUser()) {
+            throw $this->createNotFoundException();
+        }
+
+        $request->getSession()->set('active_company_id', $company->getId());
+
+        return $this->redirect($request->headers->get('referer') ?: $this->generateUrl('app_home_index'));
+    }
+
     #[Route('/new', name: 'company_new', methods: ['GET', 'POST'])]
     public function new(Request $request, EntityManagerInterface $em): Response
     {
