@@ -5,9 +5,9 @@
     <ul class="list-unstyled">
     {% for item in items %}
         <li>
-            <div style="margin-left: {{ (level - 1) * 20 }}px;">
-                {{ item.name }}
-                <span class="float-end">
+            <div>
+                <span style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
+                <span class="float-end m-0 p-0">
                     <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
                     <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
