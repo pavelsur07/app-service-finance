@@ -1,0 +1,89 @@
+{% extends 'base.html.twig' %}
+{% block title %}Контрагенты{% endblock %}
+
+{% set type_labels = {
+    'LEGAL_ENTITY': 'Юр. лицо',
+    'INDIVIDUAL_ENTREPRENEUR': 'ИП',
+    'SELF_EMPLOYED': 'Самозанятый',
+    'NATURAL_PERSON': 'Физ. лицо'
+} %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Контрагенты</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <form method="get" class="row g-2 mb-3">
+                    <div class="col">
+                        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Поиск...">
+                    </div>
+                    <div class="col">
+                        <select name="type" class="form-select">
+                            <option value="">Все типы</option>
+                            {% for key,label in type_labels %}
+                                <option value="{{ key }}" {% if type == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" name="show_archived" value="1" id="show_archived" {% if show_archived %}checked{% endif %}>
+                            <label class="form-check-label" for="show_archived">Показывать архив</label>
+                        </div>
+                    </div>
+                    <div class="col-auto">
+                        <button class="btn btn-primary" type="submit">Фильтр</button>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <a href="{{ path('counterparty_new') }}" class="btn btn-success">+ Добавить</a>
+                    </div>
+                </form>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Наименование</th>
+                            <th>ИНН</th>
+                            <th>Тип</th>
+                            <th>Статус</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td>{{ item.name }}</td>
+                            <td>{{ item.inn }}</td>
+                            <td>{{ type_labels[item.type.value] }}</td>
+                            <td>{{ item.isArchived ? 'В архиве' : 'Активен' }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('counterparty_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                {% if item.isArchived %}
+                                    <form method="post" action="{{ path('counterparty_unarchive', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Разархивировать?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('unarchive' ~ item.id) }}">
+                                        <button class="btn btn-sm btn-secondary">♻️</button>
+                                    </form>
+                                {% else %}
+                                    <form method="post" action="{{ path('counterparty_archive', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Архивировать?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('archive' ~ item.id) }}">
+                                        <button class="btn btn-sm btn-danger">🗄</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="5" class="text-center">Нет данных</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
