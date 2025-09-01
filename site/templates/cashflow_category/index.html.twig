@@ -5,11 +5,11 @@
     <ul class="list-unstyled">
     {% for item in items %}
         <li>
-            <div>
+            <div class="d-flex align-items-center">
                 <span style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
-                <span class="float-end m-0 p-0">
+                <span class="ms-auto d-inline-flex gap-1">
                     <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                    <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
+                    <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
                         <button class="btn btn-sm btn-danger">🗑</button>
                     </form>
