@@ -19,12 +19,24 @@ class ActiveCompanyService
 
     public function getActiveCompany(): Company
     {
-        $id = $this->requestStack->getSession()->get('active_company_id');
-        $company = $this->companyRepository->find($id);
+        $session = $this->requestStack->getSession();
+        $id = $session->get('active_company_id');
         $user = $this->security->getUser();
-        if (!$company || $company->getUser() !== $user) {
+
+        if ($id) {
+            $company = $this->companyRepository->find($id);
+            if ($company && $company->getUser() === $user) {
+                return $company;
+            }
+        }
+
+        $company = $this->companyRepository->findOneBy(['user' => $user]);
+        if (!$company) {
             throw new NotFoundHttpException();
         }
+
+        $session->set('active_company_id', $company->getId());
+
         return $company;
     }
 }
