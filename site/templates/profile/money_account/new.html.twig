@@ -1,0 +1,8 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}New Account{% endblock %}
+
+{% block body %}
+<h1>New Money Account</h1>
+{% include 'profile/money_account/_form.html.twig' with {'form': form} %}
+{% endblock %}
