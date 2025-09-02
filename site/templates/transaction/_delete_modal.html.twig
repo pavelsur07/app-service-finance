@@ -1,0 +1,21 @@
+<div class="modal fade" id="delete-modal-{{ tx.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Подтверждение</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Удалить транзакцию безвозвратно?
+            </div>
+            <div class="modal-footer">
+                <form method="post" action="{{ path('cash_transaction_delete', {id: tx.id}) }}">
+                    <input type="hidden" name="_token" value="{{ csrf_token('tx_delete' ~ tx.id) }}">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-danger">Удалить</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+

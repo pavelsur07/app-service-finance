@@ -1,0 +1,16 @@
+{% if breadcrumbs is defined and breadcrumbs %}
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            {% for crumb in breadcrumbs %}
+                <li class="breadcrumb-item{% if loop.last %} active{% endif %}">
+                    {% if crumb.path is defined and crumb.path and not loop.last %}
+                        <a href="{{ path(crumb.path) }}">{{ crumb.label }}</a>
+                    {% else %}
+                        {{ crumb.label }}
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    </nav>
+{% endif %}
+

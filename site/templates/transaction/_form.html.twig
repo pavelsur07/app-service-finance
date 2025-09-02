@@ -1,0 +1,55 @@
+{{ form_start(form) }}
+<input type="hidden" name="_token" value="{{ csrf_token('tx_form' ~ (tx.id|default('new'))) }}">
+<div class="card">
+    <div class="card-body">
+        <div class="mb-3">
+            {{ form_label(form.occurredAt, 'Дата', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.occurredAt, {'attr': {'class': 'form-control'}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.occurredAt) }}</div>
+        </div>
+        <div class="mb-3">
+            {{ form_label(form.moneyAccount, 'Счет', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.moneyAccount, {'attr': {'class': 'form-select'}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.moneyAccount) }}</div>
+        </div>
+        <div class="mb-3">
+            {{ form_label(form.direction, 'Направление', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.direction, {'attr': {'class': 'form-select'}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.direction) }}</div>
+        </div>
+        <div class="row g-2">
+            <div class="col-md-6">
+                {{ form_label(form.amount, 'Сумма', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.amount, {'attr': {'class': 'form-control', 'step': '0.01'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.amount) }}</div>
+            </div>
+            <div class="col-md-6">
+                {{ form_label(form.currency, 'Валюта', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.currency, {'attr': {'class': 'form-control', 'readonly': true}}) }}
+            </div>
+        </div>
+        <div class="mb-3">
+            {{ form_label(form.cashflowCategory, 'Статья ДДС', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.cashflowCategory, {'attr': {'class': 'form-select'}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.cashflowCategory) }}</div>
+        </div>
+        <div class="mb-3">
+            {{ form_label(form.counterparty, 'Контрагент', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.counterparty, {'attr': {'class': 'form-select'}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.counterparty) }}</div>
+        </div>
+        <div class="mb-3">
+            {{ form_label(form.description, 'Описание', {'label_attr': {'class': 'form-label'}}) }}
+            {{ form_widget(form.description, {'attr': {'class': 'form-control', 'rows': 3}}) }}
+            <div class="invalid-feedback d-block">{{ form_errors(form.description) }}</div>
+        </div>
+    </div>
+    <div class="card-footer text-end">
+        <button class="btn btn-primary" type="submit">Сохранить</button>
+        <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">Отмена</a>
+    </div>
+</div>
+{{ form_end(form, {'render_rest': false}) }}
+
+{% block scripts %}{% endblock %}
+
