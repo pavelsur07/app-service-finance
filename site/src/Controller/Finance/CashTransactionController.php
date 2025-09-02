@@ -143,7 +143,7 @@ class CashTransactionController extends AbstractController
         $dto = new CashTransactionDTO();
         $dto->occurredAt = new \DateTimeImmutable('today');
 
-        $form = $this->createFormBuilder($dto)
+        $form = $this->createFormBuilder($dto, ['csrf_protection' => false])
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $accountRepo->findBy(['company' => $company]),
@@ -236,7 +236,7 @@ class CashTransactionController extends AbstractController
         $dto->amount = $tx->getAmount();
         $dto->direction = $tx->getDirection();
 
-        $form = $this->createFormBuilder($dto)
+        $form = $this->createFormBuilder($dto, ['csrf_protection' => false])
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $accountRepo->findBy(['company' => $company]),
