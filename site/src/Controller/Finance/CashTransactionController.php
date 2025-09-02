@@ -150,6 +150,7 @@ class CashTransactionController extends AbstractController
                 'choice_label' => fn(MoneyAccount $a) => $a->getName(),
                 'choice_value' => 'id',
                 'choice_attr' => fn(MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
+                'mapped' => false,
             ])
             ->add('direction', ChoiceType::class, [
                 'choices' => ['Приток' => CashDirection::INFLOW, 'Отток' => CashDirection::OUTFLOW],
@@ -164,12 +165,14 @@ class CashTransactionController extends AbstractController
                 'choices' => $categoryRepo->findBy(['company' => $company], ['sort' => 'ASC']),
                 'choice_label' => fn(CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
                 'choice_value' => 'id',
+                'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [
                 'required' => false,
                 'choices' => $counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']),
                 'choice_label' => 'name',
                 'choice_value' => 'id',
+                'mapped' => false,
             ])
             ->add('description', TextareaType::class, ['required' => false])
             ->getForm();
@@ -238,6 +241,7 @@ class CashTransactionController extends AbstractController
                 'choice_value' => 'id',
                 'choice_attr' => fn(MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
                 'data' => $tx->getMoneyAccount(),
+                'mapped' => false,
             ])
             ->add('direction', ChoiceType::class, [
                 'choices' => ['Приток' => CashDirection::INFLOW, 'Отток' => CashDirection::OUTFLOW],
@@ -254,6 +258,7 @@ class CashTransactionController extends AbstractController
                 'choice_label' => fn(CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
                 'choice_value' => 'id',
                 'data' => $tx->getCashflowCategory(),
+                'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [
                 'required' => false,
@@ -261,6 +266,7 @@ class CashTransactionController extends AbstractController
                 'choice_label' => 'name',
                 'choice_value' => 'id',
                 'data' => $tx->getCounterparty(),
+                'mapped' => false,
             ])
             ->add('description', TextareaType::class, ['required' => false, 'data' => $tx->getDescription()])
             ->getForm();
