@@ -14,13 +14,6 @@
 {% block content %}
 <div class="d-flex align-items-center mb-3">
     <h2 class="page-title">Транзакции (ДДС)</h2>
-    <form method="post" action="{{ path('company_set_active') }}" class="ms-3">
-        <select name="company_id" class="form-select" onchange="this.form.submit()">
-            {% for c in companies %}
-                <option value="{{ c.id }}" {% if c.id == company.id %}selected{% endif %}>{{ c.name }}</option>
-            {% endfor %}
-        </select>
-    </form>
     <div class="ms-auto d-print-none">
         <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
         <a href="#" class="btn btn-outline-secondary">Импорт</a>
