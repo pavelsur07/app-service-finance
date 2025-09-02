@@ -87,8 +87,11 @@ class CashTransactionController extends AbstractController
 
         $page = max(1, (int)$request->query->get('page', 1));
         $limit = 20;
+
         $qbCount = clone $qb;
+        $qbCount->resetDQLPart('orderBy');
         $total = (int)$qbCount->select('COUNT(t.id)')->getQuery()->getSingleScalarResult();
+
         $qb->setFirstResult(($page-1)*$limit)->setMaxResults($limit);
         $transactions = $qb->getQuery()->getResult();
 
