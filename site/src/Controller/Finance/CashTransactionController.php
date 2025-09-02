@@ -12,6 +12,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
+use App\Repository\CompanyRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -36,9 +37,11 @@ class CashTransactionController extends AbstractController
         CashTransactionRepository $txRepo,
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo
+        CounterpartyRepository $counterpartyRepo,
+        CompanyRepository $companyRepo
     ): Response {
         $company = $this->companyService->getActiveCompany();
+        $companies = $companyRepo->findByUser($this->getUser());
 
         $filters = [
             'dateFrom' => $request->query->get('dateFrom'),
@@ -128,6 +131,8 @@ class CashTransactionController extends AbstractController
             'counterparties' => $counterparties,
             'summary' => $summary,
             'pager' => $pager,
+            'companies' => $companies,
+            'company' => $company,
         ]);
     }
 
