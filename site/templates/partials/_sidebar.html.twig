@@ -1,0 +1,75 @@
+{% set current_route = app.request.attributes.get('_route') %}
+<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{{ path('app_home_index') }}">Финансы</a>
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+            <ul class="navbar-nav pt-lg-3">
+                <li class="nav-item mb-2">
+                    <span class="nav-link text-uppercase text-muted">Рабочая зона</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-title">Чат-центр</span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3 mb-2">
+                    <span class="nav-link text-uppercase text-muted">Финансы</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_route == 'cash_transaction_index' %}active{% endif %}" href="{{ path('cash_transaction_index') }}">
+                        <span class="nav-link-title">Транзакции (ДДС)</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-title">Остатки по счетам</span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3 mb-2">
+                    <span class="nav-link text-uppercase text-muted">Справочники</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_route == 'money_account_index' %}active{% endif %}" href="{{ path('money_account_index') }}">
+                        <span class="nav-link-title">Счета/Кассы/Кошельки</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_route == 'counterparty_index' %}active{% endif %}" href="{{ path('counterparty_index') }}">
+                        <span class="nav-link-title">Контрагенты</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_route == 'cashflow_category_index' %}active{% endif %}" href="{{ path('cashflow_category_index') }}">
+                        <span class="nav-link-title">Статьи ДДС</span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3 mb-2">
+                    <span class="nav-link text-uppercase text-muted">Отчеты</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-title">Отчет ДДС</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-title">P&amp;L</span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3 mb-2">
+                    <span class="nav-link text-uppercase text-muted">Настройки</span>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <span class="nav-link-title">Профиль компании</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</aside>
+

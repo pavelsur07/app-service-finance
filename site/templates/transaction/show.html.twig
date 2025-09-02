@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+{% block title %}Просмотр транзакции{% endblock %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label':'Главная','path':'app_home_index'},
+            {'label':'Финансы'},
+            {'label':'Транзакции','path':'cash_transaction_index'},
+            {'label':'Просмотр'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <dl class="row">
+            <dt class="col-md-3">Дата</dt><dd class="col-md-9">{{ tx.occurredAt|date('d.m.Y') }}</dd>
+            <dt class="col-md-3">Счет</dt><dd class="col-md-9">{{ tx.moneyAccount.name }}</dd>
+            <dt class="col-md-3">Направление</dt><dd class="col-md-9"><span class="badge bg-{{ tx.direction == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction == 'INFLOW' ? 'Приток' : 'Отток' }}</span></dd>
+            <dt class="col-md-3">Сумма</dt><dd class="col-md-9 text-end">{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</dd>
+            <dt class="col-md-3">Статья</dt><dd class="col-md-9">{% set chain = [] %}{% set c = tx.cashflowCategory %}{% for i in 0..10 if c %}{% set chain = [c.name]|merge(chain) %}{% set c = c.parent %}{% endfor %}{{ chain|join(' / ') }}</dd>
+            <dt class="col-md-3">Контрагент</dt><dd class="col-md-9">{{ tx.counterparty ? tx.counterparty.name : '' }}</dd>
+            <dt class="col-md-3">Описание</dt><dd class="col-md-9">{{ tx.description }}</dd>
+        </dl>
+    </div>
+    <div class="card-footer text-end">
+        <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-warning">Редактировать</a>
+        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#delete-modal-{{ tx.id }}">Удалить</button>
+        <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">Назад к списку</a>
+    </div>
+</div>
+{{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
+{% endblock %}
+
