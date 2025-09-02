@@ -179,7 +179,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid() && $this->isCsrfTokenValid('tx_formnew', $request->request->get('_token'))) {
+        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_formnew', $request->request->get('_token'))) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
@@ -190,9 +190,12 @@ class CashTransactionController extends AbstractController
             $cp = $form->get('counterparty')->getData();
             $data->cashflowCategoryId = $cat?->getId();
             $data->counterpartyId = $cp?->getId();
-            $service->add($data);
-            $this->addFlash('success', 'Транзакция добавлена');
-            return $this->redirectToRoute('cash_transaction_index');
+
+            if ($form->isValid()) {
+                $service->add($data);
+                $this->addFlash('success', 'Транзакция добавлена');
+                return $this->redirectToRoute('cash_transaction_index');
+            }
         }
 
         return $this->render('transaction/new.html.twig', [
@@ -273,7 +276,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid() && $this->isCsrfTokenValid('tx_form'.$tx->getId(), $request->request->get('_token'))) {
+        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_form'.$tx->getId(), $request->request->get('_token'))) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
@@ -284,9 +287,12 @@ class CashTransactionController extends AbstractController
             $cp = $form->get('counterparty')->getData();
             $data->cashflowCategoryId = $cat?->getId();
             $data->counterpartyId = $cp?->getId();
-            $service->update($tx, $data);
-            $this->addFlash('success', 'Транзакция обновлена');
-            return $this->redirectToRoute('cash_transaction_index');
+
+            if ($form->isValid()) {
+                $service->update($tx, $data);
+                $this->addFlash('success', 'Транзакция обновлена');
+                return $this->redirectToRoute('cash_transaction_index');
+            }
         }
 
         return $this->render('transaction/edit.html.twig', [
