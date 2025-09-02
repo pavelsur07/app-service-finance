@@ -143,7 +143,7 @@ class CashTransactionController extends AbstractController
         $dto = new CashTransactionDTO();
         $dto->occurredAt = new \DateTimeImmutable('today');
 
-        $form = $this->createFormBuilder($dto, ['csrf_protection' => false])
+        $form = $this->createFormBuilder($dto)
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $accountRepo->findBy(['company' => $company]),
@@ -179,7 +179,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_formnew', $request->request->get('_token'))) {
+        if ($form->isSubmitted()) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
@@ -236,7 +236,7 @@ class CashTransactionController extends AbstractController
         $dto->amount = $tx->getAmount();
         $dto->direction = $tx->getDirection();
 
-        $form = $this->createFormBuilder($dto, ['csrf_protection' => false])
+        $form = $this->createFormBuilder($dto)
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $accountRepo->findBy(['company' => $company]),
@@ -276,7 +276,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_form'.$tx->getId(), $request->request->get('_token'))) {
+        if ($form->isSubmitted()) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
