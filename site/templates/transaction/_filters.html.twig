@@ -27,7 +27,12 @@
                     <select name="categoryId" class="form-select">
                         <option value="">Все</option>
                         {% for c in categories %}
-                            <option value="{{ c.id }}" {% if filters.categoryId == c.id %}selected{% endif %}>{{ ('&nbsp;&nbsp;'|raw)|repeat(c.level-1) }}{{ c.name }}</option>
+                            <option value="{{ c.id }}" {% if filters.categoryId == c.id %}selected{% endif %}>
+                                {% if c.level > 1 %}
+                                    {% for i in 1..(c.level - 1) %}&nbsp;&nbsp;{% endfor %}
+                                {% endif %}
+                                {{ c.name }}
+                            </option>
                         {% endfor %}
                     </select>
                 </div>
