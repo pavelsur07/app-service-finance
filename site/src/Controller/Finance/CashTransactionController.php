@@ -179,7 +179,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_formnew', $request->request->get('_token'))) {
+        if ($form->isSubmitted()) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
@@ -276,7 +276,7 @@ class CashTransactionController extends AbstractController
 
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $this->isCsrfTokenValid('tx_form'.$tx->getId(), $request->request->get('_token'))) {
+        if ($form->isSubmitted()) {
             /** @var CashTransactionDTO $data */
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
