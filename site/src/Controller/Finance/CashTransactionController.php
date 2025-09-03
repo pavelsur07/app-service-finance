@@ -159,6 +159,7 @@ class CashTransactionController extends AbstractController
             ->add('currency', ChoiceType::class, [
                 'choices' => ['RUB' => 'RUB'],
                 'disabled' => true,
+                'mapped' => false,
             ])
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
