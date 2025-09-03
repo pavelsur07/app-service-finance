@@ -3,7 +3,7 @@ init: docker-down-clear site-clear docker-up site-init
 docker-up:
 	docker-compose up -d
 down:
-	docker-compose -f down -v --remove-orphans
+	docker-compose down --remove-orphans
 docker-down-clear:
 	docker-compose down -v --remove-orphans
 docker-pull:

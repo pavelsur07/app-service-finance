@@ -12,6 +12,7 @@ use App\Enum\CashDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
 
 class CashTransactionService
@@ -22,6 +23,9 @@ class CashTransactionService
         private CashTransactionRepository $txRepo
     ) {}
 
+    /**
+     * @throws ORMException
+     */
     public function add(CashTransactionDTO $dto): CashTransaction
     {
         $company = $this->em->getReference(Company::class, $dto->companyId);

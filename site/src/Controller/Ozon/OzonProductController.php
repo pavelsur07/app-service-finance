@@ -3,6 +3,7 @@
 namespace App\Controller\Ozon;
 
 use App\Api\Ozon\OzonApiClient;
+use App\Entity\Company;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Service\Ozon\OzonProductSyncService;
 use App\Service\Ozon\OzonProductStockService;
@@ -43,12 +44,17 @@ class OzonProductController extends AbstractController
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
 
-        $products = $client->getAllProductsTest(
-            $company->getOzonSellerId(),
-            $company->getOzonApiKey()
-        );
+        $to = new \DateTimeImmutable('today');
+        $from = $to->modify('-30 days');
 
-        return $this->json($products);
+        /*$sale = $client->createRealizationReport(
+            clientId: $company->getOzonSellerId(),
+            apiKey: $company->getOzonApiKey(),
+            from: $from,
+            to: $to
+        );*/
+
+        return $this->json($client->test($company->getOzonSellerId(),$company->getOzonApiKey(), $from, $to));
     }
 
     #[Route('/ozon/products/sync', name: 'ozon_products_sync')]

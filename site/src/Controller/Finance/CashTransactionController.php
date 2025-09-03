@@ -14,6 +14,7 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
+use Doctrine\ORM\Exception\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
@@ -57,7 +58,7 @@ class CashTransactionController extends AbstractController
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'DESC');
 
-        if ($filters['dateFrom']) {
+       /* if ($filters['dateFrom']) {
             $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
         }
         if ($filters['dateTo']) {
@@ -83,7 +84,7 @@ class CashTransactionController extends AbstractController
         }
         if ($filters['q']) {
             $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
-        }
+        }*/
 
         $page = max(1, (int)$request->query->get('page', 1));
         $limit = 20;
@@ -131,6 +132,9 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
+    /**
+     * @throws ORMException
+     */
     #[Route('/new', name: 'cash_transaction_new', methods: ['GET','POST'])]
     public function new(
         Request $request,
@@ -191,7 +195,6 @@ class CashTransactionController extends AbstractController
             $cp = $form->get('counterparty')->getData();
             $data->cashflowCategoryId = $cat?->getId();
             $data->counterpartyId = $cp?->getId();
-
             if ($form->isValid()) {
                 $service->add($data);
                 $this->addFlash('success', 'Транзакция добавлена');

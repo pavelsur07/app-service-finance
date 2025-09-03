@@ -3,10 +3,11 @@
 namespace App\Entity;
 
 use App\Enum\CashDirection;
+use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity(repositoryClass: \App\Repository\CashTransactionRepository::class)]
+#[ORM\Entity(repositoryClass: CashTransactionRepository::class)]
 #[ORM\Table(name: 'cash_transaction')]
 #[ORM\Index(name: 'idx_company_account_occurred', columns: ['company_id', 'money_account_id', 'occurred_at'])]
 #[ORM\Index(name: 'idx_company_occurred', columns: ['company_id', 'occurred_at'])]
@@ -57,7 +58,15 @@ class CashTransaction
     #[ORM\Column(type: 'datetime')]
     private \DateTimeInterface $updatedAt;
 
-    public function __construct(string $id, Company $company, MoneyAccount $account, CashDirection $direction, string $amount, string $currency, \DateTimeImmutable $occurredAt)
+    public function __construct(
+        string $id,
+        Company $company,
+        MoneyAccount $account,
+        CashDirection $direction,
+        string $amount,
+        string $currency,
+        \DateTimeImmutable $occurredAt
+    )
     {
         Assert::uuid($id);
         $this->id = $id;
