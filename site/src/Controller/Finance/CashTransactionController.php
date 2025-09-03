@@ -255,6 +255,9 @@ class CashTransactionController extends AbstractController
             ->add('currency', ChoiceType::class, [
                 'choices' => [$tx->getCurrency() => $tx->getCurrency()],
                 'disabled' => true,
+                // поле валюты отображается только для пользователя
+                // и не должно изменять данные DTO
+                'mapped' => false,
             ])
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
