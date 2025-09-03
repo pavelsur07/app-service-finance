@@ -29,9 +29,30 @@ class CashTransactionService
         if ($dto->currency !== $account->getCurrency()) {
             throw new CurrencyMismatchException();
         }
-        $tx = new CashTransaction(Uuid::uuid4()->toString(), $company, $account, $dto->direction, $dto->amount, $dto->currency, $dto->occurredAt);
+        $tx = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $account,
+            $dto->direction,
+            $dto->amount,
+            $dto->currency,
+            $dto->occurredAt
+        );
+
+        $counterparty = $dto->counterpartyId
+            ? $this->em->getReference(Counterparty::class, $dto->counterpartyId)
+            : null;
+        $category = $dto->cashflowCategoryId
+            ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
+            : null;
+
+        $tx
+            ->setDescription($dto->description)
+            ->setCounterparty($counterparty)
+            ->setCashflowCategory($category);
+
         $this->em->persist($tx);
-        $from = $dto->occurredAt->setTime(0,0);
+        $from = $dto->occurredAt->setTime(0, 0);
         $to = new \DateTimeImmutable('today');
         $this->em->flush();
         $this->balanceService->recalculateDailyRange($company, $account, $from, $to);
