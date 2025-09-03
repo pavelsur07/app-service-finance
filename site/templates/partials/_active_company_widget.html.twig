@@ -1,0 +1,10 @@
+{% if app.user %}
+    {% set activeCompanyId = app.session.get('active_company_id') %}
+    <form action="{{ path('company_set_active') }}" method="post" class="ms-3">
+        <select name="company_id" class="form-select" onchange="this.form.submit()">
+            {% for company in app.user.companies %}
+                <option value="{{ company.id }}" {% if company.id == activeCompanyId %}selected{% endif %}>{{ company.name }}</option>
+            {% endfor %}
+        </select>
+    </form>
+{% endif %}

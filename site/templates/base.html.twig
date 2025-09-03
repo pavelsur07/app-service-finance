@@ -13,8 +13,9 @@
     {% include 'partials/_sidebar.html.twig' %}
     <div class="page-wrapper">
         <header class="navbar navbar-expand-md d-print-none">
-            <div class="container-xl">
+            <div class="container-xl d-flex justify-content-between align-items-center">
                 <h1 class="navbar-brand">Сервис</h1>
+                {% include 'partials/_active_company_widget.html.twig' %}
             </div>
         </header>
         <div class="page-body">
