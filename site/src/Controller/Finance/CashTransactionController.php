@@ -12,6 +12,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
+use App\Form\CashTransactionType;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\Exception\ORMException;
@@ -138,49 +139,13 @@ class CashTransactionController extends AbstractController
     #[Route('/new', name: 'cash_transaction_new', methods: ['GET','POST'])]
     public function new(
         Request $request,
-        CashTransactionService $service,
-        MoneyAccountRepository $accountRepo,
-        CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo
+        CashTransactionService $service
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $dto = new CashTransactionDTO();
         $dto->occurredAt = new \DateTimeImmutable('today');
 
-        $form = $this->createFormBuilder($dto)
-            ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
-            ->add('moneyAccount', ChoiceType::class, [
-                'choices' => $accountRepo->findBy(['company' => $company]),
-                'choice_label' => fn(MoneyAccount $a) => $a->getName(),
-                'choice_value' => 'id',
-                'choice_attr' => fn(MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
-                'mapped' => false,
-            ])
-            ->add('direction', ChoiceType::class, [
-                'choices' => ['Приток' => CashDirection::INFLOW, 'Отток' => CashDirection::OUTFLOW],
-            ])
-            ->add('amount', NumberType::class, ['scale' => 2])
-            ->add('currency', ChoiceType::class, [
-                'choices' => ['RUB' => 'RUB'],
-                'disabled' => true,
-                'mapped' => false,
-            ])
-            ->add('cashflowCategory', ChoiceType::class, [
-                'required' => false,
-                'choices' => $categoryRepo->findBy(['company' => $company], ['sort' => 'ASC']),
-                'choice_label' => fn(CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
-                'choice_value' => 'id',
-                'mapped' => false,
-            ])
-            ->add('counterparty', ChoiceType::class, [
-                'required' => false,
-                'choices' => $counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']),
-                'choice_label' => 'name',
-                'choice_value' => 'id',
-                'mapped' => false,
-            ])
-            ->add('description', TextareaType::class, ['required' => false])
-            ->getForm();
+        $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company]);
 
         $form->handleRequest($request);
 
@@ -189,8 +154,8 @@ class CashTransactionController extends AbstractController
             $data = $form->getData();
             $account = $form->get('moneyAccount')->getData();
             $data->companyId = $company->getId();
-            $data->moneyAccountId = $account->getId();
-            $data->currency = $account->getCurrency();
+            $data->moneyAccountId = $account?->getId();
+            $data->currency = $account?->getCurrency();
             $cat = $form->get('cashflowCategory')->getData();
             $cp = $form->get('counterparty')->getData();
             $data->cashflowCategoryId = $cat?->getId();
