@@ -17,6 +17,8 @@ use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class CashTransactionType extends AbstractType
@@ -66,6 +68,22 @@ class CashTransactionType extends AbstractType
                 'mapped' => false,
             ])
             ->add('description', TextareaType::class, ['required' => false]);
+
+        $builder->addEventListener(FormEvents::SUBMIT, function (FormEvent $event) use ($company) {
+            /** @var CashTransactionDTO $data */
+            $data = $event->getData();
+            $form = $event->getForm();
+            $account = $form->get('moneyAccount')->getData();
+
+            $data->companyId = $company?->getId();
+            $data->moneyAccountId = $account?->getId();
+            $data->currency = $account?->getCurrency();
+
+            $cat = $form->get('cashflowCategory')->getData();
+            $cp = $form->get('counterparty')->getData();
+            $data->cashflowCategoryId = $cat?->getId();
+            $data->counterpartyId = $cp?->getId();
+        }, 1);
     }
 
     public function configureOptions(OptionsResolver $resolver): void
