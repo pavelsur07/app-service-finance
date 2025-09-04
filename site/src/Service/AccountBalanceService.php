@@ -9,6 +9,7 @@ use App\Entity\MoneyAccount;
 use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use Ramsey\Uuid\Uuid;
+use Doctrine\Common\Collections\ArrayCollection;
 
 class AccountBalanceService
 {
@@ -47,7 +48,7 @@ class AccountBalanceService
         $snapshots = $this->balanceRepo->createQueryBuilder('b')
             ->where('b.company = :c')->andWhere('b.moneyAccount = :a')
             ->andWhere('b.date BETWEEN :f AND :t')
-            ->setParameters(['c'=>$company,'a'=>$account,'f'=>$from,'t'=>$to])
+            ->setParameters(new ArrayCollection(['c'=>$company,'a'=>$account,'f'=>$from,'t'=>$to]))
             ->orderBy('b.date','ASC')
             ->getQuery()->getResult();
         $balances = [];
