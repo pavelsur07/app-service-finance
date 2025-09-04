@@ -7,7 +7,6 @@ use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
-use Doctrine\Common\Collections\ArrayCollection;
 
 class CashTransactionRepository extends ServiceEntityRepository
 {
@@ -28,12 +27,12 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->where('t.company = :company')
             ->andWhere('t.moneyAccount = :account')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->setParameters(new ArrayCollection([
+            ->setParameters([
                 'company' => $company,
                 'account' => $account,
                 'from' => $from->setTime(0,0),
                 'to' => $to->setTime(23,59,59),
-            ]))
+            ])
             ->groupBy('date')
             ->orderBy('date', 'ASC');
         return $qb->getQuery()->getArrayResult();
