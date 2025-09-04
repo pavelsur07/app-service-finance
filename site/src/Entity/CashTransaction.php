@@ -84,6 +84,7 @@ class CashTransaction
     public function getId(): ?string { return $this->id; }
     public function getCompany(): Company { return $this->company; }
     public function getMoneyAccount(): MoneyAccount { return $this->moneyAccount; }
+    public function setMoneyAccount(MoneyAccount $a): self { $this->moneyAccount = $a; return $this; }
     public function getCounterparty(): ?Counterparty { return $this->counterparty; }
     public function setCounterparty(?Counterparty $c): self { $this->counterparty = $c; return $this; }
     public function getCashflowCategory(): ?CashflowCategory { return $this->cashflowCategory; }
