@@ -21,11 +21,9 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->where('b.company = :company')
             ->andWhere('b.moneyAccount = :account')
             ->andWhere('b.date < :date')
-            ->setParameters([
-                'company' => $company,
-                'account' => $account,
-                'date' => $date->setTime(0,0)
-            ])
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('date', $date->setTime(0,0))
             ->orderBy('b.date', 'DESC')
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
