@@ -21,6 +21,8 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -150,24 +152,14 @@ class CashTransactionController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted()) {
-            /** @var CashTransactionDTO $data */
-            $data = $form->getData();
-            $account = $form->get('moneyAccount')->getData();
-            $data->companyId = $company->getId();
-            $data->moneyAccountId = $account?->getId();
-            $data->currency = $account?->getCurrency();
-            $cat = $form->get('cashflowCategory')->getData();
-            $cp = $form->get('counterparty')->getData();
-            $data->cashflowCategoryId = $cat?->getId();
-            $data->counterpartyId = $cp?->getId();
-
             if ($form->isValid()) {
+                /** @var CashTransactionDTO $data */
+                $data = $form->getData();
                 $service->add($data);
                 $this->addFlash('success', 'Транзакция добавлена');
                 return $this->redirectToRoute('cash_transaction_index');
             }
             return $this->json($form->getErrors(true));
-            $this->addFlash('error', 'Транзакция не добавлена'. $form->getErrors(true)[0]);
         }
 
         return $this->render('transaction/new.html.twig', [
@@ -247,23 +239,29 @@ class CashTransactionController extends AbstractController
                 'mapped' => false,
             ])
             ->add('description', TextareaType::class, ['required' => false, 'data' => $tx->getDescription()])
+            ->addEventListener(FormEvents::SUBMIT, function (FormEvent $event) use ($company) {
+                /** @var CashTransactionDTO $data */
+                $data = $event->getData();
+                $form = $event->getForm();
+                $account = $form->get('moneyAccount')->getData();
+
+                $data->companyId = $company->getId();
+                $data->moneyAccountId = $account?->getId();
+                $data->currency = $account?->getCurrency();
+
+                $cat = $form->get('cashflowCategory')->getData();
+                $cp = $form->get('counterparty')->getData();
+                $data->cashflowCategoryId = $cat?->getId();
+                $data->counterpartyId = $cp?->getId();
+            }, 1)
             ->getForm();
 
         $form->handleRequest($request);
 
         if ($form->isSubmitted()) {
-            /** @var CashTransactionDTO $data */
-            $data = $form->getData();
-            $account = $form->get('moneyAccount')->getData();
-            $data->companyId = $company->getId();
-            $data->moneyAccountId = $account->getId();
-            $data->currency = $account->getCurrency();
-            $cat = $form->get('cashflowCategory')->getData();
-            $cp = $form->get('counterparty')->getData();
-            $data->cashflowCategoryId = $cat?->getId();
-            $data->counterpartyId = $cp?->getId();
-
             if ($form->isValid()) {
+                /** @var CashTransactionDTO $data */
+                $data = $form->getData();
                 $service->update($tx, $data);
                 $this->addFlash('success', 'Транзакция обновлена');
                 return $this->redirectToRoute('cash_transaction_index');
