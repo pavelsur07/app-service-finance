@@ -160,11 +160,14 @@ class CashTransactionController extends AbstractController
             $cp = $form->get('counterparty')->getData();
             $data->cashflowCategoryId = $cat?->getId();
             $data->counterpartyId = $cp?->getId();
+
             if ($form->isValid()) {
                 $service->add($data);
                 $this->addFlash('success', 'Транзакция добавлена');
                 return $this->redirectToRoute('cash_transaction_index');
             }
+            return $this->json($form->getErrors(true));
+            $this->addFlash('error', 'Транзакция не добавлена'. $form->getErrors(true)[0]);
         }
 
         return $this->render('transaction/new.html.twig', [
