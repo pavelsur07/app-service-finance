@@ -6,9 +6,7 @@ use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
-use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
-use Doctrine\Common\Collections\ArrayCollection;
 
 class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
 {
@@ -23,11 +21,11 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->where('b.company = :company')
             ->andWhere('b.moneyAccount = :account')
             ->andWhere('b.date < :date')
-            ->setParameters(new ArrayCollection([
+            ->setParameters([
                 'company' => $company,
                 'account' => $account,
                 'date' => $date->setTime(0,0)
-            ]))
+            ])
             ->orderBy('b.date', 'DESC')
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
