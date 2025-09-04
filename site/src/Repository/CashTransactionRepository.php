@@ -27,12 +27,10 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->where('t.company = :company')
             ->andWhere('t.moneyAccount = :account')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
-            ->setParameters([
-                'company' => $company,
-                'account' => $account,
-                'from' => $from->setTime(0,0),
-                'to' => $to->setTime(23,59,59),
-            ])
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
             ->groupBy('date')
             ->orderBy('date', 'ASC');
         return $qb->getQuery()->getArrayResult();
