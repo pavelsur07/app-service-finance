@@ -2,6 +2,7 @@
 
 namespace App\Controller\Finance;
 
+use App\Enum\CashDirection;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
@@ -74,7 +75,10 @@ class ReportCashflowController extends AbstractController
                 continue;
             }
             $amount = (float) $row['amount'];
-            $amount = $row['direction'] === 'OUTFLOW'
+            $direction = $row['direction'] instanceof CashDirection
+                ? $row['direction']->value
+                : $row['direction'];
+            $amount = $direction === CashDirection::OUTFLOW->value
                 ? -abs($amount)
                 : abs($amount);
             $currency = $row['currency'];
