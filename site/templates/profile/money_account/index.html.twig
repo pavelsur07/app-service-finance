@@ -24,6 +24,7 @@
                             <th>Name</th>
                             <th>Type</th>
                             <th>Currency</th>
+                            <th class="w-1"></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -32,10 +33,15 @@
                             <td>{{ acc.name }}</td>
                             <td>{{ acc.type.value }}</td>
                             <td>{{ acc.currency }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('money_account_edit', {'id': acc.id}) }}" class="btn btn-icon" title="Edit">
+                                    <i class="ti ti-pencil"></i>
+                                </a>
+                            </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="3" class="text-center">No accounts.</td>
+                            <td colspan="4" class="text-center">No accounts.</td>
                         </tr>
                     {% endfor %}
                     </tbody>

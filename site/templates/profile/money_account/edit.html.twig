@@ -1,18 +1,18 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}New Account{% endblock %}
+{% block title %}Edit Account{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">New Money Account</h2>
+                    <h2 class="page-title">Edit Money Account</h2>
                 </div>
             </div>
         </div>
     </div>
     <div class="container-xl mt-3">
-        {% include 'profile/money_account/_form.html.twig' with {'form': form, 'button_label': 'Create'} %}
+        {% include 'profile/money_account/_form.html.twig' with {'form': form, 'button_label': 'Update'} %}
     </div>
 {% endblock %}
