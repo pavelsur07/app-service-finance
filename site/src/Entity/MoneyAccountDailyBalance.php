@@ -55,7 +55,7 @@ class MoneyAccountDailyBalance
         $this->closingBalance = $closing;
         $this->currency = strtoupper($currency);
     }
-
+    public function getMoneyAccount(): MoneyAccount { return $this->moneyAccount; }
     public function getDate(): \DateTimeImmutable { return $this->date; }
     public function getOpeningBalance(): string { return $this->openingBalance; }
     public function getInflow(): string { return $this->inflow; }
