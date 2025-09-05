@@ -38,7 +38,7 @@
                         <span class="nav-link-title text-muted"> Отчеты </span>
                     </a>
                     <div class="dropdown-menu">
-                        <a class="dropdown-item " href="#">
+                        <a class="dropdown-item {{ current_route starts with 'report_cashflow' ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}">
                             <span class="nav-link-title">Отчет ДДС</span>
                         </a>
                         <a class="dropdown-item " href="#">
