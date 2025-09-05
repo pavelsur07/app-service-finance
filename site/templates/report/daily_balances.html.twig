@@ -40,8 +40,10 @@
                 <tr>
                     <th>Дата</th>
                     {% for type, accounts in accountsByType %}
-                        {% for acc in accounts if accountCurrencies[acc.id] == currency %}
-                            <th>{{ acc.name }}</th>
+                        {% for acc in accounts %}
+                            {% if accountCurrencies[acc.id] == currency %}
+                                <th>{{ acc.name }}</th>
+                            {% endif %}
                         {% endfor %}
                         <th>Подытог {{ typeLabels[type] }}</th>
                     {% endfor %}
@@ -58,17 +60,21 @@
                         {% for type, accounts in accountsByType %}
                             {% set subtotal = 0 %}
                             {% set prevSubtotal = 0 %}
-                            {% for acc in accounts if accountCurrencies[acc.id] == currency %}
-                                {% set value = dailyBalances[date][acc.id]|default('0') %}
-                                {% set subtotal = subtotal + value %}
-                                {% if prevDate %}{% set prevSubtotal = prevSubtotal + dailyBalances[prevDate][acc.id]|default('0') %}{% endif %}
-                                <td class="text-end">
-                                    {{ value|number_format(2, ',', ' ') }}
+                            {% for acc in accounts %}
+                                {% if accountCurrencies[acc.id] == currency %}
+                                    {% set value = dailyBalances[date][acc.id]|default(0) %}
+                                    {% set subtotal = subtotal + value %}
                                     {% if prevDate %}
-                                        {% set diff = value - (dailyBalances[prevDate][acc.id]|default(0)) %}
-                                        <div class="small text-muted">Δ к вчера: {{ diff|number_format(2, ',', ' ') }}</div>
+                                        {% set prevSubtotal = prevSubtotal + dailyBalances[prevDate][acc.id]|default(0) %}
                                     {% endif %}
-                                </td>
+                                    <td class="text-end">
+                                        {{ value|number_format(2, ',', ' ') }}
+                                        {% if prevDate %}
+                                            {% set diff = value - (dailyBalances[prevDate][acc.id]|default(0)) %}
+                                            <div class="small text-muted">Δ к вчера: {{ diff|number_format(2, ',', ' ') }}</div>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                             {% endfor %}
                             {% set companyTotal = companyTotal + subtotal %}
                             {% if prevDate %}{% set companyPrevTotal = companyPrevTotal + prevSubtotal %}{% endif %}
