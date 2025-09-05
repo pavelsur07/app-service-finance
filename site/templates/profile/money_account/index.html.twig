@@ -3,20 +3,44 @@
 {% block title %}Accounts{% endblock %}
 
 {% block body %}
-<h1>Money Accounts</h1>
-<table class="table">
-    <thead>
-        <tr><th>Name</th><th>Type</th><th>Currency</th></tr>
-    </thead>
-    <tbody>
-    {% for acc in accounts %}
-        <tr>
-            <td>{{ acc.name }}</td>
-            <td>{{ acc.type.value }}</td>
-            <td>{{ acc.currency }}</td>
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-<a href="{{ path('money_account_new') }}" class="btn btn-primary">Create</a>
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Money Accounts</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('money_account_new') }}" class="btn btn-primary">Create</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Type</th>
+                            <th>Currency</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for acc in accounts %}
+                        <tr>
+                            <td>{{ acc.name }}</td>
+                            <td>{{ acc.type.value }}</td>
+                            <td>{{ acc.currency }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="3" class="text-center">No accounts.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
 {% endblock %}
