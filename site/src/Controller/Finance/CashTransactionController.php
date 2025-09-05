@@ -121,7 +121,7 @@ class CashTransactionController extends AbstractController
         ];
 
         $accounts = $accountRepo->findBy(['company' => $company]);
-        $categories = $categoryRepo->findBy(['company' => $company], ['sort' => 'ASC']);
+        $categories = $categoryRepo->findTreeByCompany($company);
         $counterparties = $counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']);
 
         return $this->render('transaction/index.html.twig', [
@@ -232,9 +232,10 @@ class CashTransactionController extends AbstractController
             ])
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
-                'choices' => $categoryRepo->findBy(['company' => $company], ['sort' => 'ASC']),
+                'choices' => $categoryRepo->findTreeByCompany($company),
                 'choice_label' => fn(CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
                 'choice_value' => 'id',
+                'choice_attr' => fn(CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'data' => $tx->getCashflowCategory(),
                 'mapped' => false,
             ])
