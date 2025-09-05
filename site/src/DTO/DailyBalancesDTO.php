@@ -2,6 +2,8 @@
 
 namespace App\DTO;
 
+use function bcadd;
+
 class DailyBalancesDTO
 {
     /** @var list<MoneyBalanceDTO> */
