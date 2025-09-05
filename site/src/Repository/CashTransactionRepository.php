@@ -21,7 +21,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function sumByDay(Company $company, MoneyAccount $account, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $qb = $this->createQueryBuilder('t')
-            ->select("DATE(t.occurredAt) as date",
+            ->select("DATE_FORMAT(t.occurredAt, '%Y-%m-%d') as date",
                 "SUM(CASE WHEN t.direction = 'INFLOW' THEN t.amount ELSE 0 END) as inflow",
                 "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN t.amount ELSE 0 END) as outflow")
             ->where('t.company = :company')
