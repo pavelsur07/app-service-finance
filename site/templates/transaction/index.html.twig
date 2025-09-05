@@ -47,15 +47,7 @@
                     <td>{{ tx.moneyAccount.name }}</td>
                     <td class="text-end"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
-                        {% set chain = [] %}
-                        {% set c = tx.cashflowCategory %}
-                        {% for i in 0..10 %}
-                            {% if c %}
-                                {% set chain = [c.name]|merge(chain) %}
-                                {% set c = c.parent %}
-                            {% endif %}
-                        {% endfor %}
-                        {{ chain|join(' / ') }}
+                        {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
                     </td>
                     <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
                     <td>{{ tx.description }}</td>
