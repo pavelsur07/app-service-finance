@@ -74,9 +74,9 @@ class ReportCashflowController extends AbstractController
                 continue;
             }
             $amount = (float) $row['amount'];
-            if ($row['direction'] === 'OUTFLOW') {
-                $amount = -$amount;
-            }
+            $amount = $row['direction'] === 'OUTFLOW'
+                ? -abs($amount)
+                : abs($amount);
             $currency = $row['currency'];
             $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
             if ($periodIndex === null) {
