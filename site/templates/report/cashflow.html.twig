@@ -40,11 +40,18 @@
 {% set periodCount = periods|length %}
 {% import _self as macros %}
 
+{% macro format_amount(value) %}
+    {% set class = value < 0 ? 'text-danger' : (value > 0 ? 'text-success' : '') %}
+    {% set sign = value > 0 ? '+' : (value < 0 ? '-' : '') %}
+    <span class="{{ class }}">{{ sign }}{{ value|abs|number_format(2, ',', ' ') }}</span>
+{% endmacro %}
+
 {% macro render_category(cat, totals, currency, periodCount) %}
 <tr>
     <td style="padding-left: {{ (cat.level - 1) * 20 }}px">{{ cat.name }}</td>
     {% for i in 0..periodCount-1 %}
-        <td class="text-end">{{ (totals[cat.id].totals[currency][i] ?? 0)|number_format(2, ',', ' ') }}</td>
+        {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
+        <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
     {% endfor %}
 </tr>
 {% for child in cat.children %}
@@ -71,7 +78,7 @@
                     <tr class="fw-bold">
                         <td>Сальдо на начало</td>
                         {% for i in 0..periodCount-1 %}
-                            <td class="text-end">{{ openings[currency][i]|number_format(2, ',', ' ') }}</td>
+                            <td class="text-end">{{ macros.format_amount(openings[currency][i])|raw }}</td>
                         {% endfor %}
                     </tr>
                     {% for cat in categories %}
@@ -80,7 +87,7 @@
                     <tr class="fw-bold">
                         <td>Сальдо на конец</td>
                         {% for i in 0..periodCount-1 %}
-                            <td class="text-end">{{ closings[currency][i]|number_format(2, ',', ' ') }}</td>
+                            <td class="text-end">{{ macros.format_amount(closings[currency][i])|raw }}</td>
                         {% endfor %}
                     </tr>
                 </tbody>
