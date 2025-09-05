@@ -7,6 +7,7 @@ use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Ramsey\Uuid\Uuid;
 
 class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
 {
@@ -42,7 +43,8 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
         $params = [];
         $i = 0;
         foreach ($rows as $row) {
-            $values[] = '(:company'.$i.', :account'.$i.', :date'.$i.', :opening'.$i.', :inflow'.$i.', :outflow'.$i.', :closing'.$i.', :currency'.$i.')';
+            $values[] = '(:id'.$i.', :company'.$i.', :account'.$i.', :date'.$i.', :opening'.$i.', :inflow'.$i.', :outflow'.$i.', :closing'.$i.', :currency'.$i.')';
+            $params['id'.$i] = Uuid::uuid4()->toString();
             $params['company'.$i] = $row['company_id'];
             $params['account'.$i] = $row['money_account_id'];
             $params['date'.$i] = $row['date'];
@@ -53,7 +55,7 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             $params['currency'.$i] = $row['currency'];
             $i++;
         }
-        $sql = 'INSERT INTO money_account_daily_balance (company_id, money_account_id, date, opening_balance, inflow, outflow, closing_balance, currency) VALUES '
+        $sql = 'INSERT INTO money_account_daily_balance (id, company_id, money_account_id, date, opening_balance, inflow, outflow, closing_balance, currency) VALUES '
             . implode(',', $values)
             . ' ON CONFLICT (company_id, money_account_id, date) DO UPDATE SET opening_balance = excluded.opening_balance, inflow = excluded.inflow, outflow = excluded.outflow, closing_balance = excluded.closing_balance, currency = excluded.currency';
         $conn->executeStatement($sql, $params);
