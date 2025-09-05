@@ -8,6 +8,8 @@ use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
+use function bcadd;
+use function bcsub;
 
 class AccountBalanceService
 {
