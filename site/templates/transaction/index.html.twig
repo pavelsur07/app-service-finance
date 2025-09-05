@@ -33,7 +33,6 @@
             <tr>
                 <th>Дата</th>
                 <th>Счет</th>
-                <th>Направление</th>
                 <th class="text-end">Сумма</th>
                 <th>Статья</th>
                 <th>Контрагент</th>
@@ -46,12 +45,7 @@
                 <tr>
                     <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                     <td>{{ tx.moneyAccount.name }}</td>
-                    <td>
-                        <span class="badge bg-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">
-                            {{ tx.direction.value == 'INFLOW' ? 'Приток' : 'Отток' }}
-                        </span>
-                    </td>
-                    <td class="text-end">{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</td>
+                    <td class="text-end"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
                         {% set chain = [] %}
                         {% set c = tx.cashflowCategory %}
@@ -74,7 +68,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="8" class="text-center text-muted">Нет транзакций</td>
+                    <td colspan="7" class="text-center text-muted">Нет транзакций</td>
                 </tr>
             {% endfor %}
             </tbody>
