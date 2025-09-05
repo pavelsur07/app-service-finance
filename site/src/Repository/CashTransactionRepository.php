@@ -22,7 +22,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     {
         $qb = $this->createQueryBuilder('t')
             ->select(
-                'DATE(t.occurredAt) as date',
+                "SUBSTRING(t.occurredAt, 1, 10) as date",
                 "SUM(CASE WHEN t.direction = 'INFLOW' THEN t.amount ELSE 0 END) as inflow",
                 "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN t.amount ELSE 0 END) as outflow"
             )
@@ -33,8 +33,8 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('account', $account)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
-            ->groupBy('DATE(t.occurredAt)')
-            ->orderBy('DATE(t.occurredAt)', 'ASC');
+            ->groupBy("SUBSTRING(t.occurredAt, 1, 10)")
+            ->orderBy("SUBSTRING(t.occurredAt, 1, 10)", 'ASC');
         return $qb->getQuery()->getArrayResult();
     }
 }
