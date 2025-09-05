@@ -18,6 +18,9 @@
         <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
         <a href="#" class="btn btn-outline-secondary">Импорт</a>
         <a href="#" class="btn btn-outline-secondary">Экспорт</a>
+        <form method="post" action="{{ path('cash_transaction_clear') }}" class="d-inline">
+            <button type="submit" class="btn btn-outline-danger">Очистить</button>
+        </form>
     </div>
 </div>
 
