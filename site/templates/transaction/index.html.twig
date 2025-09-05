@@ -44,7 +44,9 @@
                     <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                     <td>{{ tx.moneyAccount.name }}</td>
                     <td>
-                        <span class="badge bg-{{ tx.direction == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction == 'INFLOW' ? 'Приток' : 'Отток' }}</span>
+                        <span class="badge bg-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">
+                            {{ tx.direction.value == 'INFLOW' ? 'Приток' : 'Отток' }}
+                        </span>
                     </td>
                     <td class="text-end">{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</td>
                     <td>
