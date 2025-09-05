@@ -1,0 +1,91 @@
+{% extends 'base.html.twig' %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Отчет ДДС', 'path': 'report_cashflow_index'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+    <h2 class="page-title">Отчет ДДС</h2>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input type="date" name="from" value="{{ date_from|date('Y-m-d') }}" class="form-control"/>
+    </div>
+    <div class="col-auto">
+        <input type="date" name="to" value="{{ date_to|date('Y-m-d') }}" class="form-control"/>
+    </div>
+    <input type="hidden" name="group" value="{{ group }}" id="group-input"/>
+    <div class="col-auto">
+        <div class="btn-group" role="group">
+            <button type="submit" class="btn btn-outline-primary {% if group == 'day' %}active{% endif %}" onclick="document.getElementById('group-input').value='day'">По дням</button>
+            <button type="submit" class="btn btn-outline-primary {% if group == 'week' %}active{% endif %}" onclick="document.getElementById('group-input').value='week'">По неделям</button>
+            <button type="submit" class="btn btn-outline-primary {% if group == 'month' %}active{% endif %}" onclick="document.getElementById('group-input').value='month'">По месяцам</button>
+            <button type="submit" class="btn btn-outline-primary {% if group == 'quarter' %}active{% endif %}" onclick="document.getElementById('group-input').value='quarter'">По кварталам</button>
+            <button type="submit" class="btn btn-outline-primary {% if group == 'year' %}active{% endif %}" onclick="document.getElementById('group-input').value='year'">По годам</button>
+        </div>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Показать</button>
+    </div>
+</form>
+
+{% set periodCount = periods|length %}
+{% import _self as macros %}
+
+{% macro render_category(cat, totals, currency, periodCount) %}
+<tr>
+    <td style="padding-left: {{ (cat.level - 1) * 20 }}px">{{ cat.name }}</td>
+    {% for i in 0..periodCount-1 %}
+        <td class="text-end">{{ (totals[cat.id].totals[currency][i] ?? 0)|number_format(2, ',', ' ') }}</td>
+    {% endfor %}
+</tr>
+{% for child in cat.children %}
+    {{ _self.render_category(child, totals, currency, periodCount) }}
+{% endfor %}
+{% endmacro %}
+
+{% for currency, values in openings %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Валюта: {{ currency }}</h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                    <tr>
+                        <th>Категория</th>
+                        {% for p in periods %}
+                            <th>{{ p.label }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fw-bold">
+                        <td>Сальдо на начало</td>
+                        {% for i in 0..periodCount-1 %}
+                            <td class="text-end">{{ openings[currency][i]|number_format(2, ',', ' ') }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% for cat in categories %}
+                        {{ macros.render_category(cat, categoryTotals, currency, periodCount) }}
+                    {% endfor %}
+                    <tr class="fw-bold">
+                        <td>Сальдо на конец</td>
+                        {% for i in 0..periodCount-1 %}
+                            <td class="text-end">{{ closings[currency][i]|number_format(2, ',', ' ') }}</td>
+                        {% endfor %}
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}
