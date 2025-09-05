@@ -30,4 +30,27 @@ class CashflowCategoryRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Возвращает список категорий в порядке вложенности
+     *
+     * @return CashflowCategory[]
+     */
+    public function findTreeByCompany(Company $company): array
+    {
+        $roots = $this->findRootByCompany($company);
+        $result = [];
+        foreach ($roots as $root) {
+            $this->collectTree($root, $result);
+        }
+        return $result;
+    }
+
+    private function collectTree(CashflowCategory $category, array &$result): void
+    {
+        $result[] = $category;
+        foreach ($category->getChildren() as $child) {
+            $this->collectTree($child, $result);
+        }
+    }
 }

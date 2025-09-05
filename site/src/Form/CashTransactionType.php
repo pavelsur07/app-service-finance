@@ -55,9 +55,10 @@ class CashTransactionType extends AbstractType
             ])
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
-                'choices' => $company ? $this->categoryRepo->findBy(['company' => $company], ['sort' => 'ASC']) : [],
+                'choices' => $company ? $this->categoryRepo->findTreeByCompany($company) : [],
                 'choice_label' => fn (CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
                 'choice_value' => 'id',
+                'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [
