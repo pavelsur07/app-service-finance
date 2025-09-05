@@ -7,6 +7,7 @@ use App\Enum\MoneyAccountType;
 use App\Form\MoneyAccountType as MoneyAccountFormType;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\AccountBalanceService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -55,6 +56,43 @@ class MoneyAccountController extends AbstractController
 
         return $this->render('profile/money_account/new.html.twig', [
             'form' => $form->createView(),
+        ]);
+    }
+
+    #[Route('/{id}/edit', name: 'money_account_edit', methods: ['GET', 'POST'])]
+    public function edit(
+        Request $request,
+        MoneyAccount $account,
+        EntityManagerInterface $em,
+        AccountBalanceService $balanceService
+    ): Response {
+        $form = $this->createForm(MoneyAccountFormType::class, $account);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->flush();
+
+            $company = $account->getCompany();
+            $balanceService->recalculateDailyRange(
+                $company,
+                $account,
+                $account->getOpeningBalanceDate(),
+                new \DateTimeImmutable('today')
+            );
+            $todayBalance = $balanceService->getBalanceOnDate(
+                $company,
+                $account,
+                new \DateTimeImmutable('today')
+            );
+            $account->setCurrentBalance($todayBalance->closing);
+            $em->flush();
+
+            return $this->redirectToRoute('money_account_index');
+        }
+
+        return $this->render('profile/money_account/edit.html.twig', [
+            'form' => $form->createView(),
+            'account' => $account,
         ]);
     }
 }
