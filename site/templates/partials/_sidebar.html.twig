@@ -22,11 +22,15 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {{ current_route starts with 'report_daily_balances' ? 'active' : '' }}" href="{{ path('report_daily_balances_index') }}">
+                        <span class="nav-link-title">Промежуточные итоги (остатки)</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="#">
                         <span class="nav-link-title">Остатки по счетам</span>
                     </a>
                 </li>
-
 
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
@@ -38,7 +42,7 @@
                             <span class="nav-link-title">Отчет ДДС</span>
                         </a>
                         <a class="dropdown-item " href="#">
-                            <span class="nav-link-title">P&amp;L</span>
+                            <span class="nav-link-title">P&L</span>
                         </a>
                     </div>
                 </li>
@@ -62,7 +66,6 @@
                 </li>
 
 
-
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
@@ -78,4 +81,3 @@
         </div>
     </div>
 </aside>
-
