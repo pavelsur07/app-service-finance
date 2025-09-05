@@ -1,0 +1,79 @@
+{% extends 'base.html.twig' %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Остатки по счетам / кассам / кошелькам', 'path': 'report_account_balances_index'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center mb-3">
+    <h2 class="page-title">Остатки по счетам / кассам / кошелькам</h2>
+</div>
+
+<form method="get" class="row g-2 mb-3">
+    <div class="col-auto">
+        <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control"/>
+    </div>
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary">Показать</button>
+    </div>
+</form>
+
+{% set typeLabels = {'bank': 'Банк', 'cash': 'Касса', 'ewallet': 'Кошелёк'} %}
+
+{% for currency, groups in accountsByCurrency %}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">Валюта: {{ currency }}</h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped">
+                <thead>
+                <tr>
+                    <th>Тип</th>
+                    <th>Счёт</th>
+                    <th>Остаток</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for type, accounts in groups %}
+                    {% if accounts|length > 0 %}
+                        {% for account in accounts %}
+                            <tr>
+                                {% if loop.first %}
+                                    <td rowspan="{{ accounts|length }}" class="align-middle">{{ typeLabels[type] }}</td>
+                                {% endif %}
+                                <td>{{ account.name }}</td>
+                                {% set bal = balancesByAccountId[account.id]|default('0') %}
+                                <td class="text-end">{{ bal|number_format(2, '.', ' ') }}</td>
+                            </tr>
+                        {% endfor %}
+                    {% endif %}
+                {% endfor %}
+                <tr>
+                    <td colspan="2" class="text-end">Подытог Банк</td>
+                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.bank|number_format(2, '.', ' ') }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-end">Подытог Касса</td>
+                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.cash|number_format(2, '.', ' ') }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-end">Подытог Кошелёк</td>
+                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|number_format(2, '.', ' ') }}</td>
+                </tr>
+                <tr>
+                    <td colspan="2" class="text-end fw-bold">Итог по компании ({{ currency }})</td>
+                    <td class="text-end fw-bold">{{ totalsByCurrency[currency].totalCompany|number_format(2, '.', ' ') }}</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}
