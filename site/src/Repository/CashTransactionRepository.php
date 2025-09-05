@@ -33,8 +33,8 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('account', $account)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
-            ->groupBy('date')
-            ->orderBy('date', 'ASC');
+            ->groupBy('DATE(t.occurredAt)')
+            ->orderBy('DATE(t.occurredAt)', 'ASC');
         return $qb->getQuery()->getArrayResult();
     }
 }
