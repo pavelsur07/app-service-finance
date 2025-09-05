@@ -66,7 +66,8 @@ class AccountBalanceService
         $txAgg = $this->txRepo->sumByDay($company, $account, $from, $to);
         $map = [];
         foreach ($txAgg as $row) {
-            $map[$row['date']] = $row;
+            $dateKey = $row['date'] instanceof \DateTimeInterface ? $row['date']->format('Y-m-d') : $row['date'];
+            $map[$dateKey] = $row;
         }
         $current = clone $from;
         while ($current <= $to) {
