@@ -135,6 +135,14 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
+    #[Route('/clear', name: 'cash_transaction_clear', methods: ['POST'])]
+    public function clear(CashTransactionService $service): Response
+    {
+        $service->clearAll();
+        $this->addFlash('success', 'Журнал очищен');
+        return $this->redirectToRoute('cash_transaction_index');
+    }
+
     /**
      * @throws ORMException
      */

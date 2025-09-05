@@ -105,4 +105,25 @@ class CashTransactionService
         $this->em->flush();
         $this->balanceService->recalculateDailyRange($company, $account, $from, $to);
     }
+
+    /**
+     * Temporary method used during debugging to wipe all transactions and
+     * rebuild account balances from scratch.
+     */
+    public function clearAll(): void
+    {
+        // remove all transactions and existing daily balance snapshots
+        $this->em->createQuery('DELETE FROM App\\Entity\\CashTransaction t')->execute();
+        $this->em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
+
+        // recalculate balances for every account to ensure snapshots are
+        // recreated with opening values
+        $accounts = $this->em->getRepository(MoneyAccount::class)->findAll();
+        $today = new \DateTimeImmutable('today');
+        foreach ($accounts as $account) {
+            /** @var MoneyAccount $account */
+            $company = $account->getCompany();
+            $this->balanceService->recalculateDailyRange($company, $account, $today, $today);
+        }
+    }
 }

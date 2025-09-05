@@ -105,4 +105,41 @@ class CashTransactionServiceTest extends TestCase
         $this->assertSame($category->getId(), $tx->getCashflowCategory()->getId());
         $this->assertSame($counterparty->getId(), $tx->getCounterparty()->getId());
     }
+
+    public function testClearAllRemovesTransactionsAndRebuildsBalances(): void
+    {
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('t@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('Test');
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $account->setOpeningBalance('100');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $dto = new CashTransactionDTO();
+        $dto->companyId = $company->getId();
+        $dto->moneyAccountId = $account->getId();
+        $dto->direction = CashDirection::INFLOW;
+        $dto->amount = '50';
+        $dto->currency = 'USD';
+        $dto->occurredAt = new \DateTimeImmutable('2024-01-02');
+        $this->txService->add($dto);
+
+        $this->txService->clearAll();
+
+        $this->assertCount(0, $this->em->getRepository(CashTransaction::class)->findAll());
+        $balances = $this->em->getRepository(MoneyAccountDailyBalance::class)->findAll();
+        $this->assertCount(1, $balances);
+        $balance = $balances[0];
+        $this->assertSame('100', $balance->getOpeningBalance());
+        $this->assertSame('0', $balance->getInflow());
+        $this->assertSame('0', $balance->getOutflow());
+        $this->assertSame('100.00', $balance->getClosingBalance());
+    }
 }
