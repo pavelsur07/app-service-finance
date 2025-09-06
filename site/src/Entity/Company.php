@@ -20,6 +20,9 @@ class Company
     #[ORM\Column(length: 255)]
     private ?string $name = null;
 
+    #[ORM\Column(length: 12, nullable: true)]
+    private ?string $inn = null;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $wildberriesApiKey = null;
 
@@ -49,6 +52,9 @@ class Company
     public function getId(): ?string { return $this->id; }
     public function getName(): ?string { return $this->name; }
     public function setName(string $name): self { $this->name = $name; return $this; }
+
+    public function getInn(): ?string { return $this->inn; }
+    public function setInn(?string $inn): self { $this->inn = $inn; return $this; }
 
     public function getWildberriesApiKey(): ?string { return $this->wildberriesApiKey; }
     public function setWildberriesApiKey(?string $wildberriesApiKey): self {

@@ -12,6 +12,11 @@
                     {{ form_errors(form.name) }}
                 </div>
                 <div class="mb-3">
+                    {{ form_label(form.inn) }}
+                    {{ form_widget(form.inn, {'attr': {'class': 'form-control'}}) }}
+                    {{ form_errors(form.inn) }}
+                </div>
+                <div class="mb-3">
                     {{ form_label(form.wildberriesApiKey) }}
                     {{ form_widget(form.wildberriesApiKey, {'attr': {'class': 'form-control'}}) }}
                     {{ form_errors(form.wildberriesApiKey) }}
