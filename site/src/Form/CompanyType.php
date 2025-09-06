@@ -17,6 +17,10 @@ class CompanyType extends AbstractType
                 'label' => 'Наименование компании',
                 'required' => true,
             ])
+            ->add('inn', TextType::class, [
+                'label' => 'ИНН',
+                'required' => false,
+            ])
             ->add('wildberriesApiKey', TextType::class, [
                 'label' => 'Wildberries API ключ',
                 'required' => false,
