@@ -121,11 +121,26 @@ class ReportCashflowController extends AbstractController
         $accounts = $this->accountRepository->findBy(['company' => $company]);
         $openingByCurrency = [];
         foreach ($accounts as $account) {
-            $balance = $this->balanceRepository->findLastBefore($company, $account, $from);
-            if ($balance) {
-                $currency = $account->getCurrency();
-                $openingByCurrency[$currency] = ($openingByCurrency[$currency] ?? 0) + (float) $balance->getClosingBalance();
+            $date = $from->setTime(0, 0);
+            $snapshot = $this->balanceRepository->findOneBy([
+                'company' => $company,
+                'moneyAccount' => $account,
+                'date' => $date,
+            ]);
+
+            if ($snapshot) {
+                $opening = (float) $snapshot->getOpeningBalance();
+            } else {
+                $prev = $this->balanceRepository->findLastBefore($company, $account, $from);
+                if ($prev) {
+                    $opening = (float) $prev->getClosingBalance();
+                } else {
+                    $opening = (float) $account->getOpeningBalance();
+                }
             }
+
+            $currency = $account->getCurrency();
+            $openingByCurrency[$currency] = ($openingByCurrency[$currency] ?? 0) + $opening;
         }
 
         $openings = [];
