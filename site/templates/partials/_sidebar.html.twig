@@ -22,6 +22,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {{ current_route starts with 'document_' ? 'active' : '' }}" href="{{ path('document_index') }}">
+                        <span class="nav-link-title">Документы</span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link {{ current_route starts with 'report_daily_balances' ? 'active' : '' }}" href="{{ path('report_daily_balances_index') }}">
                         <span class="nav-link-title">Промежуточные итоги (остатки)</span>
                     </a>
@@ -61,6 +66,9 @@
                         </a>
                         <a class="dropdown-item {% if current_route == 'cashflow_category_index' %}active{% endif %}" href="{{ path('cashflow_category_index') }}">
                             <span class="nav-link-title">Статьи ДДС</span>
+                        </a>
+                        <a class="dropdown-item {{ current_route starts with 'pl_category_' ? 'active' : '' }}" href="{{ path('pl_category_index') }}">
+                            <span class="nav-link-title">Категории P&amp;L</span>
                         </a>
                     </div>
                 </li>
