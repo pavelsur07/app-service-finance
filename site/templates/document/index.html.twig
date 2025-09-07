@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}Документы{% endblock %}
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Документы</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table card-table">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Номер</th>
+                            <th>Тип</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                            <tr>
+                                <td>{{ item.date|date('Y-m-d H:i') }}</td>
+                                <td>{{ item.number }}</td>
+                                <td>{{ item.type }}</td>
+                                <td class="text-end">
+                                    <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-info">👁</a>
+                                    <a href="{{ path('document_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                    <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                                        <button class="btn btn-sm btn-danger">🗑</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-center">Нет данных</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

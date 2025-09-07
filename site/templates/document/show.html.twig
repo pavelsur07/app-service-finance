@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+{% block title %}Просмотр документа{% endblock %}
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <h2 class="page-title">Документ {{ item.type }}</h2>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-3">Дата</dt>
+                    <dd class="col-sm-9">{{ item.date|date('Y-m-d H:i') }}</dd>
+                    <dt class="col-sm-3">Номер</dt>
+                    <dd class="col-sm-9">{{ item.number }}</dd>
+                    <dt class="col-sm-3">Тип</dt>
+                    <dd class="col-sm-9">{{ item.type }}</dd>
+                    <dt class="col-sm-3">Описание</dt>
+                    <dd class="col-sm-9">{{ item.description }}</dd>
+                </dl>
+                <h4>Операции</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Категория</th>
+                            <th>Сумма</th>
+                            <th>Контрагент</th>
+                            <th>Комментарий</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for op in item.operations %}
+                            <tr>
+                                <td>{{ op.category.name }}</td>
+                                <td>{{ op.amount }}</td>
+                                <td>{{ op.counterparty ? op.counterparty.name : '' }}</td>
+                                <td>{{ op.comment }}</td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="4" class="text-center">Нет операций</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

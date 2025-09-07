@@ -1,0 +1,53 @@
+<?php
+
+namespace App\Entity;
+
+use Doctrine\ORM\Mapping as ORM;
+use Webmozart\Assert\Assert;
+use App\Repository\DocumentOperationRepository;
+use Ramsey\Uuid\Uuid;
+
+#[ORM\Entity(repositoryClass: DocumentOperationRepository::class)]
+#[ORM\Table(name: 'document_operations')]
+class DocumentOperation
+{
+    #[ORM\Id]
+    #[ORM\Column(type: 'guid', unique: true)]
+    private ?string $id = null;
+
+    #[ORM\ManyToOne(targetEntity: Document::class, inversedBy: 'operations')]
+    #[ORM\JoinColumn(nullable: false)]
+    private ?Document $document = null;
+
+    #[ORM\ManyToOne(targetEntity: PLCategory::class)]
+    #[ORM\JoinColumn(nullable: false)]
+    private PLCategory $category;
+
+    #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
+    private string $amount;
+
+    #[ORM\ManyToOne(targetEntity: Counterparty::class)]
+    private ?Counterparty $counterparty = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $comment = null;
+
+    public function __construct(?string $id = null)
+    {
+        $id = $id ?? Uuid::uuid4()->toString();
+        Assert::uuid($id);
+        $this->id = $id;
+    }
+
+    public function getId(): ?string { return $this->id; }
+    public function getDocument(): ?Document { return $this->document; }
+    public function setDocument(?Document $document): self { $this->document = $document; return $this; }
+    public function getCategory(): PLCategory { return $this->category; }
+    public function setCategory(PLCategory $category): self { $this->category = $category; return $this; }
+    public function getAmount(): string { return $this->amount; }
+    public function setAmount(string $amount): self { $this->amount = $amount; return $this; }
+    public function getCounterparty(): ?Counterparty { return $this->counterparty; }
+    public function setCounterparty(?Counterparty $counterparty): self { $this->counterparty = $counterparty; return $this; }
+    public function getComment(): ?string { return $this->comment; }
+    public function setComment(?string $comment): self { $this->comment = $comment; return $this; }
+}
