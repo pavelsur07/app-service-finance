@@ -2,6 +2,9 @@
 
 namespace App\Api\Ozon;
 
+use App\Entity\Company;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\RedirectionExceptionInterface;
@@ -11,9 +14,14 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class OzonApiClient
 {
+    private const BASE_URL = 'https://api-seller.ozon.ru';
+
     public function __construct(
-        private HttpClientInterface $http
-    ) {}
+        private HttpClientInterface $http,
+        private ?LoggerInterface $logger = null,
+    ) {
+        $this->logger = $logger ?? new NullLogger();
+    }
 
     private function headers(string $clientId, string $apiKey): array
     {
@@ -22,6 +30,51 @@ class OzonApiClient
             'Api-Key' => $apiKey,
             'Content-Type' => 'application/json',
         ];
+    }
+
+    private function companyHeaders(Company $company): array
+    {
+        return [
+            'Client-Id' => $company->getOzonSellerId(),
+            'Api-Key' => $company->getOzonApiKey(),
+            'Content-Type' => 'application/json',
+        ];
+    }
+
+    /**
+     * @throws TransportExceptionInterface
+     */
+    private function request(Company $company, string $path, array $body): array
+    {
+        $headers = $this->companyHeaders($company);
+        $delay = 1;
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            try {
+                $response = $this->http->request('POST', self::BASE_URL . $path, [
+                    'headers' => $headers,
+                    'json' => $body,
+                ]);
+                $status = $response->getStatusCode();
+                $reqId = $response->getHeaders(false)['x-request-id'][0] ?? null;
+                if ($reqId) {
+                    $this->logger->info('Ozon request', ['path' => $path, 'x-request-id' => $reqId]);
+                }
+                if (in_array($status, [429, 503], true)) {
+                    sleep($delay);
+                    $delay *= 2;
+                    continue;
+                }
+                return $response->toArray(false);
+            } catch (TransportExceptionInterface $e) {
+                sleep($delay);
+                $delay *= 2;
+                if ($attempt === 4) {
+                    throw $e;
+                }
+            }
+        }
+
+        return [];
     }
 
     public function getAllProducts(string $clientId, string $apiKey): array
@@ -143,5 +196,84 @@ class OzonApiClient
         }
 
         return $this->http->request('GET', $url)->getContent();
+    }
+
+    public function getFbsPostingsList(Company $company, \DateTimeImmutable $since, \DateTimeImmutable $to, array|string|null $status = null, int $limit = 1000, int $offset = 0, array $withFlags = []): array
+    {
+        $filter = [
+            'since' => $since->format(DATE_ATOM),
+            'to' => $to->format(DATE_ATOM),
+        ];
+        if ($status !== null) {
+            $filter['status'] = $status;
+        }
+        $body = [
+            'dir' => 'asc',
+            'filter' => $filter,
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+        $with = [];
+        foreach (['analytics_data','financial_data','barcodes'] as $flag) {
+            if (isset($withFlags[$flag]) && $withFlags[$flag]) {
+                $with[$flag] = true;
+            }
+        }
+        if ($with) {
+            $body['with'] = $with;
+        }
+        return $this->request($company, '/v3/posting/fbs/list', $body);
+    }
+
+    public function getFbsPosting(Company $company, string $postingNumber, array $withFlags = []): array
+    {
+        $body = ['posting_number' => $postingNumber];
+        $with = [];
+        foreach (['analytics_data','financial_data','barcodes','legal_info','product_exemplars','related_postings','translit'] as $flag) {
+            if (isset($withFlags[$flag]) && $withFlags[$flag]) {
+                $with[$flag] = true;
+            }
+        }
+        if ($with) {
+            $body['with'] = $with;
+        }
+        return $this->request($company, '/v3/posting/fbs/get', $body);
+    }
+
+    public function getFbsUnfulfilledList(Company $company, int $limit = 1000, int $offset = 0, array $withFlags = []): array
+    {
+        $body = [
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+        $with = [];
+        foreach (['analytics_data','financial_data','barcodes'] as $flag) {
+            if (isset($withFlags[$flag]) && $withFlags[$flag]) {
+                $with[$flag] = true;
+            }
+        }
+        if ($with) {
+            $body['with'] = $with;
+        }
+        return $this->request($company, '/v3/posting/fbs/unfulfilled/list', $body);
+    }
+
+    public function getFboPostingsList(Company $company, \DateTimeImmutable $since, \DateTimeImmutable $to, int $limit = 1000, int $offset = 0): array
+    {
+        $body = [
+            'filter' => [
+                'since' => $since->format(DATE_ATOM),
+                'to' => $to->format(DATE_ATOM),
+            ],
+            'limit' => $limit,
+            'offset' => $offset,
+        ];
+        return $this->request($company, '/v2/posting/fbo/list', $body);
+    }
+
+    public function getFboPosting(Company $company, string $postingNumber): array
+    {
+        $body = ['posting_number' => $postingNumber];
+        return $this->request($company, '/v2/posting/fbo/get', $body);
     }
 }
