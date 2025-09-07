@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<h1>Ozon Orders</h1>
+<table class="table">
+    <thead>
+    <tr>
+        <th>Posting</th>
+        <th>Scheme</th>
+        <th>Status</th>
+        <th>Status Updated</th>
+        <th>Warehouse</th>
+        <th>Raw</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for order in orders %}
+        <tr>
+            <td><a href="{{ path('ozon_order_show', {id: order.id}) }}">{{ order.postingNumber }}</a></td>
+            <td>{{ order.scheme }}</td>
+            <td>{{ order.status }}</td>
+            <td>{{ order.statusUpdatedAt|date('Y-m-d H:i') }}</td>
+            <td>{{ order.warehouseId }}</td>
+            <td><button onclick="alert(JSON.stringify({{ order.raw|json_encode|raw }}))">Raw</button></td>
+        </tr>
+    {% else %}
+        <tr><td colspan="6">No orders</td></tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
