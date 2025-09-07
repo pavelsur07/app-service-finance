@@ -28,7 +28,7 @@ class OzonOrder
     private string $scheme;
 
     #[ORM\Column(length: 255)]
-    private string $status;
+    private string $status = '';
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $statusUpdatedAt;
