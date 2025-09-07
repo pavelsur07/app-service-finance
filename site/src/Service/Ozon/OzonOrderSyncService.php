@@ -48,6 +48,7 @@ readonly class OzonOrderSyncService
                 $order->setRaw($posting);
                 $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
                 $order->setUpdatedAt($now);
+                $this->em->persist($order);
                 $statusUpdatedAt = isset($posting['status_updated_at']) ? new \DateTimeImmutable($posting['status_updated_at']) : $now;
                 if ($order->getStatus() !== ($posting['status'] ?? '')) {
                     $order->setStatus($posting['status'] ?? '');
@@ -61,7 +62,6 @@ readonly class OzonOrderSyncService
                 } else {
                     $order->setStatusUpdatedAt($statusUpdatedAt);
                 }
-                $this->em->persist($order);
 
                 $items = $posting['products'] ?? $posting['items'] ?? [];
                 if (!$items || $forceDetails) {
@@ -131,6 +131,7 @@ readonly class OzonOrderSyncService
                 $order->setRaw($posting);
                 $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
                 $order->setUpdatedAt($now);
+                $this->em->persist($order);
                 $statusUpdatedAt = isset($posting['status_updated_at']) ? new \DateTimeImmutable($posting['status_updated_at']) : $now;
                 if ($order->getStatus() !== ($posting['status'] ?? '')) {
                     $order->setStatus($posting['status'] ?? '');
@@ -144,7 +145,6 @@ readonly class OzonOrderSyncService
                 } else {
                     $order->setStatusUpdatedAt($statusUpdatedAt);
                 }
-                $this->em->persist($order);
 
                 $items = $posting['products'] ?? [];
                 if (!$items || $forceDetails) {
