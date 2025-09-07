@@ -5,7 +5,9 @@
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
                 <li class="nav-item mb-2">
-                    <span class="nav-link text-uppercase text-muted">Рабочая зона</span>
+                    <a class="nav-link {% if current_route == 'cash_transaction_index' %}active{% endif %}" href="{{ path('app_home_index') }}">
+                    <span class="nav-link  text-muted">Главная</span>
+                    </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link" href="#">
