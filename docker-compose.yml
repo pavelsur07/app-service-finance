@@ -32,12 +32,16 @@ services:
             - traefik.http.routers.site.entryPoints=http
             - traefik.http.services.site.loadBalancer.server.port=80
     site-php-fpm:
-        build: ./site/docker/development/php-fpm
+        build:
+            context: site/docker
+            dockerfile: development/php-fpm/Dockerfile
         container_name: symfony-php-fpm
         volumes:
           - ./site:/app
     site-php-cli:
-        build: ./site/docker/development/php-cli
+        build:
+            context: site/docker
+            dockerfile: development/php-cli/Dockerfile
         container_name: symfony-cli
         working_dir: /app
         volumes:
