@@ -61,7 +61,7 @@ class CashTransactionController extends AbstractController
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'DESC');
 
-       /* if ($filters['dateFrom']) {
+        if ($filters['dateFrom']) {
             $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
         }
         if ($filters['dateTo']) {
@@ -87,7 +87,7 @@ class CashTransactionController extends AbstractController
         }
         if ($filters['q']) {
             $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
-        }*/
+        }
 
         $page = max(1, (int)$request->query->get('page', 1));
         $limit = 20;
