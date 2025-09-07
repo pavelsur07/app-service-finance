@@ -13,6 +13,20 @@
                     </a>
                 </li>
 
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#navbar-ozon" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                        <span class="nav-link-title text-muted"> Ozon </span>
+                    </a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item {{ current_route starts with 'ozon_order' ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                            <span class="nav-link-title">Заказы</span>
+                        </a>
+                        <a class="dropdown-item {{ current_route starts with 'ozon_products' ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                            <span class="nav-link-title">Товары</span>
+                        </a>
+                    </div>
+                </li>
+
                 <li class="nav-item mt-3 mb-2">
                     <span class="nav-link text-uppercase text-muted">Финансы</span>
                 </li>
