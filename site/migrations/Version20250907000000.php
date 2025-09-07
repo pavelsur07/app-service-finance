@@ -32,7 +32,7 @@ final class Version20250907000000 extends AbstractMigration
         $this->addSql('CREATE INDEX IDX_DOC_OPER_COUNTERPARTY ON document_operations (counterparty_id)');
         $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT FK_DOC_OPER_DOCUMENT FOREIGN KEY (document_id) REFERENCES documents (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT FK_DOC_OPER_CATEGORY FOREIGN KEY (category_id) REFERENCES pl_categories (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT FK_DOC_OPER_COUNTERPARTY FOREIGN KEY (counterparty_id) REFERENCES counterparties (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
+        $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT FK_DOC_OPER_COUNTERPARTY FOREIGN KEY (counterparty_id) REFERENCES "counterparty" (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
     }
 
     public function down(Schema $schema): void
