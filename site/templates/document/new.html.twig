@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+{% block title %}Новый документ{% endblock %}
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <h2 class="page-title">Новый документ</h2>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {{ form_start(form) }}
+                {{ form_row(form.date) }}
+                {{ form_row(form.number) }}
+                {{ form_row(form.type) }}
+                {{ form_row(form.description) }}
+                <div class="mb-3">
+                    <label class="form-label">Операции</label>
+                    <div data-collection-holder data-prototype="{{ form_widget(form.operations.vars.prototype)|e('html_attr') }}">
+                        {% for op in form.operations %}
+                            <div class="mb-2">
+                                {{ form_widget(op) }}
+                                <button type="button" class="btn btn-sm btn-danger remove-item">Удалить</button>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-sm btn-secondary add_item_link mt-2">+ Добавить операцию</button>
+                </div>
+                <button class="btn btn-primary">Сохранить</button>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+{% block javascripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('[data-collection-holder]').forEach(function(collectionHolder) {
+            const addButton = collectionHolder.parentElement.querySelector('.add_item_link');
+            addButton.addEventListener('click', function() {
+                const prototype = collectionHolder.dataset.prototype;
+                const index = collectionHolder.children.length;
+                let newForm = prototype.replace(/__name__/g, index);
+                const div = document.createElement('div');
+                div.classList.add('mb-2');
+                div.innerHTML = newForm + '<button type="button" class="btn btn-sm btn-danger remove-item">Удалить</button>';
+                collectionHolder.appendChild(div);
+            });
+            collectionHolder.addEventListener('click', function(e){
+                if (e.target && e.target.classList.contains('remove-item')) {
+                    e.target.closest('div.mb-2').remove();
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}

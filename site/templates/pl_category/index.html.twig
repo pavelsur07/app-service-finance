@@ -1,0 +1,48 @@
+{% extends 'base.html.twig' %}
+{% block title %}Категории P&L{% endblock %}
+
+{% macro render_items(items, level) %}
+    <ul class="list-unstyled">
+    {% for item in items %}
+        <li>
+            <div class="d-flex align-items-center">
+                <span style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
+                <span class="ms-auto d-inline-flex gap-1">
+                    <a href="{{ path('pl_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                    <form method="post" action="{{ path('pl_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                        <button class="btn btn-sm btn-danger">🗑</button>
+                    </form>
+                </span>
+            </div>
+            {% if item.children|length > 0 %}
+                {{ _self.render_items(item.children, level + 1) }}
+            {% endif %}
+        </li>
+    {% endfor %}
+    </ul>
+{% endmacro %}
+
+{% import _self as macros %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Категории P&amp;L</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {{ macros.render_items(items, 1) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
