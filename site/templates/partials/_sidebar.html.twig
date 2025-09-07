@@ -4,34 +4,13 @@
         <a class="navbar-brand" href="{{ path('app_home_index') }}">Финансы</a>
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
-                <li class="nav-item mb-2">
-                    <a class="nav-link {% if current_route == 'cash_transaction_index' %}active{% endif %}" href="{{ path('app_home_index') }}">
-                    <span class="nav-link  text-muted">Главная</span>
-                    </a>
-                </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="#">
-                        <span class="nav-link-title">Чат-центр</span>
+                    <a class="nav-link" href="{{ path('app_home_index') }}">
+                        <span class="nav-link-title"> Главная </span>
                     </a>
                 </li>
 
-                <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#navbar-ozon" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
-                        <span class="nav-link-title text-muted"> Ozon </span>
-                    </a>
-                    <div class="dropdown-menu">
-                        <a class="dropdown-item {{ current_route starts with 'ozon_order' ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                            <span class="nav-link-title">Заказы</span>
-                        </a>
-                        <a class="dropdown-item {{ current_route starts with 'ozon_products' ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                            <span class="nav-link-title">Товары</span>
-                        </a>
-                    </div>
-                </li>
 
-                <li class="nav-item mt-3 mb-2">
-                    <span class="nav-link text-uppercase text-muted">Финансы</span>
-                </li>
                 <li class="nav-item">
                     <a class="nav-link {% if current_route == 'cash_transaction_index' %}active{% endif %}" href="{{ path('cash_transaction_index') }}">
                         <span class="nav-link-title">Транзакции (ДДС)</span>
@@ -39,12 +18,12 @@
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {{ current_route starts with 'document_' ? 'active' : '' }}" href="{{ path('document_index') }}">
-                        <span class="nav-link-title">Документы</span>
+                        <span class="nav-link-title">Документы (ОПиУ)</span>
                     </a>
                 </li>
                 <li class="nav-item">
                     <a class="nav-link {{ current_route starts with 'report_daily_balances' ? 'active' : '' }}" href="{{ path('report_daily_balances_index') }}">
-                        <span class="nav-link-title">Промежуточные итоги (остатки)</span>
+                        <span class="nav-link-title">Промежуточные итоги</span>
                     </a>
                 </li>
                 <li class="nav-item">
@@ -63,7 +42,7 @@
                             <span class="nav-link-title">Отчет ДДС</span>
                         </a>
                         <a class="dropdown-item " href="#">
-                            <span class="nav-link-title">P&L</span>
+                            <span class="nav-link-title">Отчет ОПиУ</span>
                         </a>
                     </div>
                 </li>
@@ -89,7 +68,21 @@
                     </div>
                 </li>
 
-
+                {#---- Ozon ---#}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#navbar-ozon" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                        <span class="nav-link-title text-muted"> Ozon </span>
+                    </a>
+                    <div class="dropdown-menu">
+                        <a class="dropdown-item {{ current_route starts with 'ozon_order' ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                            <span class="nav-link-title">Заказы</span>
+                        </a>
+                        <a class="dropdown-item {{ current_route starts with 'ozon_products' ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                            <span class="nav-link-title">Товары</span>
+                        </a>
+                    </div>
+                </li>
+                {#---- Profile ---#}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
