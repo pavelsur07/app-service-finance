@@ -55,6 +55,10 @@ class CashTransactionService
             ->setCounterparty($counterparty)
             ->setCashflowCategory($category);
 
+        if ($dto->externalId) {
+            $tx->setExternalId($dto->externalId);
+        }
+
         $this->em->persist($tx);
         $from = $dto->occurredAt->setTime(0, 0);
         $to = new \DateTimeImmutable('today');
