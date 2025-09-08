@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+{% block title %}Импорт 1C{% endblock %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label':'Главная','path':'app_home_index'},
+            {'label':'Финансы'},
+            {'label':'Импорт'},
+            {'label':'1C'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+    <h2 class="page-title mb-3">Импорт 1C</h2>
+    <form method="post" enctype="multipart/form-data">
+        <input type="hidden" name="_token" value="{{ csrf_token('bank1c_import') }}">
+        <div class="mb-3">
+            <label class="form-label">Счёт</label>
+            <select name="moneyAccount" id="moneyAccount" class="form-select" required>
+                {% for acc in accounts %}
+                    <option value="{{ acc.id }}" data-account="{{ acc.accountNumber }}" data-currency="{{ acc.currency }}">{{ acc.name }}</option>
+                {% endfor %}
+            </select>
+            <div class="form-hint" id="accountInfo"></div>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Выписка (.txt)</label>
+            <input type="file" name="statement" accept=".txt" required class="form-control">
+        </div>
+        <p class="text-muted">Формат 1CClientBankExchange, кодировка Windows-1251</p>
+        <button type="submit" class="btn btn-primary">Импортировать</button>
+    </form>
+{% endblock %}
+
+{% block scripts %}
+    {{ parent() }}
+    <script>
+        const select = document.getElementById('moneyAccount');
+        const info = document.getElementById('accountInfo');
+        if (select) {
+            function updateInfo() {
+                const opt = select.options[select.selectedIndex];
+                if (opt) {
+                    const acc = opt.dataset.account || '';
+                    const cur = opt.dataset.currency || '';
+                    info.textContent = acc ? acc + ' / ' + cur : '';
+                }
+            }
+            select.addEventListener('change', updateInfo);
+            updateInfo();
+        }
+    </script>
+{% endblock %}
