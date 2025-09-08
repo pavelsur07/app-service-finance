@@ -16,7 +16,7 @@
     <h2 class="page-title">Транзакции (ДДС)</h2>
     <div class="ms-auto d-print-none">
         <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
-        <a href="#" class="btn btn-outline-secondary">Импорт</a>
+        <a href="{{ path('bank1c_import_form') }}" class="btn btn-outline-secondary">Импорт 1C</a>
         <a href="#" class="btn btn-outline-secondary">Экспорт</a>
         <form method="post" action="{{ path('cash_transaction_clear') }}" class="d-inline">
             <button type="submit" class="btn btn-outline-danger">Очистить</button>
