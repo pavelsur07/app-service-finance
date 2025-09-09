@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\AutoTemplateDirection;
+use App\Enum\AutoTemplateScope;
 use App\Enum\MatchLogic;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -18,6 +19,9 @@ class AutoCategoryTemplate
     #[ORM\ManyToOne]
     #[ORM\JoinColumn(nullable: false)]
     private Company $company;
+
+    #[ORM\Column(enumType: AutoTemplateScope::class)]
+    private AutoTemplateScope $scope = AutoTemplateScope::CASHFLOW;
 
     #[ORM\Column(length: 255)]
     private string $name = '';
@@ -61,6 +65,8 @@ class AutoCategoryTemplate
 
     public function getId(): string { return $this->id; }
     public function getCompany(): Company { return $this->company; }
+    public function getScope(): AutoTemplateScope { return $this->scope; }
+    public function setScope(AutoTemplateScope $scope): self { $this->scope = $scope; return $this; }
     public function getName(): string { return $this->name; }
     public function setName(string $name): self { $this->name = $name; return $this; }
     public function isActive(): bool { return $this->isActive; }
