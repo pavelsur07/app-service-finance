@@ -1,0 +1,157 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<div class="page-body">
+  <div class="container-xl">
+    <div class="row row-cards">
+      <div class="col-12">
+        <form method="post">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Шаблон автокатегоризации ДДС</h3>
+            </div>
+            <div class="card-body">
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label">Название</label>
+                  {{ form_widget(form.name) }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Активен</label><br>
+                  {{ form_widget(form.isActive) }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Направление</label>
+                  {{ form_widget(form.direction) }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Целевая статья ДДС</label>
+                  {{ form_widget(form.targetCategory) }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Приоритет</label>
+                  {{ form_widget(form.priority) }}
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Логика совпадения</label>
+                  {{ form_widget(form.matchLogic) }}
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Остановиться после совпадения</label><br>
+                  {{ form_widget(form.stopOnMatch) }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card mt-3">
+            <div class="card-header">
+              <h3 class="card-title">Условия</h3>
+              <div class="card-actions">
+                <button type="button" class="btn btn-sm btn-primary" id="add-condition">Добавить условие</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div data-collection-holder
+                   data-prototype="{{ form_widget(form.conditions.vars.prototype)|e('html_attr') }}">
+                {% for condForm in form.conditions %}
+                  <div class="border rounded p-3 mb-3 condition-item">
+                    <div class="row g-3 align-items-end">
+                      <div class="col-md-3">
+                        <label class="form-label">Поле</label>
+                        {{ form_widget(condForm.field, {'attr': {'class': 'form-select js-field'}}) }}
+                      </div>
+                      <div class="col-md-3">
+                        <label class="form-label">Оператор</label>
+                        {{ form_widget(condForm.operator, {'attr': {'class': 'form-select js-operator'}}) }}
+                      </div>
+                      <div class="col-md-4">
+                        <label class="form-label">Значение</label>
+                        {{ form_widget(condForm.value) }}
+                        <div class="form-hint js-hint">
+                          Для «Содержит» введите слово/фразу. BETWEEN: 1000..5000. IN: ["A","B"]. REGEX: корректный паттерн.
+                        </div>
+                      </div>
+                      <div class="col-md-2">
+                        <label class="form-label">Опции</label>
+                        <div class="form-check">
+                          {{ form_widget(condForm.caseSensitive, {'attr': {'class': 'form-check-input'}}) }}
+                          <label class="form-check-label">Учитывать регистр</label>
+                        </div>
+                        <div class="form-check">
+                          {{ form_widget(condForm.negate, {'attr': {'class': 'form-check-input'}}) }}
+                          <label class="form-check-label">Инвертировать</label>
+                        </div>
+                      </div>
+                      <div class="col-12 text-end">
+                        <button type="button" class="btn btn-link text-danger p-0 js-remove-condition">Удалить</button>
+                      </div>
+                      {{ form_widget(condForm.position) }}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 d-flex gap-2">
+            <button class="btn btn-primary" type="submit">Сохранить</button>
+            <a href="{{ path('auto_template_index') }}" class="btn btn-secondary">Отмена</a>
+          </div>
+
+          {{ form_rest(form) }}
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function(){
+    const holder = document.querySelector('[data-collection-holder]');
+    const addBtn = document.getElementById('add-condition');
+
+    function addForm() {
+      const prototype = holder.dataset.prototype;
+      const index = holder.querySelectorAll('.condition-item').length;
+      const html = prototype.replace(/__name__/g, index);
+      const div = document.createElement('div');
+      div.className = 'border rounded p-3 mb-3 condition-item';
+      div.innerHTML = html;
+      attachHandlers(div);
+      holder.appendChild(div);
+    }
+
+    function attachHandlers(scope) {
+      scope.querySelectorAll('.js-remove-condition').forEach(btn => {
+        btn.addEventListener('click', () => scope.remove());
+      });
+      const field = scope.querySelector('.js-field');
+      const op = scope.querySelector('.js-operator');
+      const hint = scope.querySelector('.js-hint');
+      const value = scope.querySelector('.js-value');
+
+      function refreshHint() {
+        const f = field?.value || '';
+        const o = op?.value || '';
+        if (['contains','eq','neq','ncontains','starts_with','ends_with','regex','in','not_in'].includes(o)) {
+          value.placeholder = 'Введите триггер (слово/фразу) или значение';
+          hint.textContent = 'Строковые: впишите триггер вручную. IN — JSON-массив. REGEX — корректный паттерн.';
+        } else if (o === 'between') {
+          value.placeholder = 'min..max (пример: 1000..5000 или 2025-01-01..2025-12-31)';
+          hint.textContent = 'BETWEEN: min..max для чисел или дат (YYYY-MM-DD).';
+        } else {
+          value.placeholder = 'Значение';
+          hint.textContent = 'Укажите значение. Для строк — можно вводить слова/фразы.';
+        }
+      }
+      field?.addEventListener('change', refreshHint);
+      op?.addEventListener('change', refreshHint);
+      refreshHint();
+    }
+
+    addBtn?.addEventListener('click', addForm);
+    document.querySelectorAll('.condition-item').forEach(attachHandlers);
+  })();
+</script>
+{% endblock %}
