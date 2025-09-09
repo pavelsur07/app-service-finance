@@ -1,0 +1,61 @@
+{% extends 'base.html.twig' %}
+{% block body %}
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Шаблоны автокатегоризации ДДС</h3>
+        <div class="card-actions">
+          <a href="{{ path('auto_template_new') }}" class="btn btn-primary btn-sm">Создать шаблон</a>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+          <thead>
+          <tr>
+            <th>Активен</th>
+            <th>Название</th>
+            <th>Направление</th>
+            <th>Категория</th>
+            <th>Приоритет</th>
+            <th>Условий</th>
+            <th class="w-1"></th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for t in templates %}
+            <tr>
+              <td>
+                {% if t.isActive %}
+                  <span class="badge bg-green">Да</span>
+                {% else %}
+                  <span class="badge bg-secondary">Нет</span>
+                {% endif %}
+              </td>
+              <td>{{ t.name }}</td>
+              <td>{{ t.direction.value }}</td>
+              <td>{{ t.targetCategory.name ?? '—' }}</td>
+              <td>{{ t.priority }}</td>
+              <td>{{ t.conditions|length }}</td>
+              <td class="text-nowrap">
+                <a href="{{ path('auto_template_edit', {id: t.id}) }}" class="btn btn-sm">Ред.</a>
+                <a href="{{ path('auto_template_test', {id: t.id}) }}" class="btn btn-sm">Тест</a>
+                <form method="post" action="{{ path('auto_template_toggle', {id: t.id}) }}" style="display:inline">
+                  <button class="btn btn-sm">{{ t.isActive ? 'Выкл' : 'Вкл' }}</button>
+                </form>
+                <form method="post" action="{{ path('auto_template_delete', {id: t.id}) }}" style="display:inline"
+                      onsubmit="return confirm('Удалить шаблон?');">
+                  <button class="btn btn-sm btn-danger">Удалить</button>
+                </form>
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="7" class="text-center text-muted">Шаблонов пока нет</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
