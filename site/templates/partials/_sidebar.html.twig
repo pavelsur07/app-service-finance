@@ -54,7 +54,7 @@
                     </a>
                     <div class="dropdown-menu">
                         <a class="dropdown-item {% if current_route == 'money_account_index' %}active{% endif %}" href="{{ path('money_account_index') }}">
-                            <span class="nav-link-title">Счета/Кассы/Кошельки</span>
+                            <span class="nav-link-title">Счета / Кассы / Кошельки</span>
                         </a>
                         <a class="dropdown-item {% if current_route == 'counterparty_index' %}active{% endif %}" href="{{ path('counterparty_index') }}">
                         <span class="nav-link-title">Контрагенты</span>
@@ -63,7 +63,7 @@
                             <span class="nav-link-title">Статьи ДДС</span>
                         </a>
                         <a class="dropdown-item {{ current_route starts with 'pl_category_' ? 'active' : '' }}" href="{{ path('pl_category_index') }}">
-                            <span class="nav-link-title">Категории P&amp;L</span>
+                            <span class="nav-link-title">Статьи ОПиУ (P&amp;L)</span>
                         </a>
                         <a class="dropdown-item {{ current_route starts with 'auto_template_' ? 'active' : '' }}" href="#">
                             <span class="nav-link-title">Автоправила</span>
