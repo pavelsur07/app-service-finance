@@ -83,7 +83,15 @@ class AutoCategoryTemplate
     public function setMatchLogic(MatchLogic $m): self { $this->matchLogic = $m; return $this; }
     /** @return Collection<int, AutoCategoryCondition> */
     public function getConditions(): Collection { return $this->conditions; }
-    public function addCondition(AutoCategoryCondition $c): self { if(!$this->conditions->contains($c)){ $this->conditions->add($c); } return $this; }
+    public function addCondition(AutoCategoryCondition $c): self
+    {
+        if (!$this->conditions->contains($c)) {
+            $c->setTemplate($this);
+            $this->conditions->add($c);
+        }
+
+        return $this;
+    }
     public function removeCondition(AutoCategoryCondition $c): self { $this->conditions->removeElement($c); return $this; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function setCreatedAt(\DateTimeImmutable $d): self { $this->createdAt = $d; return $this; }

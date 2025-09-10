@@ -5,6 +5,7 @@ namespace App\Entity;
 use App\Enum\ConditionField;
 use App\Enum\ConditionOperator;
 use Doctrine\ORM\Mapping as ORM;
+use Ramsey\Uuid\Uuid;
 
 #[ORM\Entity]
 class AutoCategoryCondition
@@ -15,7 +16,7 @@ class AutoCategoryCondition
 
     #[ORM\ManyToOne(inversedBy: 'conditions')]
     #[ORM\JoinColumn(nullable: false)]
-    private AutoCategoryTemplate $template;
+    private ?AutoCategoryTemplate $template = null;
 
     #[ORM\Column(enumType: ConditionField::class)]
     private ConditionField $field;
@@ -35,14 +36,15 @@ class AutoCategoryCondition
     #[ORM\Column(type: 'integer')]
     private int $position = 0;
 
-    public function __construct(string $id, AutoCategoryTemplate $template)
+    public function __construct(?string $id = null, ?AutoCategoryTemplate $template = null)
     {
-        $this->id = $id;
+        $this->id = $id ?? Uuid::uuid4()->toString();
         $this->template = $template;
     }
 
     public function getId(): string { return $this->id; }
-    public function getTemplate(): AutoCategoryTemplate { return $this->template; }
+    public function getTemplate(): ?AutoCategoryTemplate { return $this->template; }
+    public function setTemplate(AutoCategoryTemplate $t): self { $this->template = $t; return $this; }
     public function getField(): ConditionField { return $this->field; }
     public function setField(ConditionField $f): self { $this->field = $f; return $this; }
     public function getOperator(): ConditionOperator { return $this->operator; }
