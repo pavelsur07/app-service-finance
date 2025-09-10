@@ -24,10 +24,28 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('action', EnumType::class, [
                 'class' => CashTransactionAutoRuleAction::class,
                 'label' => 'Действие с операцией ДДС',
+                'choice_label' => function (CashTransactionAutoRuleAction $choice) {
+                    return match ($choice) {
+                        CashTransactionAutoRuleAction::FILL => 'Заполнить поля операции',
+                        CashTransactionAutoRuleAction::UPDATE => 'Изменить поля операции',
+                    };
+                },
             ])
             ->add('operationType', EnumType::class, [
                 'class' => CashTransactionAutoRuleOperationType::class,
                 'label' => 'Тип операции',
+                'choices' => [
+                    CashTransactionAutoRuleOperationType::OUTFLOW,
+                    CashTransactionAutoRuleOperationType::INFLOW,
+                    CashTransactionAutoRuleOperationType::ANY,
+                ],
+                'choice_label' => function (CashTransactionAutoRuleOperationType $choice) {
+                    return match ($choice) {
+                        CashTransactionAutoRuleOperationType::OUTFLOW => 'Отток',
+                        CashTransactionAutoRuleOperationType::INFLOW => 'Приток',
+                        CashTransactionAutoRuleOperationType::ANY => 'Любое',
+                    };
+                },
             ])
             ->add('cashflowCategory', EntityType::class, [
                 'class' => CashflowCategory::class,
