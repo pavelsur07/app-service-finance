@@ -56,13 +56,11 @@ class CashTransactionAutoRuleConditionTest extends TestCase
             $category
         );
 
-        $condition = new CashTransactionAutoRuleCondition(
-            Uuid::uuid4()->toString(),
-            $rule,
-            CashTransactionAutoRuleConditionField::DESCRIPTION,
-            CashTransactionAutoRuleConditionOperator::CONTAINS,
-            'invoice'
-        );
+        $condition = new CashTransactionAutoRuleCondition();
+        $condition->setAutoRule($rule);
+        $condition->setField(CashTransactionAutoRuleConditionField::DESCRIPTION);
+        $condition->setOperator(CashTransactionAutoRuleConditionOperator::CONTAINS);
+        $condition->setValue('invoice');
         $rule->addCondition($condition);
 
         $this->em->persist($user);
