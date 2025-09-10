@@ -52,8 +52,42 @@
               </div>
             </div>
             <div class="card-body">
+              {% set conditionPrototype %}
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label">Поле</label>
+                    {{ form_widget(form.conditions.vars.prototype.field, {'attr': {'class': 'form-select js-field'}}) }}
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Оператор</label>
+                    {{ form_widget(form.conditions.vars.prototype.operator, {'attr': {'class': 'form-select js-operator'}}) }}
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Значение</label>
+                    {{ form_widget(form.conditions.vars.prototype.value) }}
+                    <div class="form-hint js-hint">
+                      CONTAINS — слово/фраза. BETWEEN: min..max (числа или YYYY-MM-DD). IN: ["A","B"]. REGEX: валидный PCRE.
+                    </div>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label">Опции</label>
+                    <div class="form-check">
+                      {{ form_widget(form.conditions.vars.prototype.caseSensitive, {'attr': {'class': 'form-check-input'}}) }}
+                      <label class="form-check-label">Учитывать регистр</label>
+                    </div>
+                    <div class="form-check">
+                      {{ form_widget(form.conditions.vars.prototype.negate, {'attr': {'class': 'form-check-input'}}) }}
+                      <label class="form-check-label">Инвертировать</label>
+                    </div>
+                  </div>
+                  <div class="col-12 text-end">
+                    <button type="button" class="btn btn-link text-danger p-0 js-remove-condition">Удалить</button>
+                  </div>
+                  {{ form_widget(form.conditions.vars.prototype.position) }}
+                </div>
+              {% endset %}
               <div data-collection-holder
-                   data-prototype="{{ form_widget(form.conditions.vars.prototype)|e('html_attr') }}">
+                   data-prototype="{{ conditionPrototype|e('html_attr') }}">
                 {% for condForm in form.conditions %}
                   <div class="border rounded p-3 mb-3 condition-item">
                     <div class="row g-3 align-items-end">
