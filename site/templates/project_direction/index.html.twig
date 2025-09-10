@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+{% block title %}Направления{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Направления</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <div class="mb-3 text-end">
+                    <a href="{{ path('project_direction_new') }}" class="btn btn-success">+ Добавить</a>
+                </div>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Наименование</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td>{{ item.name }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
+                                <form method="post" action="{{ path('project_direction_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Удалить?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                                    <button class="btn btn-sm btn-danger">🗑</button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr><td colspan="2" class="text-center">Нет данных</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
