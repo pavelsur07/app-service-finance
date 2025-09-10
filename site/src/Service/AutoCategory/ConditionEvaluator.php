@@ -103,7 +103,10 @@ class ConditionEvaluator implements ConditionEvaluatorInterface
         }
         $delim = '/';
         $mod = $caseSensitive ? '' : 'i';
-        $regex = $delim . str_replace($delim, '\' . $delim, $pattern) . $delim . $mod;
+        // Escape delimiter in pattern to build a valid regular expression.
+        // Need to prefix delimiter with a single backslash. In single quoted
+        // strings, we write "\\" to represent one backslash character.
+        $regex = $delim . str_replace($delim, '\\' . $delim, $pattern) . $delim . $mod;
         $result = @preg_match($regex, $value);
         return $result === 1;
     }
