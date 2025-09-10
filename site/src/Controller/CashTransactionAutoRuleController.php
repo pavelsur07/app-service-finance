@@ -8,6 +8,7 @@ use App\Enum\CashTransactionAutoRuleOperationType;
 use App\Form\CashTransactionAutoRuleType;
 use App\Repository\CashTransactionAutoRuleRepository;
 use App\Repository\CashflowCategoryRepository;
+use App\Repository\CounterpartyRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -35,10 +36,12 @@ class CashTransactionAutoRuleController extends AbstractController
         Request $request,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
-        CashflowCategoryRepository $categoryRepo
+        CashflowCategoryRepository $categoryRepo,
+        CounterpartyRepository $counterpartyRepo
     ): Response {
         $company = $companyService->getActiveCompany();
         $categories = $categoryRepo->findTreeByCompany($company);
+        $counterparties = $counterpartyRepo->findBy(['company' => $company]);
 
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
@@ -48,7 +51,10 @@ class CashTransactionAutoRuleController extends AbstractController
             CashTransactionAutoRuleOperationType::ANY
         );
 
-        $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, ['categories' => $categories]);
+        $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
+            'categories' => $categories,
+            'counterparties' => $counterparties,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -69,7 +75,8 @@ class CashTransactionAutoRuleController extends AbstractController
         CashTransactionAutoRuleRepository $repo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
-        CashflowCategoryRepository $categoryRepo
+        CashflowCategoryRepository $categoryRepo,
+        CounterpartyRepository $counterpartyRepo
     ): Response {
         $company = $companyService->getActiveCompany();
         $rule = $repo->find($id);
@@ -78,7 +85,11 @@ class CashTransactionAutoRuleController extends AbstractController
         }
 
         $categories = $categoryRepo->findTreeByCompany($company);
-        $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, ['categories' => $categories]);
+        $counterparties = $counterpartyRepo->findBy(['company' => $company]);
+        $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
+            'categories' => $categories,
+            'counterparties' => $counterparties,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {

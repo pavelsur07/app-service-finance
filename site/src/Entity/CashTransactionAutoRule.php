@@ -5,6 +5,8 @@ namespace App\Entity;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
 use App\Repository\CashTransactionAutoRuleRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -35,6 +37,10 @@ class CashTransactionAutoRule
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private ?CashflowCategory $cashflowCategory = null;
 
+    /** @var Collection<int, CashTransactionAutoRuleCondition> */
+    #[ORM\OneToMany(mappedBy: 'autoRule', targetEntity: CashTransactionAutoRuleCondition::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $conditions;
+
     public function __construct(
         string $id,
         Company $company,
@@ -52,6 +58,7 @@ class CashTransactionAutoRule
         if ($cashflowCategory) {
             $this->cashflowCategory = $cashflowCategory;
         }
+        $this->conditions = new ArrayCollection();
     }
 
     public function getId(): ?string { return $this->id; }
@@ -65,4 +72,24 @@ class CashTransactionAutoRule
     public function setOperationType(CashTransactionAutoRuleOperationType $operationType): self { $this->operationType = $operationType; return $this; }
     public function getCashflowCategory(): ?CashflowCategory { return $this->cashflowCategory; }
     public function setCashflowCategory(CashflowCategory $cashflowCategory): self { $this->cashflowCategory = $cashflowCategory; return $this; }
+
+    /** @return Collection<int, CashTransactionAutoRuleCondition> */
+    public function getConditions(): Collection { return $this->conditions; }
+    public function addCondition(CashTransactionAutoRuleCondition $condition): self
+    {
+        if (!$this->conditions->contains($condition)) {
+            $this->conditions->add($condition);
+            $condition->setAutoRule($this);
+        }
+        return $this;
+    }
+    public function removeCondition(CashTransactionAutoRuleCondition $condition): self
+    {
+        if ($this->conditions->removeElement($condition)) {
+            if ($condition->getAutoRule() === $this) {
+                $condition->setAutoRule(null);
+            }
+        }
+        return $this;
+    }
 }
