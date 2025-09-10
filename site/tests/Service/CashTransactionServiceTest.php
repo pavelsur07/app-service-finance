@@ -8,7 +8,6 @@ use App\Enum\MoneyAccountType;
 use App\Enum\CounterpartyType;
 use App\Service\AccountBalanceService;
 use App\Service\CashTransactionService;
-use App\Service\AutoCategory\AutoCategorizerInterface;
 use App\Entity\User;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
@@ -65,8 +64,7 @@ class CashTransactionServiceTest extends TestCase
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
         $balanceRepo = new \App\Repository\MoneyAccountDailyBalanceRepository($registry);
         $balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $categorizer = $this->createMock(AutoCategorizerInterface::class);
-        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo, $categorizer);
+        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo);
     }
 
     public function testAddPersistsAllFields(): void
