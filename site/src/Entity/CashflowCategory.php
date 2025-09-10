@@ -68,4 +68,6 @@ class CashflowCategory
     {
         return $this->parent ? $this->parent->getLevel() + 1 : 1;
     }
+
+    public function __toString(): string { return $this->name; }
 }
