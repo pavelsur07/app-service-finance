@@ -6,6 +6,7 @@ use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Repository\CashTransactionAutoRuleConditionRepository;
 use Doctrine\ORM\Mapping as ORM;
+use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: CashTransactionAutoRuleConditionRepository::class)]
@@ -37,19 +38,24 @@ class CashTransactionAutoRuleCondition
     private ?string $valueTo = null;
 
     public function __construct(
-        string $id,
-        CashTransactionAutoRule $autoRule,
-        CashTransactionAutoRuleConditionField $field,
-        CashTransactionAutoRuleConditionOperator $operator,
+        ?string $id = null,
+        ?CashTransactionAutoRule $autoRule = null,
+        ?CashTransactionAutoRuleConditionField $field = null,
+        ?CashTransactionAutoRuleConditionOperator $operator = null,
         ?string $value = null,
         ?string $valueTo = null,
         ?Counterparty $counterparty = null
     ) {
+        $id = $id ?? Uuid::uuid4()->toString();
         Assert::uuid($id);
         $this->id = $id;
         $this->autoRule = $autoRule;
-        $this->field = $field;
-        $this->operator = $operator;
+        if ($field) {
+            $this->field = $field;
+        }
+        if ($operator) {
+            $this->operator = $operator;
+        }
         $this->value = $value;
         $this->valueTo = $valueTo;
         $this->counterparty = $counterparty;
