@@ -45,6 +45,70 @@
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('[data-collection-holder]').forEach(function(collectionHolder) {
             const addButton = collectionHolder.parentElement.querySelector('.add_item_link');
+
+            const initCondition = function(card) {
+                const fieldSelect = card.querySelector('[id$="_field"]');
+                const operatorSelect = card.querySelector('[id$="_operator"]');
+                const operatorRow = card.querySelector('.condition-operator-row');
+                const counterpartyRow = card.querySelector('.condition-counterparty-row');
+                const valueRow = card.querySelector('.condition-value-row');
+                const valueInput = valueRow ? valueRow.querySelector('input') : null;
+                const valueToRow = card.querySelector('.condition-value-to-row');
+
+                const update = function() {
+                    const val = fieldSelect.value;
+                    if (val === 'COUNTERPARTY') {
+                        operatorRow.style.display = 'none';
+                        operatorSelect.value = 'EQUAL';
+                        counterpartyRow.style.display = '';
+                        valueRow.style.display = 'none';
+                        valueToRow.style.display = 'none';
+                    } else if (val === 'COUNTERPARTY_NAME') {
+                        operatorRow.style.display = 'none';
+                        operatorSelect.value = 'CONTAINS';
+                        counterpartyRow.style.display = 'none';
+                        valueRow.style.display = '';
+                        valueToRow.style.display = 'none';
+                        if (valueInput) {
+                            valueInput.removeAttribute('inputmode');
+                            valueInput.oninput = null;
+                        }
+                    } else if (val === 'INN') {
+                        operatorRow.style.display = 'none';
+                        operatorSelect.value = 'CONTAINS';
+                        counterpartyRow.style.display = 'none';
+                        valueRow.style.display = '';
+                        valueToRow.style.display = 'none';
+                        if (valueInput) {
+                            valueInput.setAttribute('inputmode', 'numeric');
+                            valueInput.oninput = function() { this.value = this.value.replace(/\D/g, ''); };
+                        }
+                    } else if (val === 'DESCRIPTION') {
+                        operatorRow.style.display = 'none';
+                        operatorSelect.value = 'CONTAINS';
+                        counterpartyRow.style.display = 'none';
+                        valueRow.style.display = '';
+                        valueToRow.style.display = 'none';
+                        if (valueInput) {
+                            valueInput.removeAttribute('inputmode');
+                            valueInput.oninput = null;
+                        }
+                    } else {
+                        operatorRow.style.display = '';
+                        counterpartyRow.style.display = 'none';
+                        valueRow.style.display = '';
+                        valueToRow.style.display = '';
+                        if (valueInput) {
+                            valueInput.removeAttribute('inputmode');
+                            valueInput.oninput = null;
+                        }
+                    }
+                };
+
+                fieldSelect.addEventListener('change', update);
+                update();
+            };
+
             addButton.addEventListener('click', function() {
                 const prototype = collectionHolder.dataset.prototype;
                 const index = collectionHolder.children.length;
@@ -53,7 +117,11 @@
                 div.classList.add('card', 'mb-2');
                 div.innerHTML = '<div class="card-body">' + newForm + '<button type="button" class="btn btn-sm btn-danger remove-item">Удалить</button></div>';
                 collectionHolder.appendChild(div);
+                initCondition(div);
             });
+
+            collectionHolder.querySelectorAll('.card').forEach(initCondition);
+
             collectionHolder.addEventListener('click', function(e){
                 if (e.target && e.target.classList.contains('remove-item')) {
                     e.target.closest('div.card').remove();

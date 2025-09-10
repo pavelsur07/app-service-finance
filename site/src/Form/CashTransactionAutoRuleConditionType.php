@@ -20,7 +20,8 @@ class CashTransactionAutoRuleConditionType extends AbstractType
         $builder
             ->add('field', EnumType::class, [
                 'class' => CashTransactionAutoRuleConditionField::class,
-                'label' => 'Поле',
+                'label' => 'Если у операции заполнено поле',
+                'row_attr' => ['class' => 'condition-field-row'],
                 'choice_label' => function (CashTransactionAutoRuleConditionField $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleConditionField::COUNTERPARTY => 'Контрагент (точное совпадение)',
@@ -35,6 +36,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
             ->add('operator', EnumType::class, [
                 'class' => CashTransactionAutoRuleConditionOperator::class,
                 'label' => 'Оператор',
+                'row_attr' => ['class' => 'condition-operator-row'],
                 'choice_label' => function (CashTransactionAutoRuleConditionOperator $choice) {
                     return match ($choice) {
                         CashTransactionAutoRuleConditionOperator::EQUAL => '=',
@@ -51,14 +53,17 @@ class CashTransactionAutoRuleConditionType extends AbstractType
                 'choice_label' => 'name',
                 'required' => false,
                 'label' => 'Контрагент',
+                'row_attr' => ['class' => 'condition-counterparty-row'],
             ])
             ->add('value', TextType::class, [
                 'required' => false,
-                'label' => 'Значение',
+                'label' => 'Содержит',
+                'row_attr' => ['class' => 'condition-value-row'],
             ])
             ->add('valueTo', TextType::class, [
                 'required' => false,
                 'label' => 'Значение до',
+                'row_attr' => ['class' => 'condition-value-to-row'],
             ]);
     }
 
