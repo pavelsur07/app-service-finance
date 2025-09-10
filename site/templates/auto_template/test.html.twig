@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<div class="page-body">
+  <div class="container-xl">
+    <h3>Тест шаблона "{{ template.name }}"</h3>
+    <form method="post" class="mb-3">
+      <div class="mb-3">
+        <label class="form-label">Операция</label>
+        <select name="tx" class="form-select">
+          {% for o in operations %}
+            <option value="{{ o.id }}" {% if selected and selected.id == o.id %}selected{% endif %}>
+              {{ o.occurredAt|date('Y-m-d') }} — {{ o.amount }} — {{ o.description|default('') }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit">Проверить</button>
+      <a href="{{ path('auto_template_index') }}" class="btn btn-secondary">Назад</a>
+    </form>
+
+    {% if result %}
+      <h4>Результат</h4>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Поле</th>
+            <th>Оператор</th>
+            <th>Значение</th>
+            <th>Совп.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in result.conditions %}
+            <tr>
+              <td>{{ row.field }}</td>
+              <td>{{ row.operator }}</td>
+              <td>{{ row.value }}</td>
+              <td>{{ row.result ? 'Да' : 'Нет' }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div class="mt-2">
+        {% if result.category %}
+          Категория будет присвоена: {{ result.category.name }}
+        {% else %}
+          Совпадений нет.
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+

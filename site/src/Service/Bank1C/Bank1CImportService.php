@@ -13,6 +13,8 @@ use App\Repository\CounterpartyRepository;
 use App\Service\Bank1C\Dto\Bank1CImportResult;
 use App\Service\Bank1C\Dto\Bank1CDocument;
 use App\Service\CashTransactionService;
+use App\Service\AutoCategory\AutoCategorizerInterface;
+use App\Enum\AutoTemplateDirection;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -23,7 +25,8 @@ class Bank1CImportService
         private CashTransactionService $txService,
         private CounterpartyRepository $cpRepo,
         private CashTransactionRepository $txRepo,
-        private EntityManagerInterface $em
+        private EntityManagerInterface $em,
+        private AutoCategorizerInterface $autoCategorizer
     ) {
     }
 
@@ -65,8 +68,37 @@ class Bank1CImportService
                 $dto->occurredAt = new \DateTimeImmutable($dateStr);
                 $dto->description = $doc->purpose;
                 $dto->externalId = $externalId;
+                $dto->payerInn = $doc->payerInn;
+                $dto->payeeInn = $doc->payeeInn;
+                $dto->counterpartyNameRaw = $direction === CashDirection::INFLOW ? $doc->payerName : $doc->payeeName;
+                $dto->payerAccount = $doc->payerAccount;
+                $dto->payeeAccount = $doc->payeeAccount;
                 if ($counterparty) {
                     $dto->counterpartyId = $counterparty->getId();
+                    $dto->counterpartyType = $counterparty->getType();
+                }
+                if (!$dto->cashflowCategoryId) {
+                    $operation = [
+                        'plat_inn' => $dto->payerInn,
+                        'pol_inn' => $dto->payeeInn,
+                        'description' => $dto->description ?? '',
+                        'amount' => $dto->amount,
+                        'counterparty_name_raw' => $dto->counterpartyNameRaw,
+                        'payer_account' => $dto->payerAccount,
+                        'payee_account' => $dto->payeeAccount,
+                        'payer_bic' => $dto->payerBic,
+                        'payee_bank' => $dto->payeeBank,
+                        'doc_number' => $dto->externalId,
+                        'date' => $dto->occurredAt,
+                        'money_account' => $dto->moneyAccountId,
+                        'counterparty_id' => $dto->counterpartyId,
+                        'counterparty_type' => $dto->counterpartyType?->value,
+                    ];
+                    $autoDir = $direction === CashDirection::INFLOW ? AutoTemplateDirection::INFLOW : AutoTemplateDirection::OUTFLOW;
+                    $cat = $this->autoCategorizer->resolveCashflowCategory($company, $operation, $autoDir);
+                    if ($cat) {
+                        $dto->cashflowCategoryId = $cat->getId();
+                    }
                 }
                 $this->txService->add($dto);
                 $result->created++;

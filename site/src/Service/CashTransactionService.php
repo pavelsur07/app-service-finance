@@ -11,6 +11,8 @@ use App\Entity\CashflowCategory;
 use App\Enum\CashDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Repository\CashTransactionRepository;
+use App\Service\AutoCategory\AutoCategorizerInterface;
+use App\Enum\AutoTemplateDirection;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
@@ -20,7 +22,8 @@ class CashTransactionService
     public function __construct(
         private EntityManagerInterface $em,
         private AccountBalanceService $balanceService,
-        private CashTransactionRepository $txRepo
+        private CashTransactionRepository $txRepo,
+        private AutoCategorizerInterface $autoCategorizer
     ) {}
 
     /**
@@ -49,6 +52,32 @@ class CashTransactionService
         $category = $dto->cashflowCategoryId
             ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
             : null;
+
+        if (!$category) {
+            $operation = [
+                'plat_inn' => $dto->payerInn,
+                'pol_inn' => $dto->payeeInn,
+                'description' => $dto->description ?? '',
+                'amount' => $dto->amount,
+                'counterparty_name_raw' => $dto->counterpartyNameRaw,
+                'payer_account' => $dto->payerAccount,
+                'payee_account' => $dto->payeeAccount,
+                'payer_bic' => $dto->payerBic,
+                'payee_bank' => $dto->payeeBank,
+                'doc_number' => $dto->externalId,
+                'date' => $dto->occurredAt,
+                'money_account' => $dto->moneyAccountId,
+                'counterparty_id' => $dto->counterpartyId,
+                'counterparty_type' => $dto->counterpartyType?->value,
+            ];
+            $direction = $dto->direction === CashDirection::INFLOW
+                ? AutoTemplateDirection::INFLOW
+                : AutoTemplateDirection::OUTFLOW;
+            $found = $this->autoCategorizer->resolveCashflowCategory($company, $operation, $direction);
+            if ($found) {
+                $category = $found;
+            }
+        }
 
         $tx
             ->setDescription($dto->description)
