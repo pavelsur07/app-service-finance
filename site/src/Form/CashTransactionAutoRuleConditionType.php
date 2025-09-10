@@ -48,6 +48,7 @@ class CashTransactionAutoRuleConditionType extends AbstractType
             ->add('counterparty', EntityType::class, [
                 'class' => Counterparty::class,
                 'choices' => $options['counterparties'],
+                'choice_label' => 'name',
                 'required' => false,
                 'label' => 'Контрагент',
             ])
