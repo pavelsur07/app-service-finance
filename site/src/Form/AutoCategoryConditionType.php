@@ -11,6 +11,9 @@ use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\HiddenType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Form\FormError;
+use Symfony\Component\Form\FormEvent;
+use Symfony\Component\Form\FormEvents;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
 class AutoCategoryConditionType extends AbstractType
@@ -51,7 +54,7 @@ class AutoCategoryConditionType extends AbstractType
                     'class' => 'form-control js-value',
                     'placeholder' => 'Введите триггер (слово/фразу) или значение',
                 ],
-                'help' => 'Для "Содержит" введите слово или фразу. Для BETWEEN: мин..макс. Для IN: ["A","B"]. Для REGEX: корректный паттерн.',
+                'help' => 'CONTAINS — слово/фраза. BETWEEN — min..max (числа или YYYY-MM-DD). IN — ["A","B"]. REGEX — валидный PCRE.',
             ])
             ->add('caseSensitive', CheckboxType::class, [
                 'required' => false,
@@ -64,6 +67,20 @@ class AutoCategoryConditionType extends AbstractType
             ->add('position', HiddenType::class, [
                 'empty_data' => '0',
             ]);
+
+        $b->addEventListener(FormEvents::POST_SUBMIT, function(FormEvent $event) {
+            /** @var AutoCategoryCondition $data */
+            $data = $event->getData();
+            $form = $event->getForm();
+            if ($data->getOperator() === ConditionOperator::REGEX) {
+                $pattern = $data->getValue();
+                $delim = '/';
+                $regex = $delim . str_replace($delim, '\\' . $delim, $pattern) . $delim;
+                if (@preg_match($regex, '') === false) {
+                    $form->get('value')->addError(new FormError('Некорректное регулярное выражение'));
+                }
+            }
+        });
     }
 
     public function configureOptions(OptionsResolver $resolver): void

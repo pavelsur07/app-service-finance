@@ -3,6 +3,7 @@
 namespace App\DTO;
 
 use App\Enum\CashDirection;
+use App\Enum\CounterpartyType;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class CashTransactionDTO
@@ -32,6 +33,15 @@ class CashTransactionDTO
 
     public ?string $description = null;
     public ?string $externalId = null;
+
+    public ?string $payerInn = null;
+    public ?string $payeeInn = null;
+    public ?string $counterpartyNameRaw = null;
+    public ?string $payerAccount = null;
+    public ?string $payeeAccount = null;
+    public ?string $payerBic = null;
+    public ?string $payeeBank = null;
+    public ?CounterpartyType $counterpartyType = null;
 
     public function __construct()
     {

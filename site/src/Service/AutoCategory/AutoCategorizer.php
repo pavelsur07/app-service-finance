@@ -52,6 +52,7 @@ class AutoCategorizer implements AutoCategorizerInterface
         }
 
         $this->logger->info('auto_category', [
+            'company_id' => $company->getId(),
             'operationRef' => $operation['doc_number'] ?? null,
             'matched_template_id' => $matchedTemplateId,
             'conditions' => $matchedConditions,

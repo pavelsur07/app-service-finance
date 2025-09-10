@@ -18,6 +18,7 @@ use App\Service\AccountBalanceService;
 use App\Service\Bank1C\Bank1CImportService;
 use App\Service\Bank1C\Bank1CStatementParser;
 use App\Service\CashTransactionService;
+use App\Service\AutoCategory\AutoCategorizerInterface;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;
@@ -70,9 +71,10 @@ class Bank1CImportServiceTest extends TestCase
         $cpRepo = new CounterpartyRepository($registry);
         $balanceRepo = new MoneyAccountDailyBalanceRepository($registry);
         $balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $txService = new CashTransactionService($this->em, $balanceService, $txRepo);
+        $categorizer = $this->createMock(AutoCategorizerInterface::class);
+        $txService = new CashTransactionService($this->em, $balanceService, $txRepo, $categorizer);
         $parser = new Bank1CStatementParser();
-        $this->importService = new Bank1CImportService($parser, $txService, $cpRepo, $txRepo, $this->em);
+        $this->importService = new Bank1CImportService($parser, $txService, $cpRepo, $txRepo, $this->em, $categorizer);
 
         $user = new User(Uuid::uuid4()->toString());
         $user->setEmail('t@example.com');

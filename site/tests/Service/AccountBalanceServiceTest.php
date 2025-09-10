@@ -6,6 +6,7 @@ use App\DTO\CashTransactionDTO;
 use App\Enum\CashDirection;
 use App\Service\AccountBalanceService;
 use App\Service\CashTransactionService;
+use App\Service\AutoCategory\AutoCategorizerInterface;
 use App\Entity\User;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
@@ -58,7 +59,8 @@ class AccountBalanceServiceTest extends TestCase
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
         $balanceRepo = new \App\Repository\MoneyAccountDailyBalanceRepository($registry);
         $this->balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo);
+        $categorizer = $this->createMock(AutoCategorizerInterface::class);
+        $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo, $categorizer);
     }
 
     public function testRecalculateBalances(): void
