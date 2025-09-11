@@ -1,0 +1,62 @@
+{% extends 'base.html.twig' %}
+{% block title %}Проверка правила — {{ rule.name }}{% endblock %}
+
+{% block body %}
+<div class="container-xl mt-3">
+  <div class="d-flex align-items-center mb-2">
+    <h2 class="page-title">Совпадения по правилу: {{ rule.name }}</h2>
+    <div class="ms-auto text-muted">Показано: {{ transactions|length }} (limit {{ limit }})</div>
+  </div>
+
+  <form method="get" class="card card-body mb-3">
+    <div class="row g-2">
+      <div class="col-md-3">
+        <label class="form-label">С даты</label>
+        <input type="date" name="dateFrom" value="{{ app.request.get('dateFrom') }}" class="form-control">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">По дату</label>
+        <input type="date" name="dateTo" value="{{ app.request.get('dateTo') }}" class="form-control">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Лимит</label>
+        <input type="number" name="limit" value="{{ app.request.get('limit') ?? 200 }}" class="form-control" min="10" max="1000">
+      </div>
+      <div class="col-md-2 align-self-end">
+        <button class="btn btn-primary">Обновить</button>
+      </div>
+    </div>
+  </form>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-vcenter">
+        <thead>
+          <tr>
+            <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
+            <th>Статья</th><th>Контрагент</th><th>Описание</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for t in transactions %}
+          <tr>
+            <td>{{ t.occurredAt|date('d.m.Y') }}</td>
+            <td>{{ t.moneyAccount.name }}</td>
+            <td class="text-end">{{ t.amount|number_format(2, ',', ' ') }} {{ t.currency }}</td>
+            <td>{{ t.cashflowCategory ? t.cashflowCategory.name : '' }}</td>
+            <td>{{ t.counterparty ? t.counterparty.name : '' }}</td>
+            <td>{{ t.description }}</td>
+            <td class="text-nowrap">
+              <a class="btn btn-sm btn-info" href="{{ path('cash_transaction_show', {id: t.id}) }}">Просмотр</a>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="text-center text-muted">Совпадений нет</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
