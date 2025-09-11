@@ -20,7 +20,18 @@
             <dt class="col-md-3">Счет</dt><dd class="col-md-9">{{ tx.moneyAccount.name }}</dd>
             <dt class="col-md-3">Направление</dt><dd class="col-md-9"><span class="badge bg-{{ tx.direction == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction == 'INFLOW' ? 'Приток' : 'Отток' }}</span></dd>
             <dt class="col-md-3">Сумма</dt><dd class="col-md-9 text-end">{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</dd>
-            <dt class="col-md-3">Статья</dt><dd class="col-md-9">{% set chain = [] %}{% set c = tx.cashflowCategory %}{% for i in 0..10 if c %}{% set chain = [c.name]|merge(chain) %}{% set c = c.parent %}{% endfor %}{{ chain|join(' / ') }}</dd>
+            <dt class="col-md-3">Статья</dt>
+            <dd class="col-md-9">
+                {% set chain = [] %}
+                {% set c = tx.cashflowCategory %}
+                {% for i in 0..10 %}
+                    {% if c %}
+                        {% set chain = [c.name]|merge(chain) %}
+                        {% set c = c.parent %}
+                    {% endif %}
+                {% endfor %}
+                {{ chain|join(' / ') }}
+            </dd>
             <dt class="col-md-3">Контрагент</dt><dd class="col-md-9">{{ tx.counterparty ? tx.counterparty.name : '' }}</dd>
             <dt class="col-md-3">Описание</dt><dd class="col-md-9">{{ tx.description }}</dd>
         </dl>
