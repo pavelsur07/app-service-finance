@@ -54,10 +54,12 @@
                     <td class="text-nowrap">
                         <a href="{{ path('cash_transaction_show', {id: tx.id}) }}" class="btn btn-sm btn-info">Просмотр</a>
                         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-sm btn-warning">Редактировать</a>
-                        <a href="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
+                        <a href="#"
                            class="btn btn-sm btn-outline-secondary js-auto-rule"
                            data-transaction-id="{{ tx.id }}"
-                           data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}">
+                           data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
+                           data-bs-toggle="modal"
+                           data-bs-target="#autoRuleModal">
                           A+
                         </a>
                         <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#delete-modal-{{ tx.id }}">Удалить</button>
@@ -90,7 +92,6 @@
             <div class="col">Баланс движения</div>
             <div class="col text-end">{{ summary.net|number_format(2, ',', ' ') }}</div>
         </div>
-    </div>
     </div>
 </div>
 
@@ -147,11 +148,8 @@
       bodyEl.innerHTML = '<div class="text-muted">Загрузка…</div>';
 
       // Показ модалки (Tabler/Bootstrap 5)
-      const ModalClass = window.Tabler?.Modal || window.bootstrap?.Modal;
-      if (ModalClass) {
-        const modal = new ModalClass(modalEl);
-        modal.show();
-      }
+      const modal = window.bootstrap?.Modal.getOrCreateInstance(modalEl);
+      modal?.show();
 
       try {
         const html = await fetch(url, {headers: {'X-Requested-With':'XMLHttpRequest'}}).then(r => r.text());
