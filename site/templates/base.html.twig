@@ -9,6 +9,9 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
         {% block stylesheets %}{% endblock %}
     {% endblock %}
+    {% block importmap %}
+        {{ importmap('app')|replace({'<script type="importmap"': '<script type="importmap" data-turbo-track="reload"'}) }}
+    {% endblock %}
 </head>
 <body class="layout-fluid layout-fluid-vertical">
 <div class="page">
@@ -33,7 +36,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
 
 {% block scripts %}
-    {{ importmap('app') }}
     {% block javascripts %}{% endblock %}
 {% endblock %}
 </body>
