@@ -33,11 +33,11 @@
                 </li>
 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
                         <span class="nav-link-title text-muted"> Отчеты </span>
                     </a>
-                    <div class="dropdown-menu">
+                    <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item {{ current_route starts with 'report_cashflow' ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}">
                             <span class="nav-link-title">Отчет ДДС</span>
                         </a>
@@ -48,11 +48,11 @@
                 </li>
 
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
                         <span class="nav-link-title text-muted"> Справочники </span>
                     </a>
-                    <div class="dropdown-menu">
+                    <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item {% if current_route == 'money_account_index' %}active{% endif %}" href="{{ path('money_account_index') }}">
                             <span class="nav-link-title">Счета / Кассы / Кошельки</span>
                         </a>
@@ -76,10 +76,10 @@
 
                 {#---- Ozon ---#}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#navbar-ozon" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
                         <span class="nav-link-title text-muted"> Ozon </span>
                     </a>
-                    <div class="dropdown-menu">
+                    <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item {{ current_route starts with 'ozon_order' ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
                             <span class="nav-link-title">Заказы</span>
                         </a>
@@ -90,12 +90,12 @@
                 </li>
                 {#---- Profile ---#}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#navbar-plugins" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
 
                         <span class="nav-link-title text-muted"> Настройки </span>
                     </a>
-                    <div class="dropdown-menu">
+                    <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item" href="{{ path('company_index') }}"> Профиль компании </a>
                     </div>
                 </li>
