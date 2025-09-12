@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
@@ -14,10 +15,12 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CounterpartyRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\CashTransactionAutoRuleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -210,6 +213,67 @@ class CashTransactionAutoRuleController extends AbstractController
             'transactions' => $transactions,
             'limit' => $limit,
         ]);
+    }
+
+    #[Route('/match/{transactionId}', name: 'cash_transaction_auto_rule_match_one', methods: ['GET'])]
+    public function matchOne(
+        string $transactionId,
+        ActiveCompanyService $companyService,
+        CashTransactionRepository $txRepo,
+        CashTransactionAutoRuleService $autoRuleService
+    ): Response {
+        $company = $companyService->getActiveCompany();
+
+        /** @var CashTransaction|null $t */
+        $t = $txRepo->find($transactionId);
+        if (!$t || $t->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $rule = $autoRuleService->findMatchingRule($t);
+
+        return $this->render('cash_transaction/_auto_rule_modal_body.html.twig', [
+            'transaction' => $t,
+            'rule' => $rule,
+        ]);
+    }
+
+    #[Route('/apply/{transactionId}', name: 'cash_transaction_auto_rule_apply_one', methods: ['POST'])]
+    public function applyOne(
+        string $transactionId,
+        Request $request,
+        ActiveCompanyService $companyService,
+        CashTransactionRepository $txRepo,
+        CashTransactionAutoRuleRepository $ruleRepo,
+        CashTransactionAutoRuleService $autoRuleService
+    ): Response {
+        $company = $companyService->getActiveCompany();
+
+        /** @var CashTransaction|null $t */
+        $t = $txRepo->find($transactionId);
+        if (!$t || $t->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $ruleId = (string)$request->request->get('ruleId', '');
+        $rule = $ruleId ? $ruleRepo->find($ruleId) : null;
+
+        // safety: если id не пришёл — пересчитаем подбор прямо сейчас
+        if (!$rule) {
+            $rule = $autoRuleService->findMatchingRule($t);
+        }
+        if (!$rule || $rule->getCompany() !== $company) {
+            return new JsonResponse(['ok' => false, 'message' => 'Подходящее правило не найдено'], 200);
+        }
+
+        $changed = $autoRuleService->applyRule($rule, $t);
+
+        return new JsonResponse([
+            'ok' => true,
+            'changed' => $changed,
+            'ruleName' => $rule->getName(),
+            'action' => $rule->getAction()->value,
+        ], 200);
     }
 
     #[Route('/{id}/delete', name: 'cash_transaction_auto_rule_delete', methods: ['POST'])]
