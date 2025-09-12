@@ -54,6 +54,12 @@
                     <td class="text-nowrap">
                         <a href="{{ path('cash_transaction_show', {id: tx.id}) }}" class="btn btn-sm btn-info">Просмотр</a>
                         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-sm btn-warning">Редактировать</a>
+                        <a href="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
+                           class="btn btn-sm btn-outline-secondary js-auto-rule"
+                           data-transaction-id="{{ tx.id }}"
+                           data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}">
+                          A+
+                        </a>
                         <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#delete-modal-{{ tx.id }}">Удалить</button>
                         {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
                     </td>
@@ -87,6 +93,20 @@
     </div>
     </div>
 </div>
+
+<div class="modal fade" id="autoRuleModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Автоправило</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+      </div>
+      <div class="modal-body" id="autoRuleModalBody">
+        <div class="text-muted">Загрузка…</div>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -113,6 +133,56 @@
                 to.value = fmt(now);
             });
         });
+    </script>
+    <script>
+    document.addEventListener('click', async (e) => {
+      const btn = e.target.closest('.js-auto-rule');
+      if (!btn) return;
+
+      e.preventDefault();
+      const url = btn.dataset.url;
+      const modalEl = document.getElementById('autoRuleModal');
+      const bodyEl  = document.getElementById('autoRuleModalBody');
+
+      bodyEl.innerHTML = '<div class="text-muted">Загрузка…</div>';
+
+      try {
+        const html = await fetch(url, {headers: {'X-Requested-With':'XMLHttpRequest'}}).then(r => r.text());
+        bodyEl.innerHTML = html;
+      } catch(err) {
+        bodyEl.innerHTML = '<div class="text-danger">Ошибка загрузки</div>';
+      }
+
+      // Показ модалки (Bootstrap 5)
+      const modal = new bootstrap.Modal(modalEl);
+      modal.show();
+
+      // Обработка submit "Применить" внутри модалки (AJAX)
+      modalEl.addEventListener('submit', async (ev) => {
+        const f = ev.target;
+        if (f.id !== 'autoRuleApplyForm') return;
+        ev.preventDefault();
+
+        const formData = new FormData(f);
+        const res = await fetch(f.action, { method: 'POST', body: formData, headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        const data = await res.json();
+
+        if (data.ok) {
+          bodyEl.innerHTML = `
+        <div class="alert alert-success mb-2">Применено: ${data.changed ? 'да' : 'без изменений'}</div>
+        <div>Правило: <b>${data.ruleName}</b> (${data.action})</div>
+        <div class="mt-3 text-end">
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Закрыть</button>
+        </div>`;
+        } else {
+          bodyEl.innerHTML = `
+        <div class="alert alert-warning mb-2">${data.message ?? 'Не найдено'}</div>
+        <div class="mt-3 text-end">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+        </div>`;
+        }
+      }, { once: true });
+    });
     </script>
 {% endblock %}
 

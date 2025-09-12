@@ -1,0 +1,25 @@
+{# Это только BODY модалки; сама модалка — ниже #}
+
+{% if rule %}
+  <div class="mb-2">
+    <div class="h3">Найдено автоправило</div>
+    <div class="text-muted">«{{ rule.name }}» ({{ rule.action.value }}, {{ rule.operationType.value }})</div>
+  </div>
+
+  <form id="autoRuleApplyForm" method="post"
+        action="{{ path('cash_transaction_auto_rule_apply_one', {transactionId: transaction.id}) }}">
+    <input type="hidden" name="ruleId" value="{{ rule.id }}">
+    {# CSRF не обязателен для AJAX, но можно добавить, если в проекте принято #}
+    <div class="d-flex gap-2 mt-3">
+      <button type="submit" class="btn btn-primary">Применить</button>
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+    </div>
+  </form>
+{% else %}
+  <div class="mb-2">
+    <div class="h3">Подходящих автоправил не найдено</div>
+  </div>
+  <div class="d-flex gap-2 mt-3">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+  </div>
+{% endif %}
