@@ -24,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     .forEach((link) => {
       link.addEventListener('click', (event) => {
         event.preventDefault();
+        // Prevent the click from bubbling up, which would
+        // immediately close the menu in some browsers.
+        event.stopPropagation();
         const menu = link.nextElementSibling;
         if (menu) {
           const isOpen = menu.classList.toggle('show');
