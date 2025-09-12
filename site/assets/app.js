@@ -26,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         const menu = link.nextElementSibling;
         if (menu) {
-          menu.classList.toggle('show');
+          const isOpen = menu.classList.toggle('show');
+          link.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
         }
       });
     });
