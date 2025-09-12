@@ -33,6 +33,10 @@
 <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  if (typeof window.Tabler === 'undefined') {
+    return;
+  }
+
   document
     .querySelectorAll('#sidebar-menu .nav-item.dropdown > a.nav-link.dropdown-toggle[data-bs-toggle="dropdown"]')
     .forEach(function (el) {
