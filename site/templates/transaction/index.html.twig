@@ -153,9 +153,12 @@
         bodyEl.innerHTML = '<div class="text-danger">Ошибка загрузки</div>';
       }
 
-      // Показ модалки (Bootstrap 5)
-      const modal = new bootstrap.Modal(modalEl);
-      modal.show();
+      // Показ модалки (Tabler/Bootstrap 5)
+      const ModalClass = window.Tabler?.Modal || window.bootstrap?.Modal;
+      if (ModalClass) {
+        const modal = new ModalClass(modalEl);
+        modal.show();
+      }
 
       // Обработка submit "Применить" внутри модалки (AJAX)
       modalEl.addEventListener('submit', async (ev) => {
