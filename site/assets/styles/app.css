@@ -17,3 +17,16 @@ body {
         padding: 3rem;
     }
 }
+
+/*
+ * Fallback styles for dropdown menus in the sidebar. When Tabler's CSS
+ * is unavailable, ensure that the dropdown menu can still be toggled
+ * via the "show" class added by our JavaScript.
+ */
+.navbar-vertical .dropdown-menu {
+    display: none;
+}
+
+.navbar-vertical .dropdown-menu.show {
+    display: block;
+}

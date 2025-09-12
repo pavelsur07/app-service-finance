@@ -1,10 +1,33 @@
 import './bootstrap.js';
-/*
- * Welcome to your app's main JavaScript file!
- *
- * This file will be included onto the page via the importmap() Twig function,
- * which should already be in your base.html.twig.
- */
 import './styles/app.css';
 
-console.log('This log comes from assets/app.js - welcome to AssetMapper! 🎉');
+/**
+ * Simple dropdown handler for the vertical sidebar.
+ *
+ * Tabler's JavaScript is normally responsible for toggling dropdown
+ * menus. In environments where the library isn't loaded (for example
+ * when CDN assets are unavailable), the menu items would stop opening.
+ *
+ * The code below reproduces the required behaviour using vanilla
+ * JavaScript so that the menu continues to work even without the
+ * external dependency.
+ */
+document.addEventListener('DOMContentLoaded', () => {
+  // If Tabler's JavaScript is available, it will handle dropdowns itself.
+  // The fallback logic below runs only when Tabler isn't present.
+  if (typeof window.Tabler !== 'undefined') {
+    return;
+  }
+
+  document
+    .querySelectorAll('.navbar-vertical .nav-item.dropdown > .nav-link')
+    .forEach((link) => {
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        const menu = link.nextElementSibling;
+        if (menu) {
+          menu.classList.toggle('show');
+        }
+      });
+    });
+});
