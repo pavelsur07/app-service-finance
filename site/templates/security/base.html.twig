@@ -10,7 +10,7 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
     {% endblock %}
     {% block importmap %}
-        {{ importmap('app')|replace({'<script type="importmap"': '<script type="importmap" data-turbo-track="reload"'}) }}
+        {{ importmap('app')|replace({'<script type="importmap"': '<script type="importmap" data-turbo-track="reload"'})|raw }}
     {% endblock %}
 </head>
 <body>
