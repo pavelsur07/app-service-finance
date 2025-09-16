@@ -49,7 +49,8 @@ class Bank1CImportController extends AbstractController
             $this->addFlash('danger', 'Файл не загружен');
             return $this->redirectToRoute('bank1c_import_form');
         }
-        if ($file->getSize() > 10 * 1024 * 1024 || $file->getClientOriginalExtension() !== 'txt') {
+        $extension = strtolower($file->getClientOriginalExtension() ?? '');
+        if ($file->getSize() > 10 * 1024 * 1024 || $extension !== 'txt') {
             $this->addFlash('danger', 'Недопустимый файл');
             return $this->redirectToRoute('bank1c_import_form');
         }
