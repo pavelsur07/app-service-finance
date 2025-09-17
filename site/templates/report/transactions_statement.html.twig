@@ -123,7 +123,6 @@
             <thead>
                 <tr>
                     <th>Дата / Период</th>
-                    <th>Документ</th>
                     <th>Контрагент</th>
                     <th>Описание</th>
                     <th class="text-end">Сумма</th>
@@ -133,13 +132,12 @@
             <tbody>
                 {% if buckets is empty %}
                     <tr>
-                        <td colspan="6" class="text-center text-muted py-5">Нет данных за выбранный период</td>
+                        <td colspan="5" class="text-center text-muted py-5">Нет данных за выбранный период</td>
                     </tr>
                 {% else %}
                     {% for bucket in buckets %}
                         <tr class="fw-bold">
                             <td>{{ bucket.label }} — Сальдо на начало</td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -152,7 +150,6 @@
                                 {% set amountClass = amount < 0 ? 'text-danger' : (amount > 0 ? 'text-success' : '') %}
                                 <tr>
                                     <td>{% if groupBy == 'day' %}{{ trx.date|date('d.m.Y') }}{% else %}{{ bucket.label }}{% endif %}</td>
-                                    <td>{{ trx.doc|default('') }}</td>
                                     <td>{{ trx.counterparty|default('') }}</td>
                                     <td>{{ trx.description|default('') }}</td>
                                     <td class="text-end {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
@@ -162,7 +159,6 @@
                         {% endif %}
                         <tr class="fw-bold">
                             <td>{{ bucket.label }} — Сальдо на конец</td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
