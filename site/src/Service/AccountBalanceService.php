@@ -64,6 +64,15 @@ class AccountBalanceService
         $to = $to->setTime(0,0);
         $prev = $this->balanceRepo->findLastBefore($company, $account, $from);
         $opening = $prev ? $prev->getClosingBalance() : $account->getOpeningBalance();
+        // Если пересчёт стартует ровно с даты ввода остатка — opening фиксируем как установленный остаток счёта
+        $accountOpeningDate = $account->getOpeningBalanceDate();
+        if ($accountOpeningDate !== null) {
+            $fromDateOnly = $from->format('Y-m-d');
+            $openingDateOnly = $accountOpeningDate->setTime(0, 0)->format('Y-m-d');
+            if ($fromDateOnly === $openingDateOnly) {
+                $opening = $account->getOpeningBalance();
+            }
+        }
         $rows = [];
         $txAgg = $this->txRepo->sumByDay($company, $account, $from, $to);
         $map = [];
