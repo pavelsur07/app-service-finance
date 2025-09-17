@@ -3,13 +3,16 @@
 namespace App\Tests\Service;
 
 use App\DTO\CashTransactionDTO;
-use App\Enum\CashDirection;
-use App\Service\AccountBalanceService;
-use App\Service\CashTransactionService;
-use App\Entity\User;
+use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
+use App\Entity\MoneyAccountDailyBalance;
+use App\Entity\User;
+use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;
+use App\Repository\MoneyAccountDailyBalanceRepository;
+use App\Service\AccountBalanceService;
+use App\Service\CashTransactionService;
 use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -39,6 +42,7 @@ class AccountBalanceServiceTest extends TestCase
     private EntityManager $em;
     private AccountBalanceService $balanceService;
     private CashTransactionService $txService;
+    private MoneyAccountDailyBalanceRepository $balanceRepo;
 
     protected function setUp(): void
     {
@@ -56,8 +60,8 @@ class AccountBalanceServiceTest extends TestCase
         $schemaTool->createSchema($classes);
         $registry = new SimpleManagerRegistry($this->em);
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
-        $balanceRepo = new \App\Repository\MoneyAccountDailyBalanceRepository($registry);
-        $this->balanceService = new AccountBalanceService($txRepo, $balanceRepo);
+        $this->balanceRepo = new MoneyAccountDailyBalanceRepository($registry);
+        $this->balanceService = new AccountBalanceService($txRepo, $this->balanceRepo);
         $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo);
     }
 
@@ -98,5 +102,70 @@ class AccountBalanceServiceTest extends TestCase
         $this->assertCount(2, $balances->balances);
         $this->assertSame('150', $balances->balances[0]->closing);
         $this->assertSame('120', $balances->balances[1]->closing);
+    }
+
+    public function testRecalculateUsesAccountOpeningBalanceWhenRangeStartsOnOpeningDate(): void
+    {
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('opening@example.com');
+        $user->setPassword('pass');
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('Opening Test');
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Operating', 'USD');
+        $account->setOpeningBalance('1000.00');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2025-09-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+
+        $previous = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $account,
+            new \DateTimeImmutable('2025-08-31'),
+            '0.00',
+            '0.00',
+            '0.00',
+            '0.00',
+            'USD'
+        );
+        $this->em->persist($previous);
+
+        $outflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $account,
+            CashDirection::OUTFLOW,
+            '100.00',
+            'USD',
+            new \DateTimeImmutable('2025-09-01')
+        );
+        $inflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $account,
+            CashDirection::INFLOW,
+            '20.00',
+            'USD',
+            new \DateTimeImmutable('2025-09-01')
+        );
+        $this->em->persist($outflow);
+        $this->em->persist($inflow);
+
+        $this->em->flush();
+
+        $rangeDate = new \DateTimeImmutable('2025-09-01');
+        $this->balanceService->recalculateDailyRange($company, $account, $rangeDate, $rangeDate);
+
+        $snapshot = $this->balanceRepo->findOneBy([
+            'company' => $company,
+            'moneyAccount' => $account,
+            'date' => $rangeDate,
+        ]);
+
+        $this->assertNotNull($snapshot);
+        $this->assertSame('1000.00', $snapshot->getOpeningBalance());
+        $this->assertSame('920.00', $snapshot->getClosingBalance());
     }
 }
