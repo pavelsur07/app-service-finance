@@ -78,6 +78,10 @@
         "symfony/polyfill-php82": "*"
     },
     "scripts": {
+        "cs:check": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "cs:phpcs": "phpcs --standard=PSR12 src tests",
+        "cs:twig": "twigcs --config .twig-cs-fixer.php templates",
         "auto-scripts": {
             "cache:clear": "symfony-cmd",
             "assets:install %PUBLIC_DIR%": "symfony-cmd",
@@ -101,7 +105,10 @@
     },
     "require-dev": {
         "doctrine/doctrine-fixtures-bundle": "^4.1",
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "friendsoftwig/twigcs": "^6.1",
         "phpunit/phpunit": "^11.5",
+        "squizlabs/php_codesniffer": "^3.10",
         "symfony/browser-kit": "7.3.*",
         "symfony/css-selector": "7.3.*",
         "symfony/debug-bundle": "7.3.*",
