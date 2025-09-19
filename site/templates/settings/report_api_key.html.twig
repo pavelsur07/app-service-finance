@@ -27,11 +27,16 @@
                     </form>
                 </div>
 
-                <div class="mt-4">
-                    <h3 class="h5">Использование в Google Sheets</h3>
-                    <p class="text-muted mb-2">Пример формулы для импорта отчёта по движению денежных средств:</p>
-                    <pre class="bg-light p-3 rounded"><code>{{ '=IMPORTDATA("' ~ app.request.schemeAndHttpHost ~ '/api/public/reports/cashflow.csv?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30")' }}</code></pre>
-                </div>
+                <p class="text-muted mt-3">Ключ отображается только при генерации — сохраните его и не передавайте посторонним.</p>
+
+                <h2 class="h5 mt-4">Как использовать с Google Sheets</h2>
+                <p>Скопируйте формулу (ключ передается через query-параметр <code>token</code>):</p>
+                <pre>=IMPORTDATA("{{ app.request.schemeAndHttpHost }}/api/public/reports/cashflow.csv?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30")</pre>
+                <p>Google Sheets (IMPORTDATA) не отправляет заголовки Authorization, поэтому ключ должен быть в URL.</p>
+                <p>Если нужен JSON для Apps Script:</p>
+                <pre>{{ app.request.schemeAndHttpHost }}/api/public/reports/cashflow.json?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30</pre>
+
+                <p class="mt-3"><a href="{{ path('report_cashflow_index') }}" target="_blank">Открыть отчёт ДДС (UI)</a></p>
             </div>
         </div>
     </div>
