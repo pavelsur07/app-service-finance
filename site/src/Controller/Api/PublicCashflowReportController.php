@@ -4,30 +4,30 @@ namespace App\Controller\Api;
 
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportRequestMapper;
+use App\Service\RateLimiter\ReportsApiRateLimiter;
 use App\Service\ReportApiKeyManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\Routing\Attribute\Route;
 
 final class PublicCashflowReportController extends AbstractController
 {
     public function __construct(
-        private ReportApiKeyManager $keys,
-        private CashflowReportRequestMapper $mapper,
-        private CashflowReportBuilder $builder,
+        private readonly ReportApiKeyManager $keys,
+        private readonly CashflowReportRequestMapper $mapper,
+        private readonly CashflowReportBuilder $builder,
+        private readonly ReportsApiRateLimiter $rateLimiter,
     ) {}
 
     #[Route('/api/public/reports/cashflow.json', name: 'api_report_cashflow_json', methods: ['GET'])]
-    public function jsonReport(Request $r, #[Autowire(service: 'limiter.reports_api')] RateLimiterFactory $reportsApiLimiter): JsonResponse
+    public function jsonReport(Request $r): JsonResponse
     {
         $token = (string) $r->query->get('token', '');
-        $limiter = $reportsApiLimiter->create($token ?: ($r->getClientIp() ?? 'anon'));
-        if (!$limiter->consume(1)->isAccepted()) {
+        $identifier = $token !== '' ? $token : ($r->getClientIp() ?? 'anon');
+        if (!$this->rateLimiter->consume($identifier)) {
             return new JsonResponse(['error' => 'rate_limited'], 429);
         }
         if ($token === '') {
@@ -60,11 +60,11 @@ final class PublicCashflowReportController extends AbstractController
     }
 
     #[Route('/api/public/reports/cashflow.csv', name: 'api_report_cashflow_csv', methods: ['GET'])]
-    public function csv(Request $r, #[Autowire(service: 'limiter.reports_api')] RateLimiterFactory $reportsApiLimiter): Response
+    public function csv(Request $r): Response
     {
         $token = (string) $r->query->get('token', '');
-        $limiter = $reportsApiLimiter->create($token ?: ($r->getClientIp() ?? 'anon'));
-        if (!$limiter->consume(1)->isAccepted()) {
+        $identifier = $token !== '' ? $token : ($r->getClientIp() ?? 'anon');
+        if (!$this->rateLimiter->consume($identifier)) {
             return new JsonResponse(['error' => 'rate_limited'], 429);
         }
         if ($token === '') {
