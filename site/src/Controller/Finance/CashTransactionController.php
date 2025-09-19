@@ -5,6 +5,7 @@ namespace App\Controller\Finance;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
+use App\Entity\ProjectDirection;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Form\CashTransactionType;
@@ -12,6 +13,7 @@ use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
+use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\Exception\ORMException;
@@ -186,6 +188,7 @@ class CashTransactionController extends AbstractController
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
+        ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         if ($tx->getCompany() !== $company) {
@@ -236,6 +239,14 @@ class CashTransactionController extends AbstractController
                 'data' => $tx->getCounterparty(),
                 'mapped' => false,
             ])
+            ->add('projectDirection', ChoiceType::class, [
+                'required' => false,
+                'choices' => $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']),
+                'choice_label' => fn (ProjectDirection $projectDirection) => $projectDirection->getName(),
+                'choice_value' => 'id',
+                'data' => $tx->getProjectDirection(),
+                'mapped' => false,
+            ])
             ->add('description', TextareaType::class, ['required' => false, 'data' => $tx->getDescription()])
             ->addEventListener(FormEvents::SUBMIT, function (FormEvent $event) use ($company) {
                 /** @var CashTransactionDTO $data */
@@ -249,8 +260,10 @@ class CashTransactionController extends AbstractController
 
                 $cat = $form->get('cashflowCategory')->getData();
                 $cp = $form->get('counterparty')->getData();
+                $projectDirection = $form->get('projectDirection')->getData();
                 $data->cashflowCategoryId = $cat?->getId();
                 $data->counterpartyId = $cp?->getId();
+                $data->projectDirectionId = $projectDirection?->getId();
             }, 1)
             ->getForm();
 

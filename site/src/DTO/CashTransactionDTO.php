@@ -16,6 +16,7 @@ class CashTransactionDTO
 
     public ?string $counterpartyId = null;
     public ?string $cashflowCategoryId = null;
+    public ?string $projectDirectionId = null;
 
     #[Assert\Choice(callback: [CashDirection::class, 'cases'])]
     public CashDirection $direction;

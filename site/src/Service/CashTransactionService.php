@@ -8,6 +8,7 @@ use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
+use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -49,11 +50,15 @@ class CashTransactionService
         $category = $dto->cashflowCategoryId
             ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId)
             : null;
+        $projectDirection = $dto->projectDirectionId
+            ? $this->em->getReference(ProjectDirection::class, $dto->projectDirectionId)
+            : null;
 
         $tx
             ->setDescription($dto->description)
             ->setCounterparty($counterparty)
-            ->setCashflowCategory($category);
+            ->setCashflowCategory($category)
+            ->setProjectDirection($projectDirection);
 
         if ($dto->externalId) {
             $tx->setExternalId($dto->externalId);
@@ -86,7 +91,10 @@ class CashTransactionService
 
         $counterparty = $dto->counterpartyId ? $this->em->getReference(Counterparty::class, $dto->counterpartyId) : null;
         $category = $dto->cashflowCategoryId ? $this->em->getReference(CashflowCategory::class, $dto->cashflowCategoryId) : null;
-        $tx->setCounterparty($counterparty)->setCashflowCategory($category);
+        $projectDirection = $dto->projectDirectionId ? $this->em->getReference(ProjectDirection::class, $dto->projectDirectionId) : null;
+        $tx->setCounterparty($counterparty)
+            ->setCashflowCategory($category)
+            ->setProjectDirection($projectDirection);
 
         $this->em->flush();
 

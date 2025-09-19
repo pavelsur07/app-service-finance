@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\CashDirection;
+use App\Entity\ProjectDirection;
 use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -30,6 +31,10 @@ class CashTransaction
 
     #[ORM\ManyToOne(targetEntity: CashflowCategory::class)]
     private ?CashflowCategory $cashflowCategory = null;
+
+    #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?ProjectDirection $projectDirection = null;
 
     #[ORM\Column(enumType: CashDirection::class)]
     private CashDirection $direction;
@@ -122,6 +127,18 @@ class CashTransaction
     public function setCashflowCategory(?CashflowCategory $c): self
     {
         $this->cashflowCategory = $c;
+
+        return $this;
+    }
+
+    public function getProjectDirection(): ?ProjectDirection
+    {
+        return $this->projectDirection;
+    }
+
+    public function setProjectDirection(?ProjectDirection $projectDirection): self
+    {
+        $this->projectDirection = $projectDirection;
 
         return $this;
     }
