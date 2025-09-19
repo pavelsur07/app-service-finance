@@ -98,6 +98,8 @@ final class CashflowReportBuilder
             }
         }
 
+        $categoryTree = $this->buildCategoryTree($categories);
+
         $accounts = $this->accountRepository->findBy(['company' => $company]);
         $openingByCurrency = [];
         foreach ($accounts as $account) {
@@ -149,7 +151,45 @@ final class CashflowReportBuilder
             'categoryTotals' => $categoryMap,
             'openings' => $openings,
             'closings' => $closings,
+            'categoryTree' => $categoryTree,
         ];
+    }
+
+    /**
+     * @param \App\Entity\CashflowCategory[] $categories  // полный список, как вернул findTreeByCompany()
+     * @return array<int, array{id:string,name:string,parentId:?string,level:int,order:int}>
+     */
+    private function buildCategoryTree(array $categories): array
+    {
+        $result = [];
+        $order = 0;
+
+        // Подготовим быстрый доступ по id
+        $byId = [];
+        foreach ($categories as $c) {
+            $byId[$c->getId()] = $c;
+        }
+
+        // Плоский список в текущем порядке (ожидается depth-first из репозитория)
+        foreach ($categories as $c) {
+            $level = 0;
+            $p = $c->getParent();
+            // Считаем уровень до 4 (итого 5 уровней: 0..4)
+            while ($p && $level < 4) {
+                $level++;
+                $p = $p->getParent();
+            }
+
+            $result[] = [
+                'id'       => $c->getId(),
+                'name'     => (string) $c->getName(),
+                'parentId' => $c->getParent() ? $c->getParent()->getId() : null,
+                'level'    => $level,
+                'order'    => $order++,
+            ];
+        }
+
+        return $result;
     }
 
     private function buildPeriods(\DateTimeImmutable $from, \DateTimeImmutable $to, string $group): array
