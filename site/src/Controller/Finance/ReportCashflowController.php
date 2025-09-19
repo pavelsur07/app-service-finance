@@ -28,6 +28,13 @@ class ReportCashflowController extends AbstractController
     #[Route('', name: 'report_cashflow_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
+        $payload = $this->buildCashflowPayload($request);
+
+        return $this->render('report/cashflow.html.twig', $payload);
+    }
+
+    private function buildCashflowPayload(Request $request): array
+    {
         $company = $this->activeCompanyService->getActiveCompany();
 
         $group = $request->query->get('group', 'month');
@@ -48,17 +55,15 @@ class ReportCashflowController extends AbstractController
         $periods = $this->buildPeriods($from, $to, $group);
         $periodCount = count($periods);
 
-        // Load categories tree
         $categories = $this->categoryRepository->findTreeByCompany($company);
         $categoryMap = [];
         foreach ($categories as $cat) {
             $categoryMap[$cat->getId()] = [
                 'entity' => $cat,
-                'totals' => [], // currency => [period => amount]
+                'totals' => [],
             ];
         }
 
-        // Fetch transactions
         $rows = $this->transactionRepository->createQueryBuilder('t')
             ->select('IDENTITY(t.cashflowCategory) AS category', 't.direction', 't.amount', 't.currency', 't.occurredAt')
             ->where('t.company = :company')
@@ -74,6 +79,7 @@ class ReportCashflowController extends AbstractController
             if (!$catId || !isset($categoryMap[$catId])) {
                 continue;
             }
+
             $amount = (float) $row['amount'];
             $direction = $row['direction'] instanceof CashDirection
                 ? $row['direction']->value
@@ -86,14 +92,15 @@ class ReportCashflowController extends AbstractController
             if (null === $periodIndex) {
                 continue;
             }
+
             if (!isset($categoryMap[$catId]['totals'][$currency])) {
                 $categoryMap[$catId]['totals'][$currency] = array_fill(0, $periodCount, 0.0);
             }
+
             $categoryMap[$catId]['totals'][$currency][$periodIndex] += $amount;
             $companyTotals[$currency][$periodIndex] = ($companyTotals[$currency][$periodIndex] ?? 0) + $amount;
         }
 
-        // Aggregate totals up the tree
         foreach (array_reverse($categories) as $cat) {
             $parent = $cat->getParent();
             if ($parent && isset($categoryMap[$parent->getId()])) {
@@ -102,6 +109,7 @@ class ReportCashflowController extends AbstractController
                     if (!isset($categoryMap[$parent->getId()]['totals'][$currency])) {
                         $categoryMap[$parent->getId()]['totals'][$currency] = array_fill(0, $periodCount, 0.0);
                     }
+
                     foreach ($vals as $idx => $val) {
                         $categoryMap[$parent->getId()]['totals'][$currency][$idx] += $val;
                     }
@@ -109,7 +117,6 @@ class ReportCashflowController extends AbstractController
             }
         }
 
-        // Build category tree for template
         $rootCategories = [];
         foreach ($categories as $cat) {
             if (!$cat->getParent()) {
@@ -117,7 +124,6 @@ class ReportCashflowController extends AbstractController
             }
         }
 
-        // Opening balances per currency
         $accounts = $this->accountRepository->findBy(['company' => $company]);
         $openingByCurrency = [];
         foreach ($accounts as $account) {
@@ -159,7 +165,7 @@ class ReportCashflowController extends AbstractController
             }
         }
 
-        return $this->render('report/cashflow.html.twig', [
+        return [
             'company' => $company,
             'group' => $group,
             'date_from' => $from,
@@ -169,7 +175,7 @@ class ReportCashflowController extends AbstractController
             'categoryTotals' => $categoryMap,
             'openings' => $openings,
             'closings' => $closings,
-        ]);
+        ];
     }
 
     private function buildPeriods(\DateTimeImmutable $from, \DateTimeImmutable $to, string $group): array
