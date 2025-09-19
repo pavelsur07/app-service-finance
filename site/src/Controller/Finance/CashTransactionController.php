@@ -3,16 +3,15 @@
 namespace App\Controller\Finance;
 
 use App\DTO\CashTransactionDTO;
-use App\Entity\CashTransaction;
 use App\Entity\CashflowCategory;
-use App\Entity\Counterparty;
+use App\Entity\CashTransaction;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
-use App\Repository\CashTransactionRepository;
+use App\Form\CashTransactionType;
 use App\Repository\CashflowCategoryRepository;
+use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
-use App\Form\CashTransactionType;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\Exception\ORMException;
@@ -40,7 +39,7 @@ class CashTransactionController extends AbstractController
         CashTransactionRepository $txRepo,
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo
+        CounterpartyRepository $counterpartyRepo,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -89,17 +88,17 @@ class CashTransactionController extends AbstractController
             $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
         }
 
-        $page = max(1, (int)$request->query->get('page', 1));
+        $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
 
         $qbCount = clone $qb;
         $qbCount->resetDQLPart('orderBy');
-        $total = (int)$qbCount->select('COUNT(t.id)')->getQuery()->getSingleScalarResult();
+        $total = (int) $qbCount->select('COUNT(t.id)')->getQuery()->getSingleScalarResult();
 
-        $qb->setFirstResult(($page-1)*$limit)->setMaxResults($limit);
+        $qb->setFirstResult(($page - 1) * $limit)->setMaxResults($limit);
         $transactions = $qb->getQuery()->getResult();
 
-        $pages = (int)ceil($total / $limit);
+        $pages = (int) ceil($total / $limit);
         $pager = [
             'current' => $page,
             'pages' => $pages,
@@ -140,16 +139,17 @@ class CashTransactionController extends AbstractController
     {
         $service->clearAll();
         $this->addFlash('success', 'Журнал очищен');
+
         return $this->redirectToRoute('cash_transaction_index');
     }
 
     /**
      * @throws ORMException
      */
-    #[Route('/new', name: 'cash_transaction_new', methods: ['GET','POST'])]
+    #[Route('/new', name: 'cash_transaction_new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        CashTransactionService $service
+        CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $dto = new CashTransactionDTO();
@@ -165,8 +165,10 @@ class CashTransactionController extends AbstractController
                 $data = $form->getData();
                 $service->add($data);
                 $this->addFlash('success', 'Транзакция добавлена');
+
                 return $this->redirectToRoute('cash_transaction_index');
             }
+
             return $this->json($form->getErrors(true));
         }
 
@@ -189,14 +191,14 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'cash_transaction_edit', methods: ['GET','POST'])]
+    #[Route('/{id}/edit', name: 'cash_transaction_edit', methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
         CashTransaction $tx,
         CashTransactionService $service,
         MoneyAccountRepository $accountRepo,
         CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo
+        CounterpartyRepository $counterpartyRepo,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         if ($tx->getCompany() !== $company) {
@@ -212,9 +214,9 @@ class CashTransactionController extends AbstractController
             ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
             ->add('moneyAccount', ChoiceType::class, [
                 'choices' => $accountRepo->findBy(['company' => $company]),
-                'choice_label' => fn(MoneyAccount $a) => $a->getName(),
+                'choice_label' => fn (MoneyAccount $a) => $a->getName(),
                 'choice_value' => 'id',
-                'choice_attr' => fn(MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
+                'choice_attr' => fn (MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
                 'data' => $tx->getMoneyAccount(),
                 'mapped' => false,
             ])
@@ -233,9 +235,9 @@ class CashTransactionController extends AbstractController
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
                 'choices' => $categoryRepo->findTreeByCompany($company),
-                'choice_label' => fn(CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
+                'choice_label' => fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
                 'choice_value' => 'id',
-                'choice_attr' => fn(CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'data' => $tx->getCashflowCategory(),
                 'mapped' => false,
             ])
@@ -273,6 +275,7 @@ class CashTransactionController extends AbstractController
                 $data = $form->getData();
                 $service->update($tx, $data);
                 $this->addFlash('success', 'Транзакция обновлена');
+
                 return $this->redirectToRoute('cash_transaction_index');
             }
         }
@@ -301,4 +304,3 @@ class CashTransactionController extends AbstractController
         return $this->redirectToRoute('cash_transaction_index');
     }
 }
-

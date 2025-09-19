@@ -2,8 +2,8 @@
 
 namespace App\Entity\Ozon;
 
-use Doctrine\ORM\Mapping as ORM;
 use App\Entity\Company;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity]
 #[ORM\Table(name: '`ozon_products`')]
@@ -35,13 +35,11 @@ class OzonProduct
     #[ORM\JoinColumn(nullable: false)]
     private Company $company;
 
-
     public function __construct(string $id, Company $company)
     {
         $this->id = $id;
         $this->company = $company;
     }
-
 
     public function getId(): ?string
     {

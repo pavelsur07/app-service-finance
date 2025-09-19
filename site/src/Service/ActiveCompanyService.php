@@ -4,8 +4,8 @@ namespace App\Service;
 
 use App\Entity\Company;
 use App\Repository\CompanyRepository;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ActiveCompanyService
@@ -13,7 +13,7 @@ class ActiveCompanyService
     public function __construct(
         private RequestStack $requestStack,
         private CompanyRepository $companyRepository,
-        private Security $security
+        private Security $security,
     ) {
     }
 

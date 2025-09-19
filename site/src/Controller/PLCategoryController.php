@@ -5,9 +5,9 @@ namespace App\Controller;
 use App\Entity\PLCategory;
 use App\Form\PLCategoryType;
 use App\Repository\PLCategoryRepository;
+use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,6 +21,7 @@ class PLCategoryController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
         $items = $repo->findRootByCompany($company);
+
         return $this->render('pl_category/index.html.twig', [
             'items' => $items,
         ]);
@@ -42,6 +43,7 @@ class PLCategoryController extends AbstractController
             } else {
                 $em->persist($category);
                 $em->flush();
+
                 return $this->redirectToRoute('pl_category_index');
             }
         }
@@ -68,6 +70,7 @@ class PLCategoryController extends AbstractController
                 $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
             } else {
                 $em->flush();
+
                 return $this->redirectToRoute('pl_category_index');
             }
         }

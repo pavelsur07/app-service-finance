@@ -32,7 +32,7 @@ class CashflowCategoryRepository extends ServiceEntityRepository
     }
 
     /**
-     * Возвращает список категорий в порядке вложенности
+     * Возвращает список категорий в порядке вложенности.
      *
      * @return CashflowCategory[]
      */
@@ -43,6 +43,7 @@ class CashflowCategoryRepository extends ServiceEntityRepository
         foreach ($roots as $root) {
             $this->collectTree($root, $result);
         }
+
         return $result;
     }
 

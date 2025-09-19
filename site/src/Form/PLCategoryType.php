@@ -25,7 +25,7 @@ class PLCategoryType extends AbstractType
                 'class' => PLCategory::class,
                 'choices' => $options['parents'],
                 'choice_label' => function (PLCategory $item) {
-                    return str_repeat('—', $item->getLevel() - 1) . ' ' . $item->getName();
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,
                 'label' => 'Родитель',

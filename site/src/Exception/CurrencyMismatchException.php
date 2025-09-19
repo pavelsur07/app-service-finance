@@ -1,4 +1,7 @@
 <?php
+
 namespace App\Exception;
 
-class CurrencyMismatchException extends \DomainException {}
+class CurrencyMismatchException extends \DomainException
+{
+}

@@ -13,7 +13,7 @@ class Bank1CStatement
         /** @param array<string,string> $account */
         public array $account,
         /** @var Bank1CDocument[] */
-        public array $documents
+        public array $documents,
     ) {
     }
 }

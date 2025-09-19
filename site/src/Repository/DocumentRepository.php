@@ -2,8 +2,8 @@
 
 namespace App\Repository;
 
-use App\Entity\Document;
 use App\Entity\Company;
+use App\Entity\Document;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

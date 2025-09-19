@@ -2,9 +2,9 @@
 
 namespace App\Form;
 
+use App\Entity\Counterparty;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\Counterparty;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -21,7 +21,7 @@ class DocumentOperationType extends AbstractType
                 'class' => PLCategory::class,
                 'choices' => $options['categories'],
                 'choice_label' => function (PLCategory $item) {
-                    return str_repeat('—', $item->getLevel() - 1) . ' ' . $item->getName();
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'label' => 'Категория',
             ])

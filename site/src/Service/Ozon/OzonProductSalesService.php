@@ -18,7 +18,8 @@ readonly class OzonProductSalesService
         private EntityManagerInterface $em,
         private OzonProductRepository $productRepository,
         private OzonProductSalesRepository $salesRepository,
-    ) {}
+    ) {
+    }
 
     public function createSalesReport(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): string
     {
@@ -45,7 +46,7 @@ readonly class OzonProductSalesService
         $lines = preg_split('/\r?\n/', trim($csv));
         $rows = [];
         foreach ($lines as $line) {
-            if ($line === '') {
+            if ('' === $line) {
                 continue;
             }
             $rows[] = str_getcsv($line, ';');
@@ -58,7 +59,7 @@ readonly class OzonProductSalesService
     {
         foreach ($rows as $row) {
             $offerId = $row[0] ?? null;
-            $qty = isset($row[1]) ? (int)$row[1] : 0;
+            $qty = isset($row[1]) ? (int) $row[1] : 0;
 
             if (!$offerId) {
                 continue;

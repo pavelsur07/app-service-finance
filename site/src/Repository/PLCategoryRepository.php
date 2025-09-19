@@ -2,8 +2,8 @@
 
 namespace App\Repository;
 
-use App\Entity\PLCategory;
 use App\Entity\Company;
+use App\Entity\PLCategory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -38,6 +38,7 @@ class PLCategoryRepository extends ServiceEntityRepository
         foreach ($roots as $root) {
             $this->collectTree($root, $result);
         }
+
         return $result;
     }
 

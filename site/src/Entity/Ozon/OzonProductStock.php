@@ -3,8 +3,8 @@
 namespace App\Entity\Ozon;
 
 use App\Entity\Company;
-use Doctrine\ORM\Mapping as ORM;
 use App\Repository\Ozon\OzonProductStockRepository;
+use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: OzonProductStockRepository::class)]
 #[ORM\Table(name: '`ozon_product_stocks`')]

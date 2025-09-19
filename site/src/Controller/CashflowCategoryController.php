@@ -5,9 +5,9 @@ namespace App\Controller;
 use App\Entity\CashflowCategory;
 use App\Form\CashflowCategoryType;
 use App\Repository\CashflowCategoryRepository;
+use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,10 +19,11 @@ class CashflowCategoryController extends AbstractController
     #[Route('/', name: 'cashflow_category_index', methods: ['GET'])]
     public function index(
         CashflowCategoryRepository $repo,
-        ActiveCompanyService $companyService
+        ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
         $items = $repo->findRootByCompany($company);
+
         return $this->render('cashflow_category/index.html.twig', [
             'items' => $items,
         ]);
@@ -33,7 +34,7 @@ class CashflowCategoryController extends AbstractController
         Request $request,
         CashflowCategoryRepository $repo,
         EntityManagerInterface $em,
-        ActiveCompanyService $companyService
+        ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
@@ -49,6 +50,7 @@ class CashflowCategoryController extends AbstractController
             } else {
                 $em->persist($article);
                 $em->flush();
+
                 return $this->redirectToRoute('cashflow_category_index');
             }
         }
@@ -64,7 +66,7 @@ class CashflowCategoryController extends AbstractController
         CashflowCategory $article,
         CashflowCategoryRepository $repo,
         EntityManagerInterface $em,
-        ActiveCompanyService $companyService
+        ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
         if ($article->getCompany() !== $company) {
@@ -81,6 +83,7 @@ class CashflowCategoryController extends AbstractController
                 $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
             } else {
                 $em->flush();
+
                 return $this->redirectToRoute('cashflow_category_index');
             }
         }
@@ -96,7 +99,7 @@ class CashflowCategoryController extends AbstractController
         Request $request,
         CashflowCategory $article,
         EntityManagerInterface $em,
-        ActiveCompanyService $companyService
+        ActiveCompanyService $companyService,
     ): Response {
         $company = $companyService->getActiveCompany();
         if ($article->getCompany() !== $company) {

@@ -21,6 +21,7 @@ class ProjectDirectionController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
         $items = $repo->findByCompany($company);
+
         return $this->render('project_direction/index.html.twig', [
             'items' => $items,
         ]);
@@ -36,8 +37,10 @@ class ProjectDirectionController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($direction);
             $em->flush();
+
             return $this->redirectToRoute('project_direction_index');
         }
+
         return $this->render('project_direction/new.html.twig', [
             'form' => $form->createView(),
         ]);
@@ -54,8 +57,10 @@ class ProjectDirectionController extends AbstractController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
+
             return $this->redirectToRoute('project_direction_index');
         }
+
         return $this->render('project_direction/edit.html.twig', [
             'form' => $form->createView(),
             'item' => $direction,
@@ -73,6 +78,7 @@ class ProjectDirectionController extends AbstractController
             $em->remove($direction);
             $em->flush();
         }
+
         return $this->redirectToRoute('project_direction_index');
     }
 }

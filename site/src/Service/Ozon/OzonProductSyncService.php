@@ -11,9 +11,10 @@ use Ramsey\Uuid\Uuid;
 readonly class OzonProductSyncService
 {
     public function __construct(
-        private OzonApiClient          $client,
-        private EntityManagerInterface $em
-    ) {}
+        private OzonApiClient $client,
+        private EntityManagerInterface $em,
+    ) {
+    }
 
     public function sync(Company $company): void
     {
@@ -23,7 +24,6 @@ readonly class OzonProductSyncService
         );
 
         foreach ($products as $data) {
-
             if ($data['archived']) {
                 continue;
             }

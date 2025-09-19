@@ -6,8 +6,8 @@ use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
 use App\Form\MoneyAccountType as MoneyAccountFormType;
 use App\Repository\MoneyAccountRepository;
-use App\Service\ActiveCompanyService;
 use App\Service\AccountBalanceService;
+use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -51,6 +51,7 @@ class MoneyAccountController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($account);
             $em->flush();
+
             return $this->redirectToRoute('money_account_index');
         }
 
@@ -64,7 +65,7 @@ class MoneyAccountController extends AbstractController
         Request $request,
         MoneyAccount $account,
         EntityManagerInterface $em,
-        AccountBalanceService $balanceService
+        AccountBalanceService $balanceService,
     ): Response {
         $form = $this->createForm(MoneyAccountFormType::class, $account);
         $form->handleRequest($request);

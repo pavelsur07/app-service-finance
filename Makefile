@@ -28,6 +28,14 @@ site-migrations:
 site-fixtures:
 	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction
 
+site-cs-check:
+	docker-compose run --rm site-php-cli composer cs:check   # Проверка PHP-стиля
+
+site-cs-fix:
+    docker-compose run --rm site-php-cli composer cs:fix     # Автопочинка PHP-стиля
+    #docker-compose run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
+    docker-compose run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
+
 build: build-site
 
 build-site:

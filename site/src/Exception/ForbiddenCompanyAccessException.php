@@ -1,4 +1,7 @@
 <?php
+
 namespace App\Exception;
 
-class ForbiddenCompanyAccessException extends \RuntimeException {}
+class ForbiddenCompanyAccessException extends \RuntimeException
+{
+}

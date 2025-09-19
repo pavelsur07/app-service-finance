@@ -24,7 +24,7 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             ->andWhere('b.date < :date')
             ->setParameter('company', $company)
             ->setParameter('account', $account)
-            ->setParameter('date', $date->setTime(0,0))
+            ->setParameter('date', $date->setTime(0, 0))
             ->orderBy('b.date', 'DESC')
             ->setMaxResults(1)
             ->getQuery()->getOneOrNullResult();
@@ -53,11 +53,11 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             $params['outflow'.$i] = $row['outflow'];
             $params['closing'.$i] = $row['closing_balance'];
             $params['currency'.$i] = $row['currency'];
-            $i++;
+            ++$i;
         }
         $sql = 'INSERT INTO money_account_daily_balance (id, company_id, money_account_id, date, opening_balance, inflow, outflow, closing_balance, currency) VALUES '
-            . implode(',', $values)
-            . ' ON CONFLICT (company_id, money_account_id, date) DO UPDATE SET opening_balance = excluded.opening_balance, inflow = excluded.inflow, outflow = excluded.outflow, closing_balance = excluded.closing_balance, currency = excluded.currency';
+            .implode(',', $values)
+            .' ON CONFLICT (company_id, money_account_id, date) DO UPDATE SET opening_balance = excluded.opening_balance, inflow = excluded.inflow, outflow = excluded.outflow, closing_balance = excluded.closing_balance, currency = excluded.currency';
         $conn->executeStatement($sql, $params);
     }
 }

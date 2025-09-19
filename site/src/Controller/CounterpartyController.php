@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Counterparty;
+use App\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Form\CounterpartyType;
 use App\Repository\CounterpartyRepository;
 use App\Service\ActiveCompanyService;
@@ -13,7 +14,6 @@ use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use App\Enum\CounterpartyType as CounterpartyTypeEnum;
 
 #[Route('/counterparties')]
 class CounterpartyController extends AbstractController
@@ -58,6 +58,7 @@ class CounterpartyController extends AbstractController
                 $em->persist($counterparty);
                 $em->flush();
                 $this->addFlash('success', 'Контрагент добавлен');
+
                 return $this->redirectToRoute('counterparty_index');
             }
         }
@@ -91,6 +92,7 @@ class CounterpartyController extends AbstractController
                 $counterparty->setUpdatedAt(new \DateTimeImmutable());
                 $em->flush();
                 $this->addFlash('success', 'Контрагент обновлён');
+
                 return $this->redirectToRoute('counterparty_index');
             }
         }

@@ -35,13 +35,48 @@ class OzonOrderStatusHistory
         $this->changedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getOrder(): OzonOrder { return $this->order; }
-    public function setOrder(OzonOrder $order): void { $this->order = $order; }
-    public function getStatus(): string { return $this->status; }
-    public function setStatus(string $status): void { $this->status = $status; }
-    public function getChangedAt(): \DateTimeImmutable { return $this->changedAt; }
-    public function setChangedAt(\DateTimeImmutable $changedAt): void { $this->changedAt = $changedAt; }
-    public function getRawEvent(): array { return $this->rawEvent; }
-    public function setRawEvent(array $rawEvent): void { $this->rawEvent = $rawEvent; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getOrder(): OzonOrder
+    {
+        return $this->order;
+    }
+
+    public function setOrder(OzonOrder $order): void
+    {
+        $this->order = $order;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): void
+    {
+        $this->status = $status;
+    }
+
+    public function getChangedAt(): \DateTimeImmutable
+    {
+        return $this->changedAt;
+    }
+
+    public function setChangedAt(\DateTimeImmutable $changedAt): void
+    {
+        $this->changedAt = $changedAt;
+    }
+
+    public function getRawEvent(): array
+    {
+        return $this->rawEvent;
+    }
+
+    public function setRawEvent(array $rawEvent): void
+    {
+        $this->rawEvent = $rawEvent;
+    }
 }

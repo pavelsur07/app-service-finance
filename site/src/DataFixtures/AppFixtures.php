@@ -15,11 +15,12 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class AppFixtures extends Fixture
 {
-    public function __construct(private UserPasswordHasherInterface $passwordHasher) {}
+    public function __construct(private UserPasswordHasherInterface $passwordHasher)
+    {
+    }
 
     public function load(ObjectManager $manager): void
     {
-
         $usersData = [
             ['admin@app.ru', 'password', ['ROLE_ADMIN']],
             ['manager@app.ru', 'password', ['ROLE_MANAGER']],
@@ -32,7 +33,7 @@ class AppFixtures extends Fixture
         $owner->setPassword($this->passwordHasher->hashPassword($owner, 'password'));
         $manager->persist($owner);
 
-        $company = new Company(id: Uuid::uuid4()->toString(),user: $owner);
+        $company = new Company(id: Uuid::uuid4()->toString(), user: $owner);
         $company->setName('Вумджой ООО');
         $manager->persist($company);
 
@@ -62,8 +63,6 @@ class AppFixtures extends Fixture
             $user->setPassword($this->passwordHasher->hashPassword($user, $plainPassword));
             $manager->persist($user);
         }
-
-
 
         $manager->flush();
     }

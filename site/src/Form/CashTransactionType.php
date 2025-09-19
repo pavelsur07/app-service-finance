@@ -5,7 +5,6 @@ namespace App\Form;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
-use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Repository\CashflowCategoryRepository;
@@ -26,7 +25,7 @@ class CashTransactionType extends AbstractType
     public function __construct(
         private MoneyAccountRepository $accountRepo,
         private CashflowCategoryRepository $categoryRepo,
-        private CounterpartyRepository $counterpartyRepo
+        private CounterpartyRepository $counterpartyRepo,
     ) {
     }
 
@@ -56,7 +55,7 @@ class CashTransactionType extends AbstractType
             ->add('cashflowCategory', ChoiceType::class, [
                 'required' => false,
                 'choices' => $company ? $this->categoryRepo->findTreeByCompany($company) : [],
-                'choice_label' => fn (CashflowCategory $c) => str_repeat(' ', $c->getLevel()-1).$c->getName(),
+                'choice_label' => fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
                 'choice_value' => 'id',
                 'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,

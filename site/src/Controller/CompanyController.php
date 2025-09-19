@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/company')]
@@ -20,6 +20,7 @@ class CompanyController extends AbstractController
     {
         // Показываем только свои компании
         $companies = $companyRepository->findByUser($this->getUser());
+
         return $this->render('company/index.html.twig', [
             'companies' => $companies,
         ]);
@@ -52,6 +53,7 @@ class CompanyController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($company);
             $em->flush();
+
             return $this->redirectToRoute('company_index');
         }
 
@@ -61,7 +63,7 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}', name: 'company_show', methods: ['GET'])]
-    public function show(string $id,Company $company): Response
+    public function show(string $id, Company $company): Response
     {
         // Можно добавить проверку владельца!
         return $this->render('company/show.html.twig', [
@@ -70,7 +72,7 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'])]
-    public function edit(string $id,Request $request, Company $company, EntityManagerInterface $em): Response
+    public function edit(string $id, Request $request, Company $company, EntityManagerInterface $em): Response
     {
         // Можно добавить проверку владельца!
         $form = $this->createForm(CompanyType::class, $company);
@@ -78,6 +80,7 @@ class CompanyController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
+
             return $this->redirectToRoute('company_index');
         }
 
@@ -94,6 +97,7 @@ class CompanyController extends AbstractController
             $em->remove($company);
             $em->flush();
         }
+
         return $this->redirectToRoute('company_index');
     }
 }

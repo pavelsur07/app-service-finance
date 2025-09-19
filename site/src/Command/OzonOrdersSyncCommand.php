@@ -6,9 +6,6 @@ use App\Entity\Company;
 use App\Repository\CompanyRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;
 use App\Service\Ozon\OzonOrderSyncService;
-use DateInterval;
-use DateTimeImmutable;
-use DateTimeZone;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -38,19 +35,20 @@ class OzonOrdersSyncCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $companyId = (string)$input->getOption('company');
-        $scheme = strtoupper((string)$input->getOption('scheme'));
+        $companyId = (string) $input->getOption('company');
+        $scheme = strtoupper((string) $input->getOption('scheme'));
         /** @var Company|null $company */
         $company = $this->companyRepo->find($companyId);
         if (!$company) {
             $output->writeln('<error>Company not found</error>');
+
             return Command::FAILURE;
         }
 
         $sinceOpt = $input->getOption('since');
         $toOpt = $input->getOption('to');
-        $since = $sinceOpt ? new DateTimeImmutable($sinceOpt, new DateTimeZone('UTC')) : null;
-        $to = $toOpt ? new DateTimeImmutable($toOpt, new DateTimeZone('UTC')) : null;
+        $since = $sinceOpt ? new \DateTimeImmutable($sinceOpt, new \DateTimeZone('UTC')) : null;
+        $to = $toOpt ? new \DateTimeImmutable($toOpt, new \DateTimeZone('UTC')) : null;
 
         if (!$since || !$to) {
             $cursor = $this->cursorRepo->findOneByCompanyAndScheme($company, $scheme);
@@ -61,11 +59,11 @@ class OzonOrdersSyncCommand extends Command
         }
 
         if (!$since || !$to) {
-            $to = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-            $since = $to->sub(new DateInterval('P3D'));
+            $to = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+            $since = $to->sub(new \DateInterval('P3D'));
         }
 
-        if ($scheme === 'FBS') {
+        if ('FBS' === $scheme) {
             $statusParam = $input->getOption('status');
             $status = null;
             if ($statusParam) {
@@ -77,6 +75,7 @@ class OzonOrdersSyncCommand extends Command
         }
 
         $output->writeln(sprintf('Postings processed: %d, new statuses: %d', $result['orders'], $result['statusChanges']));
+
         return Command::SUCCESS;
     }
 }

@@ -49,25 +49,95 @@ class CashflowCategory
         $this->children = new ArrayCollection();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): self { $this->name = $name; return $this; }
-    public function getDescription(): ?string { return $this->description; }
-    public function setDescription(?string $description): self { $this->description = $description; return $this; }
-    public function getStatus(): CashflowCategoryStatus { return $this->status; }
-    public function setStatus(CashflowCategoryStatus $status): self { $this->status = $status; return $this; }
-    public function getSort(): int { return $this->sort; }
-    public function setSort(int $sort): self { $this->sort = $sort; return $this; }
-    public function getParent(): ?self { return $this->parent; }
-    public function setParent(?self $parent): self { $this->parent = $parent; return $this; }
-    public function getChildren(): Collection { return $this->children; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): self { $this->company = $company; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = $description;
+
+        return $this;
+    }
+
+    public function getStatus(): CashflowCategoryStatus
+    {
+        return $this->status;
+    }
+
+    public function setStatus(CashflowCategoryStatus $status): self
+    {
+        $this->status = $status;
+
+        return $this;
+    }
+
+    public function getSort(): int
+    {
+        return $this->sort;
+    }
+
+    public function setSort(int $sort): self
+    {
+        $this->sort = $sort;
+
+        return $this;
+    }
+
+    public function getParent(): ?self
+    {
+        return $this->parent;
+    }
+
+    public function setParent(?self $parent): self
+    {
+        $this->parent = $parent;
+
+        return $this;
+    }
+
+    public function getChildren(): Collection
+    {
+        return $this->children;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): self
+    {
+        $this->company = $company;
+
+        return $this;
+    }
 
     public function getLevel(): int
     {
         return $this->parent ? $this->parent->getLevel() + 1 : 1;
     }
 
-    public function __toString(): string { return $this->name; }
+    public function __toString(): string
+    {
+        return $this->name;
+    }
 }

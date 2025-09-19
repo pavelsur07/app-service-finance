@@ -1,6 +1,7 @@
 <?php
 
 // src/Command/TestOzonApiCommand.php
+
 namespace App\Command;
 
 use App\Api\Ozon\OzonApiClient;
@@ -15,7 +16,7 @@ class TestOzonApiCommand extends Command
 {
     public function __construct(
         private OzonApiClient $client,
-        private CompanyRepository $companyRepo
+        private CompanyRepository $companyRepo,
     ) {
         parent::__construct();
     }
@@ -24,7 +25,8 @@ class TestOzonApiCommand extends Command
     {
         $company = $this->companyRepo->findOneBy([]); // Возьми нужную компанию
         if (!$company) {
-            $output->writeln("Нет компании");
+            $output->writeln('Нет компании');
+
             return Command::FAILURE;
         }
 
@@ -33,9 +35,9 @@ class TestOzonApiCommand extends Command
             $company->getOzonApiKey()
         );
 
-        $output->writeln("Всего товаров: " . count($products));
+        $output->writeln('Всего товаров: '.count($products));
         foreach ($products as $p) {
-            $output->writeln($p['sku'] . ' | ' . $p['name']);
+            $output->writeln($p['sku'].' | '.$p['name']);
         }
 
         return Command::SUCCESS;

@@ -36,7 +36,7 @@ class MoneyAccountRepository extends ServiceEntityRepository
             $qb->andWhere('m.currency IN (:currencies)')->setParameter('currencies', $currencies);
         }
 
-        if ($active !== null) {
+        if (null !== $active) {
             $qb->andWhere('m.isActive = :active')->setParameter('active', $active);
         }
 

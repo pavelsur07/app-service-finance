@@ -36,7 +36,7 @@ class CashflowCategoryType extends AbstractType
                 'class' => CashflowCategory::class,
                 'choices' => $options['parents'],
                 'choice_label' => function (CashflowCategory $item) {
-                    return str_repeat('—', $item->getLevel() - 1) . ' ' . $item->getName();
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'required' => false,
                 'label' => 'Родитель',

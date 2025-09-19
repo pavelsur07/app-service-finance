@@ -41,7 +41,7 @@ class CounterpartyRepository extends ServiceEntityRepository
         }
 
         foreach ($sort as $field => $direction) {
-            $qb->addOrderBy('c.' . $field, $direction);
+            $qb->addOrderBy('c.'.$field, $direction);
         }
 
         return $qb->getQuery()->getResult();

@@ -18,7 +18,8 @@ readonly class OzonProductStockService
         private EntityManagerInterface $em,
         private OzonProductRepository $productRepository,
         private OzonProductStockRepository $stockRepository,
-    ) {}
+    ) {
+    }
 
     public function updateStocks(Company $company): void
     {
@@ -49,7 +50,7 @@ readonly class OzonProductStockService
                 $this->em->persist($stock);
             }
 
-            $stock->setQty((int)($item['stock'] ?? 0));
+            $stock->setQty((int) ($item['stock'] ?? 0));
             $stock->setUpdatedAt(new \DateTimeImmutable());
         }
 

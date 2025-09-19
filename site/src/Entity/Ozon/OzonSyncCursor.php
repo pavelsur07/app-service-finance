@@ -37,15 +37,58 @@ class OzonSyncCursor
         $this->scheme = $scheme;
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): void { $this->company = $company; }
-    public function getScheme(): string { return $this->scheme; }
-    public function setScheme(string $scheme): void { $this->scheme = $scheme; }
-    public function getLastSince(): ?\DateTimeImmutable { return $this->lastSince; }
-    public function setLastSince(?\DateTimeImmutable $lastSince): void { $this->lastSince = $lastSince; }
-    public function getLastTo(): ?\DateTimeImmutable { return $this->lastTo; }
-    public function setLastTo(?\DateTimeImmutable $lastTo): void { $this->lastTo = $lastTo; }
-    public function getLastRunAt(): ?\DateTimeImmutable { return $this->lastRunAt; }
-    public function setLastRunAt(?\DateTimeImmutable $lastRunAt): void { $this->lastRunAt = $lastRunAt; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): void
+    {
+        $this->company = $company;
+    }
+
+    public function getScheme(): string
+    {
+        return $this->scheme;
+    }
+
+    public function setScheme(string $scheme): void
+    {
+        $this->scheme = $scheme;
+    }
+
+    public function getLastSince(): ?\DateTimeImmutable
+    {
+        return $this->lastSince;
+    }
+
+    public function setLastSince(?\DateTimeImmutable $lastSince): void
+    {
+        $this->lastSince = $lastSince;
+    }
+
+    public function getLastTo(): ?\DateTimeImmutable
+    {
+        return $this->lastTo;
+    }
+
+    public function setLastTo(?\DateTimeImmutable $lastTo): void
+    {
+        $this->lastTo = $lastTo;
+    }
+
+    public function getLastRunAt(): ?\DateTimeImmutable
+    {
+        return $this->lastRunAt;
+    }
+
+    public function setLastRunAt(?\DateTimeImmutable $lastRunAt): void
+    {
+        $this->lastRunAt = $lastRunAt;
+    }
 }

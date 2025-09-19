@@ -13,28 +13,78 @@ use App\Enum\MoneyAccountType;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Service\AccountBalanceService;
 use App\Service\CashTransactionService;
-use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\ORM\Tools\Setup;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 class SimpleManagerRegistry implements ManagerRegistry
 {
-    public function __construct(private EntityManager $em) {}
-    public function getDefaultConnectionName(){return 'default';}
-    public function getConnection($name = null){return $this->em->getConnection();}
-    public function getConnections(){return [$this->em->getConnection()];}
-    public function getConnectionNames(){return ['default'];}
-    public function getDefaultManagerName(){return 'default';}
-    public function getManager($name = null){return $this->em;}
-    public function getManagers(){return ['default' => $this->em];}
-    public function resetManager($name = null){return $this->em;}
-    public function getAliasNamespace($alias){return 'App\\Entity';}
-    public function getManagerNames(){return ['default'];}
-    public function getRepository($persistentObject, $persistentManagerName = null){return $this->em->getRepository($persistentObject);}
-    public function getManagerForClass($class){return $this->em;}
+    public function __construct(private EntityManager $em)
+    {
+    }
+
+    public function getDefaultConnectionName()
+    {
+        return 'default';
+    }
+
+    public function getConnection($name = null)
+    {
+        return $this->em->getConnection();
+    }
+
+    public function getConnections()
+    {
+        return [$this->em->getConnection()];
+    }
+
+    public function getConnectionNames()
+    {
+        return ['default'];
+    }
+
+    public function getDefaultManagerName()
+    {
+        return 'default';
+    }
+
+    public function getManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getManagers()
+    {
+        return ['default' => $this->em];
+    }
+
+    public function resetManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getAliasNamespace($alias)
+    {
+        return 'App\\Entity';
+    }
+
+    public function getManagerNames()
+    {
+        return ['default'];
+    }
+
+    public function getRepository($persistentObject, $persistentManagerName = null)
+    {
+        return $this->em->getRepository($persistentObject);
+    }
+
+    public function getManagerForClass($class)
+    {
+        return $this->em;
+    }
 }
 
 class AccountBalanceServiceTest extends TestCase
@@ -54,8 +104,8 @@ class AccountBalanceServiceTest extends TestCase
             $this->em->getClassMetadata(User::class),
             $this->em->getClassMetadata(Company::class),
             $this->em->getClassMetadata(MoneyAccount::class),
-            $this->em->getClassMetadata(\App\Entity\CashTransaction::class),
-            $this->em->getClassMetadata(\App\Entity\MoneyAccountDailyBalance::class),
+            $this->em->getClassMetadata(CashTransaction::class),
+            $this->em->getClassMetadata(MoneyAccountDailyBalance::class),
         ];
         $schemaTool->createSchema($classes);
         $registry = new SimpleManagerRegistry($this->em);

@@ -2,9 +2,9 @@
 
 namespace App\Tests\Entity;
 
+use App\Entity\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
 use App\Entity\CashTransactionAutoRuleCondition;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\User;
 use App\Enum\CashTransactionAutoRuleAction;

@@ -1,4 +1,7 @@
 <?php
+
 namespace App\Exception;
 
-class NegativeAmountException extends \DomainException {}
+class NegativeAmountException extends \DomainException
+{
+}

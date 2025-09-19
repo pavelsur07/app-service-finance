@@ -4,12 +4,12 @@ namespace App\Controller;
 
 use App\Entity\Document;
 use App\Form\DocumentType;
+use App\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
-use App\Repository\CounterpartyRepository;
+use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -23,6 +23,7 @@ class DocumentController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
         $items = $repo->findByCompany($company);
+
         return $this->render('document/index.html.twig', [
             'items' => $items,
         ]);
@@ -45,6 +46,7 @@ class DocumentController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($document);
             $em->flush();
+
             return $this->redirectToRoute('document_index');
         }
 
@@ -84,6 +86,7 @@ class DocumentController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
+
             return $this->redirectToRoute('document_index');
         }
 

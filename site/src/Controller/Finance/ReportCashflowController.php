@@ -3,8 +3,8 @@
 namespace App\Controller\Finance;
 
 use App\Enum\CashDirection;
-use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
+use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
@@ -21,7 +21,7 @@ class ReportCashflowController extends AbstractController
         private CashflowCategoryRepository $categoryRepository,
         private CashTransactionRepository $transactionRepository,
         private MoneyAccountRepository $accountRepository,
-        private MoneyAccountDailyBalanceRepository $balanceRepository
+        private MoneyAccountDailyBalanceRepository $balanceRepository,
     ) {
     }
 
@@ -34,9 +34,9 @@ class ReportCashflowController extends AbstractController
         $fromParam = $request->query->get('from');
         $toParam = $request->query->get('to');
         $today = new \DateTimeImmutable('today');
-        $currentQuarter = (int) floor(((int)$today->format('n') - 1) / 3);
+        $currentQuarter = (int) floor(((int) $today->format('n') - 1) / 3);
         $quarterStartMonth = $currentQuarter * 3 + 1;
-        $defaultFrom = new \DateTimeImmutable($today->format('Y') . '-' . sprintf('%02d', $quarterStartMonth) . '-01');
+        $defaultFrom = new \DateTimeImmutable($today->format('Y').'-'.sprintf('%02d', $quarterStartMonth).'-01');
         $defaultTo = $defaultFrom->modify('+3 months -1 day');
 
         $from = $fromParam ? new \DateTimeImmutable($fromParam) : $defaultFrom;
@@ -64,8 +64,8 @@ class ReportCashflowController extends AbstractController
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->setParameter('company', $company)
-            ->setParameter('from', $from->setTime(0,0))
-            ->setParameter('to', $to->setTime(23,59,59))
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
             ->getQuery()->getArrayResult();
 
         $companyTotals = [];
@@ -83,7 +83,7 @@ class ReportCashflowController extends AbstractController
                 : abs($amount);
             $currency = $row['currency'];
             $periodIndex = $this->findPeriodIndex($periods, $row['occurredAt']);
-            if ($periodIndex === null) {
+            if (null === $periodIndex) {
                 continue;
             }
             if (!isset($categoryMap[$catId]['totals'][$currency])) {
@@ -151,7 +151,7 @@ class ReportCashflowController extends AbstractController
             $openings[$currency] = [];
             $closings[$currency] = [];
             $current = $opening;
-            for ($i = 0; $i < $periodCount; $i++) {
+            for ($i = 0; $i < $periodCount; ++$i) {
                 $openings[$currency][$i] = $current;
                 $net = $companyTotals[$currency][$i] ?? 0;
                 $current += $net;
@@ -187,15 +187,15 @@ class ReportCashflowController extends AbstractController
                 case 'week':
                     $start = $current;
                     $end = min($start->modify('+6 days'), $to);
-                    $label = $start->format('d.m') . '-' . $end->format('d.m');
+                    $label = $start->format('d.m').'-'.$end->format('d.m');
                     $current = $end->modify('+1 day');
                     break;
                 case 'quarter':
-                    $startMonth = (int)($current->format('n')); 
-                    $startMonth = (int)floor(($startMonth - 1) / 3) * 3 + 1;
-                    $start = new \DateTimeImmutable($current->format('Y') . '-' . sprintf('%02d', $startMonth) . '-01');
+                    $startMonth = (int) $current->format('n');
+                    $startMonth = (int) floor(($startMonth - 1) / 3) * 3 + 1;
+                    $start = new \DateTimeImmutable($current->format('Y').'-'.sprintf('%02d', $startMonth).'-01');
                     $end = min($start->modify('+3 months -1 day'), $to);
-                    $label = 'Q' . (((int)(($startMonth - 1) / 3)) + 1) . ' ' . $start->format('Y');
+                    $label = 'Q'.(((int) (($startMonth - 1) / 3)) + 1).' '.$start->format('Y');
                     $current = $end->modify('+1 day');
                     break;
                 case 'year':
@@ -214,6 +214,7 @@ class ReportCashflowController extends AbstractController
             }
             $periods[] = ['label' => $label, 'start' => $start, 'end' => $end];
         }
+
         return $periods;
     }
 
@@ -224,6 +225,7 @@ class ReportCashflowController extends AbstractController
                 return $idx;
             }
         }
+
         return null;
     }
 }

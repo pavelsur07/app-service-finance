@@ -42,6 +42,7 @@ class ProjectDirection
     public function setCompany(Company $company): self
     {
         $this->company = $company;
+
         return $this;
     }
 
@@ -53,6 +54,7 @@ class ProjectDirection
     public function setName(string $name): self
     {
         $this->name = $name;
+
         return $this;
     }
 }

@@ -5,10 +5,7 @@ namespace App\Api\Ozon;
 use App\Entity\Company;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
-use Symfony\Contracts\HttpClient\Exception\RedirectionExceptionInterface;
-use Symfony\Contracts\HttpClient\Exception\ServerExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -48,9 +45,9 @@ class OzonApiClient
     {
         $headers = $this->companyHeaders($company);
         $delay = 1;
-        for ($attempt = 0; $attempt < 5; $attempt++) {
+        for ($attempt = 0; $attempt < 5; ++$attempt) {
             try {
-                $response = $this->http->request('POST', self::BASE_URL . $path, [
+                $response = $this->http->request('POST', self::BASE_URL.$path, [
                     'headers' => $headers,
                     'json' => $body,
                 ]);
@@ -64,11 +61,12 @@ class OzonApiClient
                     $delay *= 2;
                     continue;
                 }
+
                 return $response->toArray(false);
             } catch (TransportExceptionInterface $e) {
                 sleep($delay);
                 $delay *= 2;
-                if ($attempt === 4) {
+                if (4 === $attempt) {
                     throw $e;
                 }
             }
@@ -88,7 +86,7 @@ class OzonApiClient
             $response = $this->http->request('POST', 'https://api-seller.ozon.ru/v3/product/list', [
                 'headers' => $this->headers($clientId, $apiKey),
                 'json' => [
-                    'filter' => (object)[],  // обязателен!
+                    'filter' => (object) [],  // обязателен!
                     'limit' => $limit,
                     'last_id' => $lastId,
                 ],
@@ -97,7 +95,7 @@ class OzonApiClient
             $items = $data['result']['items'] ?? [];
             foreach ($items as $item) {
                 if (!empty($item['product_id'])) {
-                    $productIds[] = (int)$item['product_id'];
+                    $productIds[] = (int) $item['product_id'];
                 }
             }
             $lastId = $data['result']['last_id'] ?? '';
@@ -120,21 +118,20 @@ class OzonApiClient
 
             foreach (($infoData['items'] ?? []) as $product) {
                 $allProducts[] = [
-                    'id'           => $product['id'] ?? '',
-                    'offer_id'          => $product['offer_id'] ?? '',
-                    'sku'       => isset($product['sources'][0]['sku']) ? (string)$product['sources'][0]['sku'] : '',
-                    'name'         => $product['name'] ?? '',
-                    'price'        => isset($product['price']) ? (float) $product['price'] : 0.0,
-                    'barcode'      => $product['barcodes'][0] ?? '',
-                    'image_url'    => $product['images'][0] ?? null,
-                    'archived'     => $product['is_archived'] ?? false,
+                    'id' => $product['id'] ?? '',
+                    'offer_id' => $product['offer_id'] ?? '',
+                    'sku' => isset($product['sources'][0]['sku']) ? (string) $product['sources'][0]['sku'] : '',
+                    'name' => $product['name'] ?? '',
+                    'price' => isset($product['price']) ? (float) $product['price'] : 0.0,
+                    'barcode' => $product['barcodes'][0] ?? '',
+                    'image_url' => $product['images'][0] ?? null,
+                    'archived' => $product['is_archived'] ?? false,
                 ];
             }
         }
 
         return $allProducts;
     }
-
 
     public function getStocks(string $clientId, string $apiKey): array
     {
@@ -201,10 +198,10 @@ class OzonApiClient
     public function getFbsPostingsList(Company $company, \DateTimeImmutable $since, \DateTimeImmutable $to, array|string|null $status = null, int $limit = 1000, int $offset = 0, array $withFlags = []): array
     {
         $filter = [
-            'since' => $since->format(DATE_ATOM),
-            'to' => $to->format(DATE_ATOM),
+            'since' => $since->format(\DATE_ATOM),
+            'to' => $to->format(\DATE_ATOM),
         ];
-        if ($status !== null) {
+        if (null !== $status) {
             $filter['status'] = $status;
         }
         $body = [
@@ -214,7 +211,7 @@ class OzonApiClient
             'offset' => $offset,
         ];
         $with = [];
-        foreach (['analytics_data','financial_data','barcodes'] as $flag) {
+        foreach (['analytics_data', 'financial_data', 'barcodes'] as $flag) {
             if (isset($withFlags[$flag]) && $withFlags[$flag]) {
                 $with[$flag] = true;
             }
@@ -222,6 +219,7 @@ class OzonApiClient
         if ($with) {
             $body['with'] = $with;
         }
+
         return $this->request($company, '/v3/posting/fbs/list', $body);
     }
 
@@ -229,7 +227,7 @@ class OzonApiClient
     {
         $body = ['posting_number' => $postingNumber];
         $with = [];
-        foreach (['analytics_data','financial_data','barcodes','legal_info','product_exemplars','related_postings','translit'] as $flag) {
+        foreach (['analytics_data', 'financial_data', 'barcodes', 'legal_info', 'product_exemplars', 'related_postings', 'translit'] as $flag) {
             if (isset($withFlags[$flag]) && $withFlags[$flag]) {
                 $with[$flag] = true;
             }
@@ -237,6 +235,7 @@ class OzonApiClient
         if ($with) {
             $body['with'] = $with;
         }
+
         return $this->request($company, '/v3/posting/fbs/get', $body);
     }
 
@@ -247,7 +246,7 @@ class OzonApiClient
             'offset' => $offset,
         ];
         $with = [];
-        foreach (['analytics_data','financial_data','barcodes'] as $flag) {
+        foreach (['analytics_data', 'financial_data', 'barcodes'] as $flag) {
             if (isset($withFlags[$flag]) && $withFlags[$flag]) {
                 $with[$flag] = true;
             }
@@ -255,6 +254,7 @@ class OzonApiClient
         if ($with) {
             $body['with'] = $with;
         }
+
         return $this->request($company, '/v3/posting/fbs/unfulfilled/list', $body);
     }
 
@@ -262,18 +262,20 @@ class OzonApiClient
     {
         $body = [
             'filter' => [
-                'since' => $since->format(DATE_ATOM),
-                'to' => $to->format(DATE_ATOM),
+                'since' => $since->format(\DATE_ATOM),
+                'to' => $to->format(\DATE_ATOM),
             ],
             'limit' => $limit,
             'offset' => $offset,
         ];
+
         return $this->request($company, '/v2/posting/fbo/list', $body);
     }
 
     public function getFboPosting(Company $company, string $postingNumber): array
     {
         $body = ['posting_number' => $postingNumber];
+
         return $this->request($company, '/v2/posting/fbo/get', $body);
     }
 }

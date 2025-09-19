@@ -22,7 +22,8 @@ readonly class OzonOrderSyncService
         private OzonOrderRepository $orderRepo,
         private OzonProductRepository $productRepo,
         private OzonSyncCursorRepository $cursorRepo,
-    ) {}
+    ) {
+    }
 
     /**
      * @return array{orders:int, statusChanges:int}
@@ -58,7 +59,7 @@ readonly class OzonOrderSyncService
                     $history->setChangedAt($statusUpdatedAt);
                     $history->setRawEvent($posting);
                     $this->em->persist($history);
-                    $statusChanges++;
+                    ++$statusChanges;
                 } else {
                     $order->setStatusUpdatedAt($statusUpdatedAt);
                 }
@@ -69,7 +70,7 @@ readonly class OzonOrderSyncService
                     $items = $details['result']['products'] ?? $details['result']['items'] ?? [];
                 }
                 foreach ($items as $item) {
-                    $sku = isset($item['sku']) ? (string)$item['sku'] : null;
+                    $sku = isset($item['sku']) ? (string) $item['sku'] : null;
                     $offerId = $item['offer_id'] ?? null;
                     $orderItem = $this->em->getRepository(OzonOrderItem::class)->findOneBy([
                         'order' => $order,
@@ -78,8 +79,8 @@ readonly class OzonOrderSyncService
                     ]) ?? new OzonOrderItem(Uuid::uuid4()->toString(), $order);
                     $orderItem->setSku($sku);
                     $orderItem->setOfferId($offerId);
-                    $orderItem->setQuantity((int)($item['quantity'] ?? 0));
-                    $orderItem->setPrice((string)($item['price'] ?? '0'));
+                    $orderItem->setQuantity((int) ($item['quantity'] ?? 0));
+                    $orderItem->setPrice((string) ($item['price'] ?? '0'));
                     $product = null;
                     if ($sku) {
                         $product = $this->productRepo->findOneBy(['ozonSku' => $sku, 'company' => $company]);
@@ -91,7 +92,7 @@ readonly class OzonOrderSyncService
                     $orderItem->setRaw($item);
                     $this->em->persist($orderItem);
                 }
-                $processed++;
+                ++$processed;
             }
             $offset += $limit;
         } while (!empty($data['result']['has_next']));
@@ -141,7 +142,7 @@ readonly class OzonOrderSyncService
                     $history->setChangedAt($statusUpdatedAt);
                     $history->setRawEvent($posting);
                     $this->em->persist($history);
-                    $statusChanges++;
+                    ++$statusChanges;
                 } else {
                     $order->setStatusUpdatedAt($statusUpdatedAt);
                 }
@@ -152,7 +153,7 @@ readonly class OzonOrderSyncService
                     $items = $details['result']['products'] ?? [];
                 }
                 foreach ($items as $item) {
-                    $sku = isset($item['sku']) ? (string)$item['sku'] : null;
+                    $sku = isset($item['sku']) ? (string) $item['sku'] : null;
                     $offerId = $item['offer_id'] ?? null;
                     $orderItem = $this->em->getRepository(OzonOrderItem::class)->findOneBy([
                         'order' => $order,
@@ -161,8 +162,8 @@ readonly class OzonOrderSyncService
                     ]) ?? new OzonOrderItem(Uuid::uuid4()->toString(), $order);
                     $orderItem->setSku($sku);
                     $orderItem->setOfferId($offerId);
-                    $orderItem->setQuantity((int)($item['quantity'] ?? 0));
-                    $orderItem->setPrice((string)($item['price'] ?? '0'));
+                    $orderItem->setQuantity((int) ($item['quantity'] ?? 0));
+                    $orderItem->setPrice((string) ($item['price'] ?? '0'));
                     $product = null;
                     if ($sku) {
                         $product = $this->productRepo->findOneBy(['ozonSku' => $sku, 'company' => $company]);
@@ -174,7 +175,7 @@ readonly class OzonOrderSyncService
                     $orderItem->setRaw($item);
                     $this->em->persist($orderItem);
                 }
-                $processed++;
+                ++$processed;
             }
             $offset += $limit;
         } while (!empty($data['result']['has_next']));

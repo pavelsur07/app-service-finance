@@ -2,12 +2,11 @@
 
 namespace App\Entity;
 
+use App\Repository\PLCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
-use App\Repository\PLCategoryRepository;
-use App\Entity\Company;
 
 #[ORM\Entity(repositoryClass: PLCategoryRepository::class)]
 #[ORM\Table(name: 'pl_categories')]
@@ -45,22 +44,75 @@ class PLCategory
         $this->children = new ArrayCollection();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): self { $this->company = $company; return $this; }
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): self { $this->name = $name; return $this; }
-    public function getParent(): ?self { return $this->parent; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): self
+    {
+        $this->company = $company;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function getParent(): ?self
+    {
+        return $this->parent;
+    }
+
     public function setParent(?self $parent): self
     {
         $this->parent = $parent;
         $this->level = $parent ? $parent->getLevel() + 1 : 1;
         Assert::range($this->level, 1, 5);
+
         return $this;
     }
-    public function getChildren(): Collection { return $this->children; }
-    public function getLevel(): int { return $this->level; }
-    public function setLevel(int $level): self { $this->level = $level; return $this; }
-    public function getSortOrder(): int { return $this->sortOrder; }
-    public function setSortOrder(int $sortOrder): self { $this->sortOrder = $sortOrder; return $this; }
+
+    public function getChildren(): Collection
+    {
+        return $this->children;
+    }
+
+    public function getLevel(): int
+    {
+        return $this->level;
+    }
+
+    public function setLevel(int $level): self
+    {
+        $this->level = $level;
+
+        return $this;
+    }
+
+    public function getSortOrder(): int
+    {
+        return $this->sortOrder;
+    }
+
+    public function setSortOrder(int $sortOrder): self
+    {
+        $this->sortOrder = $sortOrder;
+
+        return $this;
+    }
 }

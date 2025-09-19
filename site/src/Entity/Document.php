@@ -2,12 +2,11 @@
 
 namespace App\Entity;
 
+use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
-use App\Repository\DocumentRepository;
-use App\Entity\Company;
 
 #[ORM\Entity(repositoryClass: DocumentRepository::class)]
 #[ORM\Table(name: 'documents')]
@@ -45,27 +44,87 @@ class Document
         $this->operations = new ArrayCollection();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): self { $this->company = $company; return $this; }
-    public function getDate(): \DateTimeImmutable { return $this->date; }
-    public function setDate(\DateTimeImmutable $date): self { $this->date = $date; return $this; }
-    public function getNumber(): ?string { return $this->number; }
-    public function setNumber(?string $number): self { $this->number = $number; return $this; }
-    public function getType(): string { return $this->type; }
-    public function setType(string $type): self { $this->type = $type; return $this; }
-    public function getDescription(): ?string { return $this->description; }
-    public function setDescription(?string $description): self { $this->description = $description; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): self
+    {
+        $this->company = $company;
+
+        return $this;
+    }
+
+    public function getDate(): \DateTimeImmutable
+    {
+        return $this->date;
+    }
+
+    public function setDate(\DateTimeImmutable $date): self
+    {
+        $this->date = $date;
+
+        return $this;
+    }
+
+    public function getNumber(): ?string
+    {
+        return $this->number;
+    }
+
+    public function setNumber(?string $number): self
+    {
+        $this->number = $number;
+
+        return $this;
+    }
+
+    public function getType(): string
+    {
+        return $this->type;
+    }
+
+    public function setType(string $type): self
+    {
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $description): self
+    {
+        $this->description = $description;
+
+        return $this;
+    }
+
     /** @return Collection<int, DocumentOperation> */
-    public function getOperations(): Collection { return $this->operations; }
+    public function getOperations(): Collection
+    {
+        return $this->operations;
+    }
+
     public function addOperation(DocumentOperation $op): self
     {
         if (!$this->operations->contains($op)) {
             $this->operations->add($op);
             $op->setDocument($this);
         }
+
         return $this;
     }
+
     public function removeOperation(DocumentOperation $op): self
     {
         if ($this->operations->removeElement($op)) {
@@ -73,6 +132,7 @@ class Document
                 $op->setDocument(null);
             }
         }
+
         return $this;
     }
 }

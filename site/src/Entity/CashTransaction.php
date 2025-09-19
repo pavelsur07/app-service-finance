@@ -65,9 +65,8 @@ class CashTransaction
         CashDirection $direction,
         string $amount,
         string $currency,
-        \DateTimeImmutable $occurredAt
-    )
-    {
+        \DateTimeImmutable $occurredAt,
+    ) {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
@@ -81,29 +80,150 @@ class CashTransaction
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function getMoneyAccount(): MoneyAccount { return $this->moneyAccount; }
-    public function setMoneyAccount(MoneyAccount $a): self { $this->moneyAccount = $a; return $this; }
-    public function getCounterparty(): ?Counterparty { return $this->counterparty; }
-    public function setCounterparty(?Counterparty $c): self { $this->counterparty = $c; return $this; }
-    public function getCashflowCategory(): ?CashflowCategory { return $this->cashflowCategory; }
-    public function setCashflowCategory(?CashflowCategory $c): self { $this->cashflowCategory = $c; return $this; }
-    public function getDirection(): CashDirection { return $this->direction; }
-    public function setDirection(CashDirection $d): self { $this->direction = $d; return $this; }
-    public function getAmount(): string { return $this->amount; }
-    public function setAmount(string $a): self { $this->amount = $a; return $this; }
-    public function getCurrency(): string { return $this->currency; }
-    public function setCurrency(string $c): self { $this->currency = strtoupper($c); return $this; }
-    public function getOccurredAt(): \DateTimeImmutable { return $this->occurredAt; }
-    public function setOccurredAt(\DateTimeImmutable $o): self { $this->occurredAt = $o; return $this; }
-    public function getBookedAt(): \DateTimeImmutable { return $this->bookedAt; }
-    public function setBookedAt(\DateTimeImmutable $b): self { $this->bookedAt = $b; return $this; }
-    public function getDescription(): ?string { return $this->description; }
-    public function setDescription(?string $d): self { $this->description = $d; return $this; }
-    public function getExternalId(): ?string { return $this->externalId; }
-    public function setExternalId(?string $e): self { $this->externalId = $e; return $this; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
-    public function setUpdatedAt(\DateTimeInterface $u): self { $this->updatedAt = $u; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function getMoneyAccount(): MoneyAccount
+    {
+        return $this->moneyAccount;
+    }
+
+    public function setMoneyAccount(MoneyAccount $a): self
+    {
+        $this->moneyAccount = $a;
+
+        return $this;
+    }
+
+    public function getCounterparty(): ?Counterparty
+    {
+        return $this->counterparty;
+    }
+
+    public function setCounterparty(?Counterparty $c): self
+    {
+        $this->counterparty = $c;
+
+        return $this;
+    }
+
+    public function getCashflowCategory(): ?CashflowCategory
+    {
+        return $this->cashflowCategory;
+    }
+
+    public function setCashflowCategory(?CashflowCategory $c): self
+    {
+        $this->cashflowCategory = $c;
+
+        return $this;
+    }
+
+    public function getDirection(): CashDirection
+    {
+        return $this->direction;
+    }
+
+    public function setDirection(CashDirection $d): self
+    {
+        $this->direction = $d;
+
+        return $this;
+    }
+
+    public function getAmount(): string
+    {
+        return $this->amount;
+    }
+
+    public function setAmount(string $a): self
+    {
+        $this->amount = $a;
+
+        return $this;
+    }
+
+    public function getCurrency(): string
+    {
+        return $this->currency;
+    }
+
+    public function setCurrency(string $c): self
+    {
+        $this->currency = strtoupper($c);
+
+        return $this;
+    }
+
+    public function getOccurredAt(): \DateTimeImmutable
+    {
+        return $this->occurredAt;
+    }
+
+    public function setOccurredAt(\DateTimeImmutable $o): self
+    {
+        $this->occurredAt = $o;
+
+        return $this;
+    }
+
+    public function getBookedAt(): \DateTimeImmutable
+    {
+        return $this->bookedAt;
+    }
+
+    public function setBookedAt(\DateTimeImmutable $b): self
+    {
+        $this->bookedAt = $b;
+
+        return $this;
+    }
+
+    public function getDescription(): ?string
+    {
+        return $this->description;
+    }
+
+    public function setDescription(?string $d): self
+    {
+        $this->description = $d;
+
+        return $this;
+    }
+
+    public function getExternalId(): ?string
+    {
+        return $this->externalId;
+    }
+
+    public function setExternalId(?string $e): self
+    {
+        $this->externalId = $e;
+
+        return $this;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeInterface $u): self
+    {
+        $this->updatedAt = $u;
+
+        return $this;
+    }
 }

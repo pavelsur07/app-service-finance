@@ -22,14 +22,14 @@ class Bank1CStatementParser
 
         foreach ($lines as $line) {
             $line = trim($line);
-            if ($line === '') {
+            if ('' === $line) {
                 continue;
             }
-            if ($line === 'СекцияРасчСчет') {
+            if ('СекцияРасчСчет' === $line) {
                 $state = 'ACCOUNT';
                 continue;
             }
-            if ($line === 'КонецРасчСчет') {
+            if ('КонецРасчСчет' === $line) {
                 $state = 'AFTER_ACCOUNT';
                 continue;
             }
@@ -39,7 +39,7 @@ class Bank1CStatementParser
                 $state = 'DOC';
                 continue;
             }
-            if ($line === 'КонецДокумента') {
+            if ('КонецДокумента' === $line) {
                 if ($current) {
                     $documents[] = $current;
                 }
@@ -47,7 +47,7 @@ class Bank1CStatementParser
                 $state = 'AFTER_DOC';
                 continue;
             }
-            if ($line === 'КонецФайла') {
+            if ('КонецФайла' === $line) {
                 break;
             }
             [$key, $value] = array_map('trim', explode('=', $line, 2) + [1 => '']);

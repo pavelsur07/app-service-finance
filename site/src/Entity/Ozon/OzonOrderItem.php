@@ -3,7 +3,6 @@
 namespace App\Entity\Ozon;
 
 use Doctrine\ORM\Mapping as ORM;
-use App\Entity\Ozon\OzonProduct;
 
 #[ORM\Entity]
 #[ORM\Table(name: 'ozon_order_items')]
@@ -43,19 +42,78 @@ class OzonOrderItem
         $this->order = $order;
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getOrder(): OzonOrder { return $this->order; }
-    public function setOrder(OzonOrder $order): void { $this->order = $order; }
-    public function getSku(): ?string { return $this->sku; }
-    public function setSku(?string $sku): void { $this->sku = $sku; }
-    public function getOfferId(): ?string { return $this->offerId; }
-    public function setOfferId(?string $offerId): void { $this->offerId = $offerId; }
-    public function getQuantity(): int { return $this->quantity; }
-    public function setQuantity(int $quantity): void { $this->quantity = $quantity; }
-    public function getPrice(): string { return $this->price; }
-    public function setPrice(string $price): void { $this->price = $price; }
-    public function getProduct(): ?OzonProduct { return $this->product; }
-    public function setProduct(?OzonProduct $product): void { $this->product = $product; }
-    public function getRaw(): array { return $this->raw; }
-    public function setRaw(array $raw): void { $this->raw = $raw; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getOrder(): OzonOrder
+    {
+        return $this->order;
+    }
+
+    public function setOrder(OzonOrder $order): void
+    {
+        $this->order = $order;
+    }
+
+    public function getSku(): ?string
+    {
+        return $this->sku;
+    }
+
+    public function setSku(?string $sku): void
+    {
+        $this->sku = $sku;
+    }
+
+    public function getOfferId(): ?string
+    {
+        return $this->offerId;
+    }
+
+    public function setOfferId(?string $offerId): void
+    {
+        $this->offerId = $offerId;
+    }
+
+    public function getQuantity(): int
+    {
+        return $this->quantity;
+    }
+
+    public function setQuantity(int $quantity): void
+    {
+        $this->quantity = $quantity;
+    }
+
+    public function getPrice(): string
+    {
+        return $this->price;
+    }
+
+    public function setPrice(string $price): void
+    {
+        $this->price = $price;
+    }
+
+    public function getProduct(): ?OzonProduct
+    {
+        return $this->product;
+    }
+
+    public function setProduct(?OzonProduct $product): void
+    {
+        $this->product = $product;
+    }
+
+    public function getRaw(): array
+    {
+        return $this->raw;
+    }
+
+    public function setRaw(array $raw): void
+    {
+        $this->raw = $raw;
+    }
 }

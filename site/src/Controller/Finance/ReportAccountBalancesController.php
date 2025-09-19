@@ -18,7 +18,7 @@ class ReportAccountBalancesController extends AbstractController
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
         private MoneyAccountRepository $accountRepository,
-        private MoneyAccountDailyBalanceRepository $balanceRepository
+        private MoneyAccountDailyBalanceRepository $balanceRepository,
     ) {
     }
 

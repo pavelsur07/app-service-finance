@@ -41,20 +41,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?string $password = null;
 
-
     #[ORM\OneToMany(targetEntity: Company::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $companies;
 
-    /**
-     * @param string $id
-     */
     public function __construct(string $id)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->companies = new ArrayCollection();
     }
-
 
     public function getId(): ?string
     {
@@ -137,6 +132,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->companies[] = $company;
             $company->setUser($this);
         }
+
         return $this;
     }
 
@@ -147,6 +143,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
                 $company->setUser(null);
             }
         }
+
         return $this;
     }
 
@@ -154,7 +151,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         return $this->companies;
     }
-
 
     #[\Deprecated]
     public function eraseCredentials(): void

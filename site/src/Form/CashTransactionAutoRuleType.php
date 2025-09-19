@@ -2,16 +2,15 @@
 
 namespace App\Form;
 
-use App\Entity\CashTransactionAutoRule;
 use App\Entity\CashflowCategory;
-use App\Form\CashTransactionAutoRuleConditionType;
+use App\Entity\CashTransactionAutoRule;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
-use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -53,7 +52,7 @@ class CashTransactionAutoRuleType extends AbstractType
                 'class' => CashflowCategory::class,
                 'choices' => $options['categories'],
                 'choice_label' => function (CashflowCategory $item) {
-                    return str_repeat('—', $item->getLevel() - 1) . ' ' . $item->getName();
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'label' => 'Категория движения ДДС',
             ])

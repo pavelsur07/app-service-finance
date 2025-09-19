@@ -3,40 +3,90 @@
 namespace App\Tests\Service;
 
 use App\DTO\CashTransactionDTO;
+use App\Entity\CashflowCategory;
+use App\Entity\CashTransaction;
+use App\Entity\Company;
+use App\Entity\Counterparty;
+use App\Entity\MoneyAccount;
+use App\Entity\MoneyAccountDailyBalance;
+use App\Entity\User;
 use App\Enum\CashDirection;
-use App\Enum\MoneyAccountType;
 use App\Enum\CounterpartyType;
+use App\Enum\MoneyAccountType;
 use App\Service\AccountBalanceService;
 use App\Service\CashTransactionService;
-use App\Entity\User;
-use App\Entity\Company;
-use App\Entity\MoneyAccount;
-use App\Entity\CashTransaction;
-use App\Entity\MoneyAccountDailyBalance;
-use App\Entity\CashflowCategory;
-use App\Entity\Counterparty;
-use Doctrine\ORM\Tools\Setup;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
+use Doctrine\ORM\Tools\Setup;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 class SimpleManagerRegistry implements ManagerRegistry
 {
-    public function __construct(private EntityManager $em) {}
-    public function getDefaultConnectionName(){return 'default';}
-    public function getConnection($name = null){return $this->em->getConnection();}
-    public function getConnections(){return [$this->em->getConnection()];}
-    public function getConnectionNames(){return ['default'];}
-    public function getDefaultManagerName(){return 'default';}
-    public function getManager($name = null){return $this->em;}
-    public function getManagers(){return ['default' => $this->em];}
-    public function resetManager($name = null){return $this->em;}
-    public function getAliasNamespace($alias){return 'App\\Entity';}
-    public function getManagerNames(){return ['default'];}
-    public function getRepository($persistentObject, $persistentManagerName = null){return $this->em->getRepository($persistentObject);}
-    public function getManagerForClass($class){return $this->em;}
+    public function __construct(private EntityManager $em)
+    {
+    }
+
+    public function getDefaultConnectionName()
+    {
+        return 'default';
+    }
+
+    public function getConnection($name = null)
+    {
+        return $this->em->getConnection();
+    }
+
+    public function getConnections()
+    {
+        return [$this->em->getConnection()];
+    }
+
+    public function getConnectionNames()
+    {
+        return ['default'];
+    }
+
+    public function getDefaultManagerName()
+    {
+        return 'default';
+    }
+
+    public function getManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getManagers()
+    {
+        return ['default' => $this->em];
+    }
+
+    public function resetManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getAliasNamespace($alias)
+    {
+        return 'App\\Entity';
+    }
+
+    public function getManagerNames()
+    {
+        return ['default'];
+    }
+
+    public function getRepository($persistentObject, $persistentManagerName = null)
+    {
+        return $this->em->getRepository($persistentObject);
+    }
+
+    public function getManagerForClass($class)
+    {
+        return $this->em;
+    }
 }
 
 class CashTransactionServiceTest extends TestCase

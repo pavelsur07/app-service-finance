@@ -66,31 +66,138 @@ class OzonOrder
         $this->statusUpdatedAt = $this->createdAt;
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): void { $this->company = $company; }
-    public function getPostingNumber(): string { return $this->postingNumber; }
-    public function setPostingNumber(string $postingNumber): void { $this->postingNumber = $postingNumber; }
-    public function getScheme(): string { return $this->scheme; }
-    public function setScheme(string $scheme): void { $this->scheme = $scheme; }
-    public function getStatus(): string { return $this->status; }
-    public function setStatus(string $status): void { $this->status = $status; }
-    public function getStatusUpdatedAt(): \DateTimeImmutable { return $this->statusUpdatedAt; }
-    public function setStatusUpdatedAt(\DateTimeImmutable $statusUpdatedAt): void { $this->statusUpdatedAt = $statusUpdatedAt; }
-    public function getOzonCreatedAt(): ?\DateTimeImmutable { return $this->ozonCreatedAt; }
-    public function setOzonCreatedAt(?\DateTimeImmutable $v): void { $this->ozonCreatedAt = $v; }
-    public function getOzonUpdatedAt(): ?\DateTimeImmutable { return $this->ozonUpdatedAt; }
-    public function setOzonUpdatedAt(?\DateTimeImmutable $v): void { $this->ozonUpdatedAt = $v; }
-    public function getWarehouseId(): ?string { return $this->warehouseId; }
-    public function setWarehouseId(?string $warehouseId): void { $this->warehouseId = $warehouseId; }
-    public function getDeliveryMethodName(): ?string { return $this->deliveryMethodName; }
-    public function setDeliveryMethodName(?string $deliveryMethodName): void { $this->deliveryMethodName = $deliveryMethodName; }
-    public function getPaymentStatus(): ?string { return $this->paymentStatus; }
-    public function setPaymentStatus(?string $paymentStatus): void { $this->paymentStatus = $paymentStatus; }
-    public function getRaw(): array { return $this->raw; }
-    public function setRaw(array $raw): void { $this->raw = $raw; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function setCreatedAt(\DateTimeImmutable $createdAt): void { $this->createdAt = $createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
-    public function setUpdatedAt(\DateTimeImmutable $updatedAt): void { $this->updatedAt = $updatedAt; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): void
+    {
+        $this->company = $company;
+    }
+
+    public function getPostingNumber(): string
+    {
+        return $this->postingNumber;
+    }
+
+    public function setPostingNumber(string $postingNumber): void
+    {
+        $this->postingNumber = $postingNumber;
+    }
+
+    public function getScheme(): string
+    {
+        return $this->scheme;
+    }
+
+    public function setScheme(string $scheme): void
+    {
+        $this->scheme = $scheme;
+    }
+
+    public function getStatus(): string
+    {
+        return $this->status;
+    }
+
+    public function setStatus(string $status): void
+    {
+        $this->status = $status;
+    }
+
+    public function getStatusUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->statusUpdatedAt;
+    }
+
+    public function setStatusUpdatedAt(\DateTimeImmutable $statusUpdatedAt): void
+    {
+        $this->statusUpdatedAt = $statusUpdatedAt;
+    }
+
+    public function getOzonCreatedAt(): ?\DateTimeImmutable
+    {
+        return $this->ozonCreatedAt;
+    }
+
+    public function setOzonCreatedAt(?\DateTimeImmutable $v): void
+    {
+        $this->ozonCreatedAt = $v;
+    }
+
+    public function getOzonUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->ozonUpdatedAt;
+    }
+
+    public function setOzonUpdatedAt(?\DateTimeImmutable $v): void
+    {
+        $this->ozonUpdatedAt = $v;
+    }
+
+    public function getWarehouseId(): ?string
+    {
+        return $this->warehouseId;
+    }
+
+    public function setWarehouseId(?string $warehouseId): void
+    {
+        $this->warehouseId = $warehouseId;
+    }
+
+    public function getDeliveryMethodName(): ?string
+    {
+        return $this->deliveryMethodName;
+    }
+
+    public function setDeliveryMethodName(?string $deliveryMethodName): void
+    {
+        $this->deliveryMethodName = $deliveryMethodName;
+    }
+
+    public function getPaymentStatus(): ?string
+    {
+        return $this->paymentStatus;
+    }
+
+    public function setPaymentStatus(?string $paymentStatus): void
+    {
+        $this->paymentStatus = $paymentStatus;
+    }
+
+    public function getRaw(): array
+    {
+        return $this->raw;
+    }
+
+    public function setRaw(array $raw): void
+    {
+        $this->raw = $raw;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): void
+    {
+        $this->createdAt = $createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): void
+    {
+        $this->updatedAt = $updatedAt;
+    }
 }

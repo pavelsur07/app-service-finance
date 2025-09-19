@@ -20,7 +20,7 @@ class ReportTransactionsStatementController extends AbstractController
         private readonly ActiveCompanyService $activeCompany,
         private readonly CashTransactionRepository $trxRepo,
         private readonly MoneyAccountDailyBalanceRepository $dailyRepo,
-        private readonly MoneyAccountRepository $accountRepo
+        private readonly MoneyAccountRepository $accountRepo,
     ) {
     }
 
@@ -66,21 +66,21 @@ class ReportTransactionsStatementController extends AbstractController
         }
 
         $includeRaw = $request->query->get('include_empty_periods', '0');
-        $includeEmpty = is_string($includeRaw) ? $includeRaw === '1' : false;
+        $includeEmpty = is_string($includeRaw) ? '1' === $includeRaw : false;
         $expandRaw = $request->query->get('expand_transactions', '1');
-        $expandTransactions = is_string($expandRaw) ? $expandRaw !== '0' : true;
+        $expandTransactions = is_string($expandRaw) ? '0' !== $expandRaw : true;
 
         $accountRaw = $request->query->get('account');
-        $accountParam = is_string($accountRaw) && $accountRaw !== '' ? $accountRaw : null;
+        $accountParam = is_string($accountRaw) && '' !== $accountRaw ? $accountRaw : null;
         $categoryRaw = $request->query->get('category');
-        $categoryParam = is_string($categoryRaw) && $categoryRaw !== '' ? $categoryRaw : null;
+        $categoryParam = is_string($categoryRaw) && '' !== $categoryRaw ? $categoryRaw : null;
 
         $accounts = $this->accountRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $accountOptions = [];
         $accountIds = [];
         $selectedAccount = null;
         foreach ($accounts as $account) {
-            /** @var MoneyAccount $account */
+            /* @var MoneyAccount $account */
             $accountOptions[] = [
                 'id' => $account->getId(),
                 'name' => sprintf('%s (%s)', $account->getName(), $account->getCurrency()),
@@ -243,6 +243,7 @@ class ReportTransactionsStatementController extends AbstractController
 
     /**
      * @param list<string> $accountIds
+     *
      * @return array<string, array<string, array{opening: float, closing: float}>>
      */
     private function fetchDailyBalances(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $accountIds): array
@@ -290,7 +291,7 @@ class ReportTransactionsStatementController extends AbstractController
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         ?string $accountId,
-        ?string $categoryId
+        ?string $categoryId,
     ): array {
         $qb = $this->trxRepo->createQueryBuilder('t')
             ->leftJoin('t.counterparty', 'counterparty')
@@ -332,7 +333,7 @@ class ReportTransactionsStatementController extends AbstractController
             }
 
             $amount = (float) $transaction->getAmount();
-            if ($transaction->getDirection() === CashDirection::OUTFLOW) {
+            if (CashDirection::OUTFLOW === $transaction->getDirection()) {
                 $amount = -abs($amount);
             } else {
                 $amount = abs($amount);
@@ -352,7 +353,7 @@ class ReportTransactionsStatementController extends AbstractController
             ];
         }
 
-        asort($categories, SORT_LOCALE_STRING);
+        asort($categories, \SORT_LOCALE_STRING);
 
         $categoryOptions = [];
         foreach ($categories as $id => $name) {
@@ -369,6 +370,7 @@ class ReportTransactionsStatementController extends AbstractController
      * @param array<int, array{start: \DateTimeImmutable, end: \DateTimeImmutable, label_start: \DateTimeImmutable, label_end: \DateTimeImmutable}> $periods
      * @param array<string, array<string, array{opening: float, closing: float}>> $balances
      * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}> $transactions
+     *
      * @return array{summary: array{opening: float, income: float, expense: float, closing: float}, buckets: list<array{label: string, opening: float, closing_calc: float, closing_fact: ?float, check_ok: bool, check_diff: ?float, transactions: list<array{date: \DateTimeInterface, doc: ?string, counterparty: ?string, description: ?string, amount: float, balance_after: float}>}>}
      */
     private function aggregateByBuckets(
@@ -377,7 +379,7 @@ class ReportTransactionsStatementController extends AbstractController
         array $transactions,
         string $group,
         bool $includeEmpty,
-        bool $expandTransactions
+        bool $expandTransactions,
     ): array {
         $buckets = [];
         $summary = [
@@ -432,7 +434,7 @@ class ReportTransactionsStatementController extends AbstractController
                 $txDate = $tx['date'];
 
                 if ($txDate < $start) {
-                    $txIndex++;
+                    ++$txIndex;
                     continue;
                 }
 
@@ -461,7 +463,7 @@ class ReportTransactionsStatementController extends AbstractController
                     $summary['expense'] += abs($amount);
                 }
 
-                $txIndex++;
+                ++$txIndex;
             }
 
             $closingCalc = round($running, 2);
@@ -477,7 +479,7 @@ class ReportTransactionsStatementController extends AbstractController
 
             $checkOk = false;
             $checkDiff = null;
-            if ($closingFact !== null) {
+            if (null !== $closingFact) {
                 $diff = round(abs($closingCalc - $closingFact), 2);
                 $checkOk = $diff < 0.01;
                 $checkDiff = $checkOk ? null : $diff;

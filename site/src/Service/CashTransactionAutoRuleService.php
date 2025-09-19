@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Service;
 
 use App\Entity\CashTransaction;
@@ -14,8 +15,9 @@ class CashTransactionAutoRuleService
 {
     public function __construct(
         private CashTransactionAutoRuleRepository $ruleRepo,
-        private EntityManagerInterface $em
-    ) {}
+        private EntityManagerInterface $em,
+    ) {
+    }
 
     /**
      * Найти ПЕРВОЕ подходящее правило для транзакции (в пределах компании транзакции).
@@ -29,72 +31,98 @@ class CashTransactionAutoRuleService
         foreach ($rules as $rule) {
             // 1) Тип операции
             $opType = $rule->getOperationType();
-            if ($opType->value !== 'ANY') {
-                if ($opType->value === 'INFLOW'  && $t->getDirection() !== CashDirection::INFLOW)  { continue; }
-                if ($opType->value === 'OUTFLOW' && $t->getDirection() !== CashDirection::OUTFLOW) { continue; }
+            if ('ANY' !== $opType->value) {
+                if ('INFLOW' === $opType->value && CashDirection::INFLOW !== $t->getDirection()) {
+                    continue;
+                }
+                if ('OUTFLOW' === $opType->value && CashDirection::OUTFLOW !== $t->getDirection()) {
+                    continue;
+                }
             }
 
             // 2) Все условия (AND)
             $ok = true;
             foreach ($rule->getConditions() as $cond) {
-                $field    = $cond->getField();
+                $field = $cond->getField();
                 $operator = $cond->getOperator();
-                $value    = (string) ($cond->getValue() ?? '');
-                $valueTo  = (string) ($cond->getValueTo() ?? '');
+                $value = (string) ($cond->getValue() ?? '');
+                $valueTo = (string) ($cond->getValueTo() ?? '');
 
                 switch ($field) {
                     case CashTransactionAutoRuleConditionField::COUNTERPARTY:
                         // точное совпадение по выбранному контрагенту
-                        if ($t->getCounterparty() !== $cond->getCounterparty()) { $ok = false; }
+                        if ($t->getCounterparty() !== $cond->getCounterparty()) {
+                            $ok = false;
+                        }
                         break;
 
                     case CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME:
                         $name = $t->getCounterparty()?->getName() ?? '';
-                        if (!$this->containsNormalized($name, $value)) { $ok = false; }
+                        if (!$this->containsNormalized($name, $value)) {
+                            $ok = false;
+                        }
                         break;
 
                     case CashTransactionAutoRuleConditionField::INN:
-                        $inn = preg_replace('/\D+/', '', (string)($t->getCounterparty()?->getInn() ?? ''));
+                        $inn = preg_replace('/\D+/', '', (string) ($t->getCounterparty()?->getInn() ?? ''));
                         $val = preg_replace('/\D+/', '', $value);
-                        if ($inn !== $val) { $ok = false; }
+                        if ($inn !== $val) {
+                            $ok = false;
+                        }
                         break;
 
                     case CashTransactionAutoRuleConditionField::DATE:
                         // EQUAL — в пределах суток; BETWEEN — включая границы
                         $d = $t->getOccurredAt();
-                        if ($operator === CashTransactionAutoRuleConditionOperator::BETWEEN) {
+                        if (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator) {
                             $from = new \DateTimeImmutable($value.' 00:00:00');
-                            $to   = new \DateTimeImmutable($valueTo.' 23:59:59');
-                            if ($d < $from || $d > $to) { $ok = false; }
+                            $to = new \DateTimeImmutable($valueTo.' 23:59:59');
+                            if ($d < $from || $d > $to) {
+                                $ok = false;
+                            }
                         } else { // EQUAL
                             $from = new \DateTimeImmutable($value.' 00:00:00');
-                            $to   = new \DateTimeImmutable($value.' 23:59:59');
-                            if ($d < $from || $d > $to) { $ok = false; }
+                            $to = new \DateTimeImmutable($value.' 23:59:59');
+                            if ($d < $from || $d > $to) {
+                                $ok = false;
+                            }
                         }
                         break;
 
                     case CashTransactionAutoRuleConditionField::AMOUNT:
                         // amount хранится строкой; сравним через bccomp при масштабе 2
                         $amt = $t->getAmount();
-                        $cmp = fn(string $a, string $b) => \bccomp($a, $b, 2);
-                        if ($operator === CashTransactionAutoRuleConditionOperator::BETWEEN) {
-                            if (!($cmp($amt, (string)$value) >= 0 && $cmp($amt, (string)$valueTo) <= 0)) { $ok = false; }
-                        } elseif ($operator === CashTransactionAutoRuleConditionOperator::GREATER_THAN) {
-                            if (!($cmp($amt, (string)$value) > 0)) { $ok = false; }
-                        } elseif ($operator === CashTransactionAutoRuleConditionOperator::LESS_THAN) {
-                            if (!($cmp($amt, (string)$value) < 0)) { $ok = false; }
+                        $cmp = fn (string $a, string $b) => \bccomp($a, $b, 2);
+                        if (CashTransactionAutoRuleConditionOperator::BETWEEN === $operator) {
+                            if (!($cmp($amt, (string) $value) >= 0 && $cmp($amt, (string) $valueTo) <= 0)) {
+                                $ok = false;
+                            }
+                        } elseif (CashTransactionAutoRuleConditionOperator::GREATER_THAN === $operator) {
+                            if (!($cmp($amt, (string) $value) > 0)) {
+                                $ok = false;
+                            }
+                        } elseif (CashTransactionAutoRuleConditionOperator::LESS_THAN === $operator) {
+                            if (!($cmp($amt, (string) $value) < 0)) {
+                                $ok = false;
+                            }
                         } else { // EQUAL
-                            if (!($cmp($amt, (string)$value) === 0)) { $ok = false; }
+                            if (!(0 === $cmp($amt, (string) $value))) {
+                                $ok = false;
+                            }
                         }
                         break;
 
                     case CashTransactionAutoRuleConditionField::DESCRIPTION:
                         $desc = $t->getDescription() ?? '';
-                        if (!$this->containsNormalized($desc, $value)) { $ok = false; }
+                        if (!$this->containsNormalized($desc, $value)) {
+                            $ok = false;
+                        }
                         break;
                 }
 
-                if (!$ok) { break; }
+                if (!$ok) {
+                    break;
+                }
             }
 
             if ($ok) {
@@ -120,13 +148,13 @@ class CashTransactionAutoRuleService
         }
 
         $category = $rule->getCashflowCategory(); // в сущности правила поле not-null
-        $action   = $rule->getAction();
+        $action = $rule->getAction();
 
         // Семантика:
         // FILL   — ставим категорию только если у транзакции она пуста
         // UPDATE — перезаписываем всегда
-        if ($action === CashTransactionAutoRuleAction::FILL) {
-            if ($t->getCashflowCategory() === null) {
+        if (CashTransactionAutoRuleAction::FILL === $action) {
+            if (null === $t->getCashflowCategory()) {
                 $t->setCashflowCategory($category);
                 $changed = true;
             }
@@ -146,9 +174,10 @@ class CashTransactionAutoRuleService
 
     private function containsNormalized(string $haystack, string $needle): bool
     {
-        $norm = fn(string $s) => mb_strtolower(str_replace('ё','е',$s));
+        $norm = fn (string $s) => mb_strtolower(str_replace('ё', 'е', $s));
         $h = $norm($haystack);
         $n = $norm($needle);
-        return $n !== '' && mb_strpos($h, $n) !== false;
+
+        return '' !== $n && false !== mb_strpos($h, $n);
     }
 }

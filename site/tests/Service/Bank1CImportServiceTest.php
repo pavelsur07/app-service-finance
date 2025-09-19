@@ -2,8 +2,8 @@
 
 namespace App\Tests\Service;
 
-use App\Entity\CashTransaction;
 use App\Entity\CashflowCategory;
+use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
@@ -27,19 +27,69 @@ use Ramsey\Uuid\Uuid;
 
 class SimpleManagerRegistry implements ManagerRegistry
 {
-    public function __construct(private EntityManager $em) {}
-    public function getDefaultConnectionName(){return 'default';}
-    public function getConnection($name = null){return $this->em->getConnection();}
-    public function getConnections(){return [$this->em->getConnection()];}
-    public function getConnectionNames(){return ['default'];}
-    public function getDefaultManagerName(){return 'default';}
-    public function getManager($name = null){return $this->em;}
-    public function getManagers(){return ['default' => $this->em];}
-    public function resetManager($name = null){return $this->em;}
-    public function getAliasNamespace($alias){return 'App\\Entity';}
-    public function getManagerNames(){return ['default'];}
-    public function getRepository($persistentObject, $persistentManagerName = null){return $this->em->getRepository($persistentObject);}
-    public function getManagerForClass($class){return $this->em;}
+    public function __construct(private EntityManager $em)
+    {
+    }
+
+    public function getDefaultConnectionName()
+    {
+        return 'default';
+    }
+
+    public function getConnection($name = null)
+    {
+        return $this->em->getConnection();
+    }
+
+    public function getConnections()
+    {
+        return [$this->em->getConnection()];
+    }
+
+    public function getConnectionNames()
+    {
+        return ['default'];
+    }
+
+    public function getDefaultManagerName()
+    {
+        return 'default';
+    }
+
+    public function getManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getManagers()
+    {
+        return ['default' => $this->em];
+    }
+
+    public function resetManager($name = null)
+    {
+        return $this->em;
+    }
+
+    public function getAliasNamespace($alias)
+    {
+        return 'App\\Entity';
+    }
+
+    public function getManagerNames()
+    {
+        return ['default'];
+    }
+
+    public function getRepository($persistentObject, $persistentManagerName = null)
+    {
+        return $this->em->getRepository($persistentObject);
+    }
+
+    public function getManagerForClass($class)
+    {
+        return $this->em;
+    }
 }
 
 class Bank1CImportServiceTest extends TestCase

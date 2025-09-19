@@ -47,7 +47,7 @@ class CashTransactionAutoRule
         string $name,
         CashTransactionAutoRuleAction $action,
         CashTransactionAutoRuleOperationType $operationType,
-        ?CashflowCategory $cashflowCategory = null
+        ?CashflowCategory $cashflowCategory = null,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -61,28 +61,87 @@ class CashTransactionAutoRule
         $this->conditions = new ArrayCollection();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): self { $this->company = $company; return $this; }
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): self { $this->name = $name; return $this; }
-    public function getAction(): CashTransactionAutoRuleAction { return $this->action; }
-    public function setAction(CashTransactionAutoRuleAction $action): self { $this->action = $action; return $this; }
-    public function getOperationType(): CashTransactionAutoRuleOperationType { return $this->operationType; }
-    public function setOperationType(CashTransactionAutoRuleOperationType $operationType): self { $this->operationType = $operationType; return $this; }
-    public function getCashflowCategory(): ?CashflowCategory { return $this->cashflowCategory; }
-    public function setCashflowCategory(CashflowCategory $cashflowCategory): self { $this->cashflowCategory = $cashflowCategory; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): self
+    {
+        $this->company = $company;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function getAction(): CashTransactionAutoRuleAction
+    {
+        return $this->action;
+    }
+
+    public function setAction(CashTransactionAutoRuleAction $action): self
+    {
+        $this->action = $action;
+
+        return $this;
+    }
+
+    public function getOperationType(): CashTransactionAutoRuleOperationType
+    {
+        return $this->operationType;
+    }
+
+    public function setOperationType(CashTransactionAutoRuleOperationType $operationType): self
+    {
+        $this->operationType = $operationType;
+
+        return $this;
+    }
+
+    public function getCashflowCategory(): ?CashflowCategory
+    {
+        return $this->cashflowCategory;
+    }
+
+    public function setCashflowCategory(CashflowCategory $cashflowCategory): self
+    {
+        $this->cashflowCategory = $cashflowCategory;
+
+        return $this;
+    }
 
     /** @return Collection<int, CashTransactionAutoRuleCondition> */
-    public function getConditions(): Collection { return $this->conditions; }
+    public function getConditions(): Collection
+    {
+        return $this->conditions;
+    }
+
     public function addCondition(CashTransactionAutoRuleCondition $condition): self
     {
         if (!$this->conditions->contains($condition)) {
             $this->conditions->add($condition);
             $condition->setAutoRule($this);
         }
+
         return $this;
     }
+
     public function removeCondition(CashTransactionAutoRuleCondition $condition): self
     {
         if ($this->conditions->removeElement($condition)) {
@@ -90,6 +149,7 @@ class CashTransactionAutoRule
                 $condition->setAutoRule(null);
             }
         }
+
         return $this;
     }
 }

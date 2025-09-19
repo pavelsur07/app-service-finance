@@ -54,18 +54,85 @@ class Counterparty
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getCompany(): Company { return $this->company; }
-    public function setCompany(Company $company): self { $this->company = $company; return $this; }
-    public function getName(): string { return $this->name; }
-    public function setName(string $name): self { $this->name = $name; return $this; }
-    public function getInn(): ?string { return $this->inn; }
-    public function setInn(?string $inn): self { $this->inn = $inn; return $this; }
-    public function getType(): CounterpartyType { return $this->type; }
-    public function setType(CounterpartyType $type): self { $this->type = $type; return $this; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeInterface { return $this->updatedAt; }
-    public function setUpdatedAt(\DateTimeInterface $updatedAt): self { $this->updatedAt = $updatedAt; return $this; }
-    public function isArchived(): bool { return $this->isArchived; }
-    public function setIsArchived(bool $isArchived): self { $this->isArchived = $isArchived; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): self
+    {
+        $this->company = $company;
+
+        return $this;
+    }
+
+    public function getName(): string
+    {
+        return $this->name;
+    }
+
+    public function setName(string $name): self
+    {
+        $this->name = $name;
+
+        return $this;
+    }
+
+    public function getInn(): ?string
+    {
+        return $this->inn;
+    }
+
+    public function setInn(?string $inn): self
+    {
+        $this->inn = $inn;
+
+        return $this;
+    }
+
+    public function getType(): CounterpartyType
+    {
+        return $this->type;
+    }
+
+    public function setType(CounterpartyType $type): self
+    {
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeInterface
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(\DateTimeInterface $updatedAt): self
+    {
+        $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function isArchived(): bool
+    {
+        return $this->isArchived;
+    }
+
+    public function setIsArchived(bool $isArchived): self
+    {
+        $this->isArchived = $isArchived;
+
+        return $this;
+    }
 }

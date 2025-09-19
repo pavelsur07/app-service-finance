@@ -3,11 +3,10 @@
 namespace App\Controller\Ozon;
 
 use App\Api\Ozon\OzonApiClient;
-use App\Entity\Company;
 use App\Repository\Ozon\OzonProductRepository;
-use App\Service\Ozon\OzonProductSyncService;
-use App\Service\Ozon\OzonProductStockService;
 use App\Service\Ozon\OzonProductSalesService;
+use App\Service\Ozon\OzonProductStockService;
+use App\Service\Ozon\OzonProductSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,7 +18,7 @@ class OzonProductController extends AbstractController
     #[Route('/ozon/products', name: 'ozon_products')]
     public function index(
         OzonProductRepository $repo,
-        Request $request
+        Request $request,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
         $page = max(1, (int) $request->query->get('page', 1));
@@ -39,8 +38,8 @@ class OzonProductController extends AbstractController
     #[Route('/ozon/products-test', name: 'ozon_products_test')]
     public function indexTest(
         OzonProductRepository $repo,
-        OzonApiClient         $client,
-        Request $request
+        OzonApiClient $client,
+        Request $request,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
 
@@ -54,16 +53,17 @@ class OzonProductController extends AbstractController
             to: $to
         );*/
 
-        return $this->json($client->test($company->getOzonSellerId(),$company->getOzonApiKey(), $from, $to));
+        return $this->json($client->test($company->getOzonSellerId(), $company->getOzonApiKey(), $from, $to));
     }
 
     #[Route('/ozon/products/sync', name: 'ozon_products_sync')]
     public function sync(
-        OzonProductSyncService $syncService
+        OzonProductSyncService $syncService,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
         $syncService->sync($company);
         $this->addFlash('success', 'Ozon-товары обновлены!');
+
         return $this->redirectToRoute('ozon_products');
     }
 
@@ -71,11 +71,11 @@ class OzonProductController extends AbstractController
     public function clear(
         OzonProductRepository $repo,
         EntityManagerInterface $em,
-        Request $request
+        Request $request,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
 
-        /*$em = $this->getDoctrine()->getManager();*/
+        /* $em = $this->getDoctrine()->getManager(); */
         $products = $repo->findBy(['company' => $company]);
         foreach ($products as $product) {
             $em->remove($product);
@@ -83,22 +83,24 @@ class OzonProductController extends AbstractController
         $em->flush();
 
         $this->addFlash('success', 'Все товары Ozon удалены!');
+
         return $this->redirectToRoute('ozon_products');
     }
 
     #[Route('/ozon/products/stocks/update', name: 'ozon_products_update_stocks')]
     public function updateStocks(
-        OzonProductStockService $stockService
+        OzonProductStockService $stockService,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
         $stockService->updateStocks($company);
         $this->addFlash('success', 'Остатки обновлены!');
+
         return $this->redirectToRoute('ozon_products');
     }
 
     #[Route('/ozon/products/sales/update', name: 'ozon_products_update_sales')]
     public function updateSales(
-        OzonProductSalesService $salesService
+        OzonProductSalesService $salesService,
     ): Response {
         $company = $this->getUser()->getCompanies()[0];
 
@@ -110,6 +112,7 @@ class OzonProductController extends AbstractController
         $salesService->saveSales($company, $rows, $from, $to);
 
         $this->addFlash('success', 'Продажи за 30 дней обновлены!');
+
         return $this->redirectToRoute('ozon_products');
     }
 }

@@ -14,9 +14,6 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use DateInterval;
-use DateTimeImmutable;
-use DateTimeZone;
 
 class OzonOrderController extends AbstractController
 {
@@ -57,11 +54,12 @@ class OzonOrderController extends AbstractController
     public function sync(OzonOrderSyncService $syncService): Response
     {
         $company = $this->getUser()->getCompanies()[0];
-        $to = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-        $since = $to->sub(new DateInterval('P3D'));
+        $to = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $since = $to->sub(new \DateInterval('P3D'));
         $syncService->syncFbs($company, $since, $to);
         $syncService->syncFbo($company, $since, $to);
         $this->addFlash('success', 'Ozon заказы обновлены!');
+
         return $this->redirectToRoute('ozon_orders');
     }
 
@@ -69,8 +67,8 @@ class OzonOrderController extends AbstractController
     public function api(OzonApiClient $client): JsonResponse
     {
         $company = $this->getUser()->getCompanies()[0];
-        $to = new DateTimeImmutable('now', new DateTimeZone('UTC'));
-        $since = $to->sub(new DateInterval('P3D'));
+        $to = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
+        $since = $to->sub(new \DateInterval('P3D'));
 
         $fbs = $client->getFbsPostingsList($company, $since, $to);
         $fbo = $client->getFboPostingsList($company, $since, $to);
@@ -86,6 +84,7 @@ class OzonOrderController extends AbstractController
     {
         $items = $em->getRepository(OzonOrderItem::class)->findBy(['order' => $order]);
         $history = $historyRepo->findBy(['order' => $order], ['changedAt' => 'ASC']);
+
         return $this->render('ozon/orders/show.html.twig', [
             'order' => $order,
             'items' => $items,

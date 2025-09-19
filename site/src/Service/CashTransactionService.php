@@ -3,12 +3,11 @@
 namespace App\Service;
 
 use App\DTO\CashTransactionDTO;
+use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\Counterparty;
-use App\Entity\CashflowCategory;
-use App\Enum\CashDirection;
+use App\Entity\MoneyAccount;
 use App\Exception\CurrencyMismatchException;
 use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,8 +19,9 @@ class CashTransactionService
     public function __construct(
         private EntityManagerInterface $em,
         private AccountBalanceService $balanceService,
-        private CashTransactionRepository $txRepo
-    ) {}
+        private CashTransactionRepository $txRepo,
+    ) {
+    }
 
     /**
      * @throws ORMException
@@ -64,6 +64,7 @@ class CashTransactionService
         $to = new \DateTimeImmutable('today');
         $this->em->flush();
         $this->balanceService->recalculateDailyRange($company, $account, $from, $to);
+
         return $tx;
     }
 
@@ -89,7 +90,7 @@ class CashTransactionService
 
         $this->em->flush();
 
-        $from = min($dto->occurredAt, $oldDate)->setTime(0,0);
+        $from = min($dto->occurredAt, $oldDate)->setTime(0, 0);
         $to = new \DateTimeImmutable('today');
         $this->balanceService->recalculateDailyRange($company, $oldAccount, $from, $to);
         if ($oldAccount !== $account) {
@@ -103,7 +104,7 @@ class CashTransactionService
     {
         $company = $tx->getCompany();
         $account = $tx->getMoneyAccount();
-        $from = $tx->getOccurredAt()->setTime(0,0);
+        $from = $tx->getOccurredAt()->setTime(0, 0);
         $to = new \DateTimeImmutable('today');
         $this->em->remove($tx);
         $this->em->flush();

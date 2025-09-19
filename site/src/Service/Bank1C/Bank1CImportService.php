@@ -10,8 +10,8 @@ use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
-use App\Service\Bank1C\Dto\Bank1CImportResult;
 use App\Service\Bank1C\Dto\Bank1CDocument;
+use App\Service\Bank1C\Dto\Bank1CImportResult;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -23,7 +23,7 @@ class Bank1CImportService
         private CashTransactionService $txService,
         private CounterpartyRepository $cpRepo,
         private CashTransactionRepository $txRepo,
-        private EntityManagerInterface $em
+        private EntityManagerInterface $em,
     ) {
     }
 
@@ -32,7 +32,7 @@ class Bank1CImportService
         $result = new Bank1CImportResult();
         $statement = $this->parser->parse($raw);
         foreach ($statement->documents as $doc) {
-            $result->total++;
+            ++$result->total;
             try {
                 $direction = $this->determineDirection($account, $doc);
                 $dateStr = $this->determineDate($direction, $doc);
@@ -52,7 +52,7 @@ class Bank1CImportService
                     'moneyAccount' => $account,
                     'externalId' => $externalId,
                 ])) {
-                    $result->duplicates++;
+                    ++$result->duplicates;
                     continue;
                 }
 
@@ -67,7 +67,7 @@ class Bank1CImportService
                 $dto->externalId = $externalId;
                 $dto->payerInn = $doc->payerInn;
                 $dto->payeeInn = $doc->payeeInn;
-                $dto->counterpartyNameRaw = $direction === CashDirection::INFLOW ? $doc->payerName : $doc->payeeName;
+                $dto->counterpartyNameRaw = CashDirection::INFLOW === $direction ? $doc->payerName : $doc->payeeName;
                 $dto->payerAccount = $doc->payerAccount;
                 $dto->payeeAccount = $doc->payeeAccount;
                 if ($counterparty) {
@@ -75,7 +75,7 @@ class Bank1CImportService
                     $dto->counterpartyType = $counterparty->getType();
                 }
                 $this->txService->add($dto);
-                $result->created++;
+                ++$result->created;
                 if (count($result->samples) < 10) {
                     $result->samples[] = [
                         'date' => $dateStr,
@@ -86,9 +86,10 @@ class Bank1CImportService
                     ];
                 }
             } catch (\Throwable $e) {
-                $result->errors[] = ($doc->number ?? '?') . ': ' . $e->getMessage();
+                $result->errors[] = ($doc->number ?? '?').': '.$e->getMessage();
             }
         }
+
         return $result;
     }
 
@@ -101,21 +102,23 @@ class Bank1CImportService
         if ($doc->payerAccount === $acc) {
             return CashDirection::OUTFLOW;
         }
+
         return CashDirection::INFLOW;
     }
 
     private function determineDate(CashDirection $direction, Bank1CDocument $doc): string
     {
-        if ($direction === CashDirection::INFLOW) {
+        if (CashDirection::INFLOW === $direction) {
             return $doc->dateCredited ?: ($doc->date ?: 'today');
         }
+
         return $doc->dateDebited ?: ($doc->date ?: 'today');
     }
 
     private function resolveCounterparty(Company $company, CashDirection $direction, Bank1CDocument $doc): ?Counterparty
     {
-        $name = $direction === CashDirection::INFLOW ? $doc->payerName : $doc->payeeName;
-        $inn = $direction === CashDirection::INFLOW ? $doc->payerInn : $doc->payeeInn;
+        $name = CashDirection::INFLOW === $direction ? $doc->payerName : $doc->payeeName;
+        $inn = CashDirection::INFLOW === $direction ? $doc->payerInn : $doc->payeeInn;
         if (!$name && !$inn) {
             return null;
         }
@@ -135,17 +138,19 @@ class Bank1CImportService
             $this->em->persist($counterparty);
             $this->em->flush();
         }
+
         return $counterparty;
     }
 
     private function guessCounterpartyType(string $name, ?string $inn): CounterpartyType
     {
-        if ($inn && strlen($inn) === 12) {
+        if ($inn && 12 === strlen($inn)) {
             return CounterpartyType::INDIVIDUAL_ENTREPRENEUR;
         }
         if (str_starts_with(mb_strtoupper($name), 'ИП')) {
             return CounterpartyType::INDIVIDUAL_ENTREPRENEUR;
         }
+
         return CounterpartyType::LEGAL_ENTITY;
     }
 }

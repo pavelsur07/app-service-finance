@@ -44,7 +44,7 @@ class CashTransactionAutoRuleCondition
         ?CashTransactionAutoRuleConditionOperator $operator = null,
         ?string $value = null,
         ?string $valueTo = null,
-        ?Counterparty $counterparty = null
+        ?Counterparty $counterparty = null,
     ) {
         $id = $id ?? Uuid::uuid4()->toString();
         Assert::uuid($id);
@@ -61,17 +61,80 @@ class CashTransactionAutoRuleCondition
         $this->counterparty = $counterparty;
     }
 
-    public function getId(): ?string { return $this->id; }
-    public function getAutoRule(): ?CashTransactionAutoRule { return $this->autoRule; }
-    public function setAutoRule(?CashTransactionAutoRule $rule): self { $this->autoRule = $rule; return $this; }
-    public function getField(): CashTransactionAutoRuleConditionField { return $this->field; }
-    public function setField(CashTransactionAutoRuleConditionField $field): self { $this->field = $field; return $this; }
-    public function getOperator(): CashTransactionAutoRuleConditionOperator { return $this->operator; }
-    public function setOperator(CashTransactionAutoRuleConditionOperator $operator): self { $this->operator = $operator; return $this; }
-    public function getCounterparty(): ?Counterparty { return $this->counterparty; }
-    public function setCounterparty(?Counterparty $counterparty): self { $this->counterparty = $counterparty; return $this; }
-    public function getValue(): ?string { return $this->value; }
-    public function setValue(?string $value): self { $this->value = $value; return $this; }
-    public function getValueTo(): ?string { return $this->valueTo; }
-    public function setValueTo(?string $valueTo): self { $this->valueTo = $valueTo; return $this; }
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getAutoRule(): ?CashTransactionAutoRule
+    {
+        return $this->autoRule;
+    }
+
+    public function setAutoRule(?CashTransactionAutoRule $rule): self
+    {
+        $this->autoRule = $rule;
+
+        return $this;
+    }
+
+    public function getField(): CashTransactionAutoRuleConditionField
+    {
+        return $this->field;
+    }
+
+    public function setField(CashTransactionAutoRuleConditionField $field): self
+    {
+        $this->field = $field;
+
+        return $this;
+    }
+
+    public function getOperator(): CashTransactionAutoRuleConditionOperator
+    {
+        return $this->operator;
+    }
+
+    public function setOperator(CashTransactionAutoRuleConditionOperator $operator): self
+    {
+        $this->operator = $operator;
+
+        return $this;
+    }
+
+    public function getCounterparty(): ?Counterparty
+    {
+        return $this->counterparty;
+    }
+
+    public function setCounterparty(?Counterparty $counterparty): self
+    {
+        $this->counterparty = $counterparty;
+
+        return $this;
+    }
+
+    public function getValue(): ?string
+    {
+        return $this->value;
+    }
+
+    public function setValue(?string $value): self
+    {
+        $this->value = $value;
+
+        return $this;
+    }
+
+    public function getValueTo(): ?string
+    {
+        return $this->valueTo;
+    }
+
+    public function setValueTo(?string $valueTo): self
+    {
+        $this->valueTo = $valueTo;
+
+        return $this;
+    }
 }

@@ -23,6 +23,7 @@ class Bank1CImportController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
         $accounts = $accountRepo->findBy(['company' => $company]);
+
         return $this->render('finance/import/bank1c/upload.html.twig', [
             'accounts' => $accounts,
         ]);
@@ -32,7 +33,7 @@ class Bank1CImportController extends AbstractController
     public function handle(
         Request $request,
         MoneyAccountRepository $accountRepo,
-        Bank1CImportService $importService
+        Bank1CImportService $importService,
     ): Response {
         if (!$this->isCsrfTokenValid('bank1c_import', $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
@@ -47,15 +48,18 @@ class Bank1CImportController extends AbstractController
         $file = $request->files->get('statement');
         if (!$file) {
             $this->addFlash('danger', 'Файл не загружен');
+
             return $this->redirectToRoute('bank1c_import_form');
         }
         $extension = strtolower($file->getClientOriginalExtension() ?? '');
-        if ($file->getSize() > 10 * 1024 * 1024 || $extension !== 'txt') {
+        if ($file->getSize() > 10 * 1024 * 1024 || 'txt' !== $extension) {
             $this->addFlash('danger', 'Недопустимый файл');
+
             return $this->redirectToRoute('bank1c_import_form');
         }
         $raw = file_get_contents($file->getPathname());
         $result = $importService->import($company, $account, $raw, $file->getClientOriginalName());
+
         return $this->render('finance/import/bank1c/result.html.twig', [
             'result' => $result,
         ]);

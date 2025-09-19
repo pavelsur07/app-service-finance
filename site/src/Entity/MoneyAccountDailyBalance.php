@@ -7,9 +7,9 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: \App\Repository\MoneyAccountDailyBalanceRepository::class)]
 #[ORM\Table(name: 'money_account_daily_balance')]
-#[ORM\UniqueConstraint(name: 'uniq_company_account_date', columns: ['company_id','money_account_id','date'])]
-#[ORM\Index(name: 'idx_company_date', columns: ['company_id','date'])]
-#[ORM\Index(name: 'idx_account_date', columns: ['money_account_id','date'])]
+#[ORM\UniqueConstraint(name: 'uniq_company_account_date', columns: ['company_id', 'money_account_id', 'date'])]
+#[ORM\Index(name: 'idx_company_date', columns: ['company_id', 'date'])]
+#[ORM\Index(name: 'idx_account_date', columns: ['money_account_id', 'date'])]
 class MoneyAccountDailyBalance
 {
     #[ORM\Id]
@@ -55,14 +55,62 @@ class MoneyAccountDailyBalance
         $this->closingBalance = $closing;
         $this->currency = strtoupper($currency);
     }
-    public function getMoneyAccount(): MoneyAccount { return $this->moneyAccount; }
-    public function getDate(): \DateTimeImmutable { return $this->date; }
-    public function getOpeningBalance(): string { return $this->openingBalance; }
-    public function getInflow(): string { return $this->inflow; }
-    public function getOutflow(): string { return $this->outflow; }
-    public function getClosingBalance(): string { return $this->closingBalance; }
-    public function setOpeningBalance(string $o): self { $this->openingBalance = $o; return $this; }
-    public function setInflow(string $i): self { $this->inflow = $i; return $this; }
-    public function setOutflow(string $o): self { $this->outflow = $o; return $this; }
-    public function setClosingBalance(string $c): self { $this->closingBalance = $c; return $this; }
+
+    public function getMoneyAccount(): MoneyAccount
+    {
+        return $this->moneyAccount;
+    }
+
+    public function getDate(): \DateTimeImmutable
+    {
+        return $this->date;
+    }
+
+    public function getOpeningBalance(): string
+    {
+        return $this->openingBalance;
+    }
+
+    public function getInflow(): string
+    {
+        return $this->inflow;
+    }
+
+    public function getOutflow(): string
+    {
+        return $this->outflow;
+    }
+
+    public function getClosingBalance(): string
+    {
+        return $this->closingBalance;
+    }
+
+    public function setOpeningBalance(string $o): self
+    {
+        $this->openingBalance = $o;
+
+        return $this;
+    }
+
+    public function setInflow(string $i): self
+    {
+        $this->inflow = $i;
+
+        return $this;
+    }
+
+    public function setOutflow(string $o): self
+    {
+        $this->outflow = $o;
+
+        return $this;
+    }
+
+    public function setClosingBalance(string $c): self
+    {
+        $this->closingBalance = $c;
+
+        return $this;
+    }
 }

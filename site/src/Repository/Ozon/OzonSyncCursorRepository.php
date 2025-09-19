@@ -2,8 +2,8 @@
 
 namespace App\Repository\Ozon;
 
-use App\Entity\Ozon\OzonSyncCursor;
 use App\Entity\Company;
+use App\Entity\Ozon\OzonSyncCursor;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
