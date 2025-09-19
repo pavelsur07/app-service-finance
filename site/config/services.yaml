@@ -18,3 +18,14 @@ services:
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
+        # Клиент Redis для сессий
+    session.redis:
+        class: Predis\Client
+        arguments:
+            - '%env(REDIS_DSN)%'
+
+    # Обработчик сессий Redis
+    Symfony\Component\HttpFoundation\Session\Storage\Handler\RedisSessionHandler:
+        arguments:
+            - '@session.redis'
+            - { prefix: 'sess_', ttl: 1209600 } # 14 дней

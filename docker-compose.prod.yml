@@ -75,10 +75,12 @@ services:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
         networks:
             - default
         depends_on:
             - site-postgres
+            - site-redis
     site-php-cli:
         build:
             context: site
@@ -88,10 +90,12 @@ services:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
         networks:
             - default
         depends_on:
             - site-postgres
+            - site-redis
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -104,10 +108,19 @@ services:
             - postgres_data:/var/lib/postgresql/data
         networks:
             - default
-
+    site-redis:
+        image: redis:7-alpine
+        container_name: site-redis
+        restart: always
+        command: ["redis-server", "--appendonly", "yes"]
+        volumes:
+            - site-redis-data:/data
+        networks:
+            - default
 volumes:
     traefik-certs:
     postgres_data:
+    site-redis-data:
 
 networks:
     traefik-public:
