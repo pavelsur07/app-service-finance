@@ -53,7 +53,12 @@ final class PublicCashflowReportController extends AbstractController
                                     'label' => $p['label'],
                                 ], $payload['periods']),
             'categories'     => array_map(fn($c) => ['id' => $c->getId(), 'name' => $c->getName()], $payload['categories']),
-            'categoryTotals' => $payload['categoryTotals'],
+            'categoryTotals' => array_map(
+                                    static fn(array $row): array => [
+                                        'totals' => $row['totals'],
+                                    ],
+                                    $payload['categoryTotals']
+                                ),
             'openings'       => $payload['openings'],
             'closings'       => $payload['closings'],
         ]);
