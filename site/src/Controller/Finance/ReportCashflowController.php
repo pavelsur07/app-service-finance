@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
 
 #[Route('/finance/reports/cashflow')]
 class ReportCashflowController extends AbstractController
@@ -39,9 +40,14 @@ class ReportCashflowController extends AbstractController
     }
 
     #[Route('/api/public/reports/cashflow.json', name: 'api_report_cashflow_json', methods: ['GET'])]
-    public function apiJson(Request $r): Response
+    public function apiJson(Request $r, RateLimiterFactory $reportsApiLimiter): Response
     {
         $token = (string) $r->query->get('token', '');
+        $limiter = $reportsApiLimiter->create($token ?: ($r->getClientIp() ?? 'anon'));
+        $limit = $limiter->consume(1);
+        if (!$limit->isAccepted()) {
+            return new JsonResponse(['error' => 'rate_limited'], 429);
+        }
         if ($token === '') {
             return new JsonResponse(['error' => 'token_required'], 401);
         }
@@ -79,9 +85,14 @@ class ReportCashflowController extends AbstractController
     }
 
     #[Route('/api/public/reports/cashflow.csv', name: 'api_report_cashflow_csv', methods: ['GET'])]
-    public function apiCsv(Request $r): Response
+    public function apiCsv(Request $r, RateLimiterFactory $reportsApiLimiter): Response
     {
         $token = (string) $r->query->get('token', '');
+        $limiter = $reportsApiLimiter->create($token ?: ($r->getClientIp() ?? 'anon'));
+        $limit = $limiter->consume(1);
+        if (!$limit->isAccepted()) {
+            return new JsonResponse(['error' => 'rate_limited'], 429);
+        }
         if ($token === '') {
             return new JsonResponse(['error' => 'token_required'], 401);
         }
