@@ -12,6 +12,7 @@ use Ramsey\Uuid\Uuid;
 #[ORM\Index(name: 'idx_report_api_key_company', columns: ['company_id'])]
 #[ORM\Index(name: 'idx_report_api_key_key_prefix', columns: ['key_prefix'])]
 #[ORM\Index(name: 'idx_report_api_key_is_active', columns: ['is_active'])]
+#[ORM\Index(name: 'idx_report_api_key_prefix_active', columns: ['key_prefix', 'is_active'])]
 class ReportApiKey
 {
     #[ORM\Id]

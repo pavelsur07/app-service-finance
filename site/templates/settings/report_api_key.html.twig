@@ -27,11 +27,12 @@
                     </form>
                 </div>
 
-                <div class="mt-4">
-                    <h3 class="h5">Использование в Google Sheets</h3>
-                    <p class="text-muted mb-2">Пример формулы для импорта отчёта по движению денежных средств:</p>
-                    <pre class="bg-light p-3 rounded"><code>{{ '=IMPORTDATA("' ~ app.request.schemeAndHttpHost ~ '/api/public/reports/cashflow.csv?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30")' }}</code></pre>
-                </div>
+                <h2 class="h5 mt-4">Как подключить Google Sheets</h2>
+                <p>Ключ передаётся через query-параметр <code>token</code> (IMPORTDATA не шлёт заголовки):</p>
+                <pre>=IMPORTDATA("{{ app.request.schemeAndHttpHost }}/api/public/reports/cashflow.csv?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30")</pre>
+                <p>JSON для Apps Script:</p>
+                <pre>{{ app.request.schemeAndHttpHost }}/api/public/reports/cashflow.json?token=ВАШ_КЛЮЧ&from=2025-09-01&to=2025-09-30</pre>
+                <p class="text-muted">Сохраните ключ — он показывается один раз при генерации.</p>
             </div>
         </div>
     </div>
