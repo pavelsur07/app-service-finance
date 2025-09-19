@@ -34,7 +34,7 @@
                 <th>Дата</th>
                 <th>Счет</th>
                 <th class="text-end">Сумма</th>
-                <th>Статья</th>
+                <th>Статья / Проект</th>
                 <th>Контрагент</th>
                 <th>Описание</th>
                 <th></th>
@@ -48,6 +48,9 @@
                     <td class="text-end"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
                         {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
+                        {% if tx.projectDirection %}
+                            <div class="text-muted small">{{ tx.projectDirection.name }}</div>
+                        {% endif %}
                     </td>
                     <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
                     <td>{{ tx.description }}</td>
