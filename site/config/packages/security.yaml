@@ -13,6 +13,12 @@ security:
         dev:
             pattern: ^/(_(profiler|wdt)|css|images|js)/
             security: false
+        public_api:
+            pattern: ^/api/public/
+            stateless: true
+            lazy: false
+            # без form_login, без custom_authenticators — доступ анонимный
+            # если есть "logout", "remember_me" — НЕ добавлять сюда
         main:
             lazy: true
             provider: app_user_provider
@@ -37,6 +43,7 @@ security:
     # Easy way to control access for large sections of your site
     # Note: Only the *first* access control that matches will be used
     access_control:
+        - { path: ^/api/public/, roles: PUBLIC_ACCESS }
         # регистрация и логин — анонимный доступ
         #- { path:/register, roles: IS_AUTHENTICATED_ANONYMOUSLY }
         #- { path:/login,    roles: IS_AUTHENTICATED_ANONYMOUSLY }
