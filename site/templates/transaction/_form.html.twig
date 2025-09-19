@@ -29,10 +29,17 @@
                 <div class="invalid-feedback d-block">{{ form_errors(form.currency) }}</div>
             </div>
         </div>
-        <div class="mb-3">
-            {{ form_label(form.cashflowCategory, 'Статья ДДС', {'label_attr': {'class': 'form-label'}}) }}
-            {{ form_widget(form.cashflowCategory, {'attr': {'class': 'form-select'}}) }}
-            <div class="invalid-feedback d-block">{{ form_errors(form.cashflowCategory) }}</div>
+        <div class="row g-2">
+            <div class="col-md-6">
+                {{ form_label(form.cashflowCategory, 'Статья ДДС', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.cashflowCategory, {'attr': {'class': 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.cashflowCategory) }}</div>
+            </div>
+            <div class="col-md-6">
+                {{ form_label(form.projectDirection, 'Проект', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.projectDirection, {'attr': {'class': 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.projectDirection) }}</div>
+            </div>
         </div>
         <div class="mb-3">
             {{ form_label(form.counterparty, 'Контрагент', {'label_attr': {'class': 'form-label'}}) }}

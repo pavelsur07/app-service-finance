@@ -6,10 +6,12 @@ use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
+use App\Entity\ProjectDirection;
 use App\Enum\CashDirection;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
+use App\Repository\ProjectDirectionRepository;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
@@ -26,6 +28,7 @@ class CashTransactionType extends AbstractType
         private MoneyAccountRepository $accountRepo,
         private CashflowCategoryRepository $categoryRepo,
         private CounterpartyRepository $counterpartyRepo,
+        private ProjectDirectionRepository $projectDirectionRepo,
     ) {
     }
 
@@ -60,6 +63,13 @@ class CashTransactionType extends AbstractType
                 'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
+            ->add('projectDirection', ChoiceType::class, [
+                'required' => false,
+                'choices' => $company ? $this->projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']) : [],
+                'choice_label' => fn (ProjectDirection $projectDirection) => $projectDirection->getName(),
+                'choice_value' => 'id',
+                'mapped' => false,
+            ])
             ->add('counterparty', ChoiceType::class, [
                 'required' => false,
                 'choices' => $company ? $this->counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']) : [],
@@ -81,8 +91,10 @@ class CashTransactionType extends AbstractType
 
             $cat = $form->get('cashflowCategory')->getData();
             $cp = $form->get('counterparty')->getData();
+            $projectDirection = $form->get('projectDirection')->getData();
             $data->cashflowCategoryId = $cat?->getId();
             $data->counterpartyId = $cp?->getId();
+            $data->projectDirectionId = $projectDirection?->getId();
         }, 1);
     }
 
