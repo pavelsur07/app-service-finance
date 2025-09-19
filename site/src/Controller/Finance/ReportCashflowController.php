@@ -33,6 +33,18 @@ class ReportCashflowController extends AbstractController
         return $this->render('report/cashflow.html.twig', $payload);
     }
 
+    #[Route('/api/public/reports/cashflow.json', name: 'api_report_cashflow_json', methods: ['GET'])]
+    public function apiJson(Request $request): Response
+    {
+        [$rows, $columns, $params] = $this->buildCashflowPayload($request);
+
+        return $this->json([
+            'meta'    => $params,
+            'columns' => $columns,
+            'rows'    => $rows,
+        ]);
+    }
+
     private function buildCashflowPayload(Request $request): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
