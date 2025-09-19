@@ -5,7 +5,6 @@ namespace App\Controller\Finance;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Report\Cashflow\CashflowReportRequestMapper;
-use App\Repository\CompanyRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\ReportApiKeyManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -16,19 +15,17 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 
-#[Route('/finance/reports/cashflow')]
 class ReportCashflowController extends AbstractController
 {
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
         private ReportApiKeyManager $keys,
-        private CompanyRepository $companyRepo,
         private CashflowReportRequestMapper $mapper,
         private CashflowReportBuilder $builder,
     ) {
     }
 
-    #[Route('', name: 'report_cashflow_index', methods: ['GET'])]
+    #[Route('/finance/reports/cashflow', name: 'report_cashflow_index', methods: ['GET'])]
     public function index(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -52,7 +49,7 @@ class ReportCashflowController extends AbstractController
             return new JsonResponse(['error' => 'token_required'], 401);
         }
 
-        $company = $this->keys->findCompanyByRawKey($token, $this->companyRepo);
+        $company = $this->keys->findCompanyByRawKey($token);
         if (!$company) {
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }
@@ -97,7 +94,7 @@ class ReportCashflowController extends AbstractController
             return new JsonResponse(['error' => 'token_required'], 401);
         }
 
-        $company = $this->keys->findCompanyByRawKey($token, $this->companyRepo);
+        $company = $this->keys->findCompanyByRawKey($token);
         if (!$company) {
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }

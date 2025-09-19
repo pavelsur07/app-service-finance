@@ -34,15 +34,16 @@ class ReportApiKeyRepository extends ServiceEntityRepository
     }
 
     /**
+     * Возвращает активные ключи по префиксу (напр., 'rk_live_').
+     *
      * @return ReportApiKey[]
      */
     public function findActiveByPrefix(string $prefix): array
     {
-        return $this->createQueryBuilder('rak')
-            ->andWhere('rak.keyPrefix = :prefix')
-            ->andWhere('rak.isActive = :active')
-            ->setParameter('prefix', $prefix)
-            ->setParameter('active', true)
+        return $this->createQueryBuilder('k')
+            ->andWhere('k.isActive = true')
+            ->andWhere('k.keyPrefix = :p')
+            ->setParameter('p', $prefix)
             ->getQuery()
             ->getResult();
     }
