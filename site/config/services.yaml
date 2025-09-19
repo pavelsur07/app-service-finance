@@ -29,3 +29,7 @@ services:
         arguments:
             - '@session.redis'
             - { prefix: 'sess_', ttl: 1209600 } # 14 дней
+
+    App\Service\RateLimiter\ReportsApiRateLimiter:
+        arguments:
+            $factory: '@?limiter.reports_api'
