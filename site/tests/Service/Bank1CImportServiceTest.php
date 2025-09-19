@@ -205,4 +205,37 @@ TXT;
         $this->assertSame('101449.51', $bal->getInflow());
         $this->assertSame('24000.00', $bal->getOutflow());
     }
+
+    public function testImportFailsWhenAccountNumberMismatch(): void
+    {
+        $raw = <<<TXT
+1CClientBankExchange
+ВерсияФормата=1.02
+Кодировка=Windows
+Отправитель=Test
+Получатель=Me
+
+СекцияРасчСчет
+НомерСчета=40702810726140001478
+КонецРасчСчет
+
+СекцияДокумент=Платежное поручение
+Номер=1
+Дата=01.09.2025
+Сумма=100.00
+ПлательщикСчет=40702810726140001478
+ПолучательСчет=40702810726140001479
+НазначениеПлатежа=Test
+КонецДокумента
+КонецФайла
+TXT;
+
+        $result = $this->importService->import($this->company, $this->account, $raw);
+
+        $this->assertSame(0, $result->created);
+        $this->assertSame(0, $result->duplicates);
+        $this->assertCount(1, $result->errors);
+        $this->assertStringContainsString('Номер счёта в файле (', $result->errors[0]);
+        $this->assertStringContainsString(') не совпадает с выбранным счётом (', $result->errors[0]);
+    }
 }

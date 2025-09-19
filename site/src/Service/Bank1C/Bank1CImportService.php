@@ -31,6 +31,23 @@ class Bank1CImportService
     {
         $result = new Bank1CImportResult();
         $statement = $this->parser->parse($raw);
+        // --- Проверка соответствия номера счёта из файла выбранному счёту ---
+        $fileAccountRaw = $statement->account['НомерСчета']
+            ?? ($statement->account['РасчСчет'] ?? ($statement->header['РасчСчет'] ?? null));
+
+        $selectedAccountRaw = $account->getAccountNumber();
+
+        $norm = static fn (?string $v): string => preg_replace('/\D+/', '', (string) ($v ?? ''));
+
+        if ($norm($fileAccountRaw) === '' || $norm($selectedAccountRaw) === '' || $norm($fileAccountRaw) !== $norm($selectedAccountRaw)) {
+            $result->errors[] = sprintf(
+                'Номер счёта в файле (%s) не совпадает с выбранным счётом (%s).',
+                (string) ($fileAccountRaw ?? ''),
+                (string) ($selectedAccountRaw ?? '')
+            );
+            return $result;
+        }
+        // --- конец проверки ---
         foreach ($statement->documents as $doc) {
             ++$result->total;
             try {
