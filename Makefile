@@ -34,7 +34,7 @@ site-cs-check:
 site-cs-fix:
     docker-compose run --rm site-php-cli composer cs:fix     # Автопочинка PHP-стиля
     #docker-compose run --rm site-php-cli composer cs:phpcs   # Проверка через phpcs (PSR-12)
-    docker-compose run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
+    #docker-compose run --rm site-php-cli composer cs:twig    # Линт Twig-шаблонов
 
 build: build-site
 

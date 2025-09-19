@@ -52,7 +52,6 @@
                     <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
                     <td>{{ tx.description }}</td>
                     <td class="text-nowrap">
-                        <a href="{{ path('cash_transaction_show', {id: tx.id}) }}" class="btn btn-sm btn-info">Просмотр</a>
                         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-sm btn-warning">Редактировать</a>
                         <a href="#"
                            class="btn btn-sm btn-outline-secondary js-auto-rule"

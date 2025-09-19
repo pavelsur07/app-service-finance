@@ -178,19 +178,6 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'cash_transaction_show', methods: ['GET'])]
-    public function show(CashTransaction $tx): Response
-    {
-        $company = $this->companyService->getActiveCompany();
-        if ($tx->getCompany() !== $company) {
-            throw $this->createNotFoundException();
-        }
-
-        return $this->render('transaction/show.html.twig', [
-            'tx' => $tx,
-        ]);
-    }
-
     #[Route('/{id}/edit', name: 'cash_transaction_edit', methods: ['GET', 'POST'])]
     public function edit(
         Request $request,
