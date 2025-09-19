@@ -23,7 +23,7 @@ final class PublicCashflowReportController extends AbstractController
     ) {}
 
     #[Route('/api/public/reports/cashflow.json', name: 'api_report_cashflow_json', methods: ['GET'])]
-    public function json(Request $r, #[Autowire(service: 'limiter.reports_api')] RateLimiterFactory $reportsApiLimiter): Response
+    public function jsonReport(Request $r, #[Autowire(service: 'limiter.reports_api')] RateLimiterFactory $reportsApiLimiter): JsonResponse
     {
         $token = (string) $r->query->get('token', '');
         $limiter = $reportsApiLimiter->create($token ?: ($r->getClientIp() ?? 'anon'));
