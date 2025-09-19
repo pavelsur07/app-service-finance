@@ -95,6 +95,7 @@
                     </a>
                     <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item" href="{{ path('company_index') }}"> Профиль компании </a>
+                        <a class="dropdown-item {{ current_route starts with 'settings_report_api_key_' ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">API-ключ отчётов</a>
                     </div>
                 </li>
 
