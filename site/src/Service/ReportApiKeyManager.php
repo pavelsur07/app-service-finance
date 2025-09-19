@@ -4,7 +4,6 @@ namespace App\Service;
 
 use App\Entity\Company;
 use App\Entity\ReportApiKey;
-use App\Repository\CompanyRepository;
 use App\Repository\ReportApiKeyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -13,8 +12,8 @@ class ReportApiKeyManager
     private const PREFIX = 'rk_live_';
 
     public function __construct(
-        private EntityManagerInterface $entityManager,
-        private ReportApiKeyRepository $reportApiKeyRepository,
+        private EntityManagerInterface $em,
+        private ReportApiKeyRepository $repo,
     ) {
     }
 
@@ -25,21 +24,21 @@ class ReportApiKeyManager
 
     public function createOrRegenerateForCompany(Company $company): string
     {
-        $this->reportApiKeyRepository->deactivateAll($company);
+        $this->repo->deactivateAll($company);
 
         $rawKey = $this->generateRawKey();
         $hash = \password_hash($rawKey, PASSWORD_ARGON2ID);
 
         $apiKey = new ReportApiKey($company, self::PREFIX, $hash);
-        $this->entityManager->persist($apiKey);
-        $this->entityManager->flush();
+        $this->em->persist($apiKey);
+        $this->em->flush();
 
         return $rawKey;
     }
 
     public function revokeAll(Company $company): void
     {
-        $this->reportApiKeyRepository->deactivateAll($company);
+        $this->repo->deactivateAll($company);
     }
 
     public function isValidRawKeyForCompany(Company $company, string $raw): bool
@@ -49,12 +48,12 @@ class ReportApiKeyManager
         }
 
         $prefix = \substr($raw, 0, 8);
-        $candidates = $this->reportApiKeyRepository->findActiveByCompanyAndPrefix($company, $prefix);
+        $candidates = $this->repo->findActiveByCompanyAndPrefix($company, $prefix);
 
         foreach ($candidates as $candidate) {
             if (\password_verify($raw, $candidate->getKeyHash())) {
                 $candidate->markAsUsed();
-                $this->entityManager->flush();
+                $this->em->flush();
 
                 return true;
             }
@@ -63,31 +62,38 @@ class ReportApiKeyManager
         return false;
     }
 
-    public function findCompanyByRawKey(string $raw, CompanyRepository $repo): ?Company
+    /**
+     * Находит компанию по «сырому» ключу из query (?token=...).
+     * Возвращает Company при валидном ключе, иначе null.
+     */
+    public function findCompanyByRawKey(string $raw): ?Company
     {
-        if (!\str_starts_with($raw, 'rk_')) {
+        $raw = \trim($raw);
+        if ($raw === '' || \strncmp($raw, 'rk_', 3) !== 0) {
             return null;
         }
 
         $prefix = \substr($raw, 0, 8);
-        $candidates = $this->reportApiKeyRepository->findActiveByPrefix($prefix);
+        $candidates = $this->repo->findActiveByPrefix($prefix);
+        if (!$candidates) {
+            return null;
+        }
 
-        foreach ($candidates as $candidate) {
-            if (!\password_verify($raw, $candidate->getKeyHash())) {
+        foreach ($candidates as $keyEntity) {
+            if (!\password_verify($raw, $keyEntity->getKeyHash())) {
                 continue;
             }
 
-            $companyId = $candidate->getCompany()->getId();
-            $candidate->markAsUsed();
-            $this->entityManager->flush();
-
-            if ($companyId === null) {
-                return null;
+            $exp = $keyEntity->getExpiresAt();
+            $now = new \DateTimeImmutable('now');
+            if ($exp && $exp < $now) {
+                continue;
             }
 
-            $company = $repo->find($companyId);
+            $keyEntity->markAsUsed($now);
+            $this->em->flush();
 
-            return $company ?? $candidate->getCompany();
+            return $keyEntity->getCompany();
         }
 
         return null;
