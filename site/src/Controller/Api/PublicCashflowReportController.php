@@ -61,6 +61,7 @@ final class PublicCashflowReportController extends AbstractController
                                 ),
             'openings'       => $payload['openings'],
             'closings'       => $payload['closings'],
+            'tree'           => $payload['tree'],
             'categoryTree'   => $payload['categoryTree'],
         ]);
     }
