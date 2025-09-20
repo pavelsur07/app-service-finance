@@ -141,6 +141,8 @@ final class CashflowReportBuilder
             }
         }
 
+        $tree = $this->buildCategoryTotalsTree($categories, $categoryMap);
+
         return [
             'company' => $company,
             'group' => $group,
@@ -151,6 +153,7 @@ final class CashflowReportBuilder
             'categoryTotals' => $categoryMap,
             'openings' => $openings,
             'closings' => $closings,
+            'tree' => $tree,
             'categoryTree' => $categoryTree,
         ];
     }
@@ -190,6 +193,64 @@ final class CashflowReportBuilder
         }
 
         return $result;
+    }
+
+    /**
+     * Собирает иерархию категорий с их суммами по периодам (из $categoryMap['totals']).
+     * Формат узла:
+     * [
+     *   'id'      => string,
+     *   'name'    => string,
+     *   'level'   => int,   // 0..4
+     *   'totals'  => array, // ['RUB' => [..по периодам..], ...]
+     *   'children'=> array<node>
+     * ]
+     *
+     * @param \App\Entity\CashflowCategory[] $allCategories  // полный список (findTreeByCompany)
+     * @param array<string,array{entity:\App\Entity\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
+     * @return array<int,array>
+     */
+    private function buildCategoryTotalsTree(array $allCategories, array $categoryMap): array
+    {
+        // Индексы
+        $byId = [];
+        $children = [];
+        foreach ($allCategories as $cat) {
+            $id = $cat->getId();
+            $byId[$id] = $cat;
+            $pid = $cat->getParent() ? $cat->getParent()->getId() : null;
+            $children[$pid][] = $id; // pid=null → корни
+        }
+
+        // Рекурсивный сбор узла
+        $makeNode = function (string $id, int $level) use (&$makeNode, $children, $byId, $categoryMap): array {
+            $cat = $byId[$id];
+            // уровень ограничим 0..4
+            $lvl = max(0, min(4, $level));
+            $totals = $categoryMap[$id]['totals'] ?? [];
+
+            $node = [
+                'id'       => $id,
+                'name'     => (string) $cat->getName(),
+                'level'    => $lvl,
+                'totals'   => $totals,    // уже агрегировано (с учётом детей — см. логику выше в build)
+                'children' => [],
+            ];
+
+            foreach ($children[$id] ?? [] as $childId) {
+                $node['children'][] = $makeNode($childId, $lvl + 1);
+            }
+
+            return $node;
+        };
+
+        // Корни в исходном порядке (как пришли из репозитория)
+        $tree = [];
+        foreach ($children[null] ?? [] as $rootId) {
+            $tree[] = $makeNode($rootId, 0);
+        }
+
+        return $tree;
     }
 
     private function buildPeriods(\DateTimeImmutable $from, \DateTimeImmutable $to, string $group): array
