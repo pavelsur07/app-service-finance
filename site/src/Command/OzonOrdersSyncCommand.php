@@ -63,15 +63,37 @@ class OzonOrdersSyncCommand extends Command
             $since = $to->sub(new \DateInterval('P3D'));
         }
 
-        if ('FBS' === $scheme) {
-            $statusParam = $input->getOption('status');
-            $status = null;
-            if ($statusParam) {
-                $status = str_contains($statusParam, ',') ? array_map('trim', explode(',', $statusParam)) : $statusParam;
-            }
+        $scheme = $input->getOption('scheme');
+        $scheme = $scheme ? strtoupper((string) $scheme) : null;
+
+        if ($scheme === 'FBS') {
+            // Явно запросили только FBS
+            $statusParam = (string) $input->getOption('status');
+            $status = $statusParam
+                ? (str_contains($statusParam, ',') ? array_map('trim', explode(',', $statusParam)) : $statusParam)
+                : null;
+
             $result = $this->syncService->syncFbs($company, $since, $to, $status);
-        } else {
+
+        } elseif ($scheme === 'FBO') {
+            // Явно запросили только FBO
             $result = $this->syncService->syncFbo($company, $since, $to);
+
+        } else {
+            // Схема не указана — как в UI: запускаем ОБЕ
+            $statusParam = (string) $input->getOption('status');
+            $status = $statusParam
+                ? (str_contains($statusParam, ',') ? array_map('trim', explode(',', $statusParam)) : $statusParam)
+                : null;
+
+            $r1 = $this->syncService->syncFbs($company, $since, $to, $status);
+            $r2 = $this->syncService->syncFbo($company, $since, $to);
+
+            // Суммируем для итогового вывода
+            $result = [
+                'orders' => (int) ($r1['orders'] ?? 0) + (int) ($r2['orders'] ?? 0),
+                'statusChanges' => (int) ($r1['statusChanges'] ?? 0) + (int) ($r2['statusChanges'] ?? 0),
+            ];
         }
 
         $output->writeln(sprintf('Postings processed: %d, new statuses: %d', $result['orders'], $result['statusChanges']));
