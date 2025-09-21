@@ -14,9 +14,14 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Psr\Log\LoggerInterface;
 
 class OzonOrderController extends AbstractController
 {
+    public function __construct(private LoggerInterface $logger)
+    {
+    }
+
     #[Route('/ozon/orders', name: 'ozon_orders')]
     public function index(Request $request, OzonOrderRepository $repo): Response
     {
@@ -51,14 +56,37 @@ class OzonOrderController extends AbstractController
     }
 
     #[Route('/ozon/orders/sync', name: 'ozon_orders_sync')]
-    public function sync(OzonOrderSyncService $syncService): Response
+    public function sync(Request $request, OzonOrderSyncService $syncService): Response
     {
         $company = $this->getUser()->getCompanies()[0];
         $to = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $since = $to->sub(new \DateInterval('P3D'));
-        $syncService->syncFbs($company, $since, $to);
-        $syncService->syncFbo($company, $since, $to);
-        $this->addFlash('success', 'Ozon заказы обновлены!');
+        $statusParam = (string) $request->query->get('status');
+        $status = $statusParam
+            ? (\str_contains($statusParam, ',') ? array_map('trim', explode(',', $statusParam)) : $statusParam)
+            : null;
+
+        $rFbs = $syncService->syncFbs($company, $since, $to, $status);
+        $rFbo = $syncService->syncFbo($company, $since, $to);
+
+        $totalOrders = (int) ($rFbs['orders'] ?? 0) + (int) ($rFbo['orders'] ?? 0);
+        $totalStatus = (int) ($rFbs['statusChanges'] ?? 0) + (int) ($rFbo['statusChanges'] ?? 0);
+
+        $this->addFlash('success', sprintf(
+            'Ozon: обработано заказов %d (FBS+FBO), новых изменений статуса %d.',
+            $totalOrders,
+            $totalStatus
+        ));
+
+        $this->logger->info('Ozon sync done', [
+            'company_id' => $company->getId(),
+            'since' => $since?->format('c'),
+            'to' => $to?->format('c'),
+            'fbs' => $rFbs,
+            'fbo' => $rFbo,
+            'total_orders' => $totalOrders,
+            'total_status_changes' => $totalStatus,
+        ]);
 
         return $this->redirectToRoute('ozon_orders');
     }
