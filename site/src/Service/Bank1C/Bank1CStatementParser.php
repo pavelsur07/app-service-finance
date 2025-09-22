@@ -69,7 +69,7 @@ class Bank1CStatementParser
                                 $current->date = $value;
                                 break;
                             case 'Сумма':
-                                $current->amount = $value;
+                                $current->amount = $this->normalizeAmount($value);
                                 break;
                             case 'ПлательщикСчет':
                                 $current->payerAccount = $value;
@@ -105,5 +105,56 @@ class Bank1CStatementParser
         }
 
         return new Bank1CStatement($header, $account, $documents);
+    }
+
+    private function normalizeAmount(?string $value): ?string
+    {
+        if (null === $value) {
+            return null;
+        }
+
+        $value = trim($value);
+        if ('' === $value) {
+            return null;
+        }
+
+        $sign = '';
+        if (str_starts_with($value, '+') || str_starts_with($value, '-')) {
+            $sign = $value[0];
+            $value = substr($value, 1);
+        }
+
+        $value = str_replace(["\u{00A0}", ' '], '', $value);
+        $filtered = preg_replace('/[^0-9,\.]/u', '', $value);
+        if (null === $filtered || '' === $filtered) {
+            return $sign.'0';
+        }
+
+        $value = $filtered;
+
+        if (str_contains($value, ',')) {
+            $value = str_replace('.', '', $value);
+            $value = str_replace(',', '.', $value);
+        } else {
+            $value = str_replace(',', '', $value);
+        }
+
+        if (str_contains($value, '.')) {
+            $parts = explode('.', $value);
+            $decimal = array_pop($parts);
+            $integer = implode('', $parts);
+            $integer = ltrim($integer, '0');
+            if ('' === $integer) {
+                $integer = '0';
+            }
+            $value = $integer.'.'.$decimal;
+        } else {
+            $value = ltrim($value, '0');
+            if ('' === $value) {
+                $value = '0';
+            }
+        }
+
+        return $sign.$value;
     }
 }
