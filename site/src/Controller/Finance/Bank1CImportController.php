@@ -58,7 +58,12 @@ class Bank1CImportController extends AbstractController
             return $this->redirectToRoute('bank1c_import_form');
         }
         $extension = strtolower($file->getClientOriginalExtension() ?? '');
-        if ($file->getSize() > 10 * 1024 * 1024 || 'txt' !== $extension) {
+        $size = $file->getSize() ?? 0;
+        $allowedExtensions = ['', 'txt'];
+        $isExtensionAllowed = in_array($extension, $allowedExtensions, true);
+        $head = @file_get_contents($file->getPathname(), false, null, 0, 2048);
+        $hasSignature = is_string($head) && str_contains($head, '1CClientBankExchange');
+        if ($size > 10 * 1024 * 1024 || !$isExtensionAllowed || !$hasSignature) {
             $this->addFlash('danger', 'Недопустимый файл');
 
             return $this->redirectToRoute('bank1c_import_form');
