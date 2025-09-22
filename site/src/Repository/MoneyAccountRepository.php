@@ -69,4 +69,29 @@ class MoneyAccountRepository extends ServiceEntityRepository
 
         $qb->getQuery()->execute();
     }
+
+    public function findOneByNormalizedAccountNumber(Company $company, string $normalized): ?MoneyAccount
+    {
+        $normalized = preg_replace('/\D+/', '', $normalized);
+        if ('' === $normalized) {
+            return null;
+        }
+
+        $accounts = $this->createQueryBuilder('m')
+            ->andWhere('m.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getResult();
+
+        foreach ($accounts as $account) {
+            if ($account instanceof MoneyAccount) {
+                $accountNumber = preg_replace('/\D+/', '', (string) $account->getAccountNumber());
+                if ($accountNumber === $normalized && $account->isActive()) {
+                    return $account;
+                }
+            }
+        }
+
+        return null;
+    }
 }
