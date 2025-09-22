@@ -73,14 +73,26 @@ readonly class OzonOrderSyncService
                     $details = $this->client->getFbsPosting($company, $posting['posting_number']);
                     $items = $details['result']['products'] ?? $details['result']['items'] ?? [];
                 }
+                $itemsRepo = $this->em->getRepository(OzonOrderItem::class);
+                $existingItems = $itemsRepo->findBy(['order' => $order]);
+                $existingByKey = [];
+                foreach ($existingItems as $existingItem) {
+                    $existingByKey[self::buildItemKey($existingItem->getSku(), $existingItem->getOfferId())] = $existingItem;
+                }
+
+                $processedItems = [];
                 foreach ($items as $item) {
                     $sku = isset($item['sku']) ? (string) $item['sku'] : null;
                     $offerId = $item['offer_id'] ?? null;
-                    $orderItem = $this->em->getRepository(OzonOrderItem::class)->findOneBy([
-                        'order' => $order,
-                        'sku' => $sku,
-                        'offerId' => $offerId,
-                    ]) ?? new OzonOrderItem(Uuid::uuid4()->toString(), $order);
+                    $key = self::buildItemKey($sku, $offerId);
+
+                    if (isset($processedItems[$key])) {
+                        $orderItem = $processedItems[$key];
+                    } else {
+                        $orderItem = $existingByKey[$key] ?? new OzonOrderItem(Uuid::uuid4()->toString(), $order);
+                        $processedItems[$key] = $orderItem;
+                    }
+
                     $orderItem->setSku($sku);
                     $orderItem->setOfferId($offerId);
                     $orderItem->setQuantity((int) ($item['quantity'] ?? 0));
@@ -212,15 +224,22 @@ readonly class OzonOrderSyncService
                     }
                 }
 
+                $processedItems = [];
                 foreach ($items as $itemRow) {
                     if (!\is_array($itemRow)) {
                         continue;
                     }
 
-                    $item = new OzonOrderItem(Uuid::uuid4()->toString(), $order);
-
                     $sku = isset($itemRow['sku']) ? (string) $itemRow['sku'] : null;
                     $offerId = isset($itemRow['offer_id']) ? (string) $itemRow['offer_id'] : null;
+
+                    $key = self::buildItemKey($sku, $offerId);
+                    if (isset($processedItems[$key])) {
+                        $item = $processedItems[$key];
+                    } else {
+                        $item = new OzonOrderItem(Uuid::uuid4()->toString(), $order);
+                        $processedItems[$key] = $item;
+                    }
 
                     $item->setSku($sku);
                     $item->setOfferId($offerId);
@@ -289,5 +308,10 @@ readonly class OzonOrderSyncService
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private static function buildItemKey(?string $sku, ?string $offerId): string
+    {
+        return serialize([$sku, $offerId]);
     }
 }
