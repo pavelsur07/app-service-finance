@@ -61,8 +61,11 @@ class Bank1CImportController extends AbstractController
         $size = $file->getSize() ?? 0;
         $allowedExtensions = ['', 'txt'];
         $isExtensionAllowed = in_array($extension, $allowedExtensions, true);
-        $head = @file_get_contents($file->getPathname(), false, null, 0, 2048);
-        $hasSignature = is_string($head) && str_contains($head, '1CClientBankExchange');
+        $head = @file_get_contents($file->getPathname(), false, null, 0, 4096);
+        $asciiSignature = '1CClientBankExchange';
+        $utf16Signature = implode("\x00", str_split($asciiSignature))."\x00";
+        $hasSignature = is_string($head)
+            && (str_contains($head, $asciiSignature) || str_contains($head, $utf16Signature));
         if ($size > 10 * 1024 * 1024 || !$isExtensionAllowed || !$hasSignature) {
             $this->addFlash('danger', 'Недопустимый файл');
 
@@ -75,8 +78,10 @@ class Bank1CImportController extends AbstractController
             return $this->redirectToRoute('bank1c_import_form');
         }
 
+        $normalizedRaw = $this->statementParser->normalizeEncoding($raw);
+
         try {
-            $statement = $this->statementParser->parse($raw);
+            $statement = $this->statementParser->parse($normalizedRaw);
         } catch (\Throwable $e) {
             $this->logger->error('Не удалось разобрать файл 1C', ['exception' => $e]);
             $this->addFlash('danger', 'Не удалось разобрать файл. Проверьте формат.');
@@ -88,6 +93,7 @@ class Bank1CImportController extends AbstractController
             ?? ($statement->account['РасчСчет'] ?? ($statement->header['РасчСчет'] ?? null));
         $normalizedAccount = $this->normalizeAccount($accountNumberRaw);
         $bankName = $this->extractBankName($statement->header, $statement->account);
+        $bankBik = $this->extractBankBik($statement->header, $statement->account);
 
         $company = $this->companyService->getActiveCompany();
         $account = $normalizedAccount !== ''
@@ -100,11 +106,13 @@ class Bank1CImportController extends AbstractController
             throw $this->createAccessDeniedException('Сессия недоступна');
         }
         $token = $this->storePreview($session, [
-            'raw' => $raw,
+            'raw' => $normalizedRaw,
             'filename' => $file->getClientOriginalName(),
             'accountNumberRaw' => $accountNumberRaw,
             'normalizedAccount' => $normalizedAccount,
             'bankName' => $bankName,
+            'bankBik' => $bankBik,
+            'accountId' => $account?->getId(),
         ]);
 
         $this->logger->info('Создано превью импорта 1C', [
@@ -112,12 +120,17 @@ class Bank1CImportController extends AbstractController
             'account_number' => $accountNumberRaw,
             'account_found' => (bool) $account,
             'bank' => $bankName,
+            'bank_bik' => $bankBik,
+            'account_id' => $account?->getId(),
+            'normalized_account' => $normalizedAccount,
+            'operations_previewed' => count($operations),
         ]);
 
         return $this->render('finance/import/bank1c/preview.html.twig', [
             'account' => $account,
             'accountNumber' => $accountNumberRaw,
             'bankName' => $bankName,
+            'bankBik' => $bankBik,
             'operations' => $operations,
             'token' => $token,
             'canProceed' => null !== $account && '' !== $normalizedAccount,
@@ -258,15 +271,19 @@ class Bank1CImportController extends AbstractController
         $payload = $session->get(self::SESSION_KEY, []);
         $preview = $payload[$token] ?? null;
         if (!is_array($preview) || !isset($preview['raw'])) {
+            $this->logger->warning('Повторное подтверждение импорта 1C без данных превью', [
+                'token' => $token,
+            ]);
             $this->addFlash('danger', 'Данные превью не найдены. Повторите импорт.');
 
             return $this->redirectToRoute('bank1c_import_form');
         }
 
         $raw = (string) $preview['raw'];
+        $normalizedRaw = $this->statementParser->normalizeEncoding($raw);
 
         try {
-            $statement = $this->statementParser->parse($raw);
+            $statement = $this->statementParser->parse($normalizedRaw);
         } catch (\Throwable $e) {
             $this->removePreview($session, $token);
             $this->logger->error('Не удалось повторно разобрать файл 1C при подтверждении', ['exception' => $e]);
@@ -277,8 +294,12 @@ class Bank1CImportController extends AbstractController
 
         $accountNumberRaw = $statement->account['НомерСчета']
             ?? ($statement->account['РасчСчет'] ?? ($statement->header['РасчСчет'] ?? null));
-        $normalizedAccount = $this->normalizeAccount($accountNumberRaw);
+        if (!$accountNumberRaw && !empty($preview['accountNumberRaw'])) {
+            $accountNumberRaw = $preview['accountNumberRaw'];
+        }
+        $normalizedAccount = $this->normalizeAccount($preview['normalizedAccount'] ?? $accountNumberRaw);
         $bankName = $this->extractBankName($statement->header, $statement->account);
+        $bankBik = $this->extractBankBik($statement->header, $statement->account);
 
         $company = $this->companyService->getActiveCompany();
         $account = $normalizedAccount !== ''
@@ -291,6 +312,8 @@ class Bank1CImportController extends AbstractController
                 'token' => $token,
                 'account_number' => $accountNumberRaw,
                 'bank' => $bankName,
+                'normalized_account' => $normalizedAccount,
+                'bank_bik' => $bankBik,
             ]);
             $this->addFlash('danger', sprintf(
                 'Счёт %s (%s) не найден в системе. Создайте счёт и повторите импорт.',
@@ -306,9 +329,11 @@ class Bank1CImportController extends AbstractController
             'account_id' => $account->getId(),
             'account_number' => $accountNumberRaw,
             'bank' => $bankName,
+            'normalized_account' => $normalizedAccount,
+            'documents_total' => count($statement->documents),
         ]);
 
-        $result = $importService->import($company, $account, $raw, $preview['filename'] ?? null);
+        $result = $importService->import($company, $account, $normalizedRaw, $preview['filename'] ?? null);
 
         $this->removePreview($session, $token);
 
@@ -318,10 +343,26 @@ class Bank1CImportController extends AbstractController
             'duplicates' => $result->duplicates,
             'errors' => count($result->errors),
             'bank' => $bankName,
+            'account_id' => $account->getId(),
+            'normalized_account' => $normalizedAccount,
         ]);
 
         return $this->render('finance/import/bank1c/result.html.twig', [
             'result' => $result,
         ]);
+    }
+
+    private function extractBankBik(array $header, array $account): ?string
+    {
+        foreach (['БИК', 'BIC'] as $key) {
+            if (!empty($account[$key])) {
+                return $account[$key];
+            }
+            if (!empty($header[$key])) {
+                return $header[$key];
+            }
+        }
+
+        return null;
     }
 }

@@ -25,6 +25,8 @@
                         <dd class="col-sm-7">{{ accountNumber ?: '—' }}</dd>
                         <dt class="col-sm-5">Банк</dt>
                         <dd class="col-sm-7">{{ bankName ?: '—' }}</dd>
+                        <dt class="col-sm-5">БИК</dt>
+                        <dd class="col-sm-7">{{ bankBik ?: '—' }}</dd>
                     </dl>
                 </div>
                 {% if account %}
@@ -51,6 +53,7 @@
             <p class="mb-2">Счёт из выписки не найден в системе или не указан.</p>
             <p class="mb-2">РасчСчет: <strong>{{ accountNumber ?: '—' }}</strong></p>
             <p class="mb-2">Банк: <strong>{{ bankName ?: '—' }}</strong></p>
+            <p class="mb-2">БИК: <strong>{{ bankBik ?: '—' }}</strong></p>
             <p class="mb-0">Создайте счёт в системе и повторите импорт.
                 {% if accountNumber %}
                     <a href="{{ path('money_account_new') }}" class="alert-link">Создать счёт</a>

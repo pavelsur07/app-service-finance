@@ -9,9 +9,7 @@ class Bank1CStatementParser
 {
     public function parse(string $raw): Bank1CStatement
     {
-        if (!mb_check_encoding($raw, 'UTF-8')) {
-            $raw = iconv('Windows-1251', 'UTF-8', $raw);
-        }
+        $raw = $this->normalizeEncoding($raw);
         $raw = str_replace("\r\n", "\n", $raw);
         $lines = preg_split('/\n/', trim($raw));
         $state = 'HEADER';
@@ -105,6 +103,33 @@ class Bank1CStatementParser
         }
 
         return new Bank1CStatement($header, $account, $documents);
+    }
+
+    public function normalizeEncoding(string $raw): string
+    {
+        if ('' === $raw) {
+            return $raw;
+        }
+
+        if (str_starts_with($raw, "\xFF\xFE")) {
+            $converted = @iconv('UTF-16LE', 'UTF-8', $raw);
+
+            return false !== $converted ? $converted : $raw;
+        }
+
+        if (preg_match('/^(?:\xEF\xBB\xBF)?1CClientBankExchange.*\RКодировка=Unicode/um', $raw)) {
+            $converted = @iconv('UTF-16LE', 'UTF-8', $raw);
+
+            return false !== $converted ? $converted : $raw;
+        }
+
+        if (!mb_check_encoding($raw, 'UTF-8')) {
+            $converted = @iconv('Windows-1251', 'UTF-8', $raw);
+
+            return false !== $converted ? $converted : $raw;
+        }
+
+        return $raw;
     }
 
     private function normalizeAmount(?string $value): ?string
