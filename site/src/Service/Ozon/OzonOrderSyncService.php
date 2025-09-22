@@ -204,11 +204,10 @@ readonly class OzonOrderSyncService
                     ++$statusChanges;
                 }
 
-                if (!$isNew) {
-                    $existingItems = $itemRepo->findBy(['order' => $order]);
-                    foreach ($existingItems as $existingItem) {
-                        $this->em->remove($existingItem);
-                    }
+                $existingItems = $itemRepo->findBy(['order' => $order]);
+                $existingByKey = [];
+                foreach ($existingItems as $existingItem) {
+                    $existingByKey[self::buildItemKey($existingItem->getSku(), $existingItem->getOfferId())] = $existingItem;
                 }
 
                 $items = $row['products'] ?? [];
@@ -237,7 +236,7 @@ readonly class OzonOrderSyncService
                     if (isset($processedItems[$key])) {
                         $item = $processedItems[$key];
                     } else {
-                        $item = new OzonOrderItem(Uuid::uuid4()->toString(), $order);
+                        $item = $existingByKey[$key] ?? new OzonOrderItem(Uuid::uuid4()->toString(), $order);
                         $processedItems[$key] = $item;
                     }
 
@@ -257,6 +256,13 @@ readonly class OzonOrderSyncService
                     $item->setRaw($itemRow);
 
                     $this->em->persist($item);
+                }
+
+                foreach ($existingItems as $existingItem) {
+                    $key = self::buildItemKey($existingItem->getSku(), $existingItem->getOfferId());
+                    if (!isset($processedItems[$key])) {
+                        $this->em->remove($existingItem);
+                    }
                 }
 
                 $this->em->persist($order);
