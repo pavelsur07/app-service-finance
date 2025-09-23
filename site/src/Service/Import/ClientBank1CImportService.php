@@ -18,9 +18,70 @@ class ClientBank1CImportService
      */
     public function parseHeaderAndDocuments(string $content): array
     {
+        $header = [];
+        $documents = [];
+        $currentDocument = null;
+
+        $lines = preg_split('/\r\n|\n|\r/', $content) ?: [];
+
+        foreach ($lines as $line) {
+            $line = trim($line);
+
+            if ($line === '') {
+                continue;
+            }
+
+            if ($line === 'КонецДокумента') {
+                if ($currentDocument !== null) {
+                    $documents[] = $currentDocument;
+                    $currentDocument = null;
+                }
+
+                continue;
+            }
+
+            $parts = explode('=', $line, 2);
+
+            if (count($parts) !== 2) {
+                continue;
+            }
+
+            [$key, $value] = $parts;
+            $key = trim($key);
+            $value = trim($value);
+
+            if ($key === '') {
+                continue;
+            }
+
+            if ($key === 'СекцияДокумент') {
+                if ($currentDocument !== null) {
+                    $documents[] = $currentDocument;
+                }
+
+                $currentDocument = [
+                    '_doc_type' => $value,
+                ];
+
+                continue;
+            }
+
+            if ($currentDocument === null) {
+                $header[$key] = $value;
+
+                continue;
+            }
+
+            $currentDocument[$key] = $value;
+        }
+
+        if ($currentDocument !== null) {
+            $documents[] = $currentDocument;
+        }
+
         return [
-            'header' => [],
-            'documents' => [],
+            'header' => $header,
+            'documents' => $documents,
         ];
     }
 
