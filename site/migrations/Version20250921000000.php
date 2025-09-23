@@ -21,6 +21,19 @@ final class Version20250921000000 extends AbstractMigration
         $this->addSql("ALTER TABLE cash_transaction ADD is_transfer BOOLEAN NOT NULL DEFAULT false");
         $this->addSql("ALTER TABLE cash_transaction ADD raw_data JSON NOT NULL DEFAULT '[]'");
         $this->addSql("ALTER TABLE cash_transaction ALTER external_id TYPE VARCHAR(128)");
+        $this->addSql(<<<'SQL'
+WITH ranked AS (
+    SELECT
+        id,
+        ROW_NUMBER() OVER (PARTITION BY external_id ORDER BY created_at, id) AS rn
+    FROM cash_transaction
+    WHERE external_id IS NOT NULL
+)
+UPDATE cash_transaction ct
+SET external_id = NULL
+FROM ranked r
+WHERE ct.id = r.id AND r.rn > 1;
+SQL);
         $this->addSql('CREATE UNIQUE INDEX uniq_cash_transaction_external_id ON cash_transaction (external_id)');
         $this->addSql("ALTER TABLE cash_transaction ALTER COLUMN is_transfer DROP DEFAULT");
         $this->addSql("ALTER TABLE cash_transaction ALTER COLUMN raw_data DROP DEFAULT");
