@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Предпросмотр импорта 1С{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Предпросмотр импорта банковской выписки 1С</h2>
+                    <div class="text-muted small">
+                        Файл: <strong>{{ filename }}</strong>
+                        {% if selectedAccount %}
+                            · Счёт: <strong>{{ selectedAccount.name }}</strong>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="table-responsive">
+                <table class="table card-table">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Документ</th>
+                            <th class="text-end">Приход</th>
+                            <th class="text-end">Расход</th>
+                            <th>Описание</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in previewRows %}
+                            <tr>
+                                <td>{{ row.date }}</td>
+                                <td>{{ row.document }}</td>
+                                <td class="text-end">{{ row.debit }}</td>
+                                <td class="text-end">{{ row.credit }}</td>
+                                <td>{{ row.description }}</td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">Нет данных для предпросмотра</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form action="{{ path('cash_bank1c_import_commit') }}" method="post">
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="overwrite_duplicates" name="overwrite_duplicates" value="1">
+                        <label class="form-check-label" for="overwrite_duplicates">Перезаписывать дубли</label>
+                    </div>
+                    <input type="hidden" name="_token" value="{{ csrf_token('bank1c_import_commit') }}">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-outline-secondary">Назад</a>
+                        <button type="submit" class="btn btn-primary">Продолжить импорт</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
