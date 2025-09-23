@@ -293,7 +293,8 @@ class ClientBank1CImportService
                 continue;
             }
 
-            $externalId = $this->generateExternalId($row, $account, $rawData);
+            $externalId = $this->generateExternalId($row, $account);
+            $isTransfer = $this->shouldMarkAsTransfer($row, $account);
 
             $transaction = $this->cashTransactionRepository->findOneBy([
                 'company' => $company,
@@ -301,6 +302,7 @@ class ClientBank1CImportService
                 'externalId' => $externalId,
             ]);
 
+            $isNewTransaction = false;
             if ($transaction !== null) {
                 ++$duplicates;
 
@@ -320,26 +322,39 @@ class ClientBank1CImportService
                 $transaction->setExternalId($externalId);
                 $this->entityManager->persist($transaction);
                 ++$created;
+                $isNewTransaction = true;
             }
 
-            $transaction
-                ->setDirection($direction)
-                ->setAmount($amount)
-                ->setCurrency($account->getCurrency())
-                ->setOccurredAt($occurredAt)
-                ->setBookedAt($occurredAt)
-                ->setExternalId($externalId)
-                ->setDescription($purpose)
-                ->setDocType($docType)
-                ->setDocNumber($docNumber)
-                ->setRawData($rawData)
-                ->setUpdatedAt(new \DateTimeImmutable());
-
             $counterparty = $this->resolveCounterparty($row, $direction, $company);
-            if ($counterparty instanceof Counterparty) {
-                $transaction->setCounterparty($counterparty);
+
+            if ($isNewTransaction) {
+                $transaction
+                    ->setDirection($direction)
+                    ->setAmount($amount)
+                    ->setCurrency($account->getCurrency())
+                    ->setOccurredAt($occurredAt)
+                    ->setBookedAt($occurredAt)
+                    ->setDescription($purpose)
+                    ->setDocType($docType)
+                    ->setDocNumber($docNumber)
+                    ->setRawData($rawData)
+                    ->setIsTransfer($isTransfer)
+                    ->setUpdatedAt(new \DateTimeImmutable());
+
+                if ($counterparty instanceof Counterparty) {
+                    $transaction->setCounterparty($counterparty);
+                } else {
+                    $transaction->setCounterparty(null);
+                }
             } else {
-                $transaction->setCounterparty(null);
+                $transaction
+                    ->setDescription($purpose)
+                    ->setRawData($rawData)
+                    ->setUpdatedAt(new \DateTimeImmutable());
+
+                if ($counterparty instanceof Counterparty) {
+                    $transaction->setCounterparty($counterparty);
+                }
             }
 
             $processedTransactions[] = $transaction;
@@ -565,50 +580,73 @@ class ClientBank1CImportService
 
     /**
      * @param array<string,mixed> $row
-     * @param array<string,mixed> $rawData
      */
-    private function generateExternalId(array $row, MoneyAccount $account, array $rawData): string
+    private function generateExternalId(array $row, MoneyAccount $account): string
     {
-        $payload = [
-            'source' => 'client_bank_1c',
-            'account' => $account->getId(),
-            'docType' => $this->getStringValue($row['docType'] ?? null),
-            'docNumber' => $this->getStringValue($row['docNumber'] ?? null),
-            'docDate' => $this->getStringValue($row['docDate'] ?? null),
-            'amount' => $row['amount'] ?? null,
-            'dateDebit' => $this->getStringValue($row['dateDebit'] ?? null),
-            'dateCredit' => $this->getStringValue($row['dateCredit'] ?? null),
-            'direction' => $this->getStringValue($row['direction'] ?? null),
-            'purpose' => $this->getStringValue($row['purpose'] ?? null),
-            'raw' => $rawData,
+        $parts = [
+            $this->getStringValue($row['docType'] ?? null) ?? '',
+            $this->getStringValue($row['docNumber'] ?? null) ?? '',
+            $this->getStringValue($row['docDate'] ?? null) ?? '',
+            $this->formatAmountForHash($row['amount'] ?? null),
+            $this->normalizeAccount($this->getStringValue($row['payerAccount'] ?? null)) ?? '',
+            $this->normalizeAccount($this->getStringValue($row['receiverAccount'] ?? null)) ?? '',
+            $this->getStringValue($row['purpose'] ?? null) ?? '',
+            $this->normalizeAccount($account->getAccountNumber()) ?? '',
         ];
 
-        $this->sortRecursive($payload);
-
-        return 'client-bank-1c:' . sha1(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        return hash('sha256', implode('|', $parts));
     }
 
-    /**
-     * @param array<mixed> $data
-     */
-    private function sortRecursive(array &$data): void
+    private function shouldMarkAsTransfer(array $row, MoneyAccount $account): bool
     {
-        if (array_is_list($data)) {
-            foreach ($data as &$value) {
-                if (is_array($value)) {
-                    $this->sortRecursive($value);
-                }
-            }
+        $statementAccount = $this->normalizeAccount($account->getAccountNumber());
+        $payerAccount = $this->normalizeAccount($this->getStringValue($row['payerAccount'] ?? null));
+        $receiverAccount = $this->normalizeAccount($this->getStringValue($row['receiverAccount'] ?? null));
 
-            return;
+        if (
+            $statementAccount !== null
+            && $statementAccount === $payerAccount
+            && $statementAccount === $receiverAccount
+        ) {
+            return true;
         }
 
-        ksort($data);
-        foreach ($data as &$value) {
-            if (is_array($value)) {
-                $this->sortRecursive($value);
+        $purpose = $this->getStringValue($row['purpose'] ?? null);
+        if ($purpose === null) {
+            return false;
+        }
+
+        $keywords = [
+            'перевод средств между счетами',
+            'депозит',
+            'возврат депозит',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if ($this->containsInsensitive($purpose, $keyword)) {
+                return true;
             }
         }
+
+        return false;
+    }
+
+    private function containsInsensitive(string $haystack, string $needle): bool
+    {
+        if (function_exists('mb_stripos')) {
+            return mb_stripos($haystack, $needle) !== false;
+        }
+
+        return stripos($haystack, $needle) !== false;
+    }
+
+    private function formatAmountForHash(mixed $amount): string
+    {
+        if (!is_numeric($amount)) {
+            return '0.00';
+        }
+
+        return number_format((float) $amount, 2, '.', '');
     }
 
     private function getStringValue(mixed $value): ?string
