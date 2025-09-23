@@ -54,8 +54,20 @@ class CashTransaction
     #[ORM\Column(type: 'string', length: 1024, nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $docType = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $docNumber = null;
+
+    #[ORM\Column(length: 128, nullable: true, unique: true)]
     private ?string $externalId = null;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $isTransfer = false;
+
+    #[ORM\Column(type: 'json')]
+    private array $rawData = [];
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -215,6 +227,30 @@ class CashTransaction
         return $this;
     }
 
+    public function getDocType(): ?string
+    {
+        return $this->docType;
+    }
+
+    public function setDocType(?string $docType): self
+    {
+        $this->docType = $docType;
+
+        return $this;
+    }
+
+    public function getDocNumber(): ?string
+    {
+        return $this->docNumber;
+    }
+
+    public function setDocNumber(?string $docNumber): self
+    {
+        $this->docNumber = $docNumber;
+
+        return $this;
+    }
+
     public function getExternalId(): ?string
     {
         return $this->externalId;
@@ -223,6 +259,30 @@ class CashTransaction
     public function setExternalId(?string $e): self
     {
         $this->externalId = $e;
+
+        return $this;
+    }
+
+    public function isTransfer(): bool
+    {
+        return $this->isTransfer;
+    }
+
+    public function setIsTransfer(bool $isTransfer): self
+    {
+        $this->isTransfer = $isTransfer;
+
+        return $this;
+    }
+
+    public function getRawData(): array
+    {
+        return $this->rawData;
+    }
+
+    public function setRawData(array $rawData): self
+    {
+        $this->rawData = $rawData;
 
         return $this;
     }
