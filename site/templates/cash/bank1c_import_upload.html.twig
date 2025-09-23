@@ -1,0 +1,46 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Импорт выписки 1С{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Импорт банковской выписки 1С</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <form action="{{ path('cash_bank1c_import_preview') }}" method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label required" for="import_file">Файл выгрузки</label>
+                        <input type="file" class="form-control" id="import_file" name="import_file" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required" for="money_account_id">Счёт</label>
+                        <select class="form-select" id="money_account_id" name="money_account_id" required>
+                            {% if accounts is not empty %}
+                                <option value="">Выберите счёт</option>
+                                {% for account in accounts %}
+                                    <option value="{{ account.id }}">{{ account.name }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="" disabled selected>Нет доступных счетов</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <input type="hidden" name="_token" value="{{ csrf_token('bank1c_import_upload') }}">
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-outline-secondary">Отмена</a>
+                        <button type="submit" class="btn btn-primary">Импортировать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
