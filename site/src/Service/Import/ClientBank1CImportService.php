@@ -2,15 +2,27 @@
 
 namespace App\Service\Import;
 
+use App\Entity\CashTransaction;
+use App\Entity\Company;
+use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
+use App\Enum\CashDirection;
+use App\Enum\CounterpartyType;
+use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
+use App\Service\AccountBalanceService;
 use App\Service\ActiveCompanyService;
+use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 
 class ClientBank1CImportService
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CounterpartyRepository $counterpartyRepository,
+        private readonly CashTransactionRepository $cashTransactionRepository,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly AccountBalanceService $accountBalanceService,
     ) {
     }
 
@@ -239,13 +251,364 @@ class ClientBank1CImportService
      */
     public function import(array $preview, MoneyAccount $account, bool $overwrite): array
     {
+        $company = $this->activeCompanyService->getActiveCompany();
+
+        $created = 0;
+        $duplicates = 0;
+        $errors = 0;
+        $minDate = null;
+        $maxDate = null;
+        $processedTransactions = [];
+
+        foreach ($preview as $row) {
+            if (!is_array($row)) {
+                ++$errors;
+
+                continue;
+            }
+
+            $rawData = $this->extractRawData($row);
+            $docType = $this->getStringValue($row['docType'] ?? null);
+            $docNumber = $this->getStringValue($row['docNumber'] ?? null);
+            $purpose = $this->getStringValue($row['purpose'] ?? null);
+
+            $direction = $this->resolveDirection($row);
+            if ($direction === null) {
+                ++$errors;
+
+                continue;
+            }
+
+            $occurredAt = $this->resolveOccurredAt($row, $direction);
+            if ($occurredAt === null) {
+                ++$errors;
+
+                continue;
+            }
+
+            $amount = $this->resolveAmount($row, $direction);
+            if ($amount === null) {
+                ++$errors;
+
+                continue;
+            }
+
+            $externalId = $this->generateExternalId($row, $account, $rawData);
+
+            $transaction = $this->cashTransactionRepository->findOneBy([
+                'company' => $company,
+                'moneyAccount' => $account,
+                'externalId' => $externalId,
+            ]);
+
+            if ($transaction !== null) {
+                ++$duplicates;
+
+                if (!$overwrite) {
+                    continue;
+                }
+            } else {
+                $transaction = new CashTransaction(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $account,
+                    $direction,
+                    $amount,
+                    $account->getCurrency(),
+                    $occurredAt,
+                );
+                $transaction->setExternalId($externalId);
+                $this->entityManager->persist($transaction);
+                ++$created;
+            }
+
+            $transaction
+                ->setDirection($direction)
+                ->setAmount($amount)
+                ->setCurrency($account->getCurrency())
+                ->setOccurredAt($occurredAt)
+                ->setBookedAt($occurredAt)
+                ->setExternalId($externalId)
+                ->setDescription($purpose)
+                ->setDocType($docType)
+                ->setDocNumber($docNumber)
+                ->setRawData($rawData)
+                ->setUpdatedAt(new \DateTimeImmutable());
+
+            $counterparty = $this->resolveCounterparty($row, $direction, $company);
+            if ($counterparty instanceof Counterparty) {
+                $transaction->setCounterparty($counterparty);
+            } else {
+                $transaction->setCounterparty(null);
+            }
+
+            $processedTransactions[] = $transaction;
+
+            if ($minDate === null || $occurredAt < $minDate) {
+                $minDate = $occurredAt;
+            }
+
+            if ($maxDate === null || $occurredAt > $maxDate) {
+                $maxDate = $occurredAt;
+            }
+        }
+
+        if (!empty($processedTransactions)) {
+            $this->entityManager->flush();
+        }
+
+        if ($minDate !== null && $maxDate !== null) {
+            $this->accountBalanceService->recalculateDailyRange($company, $account, $minDate, $maxDate);
+        }
+
         return [
-            'created' => 0,
-            'duplicates' => 0,
-            'errors' => 0,
-            'minDate' => null,
-            'maxDate' => null,
+            'created' => $created,
+            'duplicates' => $duplicates,
+            'errors' => $errors,
+            'minDate' => $minDate,
+            'maxDate' => $maxDate,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resolveDirection(array $row): ?CashDirection
+    {
+        $direction = $this->getStringValue($row['direction'] ?? null);
+
+        return match ($direction) {
+            'inflow' => CashDirection::INFLOW,
+            'outflow' => CashDirection::OUTFLOW,
+            'self-transfer' => $this->resolveTransferDirection($row),
+            default => null,
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resolveTransferDirection(array $row): CashDirection
+    {
+        $hasDebit = $this->getStringValue($row['dateDebit'] ?? null) !== null;
+        $hasCredit = $this->getStringValue($row['dateCredit'] ?? null) !== null;
+
+        if ($hasDebit && !$hasCredit) {
+            return CashDirection::OUTFLOW;
+        }
+
+        if ($hasCredit && !$hasDebit) {
+            return CashDirection::INFLOW;
+        }
+
+        return CashDirection::OUTFLOW;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resolveOccurredAt(array $row, CashDirection $direction): ?\DateTimeImmutable
+    {
+        $docDate = $this->parseDate($this->getStringValue($row['docDate'] ?? null));
+        $dateDebit = $this->parseDate($this->getStringValue($row['dateDebit'] ?? null));
+        $dateCredit = $this->parseDate($this->getStringValue($row['dateCredit'] ?? null));
+
+        return match ($direction) {
+            CashDirection::OUTFLOW => $dateDebit ?? $docDate,
+            CashDirection::INFLOW => $dateCredit ?? $docDate,
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resolveAmount(array $row, CashDirection $direction): ?string
+    {
+        $rawAmount = $row['amount'] ?? null;
+        if (!is_numeric($rawAmount)) {
+            return null;
+        }
+
+        $amount = number_format(abs((float) $rawAmount), 2, '.', '');
+
+        if ($direction === CashDirection::OUTFLOW) {
+            $amount = '-' . $amount;
+        }
+
+        return $amount;
+    }
+
+    private function parseDate(?string $date): ?\DateTimeImmutable
+    {
+        if ($date === null || $date === '') {
+            return null;
+        }
+
+        $formats = ['d.m.Y', 'Y-m-d'];
+        foreach ($formats as $format) {
+            $parsed = \DateTimeImmutable::createFromFormat('!' . $format, $date);
+            if ($parsed instanceof \DateTimeImmutable) {
+                return $parsed;
+            }
+        }
+
+        try {
+            return new \DateTimeImmutable($date);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     */
+    private function resolveCounterparty(array $row, CashDirection $direction, Company $company): ?Counterparty
+    {
+        if ($this->getStringValue($row['direction'] ?? null) === 'self-transfer') {
+            return null;
+        }
+
+        $name = null;
+        $inn = null;
+
+        if ($direction === CashDirection::OUTFLOW) {
+            $name = $this->getStringValue($row['receiverName'] ?? null);
+            $inn = $this->normalizeInn($this->getStringValue($row['receiverInn'] ?? null));
+        } else {
+            $name = $this->getStringValue($row['payerName'] ?? null);
+            $inn = $this->normalizeInn($this->getStringValue($row['payerInn'] ?? null));
+        }
+
+        if ($inn === null || $name === null) {
+            return null;
+        }
+
+        $counterparty = $this->counterpartyRepository->findOneBy([
+            'company' => $company,
+            'inn' => $inn,
+        ]);
+
+        if ($counterparty instanceof Counterparty) {
+            return $counterparty;
+        }
+
+        $counterparty = new Counterparty(
+            Uuid::uuid4()->toString(),
+            $company,
+            $name,
+            $this->determineCounterpartyType($inn),
+        );
+        $counterparty->setInn($inn);
+        $this->entityManager->persist($counterparty);
+
+        return $counterparty;
+    }
+
+    private function determineCounterpartyType(string $inn): CounterpartyType
+    {
+        return match (strlen($inn)) {
+            12 => CounterpartyType::INDIVIDUAL_ENTREPRENEUR,
+            default => CounterpartyType::LEGAL_ENTITY,
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @return array<string,mixed>
+     */
+    private function extractRawData(array $row): array
+    {
+        $raw = $row['raw'] ?? $row['rawData'] ?? [];
+        if (!is_array($raw)) {
+            $raw = [];
+        }
+
+        $normalized = [];
+        foreach ($raw as $key => $value) {
+            if (!is_string($key)) {
+                continue;
+            }
+
+            if (is_scalar($value) || $value === null) {
+                $normalized[$key] = $value === null ? null : (string) $value;
+            } elseif (is_array($value)) {
+                $normalized[$key] = $this->normalizeRawArray($value);
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<mixed> $data
+     * @return array<mixed>
+     */
+    private function normalizeRawArray(array $data): array
+    {
+        $normalized = [];
+        foreach ($data as $key => $value) {
+            if (is_string($key)) {
+                if (is_scalar($value) || $value === null) {
+                    $normalized[$key] = $value === null ? null : (string) $value;
+                } elseif (is_array($value)) {
+                    $normalized[$key] = $this->normalizeRawArray($value);
+                }
+            } else {
+                $normalized[] = is_scalar($value) || $value === null
+                    ? ($value === null ? null : (string) $value)
+                    : (is_array($value) ? $this->normalizeRawArray($value) : null);
+            }
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param array<string,mixed> $row
+     * @param array<string,mixed> $rawData
+     */
+    private function generateExternalId(array $row, MoneyAccount $account, array $rawData): string
+    {
+        $payload = [
+            'source' => 'client_bank_1c',
+            'account' => $account->getId(),
+            'docType' => $this->getStringValue($row['docType'] ?? null),
+            'docNumber' => $this->getStringValue($row['docNumber'] ?? null),
+            'docDate' => $this->getStringValue($row['docDate'] ?? null),
+            'amount' => $row['amount'] ?? null,
+            'dateDebit' => $this->getStringValue($row['dateDebit'] ?? null),
+            'dateCredit' => $this->getStringValue($row['dateCredit'] ?? null),
+            'direction' => $this->getStringValue($row['direction'] ?? null),
+            'purpose' => $this->getStringValue($row['purpose'] ?? null),
+            'raw' => $rawData,
+        ];
+
+        $this->sortRecursive($payload);
+
+        return 'client-bank-1c:' . sha1(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    /**
+     * @param array<mixed> $data
+     */
+    private function sortRecursive(array &$data): void
+    {
+        if (array_is_list($data)) {
+            foreach ($data as &$value) {
+                if (is_array($value)) {
+                    $this->sortRecursive($value);
+                }
+            }
+
+            return;
+        }
+
+        ksort($data);
+        foreach ($data as &$value) {
+            if (is_array($value)) {
+                $this->sortRecursive($value);
+            }
+        }
     }
 
     private function getStringValue(mixed $value): ?string
