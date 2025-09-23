@@ -4,6 +4,7 @@ namespace App\Controller\Cash;
 
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\Import\ClientBank1CImportService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
@@ -13,8 +14,10 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/cash/import/bank1c')]
 class Bank1CImportController extends AbstractController
 {
-    public function __construct(private readonly ActiveCompanyService $activeCompanyService)
-    {
+    public function __construct(
+        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly ClientBank1CImportService $clientBank1CImportService,
+    ) {
     }
 
     #[Route('', name: 'cash_bank1c_import_upload', methods: ['GET'])]
@@ -44,12 +47,6 @@ class Bank1CImportController extends AbstractController
 
         $accountId = (string) $request->request->get('money_account_id');
         $content = file_get_contents($uploadedFile->getPathname()) ?: '';
-        $session = $request->getSession();
-        $session->set('bank1c_import', [
-            'file_name' => $uploadedFile->getClientOriginalName(),
-            'file_content' => $content,
-            'account_id' => $accountId,
-        ]);
 
         $company = $this->activeCompanyService->getActiveCompany();
         $accounts = $accountRepository->findBy(['company' => $company]);
@@ -60,6 +57,34 @@ class Bank1CImportController extends AbstractController
                 break;
             }
         }
+
+        $parsedData = $this->clientBank1CImportService->parseHeaderAndDocuments($content);
+        $statementAccount = $parsedData['header']['РасчСчет'] ?? null;
+        $statementAccountValue = is_string($statementAccount) ? $statementAccount : null;
+        $selectedAccountNumber = $selectedAccount?->getAccountNumber();
+
+        if (
+            $statementAccountValue === null
+            || $selectedAccountNumber === null
+            || $statementAccountValue !== $selectedAccountNumber
+        ) {
+            $this->addFlash(
+                'danger',
+                sprintf(
+                    'Выбран неверный банк или выписка: в файле указан счёт %s',
+                    $statementAccountValue ?? 'не указан',
+                ),
+            );
+
+            return $this->redirectToRoute('cash_bank1c_import_upload');
+        }
+
+        $session = $request->getSession();
+        $session->set('bank1c_import', [
+            'file_name' => $uploadedFile->getClientOriginalName(),
+            'file_content' => $content,
+            'account_id' => $accountId,
+        ]);
 
         $previewRows = [
             [
