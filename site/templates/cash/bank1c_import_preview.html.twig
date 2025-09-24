@@ -13,6 +13,9 @@
                         {% if selectedAccount %}
                             · Счёт: <strong>{{ selectedAccount.name }}</strong>
                         {% endif %}
+                        {% if totalRows is defined %}
+                            · Всего операций: <strong>{{ totalRows }}</strong>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -27,23 +30,59 @@
                         <tr>
                             <th>Дата</th>
                             <th>Документ</th>
-                            <th class="text-end">Приход</th>
-                            <th class="text-end">Расход</th>
-                            <th>Описание</th>
+                            <th>Контрагент</th>
+                            <th>Назначение</th>
+                            <th class="text-end">Сумма</th>
+                            <th>Статус контрагента</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for row in previewRows %}
+                            {% set direction = row.direction ?? '' %}
+                            {% set isInflow = direction == 'inflow' %}
+                            {% set isOutflow = direction == 'outflow' %}
+                            {% set counterpartyName = direction == 'outflow' ? row.receiverName : row.payerName %}
+                            {% set counterpartyInn = direction == 'outflow' ? row.receiverInn : row.payerInn %}
+                            {% set counterpartyDisplay = counterpartyName ? counterpartyName : '—' %}
+                            {% if counterpartyInn %}
+                                {% set counterpartyDisplay = counterpartyDisplay ~ ' (' ~ counterpartyInn ~ ')' %}
+                            {% endif %}
+                            {% if direction == 'self-transfer' %}
+                                {% set counterpartyDisplay = 'Перевод между своими счетами' %}
+                            {% endif %}
+                            {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : '') %}
                             <tr>
-                                <td>{{ row.date }}</td>
-                                <td>{{ row.document }}</td>
-                                <td class="text-end">{{ row.debit }}</td>
-                                <td class="text-end">{{ row.credit }}</td>
-                                <td>{{ row.description }}</td>
+                                <td>{{ row.docDate ?? '—' }}</td>
+                                <td>
+                                    {% if row.docType %}<span class="text-muted">{{ row.docType }}</span>{% endif %}
+                                    {% if row.docNumber %}<div class="fw-semibold">№ {{ row.docNumber }}</div>{% endif %}
+                                    {% if not row.docType and not row.docNumber %}—{% endif %}
+                                </td>
+                                <td>{{ counterpartyDisplay }}</td>
+                                <td>{{ row.purpose ?? '—' }}</td>
+                                <td class="text-end">
+                                    {% if row.amount is not null %}
+                                        <span class="{{ amountClass }}">
+                                            {% if isInflow %}+{% elseif isOutflow %}-{% endif %}
+                                            {{ row.amount|number_format(2, ',', ' ') }}
+                                        </span>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if row.counterpartyStatus == 'FOUND' %}
+                                        <span class="badge bg-success">Найден</span>
+                                    {% elseif row.counterpartyStatus == 'WILL_CREATE' %}
+                                        <span class="badge bg-warning text-dark">Будет создан</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Неизвестно</span>
+                                    {% endif %}
+                                </td>
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="5" class="text-center text-muted">Нет данных для предпросмотра</td>
+                                <td colspan="6" class="text-center text-muted">Нет данных для предпросмотра</td>
                             </tr>
                         {% endfor %}
                     </tbody>
@@ -66,5 +105,6 @@
                 </form>
             </div>
         </div>
+        {% include 'partials/_pagination.html.twig' with {pager: pager} %}
     </div>
 {% endblock %}
