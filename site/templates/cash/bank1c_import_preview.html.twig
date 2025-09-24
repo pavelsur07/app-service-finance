@@ -2,6 +2,23 @@
 
 {% block title %}Предпросмотр импорта 1С{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .preview-row-inflow {
+            --tblr-table-bg: rgba(34, 197, 94, 0.08);
+        }
+
+        .preview-row-outflow {
+            --tblr-table-bg: rgba(239, 68, 68, 0.08);
+        }
+
+        .preview-row-self-transfer {
+            --tblr-table-bg: rgba(168, 85, 247, 0.12);
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
@@ -12,6 +29,9 @@
                         Файл: <strong>{{ filename }}</strong>
                         {% if selectedAccount %}
                             · Счёт: <strong>{{ selectedAccount.name }}</strong>
+                            {% if selectedAccount.accountNumber %}
+                                <span class="text-muted">(№ {{ mask_account(selectedAccount.accountNumber) }})</span>
+                            {% endif %}
                         {% endif %}
                         {% if totalRows is defined %}
                             · Всего операций: <strong>{{ totalRows }}</strong>
@@ -24,6 +44,12 @@
 
     <div class="container-xl mt-3">
         <div class="card mb-3">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title mb-0">Предпросмотр операций</h3>
+                <a href="{{ path('cash_bank1c_import_preview_csv') }}" class="btn btn-outline-primary btn-sm">
+                    Скачать CSV
+                </a>
+            </div>
             <div class="table-responsive">
                 <table class="table card-table">
                     <thead>
@@ -41,24 +67,40 @@
                             {% set direction = row.direction ?? '' %}
                             {% set isInflow = direction == 'inflow' %}
                             {% set isOutflow = direction == 'outflow' %}
+                            {% set isSelfTransfer = direction == 'self-transfer' %}
                             {% set counterpartyName = direction == 'outflow' ? row.receiverName : row.payerName %}
                             {% set counterpartyInn = direction == 'outflow' ? row.receiverInn : row.payerInn %}
                             {% set counterpartyDisplay = counterpartyName ? counterpartyName : '—' %}
                             {% if counterpartyInn %}
                                 {% set counterpartyDisplay = counterpartyDisplay ~ ' (' ~ counterpartyInn ~ ')' %}
                             {% endif %}
-                            {% if direction == 'self-transfer' %}
+                            {% set counterpartyAccount = direction == 'outflow' ? row.receiverAccount : (isInflow ? row.payerAccount : null) %}
+                            {% set counterpartyAccountDisplay = null %}
+                            {% if isSelfTransfer %}
                                 {% set counterpartyDisplay = 'Перевод между своими счетами' %}
+                                {% set payerAccountMasked = mask_account(row.payerAccount is defined ? row.payerAccount : null) %}
+                                {% set receiverAccountMasked = mask_account(row.receiverAccount is defined ? row.receiverAccount : null) %}
+                                {% if payerAccountMasked or receiverAccountMasked %}
+                                    {% set counterpartyAccountDisplay = (payerAccountMasked ?? '—') ~ ' → ' ~ (receiverAccountMasked ?? '—') %}
+                                {% endif %}
+                            {% elseif counterpartyAccount is defined %}
+                                {% set counterpartyAccountDisplay = mask_account(counterpartyAccount) %}
                             {% endif %}
-                            {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : '') %}
-                            <tr>
+                            {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : (isSelfTransfer ? 'text-purple' : '')) %}
+                            {% set rowClass = direction ? 'preview-row-' ~ direction : '' %}
+                            <tr class="{{ rowClass }}">
                                 <td>{{ row.docDate ?? '—' }}</td>
                                 <td>
                                     {% if row.docType %}<span class="text-muted">{{ row.docType }}</span>{% endif %}
                                     {% if row.docNumber %}<div class="fw-semibold">№ {{ row.docNumber }}</div>{% endif %}
                                     {% if not row.docType and not row.docNumber %}—{% endif %}
                                 </td>
-                                <td>{{ counterpartyDisplay }}</td>
+                                <td>
+                                    <div>{{ counterpartyDisplay }}</div>
+                                    {% if counterpartyAccountDisplay %}
+                                        <div class="text-muted small">{{ counterpartyAccountDisplay }}</div>
+                                    {% endif %}
+                                </td>
                                 <td>{{ row.purpose ?? '—' }}</td>
                                 <td class="text-end">
                                     {% if row.amount is not null %}
