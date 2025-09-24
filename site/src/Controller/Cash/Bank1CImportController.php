@@ -10,6 +10,7 @@ use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 #[Route('/cash/import/bank1c')]
 class Bank1CImportController extends AbstractController
@@ -74,6 +75,8 @@ class Bank1CImportController extends AbstractController
 
             $parsedData = $this->clientBank1CImportService->parseHeaderAndDocuments($content);
             $statementAccountValue = $parsedData['header']['РасчСчет'] ?? null;
+            $statementPeriodStart = $parsedData['header']['ДатаНачала'] ?? null;
+            $statementPeriodEnd = $parsedData['header']['ДатаКонца'] ?? null;
             $statementAccount = is_string($statementAccountValue) ? $statementAccountValue : null;
 
             $statementAccountNormalized = $this->normalizeAccountNumber($statementAccount);
@@ -102,6 +105,8 @@ class Bank1CImportController extends AbstractController
                 'file_name' => $uploadedFile->getClientOriginalName(),
                 'account_id' => $selectedAccount->getId(),
                 'statement_account' => $statementAccount,
+                'statement_period_start' => is_string($statementPeriodStart) ? $statementPeriodStart : null,
+                'statement_period_end' => is_string($statementPeriodEnd) ? $statementPeriodEnd : null,
                 'preview' => $preview,
             ]);
         }
@@ -199,12 +204,31 @@ class Bank1CImportController extends AbstractController
 
         $overwrite = $request->request->getBoolean('overwrite_duplicates', false);
 
-        $summary = $this->clientBank1CImportService->import($preview, $account, $overwrite);
+        $user = $this->getUser();
+        $userIdentifier = null;
+        if ($user instanceof UserInterface) {
+            $userIdentifier = $user->getUserIdentifier();
+        } elseif (is_string($user)) {
+            $userIdentifier = $user;
+        }
+
+        $fileName = is_string($state['file_name'] ?? null) ? $state['file_name'] : null;
+        $statementAccount = is_string($state['statement_account'] ?? null) ? $state['statement_account'] : null;
+        $periodStart = is_string($state['statement_period_start'] ?? null) ? $state['statement_period_start'] : null;
+        $periodEnd = is_string($state['statement_period_end'] ?? null) ? $state['statement_period_end'] : null;
+
+        $summary = $this->clientBank1CImportService->import($preview, $account, $overwrite, [
+            'user' => $userIdentifier,
+            'file' => $fileName,
+            'statement_account' => $statementAccount,
+            'date_start' => $periodStart,
+            'date_end' => $periodEnd,
+        ]);
 
         $session->remove('bank1c_import');
 
         return $this->render('cash/bank1c_import_result.html.twig', [
-            'filename' => is_string($state['file_name'] ?? null) ? $state['file_name'] : null,
+            'filename' => $fileName,
             'selectedAccount' => $account,
             'summary' => $summary,
         ]);
