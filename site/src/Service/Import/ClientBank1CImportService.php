@@ -13,7 +13,10 @@ use App\Repository\CounterpartyRepository;
 use App\Service\AccountBalanceService;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class ClientBank1CImportService
 {
@@ -23,7 +26,10 @@ class ClientBank1CImportService
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
+        #[Autowire(service: 'monolog.logger.import.bank1c')]
+        private ?LoggerInterface $importLogger = null,
     ) {
+        $this->importLogger ??= new NullLogger();
     }
 
     /**
@@ -240,7 +246,7 @@ class ClientBank1CImportService
      * @param array<int, array<string, mixed>> $preview Prepared preview rows ready for import.
      * @param MoneyAccount $account Target account for the import.
      * @param bool $overwrite Whether to overwrite existing data during import.
-     *
+     * @param array<string, mixed> $context
      * @return array{
      *     created: int,
      *     duplicates: int,
@@ -249,15 +255,36 @@ class ClientBank1CImportService
      *     maxDate: ?\DateTimeInterface
      * } Import summary statistics.
      */
-    public function import(array $preview, MoneyAccount $account, bool $overwrite): array
+    public function import(array $preview, MoneyAccount $account, bool $overwrite, array $context = []): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        $baseLogContext = [
+            'user' => $context['user'] ?? null,
+            'company' => [
+                'id' => $company->getId(),
+                'name' => $company->getName(),
+            ],
+            'file' => $context['file'] ?? null,
+            'statement_account' => $context['statement_account'] ?? null,
+            'account' => [
+                'id' => $account->getId(),
+                'name' => $account->getName(),
+                'number' => $account->getAccountNumber(),
+                'currency' => $account->getCurrency(),
+            ],
+            'date_start' => $context['date_start'] ?? null,
+            'date_end' => $context['date_end'] ?? null,
+            'overwrite' => $overwrite,
+        ];
+
+        $this->importLogger->info('Bank1C import started', $baseLogContext);
 
         $created = 0;
         $duplicates = 0;
         $errors = 0;
-        $minDate = null;
-        $maxDate = null;
+        $createdMinDate = null;
+        $createdMaxDate = null;
         $processedTransactions = [];
 
         foreach ($preview as $row) {
@@ -359,12 +386,14 @@ class ClientBank1CImportService
 
             $processedTransactions[] = $transaction;
 
-            if ($minDate === null || $occurredAt < $minDate) {
-                $minDate = $occurredAt;
-            }
+            if ($isNewTransaction) {
+                if ($createdMinDate === null || $occurredAt < $createdMinDate) {
+                    $createdMinDate = $occurredAt;
+                }
 
-            if ($maxDate === null || $occurredAt > $maxDate) {
-                $maxDate = $occurredAt;
+                if ($createdMaxDate === null || $occurredAt > $createdMaxDate) {
+                    $createdMaxDate = $occurredAt;
+                }
             }
         }
 
@@ -372,17 +401,35 @@ class ClientBank1CImportService
             $this->entityManager->flush();
         }
 
-        if ($minDate !== null && $maxDate !== null) {
-            $this->accountBalanceService->recalculateDailyRange($company, $account, $minDate, $maxDate);
+        if ($created > 0 && $createdMinDate !== null) {
+            $today = new \DateTimeImmutable('today');
+            $toDate = $createdMaxDate ?? $createdMinDate;
+            if ($createdMinDate <= $today) {
+                $toDate = $today;
+            }
+
+            $this->accountBalanceService->recalculateDailyRange($company, $account, $createdMinDate, $toDate);
         }
 
-        return [
+        $summary = [
             'created' => $created,
             'duplicates' => $duplicates,
             'errors' => $errors,
-            'minDate' => $minDate,
-            'maxDate' => $maxDate,
+            'minDate' => $createdMinDate,
+            'maxDate' => $createdMaxDate,
         ];
+
+        $this->importLogger->info('Bank1C import finished', array_merge($baseLogContext, [
+            'result' => [
+                'created' => $created,
+                'duplicates' => $duplicates,
+                'errors' => $errors,
+                'minDate' => $createdMinDate?->format('Y-m-d'),
+                'maxDate' => $createdMaxDate?->format('Y-m-d'),
+            ],
+        ]));
+
+        return $summary;
     }
 
     /**
