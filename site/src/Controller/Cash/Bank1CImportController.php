@@ -74,7 +74,7 @@ class Bank1CImportController extends AbstractController
                 return $this->redirectToRoute('cash_bank1c_import_upload');
             }
 
-            $content = mb_convert_encoding($rawContent, 'UTF-8', 'CP1251');
+            $content = $this->normalizeEncoding($rawContent);
 
             $parsedData = $this->clientBank1CImportService->parseHeaderAndDocuments($content);
             $statementAccountValue = $parsedData['header']['РасчСчет'] ?? null;
@@ -351,5 +351,25 @@ class Bank1CImportController extends AbstractController
         }
 
         return rtrim($sanitized, '_') . '_preview.csv';
+    }
+
+    private function normalizeEncoding(string $rawContent): string
+    {
+        $encodingCandidates = ['UTF-8', 'Windows-1251', 'CP1251'];
+        $detectedEncoding = mb_detect_encoding($rawContent, $encodingCandidates, true);
+
+        if ($detectedEncoding === 'UTF-8') {
+            $content = $rawContent;
+        } else {
+            $sourceEncoding = $detectedEncoding ?: 'CP1251';
+            $converted = @mb_convert_encoding($rawContent, 'UTF-8', $sourceEncoding);
+            $content = $converted !== false ? $converted : mb_convert_encoding($rawContent, 'UTF-8', 'CP1251');
+        }
+
+        if (str_starts_with($content, "\xEF\xBB\xBF")) {
+            $content = substr($content, 3);
+        }
+
+        return $content;
     }
 }
