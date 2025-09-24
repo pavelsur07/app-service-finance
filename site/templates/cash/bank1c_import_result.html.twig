@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Результат импорта 1С{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Импорт банковской выписки 1С завершён</h2>
+                    <div class="text-muted small">
+                        {% if filename %}
+                            Файл: <strong>{{ filename }}</strong>
+                        {% endif %}
+                        {% if selectedAccount %}
+                            · Счёт: <strong>{{ selectedAccount.name }}</strong>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="row g-3">
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Итоги обработки</h3>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Создано операций</span>
+                            <span class="fw-bold text-success">{{ summary.created ?? 0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Найдено дублей</span>
+                            <span class="fw-bold text-warning">{{ summary.duplicates ?? 0 }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Ошибок</span>
+                            <span class="fw-bold text-danger">{{ summary.errors ?? 0 }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title mb-0">Диапазон дат</h3>
+                    </div>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Минимальная дата</span>
+                            <span class="fw-bold">{{ summary.minDate ? summary.minDate|date('d.m.Y') : '—' }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between">
+                            <span>Максимальная дата</span>
+                            <span class="fw-bold">{{ summary.maxDate ? summary.maxDate|date('d.m.Y') : '—' }}</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-body d-flex justify-content-between flex-column flex-md-row gap-2">
+                <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-outline-secondary">Импортировать ещё файл</a>
+                <a href="{{ path('cash_transaction_index') }}" class="btn btn-primary">Перейти к операциям</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
