@@ -5,17 +5,9 @@
 {% block stylesheets %}
     {{ parent() }}
     <style>
-        .preview-row-inflow {
-            --tblr-table-bg: rgba(34, 197, 94, 0.08);
-        }
-
-        .preview-row-outflow {
-            --tblr-table-bg: rgba(239, 68, 68, 0.08);
-        }
-
-        .preview-row-self-transfer {
-            --tblr-table-bg: rgba(168, 85, 247, 0.12);
-        }
+        .preview-row-inflow { --tblr-table-bg: rgba(34, 197, 94, 0.08); }
+        .preview-row-outflow { --tblr-table-bg: rgba(239, 68, 68, 0.08); }
+        .preview-row-self-transfer { --tblr-table-bg: rgba(168, 85, 247, 0.12); }
     </style>
 {% endblock %}
 
@@ -29,8 +21,8 @@
                         Файл: <strong>{{ filename }}</strong>
                         {% if selectedAccount %}
                             · Счёт: <strong>{{ selectedAccount.name }}</strong>
-                            {% if selectedAccount.accountNumber %}
-                                <span class="text-muted">(№ {{ mask_account(selectedAccount.accountNumber) }})</span>
+                            {% if statementAccountDisplay is defined and statementAccountDisplay %}
+                                <span class="text-muted">(№ {{ statementAccountDisplay }})</span>
                             {% endif %}
                         {% endif %}
                         {% if totalRows is defined %}
@@ -53,80 +45,90 @@
             <div class="table-responsive">
                 <table class="table card-table">
                     <thead>
-                        <tr>
-                            <th>Дата</th>
-                            <th>Документ</th>
-                            <th>Контрагент</th>
-                            <th>Назначение</th>
-                            <th class="text-end">Сумма</th>
-                            <th>Статус контрагента</th>
-                        </tr>
+                    <tr>
+                        <th>Дата</th>
+                        <th>Документ</th>
+                        <th>Контрагент</th>
+                        <th>Назначение</th>
+                        <th class="text-end">Сумма</th>
+                        <th>Статус контрагента</th>
+                    </tr>
                     </thead>
                     <tbody>
-                        {% for row in previewRows %}
-                            {% set direction = row.direction ?? '' %}
-                            {% set isInflow = direction == 'inflow' %}
-                            {% set isOutflow = direction == 'outflow' %}
-                            {% set isSelfTransfer = direction == 'self-transfer' %}
-                            {% set counterpartyName = direction == 'outflow' ? row.receiverName : row.payerName %}
-                            {% set counterpartyInn = direction == 'outflow' ? row.receiverInn : row.payerInn %}
-                            {% set counterpartyDisplay = counterpartyName ? counterpartyName : '—' %}
-                            {% if counterpartyInn %}
-                                {% set counterpartyDisplay = counterpartyDisplay ~ ' (' ~ counterpartyInn ~ ')' %}
+                    {% for row in previewRows %}
+                        {% set direction = row.direction ?? '' %}
+                        {% set isInflow = direction == 'inflow' %}
+                        {% set isOutflow = direction == 'outflow' %}
+                        {% set isSelfTransfer = direction == 'self-transfer' %}
+
+                        {# имя/ИНН контрагента #}
+                        {% set counterpartyName = isOutflow ? row.receiverName : row.payerName %}
+                        {% set counterpartyInn = isOutflow ? row.receiverInn : row.payerInn %}
+                        {% set counterpartyDisplay = counterpartyName ? counterpartyName : '—' %}
+                        {% if counterpartyInn %}
+                            {% set counterpartyDisplay = counterpartyDisplay ~ ' (' ~ counterpartyInn ~ ')' %}
+                        {% endif %}
+
+                        {# счёт контрагента (уже санитизирован в контроллере) #}
+                        {% set counterpartyAccount = isOutflow
+                            ? row.receiverAccount
+                            : (isInflow ? row.payerAccount : null)
+                        %}
+
+                        {% set counterpartyAccountDisplay = null %}
+                        {% if isSelfTransfer %}
+                            {% set counterpartyDisplay = 'Перевод между своими счетами' %}
+                            {% set payerAccountMasked = row.payerAccount is defined and row.payerAccount ? row.payerAccount : null %}
+                            {% set receiverAccountMasked = row.receiverAccount is defined and row.receiverAccount ? row.receiverAccount : null %}
+                            {% if payerAccountMasked or receiverAccountMasked %}
+                                {% set counterpartyAccountDisplay = (payerAccountMasked ?? '—') ~ ' → ' ~ (receiverAccountMasked ?? '—') %}
                             {% endif %}
-                            {% set counterpartyAccount = direction == 'outflow' ? row.receiverAccount : (isInflow ? row.payerAccount : null) %}
-                            {% set counterpartyAccountDisplay = null %}
-                            {% if isSelfTransfer %}
-                                {% set counterpartyDisplay = 'Перевод между своими счетами' %}
-                                {% set payerAccountMasked = mask_account(row.payerAccount is defined ? row.payerAccount : null) %}
-                                {% set receiverAccountMasked = mask_account(row.receiverAccount is defined ? row.receiverAccount : null) %}
-                                {% if payerAccountMasked or receiverAccountMasked %}
-                                    {% set counterpartyAccountDisplay = (payerAccountMasked ?? '—') ~ ' → ' ~ (receiverAccountMasked ?? '—') %}
+                        {% elseif counterpartyAccount is defined and counterpartyAccount %}
+                            {% set counterpartyAccountDisplay = counterpartyAccount %}
+                        {% endif %}
+
+                        {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : (isSelfTransfer ? 'text-purple' : '')) %}
+                        {% set rowClass = direction ? 'preview-row-' ~ direction : '' %}
+
+                        <tr class="{{ rowClass }}">
+                            <td>{{ row.docDate ?? '—' }}</td>
+                            <td>
+                                {% if row.docType %}<span class="text-muted">{{ row.docType }}</span>{% endif %}
+                                {% if row.docNumber %}<div class="fw-semibold">№ {{ row.docNumber }}</div>{% endif %}
+                                {% if not row.docType and not row.docNumber %}—{% endif %}
+                            </td>
+                            <td>
+                                <div>{{ counterpartyDisplay }}</div>
+                                {% if counterpartyAccountDisplay %}
+                                    <div class="text-muted small">{{ counterpartyAccountDisplay }}</div>
                                 {% endif %}
-                            {% elseif counterpartyAccount is defined %}
-                                {% set counterpartyAccountDisplay = mask_account(counterpartyAccount) %}
-                            {% endif %}
-                            {% set amountClass = isInflow ? 'text-success' : (isOutflow ? 'text-danger' : (isSelfTransfer ? 'text-purple' : '')) %}
-                            {% set rowClass = direction ? 'preview-row-' ~ direction : '' %}
-                            <tr class="{{ rowClass }}">
-                                <td>{{ row.docDate ?? '—' }}</td>
-                                <td>
-                                    {% if row.docType %}<span class="text-muted">{{ row.docType }}</span>{% endif %}
-                                    {% if row.docNumber %}<div class="fw-semibold">№ {{ row.docNumber }}</div>{% endif %}
-                                    {% if not row.docType and not row.docNumber %}—{% endif %}
-                                </td>
-                                <td>
-                                    <div>{{ counterpartyDisplay }}</div>
-                                    {% if counterpartyAccountDisplay %}
-                                        <div class="text-muted small">{{ counterpartyAccountDisplay }}</div>
-                                    {% endif %}
-                                </td>
-                                <td>{{ row.purpose ?? '—' }}</td>
-                                <td class="text-end">
-                                    {% if row.amount is not null %}
-                                        <span class="{{ amountClass }}">
+                            </td>
+                            <td>{{ row.purpose ?? '—' }}</td>
+                            <td class="text-end">
+                                {% if row.amount is not null %}
+                                    <span class="{{ amountClass }}">
                                             {% if isInflow %}+{% elseif isOutflow %}-{% endif %}
-                                            {{ row.amount|number_format(2, ',', ' ') }}
+                                        {{ row.amount|number_format(2, ',', ' ') }}
                                         </span>
-                                    {% else %}
-                                        —
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if row.counterpartyStatus == 'FOUND' %}
-                                        <span class="badge bg-success">Найден</span>
-                                    {% elseif row.counterpartyStatus == 'WILL_CREATE' %}
-                                        <span class="badge bg-warning text-dark">Будет создан</span>
-                                    {% else %}
-                                        <span class="badge bg-secondary">Неизвестно</span>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="6" class="text-center text-muted">Нет данных для предпросмотра</td>
-                            </tr>
-                        {% endfor %}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.counterpartyStatus == 'FOUND' %}
+                                    <span class="badge bg-success">Найден</span>
+                                {% elseif row.counterpartyStatus == 'WILL_CREATE' %}
+                                    <span class="badge bg-warning text-dark">Будет создан</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Неизвестно</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted">Нет данных для предпросмотра</td>
+                        </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>
@@ -147,6 +149,7 @@
                 </form>
             </div>
         </div>
+
         {% include 'partials/_pagination.html.twig' with {pager: pager} %}
     </div>
 {% endblock %}

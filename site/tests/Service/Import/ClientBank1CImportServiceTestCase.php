@@ -34,7 +34,7 @@ abstract class ClientBank1CImportServiceTestCase extends TestCase
 
     protected function setUp(): void
     {
-        $config = Setup::createAttributeMetadataConfiguration([__DIR__ . '/../../../src/Entity'], true);
+        $config = Setup::createAttributeMetadataConfiguration([__DIR__.'/../../../src/Entity'], true);
         $this->em = EntityManager::create(['driver' => 'pdo_sqlite', 'memory' => true], $config);
 
         $schemaTool = new SchemaTool($this->em);

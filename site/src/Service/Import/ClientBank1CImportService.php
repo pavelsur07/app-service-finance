@@ -20,6 +20,9 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 class ClientBank1CImportService
 {
+    /** @var array<string, Counterparty> in-memory кэш контрагентов на время одного импорта (ключ: companyId:inn) */
+    private array $cpCache = [];
+
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CounterpartyRepository $counterpartyRepository,
@@ -32,16 +35,7 @@ class ClientBank1CImportService
         $this->importLogger ??= new NullLogger();
     }
 
-    /**
-     * Parse content of a Client Bank 1C export and return its header and documents sections.
-     *
-     * @param string $content Raw file content.
-     *
-     * @return array{
-     *     header: array<mixed>,
-     *     documents: array<mixed>
-     * } Parsed header and documents data.
-     */
+    // --- parseHeaderAndDocuments (без изменений) ---
     public function parseHeaderAndDocuments(string $content): array
     {
         $header = [];
@@ -52,89 +46,47 @@ class ClientBank1CImportService
 
         foreach ($lines as $line) {
             $line = trim($line);
-
-            if ($line === '') {
+            if ('' === $line) {
                 continue;
             }
-
-            if ($line === 'КонецДокумента') {
-                if ($currentDocument !== null) {
+            if ('КонецДокумента' === $line) {
+                if (null !== $currentDocument) {
                     $documents[] = $currentDocument;
                     $currentDocument = null;
                 }
-
                 continue;
             }
-
             $parts = explode('=', $line, 2);
-
-            if (count($parts) !== 2) {
+            if (2 !== count($parts)) {
                 continue;
             }
-
             [$key, $value] = $parts;
             $key = trim($key);
             $value = trim($value);
-
-            if ($key === '') {
+            if ('' === $key) {
                 continue;
             }
-
-            if ($key === 'СекцияДокумент') {
-                if ($currentDocument !== null) {
+            if ('СекцияДокумент' === $key) {
+                if (null !== $currentDocument) {
                     $documents[] = $currentDocument;
                 }
-
-                $currentDocument = [
-                    '_doc_type' => $value,
-                ];
-
+                $currentDocument = ['_doc_type' => $value];
                 continue;
             }
-
-            if ($currentDocument === null) {
+            if (null === $currentDocument) {
                 $header[$key] = $value;
-
                 continue;
             }
-
             $currentDocument[$key] = $value;
         }
-
-        if ($currentDocument !== null) {
+        if (null !== $currentDocument) {
             $documents[] = $currentDocument;
         }
 
-        return [
-            'header' => $header,
-            'documents' => $documents,
-        ];
+        return ['header' => $header, 'documents' => $documents];
     }
 
-    /**
-     * Build preview data for the provided documents and statement account identifier.
-     *
-     * @param array<int, array<string, mixed>> $documents Parsed document data.
-     * @param string $statementAccount Identifier of the account from the statement.
-     *
-     * @return array<int, array{
-     *     docType: ?string,
-     *     docNumber: ?string,
-     *     docDate: ?string,
-     *     amount: float,
-     *     payerName: ?string,
-     *     payerInn: ?string,
-     *     payerAccount: ?string,
-     *     receiverName: ?string,
-     *     receiverInn: ?string,
-     *     receiverAccount: ?string,
-     *     dateDebit: ?string,
-     *     dateCredit: ?string,
-     *     purpose: ?string,
-     *     direction: string,
-     *     counterpartyStatus: string,
-     * }>
-     */
+    // --- buildPreview (без изменений) ---
     public function buildPreview(array $documents, string $statementAccount): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
@@ -145,28 +97,25 @@ class ClientBank1CImportService
             if (!is_array($document)) {
                 continue;
             }
-
             $payerInn = $this->normalizeInn($this->getStringValue($document['ПлательщикИНН'] ?? null));
-            if ($payerInn !== null) {
+            if (null !== $payerInn) {
                 $uniqueInns[$payerInn] = true;
             }
-
             $receiverInn = $this->normalizeInn($this->getStringValue($document['ПолучательИНН'] ?? null));
-            if ($receiverInn !== null) {
+            if (null !== $receiverInn) {
                 $uniqueInns[$receiverInn] = true;
             }
         }
 
         $existingInns = [];
-        if ($uniqueInns !== []) {
+        if ([] !== $uniqueInns) {
             $counterparties = $this->counterpartyRepository->findBy([
                 'company' => $company,
                 'inn' => array_keys($uniqueInns),
             ]);
-
             foreach ($counterparties as $counterparty) {
                 $inn = $this->normalizeInn($counterparty->getInn());
-                if ($inn !== null) {
+                if (null !== $inn) {
                     $existingInns[$inn] = true;
                 }
             }
@@ -214,7 +163,7 @@ class ClientBank1CImportService
             };
 
             $counterpartyStatus = 'WILL_CREATE';
-            if ($counterpartyInn !== null && isset($existingInns[$counterpartyInn])) {
+            if (null !== $counterpartyInn && isset($existingInns[$counterpartyInn])) {
                 $counterpartyStatus = 'FOUND';
             }
 
@@ -240,24 +189,13 @@ class ClientBank1CImportService
         return $previewRows;
     }
 
-    /**
-     * Import preview data into the provided money account.
-     *
-     * @param array<int, array<string, mixed>> $preview Prepared preview rows ready for import.
-     * @param MoneyAccount $account Target account for the import.
-     * @param bool $overwrite Whether to overwrite existing data during import.
-     * @param array<string, mixed> $context
-     * @return array{
-     *     created: int,
-     *     duplicates: int,
-     *     errors: int,
-     *     minDate: ?\DateTimeInterface,
-     *     maxDate: ?\DateTimeInterface
-     * } Import summary statistics.
-     */
+    // --- import (с добавлением очистки кэша в начале) ---
     public function import(array $preview, MoneyAccount $account, bool $overwrite, array $context = []): array
     {
         $company = $this->activeCompanyService->getActiveCompany();
+
+        // Очистим кэш контрагентов перед стартом импорта
+        $this->cpCache = [];
 
         $baseLogContext = [
             'user' => $context['user'] ?? null,
@@ -290,7 +228,6 @@ class ClientBank1CImportService
         foreach ($preview as $row) {
             if (!is_array($row)) {
                 ++$errors;
-
                 continue;
             }
 
@@ -300,23 +237,20 @@ class ClientBank1CImportService
             $purpose = $this->getStringValue($row['purpose'] ?? null);
 
             $direction = $this->resolveDirection($row);
-            if ($direction === null) {
+            if (null === $direction) {
                 ++$errors;
-
                 continue;
             }
 
             $occurredAt = $this->resolveOccurredAt($row, $direction);
-            if ($occurredAt === null) {
+            if (null === $occurredAt) {
                 ++$errors;
-
                 continue;
             }
 
             $amount = $this->resolveAmount($row, $direction);
-            if ($amount === null) {
+            if (null === $amount) {
                 ++$errors;
-
                 continue;
             }
 
@@ -330,9 +264,8 @@ class ClientBank1CImportService
             ]);
 
             $isNewTransaction = false;
-            if ($transaction !== null) {
+            if (null !== $transaction) {
                 ++$duplicates;
-
                 if (!$overwrite) {
                     continue;
                 }
@@ -352,7 +285,8 @@ class ClientBank1CImportService
                 $isNewTransaction = true;
             }
 
-            $counterparty = $this->resolveCounterparty($row, $direction, $company);
+            // ⚠️ вместо прежнего resolveCounterparty() — вызов новой логики с кэшем
+            $counterparty = $this->getOrCreateCounterpartyFromRow($row, $direction, $company);
 
             if ($isNewTransaction) {
                 $transaction
@@ -387,11 +321,10 @@ class ClientBank1CImportService
             $processedTransactions[] = $transaction;
 
             if ($isNewTransaction) {
-                if ($createdMinDate === null || $occurredAt < $createdMinDate) {
+                if (null === $createdMinDate || $occurredAt < $createdMinDate) {
                     $createdMinDate = $occurredAt;
                 }
-
-                if ($createdMaxDate === null || $occurredAt > $createdMaxDate) {
+                if (null === $createdMaxDate || $occurredAt > $createdMaxDate) {
                     $createdMaxDate = $occurredAt;
                 }
             }
@@ -401,13 +334,12 @@ class ClientBank1CImportService
             $this->entityManager->flush();
         }
 
-        if ($created > 0 && $createdMinDate !== null) {
+        if ($created > 0 && null !== $createdMinDate) {
             $today = new \DateTimeImmutable('today');
             $toDate = $createdMaxDate ?? $createdMinDate;
             if ($createdMinDate <= $today) {
                 $toDate = $today;
             }
-
             $this->accountBalanceService->recalculateDailyRange($company, $account, $createdMinDate, $toDate);
         }
 
@@ -429,12 +361,14 @@ class ClientBank1CImportService
             ],
         ]));
 
+        // На всякий случай очистим кэш после импорта
+        $this->cpCache = [];
+
         return $summary;
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
+    // --- Остальные методы (resolveDirection, resolveOccurredAt, resolveAmount, parseDate) без изменений ---
+
     private function resolveDirection(array $row): ?CashDirection
     {
         $direction = $this->getStringValue($row['direction'] ?? null);
@@ -447,18 +381,14 @@ class ClientBank1CImportService
         };
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
     private function resolveTransferDirection(array $row): CashDirection
     {
-        $hasDebit = $this->getStringValue($row['dateDebit'] ?? null) !== null;
-        $hasCredit = $this->getStringValue($row['dateCredit'] ?? null) !== null;
+        $hasDebit = null !== $this->getStringValue($row['dateDebit'] ?? null);
+        $hasCredit = null !== $this->getStringValue($row['dateCredit'] ?? null);
 
         if ($hasDebit && !$hasCredit) {
             return CashDirection::OUTFLOW;
         }
-
         if ($hasCredit && !$hasDebit) {
             return CashDirection::INFLOW;
         }
@@ -466,9 +396,6 @@ class ClientBank1CImportService
         return CashDirection::OUTFLOW;
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
     private function resolveOccurredAt(array $row, CashDirection $direction): ?\DateTimeImmutable
     {
         $docDate = $this->parseDate($this->getStringValue($row['docDate'] ?? null));
@@ -481,20 +408,15 @@ class ClientBank1CImportService
         };
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
     private function resolveAmount(array $row, CashDirection $direction): ?string
     {
         $rawAmount = $row['amount'] ?? null;
         if (!is_numeric($rawAmount)) {
             return null;
         }
-
         $amount = number_format(abs((float) $rawAmount), 2, '.', '');
-
-        if ($direction === CashDirection::OUTFLOW) {
-            $amount = '-' . $amount;
+        if (CashDirection::OUTFLOW === $direction) {
+            $amount = '-'.$amount;
         }
 
         return $amount;
@@ -502,18 +424,16 @@ class ClientBank1CImportService
 
     private function parseDate(?string $date): ?\DateTimeImmutable
     {
-        if ($date === null || $date === '') {
+        if (null === $date || '' === $date) {
             return null;
         }
-
         $formats = ['d.m.Y', 'Y-m-d'];
         foreach ($formats as $format) {
-            $parsed = \DateTimeImmutable::createFromFormat('!' . $format, $date);
+            $parsed = \DateTimeImmutable::createFromFormat('!'.$format, $date);
             if ($parsed instanceof \DateTimeImmutable) {
                 return $parsed;
             }
         }
-
         try {
             return new \DateTimeImmutable($date);
         } catch (\Exception) {
@@ -522,18 +442,16 @@ class ClientBank1CImportService
     }
 
     /**
-     * @param array<string,mixed> $row
+     * Получить/создать контрагента из строки превью с учётом направления.
+     * Использует кэш, чтобы не плодить дублей до flush().
      */
-    private function resolveCounterparty(array $row, CashDirection $direction, Company $company): ?Counterparty
+    private function getOrCreateCounterpartyFromRow(array $row, CashDirection $direction, Company $company): ?Counterparty
     {
-        if ($this->getStringValue($row['direction'] ?? null) === 'self-transfer') {
+        if ('self-transfer' === $this->getStringValue($row['direction'] ?? null)) {
             return null;
         }
 
-        $name = null;
-        $inn = null;
-
-        if ($direction === CashDirection::OUTFLOW) {
+        if (CashDirection::OUTFLOW === $direction) {
             $name = $this->getStringValue($row['receiverName'] ?? null);
             $inn = $this->normalizeInn($this->getStringValue($row['receiverInn'] ?? null));
         } else {
@@ -541,19 +459,27 @@ class ClientBank1CImportService
             $inn = $this->normalizeInn($this->getStringValue($row['payerInn'] ?? null));
         }
 
-        if ($inn === null || $name === null) {
+        if (null === $inn || null === $name) {
             return null;
         }
 
-        $counterparty = $this->counterpartyRepository->findOneBy([
+        $key = $company->getId().':'.$inn;
+
+        // 1) В кэше?
+        if (isset($this->cpCache[$key])) {
+            return $this->cpCache[$key];
+        }
+
+        // 2) В БД?
+        $existing = $this->counterpartyRepository->findOneBy([
             'company' => $company,
             'inn' => $inn,
         ]);
-
-        if ($counterparty instanceof Counterparty) {
-            return $counterparty;
+        if ($existing instanceof Counterparty) {
+            return $this->cpCache[$key] = $existing;
         }
 
+        // 3) Создаём, кладём в кэш (persist без flush — нормально)
         $counterparty = new Counterparty(
             Uuid::uuid4()->toString(),
             $company,
@@ -563,7 +489,7 @@ class ClientBank1CImportService
         $counterparty->setInn($inn);
         $this->entityManager->persist($counterparty);
 
-        return $counterparty;
+        return $this->cpCache[$key] = $counterparty;
     }
 
     private function determineCounterpartyType(string $inn): CounterpartyType
@@ -574,10 +500,9 @@ class ClientBank1CImportService
         };
     }
 
-    /**
-     * @param array<string,mixed> $row
-     * @return array<string,mixed>
-     */
+    // --- extractRawData / normalizeRawArray / generateExternalId / shouldMarkAsTransfer / containsInsensitive ---
+    // (без изменений)
+
     private function extractRawData(array $row): array
     {
         $raw = $row['raw'] ?? $row['rawData'] ?? [];
@@ -590,9 +515,8 @@ class ClientBank1CImportService
             if (!is_string($key)) {
                 continue;
             }
-
-            if (is_scalar($value) || $value === null) {
-                $normalized[$key] = $value === null ? null : (string) $value;
+            if (is_scalar($value) || null === $value) {
+                $normalized[$key] = null === $value ? null : (string) $value;
             } elseif (is_array($value)) {
                 $normalized[$key] = $this->normalizeRawArray($value);
             }
@@ -601,23 +525,19 @@ class ClientBank1CImportService
         return $normalized;
     }
 
-    /**
-     * @param array<mixed> $data
-     * @return array<mixed>
-     */
     private function normalizeRawArray(array $data): array
     {
         $normalized = [];
         foreach ($data as $key => $value) {
             if (is_string($key)) {
-                if (is_scalar($value) || $value === null) {
-                    $normalized[$key] = $value === null ? null : (string) $value;
+                if (is_scalar($value) || null === $value) {
+                    $normalized[$key] = null === $value ? null : (string) $value;
                 } elseif (is_array($value)) {
                     $normalized[$key] = $this->normalizeRawArray($value);
                 }
             } else {
-                $normalized[] = is_scalar($value) || $value === null
-                    ? ($value === null ? null : (string) $value)
+                $normalized[] = is_scalar($value) || null === $value
+                    ? (null === $value ? null : (string) $value)
                     : (is_array($value) ? $this->normalizeRawArray($value) : null);
             }
         }
@@ -625,9 +545,6 @@ class ClientBank1CImportService
         return $normalized;
     }
 
-    /**
-     * @param array<string,mixed> $row
-     */
     private function generateExternalId(array $row, MoneyAccount $account): string
     {
         $parts = [
@@ -650,25 +567,16 @@ class ClientBank1CImportService
         $payerAccount = $this->normalizeAccount($this->getStringValue($row['payerAccount'] ?? null));
         $receiverAccount = $this->normalizeAccount($this->getStringValue($row['receiverAccount'] ?? null));
 
-        if (
-            $statementAccount !== null
-            && $statementAccount === $payerAccount
-            && $statementAccount === $receiverAccount
-        ) {
+        if (null !== $statementAccount && $statementAccount === $payerAccount && $statementAccount === $receiverAccount) {
             return true;
         }
 
         $purpose = $this->getStringValue($row['purpose'] ?? null);
-        if ($purpose === null) {
+        if (null === $purpose) {
             return false;
         }
 
-        $keywords = [
-            'перевод средств между счетами',
-            'депозит',
-            'возврат депозит',
-        ];
-
+        $keywords = ['перевод средств между счетами', 'депозит', 'возврат депозит'];
         foreach ($keywords as $keyword) {
             if ($this->containsInsensitive($purpose, $keyword)) {
                 return true;
@@ -681,10 +589,10 @@ class ClientBank1CImportService
     private function containsInsensitive(string $haystack, string $needle): bool
     {
         if (function_exists('mb_stripos')) {
-            return mb_stripos($haystack, $needle) !== false;
+            return false !== mb_stripos($haystack, $needle);
         }
 
-        return stripos($haystack, $needle) !== false;
+        return false !== stripos($haystack, $needle);
     }
 
     private function formatAmountForHash(mixed $amount): string
@@ -698,16 +606,14 @@ class ClientBank1CImportService
 
     private function getStringValue(mixed $value): ?string
     {
-        if ($value === null) {
+        if (null === $value) {
             return null;
         }
-
         if (is_string($value)) {
             $value = trim($value);
 
-            return $value === '' ? null : $value;
+            return '' === $value ? null : $value;
         }
-
         if (is_int($value) || is_float($value)) {
             return (string) $value;
         }
@@ -720,7 +626,6 @@ class ClientBank1CImportService
         if (is_int($value) || is_float($value)) {
             return (float) $value;
         }
-
         if (is_string($value)) {
             $normalized = str_replace(' ', '', $value);
             $normalized = str_replace(',', '.', $normalized);
@@ -733,24 +638,22 @@ class ClientBank1CImportService
 
     private function normalizeAccount(?string $account): ?string
     {
-        if ($account === null) {
+        if (null === $account) {
             return null;
         }
-
         $normalized = preg_replace('/\s+/', '', $account);
 
-        return $normalized === '' ? null : $normalized;
+        return '' === $normalized ? null : $normalized;
     }
 
     private function normalizeInn(?string $inn): ?string
     {
-        if ($inn === null) {
+        if (null === $inn) {
             return null;
         }
-
         $normalized = preg_replace('/\D+/', '', $inn);
 
-        return $normalized === '' ? null : $normalized;
+        return '' === $normalized ? null : $normalized;
     }
 
     private function determineDirection(
@@ -760,26 +663,22 @@ class ClientBank1CImportService
         ?string $dateDebit,
         ?string $dateCredit,
     ): string {
-        $isPayerMatch = $statementAccount !== null && $payerAccount !== null && $payerAccount === $statementAccount;
-        $isReceiverMatch = $statementAccount !== null && $receiverAccount !== null && $receiverAccount === $statementAccount;
+        $isPayerMatch = null !== $statementAccount && null !== $payerAccount && $payerAccount === $statementAccount;
+        $isReceiverMatch = null !== $statementAccount && null !== $receiverAccount && $receiverAccount === $statementAccount;
 
         if ($isPayerMatch && $isReceiverMatch) {
             return 'self-transfer';
         }
-
         if ($isPayerMatch) {
             return 'outflow';
         }
-
         if ($isReceiverMatch) {
             return 'inflow';
         }
-
-        if ($dateDebit !== null && $dateCredit === null) {
+        if (null !== $dateDebit && null === $dateCredit) {
             return 'outflow';
         }
-
-        if ($dateCredit !== null && $dateDebit === null) {
+        if (null !== $dateCredit && null === $dateDebit) {
             return 'inflow';
         }
 

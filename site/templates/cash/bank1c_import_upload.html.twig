@@ -16,7 +16,11 @@
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">
-                <form action="{{ path('cash_bank1c_import_preview') }}" method="post" enctype="multipart/form-data">
+                <form action="{{ path('cash_bank1c_import_preview_upload') }}"
+                      method="post"
+                      enctype="multipart/form-data">
+
+               {# <form action="{{ path('cash_bank1c_import_preview') }}" method="post" enctype="multipart/form-data">#}
                     <div class="mb-3">
                         <label class="form-label required" for="import_file">Файл выгрузки</label>
                         <input type="file" class="form-control" id="import_file" name="import_file" required>
