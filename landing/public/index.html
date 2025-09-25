@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fin-Plan SaaS — Оптимизируй финансы</title>
+    <meta name="description" content="Умный сервис финансового учёта для e‑commerce и SMB: P&L, ДДС, баланс, интеграции с банками и маркетплейсами. 7 дней бесплатно.">
+    <!-- Bootstrap 5.3 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <!-- Bootstrap Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root{
+            --brand-primary:#0A1548; /* глубокий синий (ваш бренд) */
+            --brand-secondary:#101940;
+            --accent:#FF1F1F;        /* акцент в стиле Альфа */
+            --text:#1C1C1C;
+            --muted:#6c757d;
+            --bg:#ffffff;
+            --bg-soft:#f7f8fb;
+        }
+        html,body{scroll-behavior:smooth; color:var(--text);}
+        .navbar{--bs-navbar-brand-font-size:1.125rem}
+        .navbar-brand b{color:var(--brand-primary)}
+        .btn-accent{--bs-btn-bg:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:#e11a1a;--bs-btn-hover-border-color:#e11a1a;--bs-btn-color:#fff}
+        .btn-outline-accent{--bs-btn-color:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:var(--accent);--bs-btn-hover-border-color:var(--accent);--bs-btn-hover-color:#fff}
+        .text-accent{color:var(--accent)!important}
+        .bg-primary-hero{background: radial-gradient(1200px 500px at 80% -50%, rgba(255,31,31,.15), transparent 60%), radial-gradient(1000px 600px at -20% -40%, rgba(10,21,72,.25), transparent 60%), var(--bg-soft);}
+        .hero-title{font-weight:800; letter-spacing:-0.02em}
+        .section-title{font-weight:800; letter-spacing:-0.01em}
+        .feature-icon{width:48px;height:48px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,31,31,.1);color:var(--accent)}
+        .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#f1f3f5;border:1px solid #dee2e6;border-bottom-width:2px;border-radius:.375rem;padding:.125rem .375rem}
+        .card-shadow{box-shadow:0 10px 30px rgba(16,25,64,.08);}
+        .badge-soft{background:rgba(10,21,72,.07);color:var(--brand-primary);}
+        .stat{font-weight:800;font-size:2rem;color:var(--brand-primary)}
+        .footer a{color:inherit;text-decoration:none}
+        .footer a:hover{text-decoration:underline}
+        .rounded-2xl{border-radius:1rem}
+        .bg-brand{background:var(--brand-primary);}
+        .link-arrow{text-decoration:none}
+        .link-arrow:hover{opacity:.85}
+        .check i{color:#16a34a}
+        /* demo dashboard placeholder */
+        .dash{background:linear-gradient(180deg,#fff, #f6f8ff); border:1px solid #e7eaf3}
+        .dash .bar{height:120px;background:linear-gradient(180deg, rgba(10,21,72,.1), rgba(255,31,31,.15));}
+    </style>
+</head>
+<body>
+<!-- NAVBAR -->
+<nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
+    <div class="container py-2">
+        <a class="navbar-brand d-flex align-items-center" href="#home">
+          <span class="me-2 d-inline-flex align-items-center justify-content-center rounded" style="width:34px;height:34px;background:rgba(255,31,31,.12)">
+            <i class="bi bi-graph-up-arrow text-accent"></i>
+          </span>
+            <b>Fin‑Plan</b><span class="ms-1 text-muted">SaaS</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="nav">
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                <li class="nav-item"><a class="nav-link" href="#features">Функции</a></li>
+                <li class="nav-item"><a class="nav-link" href="#product">Скриншоты</a></li>
+                <li class="nav-item"><a class="nav-link" href="#metrics">Показатели</a></li>
+                <li class="nav-item"><a class="nav-link" href="#pricing">Цены</a></li>
+                <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
+            </ul>
+            <div class="d-flex gap-2">
+                <a href="#" class="btn btn-sm btn-outline-secondary">Вход</a>
+                <a href="#cta" class="btn btn-sm btn-accent">Попробовать бесплатно</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<!-- HERO -->
+<header id="home" class="bg-primary-hero py-5 py-lg-6">
+    <div class="container py-4">
+        <div class="row align-items-center g-5">
+            <div class="col-12 col-lg-6">
+                <span class="badge badge-soft rounded-pill mb-3"><i class="bi bi-lightning-charge me-1"></i>Запуск за 5 минут • 7 дней бесплатно</span>
+                <h1 class="display-5 hero-title">Оптимизируйте финансы бизнеса <span class="text-accent">без Excel</span></h1>
+                <p class="lead text-muted mt-3">Сервис финансового учёта для e‑commerce и SMB: P&amp;L, ДДС, баланс и отчёты в реальном времени. Интеграции с банками и маркетплейсами.</p>
+                <div class="d-flex flex-wrap gap-3 mt-4">
+                    <a href="#cta" class="btn btn-lg btn-accent">Попробовать бесплатно</a>
+                    <a href="#product" class="btn btn-lg btn-outline-accent">Смотреть интерфейс</a>
+                </div>
+                <div class="d-flex align-items-center gap-3 mt-4 text-muted small">
+                    <span class="d-flex align-items-center"><i class="bi bi-shield-check me-2"></i>SSL/2FA</span>
+                    <span class="d-flex align-items-center"><i class="bi bi-cloud-arrow-down me-2"></i>Бэкапы</span>
+                    <span class="d-flex align-items-center"><i class="bi bi-lock me-2"></i>Роли и доступы</span>
+                </div>
+            </div>
+            <div class="col-12 col-lg-6">
+                <!-- Dashboard mockup -->
+                <div class="dash rounded-2xl p-3 card-shadow bg-white">
+                    <div class="d-flex justify-content-between align-items-center px-2 py-1">
+                        <div class="d-flex gap-2">
+                            <span class="rounded-circle" style="width:10px;height:10px;background:#ff5f57"></span>
+                            <span class="rounded-circle" style="width:10px;height:10px;background:#febc2e"></span>
+                            <span class="rounded-circle" style="width:10px;height:10px;background:#28c840"></span>
+                        </div>
+                        <span class="text-muted small">Дашборд • P&amp;L • ДДС</span>
+                        <span></span>
+                    </div>
+                    <div class="row g-3 p-3">
+                        <div class="col-12 col-md-7">
+                            <div class="bar rounded-2"></div>
+                            <div class="d-flex justify-content-between small text-muted mt-2">
+                                <span>Пн</span><span>Вт</span><span>Ср</span><span>Чт</span><span>Пт</span><span>Сб</span><span>Вс</span>
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-5">
+                            <div class="card border-0 card-shadow">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <span class="text-muted">EBITDA</span>
+                                        <span class="badge bg-success-subtle text-success">+12%</span>
+                                    </div>
+                                    <div class="stat mt-2">3.2 млн ₽</div>
+                                    <div class="text-muted small">За последние 30 дней</div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Выручка</span><span><b>12.4 млн ₽</b></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Себестоимость</span><span><b>6.8 млн ₽</b></span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Расходы</span><span><b>2.4 млн ₽</b></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="table-responsive small">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead>
+                                    <tr><th>Категория</th><th>План</th><th>Факт</th><th>Δ</th></tr>
+                                    </thead>
+                                    <tbody>
+                                    <tr><td>Выручка</td><td>12.0</td><td>12.4</td><td class="text-success">+0.4</td></tr>
+                                    <tr><td>COGS</td><td>7.1</td><td>6.8</td><td class="text-success">+0.3</td></tr>
+                                    <tr><td>OPEX</td><td>2.5</td><td>2.4</td><td class="text-success">+0.1</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- end mockup -->
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- FEATURES -->
+<section id="features" class="py-6">
+    <div class="container py-4">
+        <div class="row mb-4 align-items-end">
+            <div class="col-lg-8">
+                <h2 class="section-title">Почему выбирают Fin‑Plan</h2>
+                <p class="text-muted mb-0">Соберите финансы в одном месте: от автоматической категоризации до отчётов для собственника.</p>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="feature-icon mb-3"><i class="bi bi-bank"></i></div>
+                    <h5>Интеграции с банками</h5>
+                    <p class="text-muted small">Импорт выписок, автосверка и правила для распределения платежей.</p>
+                    <span class="badge rounded-pill text-bg-light">Альфа • Тинькофф • Сбер</span>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="feature-icon mb-3"><i class="bi bi-shop"></i></div>
+                    <h5>Маркетплейсы</h5>
+                    <p class="text-muted small">WB, Ozon: выручка, комиссии, возвраты и аналитика по SKU.</p>
+                    <span class="badge rounded-pill text-bg-light">API подключение</span>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="feature-icon mb-3"><i class="bi bi-graph-up"></i></div>
+                    <h5>P&amp;L и ДДС</h5>
+                    <p class="text-muted small">Отчёты в реальном времени с план‑факт анализом и сценариями.</p>
+                    <span class="badge rounded-pill text-bg-light">Гибкая структура</span>
+                </div>
+            </div>
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="feature-icon mb-3"><i class="bi bi-cpu"></i></div>
+                    <h5>AI‑помощник</h5>
+                    <p class="text-muted small">Автокатегоризация, подсказки по экономии и риск‑алерты.</p>
+                    <span class="badge rounded-pill text-bg-light">Рекомендации</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- PRODUCT / SCREENSHOTS -->
+<section id="product" class="py-6 bg-light">
+    <div class="container py-4">
+        <div class="row mb-4 align-items-end">
+            <div class="col-lg-8">
+                <h2 class="section-title">Как выглядит сервис</h2>
+                <p class="text-muted mb-0">Чистый интерфейс, быстрый доступ к ключевым метрикам и отчётам.</p>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <a class="link-arrow" href="#cta">Запросить демо <i class="bi bi-arrow-right"></i></a>
+            </div>
+        </div>
+        <div class="row g-4">
+            <div class="col-12 col-lg-7">
+                <div class="dash rounded-2xl p-3 card-shadow bg-white h-100">
+                    <div class="bar rounded-2 mb-3"></div>
+                    <div class="row g-3">
+                        <div class="col-6"><div class="p-3 border rounded-3 text-center">Отчёт ДДС</div></div>
+                        <div class="col-6"><div class="p-3 border rounded-3 text-center">Отчёт P&amp;L</div></div>
+                        <div class="col-12"><div class="p-3 border rounded-3 text-center">Баланс и обороты</div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-lg-5">
+                <div class="card border-0 card-shadow h-100">
+                    <div class="card-body">
+                        <h5>Ключевые возможности</h5>
+                        <ul class="list-unstyled mt-3">
+                            <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Сценарное планирование (планы/факты)</li>
+                            <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Гибкая иерархия категорий</li>
+                            <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Доступы: собственник, бухгалтер, аналитик</li>
+                            <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Экспорт/импорт данных</li>
+                            <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Логи и аудит операций</li>
+                        </ul>
+                        <div class="alert alert-light border mt-3">
+                            <div class="small text-muted">TIP</div>
+                            Используйте <span class="kbd">Автоправила</span> для распределения платежей по P&amp;L и ДДС.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- METRICS / SOCIAL PROOF -->
+<section id="metrics" class="py-6">
+    <div class="container py-4">
+        <div class="row g-4 text-center">
+            <div class="col-6 col-lg-3"><div class="stat">500+</div><div class="text-muted">компаний</div></div>
+            <div class="col-6 col-lg-3"><div class="stat">1.2 млрд ₽</div><div class="text-muted">учтённый оборот</div></div>
+            <div class="col-6 col-lg-3"><div class="stat">7 дней</div><div class="text-muted">бесплатный период</div></div>
+            <div class="col-6 col-lg-3"><div class="stat">5 минут</div><div class="text-muted">на старт</div></div>
+        </div>
+    </div>
+</section>
+
+<!-- PRICING -->
+<section id="pricing" class="py-6 bg-light">
+    <div class="container py-4">
+        <div class="text-center mb-5">
+            <h2 class="section-title">Тарифы</h2>
+            <p class="text-muted">Прозрачно и без лишнего. Можно начать бесплатно и перейти на платный план в любой момент.</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-12 col-lg-4">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5>Free</h5><span class="badge text-bg-light">Старт</span>
+                    </div>
+                    <div class="display-6 fw-bold my-2">0 ₽</div>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>1 компания</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>P&amp;L, ДДС, баланс</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Импорт выписок (ручной)</li>
+                        <li class="mb-2 text-muted"><i class="bi bi-dash me-2"></i>Без интеграций</li>
+                    </ul>
+                    <a href="#cta" class="btn btn-outline-secondary w-100">Начать</a>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow position-relative">
+                    <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill text-bg-danger">Популярно</span>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5>Pro</h5><span class="badge text-bg-light">Рост</span>
+                    </div>
+                    <div class="display-6 fw-bold my-2">4 900 ₽<span class="fs-6 text-muted">/мес</span></div>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>До 3 компаний</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Интеграции с банками</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Интеграции WB/Ozon</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Автоправила и алерты</li>
+                    </ul>
+                    <a href="#cta" class="btn btn-accent w-100">Выбрать Pro</a>
+                </div>
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
+                    <div class="d-flex align-items-center justify-content-between">
+                        <h5>Enterprise</h5><span class="badge text-bg-light">Команда</span>
+                    </div>
+                    <div class="display-6 fw-bold my-2">По запросу</div>
+                    <ul class="list-unstyled small">
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Неограниченно компаний</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>SLA/Доступы/Аудит</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>On‑premise вариант</li>
+                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Приоритетная поддержка</li>
+                    </ul>
+                    <a href="#cta" class="btn btn-outline-accent w-100">Связаться с нами</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ -->
+<section id="faq" class="py-6">
+    <div class="container py-4">
+        <div class="row g-4">
+            <div class="col-lg-6">
+                <h2 class="section-title mb-3">Частые вопросы</h2>
+                <div class="accordion" id="faqAcc">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="q1">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#a1" aria-expanded="true" aria-controls="a1">
+                                Подключение банков и маркетплейсов
+                            </button>
+                        </h2>
+                        <div id="a1" class="accordion-collapse collapse show" aria-labelledby="q1" data-bs-parent="#faqAcc">
+                            <div class="accordion-body">
+                                Непосредственно через API (при наличии у банка/МП) или через импорт выписок/отчётов. Есть автоправила для распределения платежей.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="q2">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a2" aria-expanded="false" aria-controls="a2">
+                                Безопасность и доступы
+                            </button>
+                        </h2>
+                        <div id="a2" class="accordion-collapse collapse" aria-labelledby="q2" data-bs-parent="#faqAcc">
+                            <div class="accordion-body">
+                                Поддерживаем роли и ограничение прав, 2FA, шифрование, бэкапы. Аудит действий пользователей.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="q3">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a3" aria-expanded="false" aria-controls="a3">
+                                Сколько стоит внедрение?
+                            </button>
+                        </h2>
+                        <div id="a3" class="accordion-collapse collapse" aria-labelledby="q3" data-bs-parent="#faqAcc">
+                            <div class="accordion-body">
+                                Начните с Free за 0 ₽. Для Pro и Enterprise помогаем с онбордингом, импортом данных и обучением.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-5 offset-lg-1">
+                <div class="p-4 bg-white border rounded-3 card-shadow h-100">
+                    <h5 class="mb-2">Какие показатели отслеживать?</h5>
+                    <p class="text-muted small mb-1">Коротко: выручка, маржа, COGS, OPEX, EBITDA, денежный разрыв, запасы, оборот капитала.</p>
+                    <a class="link-arrow" href="#metrics">Смотреть показатели <i class="bi bi-arrow-right"></i></a>
+                    <hr>
+                    <h6 class="mb-2">Готовы перейти от хаоса к системе?</h6>
+                    <ul class="list-unstyled small mb-0">
+                        <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Видимость прибыли по каналам</li>
+                        <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Контроль денег и обязательств</li>
+                        <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Уверенные финансовые решения</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section id="cta" class="py-6 bg-brand text-white">
+    <div class="container py-4">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+                <h2 class="section-title">Готовы перестать терять деньги?</h2>
+                <p class="text-white-50 mb-0">Запустите Fin‑Plan сегодня. 7 дней бесплатно, без карты и обязательств.</p>
+            </div>
+            <div class="col-lg-5">
+                <form class="bg-white text-dark rounded-2xl p-4 card-shadow">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small">Имя</label>
+                            <input type="text" class="form-control" placeholder="Иван">
+                        </div>
+                        <div class="col-12 col-md-6">
+                            <label class="form-label small">Email</label>
+                            <input type="email" class="form-control" placeholder="ivan@company.ru">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small">Компания</label>
+                            <input type="text" class="form-control" placeholder="ООО Ромашка">
+                        </div>
+                        <div class="col-12 d-grid mt-2">
+                            <button type="button" class="btn btn-accent btn-lg">Получить доступ</button>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-text">Отправляя форму, вы соглашаетесь с условиями обработки персональных данных.</div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer border-top">
+    <div class="container py-5">
+        <div class="row gy-4">
+            <div class="col-12 col-lg-4">
+                <a class="navbar-brand d-flex align-items-center mb-2" href="#home">
+              <span class="me-2 d-inline-flex align-items-center justify-content-center rounded" style="width:34px;height:34px;background:rgba(255,31,31,.12)">
+                <i class="bi bi-graph-up-arrow text-accent"></i>
+              </span>
+                    <b>Fin‑Plan</b><span class="ms-1 text-muted">SaaS</span>
+                </a>
+                <p class="text-muted small mb-1">Финансовый учёт для e‑commerce и SMB.</p>
+                <p class="text-muted small">© 2025, Fin‑Plan. Все права защищены.</p>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="text-uppercase small">Продукт</h6>
+                <ul class="list-unstyled small">
+                    <li><a href="#features">Функции</a></li>
+                    <li><a href="#product">Интерфейс</a></li>
+                    <li><a href="#pricing">Цены</a></li>
+                    <li><a href="#faq">FAQ</a></li>
+                </ul>
+            </div>
+            <div class="col-6 col-lg-2">
+                <h6 class="text-uppercase small">Ресурсы</h6>
+                <ul class="list-unstyled small">
+                    <li><a href="#">Документация</a></li>
+                    <li><a href="#">Политика конфиденциальности</a></li>
+                    <li><a href="#">Пользовательское соглашение</a></li>
+                </ul>
+            </div>
+            <div class="col-12 col-lg-4">
+                <h6 class="text-uppercase small">Контакты</h6>
+                <ul class="list-unstyled small">
+                    <li><i class="bi bi-envelope me-2"></i><a href="mailto:sales@finplan.app">sales@finplan.app</a></li>
+                    <li><i class="bi bi-telegram me-2"></i><a href="#">Telegram</a></li>
+                </ul>
+                <div class="small text-muted">Мы отвечаем в рабочие часы. Среднее время ответа — 1 час.</div>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+</body>
+</html>
