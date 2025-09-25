@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use App\Repository\ReportApiKeyRepository;
-use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -36,13 +35,13 @@ class ReportApiKey
     private bool $isActive = true;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $createdAt;
+    private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?DateTimeImmutable $lastUsedAt = null;
+    private ?\DateTimeImmutable $lastUsedAt = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?DateTimeImmutable $expiresAt = null;
+    private ?\DateTimeImmutable $expiresAt = null;
 
     public function __construct(Company $company, string $keyPrefix, string $keyHash)
     {
@@ -50,7 +49,7 @@ class ReportApiKey
         $this->company = $company;
         $this->keyPrefix = $keyPrefix;
         $this->keyHash = $keyHash;
-        $this->createdAt = new DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?string
@@ -100,27 +99,27 @@ class ReportApiKey
         $this->isActive = true;
     }
 
-    public function getCreatedAt(): DateTimeImmutable
+    public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function getLastUsedAt(): ?DateTimeImmutable
+    public function getLastUsedAt(): ?\DateTimeImmutable
     {
         return $this->lastUsedAt;
     }
 
-    public function markAsUsed(?DateTimeImmutable $usedAt = null): void
+    public function markAsUsed(?\DateTimeImmutable $usedAt = null): void
     {
-        $this->lastUsedAt = $usedAt ?? new DateTimeImmutable();
+        $this->lastUsedAt = $usedAt ?? new \DateTimeImmutable();
     }
 
-    public function getExpiresAt(): ?DateTimeImmutable
+    public function getExpiresAt(): ?\DateTimeImmutable
     {
         return $this->expiresAt;
     }
 
-    public function setExpiresAt(?DateTimeImmutable $expiresAt): void
+    public function setExpiresAt(?\DateTimeImmutable $expiresAt): void
     {
         $this->expiresAt = $expiresAt;
     }

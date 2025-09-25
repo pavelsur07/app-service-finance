@@ -155,5 +155,4 @@ class CashTransactionServiceTest extends TestCase
         $this->assertSame($category->getId(), $tx->getCashflowCategory()->getId());
         $this->assertSame($counterparty->getId(), $tx->getCounterparty()->getId());
     }
-
 }

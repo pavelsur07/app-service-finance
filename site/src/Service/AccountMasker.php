@@ -6,7 +6,7 @@ class AccountMasker
 {
     public function mask(mixed $accountNumber): ?string
     {
-        if ($accountNumber === null) {
+        if (null === $accountNumber) {
             return null;
         }
 
@@ -19,12 +19,12 @@ class AccountMasker
         }
 
         $normalized = preg_replace('/\s+/', '', $accountNumber);
-        if ($normalized === null || $normalized === '') {
+        if (null === $normalized || '' === $normalized) {
             return $accountNumber;
         }
 
         $length = mb_strlen($normalized);
-        if ($length === 0) {
+        if (0 === $length) {
             return $accountNumber;
         }
 
@@ -42,9 +42,8 @@ class AccountMasker
 
         $prefix = mb_substr($normalized, 0, $prefixLength);
         $suffix = $suffixLength > 0 ? mb_substr($normalized, -$suffixLength) : '';
-        $masked = $prefix . str_repeat('•', $maskedLength) . $suffix;
+        $masked = $prefix.str_repeat('•', $maskedLength).$suffix;
 
         return trim(chunk_split($masked, 4, ' '));
     }
 }
-

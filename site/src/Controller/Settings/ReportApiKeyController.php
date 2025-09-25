@@ -29,7 +29,7 @@ class ReportApiKeyController extends AbstractController
         $company = $this->activeCompany->getActiveCompany();
         $raw = $this->manager->createOrRegenerateForCompany($company);
 
-        $this->addFlash('success', 'Ключ создан. Сохраните: ' . $raw);
+        $this->addFlash('success', 'Ключ создан. Сохраните: '.$raw);
 
         return $this->redirectToRoute('settings_report_api_key_index');
     }

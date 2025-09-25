@@ -20,17 +20,18 @@ final class PublicCashflowReportController extends AbstractController
         private readonly CashflowReportRequestMapper $mapper,
         private readonly CashflowReportBuilder $builder,
         private readonly ReportsApiRateLimiter $rateLimiter,
-    ) {}
+    ) {
+    }
 
     #[Route('/api/public/reports/cashflow.json', name: 'api_report_cashflow_json', methods: ['GET'])]
     public function jsonReport(Request $r): JsonResponse
     {
         $token = (string) $r->query->get('token', '');
-        $identifier = $token !== '' ? $token : ($r->getClientIp() ?? 'anon');
+        $identifier = '' !== $token ? $token : ($r->getClientIp() ?? 'anon');
         if (!$this->rateLimiter->consume($identifier)) {
             return new JsonResponse(['error' => 'rate_limited'], 429);
         }
-        if ($token === '') {
+        if ('' === $token) {
             return new JsonResponse(['error' => 'token_required'], 401);
         }
 
@@ -39,30 +40,30 @@ final class PublicCashflowReportController extends AbstractController
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }
 
-        $params  = $this->mapper->fromRequest($r, $company);
+        $params = $this->mapper->fromRequest($r, $company);
         $payload = $this->builder->build($params);
 
         return $this->json([
-            'company'        => $payload['company']->getId(),
-            'group'          => $payload['group'],
-            'date_from'      => $payload['date_from']->format('Y-m-d'),
-            'date_to'        => $payload['date_to']->format('Y-m-d'),
-            'periods'        => array_map(fn($p) => [
-                                    'start' => $p['start']->format('Y-m-d'),
-                                    'end'   => $p['end']->format('Y-m-d'),
-                                    'label' => $p['label'],
-                                ], $payload['periods']),
-            'categories'     => array_map(fn($c) => ['id' => $c->getId(), 'name' => $c->getName()], $payload['categories']),
+            'company' => $payload['company']->getId(),
+            'group' => $payload['group'],
+            'date_from' => $payload['date_from']->format('Y-m-d'),
+            'date_to' => $payload['date_to']->format('Y-m-d'),
+            'periods' => array_map(fn ($p) => [
+                'start' => $p['start']->format('Y-m-d'),
+                'end' => $p['end']->format('Y-m-d'),
+                'label' => $p['label'],
+            ], $payload['periods']),
+            'categories' => array_map(fn ($c) => ['id' => $c->getId(), 'name' => $c->getName()], $payload['categories']),
             'categoryTotals' => array_map(
-                                    static fn(array $row): array => [
-                                        'totals' => $row['totals'],
-                                    ],
-                                    $payload['categoryTotals']
-                                ),
-            'openings'       => $payload['openings'],
-            'closings'       => $payload['closings'],
-            'tree'           => $payload['tree'],
-            'categoryTree'   => $payload['categoryTree'],
+                static fn (array $row): array => [
+                    'totals' => $row['totals'],
+                ],
+                $payload['categoryTotals']
+            ),
+            'openings' => $payload['openings'],
+            'closings' => $payload['closings'],
+            'tree' => $payload['tree'],
+            'categoryTree' => $payload['categoryTree'],
         ]);
     }
 
@@ -70,11 +71,11 @@ final class PublicCashflowReportController extends AbstractController
     public function csv(Request $r): Response
     {
         $token = (string) $r->query->get('token', '');
-        $identifier = $token !== '' ? $token : ($r->getClientIp() ?? 'anon');
+        $identifier = '' !== $token ? $token : ($r->getClientIp() ?? 'anon');
         if (!$this->rateLimiter->consume($identifier)) {
             return new JsonResponse(['error' => 'rate_limited'], 429);
         }
-        if ($token === '') {
+        if ('' === $token) {
             return new JsonResponse(['error' => 'token_required'], 401);
         }
 
@@ -83,13 +84,13 @@ final class PublicCashflowReportController extends AbstractController
             return new JsonResponse(['error' => 'unauthorized'], 401);
         }
 
-        $params  = $this->mapper->fromRequest($r, $company);
+        $params = $this->mapper->fromRequest($r, $company);
         $payload = $this->builder->build($params);
 
-        $periods        = $payload['periods'];
+        $periods = $payload['periods'];
         $categoryTotals = $payload['categoryTotals'];
-        $openings       = $payload['openings'];
-        $closings       = $payload['closings'];
+        $openings = $payload['openings'];
+        $closings = $payload['closings'];
 
         $resp = new StreamedResponse(function () use ($periods, $categoryTotals, $openings, $closings) {
             $out = fopen('php://output', 'w');
@@ -102,7 +103,7 @@ final class PublicCashflowReportController extends AbstractController
                     }
                     foreach ($catRow['totals'] as $currency => $vals) {
                         $opening = $openings[$currency][$i] ?? 0.0;
-                        $net     = $vals[$i] ?? 0.0;
+                        $net = $vals[$i] ?? 0.0;
                         $closing = $closings[$currency][$i] ?? 0.0;
                         fputcsv($out, [$label, $catId, $currency, $opening, $net, $closing]);
                     }

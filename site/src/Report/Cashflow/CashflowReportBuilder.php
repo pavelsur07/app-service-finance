@@ -3,8 +3,8 @@
 namespace App\Report\Cashflow;
 
 use App\Enum\CashDirection;
-use App\Repository\CashTransactionRepository;
 use App\Repository\CashflowCategoryRepository;
+use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 
@@ -159,7 +159,8 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param \App\Entity\CashflowCategory[] $categories  // полный список, как вернул findTreeByCompany()
+     * @param \App\Entity\CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
+     *
      * @return array<int, array{id:string,name:string,parentId:?string,level:int,order:int}>
      */
     private function buildCategoryTree(array $categories): array
@@ -179,16 +180,16 @@ final class CashflowReportBuilder
             $p = $c->getParent();
             // Считаем уровень до 4 (итого 5 уровней: 0..4)
             while ($p && $level < 4) {
-                $level++;
+                ++$level;
                 $p = $p->getParent();
             }
 
             $result[] = [
-                'id'       => $c->getId(),
-                'name'     => (string) $c->getName(),
+                'id' => $c->getId(),
+                'name' => (string) $c->getName(),
                 'parentId' => $c->getParent() ? $c->getParent()->getId() : null,
-                'level'    => $level,
-                'order'    => $order++,
+                'level' => $level,
+                'order' => $order++,
             ];
         }
 
@@ -204,10 +205,11 @@ final class CashflowReportBuilder
      *   'level'   => int,   // 0..4
      *   'totals'  => array, // ['RUB' => [..по периодам..], ...]
      *   'children'=> array<node>
-     * ]
+     * ].
      *
-     * @param \App\Entity\CashflowCategory[] $allCategories  // полный список (findTreeByCompany)
+     * @param \App\Entity\CashflowCategory[] $allCategories // полный список (findTreeByCompany)
      * @param array<string,array{entity:\App\Entity\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
+     *
      * @return array<int,array>
      */
     private function buildCategoryTotalsTree(array $allCategories, array $categoryMap): array
@@ -230,10 +232,10 @@ final class CashflowReportBuilder
             $totals = $categoryMap[$id]['totals'] ?? [];
 
             $node = [
-                'id'       => $id,
-                'name'     => (string) $cat->getName(),
-                'level'    => $lvl,
-                'totals'   => $totals,    // уже агрегировано (с учётом детей — см. логику выше в build)
+                'id' => $id,
+                'name' => (string) $cat->getName(),
+                'level' => $lvl,
+                'totals' => $totals,    // уже агрегировано (с учётом детей — см. логику выше в build)
                 'children' => [],
             ];
 

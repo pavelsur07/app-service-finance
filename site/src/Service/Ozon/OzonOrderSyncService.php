@@ -157,7 +157,7 @@ readonly class OzonOrderSyncService
                 }
 
                 $postingNumber = (string) ($row['posting_number'] ?? '');
-                if ($postingNumber === '') {
+                if ('' === $postingNumber) {
                     continue;
                 }
 
@@ -215,7 +215,7 @@ readonly class OzonOrderSyncService
                     $items = [];
                 }
 
-                if ((!$items && $forceDetails)) {
+                if (!$items && $forceDetails) {
                     $details = $this->client->getFboPosting($company, $postingNumber);
                     $items = $details['result']['products'] ?? [];
                     if (!\is_array($items)) {

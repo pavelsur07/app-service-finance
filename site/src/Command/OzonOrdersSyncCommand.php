@@ -66,7 +66,7 @@ class OzonOrdersSyncCommand extends Command
         $scheme = $input->getOption('scheme');
         $scheme = $scheme ? strtoupper((string) $scheme) : null;
 
-        if ($scheme === 'FBS') {
+        if ('FBS' === $scheme) {
             // Явно запросили только FBS
             $statusParam = (string) $input->getOption('status');
             $status = $statusParam
@@ -74,11 +74,9 @@ class OzonOrdersSyncCommand extends Command
                 : null;
 
             $result = $this->syncService->syncFbs($company, $since, $to, $status);
-
-        } elseif ($scheme === 'FBO') {
+        } elseif ('FBO' === $scheme) {
             // Явно запросили только FBO
             $result = $this->syncService->syncFbo($company, $since, $to);
-
         } else {
             // Схема не указана — как в UI: запускаем ОБЕ
             $statusParam = (string) $input->getOption('status');

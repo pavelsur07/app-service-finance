@@ -19,7 +19,7 @@ class ReportApiKeyManager
 
     public function generateRawKey(): string
     {
-        return self::PREFIX . \bin2hex(\random_bytes(16));
+        return self::PREFIX.\bin2hex(\random_bytes(16));
     }
 
     public function createOrRegenerateForCompany(Company $company): string
@@ -27,7 +27,7 @@ class ReportApiKeyManager
         $this->repo->deactivateAll($company);
 
         $rawKey = $this->generateRawKey();
-        $hash = \password_hash($rawKey, PASSWORD_ARGON2ID);
+        $hash = \password_hash($rawKey, \PASSWORD_ARGON2ID);
 
         $apiKey = new ReportApiKey($company, self::PREFIX, $hash);
         $this->em->persist($apiKey);
@@ -69,7 +69,7 @@ class ReportApiKeyManager
     public function findCompanyByRawKey(string $raw): ?Company
     {
         $raw = \trim($raw);
-        if ($raw === '' || \strncmp($raw, 'rk_', 3) !== 0) {
+        if ('' === $raw || 0 !== \strncmp($raw, 'rk_', 3)) {
             return null;
         }
 

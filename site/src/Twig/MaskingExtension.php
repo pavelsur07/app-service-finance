@@ -32,4 +32,3 @@ class MaskingExtension extends AbstractExtension
         return $this->accountMasker->mask($accountNumber);
     }
 }
-

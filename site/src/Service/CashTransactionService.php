@@ -118,5 +118,4 @@ class CashTransactionService
         $this->em->flush();
         $this->balanceService->recalculateDailyRange($company, $account, $from, $to);
     }
-
 }

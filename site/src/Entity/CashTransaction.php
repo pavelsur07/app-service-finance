@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use App\Enum\CashDirection;
-use App\Entity\ProjectDirection;
 use App\Repository\CashTransactionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;

@@ -30,5 +30,4 @@ class ReportCashflowController extends AbstractController
 
         return $this->render('finance/report/cashflow.html.twig', $payload);
     }
-
 }
