@@ -82,8 +82,8 @@
         "test": "phpunit -c phpunit.xml",
         "test:unit": "phpunit -c phpunit.xml --testsuite=unit",
         "test:int": "phpunit -c phpunit.xml --testsuite=integration",
-        "cs:check": "php-cs-fixer fix --dry-run --diff",
-        "cs:fix": "php-cs-fixer fix",
+        "cs:check": "php-cs-fixer fix --dry-run --diff --cache-file=var/cache/.php-cs-fixer.cache",
+        "cs:fix": "php-cs-fixer fix --cache-file=var/cache/.php-cs-fixer.cache",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
         "cs:twig": "twigcs --config .twig-cs-fixer.php templates",
         "auto-scripts": {
