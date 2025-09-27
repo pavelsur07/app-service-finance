@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Integration\Import;
+namespace App\Tests\Service\Import;
 
 use App\Entity\CashTransaction;
 use App\Entity\Company;
