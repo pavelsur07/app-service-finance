@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Service;
+namespace App\Tests\Integration;
 
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
@@ -28,42 +28,42 @@ class SimpleManagerRegistry implements ManagerRegistry
     {
     }
 
-    public function getDefaultConnectionName()
+    public function getDefaultConnectionName(): string
     {
         return 'default';
     }
 
-    public function getConnection($name = null)
+    public function getConnection($name = null): object
     {
         return $this->em->getConnection();
     }
 
-    public function getConnections()
+    public function getConnections(): array
     {
         return [$this->em->getConnection()];
     }
 
-    public function getConnectionNames()
+    public function getConnectionNames(): array
     {
         return ['default'];
     }
 
-    public function getDefaultManagerName()
+    public function getDefaultManagerName(): string
     {
         return 'default';
     }
 
-    public function getManager($name = null)
+    public function getManager($name = null): \Doctrine\Persistence\ObjectManager
     {
         return $this->em;
     }
 
-    public function getManagers()
+    public function getManagers(): array
     {
         return ['default' => $this->em];
     }
 
-    public function resetManager($name = null)
+    public function resetManager($name = null): \Doctrine\Persistence\ObjectManager
     {
         return $this->em;
     }
@@ -73,17 +73,17 @@ class SimpleManagerRegistry implements ManagerRegistry
         return 'App\\Entity';
     }
 
-    public function getManagerNames()
+    public function getManagerNames(): array
     {
         return ['default'];
     }
 
-    public function getRepository($persistentObject, $persistentManagerName = null)
+    public function getRepository($persistentObject, $persistentManagerName = null): \Doctrine\Persistence\ObjectRepository
     {
         return $this->em->getRepository($persistentObject);
     }
 
-    public function getManagerForClass($class)
+    public function getManagerForClass($class): ?\Doctrine\Persistence\ObjectManager
     {
         return $this->em;
     }

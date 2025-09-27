@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Service\Import;
+namespace App\Tests\Integration\Import;
 
 class IdempotencyTest extends ClientBank1CImportServiceTestCase
 {

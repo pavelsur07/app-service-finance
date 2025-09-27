@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Tests\Service\Import;
+namespace App\Tests\Integration\Import;
 
 class ParserTest extends ClientBank1CImportServiceTestCase
 {

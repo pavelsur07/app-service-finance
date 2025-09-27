@@ -79,6 +79,9 @@
         "symfony/polyfill-php82": "*"
     },
     "scripts": {
+        "test": "phpunit -c phpunit.xml",
+        "test:unit": "phpunit -c phpunit.xml --testsuite=unit",
+        "test:int": "phpunit -c phpunit.xml --testsuite=integration",
         "cs:check": "php-cs-fixer fix --dry-run --diff",
         "cs:fix": "php-cs-fixer fix",
         "cs:phpcs": "phpcs --standard=PSR12 src tests",
