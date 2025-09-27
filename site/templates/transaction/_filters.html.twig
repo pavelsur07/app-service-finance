@@ -1,8 +1,16 @@
 <form method="get" class="card" id="filter-form">
-    <div class="card-header" data-bs-toggle="collapse" data-bs-target="#filter-body" style="cursor:pointer;">
-        Фильтры
+    <div class="card-header d-flex align-items-center justify-content-between cursor-pointer collapsed"
+         data-bs-toggle="collapse"
+         data-bs-target="#filter-body"
+         aria-expanded="false"
+         aria-controls="filter-body"
+         style="cursor:pointer;">
+        <span>Фильтры</span>
+        <span class="icon">
+            <i class="ti ti-chevron-down"></i>
+        </span>
     </div>
-    <div id="filter-body" class="collapse{% if filters %} show{% endif %}">
+    <div id="filter-body" class="collapse">
         <div class="card-body">
             <div class="row g-2">
                 <div class="col-md-3">
@@ -86,4 +94,5 @@
         </div>
     </div>
 </form>
+
 
