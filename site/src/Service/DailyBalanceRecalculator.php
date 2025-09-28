@@ -10,7 +10,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Uid\Uuid;
+use Ramsey\Uuid\Uuid; // ← ВАЖНО: используем ramsey/uuid
 
 /**
  * Пересчёт ежедневных остатков по счётам на основе транзакций.
@@ -76,10 +76,10 @@ class DailyBalanceRecalculator
         for ($d = $from; $d <= $to; $d = $d->modify('+1 day')) {
             $k = $d->format('Y-m-d');
             $days[$k] = [
-                'date' => $d,
-                'inflow' => 0.0,
+                'date'    => $d,
+                'inflow'  => 0.0,
                 'outflow' => 0.0,
-                'delta' => 0.0, // inflow - outflow
+                'delta'   => 0.0, // inflow - outflow
             ];
         }
 
@@ -105,10 +105,10 @@ class DailyBalanceRecalculator
             $abs = abs((float) $t->getAmount());
             if (CashDirection::OUTFLOW === $t->getDirection()) {
                 $days[$key]['outflow'] += $abs;
-                $days[$key]['delta'] -= $abs;
+                $days[$key]['delta']   -= $abs;
             } else {
-                $days[$key]['inflow'] += $abs;
-                $days[$key]['delta'] += $abs;
+                $days[$key]['inflow']  += $abs;
+                $days[$key]['delta']   += $abs;
             }
         }
 
@@ -130,7 +130,7 @@ class DailyBalanceRecalculator
         }
 
         // 3.2. если нет предыдущей — возьмём opening факта В ДЕНЬ FROM
-        if (null === $startOpening) {
+        if ($startOpening === null) {
             $sameEntity = $this->dailyRepo->createQueryBuilder('b')
                 ->where('b.company = :c')->setParameter('c', $company)
                 ->andWhere('b.moneyAccount = :a')->setParameter('a', $account)
@@ -144,14 +144,14 @@ class DailyBalanceRecalculator
             }
         }
 
-        if (null === $startOpening) {
+        if ($startOpening === null) {
             $startOpening = 0.0;
         }
 
         // --- 4) Посуточный расчёт opening/closing
         $prevClose = $startOpening;
 
-        foreach ($days as $k => &$day) {
+        foreach ($days as &$day) {
             $opening = $prevClose;
             $closing = round($opening + $day['delta'], 2);
 
@@ -165,19 +165,19 @@ class DailyBalanceRecalculator
         // --- 5) Перезапись в БД
         $currency = $account->getCurrency();
 
-        foreach ($days as $k => $day) {
+        foreach ($days as $day) {
             /** @var \DateTimeImmutable $date */
             $date = $day['date'];
 
             $entity = $this->dailyRepo->findOneBy([
-                'company' => $company,
+                'company'      => $company,
                 'moneyAccount' => $account,
-                'date' => $date,
+                'date'         => $date,
             ]);
 
             if (!$entity) {
-                // У сущности нет авто-генерации id => генерируем вручную
-                $id = Uuid::v4()->toRfc4122();
+                // У сущности нет авто-генерации id => генерируем вручную через ramsey/uuid
+                $id = Uuid::uuid4()->toString(); // ← строковый UUID (36 символов)
                 $entity = new MoneyAccountDailyBalance(
                     $id,
                     $company,
