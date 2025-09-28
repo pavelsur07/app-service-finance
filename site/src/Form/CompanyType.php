@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\Company;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
@@ -32,6 +33,12 @@ class CompanyType extends AbstractType
             ->add('ozonApiKey', TextType::class, [
                 'label' => 'Ozon API ключ',
                 'required' => false,
+            ])
+            ->add('financeLockBefore', DateType::class, [
+                'widget' => 'single_text',
+                'required' => false,
+                'label' => 'Дата запрета редактирования',
+                'attr' => ['class' => 'form-control'],
             ]);
     }
 
