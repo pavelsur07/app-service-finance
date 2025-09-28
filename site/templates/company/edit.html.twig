@@ -31,6 +31,9 @@
                     {{ form_widget(form.ozonApiKey, {'attr': {'class': 'form-control'}}) }}
                     {{ form_errors(form.ozonApiKey) }}
                 </div>
+                <div class="mb-3">
+                    {{ form_row(form.financeLockBefore) }}
+                </div>
                 <button class="btn btn-primary">{{ company is defined ? 'Сохранить' : 'Создать' }}</button>
                 <a href="{{ path('company_index') }}" class="btn btn-secondary">Назад</a>
                 {{ form_end(form) }}
