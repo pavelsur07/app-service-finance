@@ -35,6 +35,9 @@ class Company
     #[ORM\JoinColumn(nullable: false)]
     private User $user;
 
+    #[ORM\Column(type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $financeLockBefore = null;
+
     #[ORM\OneToMany(targetEntity: OzonProduct::class, mappedBy: 'company', orphanRemoval: true)]
     private Collection $ozonProducts;
 
@@ -126,5 +129,17 @@ class Company
     public function getOzonProducts(): Collection
     {
         return $this->ozonProducts;
+    }
+
+    public function getFinanceLockBefore(): ?\DateTimeImmutable
+    {
+        return $this->financeLockBefore;
+    }
+
+    public function setFinanceLockBefore(?\DateTimeImmutable $date): self
+    {
+        $this->financeLockBefore = $date ? $date->setTime(0, 0) : null;
+
+        return $this;
     }
 }
