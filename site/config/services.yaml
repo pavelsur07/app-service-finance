@@ -33,7 +33,3 @@ services:
     App\Service\RateLimiter\ReportsApiRateLimiter:
         arguments:
             $factory: '@?limiter.reports_api'
-
-    App\EventSubscriber\CashTransactionRecalcSubscriber:
-        tags:
-            - { name: doctrine.event_subscriber }

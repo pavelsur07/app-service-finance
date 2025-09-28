@@ -67,11 +67,29 @@ class DailyBalanceRecalculator
      */
     private function recalcRangeForAccount(Company $company, MoneyAccount $account, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
-        $fmt = static fn (float $v): string => number_format($v, 2, '.', '');
+        $fmt = static function (float $v): string {
+            return number_format($v, 2, '.', '');
+        };
+
+        // --- 0) Расширяем правую границу до последней даты факта (если вызывающий код передал слишком короткий to)
+        $maxDateStr = $this->dailyRepo->createQueryBuilder('b')
+            ->select('MAX(b.date)')
+            ->where('b.company = :c')->setParameter('c', $company)
+            ->andWhere('b.moneyAccount = :a')->setParameter('a', $account)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        $effectiveTo = $to;
+        if ($maxDateStr) {
+            $maxDate = (new \DateTimeImmutable($maxDateStr))->setTime(0, 0);
+            if ($maxDate > $effectiveTo) {
+                $effectiveTo = $maxDate;
+            }
+        }
 
         // --- 1) Подготовка дней диапазона
         $days = [];
-        for ($d = $from; $d <= $to; $d = $d->modify('+1 day')) {
+        for ($d = $from; $d <= $effectiveTo; $d = $d->modify('+1 day')) {
             $k = $d->format('Y-m-d');
             $days[$k] = [
                 'date' => $d,
@@ -87,7 +105,7 @@ class DailyBalanceRecalculator
             ->andWhere('t.moneyAccount = :a')->setParameter('a', $account)
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->setParameter('from', $from->setTime(0, 0))
-            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('to', $effectiveTo->setTime(23, 59, 59))
             ->orderBy('t.occurredAt', 'ASC')
             ->addOrderBy('t.id', 'ASC')
             ->getQuery()->getResult();
@@ -146,9 +164,10 @@ class DailyBalanceRecalculator
             $startOpening = 0.0;
         }
 
-        // --- 4) Последовательный посуточный расчёт opening/closing
+        // --- 4) Посуточный расчёт opening/closing
         $prevClose = $startOpening;
-        foreach ($days as &$day) {
+
+        foreach ($days as $k => &$day) {
             $opening = $prevClose;
             $closing = round($opening + $day['delta'], 2);
 
@@ -162,7 +181,7 @@ class DailyBalanceRecalculator
         // --- 5) Перезапись в БД
         $currency = $account->getCurrency();
 
-        foreach ($days as $day) {
+        foreach ($days as $k => $day) {
             /** @var \DateTimeImmutable $date */
             $date = $day['date'];
 
@@ -173,9 +192,8 @@ class DailyBalanceRecalculator
             ]);
 
             if (!$entity) {
-                // Генерируем id через ramsey/uuid
+                // У сущности нет авто-генерации id => генерируем вручную
                 $id = Uuid::uuid4()->toString();
-
                 $entity = new MoneyAccountDailyBalance(
                     $id,
                     $company,
