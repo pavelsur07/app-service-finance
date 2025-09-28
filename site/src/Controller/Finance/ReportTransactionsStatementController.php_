@@ -101,20 +101,7 @@ class ReportTransactionsStatementController extends AbstractController
         $periods = $this->buildPeriods($from, $to, $group);
 
         $balances = $this->fetchDailyBalances($company, $from, $to, $accountIds);
-
-        // Если область отчёта — Компания, и конкретный счёт не выбран,
-        // исключаем внутренние перемещения/депозитные операции из расчёта движений.
-        $excludeInternal = ('company' === $scope && null === $accountParam);
-
-        $transactionsData = $this->fetchTransactions(
-            $company,
-            $from,
-            $to,
-            $accountParam,
-            $categoryParam,
-            $excludeInternal
-        );
-
+        $transactionsData = $this->fetchTransactions($company, $from, $to, $accountParam, $categoryParam);
         $transactions = $transactionsData['transactions'];
         $categoryOptions = $transactionsData['categories'];
 
@@ -305,7 +292,6 @@ class ReportTransactionsStatementController extends AbstractController
         \DateTimeImmutable $to,
         ?string $accountId,
         ?string $categoryId,
-        bool $excludeInternal = false,
     ): array {
         $qb = $this->trxRepo->createQueryBuilder('t')
             ->leftJoin('t.counterparty', 'counterparty')
@@ -346,24 +332,6 @@ class ReportTransactionsStatementController extends AbstractController
                 continue;
             }
 
-            // Названия/описания для фильтра
-            $counterpartyName = $transaction->getCounterparty() ? $transaction->getCounterparty()->getName() : null;
-            $description = $transaction->getDescription() ?? '';
-
-            // Исключаем внутренние движения при company-scope без выбранного счёта:
-            // переводы между своими счетами, вклад/депозит, возврат депозита и т.п.
-            if ($excludeInternal) {
-                $isOwnCounterparty = $counterpartyName && $counterpartyName === $company->getName();
-                $isInternalByText = 1 === preg_match(
-                    '/перевод.*между\s+счетами|вклад|депозит|возврат\s+депозит/iu',
-                    $description
-                );
-
-                if ($isOwnCounterparty || $isInternalByText) {
-                    continue;
-                }
-            }
-
             $amount = (float) $transaction->getAmount();
             if (CashDirection::OUTFLOW === $transaction->getDirection()) {
                 $amount = -abs($amount);
@@ -379,8 +347,8 @@ class ReportTransactionsStatementController extends AbstractController
             $transactions[] = [
                 'date' => $transaction->getOccurredAt(),
                 'document' => $transaction->getExternalId(),
-                'counterparty' => $counterpartyName,
-                'description' => $description,
+                'counterparty' => $transaction->getCounterparty() ? $transaction->getCounterparty()->getName() : null,
+                'description' => $transaction->getDescription(),
                 'amount' => round($amount, 2),
             ];
         }
@@ -403,19 +371,7 @@ class ReportTransactionsStatementController extends AbstractController
      * @param array<string, array<string, array{opening: float, closing: float}>> $balances
      * @param list<array{date: \DateTimeImmutable, document: ?string, counterparty: ?string, description: ?string, amount: float}> $transactions
      *
-     * @return array{
-     *   summary: array{opening: float, income: float, expense: float, closing: float},
-     *   buckets: list<array{
-     *     label: string,
-     *     period: array{start: \DateTimeImmutable, end: \DateTimeImmutable},
-     *     opening: float,
-     *     closing_calc: float,
-     *     closing_fact: float|null,
-     *     check_ok: bool,
-     *     check_diff: float|null,
-     *     transactions: list<array{date: \DateTimeImmutable, doc: ?string, counterparty: ?string, description: ?string, amount: float, balance_after: float}>
-     *   }>
-     * }
+     * @return array{summary: array{opening: float, income: float, expense: float, closing: float}, buckets: list<array{label: string, opening: float, closing_calc: float, closing_fact: ?float, check_ok: bool, check_diff: ?float, transactions: list<array{date: \DateTimeInterface, doc: ?string, counterparty: ?string, description: ?string, amount: float, balance_after: float}>}>}
      */
     private function aggregateByBuckets(
         array $periods,
@@ -432,41 +388,30 @@ class ReportTransactionsStatementController extends AbstractController
             'expense' => 0.0,
             'closing' => 0.0,
         ];
-
         $hasOpening = false;
-
-        // перенос расчётного сальдо между периодами
-        $carryRunning = null;
 
         $txIndex = 0;
         $txCount = count($transactions);
 
-        foreach ($periods as $p) {
+        foreach ($periods as $bucket) {
             /** @var \DateTimeImmutable $start */
-            $start = $p['start'];
+            $start = $bucket['start'];
             /** @var \DateTimeImmutable $end */
-            $end = $p['label_end'] ?? $p['end'];
+            $end = $bucket['end'];
 
             $startKey = $start->format('Y-m-d');
             $endKey = $end->format('Y-m-d');
 
-            // Opening: перенос с прошлого периода или первый старт из balances
-            if (null !== $carryRunning) {
-                $opening = $carryRunning;
-                $openingHasData = true;
-            } else {
-                $opening = 0.0;
-                $openingHasData = false;
-                if (isset($balances[$startKey])) {
-                    foreach ($balances[$startKey] as $row) {
-                        $opening += $row['opening'];
-                        $openingHasData = true;
-                    }
+            $opening = 0.0;
+            $openingHasData = false;
+            if (isset($balances[$startKey])) {
+                foreach ($balances[$startKey] as $row) {
+                    $opening += $row['opening'];
+                    $openingHasData = true;
                 }
-                $opening = round($opening, 2);
             }
+            $opening = round($opening, 2);
 
-            // Closing (факт по снапшотам) — только для сверки
             $closingFact = null;
             $closingHasData = false;
             if (isset($balances[$endKey])) {
@@ -480,7 +425,6 @@ class ReportTransactionsStatementController extends AbstractController
                 }
             }
 
-            // Бежим по транзакциям периода последовательно
             $running = $opening;
             $periodTransactions = [];
             $hasTransactions = false;
@@ -493,6 +437,7 @@ class ReportTransactionsStatementController extends AbstractController
                     ++$txIndex;
                     continue;
                 }
+
                 if ($txDate > $end) {
                     break;
                 }
@@ -540,14 +485,10 @@ class ReportTransactionsStatementController extends AbstractController
                 $checkDiff = $checkOk ? null : $diff;
             }
 
-            // для сводного closing используем fact если есть, иначе calc
             $summary['closing'] = $closingFact ?? $closingCalc;
-            $summary['income'] = round($summary['income'], 2);
-            $summary['expense'] = round($summary['expense'], 2);
 
             $buckets[] = [
-                'label' => $this->labelForPeriod($p, $group),
-                'period' => ['start' => $start, 'end' => $end],
+                'label' => $this->labelForPeriod($bucket, $group),
                 'opening' => $opening,
                 'closing_calc' => $closingCalc,
                 'closing_fact' => $closingFact,
@@ -555,14 +496,14 @@ class ReportTransactionsStatementController extends AbstractController
                 'check_diff' => $checkDiff,
                 'transactions' => $expandTransactions ? $periodTransactions : [],
             ];
-
-            // переносим расчётное сальдо на следующий период
-            $carryRunning = $closingCalc;
         }
 
         if (!$hasOpening) {
             $summary['opening'] = 0.0;
         }
+
+        $summary['income'] = round($summary['income'], 2);
+        $summary['expense'] = round($summary['expense'], 2);
         $summary['closing'] = round($summary['closing'], 2);
 
         return [

@@ -7,7 +7,9 @@ use App\Enum\MoneyAccountType;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\DailyBalanceRecalculator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -19,6 +21,7 @@ class ReportAccountBalancesController extends AbstractController
         private ActiveCompanyService $activeCompanyService,
         private MoneyAccountRepository $accountRepository,
         private MoneyAccountDailyBalanceRepository $balanceRepository,
+        private DailyBalanceRecalculator $recalculator, // ⬅ добавили сервис пересчёта
     ) {
     }
 
@@ -28,7 +31,7 @@ class ReportAccountBalancesController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
 
         $dateParam = $request->query->get('date');
-        $date = $dateParam ? (new \DateTimeImmutable($dateParam))->setTime(0, 0) : new \DateTimeImmutable('today');
+        $date = $dateParam ? (new \DateTimeImmutable($dateParam))->setTime(0, 0) : (new \DateTimeImmutable('today'))->setTime(0, 0);
 
         $accounts = $this->accountRepository->findBy(
             ['company' => $company, 'isActive' => true],
@@ -106,6 +109,50 @@ class ReportAccountBalancesController extends AbstractController
             'accountsByCurrency' => $accountsByCurrency,
             'balancesByAccountId' => $balancesByAccountId,
             'totalsByCurrency' => $totalsByCurrency,
+        ]);
+    }
+
+    #[Route('/recalc', name: 'report_account_balances_recalc', methods: ['POST'])]
+    public function recalc(Request $request): RedirectResponse
+    {
+        if (!$this->isCsrfTokenValid('recalc_balances', (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF-токен.');
+
+            return $this->redirectToRoute('report_account_balances_index');
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+
+        try {
+            $from = new \DateTimeImmutable((string) $request->request->get('from'));
+            $to = new \DateTimeImmutable((string) $request->request->get('to'));
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Неверный формат дат.');
+
+            return $this->redirectToRoute('report_account_balances_index');
+        }
+
+        // Нормализуем на 00:00
+        $from = $from->setTime(0, 0);
+        $to = $to->setTime(0, 0);
+
+        try {
+            // Пересчёт для всех счетов компании (можно добавить выборочные id при необходимости)
+            $this->recalculator->recalcRange($company, $from, $to, null);
+            $this->addFlash('success', sprintf(
+                'Пересчёт выполнен: %s — %s.',
+                $from->format('d.m.Y'),
+                $to->format('d.m.Y')
+            ));
+        } catch (\Throwable $e) {
+            $this->addFlash('danger', 'Ошибка пересчёта: '.$e->getMessage());
+        }
+
+        // Вернуться к тому дню, который был открыт до пересчёта
+        $backDate = (string) $request->request->get('backDate');
+
+        return $this->redirectToRoute('report_account_balances_index', [
+            'date' => $backDate ?: (new \DateTimeImmutable('today'))->format('Y-m-d'),
         ]);
     }
 }

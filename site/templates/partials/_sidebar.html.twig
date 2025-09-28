@@ -39,6 +39,15 @@
                         <a class="dropdown-item {{ current_route starts with 'report_transactions_statement' ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
                             <span class="nav-link-title">Выписка по транзакциям</span>
                         </a>
+                        <a class="dropdown-item " href="{{ path('report_transactions_debug_index') }}">
+                            <span class="nav-link-title">Отчет отладка</span>
+                        </a>
+                        <a class="dropdown-item " href="{{ path('report_debug_transactions_raw') }}">
+                            <span class="nav-link-title">Отчёт “Сырые транзакции”</span>
+                        </a>
+                        <a class="dropdown-item " href="{{ path('report_debug_daily_facts') }}">
+                            <span class="nav-link-title">Отчёт “Фактические дневные остатки”</span>
+                        </a>
                         <a class="dropdown-item " href="#">
                             <span class="nav-link-title">Отчет ОПиУ</span>
                         </a>

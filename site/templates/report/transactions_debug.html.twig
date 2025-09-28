@@ -1,0 +1,147 @@
+{% extends 'base.html.twig' %}
+
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Тестовый отчёт (сырые транзакции и фактические остатки)', 'path': 'report_transactions_debug_index'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center mb-3">
+        <h2 class="page-title">Тестовый отчёт: транзакции и фактические остатки</h2>
+    </div>
+
+    <form method="get" class="card card-body mb-4">
+        <div class="row g-3">
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата с</label>
+                <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control" required>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата по</label>
+                <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control" required>
+            </div>
+
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Счёт</label>
+                <select name="account" class="form-select">
+                    <option value="">Все счета</option>
+                    {% for account in accounts %}
+                        <option value="{{ account.id }}" {% if filters.account == account.id %}selected{% endif %}>
+                            {{ account.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Категория ДДС</label>
+                <select name="category" class="form-select">
+                    <option value="">Все категории</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" {% if filters.category == category.id %}selected{% endif %}>
+                            {{ category.name|default('') }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-sm-6 col-md-3 align-self-end">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="{{ path('report_transactions_debug_index') }}" class="btn btn-link">Сбросить</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row row-cards">
+
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <div class="card-title">1) Только транзакции (сырые)</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Счёт</th>
+                            <th>Контрагент</th>
+                            <th>Категория</th>
+                            <th>Документ</th>
+                            <th>Описание</th>
+                            <th class="text-end">Сумма</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if transactions is empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-5">Нет транзакций</td>
+                            </tr>
+                        {% else %}
+                            {% for t in transactions %}
+                                {% set amount = t.amount %}
+                                {% set sign = amount > 0 ? '+' : (amount < 0 ? '−' : '') %}
+                                {% set amountClass = amount < 0 ? 'text-danger' : (amount > 0 ? 'text-success' : '') %}
+                                <tr>
+                                    <td>{{ t.date|date('d.m.Y H:i') }}</td>
+                                    <td>{{ t.account_name }}</td>
+                                    <td>{{ t.counterparty|default('') }}</td>
+                                    <td>{{ t.category_name|default('') }}</td>
+                                    <td>{{ t.document|default('') }}</td>
+                                    <td>{{ t.description|default('') }}</td>
+                                    <td class="text-end {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">2) Фактические дневные остатки (из БД, без расчётов)</div>
+                    <div class="small text-muted">Показываем MoneyAccountDailyBalance: «Остаток на начало» и «Остаток на конец» по датам и счетам.</div>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Счёт</th>
+                            <th class="text-end">Остаток на начало</th>
+                            <th class="text-end">Остаток на конец</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if balances is empty %}
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-5">Нет данных об остатках</td>
+                            </tr>
+                        {% else %}
+                            {% for b in balances %}
+                                <tr>
+                                    <td>{{ b.date|date('d.m.Y') }}</td>
+                                    <td>{{ b.account_name }}</td>
+                                    <td class="text-end">{{ b.opening|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ b.closing|number_format(2, '.', ' ') }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}

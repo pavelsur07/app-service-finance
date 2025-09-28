@@ -1,3 +1,4 @@
+{# templates/finance/report/transactions_statement.html.twig #}
 {% extends 'base.html.twig' %}
 
 {% block breadcrumbs %}
@@ -11,174 +12,195 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center mb-3">
-    <h2 class="page-title">Выписка по транзакциям</h2>
-</div>
+    <div class="d-flex align-items-center mb-3">
+        <h2 class="page-title">Выписка по транзакциям</h2>
+    </div>
 
-<form method="get" class="card card-body mb-4">
-    <div class="row g-3">
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label">Дата с</label>
-            <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control" required>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label">Дата по</label>
-            <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control" required>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label">Группировка</label>
-            <select name="group" class="form-select">
-                <option value="day" {% if filters.group == 'day' %}selected{% endif %}>По дням</option>
-                <option value="week" {% if filters.group == 'week' %}selected{% endif %}>По неделям</option>
-                <option value="month" {% if filters.group == 'month' %}selected{% endif %}>По месяцам</option>
-                <option value="quarter" {% if filters.group == 'quarter' %}selected{% endif %}>По кварталам</option>
-            </select>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label d-block">Область отчёта</label>
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="scope" id="scope-company" value="company" {% if filters.scope == 'company' %}checked{% endif %}>
-                <label class="form-check-label" for="scope-company">Компания</label>
-            </div>
-            <div class="form-check form-check-inline">
-                <input class="form-check-input" type="radio" name="scope" id="scope-global" value="global" {% if filters.scope == 'global' %}checked{% endif %}>
-                <label class="form-check-label" for="scope-global">Глобально</label>
-            </div>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label">Счёт</label>
-            <select name="account" class="form-select">
-                <option value="">Все счета</option>
-                {% for account in accounts %}
-                    <option value="{{ account.id }}" {% if filters.account == account.id %}selected{% endif %}>{{ account.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <label class="form-label">Категория ДДС</label>
-            <select name="category" class="form-select">
-                <option value="">Все категории</option>
-                {% for category in categories %}
-                    <option value="{{ category.id }}" {% if filters.category == category.id %}selected{% endif %}>{{ category.name|default('') }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-sm-6 col-md-3">
-            <div class="form-check">
-                <input class="form-check-input" type="checkbox" value="1" id="include-empty" name="include_empty_periods" {% if filters.include_empty_periods %}checked{% endif %}>
-                <label class="form-check-label" for="include-empty">Показывать пустые интервалы</label>
-            </div>
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" value="1" id="expand-transactions" name="expand_transactions" {% if filters.expand_transactions %}checked{% endif %}>
-                <label class="form-check-label" for="expand-transactions">Разворачивать транзакции внутри интервала</label>
-            </div>
-        </div>
-        <div class="col-sm-6 col-md-3 align-self-end">
-            <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Применить</button>
-                <a href="{{ path('report_transactions_statement_index') }}" class="btn btn-link">Сбросить</a>
-            </div>
-        </div>
-    </div>
-</form>
+    {# --- ИНИЦИАЛИЗАЦИЯ ДАННЫХ (фолбэк) --- #}
+    {% set summary = aggregation is defined
+        ? aggregation.summary
+        : (summary is defined ? summary : {'opening':0,'income':0,'expense':0,'closing':0}) %}
+    {% set buckets = aggregation is defined
+        ? aggregation.buckets
+        : (buckets is defined ? buckets : []) %}
 
-<div class="row row-cards mb-4">
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="text-secondary">Сальдо на начало</div>
-                <div class="h2 mb-0">{{ summary.opening|default(0)|number_format(2, '.', ' ') }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="text-secondary">Приход</div>
-                <div class="h2 mb-0 text-success">{{ summary.income|default(0)|number_format(2, '.', ' ') }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="text-secondary">Расход</div>
-                <div class="h2 mb-0 text-danger">{{ summary.expense|default(0)|number_format(2, '.', ' ') }}</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-sm-6 col-lg-3">
-        <div class="card">
-            <div class="card-body">
-                <div class="text-secondary">Сальдо на конец</div>
-                <div class="h2 mb-0">{{ summary.closing|default(0)|number_format(2, '.', ' ') }}</div>
-            </div>
-        </div>
-    </div>
-</div>
+    {% set filters = filters is defined ? filters : {
+        date_from: date('now'),
+        date_to: date('now'),
+        group: 'day',
+        scope: 'company',
+        account: null,
+        accounts: [],
+        category: null,
+        categories: [],
+        include_empty_periods: false,
+        expand_transactions: true
+    } %}
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter">
-            <thead>
+    {% set accounts   = filters.accounts   is defined ? filters.accounts   : (accounts   is defined ? accounts   : []) %}
+    {% set categories = filters.categories is defined ? filters.categories : (categories is defined ? categories : []) %}
+
+    <form method="get" class="card card-body mb-4">
+        <div class="row g-3">
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата с</label>
+                <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control" required>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата по</label>
+                <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control" required>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Группировка</label>
+                <select name="group" class="form-select">
+                    <option value="day"     {{ filters.group == 'day' ? 'selected' }}>По дням</option>
+                    <option value="week"    {{ filters.group == 'week' ? 'selected' }}>По неделям</option>
+                    <option value="month"   {{ filters.group == 'month' ? 'selected' }}>По месяцам</option>
+                    <option value="quarter" {{ filters.group == 'quarter' ? 'selected' }}>По кварталам</option>
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label d-block">Область отчёта</label>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="scope" id="scope-company" value="company" {{ filters.scope == 'company' ? 'checked' }}>
+                    <label class="form-check-label" for="scope-company">Компания</label>
+                </div>
+                <div class="form-check form-check-inline">
+                    <input class="form-check-input" type="radio" name="scope" id="scope-global" value="global" {{ filters.scope == 'global' ? 'checked' }}>
+                    <label class="form-check-label" for="scope-global">Глобально</label>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Счёт</label>
+                <select name="account" class="form-select">
+                    <option value="">Все счета</option>
+                    {% for account in accounts %}
+                        <option value="{{ account.id }}" {{ filters.account == account.id ? 'selected' }}>{{ account.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Категория ДДС</label>
+                <select name="category" class="form-select">
+                    <option value="">Все категории</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" {{ filters.category == category.id ? 'selected' }}>{{ category.name|default('') }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" value="1" id="include-empty" name="include_empty_periods" {{ filters.include_empty_periods ? 'checked' }}>
+                    <label class="form-check-label" for="include-empty">Показывать пустые интервалы</label>
+                </div>
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="expand-transactions" name="expand_transactions" {{ filters.expand_transactions ? 'checked' }}>
+                    <label class="form-check-label" for="expand-transactions">Разворачивать транзакции внутри интервала</label>
+                </div>
+            </div>
+            <div class="col-sm-6 col-md-3 align-self-end">
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="{{ path('report_transactions_statement_index') }}" class="btn btn-link">Сбросить</a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="row row-cards mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card"><div class="card-body">
+                    <div>Сальдо на начало</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.opening|default(0)|number_format(2, '.', ' ') }}</div>
+                </div></div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card"><div class="card-body">
+                    <div>Приход</div>
+                    <div class="h2 mb-0 fw-semibold text-success">+{{ summary.income|default(0)|number_format(2, '.', ' ') }}</div>
+                </div></div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card"><div class="card-body">
+                    <div>Расход</div>
+                    <div class="h2 mb-0 fw-semibold text-danger">−{{ summary.expense|default(0)|number_format(2, '.', ' ') }}</div>
+                </div></div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card"><div class="card-body">
+                    <div>Сальдо на конец</div>
+                    <div class="h2 mb-0 fw-semibold">{{ summary.closing|default(0)|number_format(2, '.', ' ') }}</div>
+                </div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter">
+                <thead>
                 <tr>
                     <th>Дата / Период</th>
                     <th>Контрагент</th>
                     <th>Описание</th>
-                    <th class="text-end">Сумма</th>
-                    <th class="text-end">Сальдо после</th>
+                    <th class="text-end text-nowrap">Сумма</th>
+                    <th class="text-end text-nowrap">Сальдо после</th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% if buckets is empty %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-5">Нет данных за выбранный период</td>
+                        <td colspan="5" class="text-center py-5">Нет данных за выбранный период</td>
                     </tr>
                 {% else %}
                     {% for bucket in buckets %}
                         <tr class="fw-bold">
                             <td>{{ bucket.label }} — Сальдо на начало</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-end">{{ bucket.opening|number_format(2, '.', ' ') }}</td>
+                            <td></td><td></td><td></td>
+                            <td class="text-end text-nowrap fw-semibold">{{ bucket.opening|number_format(2, '.', ' ') }}</td>
                         </tr>
+
                         {% if filters.expand_transactions and bucket.transactions is not empty %}
                             {% for trx in bucket.transactions %}
                                 {% set amount = trx.amount %}
                                 {% set sign = amount > 0 ? '+' : (amount < 0 ? '−' : '') %}
                                 {% set amountClass = amount < 0 ? 'text-danger' : (amount > 0 ? 'text-success' : '') %}
                                 <tr>
-                                    <td>{% if groupBy == 'day' %}{{ trx.date|date('d.m.Y') }}{% else %}{{ bucket.label }}{% endif %}</td>
+                                    <td>
+                                        {% if filters.group == 'day' %}
+                                            {{ trx.date|date('d.m.Y') }}
+                                        {% else %}
+                                            {{ bucket.label }}
+                                        {% endif %}
+                                    </td>
                                     <td>{{ trx.counterparty|default('') }}</td>
                                     <td>{{ trx.description|default('') }}</td>
-                                    <td class="text-end {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
-                                    <td class="text-end">{{ trx.balance_after|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end text-nowrap fw-semibold {{ amountClass }}">{{ sign }}{{ amount|abs|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end text-nowrap fw-semibold">{{ trx.balance_after|number_format(2, '.', ' ') }}</td>
                                 </tr>
                             {% endfor %}
                         {% endif %}
+
                         <tr class="fw-bold">
                             <td>{{ bucket.label }} — Сальдо на конец</td>
-                            <td></td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-end">
+                            <td></td><td></td><td></td>
+                            <td class="text-end text-nowrap fw-semibold">
                                 {{ bucket.closing_calc|number_format(2, '.', ' ') }}
+                                {# Информер сверки — без цветной подложки #}
                                 {% if bucket.closing_fact is not null %}
                                     {% if bucket.check_ok %}
-                                        <span class="badge bg-success ms-2">✅</span>
+                                        <span class="ms-2 text-success" title="Расчёт совпадает с фактом">✓</span>
                                     {% else %}
-                                        <span class="badge bg-danger ms-2">❌ (Δ {{ bucket.check_diff|number_format(2, '.', ' ') }})</span>
+                                        <span class="ms-2 text-danger" title="Расхождение с фактическим остатком">Δ {{ bucket.check_diff|number_format(2, '.', ' ') }}</span>
                                     {% endif %}
                                 {% else %}
-                                    <span class="badge bg-secondary ms-2">нет фактического остатка</span>
+                                    <span class="ms-2 text-muted">нет факта</span>
                                 {% endif %}
                             </td>
                         </tr>
                     {% endfor %}
                 {% endif %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 {% endblock %}

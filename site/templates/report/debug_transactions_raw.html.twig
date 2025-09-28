@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block content %}
+    <h2>Тестовый отчёт: Сырые транзакции</h2>
+
+    <form method="get" class="card card-body mb-3">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Дата с</label>
+                <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Дата по</label>
+                <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Счёт</label>
+                <select name="account" class="form-select">
+                    <option value="">Все счета</option>
+                    {% for acc in accounts %}
+                        <option value="{{ acc.id }}" {{ filters.account == acc.id ? 'selected' : '' }}>{{ acc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button class="btn btn-primary w-100">Показать</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Счёт</th>
+                    <th>Контрагент</th>
+                    <th>Категория</th>
+                    <th>Документ</th>
+                    <th>Описание</th>
+                    <th class="text-end">Сумма</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if txs is empty %}
+                    <tr><td colspan="7" class="text-center text-muted py-5">Нет данных</td></tr>
+                {% else %}
+                    {% for t in txs %}
+                        {% set sign = t.amount > 0 ? '+' : (t.amount < 0 ? '−' : '') %}
+                        <tr>
+                            <td>{{ t.date|date('d.m.Y H:i') }}</td>
+                            <td>{{ t.account }}</td>
+                            <td>{{ t.counterparty|default('') }}</td>
+                            <td>{{ t.category|default('') }}</td>
+                            <td><small class="text-muted">{{ t.document|default('') }}</small></td>
+                            <td>{{ t.description|default('') }}</td>
+                            <td class="text-end {{ t.amount < 0 ? 'text-danger' : 'text-success' }}">
+                                {{ sign }}{{ (t.amount|abs)|number_format(2, '.', ' ') }}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

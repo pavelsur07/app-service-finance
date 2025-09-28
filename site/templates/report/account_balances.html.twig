@@ -11,69 +11,115 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center mb-3">
-    <h2 class="page-title">Остатки по счетам / кассам / кошелькам</h2>
-</div>
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h2 class="page-title mb-0">Остатки по счетам / кассам / кошелькам</h2>
 
-<form method="get" class="row g-2 mb-3">
-    <div class="col-auto">
-        <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control"/>
+        {# Кнопка пересчёта в правом верхнем углу заголовка #}
+        <button class="btn btn-outline-primary"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#recalcModal">
+            <i class="ti ti-reload me-1"></i> Пересчёт остатков
+        </button>
     </div>
-    <div class="col-auto">
-        <button type="submit" class="btn btn-primary">Показать</button>
-    </div>
-</form>
 
-{% set typeLabels = {'bank': 'Банк', 'cash': 'Касса', 'ewallet': 'Кошелёк'} %}
-
-{% for currency, groups in accountsByCurrency %}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h3 class="card-title">Валюта: {{ currency }}</h3>
+    <form method="get" class="row g-2 mb-3">
+        <div class="col-auto">
+            <input type="date" name="date" value="{{ date|date('Y-m-d') }}" class="form-control"/>
         </div>
-        <div class="table-responsive">
-            <table class="table table-bordered table-striped">
-                <thead>
-                <tr>
-                    <th>Тип</th>
-                    <th>Счёт</th>
-                    <th>Остаток</th>
-                </tr>
-                </thead>
-                <tbody>
-                {% for type, accounts in groups %}
-                    {% if accounts|length > 0 %}
-                        {% for account in accounts %}
-                            <tr>
-                                {% if loop.first %}
-                                    <td rowspan="{{ accounts|length }}" class="align-middle">{{ typeLabels[type] }}</td>
-                                {% endif %}
-                                <td>{{ account.name }}</td>
-                                {% set bal = balancesByAccountId[account.id]|default('0') %}
-                                <td class="text-end">{{ bal|number_format(2, '.', ' ') }}</td>
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
-                {% endfor %}
-                <tr>
-                    <td colspan="2" class="text-end">Подытог Банк</td>
-                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.bank|number_format(2, '.', ' ') }}</td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="text-end">Подытог Касса</td>
-                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.cash|number_format(2, '.', ' ') }}</td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="text-end">Подытог Кошелёк</td>
-                    <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|number_format(2, '.', ' ') }}</td>
-                </tr>
-                <tr>
-                    <td colspan="2" class="text-end fw-bold">Итог по компании ({{ currency }})</td>
-                    <td class="text-end fw-bold">{{ totalsByCurrency[currency].totalCompany|number_format(2, '.', ' ') }}</td>
-                </tr>
-                </tbody>
-            </table>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary">Показать</button>
+        </div>
+    </form>
+
+    {# Модалка: выбор периода пересчёта #}
+    <div class="modal fade" id="recalcModal" tabindex="-1" aria-labelledby="recalcModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <form method="post" action="{{ path('report_account_balances_recalc') }}" class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="recalcModalLabel">Пересчёт ежедневных остатков</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" name="_token" value="{{ csrf_token('recalc_balances') }}">
+                    {# Вернёмся после пересчёта на тот же срез даты, что открыт сейчас #}
+                    <input type="hidden" name="backDate" value="{{ date|date('Y-m-d') }}"/>
+
+                    <div class="mb-3">
+                        <label class="form-label">Дата с</label>
+                        {# По умолчанию — первое число месяца текущей выбранной даты #}
+                        {% set defFrom = date|date_modify('first day of this month') %}
+                        <input type="date" name="from" class="form-control" value="{{ defFrom|date('Y-m-d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Дата по</label>
+                        <input type="date" name="to" class="form-control" value="{{ date|date('Y-m-d') }}">
+                    </div>
+
+                    <div class="form-text">
+                        Будут пересчитаны ежедневные остатки всех активных счетов компании в выбранном диапазоне.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-reload me-1"></i> Пересчитать
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
-{% endfor %}
+
+    {% set typeLabels = {'bank': 'Банк', 'cash': 'Касса', 'ewallet': 'Кошелёк'} %}
+
+    {% for currency, groups in accountsByCurrency %}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Валюта: {{ currency }}</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-bordered table-striped">
+                    <thead>
+                    <tr>
+                        <th>Тип</th>
+                        <th>Счёт</th>
+                        <th class="text-end">Остаток</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for type, accounts in groups %}
+                        {% if accounts|length > 0 %}
+                            {% for account in accounts %}
+                                <tr>
+                                    {% if loop.first %}
+                                        <td rowspan="{{ accounts|length }}" class="align-middle">{{ typeLabels[type] }}</td>
+                                    {% endif %}
+                                    <td>{{ account.name }}</td>
+                                    {% set bal = balancesByAccountId[account.id]|default('0') %}
+                                    <td class="text-end">{{ bal|number_format(2, '.', ' ') }}</td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                    <tr>
+                        <td colspan="2" class="text-end">Подытог Банк</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.bank|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" class="text-end">Подытог Касса</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.cash|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" class="text-end">Подытог Кошелёк</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" class="text-end fw-bold">Итог по компании ({{ currency }})</td>
+                        <td class="text-end fw-bold">{{ totalsByCurrency[currency].totalCompany|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endfor %}
 {% endblock %}

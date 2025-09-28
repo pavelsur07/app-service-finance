@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+
+{% block content %}
+    <h2>Тестовый отчёт: Фактические дневные остатки (как в БД)</h2>
+
+    <form method="get" class="card card-body mb-3">
+        <div class="row g-2">
+            <div class="col-md-3">
+                <label class="form-label">Дата с</label>
+                <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Дата по</label>
+                <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Счёт</label>
+                <select name="account" class="form-select">
+                    <option value="">Все счета</option>
+                    {% for acc in accounts %}
+                        <option value="{{ acc.id }}" {{ filters.account == acc.id ? 'selected' : '' }}>{{ acc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 align-self-end">
+                <button class="btn btn-primary w-100">Показать</button>
+            </div>
+        </div>
+    </form>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Счёт</th>
+                    <th class="text-end">Остаток на начало</th>
+                    <th class="text-end">Остаток на конец</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if facts is empty %}
+                    <tr><td colspan="4" class="text-center text-muted py-5">Нет данных</td></tr>
+                {% else %}
+                    {% for r in facts %}
+                        <tr>
+                            <td>{{ r.date|date('d.m.Y') }}</td>
+                            <td>{{ r.account }}</td>
+                            <td class="text-end">{{ r.opening|number_format(2, '.', ' ') }}</td>
+                            <td class="text-end">{{ r.closing|number_format(2, '.', ' ') }}</td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

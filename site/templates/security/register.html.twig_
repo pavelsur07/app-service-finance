@@ -1,0 +1,47 @@
+{% extends 'security/base.html.twig' %}
+
+{% block title %}Register{% endblock %}
+
+{% block body %}
+    <div class="page page-center">
+        <div class="container-tight py-4">
+            {% for flash_error in app.flashes('verify_email_error') %}
+                <div class="alert alert-danger" role="alert">{{ flash_error }}</div>
+            {% endfor %}
+
+            {{ form_start(registrationForm, { attr: { class: 'card card-md' } }) }}
+                <div class="card-body">
+                    <h2 class="card-title text-center mb-4">Создайте новую учетную запись</h2>
+
+                    <div class="mb-3">
+                        {{ form_label(registrationForm.email, null, { label_attr: { class: 'form-label' } }) }}
+                        {{ form_widget(registrationForm.email, { attr: { class: 'form-control' } }) }}
+                        {{ form_errors(registrationForm.email) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_label(registrationForm.plainPassword, 'Password', { label_attr: { class: 'form-label' } }) }}
+                        {{ form_widget(registrationForm.plainPassword, { attr: { class: 'form-control' } }) }}
+                        {{ form_errors(registrationForm.plainPassword) }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-check">
+                            {{ form_widget(registrationForm.agreeTerms, { attr: { class: 'form-check-input' } }) }}
+                            <span class="form-check-label">{{ registrationForm.agreeTerms.vars.label|trans }}</span>
+                        </label>
+                        {{ form_errors(registrationForm.agreeTerms) }}
+                    </div>
+
+                    <div class="form-footer mt-3">
+                        <button type="submit" class="btn btn-primary w-100">Регистрация</button>
+                    </div>
+                </div>
+            {{ form_end(registrationForm) }}
+
+            <div class="text-center text-muted mt-3">
+                <a href="{{ path('app_login') }}">Вход</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
