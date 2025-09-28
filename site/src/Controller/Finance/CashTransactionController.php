@@ -16,6 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Form\FormError;
 
 #[Route('/finance/cash-transactions')]
 class CashTransactionController extends AbstractController
@@ -145,13 +146,20 @@ class CashTransactionController extends AbstractController
             if ($form->isValid()) {
                 /** @var CashTransactionDTO $data */
                 $data = $form->getData();
-                $service->add($data);
-                $this->addFlash('success', 'Транзакция добавлена');
+                try {
+                    $service->add($data);
+                    $this->addFlash('success', 'Транзакция добавлена');
 
-                return $this->redirectToRoute('cash_transaction_index');
+                    return $this->redirectToRoute('cash_transaction_index');
+                } catch (\DomainException $e) {
+                    // Период закрыт — показать ошибку пользователю
+                    $form->addError(new FormError($e->getMessage()));
+                    $this->addFlash('danger', $e->getMessage());
+                    // остаёмся на форме (без редиректа)
+                }
+            } else {
+                return $this->json($form->getErrors(true));
             }
-
-            return $this->json($form->getErrors(true));
         }
 
         return $this->render('transaction/new.html.twig', [
@@ -190,10 +198,16 @@ class CashTransactionController extends AbstractController
             if ($form->isValid()) {
                 /** @var CashTransactionDTO $data */
                 $data = $form->getData();
-                $service->update($tx, $data);
-                $this->addFlash('success', 'Транзакция обновлена');
+                try {
+                    $service->update($tx, $data);
+                    $this->addFlash('success', 'Транзакция обновлена');
 
-                return $this->redirectToRoute('cash_transaction_index');
+                    return $this->redirectToRoute('cash_transaction_index');
+                } catch (\DomainException $e) {
+                    // Период закрыт — показать ошибку и остаться на форме
+                    $form->addError(new FormError($e->getMessage()));
+                    $this->addFlash('danger', $e->getMessage());
+                }
             }
         }
 
@@ -212,8 +226,13 @@ class CashTransactionController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('tx_delete'.$tx->getId(), $request->request->get('_token'))) {
-            $service->delete($tx);
-            $this->addFlash('success', 'Транзакция удалена');
+            try {
+                $service->delete($tx);
+                $this->addFlash('success', 'Транзакция удалена');
+            } catch (\DomainException $e) {
+                // Период закрыт — показать сообщение и вернуть на список
+                $this->addFlash('danger', $e->getMessage());
+            }
         } else {
             $this->addFlash('danger', 'Неверный CSRF токен');
         }
