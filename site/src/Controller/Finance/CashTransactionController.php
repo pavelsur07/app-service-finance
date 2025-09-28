@@ -13,10 +13,10 @@ use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\Exception\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Form\FormError;
 
 #[Route('/finance/cash-transactions')]
 class CashTransactionController extends AbstractController
