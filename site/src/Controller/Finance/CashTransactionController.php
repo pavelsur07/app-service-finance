@@ -3,27 +3,16 @@
 namespace App\Controller\Finance;
 
 use App\DTO\CashTransactionDTO;
-use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
-use App\Entity\MoneyAccount;
-use App\Entity\ProjectDirection;
-use App\Enum\CashDirection;
 use App\Form\CashTransactionType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
-use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use Doctrine\ORM\Exception\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
-use Symfony\Component\Form\Extension\Core\Type\DateType;
-use Symfony\Component\Form\Extension\Core\Type\NumberType;
-use Symfony\Component\Form\Extension\Core\Type\TextareaType;
-use Symfony\Component\Form\FormEvent;
-use Symfony\Component\Form\FormEvents;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -176,10 +165,6 @@ class CashTransactionController extends AbstractController
         Request $request,
         CashTransaction $tx,
         CashTransactionService $service,
-        MoneyAccountRepository $accountRepo,
-        CashflowCategoryRepository $categoryRepo,
-        CounterpartyRepository $counterpartyRepo,
-        ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         if ($tx->getCompany() !== $company) {
@@ -190,73 +175,14 @@ class CashTransactionController extends AbstractController
         $dto->occurredAt = $tx->getOccurredAt();
         $dto->amount = $tx->getAmount();
         $dto->direction = $tx->getDirection();
+        $dto->description = $tx->getDescription();
 
-        $form = $this->createFormBuilder($dto)
-            ->add('occurredAt', DateType::class, ['widget' => 'single_text'])
-            ->add('moneyAccount', ChoiceType::class, [
-                'choices' => $accountRepo->findBy(['company' => $company]),
-                'choice_label' => fn (MoneyAccount $a) => $a->getName(),
-                'choice_value' => 'id',
-                'choice_attr' => fn (MoneyAccount $a) => ['data-currency' => $a->getCurrency()],
-                'data' => $tx->getMoneyAccount(),
-                'mapped' => false,
-            ])
-            ->add('direction', ChoiceType::class, [
-                'choices' => ['Приток' => CashDirection::INFLOW, 'Отток' => CashDirection::OUTFLOW],
-                'data' => $tx->getDirection(),
-            ])
-            ->add('amount', NumberType::class, ['scale' => 2])
-            ->add('currency', ChoiceType::class, [
-                'choices' => [$tx->getCurrency() => $tx->getCurrency()],
-                'disabled' => true,
-                // поле валюты отображается только для пользователя
-                // и не должно изменять данные DTO
-                'mapped' => false,
-            ])
-            ->add('cashflowCategory', ChoiceType::class, [
-                'required' => false,
-                'choices' => $categoryRepo->findTreeByCompany($company),
-                'choice_label' => fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
-                'choice_value' => 'id',
-                'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
-                'data' => $tx->getCashflowCategory(),
-                'mapped' => false,
-            ])
-            ->add('counterparty', ChoiceType::class, [
-                'required' => false,
-                'choices' => $counterpartyRepo->findBy(['company' => $company], ['name' => 'ASC']),
-                'choice_label' => 'name',
-                'choice_value' => 'id',
-                'data' => $tx->getCounterparty(),
-                'mapped' => false,
-            ])
-            ->add('projectDirection', ChoiceType::class, [
-                'required' => false,
-                'choices' => $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']),
-                'choice_label' => fn (ProjectDirection $projectDirection) => $projectDirection->getName(),
-                'choice_value' => 'id',
-                'data' => $tx->getProjectDirection(),
-                'mapped' => false,
-            ])
-            ->add('description', TextareaType::class, ['required' => false, 'data' => $tx->getDescription()])
-            ->addEventListener(FormEvents::SUBMIT, function (FormEvent $event) use ($company) {
-                /** @var CashTransactionDTO $data */
-                $data = $event->getData();
-                $form = $event->getForm();
-                $account = $form->get('moneyAccount')->getData();
+        $form = $this->createForm(CashTransactionType::class, $dto, ['company' => $company]);
 
-                $data->companyId = $company->getId();
-                $data->moneyAccountId = $account?->getId();
-                $data->currency = $account?->getCurrency();
-
-                $cat = $form->get('cashflowCategory')->getData();
-                $cp = $form->get('counterparty')->getData();
-                $projectDirection = $form->get('projectDirection')->getData();
-                $data->cashflowCategoryId = $cat?->getId();
-                $data->counterpartyId = $cp?->getId();
-                $data->projectDirectionId = $projectDirection?->getId();
-            }, 1)
-            ->getForm();
+        $form->get('moneyAccount')->setData($tx->getMoneyAccount());
+        $form->get('cashflowCategory')->setData($tx->getCashflowCategory());
+        $form->get('counterparty')->setData($tx->getCounterparty());
+        $form->get('projectDirection')->setData($tx->getProjectDirection());
 
         $form->handleRequest($request);
 
