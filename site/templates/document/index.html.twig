@@ -1,19 +1,26 @@
 {% extends 'base.html.twig' %}
 {% block title %}Документы{% endblock %}
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Документы'}
+        ]
+    } %}
+{% endblock %}
 {% block body %}
     <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Документы</h2>
-                </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
-                </div>
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">Документы</h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a href="{{ path('document_new') }}" class="btn btn-primary">+ Добавить документ</a>
             </div>
         </div>
     </div>
-    <div class="container-xl mt-3">
+    <div class="mt-3">
         <div class="card">
             <div class="table-responsive">
                 <table class="table card-table">
@@ -22,14 +29,14 @@
                             <th>Дата</th>
                             <th>Номер</th>
                             <th>Тип</th>
-                            <th>Природа</th>
+                            <th>Тип Движения</th>
                             <th></th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for item in items %}
                             <tr>
-                                <td>{{ item.date|date('Y-m-d H:i') }}</td>
+                                <td>{{ item.date|date('Y-m-d') }}</td>
                                 <td>{{ item.number }}</td>
                                 <td><span class="badge bg-blue-lt">{{ item.type.label }}</span></td>
                                 {% set docNature = documentNatures[item.id] ?? null %}
