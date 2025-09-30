@@ -415,9 +415,6 @@ class ClientBank1CImportService
             return null;
         }
         $amount = number_format(abs((float) $rawAmount), 2, '.', '');
-        if (CashDirection::OUTFLOW === $direction) {
-            $amount = '-'.$amount;
-        }
 
         return $amount;
     }
