@@ -15,7 +15,6 @@ use App\Repository\PLDailyTotalRepository;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 
 final class PLRegisterUpdater
 {
@@ -178,29 +177,22 @@ final class PLRegisterUpdater
         float $expense,
         bool $replace,
     ): void {
-        $entity = $this->dailyTotals->findOneBy([
-            'company' => $company,
-            'plCategory' => $category,
-            'date' => $date,
-        ]);
+        $companyId = $company->getId();
+        $categoryId = $category->getId();
 
-        if (!$entity instanceof PLDailyTotal) {
-            $entity = new PLDailyTotal(Uuid::uuid4()->toString(), $company, $date, $category);
+        if ($companyId === null || $categoryId === null) {
+            throw new \LogicException('Unable to upsert PL daily total without identifiers.');
         }
 
-        if ($replace) {
-            $incomeValue = $income;
-            $expenseValue = $expense;
-        } else {
-            $incomeValue = (float) $entity->getAmountIncome() + $income;
-            $expenseValue = (float) $entity->getAmountExpense() + $expense;
-        }
-
-        $entity->setAmountIncome($this->formatAmount($incomeValue));
-        $entity->setAmountExpense($this->formatAmount($expenseValue));
-        $entity->setUpdatedAt(new DateTimeImmutable());
-
-        $this->em->persist($entity);
+        $this->dailyTotals->upsert(
+            $companyId,
+            $categoryId,
+            $date,
+            $this->formatAmount($income),
+            $this->formatAmount($expense),
+            $replace,
+            new DateTimeImmutable(),
+        );
     }
 
     private function clearTotals(Company $company, DateTimeImmutable $from, DateTimeImmutable $to): void
