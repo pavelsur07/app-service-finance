@@ -64,27 +64,21 @@ final class PlNatureResolver
     private function byDocumentType(DocumentType $type): ?PlNature
     {
         return match ($type) {
-            DocumentType::SALES_INVOICE,
-            DocumentType::DELIVERY_NOTE,
             DocumentType::SERVICE_ACT,
-            DocumentType::COMMISSION_REPORT,
-            DocumentType::MARKETPLACE_REPORT,
-            DocumentType::CASH_RECEIPT,
-            DocumentType::BANK_STATEMENT,
-            DocumentType::FX_REVALUATION_ACT => PlNature::INCOME,
+            DocumentType::SALES_DELIVERY_NOTE,
+            DocumentType::COMMISSION_REPORT => PlNature::INCOME,
 
-            DocumentType::SUPPLIER_INVOICE,
-            DocumentType::MATERIAL_WRITE_OFF_ACT,
-            DocumentType::MANUFACTURING_ACT,
-            DocumentType::COST_ALLOCATION,
-            DocumentType::AD_ACT,
-            DocumentType::RENT_ACT,
-            DocumentType::UTILITIES_ACT,
-            DocumentType::BANK_FEES_ACT,
-            DocumentType::PAYROLL_SHEET,
-            DocumentType::ADVANCE_REPORT,
-            DocumentType::LOAN_INTEREST_STATEMENT => PlNature::EXPENSE,
+            DocumentType::PURCHASE_INVOICE,
+            DocumentType::ACCEPTANCE_ACT,
+            DocumentType::WRITE_OFF_ACT,
+            DocumentType::INVENTORY_SHEET,
+            DocumentType::LOAN_AND_SCHEDULE,
+            DocumentType::PAYROLL_ACCRUAL,
+            DocumentType::DEPRECIATION,
+            DocumentType::TAXES_AND_CONTRIBUTIONS,
+            DocumentType::FX_PENALTIES => PlNature::EXPENSE,
 
+            DocumentType::SALES_OR_PURCHASE_RETURN,
             DocumentType::OTHER => null,
         };
     }
