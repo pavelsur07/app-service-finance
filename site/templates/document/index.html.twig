@@ -30,7 +30,7 @@
                             <tr>
                                 <td>{{ item.date|date('Y-m-d H:i') }}</td>
                                 <td>{{ item.number }}</td>
-                                <td>{{ item.type }}</td>
+                                <td><span class="badge bg-blue-lt">{{ item.type.label }}</span></td>
                                 <td class="text-end">
                                     <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-info">👁</a>
                                     <a href="{{ path('document_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>

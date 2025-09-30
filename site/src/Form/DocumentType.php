@@ -3,7 +3,9 @@
 namespace App\Form;
 
 use App\Entity\Document;
+use App\Enum\DocumentType as DocumentTypeEnum;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
 use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -24,8 +26,10 @@ class DocumentType extends AbstractType
                 'required' => false,
                 'label' => 'Номер',
             ])
-            ->add('type', TextType::class, [
+            ->add('type', ChoiceType::class, [
                 'label' => 'Тип',
+                'choices' => DocumentTypeEnum::choices(),
+                'choice_value' => static fn (?DocumentTypeEnum $type) => $type?->value,
             ])
             ->add('description', TextareaType::class, [
                 'required' => false,

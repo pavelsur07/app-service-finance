@@ -3,7 +3,7 @@
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
-            <h2 class="page-title">Документ {{ item.type }}</h2>
+            <h2 class="page-title">Документ {{ item.type.label }}</h2>
         </div>
     </div>
     <div class="container-xl mt-3">
@@ -15,7 +15,7 @@
                     <dt class="col-sm-3">Номер</dt>
                     <dd class="col-sm-9">{{ item.number }}</dd>
                     <dt class="col-sm-3">Тип</dt>
-                    <dd class="col-sm-9">{{ item.type }}</dd>
+                    <dd class="col-sm-9"><span class="badge bg-blue-lt">{{ item.type.label }}</span></dd>
                     <dt class="col-sm-3">Описание</dt>
                     <dd class="col-sm-9">{{ item.description }}</dd>
                 </dl>
