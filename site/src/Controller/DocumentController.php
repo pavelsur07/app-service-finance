@@ -9,6 +9,7 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\PLRegisterUpdater;
 use App\Service\PlNatureResolver;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -20,6 +21,10 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/documents')]
 class DocumentController extends AbstractController
 {
+    public function __construct(private readonly PLRegisterUpdater $plRegisterUpdater)
+    {
+    }
+
     #[Route('/', name: 'document_index', methods: ['GET'])]
     public function index(DocumentRepository $repo, ActiveCompanyService $companyService, PlNatureResolver $natureResolver): Response
     {
@@ -55,6 +60,8 @@ class DocumentController extends AbstractController
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($document);
             $em->flush();
+
+            $this->plRegisterUpdater->updateForDocument($document);
 
             return $this->redirectToRoute('document_index');
         }
@@ -114,6 +121,8 @@ class DocumentController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
+
+            $this->plRegisterUpdater->updateForDocument($document);
 
             return $this->redirectToRoute('document_index');
         }
