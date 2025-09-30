@@ -5,14 +5,12 @@ declare(strict_types=1);
 namespace App\Service;
 
 use App\Entity\Company;
-use App\Entity\PLCategory;
 use App\Entity\PLMonthlySnapshot;
 use App\Repository\PLMonthlySnapshotRepository;
 use DateInterval;
 use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 
 final class PLSnapshotBuilder
 {
@@ -65,6 +63,12 @@ final class PLSnapshotBuilder
         $processedKeys = [];
         $now = new DateTimeImmutable();
 
+        $companyId = $company->getId();
+
+        if ($companyId === null) {
+            throw new \LogicException('Unable to rebuild PL monthly snapshots without company identifier.');
+        }
+
         foreach ($totals as $row) {
             $categoryId = $row['pl_category_id'] ?? null;
             $key = $this->categoryKey($categoryId);
@@ -72,28 +76,14 @@ final class PLSnapshotBuilder
             $income = $this->formatAmount((float) ($row['income'] ?? 0));
             $expense = $this->formatAmount((float) ($row['expense'] ?? 0));
 
-            $snapshot = $existingByCategory[$key] ?? null;
-
-            if (!$snapshot instanceof PLMonthlySnapshot) {
-                $category = null;
-
-                if (!empty($categoryId)) {
-                    $category = $this->em->getReference(PLCategory::class, $categoryId);
-                }
-
-                $snapshot = new PLMonthlySnapshot(
-                    Uuid::uuid4()->toString(),
-                    $company,
-                    $periodYm,
-                    $category,
-                );
-            }
-
-            $snapshot->setAmountIncome($income);
-            $snapshot->setAmountExpense($expense);
-            $snapshot->setUpdatedAt($now);
-
-            $this->em->persist($snapshot);
+            $this->monthlySnapshots->upsert(
+                $companyId,
+                $categoryId !== null ? (string) $categoryId : null,
+                $periodYm,
+                $income,
+                $expense,
+                $now,
+            );
 
             $processedKeys[$key] = true;
         }
