@@ -22,6 +22,7 @@
                             <th>Дата</th>
                             <th>Номер</th>
                             <th>Тип</th>
+                            <th>Природа</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -31,6 +32,12 @@
                                 <td>{{ item.date|date('Y-m-d H:i') }}</td>
                                 <td>{{ item.number }}</td>
                                 <td><span class="badge bg-blue-lt">{{ item.type.label }}</span></td>
+                                {% set docNature = documentNatures[item.id] ?? null %}
+                                <td>
+                                    {% if docNature %}
+                                        <span class="badge {{ docNature.badgeClass }}">{{ docNature.label }}</span>
+                                    {% endif %}
+                                </td>
                                 <td class="text-end">
                                     <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-info">👁</a>
                                     <a href="{{ path('document_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
@@ -41,7 +48,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="4" class="text-center">Нет данных</td></tr>
+                            <tr><td colspan="5" class="text-center">Нет данных</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>
