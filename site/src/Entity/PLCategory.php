@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\PlNature;
 use App\Repository\PLCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -114,5 +115,90 @@ class PLCategory
         $this->sortOrder = $sortOrder;
 
         return $this;
+    }
+
+    public function getRoot(): self
+    {
+        $node = $this;
+        while (($parent = $node->getParent()) !== null) {
+            $node = $parent;
+        }
+
+        return $node;
+    }
+
+    public function isIncomeRoot(): bool
+    {
+        $key = $this->resolveRootKey();
+
+        $incomeKeys = [
+            'REVENUE',
+            'INCOME',
+            'FINANCIAL_INCOME',
+            'FIN_INCOME',
+            'ВЫРУЧКА',
+            'ДОХОДЫ',
+            'ФИНАНСОВЫЕ_ДОХОДЫ',
+        ];
+
+        return in_array($key, $incomeKeys, true);
+    }
+
+    public function isExpenseRoot(): bool
+    {
+        $key = $this->resolveRootKey();
+
+        $expenseKeys = [
+            'COGS',
+            'OPEX',
+            'EXPENSE',
+            'EXPENSES',
+            'FINANCIAL_EXPENSE',
+            'FIN_EXPENSE',
+            'OTHER_EXPENSE',
+            'COST_OF_GOODS_SOLD',
+            'ПРОЧИЕ_РАСХОДЫ',
+            'СЕБЕСТОИМОСТЬ',
+            'ОПЕРАЦИОННЫЕ_РАСХОДЫ',
+            'ФИНАНСОВЫЕ_РАСХОДЫ',
+            'РАСХОДЫ',
+        ];
+
+        return in_array($key, $expenseKeys, true);
+    }
+
+    public function nature(): PlNature
+    {
+        return $this->isIncomeRoot() ? PlNature::INCOME : PlNature::EXPENSE;
+    }
+
+    private function resolveRootKey(): string
+    {
+        $root = $this->getRoot();
+
+        $value = null;
+
+        if (method_exists($root, 'getSlug')) {
+            $slug = $root->getSlug();
+            if ($slug !== null && $slug !== '') {
+                $value = $slug;
+            }
+        }
+
+        if ($value === null && method_exists($root, 'getCode')) {
+            $code = $root->getCode();
+            if ($code !== null && $code !== '') {
+                $value = $code;
+            }
+        }
+
+        if ($value === null) {
+            $value = $root->getName();
+        }
+
+        $normalized = mb_strtoupper(trim((string) $value));
+        $normalized = preg_replace('/[\s\-]+/u', '_', $normalized);
+
+        return trim((string) $normalized, '_');
     }
 }

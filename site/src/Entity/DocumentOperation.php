@@ -68,6 +68,16 @@ class DocumentOperation
         return $this;
     }
 
+    public function getPlCategory(): ?PLCategory
+    {
+        return isset($this->category) ? $this->category : null;
+    }
+
+    public function setPlCategory(PLCategory $category): self
+    {
+        return $this->setCategory($category);
+    }
+
     public function getAmount(): string
     {
         return $this->amount;
