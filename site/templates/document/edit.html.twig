@@ -1,5 +1,15 @@
 {% extends 'base.html.twig' %}
 {% block title %}Редактирование документа{% endblock %}
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Документы', 'path': 'document_index'},
+            {'label': 'Редактирование'}
+        ]
+    } %}
+{% endblock %}
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
