@@ -24,10 +24,10 @@ final class DocumentTest extends TestCase
     public function testSetTypeUpdatesValue(): void
     {
         $document = $this->createDocument();
-        $document->setType(DocumentType::AD_ACT);
+        $document->setType(DocumentType::PAYROLL_ACCRUAL);
 
-        self::assertSame(DocumentType::AD_ACT, $document->getType());
-        self::assertSame('AD_ACT', $document->getTypeValue());
+        self::assertSame(DocumentType::PAYROLL_ACCRUAL, $document->getType());
+        self::assertSame('PAYROLL_ACCRUAL', $document->getTypeValue());
     }
 
     private function createDocument(): Document

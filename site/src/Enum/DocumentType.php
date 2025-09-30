@@ -6,34 +6,26 @@ namespace App\Enum;
 
 enum DocumentType: string
 {
-    // Доходы
-    case SALES_INVOICE = 'SALES_INVOICE';            // Счет-фактура/реализация
-    case DELIVERY_NOTE = 'DELIVERY_NOTE';            // Накладная / УПД
-    case SERVICE_ACT = 'SERVICE_ACT';                // Акт выполненных работ
-    case COMMISSION_REPORT = 'COMMISSION_REPORT';    // Отчет комиссионера/агента
-    case MARKETPLACE_REPORT = 'MARKETPLACE_REPORT';  // Отчет маркетплейса
-    case CASH_RECEIPT = 'CASH_RECEIPT';              // ККТ чек (прямые продажи)
+    // Доходы / реализация
+    case SERVICE_ACT = 'SERVICE_ACT';                       // Акт выполненных работ / оказанных услуг
+    case SALES_DELIVERY_NOTE = 'SALES_DELIVERY_NOTE';       // Товарная накладная (реализация)
+    case COMMISSION_REPORT = 'COMMISSION_REPORT';           // Отчёт комиссионера / агента
 
-    // Закупки/COGS
-    case SUPPLIER_INVOICE = 'SUPPLIER_INVOICE';      // Счет/сф от поставщика
-    case MATERIAL_WRITE_OFF_ACT = 'MATERIAL_WRITE_OFF_ACT';
-    case MANUFACTURING_ACT = 'MANUFACTURING_ACT';    // Акт подрядчика (пошив)
-    case COST_ALLOCATION = 'COST_ALLOCATION';        // Калькуляция/распределение
+    // Закупки / COGS / склад
+    case PURCHASE_INVOICE = 'PURCHASE_INVOICE';             // Накладная от поставщика (закупка)
+    case ACCEPTANCE_ACT = 'ACCEPTANCE_ACT';                 // Акт приёмки-передачи
+    case WRITE_OFF_ACT = 'WRITE_OFF_ACT';                   // Акт списания
+    case INVENTORY_SHEET = 'INVENTORY_SHEET';               // Инвентаризационная опись
 
-    // OPEX
-    case AD_ACT = 'AD_ACT';                          // Реклама/инфлюенсеры
-    case RENT_ACT = 'RENT_ACT';
-    case UTILITIES_ACT = 'UTILITIES_ACT';            // Коммуналка/связь/интернет
-    case BANK_FEES_ACT = 'BANK_FEES_ACT';            // Банковские комиссии
-    case PAYROLL_SHEET = 'PAYROLL_SHEET';
-    case ADVANCE_REPORT = 'ADVANCE_REPORT';
+    // Финансовые / операционные / прочие
+    case LOAN_AND_SCHEDULE = 'LOAN_AND_SCHEDULE';           // Кредитный договор / график платежей
+    case PAYROLL_ACCRUAL = 'PAYROLL_ACCRUAL';               // Начисление заработной платы
+    case DEPRECIATION = 'DEPRECIATION';                     // Амортизация ОС
+    case TAXES_AND_CONTRIBUTIONS = 'TAXES_AND_CONTRIBUTIONS'; // Начисление налогов и взносов
+    case FX_PENALTIES = 'FX_PENALTIES';                     // Курсовые разницы, штрафы, пени
+    case SALES_OR_PURCHASE_RETURN = 'SALES_OR_PURCHASE_RETURN'; // Возврат от покупателя / поставщику
 
-    // Финансовые
-    case BANK_STATEMENT = 'BANK_STATEMENT';
-    case LOAN_INTEREST_STATEMENT = 'LOAN_INTEREST_STATEMENT';
-    case FX_REVALUATION_ACT = 'FX_REVALUATION_ACT';
-
-    // Прочее
+    /** @deprecated Только для обратной совместимости со старыми записями. Не использовать в новом коде и не показывать в UI. */
     case OTHER = 'OTHER';
 
     public static function fromLegacy(string $value): self
@@ -41,25 +33,19 @@ enum DocumentType: string
         $v = strtoupper(trim($value));
 
         return match ($v) {
-            'НАКЛАДНАЯ', 'ТОРГ-12', 'УПД' => self::DELIVERY_NOTE,
-            'ОТЧЕТ КОМИССИОНЕРА', 'ОТЧЕТ АГЕНТА' => self::COMMISSION_REPORT,
-            'ОТЧЕТ МАРКЕТПЛЕЙСА', 'WB', 'OZON', 'YANDEX' => self::MARKETPLACE_REPORT,
-            'АКТ', 'АКТ ВЫПОЛНЕННЫХ РАБОТ' => self::SERVICE_ACT,
-            'СЧЕТ-ФАКТУРА', 'РЕАЛИЗАЦИЯ' => self::SALES_INVOICE,
-            'СЧЕТ ПОСТАВЩИКА', 'СФ ПОСТАВЩИКА' => self::SUPPLIER_INVOICE,
-            'АКТ ПОДРЯДЧИКА', 'ПОШИВ' => self::MANUFACTURING_ACT,
-            'СПИСАНИЕ МАТЕРИАЛОВ' => self::MATERIAL_WRITE_OFF_ACT,
-            'КАЛЬКУЛЯЦИЯ', 'РАСПРЕДЕЛЕНИЕ ЗАТРАТ' => self::COST_ALLOCATION,
-            'РЕКЛАМА', 'АКТ РЕКЛАМЫ' => self::AD_ACT,
-            'АРЕНДА' => self::RENT_ACT,
-            'КОММУНАЛЬНЫЕ', 'СВЯЗЬ', 'ИНТЕРНЕТ' => self::UTILITIES_ACT,
-            'КОМИССИЯ БАНКА' => self::BANK_FEES_ACT,
-            'ВЕДОМОСТЬ ЗП', 'ЗАРПЛАТА' => self::PAYROLL_SHEET,
-            'АВАНСОВЫЙ ОТЧЕТ' => self::ADVANCE_REPORT,
-            'ВЫПИСКА БАНКА' => self::BANK_STATEMENT,
-            'ПРОЦЕНТЫ ПО КРЕДИТУ' => self::LOAN_INTEREST_STATEMENT,
-            'КУРСОВЫЕ РАЗНИЦЫ' => self::FX_REVALUATION_ACT,
-            'ЧЕК', 'ККТ' => self::CASH_RECEIPT,
+            'НАКЛАДНАЯ', 'ТОРГ-12', 'УПД', 'СЧЕТ-ФАКТУРА', 'РЕАЛИЗАЦИЯ', 'ЧЕК', 'ККТ' => self::SALES_DELIVERY_NOTE,
+            'АКТ', 'АКТ ВЫПОЛНЕННЫХ РАБОТ', 'АКТ ОКАЗАННЫХ УСЛУГ' => self::SERVICE_ACT,
+            'ОТЧЕТ КОМИССИОНЕРА', 'ОТЧЕТ АГЕНТА', 'ОТЧЕТ МАРКЕТПЛЕЙСА', 'WB', 'OZON', 'YANDEX' => self::COMMISSION_REPORT,
+            'СЧЕТ ПОСТАВЩИКА', 'СФ ПОСТАВЩИКА' => self::PURCHASE_INVOICE,
+            'АКТ ПОДРЯДЧИКА', 'ПОШИВ', 'АКТ ПРИЕМКИ-ПЕРЕДАЧИ' => self::ACCEPTANCE_ACT,
+            'СПИСАНИЕ МАТЕРИАЛОВ', 'АКТ СПИСАНИЯ' => self::WRITE_OFF_ACT,
+            'ИНВЕНТАРИЗАЦИЯ', 'ИНВЕНТАРИЗАЦИОННАЯ ОПИСЬ' => self::INVENTORY_SHEET,
+            'ПРОЦЕНТЫ ПО КРЕДИТУ', 'КРЕДИТНЫЙ ДОГОВОР', 'ГРАФИК ПЛАТЕЖЕЙ' => self::LOAN_AND_SCHEDULE,
+            'ВЕДОМОСТЬ ЗП', 'ЗАРПЛАТА', 'НАЧИСЛЕНИЕ ЗАРПЛАТЫ' => self::PAYROLL_ACCRUAL,
+            'АМОРТИЗАЦИЯ', 'АМОРТИЗАЦИЯ ОС' => self::DEPRECIATION,
+            'НАЛОГИ', 'ВЗНОСЫ', 'НАЧИСЛЕНИЕ НАЛОГОВ', 'НАЧИСЛЕНИЕ ВЗНОСОВ' => self::TAXES_AND_CONTRIBUTIONS,
+            'КУРСОВЫЕ РАЗНИЦЫ', 'ШТРАФЫ', 'ПЕНИ' => self::FX_PENALTIES,
+            'ВОЗВРАТ ОТ ПОКУПАТЕЛЯ', 'ВОЗВРАТ ПОСТАВЩИКУ', 'ВОЗВРАТ' => self::SALES_OR_PURCHASE_RETURN,
             default => self::OTHER,
         };
     }
@@ -67,25 +53,19 @@ enum DocumentType: string
     public function label(): string
     {
         return match ($this) {
-            self::SALES_INVOICE => 'Счет-фактура / Реализация',
-            self::DELIVERY_NOTE => 'Накладная / УПД',
-            self::SERVICE_ACT => 'Акт выполненных работ',
-            self::COMMISSION_REPORT => 'Отчет комиссионера / агента',
-            self::MARKETPLACE_REPORT => 'Отчет маркетплейса',
-            self::CASH_RECEIPT => 'ККТ чек (прямые продажи)',
-            self::SUPPLIER_INVOICE => 'Счет поставщика',
-            self::MATERIAL_WRITE_OFF_ACT => 'Списание материалов',
-            self::MANUFACTURING_ACT => 'Акт подрядчика (пошив)',
-            self::COST_ALLOCATION => 'Калькуляция / распределение',
-            self::AD_ACT => 'Реклама / инфлюенсеры',
-            self::RENT_ACT => 'Аренда',
-            self::UTILITIES_ACT => 'Коммунальные / связь / интернет',
-            self::BANK_FEES_ACT => 'Банковские комиссии',
-            self::PAYROLL_SHEET => 'Ведомость зарплаты',
-            self::ADVANCE_REPORT => 'Авансовый отчет',
-            self::BANK_STATEMENT => 'Выписка банка',
-            self::LOAN_INTEREST_STATEMENT => 'Проценты по кредиту',
-            self::FX_REVALUATION_ACT => 'Курсовые разницы',
+            self::SERVICE_ACT => 'Акт выполненных работ / оказанных услуг',
+            self::SALES_DELIVERY_NOTE => 'Товарная накладная (реализация)',
+            self::COMMISSION_REPORT => 'Отчёт комиссионера / агента',
+            self::PURCHASE_INVOICE => 'Накладная от поставщика (закупка)',
+            self::ACCEPTANCE_ACT => 'Акт приёмки-передачи',
+            self::WRITE_OFF_ACT => 'Акт списания',
+            self::INVENTORY_SHEET => 'Инвентаризационная опись',
+            self::LOAN_AND_SCHEDULE => 'Кредитный договор / график платежей',
+            self::PAYROLL_ACCRUAL => 'Начисление заработной платы',
+            self::DEPRECIATION => 'Амортизация ОС',
+            self::TAXES_AND_CONTRIBUTIONS => 'Начисление налогов и взносов',
+            self::FX_PENALTIES => 'Курсовые разницы, штрафы, пени',
+            self::SALES_OR_PURCHASE_RETURN => 'Возврат от покупателя / поставщику',
             self::OTHER => 'Прочее',
         };
     }
@@ -95,11 +75,20 @@ enum DocumentType: string
      */
     public static function choices(): array
     {
-        $choices = [];
-        foreach (self::cases() as $case) {
-            $choices[$case->label()] = $case;
-        }
-
-        return $choices;
+        return [
+            self::SERVICE_ACT->label() => self::SERVICE_ACT,
+            self::SALES_DELIVERY_NOTE->label() => self::SALES_DELIVERY_NOTE,
+            self::COMMISSION_REPORT->label() => self::COMMISSION_REPORT,
+            self::PURCHASE_INVOICE->label() => self::PURCHASE_INVOICE,
+            self::ACCEPTANCE_ACT->label() => self::ACCEPTANCE_ACT,
+            self::WRITE_OFF_ACT->label() => self::WRITE_OFF_ACT,
+            self::INVENTORY_SHEET->label() => self::INVENTORY_SHEET,
+            self::LOAN_AND_SCHEDULE->label() => self::LOAN_AND_SCHEDULE,
+            self::PAYROLL_ACCRUAL->label() => self::PAYROLL_ACCRUAL,
+            self::DEPRECIATION->label() => self::DEPRECIATION,
+            self::TAXES_AND_CONTRIBUTIONS->label() => self::TAXES_AND_CONTRIBUTIONS,
+            self::FX_PENALTIES->label() => self::FX_PENALTIES,
+            self::SALES_OR_PURCHASE_RETURN->label() => self::SALES_OR_PURCHASE_RETURN,
+        ];
     }
 }

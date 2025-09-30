@@ -28,25 +28,19 @@ BEGIN
     ) THEN
         ALTER TABLE documents
             ADD CONSTRAINT documents_type_enum_check CHECK (type IN (
-                'SALES_INVOICE',
-                'DELIVERY_NOTE',
                 'SERVICE_ACT',
+                'SALES_DELIVERY_NOTE',
                 'COMMISSION_REPORT',
-                'MARKETPLACE_REPORT',
-                'CASH_RECEIPT',
-                'SUPPLIER_INVOICE',
-                'MATERIAL_WRITE_OFF_ACT',
-                'MANUFACTURING_ACT',
-                'COST_ALLOCATION',
-                'AD_ACT',
-                'RENT_ACT',
-                'UTILITIES_ACT',
-                'BANK_FEES_ACT',
-                'PAYROLL_SHEET',
-                'ADVANCE_REPORT',
-                'BANK_STATEMENT',
-                'LOAN_INTEREST_STATEMENT',
-                'FX_REVALUATION_ACT',
+                'PURCHASE_INVOICE',
+                'ACCEPTANCE_ACT',
+                'WRITE_OFF_ACT',
+                'INVENTORY_SHEET',
+                'LOAN_AND_SCHEDULE',
+                'PAYROLL_ACCRUAL',
+                'DEPRECIATION',
+                'TAXES_AND_CONTRIBUTIONS',
+                'FX_PENALTIES',
+                'SALES_OR_PURCHASE_RETURN',
                 'OTHER'
             ));
     END IF;
