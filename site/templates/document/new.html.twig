@@ -24,11 +24,14 @@
                 {{ form_row(form.description) }}
                 <div class="mb-3">
                     <label class="form-label">Операции</label>
-                    <div data-collection-holder data-prototype="{{ form_widget(form.operations.vars.prototype)|e('html_attr') }}">
+                    {% set operationPrototype %}
+                        {% include 'document/_operation_form.html.twig' with { operationForm: form.operations.vars.prototype } %}
+                    {% endset %}
+                    <div data-collection-holder data-prototype="{{ operationPrototype|e('html_attr') }}">
                         {% for op in form.operations %}
                             <div class="card mb-3 document-operation-card">
                                 <div class="card-body">
-                                    {{ form_widget(op) }}
+                                    {% include 'document/_operation_form.html.twig' with { operationForm: op } %}
                                 </div>
                                 <div class="card-footer text-end">
                                     <button type="button" class="btn btn-sm btn-danger remove-item">Удалить</button>
