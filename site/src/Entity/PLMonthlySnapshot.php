@@ -1,40 +1,40 @@
 <?php
 
-namespace App\\Entity;
+namespace App\Entity;
 
-use App\\Repository\\PLMonthlySnapshotRepository;
-use Doctrine\\ORM\\Mapping as ORM;
-use Webmozart\\Assert\\Assert;
+use App\Repository\PLMonthlySnapshotRepository;
+use Doctrine\ORM\Mapping as ORM;
+use Webmozart\Assert\Assert;
 
-#[ORM\\Entity(repositoryClass: PLMonthlySnapshotRepository::class)]
-#[ORM\\Table(name: 'pl_monthly_snapshots')]
-#[ORM\\UniqueConstraint(name: 'uniq_pl_monthly_company_cat_period', columns: ['company_id', 'pl_category_id', 'period'])]
-#[ORM\\Index(name: 'idx_pl_monthly_company_period', columns: ['company_id', 'period'])]
+#[ORM\Entity(repositoryClass: PLMonthlySnapshotRepository::class)]
+#[ORM\Table(name: 'pl_monthly_snapshots')]
+#[ORM\UniqueConstraint(name: 'uniq_pl_monthly_company_cat_period', columns: ['company_id', 'pl_category_id', 'period'])]
+#[ORM\Index(name: 'idx_pl_monthly_company_period', columns: ['company_id', 'period'])]
 class PLMonthlySnapshot
 {
-    #[ORM\\Id]
-    #[ORM\\Column(type: 'guid', unique: true)]
+    #[ORM\Id]
+    #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
 
-    #[ORM\\ManyToOne(targetEntity: Company::class)]
-    #[ORM\\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
+    #[ORM\ManyToOne(targetEntity: Company::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private Company $company;
 
-    #[ORM\\ManyToOne(targetEntity: PLCategory::class)]
-    #[ORM\\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[ORM\ManyToOne(targetEntity: PLCategory::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?PLCategory $plCategory = null;
 
-    #[ORM\\Column(length: 7)]
+    #[ORM\Column(length: 7)]
     private string $period;
 
-    #[ORM\\Column(type: 'decimal', precision: 18, scale: 2)]
+    #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $amountIncome = '0';
 
-    #[ORM\\Column(type: 'decimal', precision: 18, scale: 2)]
+    #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $amountExpense = '0';
 
-    #[ORM\\Column(type: 'datetime_immutable')]
-    private \\DateTimeImmutable $updatedAt;
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $updatedAt;
 
     public function __construct(string $id, Company $company, string $period, ?PLCategory $category)
     {
@@ -43,7 +43,7 @@ class PLMonthlySnapshot
         $this->company = $company;
         $this->period = $period;
         $this->plCategory = $category;
-        $this->updatedAt = new \\DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): ?string
@@ -111,12 +111,12 @@ class PLMonthlySnapshot
         return $this;
     }
 
-    public function getUpdatedAt(): \\DateTimeImmutable
+    public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
     }
 
-    public function setUpdatedAt(\\DateTimeImmutable $updatedAt): self
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
 
