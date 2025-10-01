@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
+use App\Entity\ProjectDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -56,6 +57,14 @@ class CashTransactionAutoRuleType extends AbstractType
                 },
                 'label' => 'Категория движения ДДС',
             ])
+            ->add('projectDirection', EntityType::class, [
+                'class' => ProjectDirection::class,
+                'choices' => $options['projectDirections'],
+                'choice_label' => fn (ProjectDirection $item) => $item->getName(),
+                'placeholder' => 'Не выбрано',
+                'required' => false,
+                'label' => 'Направление / проект',
+            ])
             ->add('conditions', CollectionType::class, [
                 'entry_type' => CashTransactionAutoRuleConditionType::class,
                 'entry_options' => [
@@ -74,6 +83,7 @@ class CashTransactionAutoRuleType extends AbstractType
             'data_class' => CashTransactionAutoRule::class,
             'categories' => [],
             'counterparties' => [],
+            'projectDirections' => [],
         ]);
     }
 }

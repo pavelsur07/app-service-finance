@@ -34,7 +34,7 @@
         <thead>
           <tr>
             <th>Дата</th><th>Счет</th><th class="text-end">Сумма</th>
-            <th>Статья</th><th>Контрагент</th><th>Описание</th><th></th>
+            <th>Статья</th><th>Проект</th><th>Контрагент</th><th>Описание</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -44,6 +44,7 @@
             <td>{{ t.moneyAccount.name }}</td>
             <td class="text-end">{{ t.amount|number_format(2, ',', ' ') }} {{ t.currency }}</td>
             <td>{{ t.cashflowCategory ? t.cashflowCategory.name : '' }}</td>
+            <td>{{ t.projectDirection ? t.projectDirection.name : '' }}</td>
             <td>{{ t.counterparty ? t.counterparty.name : '' }}</td>
             <td>{{ t.description }}</td>
             <td class="text-nowrap">
@@ -51,7 +52,7 @@
             </td>
           </tr>
         {% else %}
-          <tr><td colspan="7" class="text-center text-muted">Совпадений нет</td></tr>
+          <tr><td colspan="8" class="text-center text-muted">Совпадений нет</td></tr>
         {% endfor %}
         </tbody>
       </table>

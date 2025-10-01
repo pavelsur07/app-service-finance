@@ -136,7 +136,7 @@ class CashTransactionAutoRuleService
     /**
      * Применить правило к одной транзакции.
      * Возвращает true, если были изменения; false — если изменений не было.
-     * NB: в текущей модели правила меняют только Категорию ДДС.
+     * NB: в текущей модели правила меняют Категорию ДДС и Направление/Проект.
      */
     public function applyRule(CashTransactionAutoRule $rule, CashTransaction $t): bool
     {
@@ -148,19 +148,28 @@ class CashTransactionAutoRuleService
         }
 
         $category = $rule->getCashflowCategory(); // в сущности правила поле not-null
+        $projectDirection = $rule->getProjectDirection();
         $action = $rule->getAction();
 
         // Семантика:
         // FILL   — ставим категорию только если у транзакции она пуста
         // UPDATE — перезаписываем всегда
         if (CashTransactionAutoRuleAction::FILL === $action) {
-            if (null === $t->getCashflowCategory()) {
+            if (null === $t->getCashflowCategory() && null !== $category) {
                 $t->setCashflowCategory($category);
+                $changed = true;
+            }
+            if (null === $t->getProjectDirection() && null !== $projectDirection) {
+                $t->setProjectDirection($projectDirection);
                 $changed = true;
             }
         } else { // UPDATE
             if ($t->getCashflowCategory() !== $category) {
                 $t->setCashflowCategory($category);
+                $changed = true;
+            }
+            if ($t->getProjectDirection() !== $projectDirection) {
+                $t->setProjectDirection($projectDirection);
                 $changed = true;
             }
         }
