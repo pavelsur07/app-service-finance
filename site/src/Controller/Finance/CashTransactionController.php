@@ -126,6 +126,19 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
+    #[Route('/{id}', name: 'cash_transaction_show', requirements: ['id' => '\\d+'], methods: ['GET'])]
+    public function show(CashTransaction $tx): Response
+    {
+        $company = $this->companyService->getActiveCompany();
+        if ($tx->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        return $this->render('transaction/show.html.twig', [
+            'tx' => $tx,
+        ]);
+    }
+
     /**
      * @throws ORMException
      */
