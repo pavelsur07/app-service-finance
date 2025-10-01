@@ -37,6 +37,10 @@ class CashTransactionAutoRule
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private ?CashflowCategory $cashflowCategory = null;
 
+    #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?ProjectDirection $projectDirection = null;
+
     /** @var Collection<int, CashTransactionAutoRuleCondition> */
     #[ORM\OneToMany(mappedBy: 'autoRule', targetEntity: CashTransactionAutoRuleCondition::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $conditions;
@@ -122,6 +126,18 @@ class CashTransactionAutoRule
     public function setCashflowCategory(CashflowCategory $cashflowCategory): self
     {
         $this->cashflowCategory = $cashflowCategory;
+
+        return $this;
+    }
+
+    public function getProjectDirection(): ?ProjectDirection
+    {
+        return $this->projectDirection;
+    }
+
+    public function setProjectDirection(?ProjectDirection $projectDirection): self
+    {
+        $this->projectDirection = $projectDirection;
 
         return $this;
     }

@@ -14,6 +14,7 @@ use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionAutoRuleRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
+use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionAutoRuleService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -45,10 +46,12 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
+        ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $companyService->getActiveCompany();
         $categories = $categoryRepo->findTreeByCompany($company);
         $counterparties = $counterpartyRepo->findBy(['company' => $company]);
+        $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
 
         $rule = new CashTransactionAutoRule(
             Uuid::uuid4()->toString(),
@@ -61,6 +64,7 @@ class CashTransactionAutoRuleController extends AbstractController
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'projectDirections' => $projectDirections,
         ]);
         $form->handleRequest($request);
 
@@ -85,6 +89,7 @@ class CashTransactionAutoRuleController extends AbstractController
         ActiveCompanyService $companyService,
         CashflowCategoryRepository $categoryRepo,
         CounterpartyRepository $counterpartyRepo,
+        ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $companyService->getActiveCompany();
         $rule = $repo->find($id);
@@ -94,9 +99,11 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $categories = $categoryRepo->findTreeByCompany($company);
         $counterparties = $counterpartyRepo->findBy(['company' => $company]);
+        $projectDirections = $projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']);
         $form = $this->createForm(CashTransactionAutoRuleType::class, $rule, [
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'projectDirections' => $projectDirections,
         ]);
         $form->handleRequest($request);
 
