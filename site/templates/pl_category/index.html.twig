@@ -1,48 +1,105 @@
 {% extends 'base.html.twig' %}
 {% block title %}Категории P&L{% endblock %}
 
-{% macro render_items(items, level) %}
-    <ul class="list-unstyled">
-    {% for item in items %}
-        <li>
-            <div class="d-flex align-items-center">
-                <span style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
-                <span class="ms-auto d-inline-flex gap-1">
-                    <a href="{{ path('pl_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
-                    <form method="post" action="{{ path('pl_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
-                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                        <button class="btn btn-sm btn-danger">🗑</button>
-                    </form>
-                </span>
-            </div>
-            {% if item.children|length > 0 %}
-                {{ _self.render_items(item.children, level + 1) }}
-            {% endif %}
-        </li>
-    {% endfor %}
-    </ul>
-{% endmacro %}
-
-{% import _self as macros %}
-
 {% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Категории P&amp;L</h2>
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between">
+        <h3 class="card-title">Категории P&amp;L</h3>
+        <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить корневую</a>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-vcenter">
+          <thead>
+            <tr>
+              <th>Название</th>
+              <th>Код</th>
+              <th>Тип</th>
+              <th>Формат</th>
+              <th class="text-end">Вес</th>
+              <th class="text-center">Показывать</th>
+              <th class="text-end">Порядок</th>
+              <th class="w-1"></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% macro row(node, level) %}
+            <tr>
+              <td style="padding-left: {{ level * 20 }}px">
+                {% if node.children|length %}
+                  <i class="ti ti-chevron-right me-1 js-toggle"></i>
+                {% else %}
+                  <i class="ti ti-circle-dot opacity-50 me-1"></i>
+                {% endif %}
+                {{ node.name }}
+              </td>
+              <td><code>{{ node.code ?? '—' }}</code></td>
+              <td>{{ node.type }}</td>
+              <td>{{ node.format }}</td>
+              <td class="text-end">{{ node.weightInParent }}</td>
+              <td class="text-center">
+                <form method="post" action="{{ path('pl_category_toggle_visible', {id: node.id}) }}">
+                  <input type="hidden" name="_token" value="{{ csrf_token('vis' ~ node.id) }}">
+                  <button class="btn btn-ghost-primary btn-sm" type="submit">{{ node.isVisible ? 'Да' : 'Нет' }}</button>
+                </form>
+              </td>
+              <td class="text-end">
+                <div class="btn-list">
+                  <form method="post" action="{{ path('pl_category_move_up', {id: node.id}) }}" class="d-inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('up' ~ node.id) }}">
+                    <button class="btn btn-icon btn-outline-secondary btn-sm" title="Вверх" type="submit"><i class="ti ti-arrow-up"></i></button>
+                  </form>
+                  <form method="post" action="{{ path('pl_category_move_down', {id: node.id}) }}" class="d-inline">
+                    <input type="hidden" name="_token" value="{{ csrf_token('down' ~ node.id) }}">
+                    <button class="btn btn-icon btn-outline-secondary btn-sm" title="Вниз" type="submit"><i class="ti ti-arrow-down"></i></button>
+                  </form>
                 </div>
-                <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
-                </div>
-            </div>
-        </div>
+              </td>
+              <td class="text-nowrap">
+                <a class="btn btn-ghost-secondary btn-sm" href="{{ path('pl_category_new', {parent: node.id}) }}"><i class="ti ti-plus"></i> Дочерняя</a>
+                <a class="btn btn-ghost-secondary btn-sm" href="{{ path('pl_category_edit', {id: node.id}) }}"><i class="ti ti-edit"></i> Ред.</a>
+                <form method="post" action="{{ path('pl_category_delete', {id: node.id}) }}" class="d-inline" onsubmit="return confirm('Удалить?');">
+                  <input type="hidden" name="_token" value="{{ csrf_token('del' ~ node.id) }}">
+                  <button class="btn btn-ghost-danger btn-sm" type="submit"><i class="ti ti-trash"></i></button>
+                </form>
+              </td>
+            </tr>
+            {% for child in node.children %}
+              {{ _self.row(child, level + 1) }}
+            {% endfor %}
+          {% endmacro %}
+
+          {% for root in tree %}
+            {{ _self.row(root, 0) }}
+          {% else %}
+            <tr><td colspan="8" class="text-muted">Категорий пока нет</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
-    <div class="container-xl mt-3">
-        <div class="card">
-            <div class="card-body">
-                {{ macros.render_items(items, 1) }}
-            </div>
-        </div>
-    </div>
+  </div>
+</div>
+
+<script>
+document.querySelectorAll('.js-toggle').forEach(function (el) {
+  el.addEventListener('click', function () {
+    const tr = el.closest('tr');
+    const level = parseInt(tr.children[0].style.paddingLeft || '0', 10);
+    let next = tr.nextElementSibling;
+    el.classList.toggle('ti-chevron-right');
+    el.classList.toggle('ti-chevron-down');
+    while (next) {
+      const pad = parseInt(next.children[0].style.paddingLeft || '0', 10);
+      if (pad <= level) {
+        break;
+      }
+      next.classList.toggle('d-none');
+      next = next.nextElementSibling;
+    }
+  });
+});
+</script>
 {% endblock %}

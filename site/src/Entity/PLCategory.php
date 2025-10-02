@@ -2,15 +2,23 @@
 
 namespace App\Entity;
 
+use App\Enum\PLCategoryType;
+use App\Enum\PLValueFormat;
 use App\Enum\PlNature;
 use App\Repository\PLCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PLCategoryRepository::class)]
-#[ORM\Table(name: 'pl_categories')]
+#[ORM\Table(
+    name: 'pl_categories',
+    uniqueConstraints: [new ORM\UniqueConstraint(name: 'uniq_plcat_company_code', columns: ['company_id', 'code'])],
+    indexes: [new ORM\Index(name: 'idx_plcat_company_parent_sort', columns: ['company_id', 'parent_id', 'sort_order'])]
+)]
+#[UniqueEntity(fields: ['company', 'code'], message: 'Код должен быть уникален в рамках компании.')]
 class PLCategory
 {
     #[ORM\Id]
@@ -23,6 +31,27 @@ class PLCategory
 
     #[ORM\Column(length: 255)]
     private string $name;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $code = null;
+
+    #[ORM\Column(enumType: PLCategoryType::class, options: ['default' => 'LEAF_INPUT'])]
+    private PLCategoryType $type = PLCategoryType::LEAF_INPUT;
+
+    #[ORM\Column(enumType: PLValueFormat::class, options: ['default' => 'MONEY'])]
+    private PLValueFormat $format = PLValueFormat::MONEY;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 4, options: ['default' => '1.0000'])]
+    private string $weightInParent = '1.0000';
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $isVisible = true;
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $formula = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $calcOrder = null;
 
     #[ORM\ManyToOne(targetEntity: self::class, inversedBy: 'children')]
     private ?self $parent = null;
@@ -113,6 +142,90 @@ class PLCategory
     public function setSortOrder(int $sortOrder): self
     {
         $this->sortOrder = $sortOrder;
+
+        return $this;
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->code;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $this->code = $code ? mb_strtoupper(trim($code)) : null;
+
+        return $this;
+    }
+
+    public function getType(): PLCategoryType
+    {
+        return $this->type;
+    }
+
+    public function setType(PLCategoryType $type): self
+    {
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function getFormat(): PLValueFormat
+    {
+        return $this->format;
+    }
+
+    public function setFormat(PLValueFormat $format): self
+    {
+        $this->format = $format;
+
+        return $this;
+    }
+
+    public function getWeightInParent(): string
+    {
+        return $this->weightInParent;
+    }
+
+    public function setWeightInParent(string $weightInParent): self
+    {
+        $this->weightInParent = $weightInParent;
+
+        return $this;
+    }
+
+    public function isVisible(): bool
+    {
+        return $this->isVisible;
+    }
+
+    public function setIsVisible(bool $isVisible): self
+    {
+        $this->isVisible = $isVisible;
+
+        return $this;
+    }
+
+    public function getFormula(): ?string
+    {
+        return $this->formula;
+    }
+
+    public function setFormula(?string $formula): self
+    {
+        $this->formula = $formula;
+
+        return $this;
+    }
+
+    public function getCalcOrder(): ?int
+    {
+        return $this->calcOrder;
+    }
+
+    public function setCalcOrder(?int $calcOrder): self
+    {
+        $this->calcOrder = $calcOrder;
 
         return $this;
     }
