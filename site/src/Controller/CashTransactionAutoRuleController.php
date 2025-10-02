@@ -17,6 +17,7 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionAutoRuleService;
+use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -166,8 +167,8 @@ class CashTransactionAutoRuleController extends AbstractController
 
                 case CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME:
                     $needJoinCp = true;
-                    $qb->andWhere('LOWER(cp.name) LIKE :'.$p)
-                       ->setParameter($p, '%'.mb_strtolower(str_replace('ё', 'е', (string) $cond->getValue())).'%');
+                    $qb->andWhere("REPLACE(LOWER(COALESCE(cp.name, '')), 'ё', 'е') LIKE :$p")
+                       ->setParameter($p, '%'.StringNormalizer::normalize((string) $cond->getValue()).'%');
                     break;
 
                 case CashTransactionAutoRuleConditionField::INN:
@@ -204,8 +205,8 @@ class CashTransactionAutoRuleController extends AbstractController
                     break;
 
                 case CashTransactionAutoRuleConditionField::DESCRIPTION:
-                    $qb->andWhere('LOWER(COALESCE(t.description, \'\')) LIKE :'.$p)
-                       ->setParameter($p, '%'.mb_strtolower(str_replace('ё', 'е', (string) $cond->getValue())).'%');
+                    $qb->andWhere("REPLACE(LOWER(COALESCE(t.description, '')), 'ё', 'е') LIKE :$p")
+                       ->setParameter($p, '%'.StringNormalizer::normalize((string) $cond->getValue()).'%');
                     break;
             }
         }

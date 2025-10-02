@@ -9,6 +9,7 @@ use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Repository\CashTransactionAutoRuleRepository;
+use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 
 class CashTransactionAutoRuleService
@@ -58,7 +59,7 @@ class CashTransactionAutoRuleService
 
                     case CashTransactionAutoRuleConditionField::COUNTERPARTY_NAME:
                         $name = $t->getCounterparty()?->getName() ?? '';
-                        if (!$this->containsNormalized($name, $value)) {
+                        if (!StringNormalizer::contains($name, $value)) {
                             $ok = false;
                         }
                         break;
@@ -114,7 +115,7 @@ class CashTransactionAutoRuleService
 
                     case CashTransactionAutoRuleConditionField::DESCRIPTION:
                         $desc = $t->getDescription() ?? '';
-                        if (!$this->containsNormalized($desc, $value)) {
+                        if (!StringNormalizer::contains($desc, $value)) {
                             $ok = false;
                         }
                         break;
@@ -181,12 +182,4 @@ class CashTransactionAutoRuleService
         return $changed;
     }
 
-    private function containsNormalized(string $haystack, string $needle): bool
-    {
-        $norm = fn (string $s) => mb_strtolower(str_replace('ё', 'е', $s));
-        $h = $norm($haystack);
-        $n = $norm($needle);
-
-        return '' !== $n && false !== mb_strpos($h, $n);
-    }
 }
