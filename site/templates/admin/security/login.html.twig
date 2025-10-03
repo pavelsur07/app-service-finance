@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Admin Login</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css"/>
+</head>
+<body class="d-flex flex-column">
+  <div class="page page-center">
+    <div class="container-tight py-4">
+      <div class="text-center mb-4">
+        <a href="#" class="navbar-brand navbar-brand-autodark">Fin-Plan · Admin</a>
+      </div>
+      <form class="card card-md" method="post" action="{{ path('admin_auth_login') }}">
+        <div class="card-body">
+          <h2 class="card-title text-center mb-4">Вход в админ-панель</h2>
+
+          {% if error %}
+            <div class="alert alert-danger" role="alert">
+              {{ error.messageKey|trans(error.messageData, 'security') }}
+            </div>
+          {% endif %}
+
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="text" name="_username" value="{{ last_username }}" class="form-control" autocomplete="username" required>
+          </div>
+
+          <div class="mb-2">
+            <label class="form-label">Пароль</label>
+            <input type="password" name="_password" class="form-control" autocomplete="current-password" required>
+          </div>
+
+          <input type="hidden" name="_csrf_token" value="{{ csrf_token('authenticate') }}"/>
+
+          <div class="form-footer">
+            <button type="submit" class="btn btn-primary w-100">Войти</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
+</body>
+</html>

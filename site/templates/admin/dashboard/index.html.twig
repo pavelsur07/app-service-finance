@@ -1,29 +1,24 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1"/>
-  <title>{{ title }}</title>
-  {# Можно использовать Tabler из CDN, чтобы не трогать сборку ассетов #}
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css"/>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
-</head>
-<body class="page">
-  <div class="page-body">
-    <div class="container-xl mt-4">
+{% extends 'admin/base.html.twig' %}
+{% block title %}Admin · Dashboard{% endblock %}
+
+{% block body %}
+  <div class="row row-cards">
+    <div class="col-12">
       <div class="card">
         <div class="card-header">
-          <h3 class="card-title">Админ-панель · Главная</h3>
+          <h3 class="card-title">Добро пожаловать в админ-панель</h3>
         </div>
         <div class="card-body">
-          <p class="text-muted">Тестовый экран. Маршрут: <code>/admin</code>, имя: <code>admin_dashboard</code>.</p>
+          <p class="text-muted">Тестовый экран. Здесь появятся метрики, очереди, статусы интеграций.</p>
         </div>
-      </div>
-      <div class="mt-3">
-        <a href="/" class="btn btn-outline-secondary"><i class="ti ti-arrow-left"></i> На сайт</a>
       </div>
     </div>
   </div>
-  <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js"></script>
-</body>
-</html>
+
+  {% include 'admin/partials/_danger_zone.html.twig' with {
+    items: [
+      { title: 'Очистить кэш', desc: 'Принудительная очистка кэша приложения.', action: '#', icon: 'ti ti-eraser' },
+      { title: 'Пауза интеграций', desc: 'Глобальный kill-switch интеграций.', action: '#', icon: 'ti ti-player-pause' }
+    ]
+  } %}
+{% endblock %}

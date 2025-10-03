@@ -34,6 +34,17 @@ security:
                 # where to redirect after logout
                 # target: app_any_route
 
+        admin:
+            pattern: ^/admin(?!/login)
+            context: admin
+            lazy: true
+            form_login:
+                login_path: admin_auth_login
+                check_path: admin_auth_login
+                enable_csrf: true
+            logout:
+                path: app_logout
+
             # activate different ways to authenticate
             # https://symfony.com/doc/current/security.html#the-firewall
 
@@ -51,6 +62,8 @@ security:
         # - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/login, roles: PUBLIC_ACCESS }
         - { path: ^/register, roles: PUBLIC_ACCESS }
+        - { path: ^/admin/login$, roles: PUBLIC_ACCESS }
+        - { path: ^/admin, roles: ROLE_ADMIN }
         - { path: ^/, roles: ROLE_USER }
 
 when@test:
