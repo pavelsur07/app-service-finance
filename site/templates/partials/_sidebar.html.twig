@@ -1,19 +1,7 @@
 {% set current_route = app.request.attributes.get('_route') %}
-{% set role_labels = {
-    'ROLE_ADMIN': 'Администратор',
-    'ROLE_MANAGER': 'Менеджер',
-    'ROLE_ACCOUNTANT': 'Бухгалтер',
-    'ROLE_USER': 'Пользователь'
-} %}
-{% set role_priority = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_ACCOUNTANT', 'ROLE_USER'] %}
-{% set user_role_label = null %}
+{% set user_roles = [] %}
 {% if app.user %}
-    {% set user_role_label = role_labels['ROLE_USER'] %}
-    {% for role in role_priority %}
-        {% if role in app.user.roles and user_role_label is null %}
-            {% set user_role_label = role_labels[role] ?? role %}
-        {% endif %}
-    {% endfor %}
+    {% set user_roles = app.user.roles|default([]) %}
 {% endif %}
 <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
     <div class="container-fluid">
@@ -118,10 +106,10 @@
                         </a>
                     </div>
                 </li>
-                {% if user_role_label %}
+                {% if user_roles is not empty %}
                     <li class="nav-item px-3">
                         <div class="text-muted small text-uppercase">Ваша роль</div>
-                        <div class="fw-semibold">{{ user_role_label }}</div>
+                        <div class="fw-semibold">{{ user_roles|join(', ') }}</div>
                     </li>
                 {% endif %}
 
