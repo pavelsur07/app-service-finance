@@ -2,15 +2,19 @@
 
 namespace App\Entity;
 
+use App\Enum\PLCategoryType;
+use App\Enum\PLValueFormat;
 use App\Enum\PlNature;
 use App\Repository\PLCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PLCategoryRepository::class)]
 #[ORM\Table(name: 'pl_categories')]
+#[UniqueEntity(fields: ['company', 'code'], message: 'Код должен быть уникален в рамках компании.')]
 class PLCategory
 {
     #[ORM\Id]
@@ -36,6 +40,27 @@ class PLCategory
 
     #[ORM\Column(type: 'integer')]
     private int $sortOrder = 0;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $code = null; // стабильный код строки P&L (для ссылок в формулах)
+
+    #[ORM\Column(enumType: PLCategoryType::class, options: ['default' => 'LEAF_INPUT'])]
+    private PLCategoryType $type = PLCategoryType::LEAF_INPUT;
+
+    #[ORM\Column(enumType: PLValueFormat::class, options: ['default' => 'MONEY'])]
+    private PLValueFormat $format = PLValueFormat::MONEY;
+
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 4, options: ['default' => '1.0000'])]
+    private string $weightInParent = '1.0000'; // вес при суммировании родителем
+
+    #[ORM\Column(type: 'boolean', options: ['default' => true])]
+    private bool $isVisible = true; // управляет отображением строки в отчёте
+
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $formula = null; // формула для KPI/особого subtotal (пока только хранение)
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $calcOrder = null; // явный порядок расчёта (на будущее)
 
     public function __construct(string $id, Company $company)
     {
@@ -200,5 +225,89 @@ class PLCategory
         $normalized = preg_replace('/[\s\-]+/u', '_', $normalized);
 
         return trim((string) $normalized, '_');
+    }
+
+    public function getCode(): ?string
+    {
+        return $this->code;
+    }
+
+    public function setCode(?string $code): self
+    {
+        $this->code = $code ? mb_strtoupper(trim($code)) : null;
+
+        return $this;
+    }
+
+    public function getType(): PLCategoryType
+    {
+        return $this->type;
+    }
+
+    public function setType(PLCategoryType $type): self
+    {
+        $this->type = $type;
+
+        return $this;
+    }
+
+    public function getFormat(): PLValueFormat
+    {
+        return $this->format;
+    }
+
+    public function setFormat(PLValueFormat $format): self
+    {
+        $this->format = $format;
+
+        return $this;
+    }
+
+    public function getWeightInParent(): string
+    {
+        return $this->weightInParent;
+    }
+
+    public function setWeightInParent(string $w): self
+    {
+        $this->weightInParent = $w;
+
+        return $this;
+    }
+
+    public function isVisible(): bool
+    {
+        return $this->isVisible;
+    }
+
+    public function setIsVisible(bool $v): self
+    {
+        $this->isVisible = $v;
+
+        return $this;
+    }
+
+    public function getFormula(): ?string
+    {
+        return $this->formula;
+    }
+
+    public function setFormula(?string $f): self
+    {
+        $this->formula = $f;
+
+        return $this;
+    }
+
+    public function getCalcOrder(): ?int
+    {
+        return $this->calcOrder;
+    }
+
+    public function setCalcOrder(?int $o): self
+    {
+        $this->calcOrder = $o;
+
+        return $this;
     }
 }
