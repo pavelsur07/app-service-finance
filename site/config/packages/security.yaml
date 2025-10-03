@@ -35,7 +35,7 @@ security:
                 # target: app_any_route
 
         admin:
-            pattern: ^/admin(?!/login)
+            pattern: ^/admin
             context: admin
             lazy: true
             form_login:
