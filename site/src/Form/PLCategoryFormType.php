@@ -3,7 +3,7 @@
 namespace App\Form;
 
 use App\Entity\PLCategory;
-use App\Enum\PLCategoryType;
+use App\Enum\PLCategoryType as PLCategoryTypeEnum;
 use App\Enum\PLValueFormat;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -16,7 +16,7 @@ use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
-class PLCategoryType extends AbstractType
+class PLCategoryFormType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
@@ -44,9 +44,9 @@ class PLCategoryType extends AbstractType
             ->add('type', ChoiceType::class, [
                 'label' => 'Тип строки',
                 'choices' => [
-                    'Лист (из фактов)' => PLCategoryType::LEAF_INPUT,
-                    'Итог (subtotal)'  => PLCategoryType::SUBTOTAL,
-                    'Показатель (KPI)' => PLCategoryType::KPI,
+                    'Лист (из фактов)' => PLCategoryTypeEnum::LEAF_INPUT,
+                    'Итог (subtotal)'  => PLCategoryTypeEnum::SUBTOTAL,
+                    'Показатель (KPI)' => PLCategoryTypeEnum::KPI,
                 ],
             ])
             ->add('format', ChoiceType::class, [
