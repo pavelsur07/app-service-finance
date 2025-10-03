@@ -19,6 +19,17 @@ security:
             lazy: false
             # без form_login, без custom_authenticators — доступ анонимный
             # если есть "logout", "remember_me" — НЕ добавлять сюда
+        admin:
+            pattern: ^/admin
+            context: admin
+            lazy: true
+            form_login:
+                login_path: admin_auth_login
+                check_path: admin_auth_login
+                enable_csrf: true
+            logout:
+                path: app_logout
+
         main:
             lazy: true
             provider: app_user_provider
@@ -33,17 +44,6 @@ security:
                 #custom_authenticator: App\Security\LoginFormAuthenticator
                 # where to redirect after logout
                 # target: app_any_route
-
-        admin:
-            pattern: ^/admin
-            context: admin
-            lazy: true
-            form_login:
-                login_path: admin_auth_login
-                check_path: admin_auth_login
-                enable_csrf: true
-            logout:
-                path: app_logout
 
             # activate different ways to authenticate
             # https://symfony.com/doc/current/security.html#the-firewall
