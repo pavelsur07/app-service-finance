@@ -10,9 +10,8 @@
 {% if app.user %}
     {% set user_role_label = role_labels['ROLE_USER'] %}
     {% for role in role_priority %}
-        {% if role in app.user.roles %}
+        {% if role in app.user.roles and user_role_label is null %}
             {% set user_role_label = role_labels[role] ?? role %}
-            {% break %}
         {% endif %}
     {% endfor %}
 {% endif %}
