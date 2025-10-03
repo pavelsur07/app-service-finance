@@ -16,9 +16,9 @@
         <div class="card-body">
           <h2 class="card-title text-center mb-4">Вход в админ-панель</h2>
 
-          {% if error %}
+          {% if error_message %}
             <div class="alert alert-danger" role="alert">
-              {{ error.messageKey|trans(error.messageData, 'security') }}
+              {{ error_message }}
             </div>
           {% endif %}
 
