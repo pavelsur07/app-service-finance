@@ -1,4 +1,21 @@
 {% set current_route = app.request.attributes.get('_route') %}
+{% set role_labels = {
+    'ROLE_ADMIN': 'Администратор',
+    'ROLE_MANAGER': 'Менеджер',
+    'ROLE_ACCOUNTANT': 'Бухгалтер',
+    'ROLE_USER': 'Пользователь'
+} %}
+{% set role_priority = ['ROLE_ADMIN', 'ROLE_MANAGER', 'ROLE_ACCOUNTANT', 'ROLE_USER'] %}
+{% set user_role_label = null %}
+{% if app.user %}
+    {% set user_role_label = role_labels['ROLE_USER'] %}
+    {% for role in role_priority %}
+        {% if role in app.user.roles %}
+            {% set user_role_label = role_labels[role] ?? role %}
+            {% break %}
+        {% endif %}
+    {% endfor %}
+{% endif %}
 <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
     <div class="container-fluid">
         <a class="navbar-brand" href="{{ path('app_home_index') }}">Финансы</a>
@@ -102,6 +119,13 @@
                         </a>
                     </div>
                 </li>
+                {% if user_role_label %}
+                    <li class="nav-item px-3">
+                        <div class="text-muted small text-uppercase">Ваша роль</div>
+                        <div class="fw-semibold">{{ user_role_label }}</div>
+                    </li>
+                {% endif %}
+
                 {#---- Profile ---#}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
