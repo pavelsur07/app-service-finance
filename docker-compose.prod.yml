@@ -41,6 +41,25 @@ services:
             - traefik.http.middlewares.frontend-redirect.redirectregex.regex=^(https?://)www.app.2bstock.ru/(.*)$$
             - traefik.http.middlewares.frontend-redirect.redirectregex.replacement=$${1}app.2bstock.ru/$${2}
             - traefik.http.middlewares.frontend-redirect.redirectregex.permanent=true
+    land:
+        build:
+            context: landing
+            dockerfile: docker/production/nginx/Dockerfile
+        container_name: land-nginx
+        restart: always
+        expose:
+            - "80"
+        networks:
+            - traefik-public
+            - default
+        labels:
+            - traefik.enable=true
+            - traefik.http.routers.land.rule=Host(`2bstock.ru`)
+            - traefik.http.routers.land.entrypoints=https
+            - traefik.http.routers.land.tls=true
+            - traefik.http.routers.land.tls.certresolver=letsEncrypt
+            - traefik.http.services.land.loadbalancer.server.port=80
+            - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
 
     site:
         build:
