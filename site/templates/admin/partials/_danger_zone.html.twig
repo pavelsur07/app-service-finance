@@ -1,0 +1,46 @@
+<div class="row row-cards mt-3">
+  <div class="col-12">
+    <div class="card border-danger">
+      <div class="card-header">
+        <h3 class="card-title text-danger">Danger Zone</h3>
+      </div>
+      <div class="card-body">
+        <p class="text-muted">Опасные действия требуют подтверждения и могут повлиять на работу системы.</p>
+        <div class="row g-3">
+          {% for i in items|default([]) %}
+            <div class="col-md-6">
+              <div class="card">
+                <div class="card-body">
+                  <div class="d-flex">
+                    <div class="me-3"><i class="{{ i.icon|default('ti ti-alert-triangle') }}"></i></div>
+                    <div>
+                      <div class="h4">{{ i.title }}</div>
+                      <div class="text-muted">{{ i.desc }}</div>
+                    </div>
+                  </div>
+                  <div class="mt-3">
+                    <a href="{{ i.action }}" class="btn btn-outline-danger" data-confirm="true">Запустить</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% block admin_scripts %}
+  {{ parent() }}
+  <script>
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-confirm="true"]');
+      if (btn) {
+        if (!confirm('Вы уверены? Это опасное действие.')) {
+          e.preventDefault();
+        }
+      }
+    });
+  </script>
+{% endblock %}
