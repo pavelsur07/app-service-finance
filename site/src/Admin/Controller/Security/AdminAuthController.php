@@ -17,9 +17,12 @@ final class AdminAuthController extends AbstractController
             return $this->redirectToRoute('admin_dashboard');
         }
 
+        $error = $authUtils->getLastAuthenticationError();
+
         return $this->render('admin/security/login.html.twig', [
             'last_username' => $authUtils->getLastUsername(),
-            'error' => $authUtils->getLastAuthenticationError(),
+            'error' => $error,
+            'error_message' => $error ? 'Неверный логин или пароль' : null,
         ]);
     }
 }
