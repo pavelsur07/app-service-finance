@@ -106,13 +106,6 @@
                         </a>
                     </div>
                 </li>
-                {% if user_roles is not empty %}
-                    <li class="nav-item px-3">
-                        <div class="text-muted small text-uppercase">Ваша роль</div>
-                        <div class="fw-semibold">{{ user_roles|join(', ') }}</div>
-                    </li>
-                {% endif %}
-
                 {#---- Profile ---#}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
