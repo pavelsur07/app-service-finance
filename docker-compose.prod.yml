@@ -54,11 +54,15 @@ services:
             - default
         labels:
             - traefik.enable=true
-            - traefik.http.routers.land.rule=Host(`2bstock.ru`)
+            - traefik.http.routers.land.rule=Host(`2bstock.ru`) || Host(`www.2bstock.ru`)
             - traefik.http.routers.land.entrypoints=https
             - traefik.http.routers.land.tls=true
             - traefik.http.routers.land.tls.certresolver=letsEncrypt
             - traefik.http.services.land.loadbalancer.server.port=80
+            - traefik.http.routers.land-http.rule=Host(`2bstock.ru`) || Host(`www.2bstock.ru`)
+            - traefik.http.routers.land-http.entrypoints=http
+            - traefik.http.routers.land-http.middlewares=redirect-to-https
+            - traefik.http.routers.land-http.priority=10
             - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
 
     site:
