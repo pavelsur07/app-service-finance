@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\PLCategory;
-use App\Form\PLCategoryType;
+use App\Form\PLCategoryFormType;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -34,7 +34,7 @@ class PLCategoryController extends AbstractController
         $category = new PLCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $repo->findTreeByCompany($company);
-        $form = $this->createForm(PLCategoryType::class, $category, ['parents' => $parents]);
+        $form = $this->createForm(PLCategoryFormType::class, $category, ['parents' => $parents]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -62,7 +62,7 @@ class PLCategoryController extends AbstractController
         }
 
         $parents = $repo->findTreeByCompany($company);
-        $form = $this->createForm(PLCategoryType::class, $category, ['parents' => $parents]);
+        $form = $this->createForm(PLCategoryFormType::class, $category, ['parents' => $parents]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
