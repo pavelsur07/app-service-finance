@@ -22,3 +22,17 @@
     ]
   } %}
 {% endblock %}
+
+{% block admin_scripts %}
+  {{ parent() }}
+  <script>
+    document.addEventListener('click', function (e) {
+      const btn = e.target.closest('[data-confirm="true"]');
+      if (btn) {
+        if (!confirm('Вы уверены? Это опасное действие.')) {
+          e.preventDefault();
+        }
+      }
+    });
+  </script>
+{% endblock %}
