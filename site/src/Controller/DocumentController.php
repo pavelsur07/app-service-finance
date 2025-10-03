@@ -9,8 +9,8 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
-use App\Service\PLRegisterUpdater;
 use App\Service\PlNatureResolver;
+use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -91,8 +91,8 @@ class DocumentController extends AbstractController
                 'nature' => $natureValue,
                 'natureLabel' => $natureValue === PlNature::INCOME->value ? 'Доход' : ($natureValue === PlNature::EXPENSE->value ? 'Расход' : null),
                 'badgeClass' => $natureValue === PlNature::INCOME->value ? 'bg-green-lt text-green' : ($natureValue === PlNature::EXPENSE->value ? 'bg-red-lt text-red' : ''),
-                'isFallback' => $category === null && $nature !== null,
-                'needsCategorization' => $category === null && $nature === null,
+                'isFallback' => null === $category && null !== $nature,
+                'needsCategorization' => null === $category && null === $nature,
             ];
         }
 
@@ -157,12 +157,12 @@ class DocumentController extends AbstractController
         if ($nature instanceof PlNature) {
             return [
                 'value' => $nature->value,
-                'label' => $nature === PlNature::INCOME ? 'Доход' : 'Расход',
-                'badgeClass' => $nature === PlNature::INCOME ? 'bg-green-lt text-green' : 'bg-red-lt text-red',
+                'label' => PlNature::INCOME === $nature ? 'Доход' : 'Расход',
+                'badgeClass' => PlNature::INCOME === $nature ? 'bg-green-lt text-green' : 'bg-red-lt text-red',
             ];
         }
 
-        if ($nature === 'MIXED') {
+        if ('MIXED' === $nature) {
             return [
                 'value' => 'MIXED',
                 'label' => 'Mixed',

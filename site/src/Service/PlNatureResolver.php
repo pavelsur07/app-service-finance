@@ -26,9 +26,6 @@ final class PlNatureResolver
         return $document ? $this->byDocumentType($document->getType()) : null;
     }
 
-    /**
-     * @return PlNature|string
-     */
     public function forDocument(Document $doc): PlNature|string
     {
         $hasIncome = false;
@@ -37,11 +34,11 @@ final class PlNatureResolver
         foreach ($doc->getOperations() as $operation) {
             $nature = $this->forOperation($operation);
 
-            if ($nature === PlNature::INCOME) {
+            if (PlNature::INCOME === $nature) {
                 $hasIncome = true;
             }
 
-            if ($nature === PlNature::EXPENSE) {
+            if (PlNature::EXPENSE === $nature) {
                 $hasExpense = true;
             }
 

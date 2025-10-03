@@ -3,7 +3,6 @@
 namespace App\Repository;
 
 use App\Entity\PLDailyTotal;
-use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
@@ -19,13 +18,13 @@ class PLDailyTotalRepository extends ServiceEntityRepository
     public function upsert(
         string $companyId,
         ?string $categoryId,
-        DateTimeImmutable $date,
+        \DateTimeImmutable $date,
         string $amountIncome,
         string $amountExpense,
         bool $replace,
-        ?DateTimeImmutable $timestamp = null,
+        ?\DateTimeImmutable $timestamp = null,
     ): void {
-        $timestamp ??= new DateTimeImmutable();
+        $timestamp ??= new \DateTimeImmutable();
 
         $connection = $this->getEntityManager()->getConnection();
 

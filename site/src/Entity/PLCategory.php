@@ -3,8 +3,8 @@
 namespace App\Entity;
 
 use App\Enum\PLCategoryType;
-use App\Enum\PLValueFormat;
 use App\Enum\PlNature;
+use App\Enum\PLValueFormat;
 use App\Repository\PLCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -205,19 +205,19 @@ class PLCategory
 
         if (method_exists($root, 'getSlug')) {
             $slug = $root->getSlug();
-            if ($slug !== null && $slug !== '') {
+            if (null !== $slug && '' !== $slug) {
                 $value = $slug;
             }
         }
 
-        if ($value === null && method_exists($root, 'getCode')) {
+        if (null === $value && method_exists($root, 'getCode')) {
             $code = $root->getCode();
-            if ($code !== null && $code !== '') {
+            if (null !== $code && '' !== $code) {
                 $value = $code;
             }
         }
 
-        if ($value === null) {
+        if (null === $value) {
             $value = $root->getName();
         }
 

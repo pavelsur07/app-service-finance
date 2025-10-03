@@ -11,6 +11,6 @@ enum PlNature: string
 
     public function sign(): int
     {
-        return $this === self::INCOME ? 1 : -1;
+        return self::INCOME === $this ? 1 : -1;
     }
 }

@@ -18,8 +18,10 @@ class PlSnapshotRebuildCommand extends Command
 {
     public function __construct(
         private readonly CompanyRepository $companyRepo,
-        private readonly PLSnapshotBuilder $builder
-    ) { parent::__construct(); }
+        private readonly PLSnapshotBuilder $builder,
+    ) {
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -33,7 +35,7 @@ class PlSnapshotRebuildCommand extends Command
     {
         $company = $this->companyRepo->find($input->getArgument('companyId'));
         $from = (string) $input->getArgument('from');
-        $to   = (string) $input->getArgument('to');
+        $to = (string) $input->getArgument('to');
 
         $this->builder->rebuildRange($company, $from, $to);
         $output->writeln('Done');

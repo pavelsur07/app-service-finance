@@ -7,8 +7,6 @@ namespace App\Service;
 use App\Entity\Company;
 use App\Entity\PLMonthlySnapshot;
 use App\Repository\PLMonthlySnapshotRepository;
-use DateInterval;
-use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -61,11 +59,11 @@ final class PLSnapshotBuilder
         }
 
         $processedKeys = [];
-        $now = new DateTimeImmutable();
+        $now = new \DateTimeImmutable();
 
         $companyId = $company->getId();
 
-        if ($companyId === null) {
+        if (null === $companyId) {
             throw new \LogicException('Unable to rebuild PL monthly snapshots without company identifier.');
         }
 
@@ -78,7 +76,7 @@ final class PLSnapshotBuilder
 
             $this->monthlySnapshots->upsert(
                 $companyId,
-                $categoryId !== null ? (string) $categoryId : null,
+                null !== $categoryId ? (string) $categoryId : null,
                 $periodYm,
                 $income,
                 $expense,
@@ -106,16 +104,16 @@ final class PLSnapshotBuilder
             [$from, $to] = [$to, $from];
         }
 
-        for ($current = $from; $current <= $to; $current = $current->add(new DateInterval('P1M'))) {
+        for ($current = $from; $current <= $to; $current = $current->add(new \DateInterval('P1M'))) {
             $this->rebuildMonthly($company, $current->format('Y-m'));
         }
     }
 
-    private function createMonthStart(string $periodYm): DateTimeImmutable
+    private function createMonthStart(string $periodYm): \DateTimeImmutable
     {
-        $date = DateTimeImmutable::createFromFormat('!Y-m', $periodYm);
+        $date = \DateTimeImmutable::createFromFormat('!Y-m', $periodYm);
 
-        if (!$date instanceof DateTimeImmutable) {
+        if (!$date instanceof \DateTimeImmutable) {
             throw new \InvalidArgumentException(sprintf('Invalid period format: %s', $periodYm));
         }
 

@@ -18,8 +18,10 @@ class PlRegisterRecalcCommand extends Command
 {
     public function __construct(
         private readonly CompanyRepository $companyRepo,
-        private readonly PLRegisterUpdater $updater
-    ) { parent::__construct(); }
+        private readonly PLRegisterUpdater $updater,
+    ) {
+        parent::__construct();
+    }
 
     protected function configure(): void
     {
@@ -33,7 +35,7 @@ class PlRegisterRecalcCommand extends Command
     {
         $company = $this->companyRepo->find($input->getArgument('companyId'));
         $from = new \DateTimeImmutable($input->getArgument('from'));
-        $to   = new \DateTimeImmutable($input->getArgument('to'));
+        $to = new \DateTimeImmutable($input->getArgument('to'));
 
         $this->updater->recalcRange($company, $from, $to);
         $output->writeln('Done');

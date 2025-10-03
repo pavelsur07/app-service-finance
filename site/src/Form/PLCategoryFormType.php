@@ -11,8 +11,8 @@ use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
+use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -45,7 +45,7 @@ class PLCategoryFormType extends AbstractType
                 'label' => 'Тип строки',
                 'choices' => [
                     'Лист (из фактов)' => PLCategoryTypeEnum::LEAF_INPUT,
-                    'Итог (subtotal)'  => PLCategoryTypeEnum::SUBTOTAL,
+                    'Итог (subtotal)' => PLCategoryTypeEnum::SUBTOTAL,
                     'Показатель (KPI)' => PLCategoryTypeEnum::KPI,
                 ],
             ])
@@ -53,8 +53,8 @@ class PLCategoryFormType extends AbstractType
                 'label' => 'Формат',
                 'choices' => [
                     'Деньги' => PLValueFormat::MONEY,
-                    '%'      => PLValueFormat::PERCENT,
-                    'Коэф.'  => PLValueFormat::RATIO,
+                    '%' => PLValueFormat::PERCENT,
+                    'Коэф.' => PLValueFormat::RATIO,
                     'Кол-во' => PLValueFormat::QTY,
                 ],
             ])
@@ -73,7 +73,7 @@ class PLCategoryFormType extends AbstractType
                 'required' => false,
                 'attr' => ['rows' => 3, 'placeholder' => 'Напр.: REV_TOTAL - VAR_COSTS_TOTAL'],
             ])
-            ->add('calcOrder', \Symfony\Component\Form\Extension\Core\Type\IntegerType::class, [
+            ->add('calcOrder', IntegerType::class, [
                 'label' => 'Порядок расчёта',
                 'required' => false,
             ]);

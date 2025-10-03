@@ -12,7 +12,6 @@ use App\Entity\PLDailyTotal;
 use App\Enum\PlNature;
 use App\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
-use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -51,7 +50,7 @@ final class PLRegisterUpdater
         $this->em->flush();
     }
 
-    public function recalcRange(Company $company, DateTimeImmutable $from, DateTimeImmutable $to): void
+    public function recalcRange(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -83,7 +82,8 @@ final class PLRegisterUpdater
 
     /**
      * @param iterable<Document> $documents
-     * @return array<string, array{date: DateTimeImmutable, categories: array<string, array{category: PLCategory, income: float, expense: float}>}>
+     *
+     * @return array<string, array{date: \DateTimeImmutable, categories: array<string, array{category: PLCategory, income: float, expense: float}>}>
      */
     private function aggregateDocuments(iterable $documents): array
     {
@@ -133,7 +133,7 @@ final class PLRegisterUpdater
 
                 $amount = abs((float) $operation->getAmount());
 
-                if ($nature === PlNature::INCOME) {
+                if (PlNature::INCOME === $nature) {
                     $result[$dateKey]['categories'][$categoryKey]['income'] += $amount;
                 } else {
                     $result[$dateKey]['categories'][$categoryKey]['expense'] += $amount;
@@ -153,7 +153,7 @@ final class PLRegisterUpdater
                 $income = $categoryData['income'];
                 $expense = $categoryData['expense'];
 
-                if ($income === 0.0 && $expense === 0.0) {
+                if (0.0 === $income && 0.0 === $expense) {
                     continue;
                 }
 
@@ -171,7 +171,7 @@ final class PLRegisterUpdater
 
     private function upsertDailyTotal(
         Company $company,
-        DateTimeImmutable $date,
+        \DateTimeImmutable $date,
         PLCategory $category,
         float $income,
         float $expense,
@@ -180,7 +180,7 @@ final class PLRegisterUpdater
         $companyId = $company->getId();
         $categoryId = $category->getId();
 
-        if ($companyId === null || $categoryId === null) {
+        if (null === $companyId || null === $categoryId) {
             throw new \LogicException('Unable to upsert PL daily total without identifiers.');
         }
 
@@ -191,11 +191,11 @@ final class PLRegisterUpdater
             $this->formatAmount($income),
             $this->formatAmount($expense),
             $replace,
-            new DateTimeImmutable(),
+            new \DateTimeImmutable(),
         );
     }
 
-    private function clearTotals(Company $company, DateTimeImmutable $from, DateTimeImmutable $to): void
+    private function clearTotals(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
     {
         $this->em->createQueryBuilder()
             ->delete(PLDailyTotal::class, 't')

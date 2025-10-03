@@ -3,7 +3,6 @@
 namespace App\Repository;
 
 use App\Entity\PLMonthlySnapshot;
-use DateTimeImmutable;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
@@ -22,9 +21,9 @@ class PLMonthlySnapshotRepository extends ServiceEntityRepository
         string $period,
         string $amountIncome,
         string $amountExpense,
-        ?DateTimeImmutable $updatedAt = null,
+        ?\DateTimeImmutable $updatedAt = null,
     ): void {
-        $updatedAt ??= new DateTimeImmutable();
+        $updatedAt ??= new \DateTimeImmutable();
 
         $connection = $this->getEntityManager()->getConnection();
 

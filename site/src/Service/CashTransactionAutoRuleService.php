@@ -181,5 +181,4 @@ class CashTransactionAutoRuleService
 
         return $changed;
     }
-
 }
