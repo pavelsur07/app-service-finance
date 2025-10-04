@@ -2,7 +2,10 @@ FROM php:8.2-cli-alpine AS builder
 
 RUN apk add --no-cache libpq-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-    && docker-php-ext-install pdo_pgsql opcache bcmath
+    && docker-php-ext-install pdo_pgsql opcache bcmath \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del --no-cache $PHPIZE_DEPS
 
 ENV APP_ENV prod
 ENV COMPOSER_ALLOW_SUPERUSER 1

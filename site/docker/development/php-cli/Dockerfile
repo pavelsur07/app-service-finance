@@ -9,6 +9,12 @@ RUN apk add --no-cache libpq-dev bash coreutils git linux-headers \
     && docker-php-ext-install pdo_pgsql xdebug bcmath \
     && apk del git linux-headers
 
+# ЭТОТ БЛОК (PECL + enable)
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del $PHPIZE_DEPS
+
 RUN mv $PHP_INI_DIR/php.ini-development $PHP_INI_DIR/php.ini
 
 COPY ./common/php/conf.d /usr/local/etc/php/conf.d

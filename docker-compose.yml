@@ -66,6 +66,14 @@ services:
         volumes:
             - ./site:/app
         command: php bin/console
+    site-php-cli-worker:
+      build:
+        context: site/docker
+        dockerfile: development/php-cli/Dockerfile
+      working_dir: /app
+      volumes:
+        - ./site:/app
+      command: php bin/console messenger:consume async --time-limit=3600 --memory-limit=256M -vv
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
