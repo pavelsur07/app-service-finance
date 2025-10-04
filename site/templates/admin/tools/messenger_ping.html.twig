@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% block title %}Проверка очереди{% endblock %}
+
+{% block body %}
+    <div class="container-xl py-4">
+        <div class="card shadow-sm">
+            <div class="card-header">
+                <h2 class="h3 mb-0">Проверка Messenger (Redis)</h2>
+            </div>
+            <div class="card-body">
+                <form method="post" class="mb-3">
+                    <input type="hidden" name="_token" value="{{ csrf_token('messenger_ping') }}">
+                    <button class="btn btn-primary" type="submit">
+                        Отправить тестовое сообщение
+                    </button>
+                </form>
+
+                {% if id %}
+                    <div id="status" class="alert alert-info">Отправлено. Ждём обработку… (id={{ id }})</div>
+                    <script>
+                        const el = document.getElementById('status');
+                        const url = '{{ path('admin_messenger_ping_status', {id: id}) }}';
+                        const t  = setInterval(async () => {
+                            const r = await fetch(url, {cache: 'no-store'});
+                            const j = await r.json();
+                            if (j.found) {
+                                el.className = 'alert alert-success';
+                                el.innerHTML = `✅ Обработано воркером <b>${j.data.host}</b> в <b>${j.data.handledAt}</b>`;
+                                clearInterval(t);
+                            }
+                        }, 1000);
+                    </script>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
