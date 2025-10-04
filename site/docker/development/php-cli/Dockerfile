@@ -9,9 +9,9 @@ RUN apk add --no-cache libpq-dev bash coreutils git linux-headers \
     && docker-php-ext-install pdo_pgsql xdebug bcmath \
     && apk del git linux-headers
 
-# ✅ Устанавливаем конкретную версию phpredis через PECL
+# ✅ Устанавливаем phpredis через PECL, чтобы обеспечить поддержку транспорта Redis
 RUN apk add --no-cache $PHPIZE_DEPS \
-    && pecl install redis-${REDIS_PECL_VERSION} \
+    && pecl install redis \
     && docker-php-ext-enable redis \
     && php -r 'echo "Redis ext version: ", phpversion("redis"), PHP_EOL;' \
     && apk del --no-cache $PHPIZE_DEPS
