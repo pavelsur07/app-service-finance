@@ -24,6 +24,10 @@ final class MessengerPingController extends AbstractController
         MessageBusInterface $bus
     ): Response {
         if ($request->isMethod('POST')) {
+            if (!$this->isCsrfTokenValid('messenger_ping', (string) $request->request->get('_token'))) {
+                throw $this->createAccessDeniedException('Invalid CSRF token.');
+            }
+
             $id = bin2hex(random_bytes(8));
             $bus->dispatch(new TestMessengerPing($id, $companyCtx->getActiveCompany()->getId()));
             return $this->redirectToRoute('admin_messenger_ping', ['id' => $id]);
