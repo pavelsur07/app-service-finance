@@ -13,6 +13,12 @@ WORKDIR /app
 COPY ./composer.json ./composer.lock ./
 
 
+# ⬇️ Добавляем ext-redis для стадии builder (чтобы composer видел расширение)
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del $PHPIZE_DEPS
+
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
@@ -23,6 +29,12 @@ FROM php:8.2-fpm-alpine
 RUN apk add --no-cache libpq-dev fcgi \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
+
+# ⬇️ Добавляем ext-redis для рантайма PHP-FPM
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && apk del $PHPIZE_DEPS
 
 RUN mv $PHP_INI_DIR/php.ini-production $PHP_INI_DIR/php.ini
 
