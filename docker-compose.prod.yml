@@ -99,6 +99,7 @@ services:
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
         networks:
             - default
         depends_on:
@@ -114,6 +115,7 @@ services:
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
         networks:
             - default
         depends_on:
@@ -131,6 +133,7 @@ services:
             APP_ENV: PROD
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379/messages
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
         networks:
             - default
         depends_on:
