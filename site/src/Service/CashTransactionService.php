@@ -10,7 +10,9 @@ use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
 use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
+use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
@@ -21,6 +23,7 @@ class CashTransactionService
         private EntityManagerInterface $em,
         private DailyBalanceRecalculator $recalculator,   // ← как и было: после CRUD пересчитываем факты
         private CashTransactionRepository $txRepo,
+        private MessageBusInterface $messageBus,
     ) {
     }
 
@@ -82,6 +85,12 @@ class CashTransactionService
         $this->em->persist($tx);
         $this->em->flush(); // ← flush перед пересчётом обязателен
 
+        $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
+            (string) $tx->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable(),
+        ));
+
         // Пересчитываем только затронутый счёт и даты
         $from = $dto->occurredAt->setTime(0, 0);
         $to = (new \DateTimeImmutable('today'))->setTime(0, 0); // правая граница — сегодня, дальше DailyBalanceRecalculator сам расширит до макс. факта
@@ -136,6 +145,12 @@ class CashTransactionService
 
         // Сохраняем изменения
         $this->em->flush(); // ← flush перед пересчётом обязателен
+
+        $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
+            (string) $tx->getId(),
+            (string) $company->getId(),
+            new \DateTimeImmutable(),
+        ));
 
         // Минимальный диапазон пересчёта: от min(старая дата, новая дата) до сегодня
         $from = min($dto->occurredAt, $oldDate)->setTime(0, 0);

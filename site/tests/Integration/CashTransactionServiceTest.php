@@ -21,6 +21,8 @@ use Doctrine\ORM\Tools\Setup;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class SimpleManagerRegistry implements ManagerRegistry
 {
@@ -89,6 +91,14 @@ class SimpleManagerRegistry implements ManagerRegistry
     }
 }
 
+class NullMessageBus implements MessageBusInterface
+{
+    public function dispatch(object $message, array $stamps = []): Envelope
+    {
+        return new Envelope($message);
+    }
+}
+
 class CashTransactionServiceTest extends TestCase
 {
     private EntityManager $em;
@@ -114,7 +124,7 @@ class CashTransactionServiceTest extends TestCase
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
         $balanceRepo = new \App\Repository\MoneyAccountDailyBalanceRepository($registry);
         $balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo);
+        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo, new NullMessageBus());
     }
 
     public function testAddPersistsAllFields(): void

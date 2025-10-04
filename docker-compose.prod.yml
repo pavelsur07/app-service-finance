@@ -119,6 +119,23 @@ services:
         depends_on:
             - site-postgres
             - site-redis
+    site-messenger-worker:
+        build:
+            context: site
+            dockerfile: docker/production/php-cli/Dockerfile
+        container_name: site-messenger-worker
+        restart: always
+        command: php bin/console messenger:consume async -vv --time-limit=3600
+        environment:
+            DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
+            APP_ENV: PROD
+            APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
+        networks:
+            - default
+        depends_on:
+            - site-postgres
+            - site-redis
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres

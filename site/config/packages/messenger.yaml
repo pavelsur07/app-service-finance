@@ -21,6 +21,8 @@ framework:
             messenger.bus.default: []
 
         routing:
+            App\Message\ApplyAutoRulesForTransaction: async
+            App\Message\EnqueueAutoRulesForRange: async
             App\Message\TestMessengerPing: async
             Symfony\Component\Mailer\Messenger\SendEmailMessage: async
             Symfony\Component\Notifier\Message\ChatMessage: async

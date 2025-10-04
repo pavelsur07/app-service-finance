@@ -8,6 +8,7 @@ use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
+use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Service\AccountBalanceService;
@@ -17,6 +18,7 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class ClientBank1CImportService
 {
@@ -29,6 +31,7 @@ class ClientBank1CImportService
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
+        private readonly MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.import.bank1c')]
         private ?LoggerInterface $importLogger = null,
     ) {
@@ -332,6 +335,14 @@ class ClientBank1CImportService
 
         if (!empty($processedTransactions)) {
             $this->entityManager->flush();
+
+            foreach ($processedTransactions as $processedTransaction) {
+                $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
+                    (string) $processedTransaction->getId(),
+                    (string) $company->getId(),
+                    new \DateTimeImmutable(),
+                ));
+            }
         }
 
         if ($created > 0 && null !== $createdMinDate) {
