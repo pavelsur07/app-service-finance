@@ -13,15 +13,19 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final class TestMessengerPingHandler
 {
     public function __construct(
-        private readonly CacheItemPoolInterface $cacheApp, // alias: cache.app
-        private readonly LoggerInterface $logger           // channel: app
+        private readonly CacheItemPoolInterface $cacheApp,
+        private readonly LoggerInterface $logger
     ) {}
 
     public function __invoke(TestMessengerPing $msg): void
     {
         $host = gethostname() ?: 'worker';
-        $item = $this->cacheApp->getItem('messenger:ping:' . $msg->id);
-        $item->expiresAfter(300); // 5 минут
+
+        // ✅ безопасный ключ (без : и прочих зарезервированных)
+        $cacheKey = 'messenger_ping_' . preg_replace('/[{}()\/\\\\@:]/', '-', $msg->id);
+
+        $item = $this->cacheApp->getItem($cacheKey);
+        $item->expiresAfter(300);
         $item->set([
             'handledAt' => (new \DateTimeImmutable())->format('H:i:s'),
             'host'      => $host,

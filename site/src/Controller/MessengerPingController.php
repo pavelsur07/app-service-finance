@@ -33,11 +33,13 @@ final class MessengerPingController extends AbstractController
             'id' => $request->query->get('id'),
         ]);
     }
-
     #[Route('/tools/messenger-ping/status/{id}', name: 'admin_messenger_ping_status', methods: ['GET'])]
     public function status(string $id, CacheItemPoolInterface $cacheApp): JsonResponse
     {
-        $item = $cacheApp->getItem('messenger:ping:' . $id);
+        // тот же безопасный ключ
+        $cacheKey = 'messenger_ping_' . preg_replace('/[{}()\/\\\\@:]/', '-', $id);
+
+        $item = $cacheApp->getItem($cacheKey);
 
         return new JsonResponse([
             'found' => $item->isHit(),
