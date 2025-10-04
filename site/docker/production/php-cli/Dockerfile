@@ -8,7 +8,7 @@ RUN apk add --no-cache libpq-dev \
 RUN apk add --no-cache $PHPIZE_DEPS \
     && pecl install redis \
     && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS \
+    && apk del $PHPIZE_DEPS
 
 RUN apk add --no-cache unzip
 
