@@ -19,12 +19,6 @@ WORKDIR /app
 COPY ./composer.json ./composer.lock ./
 
 
-# ⬇️ Добавляем ext-redis для стадии builder (чтобы composer видел расширение)
-RUN apk add --no-cache $PHPIZE_DEPS \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && apk del $PHPIZE_DEPS
-
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
