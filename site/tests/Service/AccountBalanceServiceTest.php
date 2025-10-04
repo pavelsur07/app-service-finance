@@ -19,6 +19,8 @@ use Doctrine\ORM\Tools\Setup;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class SimpleManagerRegistry implements ManagerRegistry
 {
@@ -87,6 +89,14 @@ class SimpleManagerRegistry implements ManagerRegistry
     }
 }
 
+class NullMessageBus implements MessageBusInterface
+{
+    public function dispatch(object $message, array $stamps = []): Envelope
+    {
+        return new Envelope($message);
+    }
+}
+
 class AccountBalanceServiceTest extends TestCase
 {
     private EntityManager $em;
@@ -112,7 +122,7 @@ class AccountBalanceServiceTest extends TestCase
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
         $this->balanceRepo = new MoneyAccountDailyBalanceRepository($registry);
         $this->balanceService = new AccountBalanceService($txRepo, $this->balanceRepo);
-        $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo);
+        $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo, new NullMessageBus());
     }
 
     public function testRecalculateBalances(): void
