@@ -9,6 +9,13 @@ RUN apk add --no-cache libpq-dev fcgi git linux-headers \
     && docker-php-ext-install pdo_pgsql xdebug bcmath \
     && apk del git linux-headers
 
+# ✅ Добавляем расширение phpredis, чтобы dev-окружение соответствовало требованиям транспорта Redis
+RUN apk add --no-cache $PHPIZE_DEPS \
+    && pecl install redis \
+    && docker-php-ext-enable redis \
+    && php -r 'echo "Redis ext version: ", phpversion("redis"), PHP_EOL;' \
+    && apk del --no-cache $PHPIZE_DEPS
+
 RUN mv $PHP_INI_DIR/php.ini-development $PHP_INI_DIR/php.ini
 
 COPY ./common/php/conf.d /usr/local/etc/php/conf.d
