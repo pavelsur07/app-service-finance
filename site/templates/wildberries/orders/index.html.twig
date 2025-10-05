@@ -12,7 +12,13 @@
         </div>
     {% endfor %}
 
-    <h1 class="mb-4">Заказы Wildberries</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="mb-0">Заказы Wildberries</h1>
+        <form method="post" action="{{ path('wildberries_orders_update') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('wildberries_orders_update') }}">
+            <button type="submit" class="btn btn-outline-primary">Обновить</button>
+        </form>
+    </div>
 
     <form method="get" class="row g-2 mb-4">
         <div class="col-md-3">
