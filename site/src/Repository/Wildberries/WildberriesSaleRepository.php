@@ -143,7 +143,7 @@ class WildberriesSaleRepository extends ServiceEntityRepository
                 ->setParameter('to', $filters['to']);
         }
 
-        $qb->orderBy('sale.soldAt', 'ASC');
+        $qb->orderBy('sale.soldAt', 'DESC');
 
         $query = $qb->getQuery();
         $query->setMaxResults($perPage);
