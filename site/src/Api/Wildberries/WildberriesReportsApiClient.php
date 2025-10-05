@@ -44,6 +44,26 @@ class WildberriesReportsApiClient
      * @throws TransportExceptionInterface
      * @throws DecodingExceptionInterface
      */
+    public function fetchOrders(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, array $query = []): array
+    {
+        $apiKey = $company->getWildberriesApiKey();
+        if (!$apiKey) {
+            throw new \InvalidArgumentException('Wildberries API key is not configured for company '.$company->getId());
+        }
+
+        $params = array_merge([
+            'dateFrom' => $dateFrom->format(\DATE_ATOM),
+            'dateTo' => $dateTo->format(\DATE_ATOM),
+            'flag' => 0,
+        ], $query);
+
+        return $this->request($apiKey, '/supplier/orders', $params);
+    }
+
+    /**
+     * @throws TransportExceptionInterface
+     * @throws DecodingExceptionInterface
+     */
     private function request(string $apiKey, string $path, array $query): array
     {
         $response = $this->httpClient->request('GET', rtrim(self::BASE_URL, '/').$path, [

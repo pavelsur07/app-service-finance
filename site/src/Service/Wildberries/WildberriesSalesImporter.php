@@ -10,6 +10,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Throwable;
 
 readonly class WildberriesSalesImporter
 {
@@ -37,6 +38,7 @@ readonly class WildberriesSalesImporter
         $processed = 0;
 
         $processedSales = [];
+        $orderStatuses = $this->loadOrderStatuses($company, $dateFrom, $dateTo);
 
         foreach ($rows as $row) {
             $srid = (string) ($row['srid'] ?? '');
@@ -66,7 +68,11 @@ readonly class WildberriesSalesImporter
             $sale->setForPay(isset($row['forPay']) ? (string) $row['forPay'] : null);
             $sale->setDeliveryAmount(isset($row['deliveryAmount']) ? (string) $row['deliveryAmount'] : null);
             $sale->setOrderType(isset($row['orderType']) ? (string) $row['orderType'] : null);
-            $sale->setSaleStatus(isset($row['saleStatus']) ? (string) $row['saleStatus'] : null);
+            $saleStatus = isset($row['saleStatus']) ? (string) $row['saleStatus'] : null;
+            if (null === $saleStatus && isset($orderStatuses[$srid])) {
+                $saleStatus = $orderStatuses[$srid];
+            }
+            $sale->setSaleStatus($saleStatus);
             $sale->setWarehouseName(isset($row['warehouseName']) ? (string) $row['warehouseName'] : null);
             $sale->setOblast(isset($row['oblast']) ? (string) $row['oblast'] : null);
             $sale->setOdid(isset($row['odid']) ? (string) $row['odid'] : null);
@@ -101,5 +107,47 @@ readonly class WildberriesSalesImporter
         }
 
         return $processed;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function loadOrderStatuses(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo): array
+    {
+        try {
+            $orders = $this->client->fetchOrders($company, $dateFrom, $dateTo);
+        } catch (Throwable $exception) {
+            $this->logger->error('Failed to load Wildberries order statuses', [
+                'companyId' => $company->getId(),
+                'exception' => $exception->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        if (isset($orders['orders']) && is_array($orders['orders'])) {
+            $orders = $orders['orders'];
+        }
+
+        $statuses = [];
+        foreach ($orders as $orderRow) {
+            $srid = isset($orderRow['srid']) ? (string) $orderRow['srid'] : '';
+            if ('' === $srid) {
+                continue;
+            }
+
+            if (!array_key_exists('status', $orderRow)) {
+                continue;
+            }
+
+            $status = $orderRow['status'];
+            if (null === $status) {
+                continue;
+            }
+
+            $statuses[$srid] = (string) $status;
+        }
+
+        return $statuses;
     }
 }
