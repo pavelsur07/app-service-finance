@@ -68,7 +68,19 @@ readonly class WildberriesSalesImporter
             $sale->setForPay(isset($row['forPay']) ? (string) $row['forPay'] : null);
             $sale->setDeliveryAmount(isset($row['deliveryAmount']) ? (string) $row['deliveryAmount'] : null);
             $sale->setOrderType(isset($row['orderType']) ? (string) $row['orderType'] : null);
-            $saleStatus = isset($row['saleStatus']) ? (string) $row['saleStatus'] : null;
+            $saleStatus = null;
+            foreach (['saleStatus', 'status', 'supplierStatus', 'supplierStatusName'] as $statusKey) {
+                if (!array_key_exists($statusKey, $row) || null === $row[$statusKey]) {
+                    continue;
+                }
+
+                $saleStatus = trim((string) $row[$statusKey]);
+                if ('' !== $saleStatus) {
+                    break;
+                }
+
+                $saleStatus = null;
+            }
             if (null === $saleStatus && isset($orderStatuses[$srid])) {
                 $saleStatus = $orderStatuses[$srid];
             }
@@ -140,12 +152,25 @@ readonly class WildberriesSalesImporter
                 continue;
             }
 
-            $status = $orderRow['status'];
+            $status = null;
+            foreach (['supplierStatusName', 'supplierStatus', 'status'] as $statusKey) {
+                if (!array_key_exists($statusKey, $orderRow) || null === $orderRow[$statusKey]) {
+                    continue;
+                }
+
+                $status = trim((string) $orderRow[$statusKey]);
+                if ('' !== $status) {
+                    break;
+                }
+
+                $status = null;
+            }
+
             if (null === $status) {
                 continue;
             }
 
-            $statuses[$srid] = (string) $status;
+            $statuses[$srid] = $status;
         }
 
         return $statuses;
