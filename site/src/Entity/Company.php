@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Entity\Ozon\OzonProduct;
+use App\Entity\Wildberries\WildberriesSale;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -41,12 +42,16 @@ class Company
     #[ORM\OneToMany(targetEntity: OzonProduct::class, mappedBy: 'company', orphanRemoval: true)]
     private Collection $ozonProducts;
 
+    #[ORM\OneToMany(targetEntity: WildberriesSale::class, mappedBy: 'company', orphanRemoval: true)]
+    private Collection $wildberriesSales;
+
     public function __construct(string $id, User $user)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->user = $user;
         $this->ozonProducts = new ArrayCollection();
+        $this->wildberriesSales = new ArrayCollection();
     }
 
     public function getId(): ?string
@@ -129,6 +134,11 @@ class Company
     public function getOzonProducts(): Collection
     {
         return $this->ozonProducts;
+    }
+
+    public function getWildberriesSales(): Collection
+    {
+        return $this->wildberriesSales;
     }
 
     public function getFinanceLockBefore(): ?\DateTimeImmutable

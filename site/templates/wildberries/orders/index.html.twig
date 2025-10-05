@@ -1,0 +1,117 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+    {% for message in app.flashes('success') %}
+        <div class="alert alert-success" role="alert">
+            {{ message }}
+        </div>
+    {% endfor %}
+    {% for message in app.flashes('error') %}
+        <div class="alert alert-danger" role="alert">
+            {{ message }}
+        </div>
+    {% endfor %}
+
+    <h1 class="mb-4">Заказы Wildberries</h1>
+
+    <form method="get" class="row g-2 mb-4">
+        <div class="col-md-3">
+            <label for="filter-status" class="form-label">Статус</label>
+            <input id="filter-status" type="text" name="status" value="{{ filters.status }}" class="form-control" placeholder="пример: delivered">
+        </div>
+        <div class="col-md-3">
+            <label for="filter-order-type" class="form-label">Тип заказа</label>
+            <input id="filter-order-type" type="text" name="orderType" value="{{ filters.orderType }}" class="form-control" placeholder="пример: FBO">
+        </div>
+        <div class="col-md-3">
+            <label for="filter-from" class="form-label">Дата c</label>
+            <input id="filter-from" type="datetime-local" name="from" value="{{ filters.from }}" class="form-control">
+        </div>
+        <div class="col-md-3">
+            <label for="filter-to" class="form-label">Дата по</label>
+            <input id="filter-to" type="datetime-local" name="to" value="{{ filters.to }}" class="form-control">
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2 mt-2">
+            <a href="{{ path('wildberries_orders') }}" class="btn btn-outline-secondary">Сбросить</a>
+            <button type="submit" class="btn btn-primary">Применить</button>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+            <tr>
+                <th>Дата продажи</th>
+                <th>SRID</th>
+                <th>Sale ID</th>
+                <th>ODID</th>
+                <th>Статус</th>
+                <th>Тип заказа</th>
+                <th>Кол-во</th>
+                <th>Цена</th>
+                <th>Итого</th>
+                <th>К выплате</th>
+                <th>Доставка</th>
+                <th>Склад</th>
+                <th>Регион</th>
+                <th>Обновлено</th>
+                <th>Raw</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for sale in pagination.items %}
+                <tr>
+                    <td>{{ sale.soldAt|date('Y-m-d H:i') }}</td>
+                    <td>{{ sale.srid }}</td>
+                    <td>{{ sale.saleId ?? '—' }}</td>
+                    <td>{{ sale.odid ?? '—' }}</td>
+                    <td>{{ sale.saleStatus ?? '—' }}</td>
+                    <td>{{ sale.orderType ?? '—' }}</td>
+                    <td>{{ sale.quantity }}</td>
+                    <td>{{ sale.price }}</td>
+                    <td>{{ sale.finishedPrice }}</td>
+                    <td>{{ sale.forPay ?? '—' }}</td>
+                    <td>{{ sale.deliveryAmount ?? '—' }}</td>
+                    <td>{{ sale.warehouseName ?? '—' }}</td>
+                    <td>{{ sale.oblast ?? '—' }}</td>
+                    <td>{{ sale.statusUpdatedAt ? sale.statusUpdatedAt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>
+                        <details>
+                            <summary>Показать</summary>
+                            <pre class="mb-0"><code>{{ sale.raw|json_encode(constant('JSON_PRETTY_PRINT')) }}</code></pre>
+                        </details>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="15" class="text-center">Данные о заказах отсутствуют</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pagination.pages > 1 %}
+        {% set baseParams = {} %}
+        {% for key, value in filters %}
+            {% if value is not empty %}
+                {% set baseParams = baseParams|merge({ (key): value }) %}
+            {% endif %}
+        {% endfor %}
+        <nav aria-label="Wildberries orders pagination">
+            <ul class="pagination">
+                <li class="page-item {{ pagination.currentPage <= 1 ? 'disabled' : '' }}">
+                    <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage - 1})) }}">Назад</a>
+                </li>
+                {% for pageNumber in 1..pagination.pages %}
+                    <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
+                        <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                    </li>
+                {% endfor %}
+                <li class="page-item {{ pagination.currentPage >= pagination.pages ? 'disabled' : '' }}">
+                    <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage + 1})) }}">Вперёд</a>
+                </li>
+            </ul>
+        </nav>
+    {% endif %}
+{% endblock %}

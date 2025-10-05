@@ -105,6 +105,17 @@
                         </a>
                     </div>
                 </li>
+                {#---- Wildberries ---#}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                        <span class="nav-link-title text-muted"> Wildberries </span>
+                    </a>
+                    <div class="dropdown-menu" data-bs-popper="static">
+                        <a class="dropdown-item {{ current_route starts with 'wildberries_orders' ? 'active' : '' }}" href="{{ path('wildberries_orders') }}">
+                            <span class="nav-link-title">Заказы</span>
+                        </a>
+                    </div>
+                </li>
                 {#---- Profile ---#}
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
