@@ -4,6 +4,7 @@ namespace App\Command;
 
 use App\Message\EnqueueAutoRulesForRange;
 use DateTimeImmutable;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -58,6 +59,20 @@ final class CashAutoRulesEnqueueCommand extends Command
                 array_map('trim', explode(',', $accountsOption)),
                 static fn (string $value): bool => '' !== $value,
             ));
+
+            $invalidAccountIds = array_values(array_filter(
+                $accountIds,
+                static fn (string $value): bool => !Uuid::isValid($value),
+            ));
+
+            if ([] !== $invalidAccountIds) {
+                $output->writeln(sprintf(
+                    '<error>Опция --accounts должна содержать UUID. Некорректные значения: %s.</error>',
+                    implode(', ', $invalidAccountIds),
+                ));
+
+                return Command::FAILURE;
+            }
         }
 
         $this->bus->dispatch(new EnqueueAutoRulesForRange(
