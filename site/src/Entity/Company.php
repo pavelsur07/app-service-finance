@@ -6,6 +6,7 @@ use App\Entity\Ozon\OzonProduct;
 use App\Entity\Wildberries\WildberriesSale;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -23,7 +24,7 @@ class Company
     #[ORM\Column(length: 12, nullable: true)]
     private ?string $inn = null;
 
-    #[ORM\Column(length: 255, nullable: true)]
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $wildberriesApiKey = null;
 
     #[ORM\Column(length: 255, nullable: true)]
