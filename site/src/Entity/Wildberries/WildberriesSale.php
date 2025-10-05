@@ -7,7 +7,7 @@ use App\Repository\Wildberries\WildberriesSaleRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WildberriesSaleRepository::class)]
-#[ORM\Table(name: '`wildberries_sales`')]
+#[ORM\Table(name: 'wildberries_sales')]
 #[ORM\UniqueConstraint(name: 'uniq_wb_sale_company_srid', columns: ['company_id', 'srid'])]
 class WildberriesSale
 {
