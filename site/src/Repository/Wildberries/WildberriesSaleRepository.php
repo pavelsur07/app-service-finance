@@ -29,6 +29,86 @@ class WildberriesSaleRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function hasSalesForCompany(Company $company): bool
+    {
+        $result = $this->createQueryBuilder('sale')
+            ->select('1')
+            ->andWhere('sale.company = :company')
+            ->setParameter('company', $company)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return null !== $result;
+    }
+
+    public function findLatestSoldAt(Company $company): ?\DateTimeImmutable
+    {
+        $sale = $this->createQueryBuilder('sale')
+            ->andWhere('sale.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('sale.soldAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $sale instanceof WildberriesSale ? $sale->getSoldAt() : null;
+    }
+
+    public function findOldestOpenSoldAt(Company $company): ?\DateTimeImmutable
+    {
+        $query = $this->createQueryBuilder('sale')
+            ->andWhere('sale.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('sale.soldAt', 'ASC')
+            ->getQuery();
+
+        foreach ($query->toIterable() as $sale) {
+            if (!$sale instanceof WildberriesSale) {
+                continue;
+            }
+
+            if (!$this->isClosedStatus($sale->getSaleStatus())) {
+                return $sale->getSoldAt();
+            }
+        }
+
+        return null;
+    }
+
+    private function isClosedStatus(?string $status): bool
+    {
+        if (null === $status || '' === $status) {
+            return false;
+        }
+
+        $normalized = mb_strtolower($status);
+        $keywords = [
+            'deliver',
+            'sale',
+            'sold',
+            'purchase',
+            'return',
+            'cancel',
+            'refus',
+            'выкуп',
+            'куплен',
+            'покуп',
+            'продаж',
+            'отказ',
+            'отмен',
+            'возврат',
+        ];
+
+        foreach ($keywords as $keyword) {
+            if (str_contains($normalized, $keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /**
      * @param array<string, mixed> $filters
      *
