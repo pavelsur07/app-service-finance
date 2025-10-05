@@ -36,15 +36,23 @@ readonly class WildberriesSalesImporter
         $rows = $this->client->fetchDetailedSales($company, $dateFrom, $dateTo);
         $processed = 0;
 
+        $processedSales = [];
+
         foreach ($rows as $row) {
             $srid = (string) ($row['srid'] ?? '');
             if ('' === $srid) {
                 continue;
             }
 
-            $sale = $this->salesRepository->findOneByCompanyAndSrid($company, $srid);
-            if (!$sale) {
-                $sale = new WildberriesSale(Uuid::uuid4()->toString(), $company, $srid);
+            if (isset($processedSales[$srid])) {
+                $sale = $processedSales[$srid];
+            } else {
+                $sale = $this->salesRepository->findOneByCompanyAndSrid($company, $srid);
+                if (!$sale) {
+                    $sale = new WildberriesSale(Uuid::uuid4()->toString(), $company, $srid);
+                }
+
+                $processedSales[$srid] = $sale;
             }
 
             $soldAt = isset($row['date']) ? new \DateTimeImmutable($row['date']) : $dateFrom;
