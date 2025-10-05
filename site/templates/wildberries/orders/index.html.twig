@@ -47,10 +47,7 @@
         <table class="table table-striped align-middle">
             <thead>
             <tr>
-                <th>Дата продажи</th>
-                <th>SRID</th>
-                <th>Sale ID</th>
-                <th>ODID</th>
+                <th>Дата заказа</th>
                 <th>Статус</th>
                 <th>Тип заказа</th>
                 <th>Кол-во</th>
@@ -68,9 +65,6 @@
             {% for sale in pagination.items %}
                 <tr>
                     <td>{{ sale.soldAt|date('Y-m-d H:i') }}</td>
-                    <td>{{ sale.srid }}</td>
-                    <td>{{ sale.saleId ?? '—' }}</td>
-                    <td>{{ sale.odid ?? '—' }}</td>
                     <td>{{ sale.saleStatus ?? '—' }}</td>
                     <td>{{ sale.orderType ?? '—' }}</td>
                     <td>{{ sale.quantity }}</td>
@@ -90,7 +84,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="15" class="text-center">Данные о заказах отсутствуют</td>
+                    <td colspan="12" class="text-center">Данные о заказах отсутствуют</td>
                 </tr>
             {% endfor %}
             </tbody>
@@ -109,11 +103,25 @@
                 <li class="page-item {{ pagination.currentPage <= 1 ? 'disabled' : '' }}">
                     <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage - 1})) }}">Назад</a>
                 </li>
-                {% for pageNumber in 1..pagination.pages %}
-                    <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
-                        <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                {% if pagination.pages > 10 %}
+                    {% for pageNumber in 1..4 %}
+                        <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="page-item disabled">
+                        <span class="page-link">…</span>
                     </li>
-                {% endfor %}
+                    <li class="page-item {{ pagination.pages == pagination.currentPage ? 'active' : '' }}">
+                        <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.pages})) }}">{{ pagination.pages }}</a>
+                    </li>
+                {% else %}
+                    {% for pageNumber in 1..pagination.pages %}
+                        <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                        </li>
+                    {% endfor %}
+                {% endif %}
                 <li class="page-item {{ pagination.currentPage >= pagination.pages ? 'disabled' : '' }}">
                     <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage + 1})) }}">Вперёд</a>
                 </li>
