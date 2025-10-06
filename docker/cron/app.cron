@@ -1,13 +1,13 @@
 # ┌─ min  ┌ hour ┌ dom ┌ mon ┌ dow
 # │       │      │     │     │
 # Каждые 5 минут: авто-правила ДДС
-*/5 * * * * docker exec site-php-cli php /app/bin/console app:cash:auto-rules --no-interaction >> /var/log/cron/app.log 2>&1
+*/5 * * * * php /app/bin/console app:cash:auto-rules --no-interaction >> /var/log/cron/app.log 2>&1
 
 # Раз в час: пересчёт оперативных P&L-агрегатов
-5 * * * * docker exec site-php-cli php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
+5 * * * * php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
 
 # Ежедневно в 02:10: снапшоты остатков по счетам
-10 2 * * * docker exec site-php-cli php /app/bin/console app:money-account:snapshot --no-interaction >> /var/log/cron/app.log 2>&1
+10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction >> /var/log/cron/app.log 2>&1
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
-0 3 * * * docker exec site-php-cli php /app/bin/console app:maintenance:cleanup --env=prod >> /var/log/cron/app.log 2>&1
+0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod >> /var/log/cron/app.log 2>&1
