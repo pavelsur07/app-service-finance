@@ -160,6 +160,41 @@ services:
             - site-redis-data:/data
         networks:
             - default
+
+    socket-proxy:
+        image: tecnativa/docker-socket-proxy:0.2.3
+        environment:
+            - LOG=1
+            - EVENTS=1
+            - PING=1
+            - VERSION=1
+            - CONTAINERS=1
+            - CONTAINERS_INSPECT=1
+            - CONTAINERS_EXEC=1
+            - EXEC_START=1
+        volumes:
+            - /var/run/docker.sock:/var/run/docker.sock:ro
+        restart: unless-stopped
+
+    scheduler:
+        image: docker:27-cli
+        entrypoint: ["/bin/sh", "-lc"]
+        command: >
+            'wget -qO /usr/local/bin/supercronic
+            https://github.com/aptible/supercronic/releases/download/v0.2.31/supercronic-linux-amd64
+            && chmod +x /usr/local/bin/supercronic
+            && supercronic -json /etc/crontabs/app.cron'
+        environment:
+            TZ: Europe/Zurich
+            DOCKER_HOST: tcp://socket-proxy:2375
+        volumes:
+            - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
+            - ./var/log/cron:/var/log/cron:rw
+        depends_on:
+            - socket-proxy
+            - site-php-cli
+        restart: unless-stopped
+
 volumes:
     traefik-certs:
     postgres_data:
