@@ -95,7 +95,7 @@ try-build:
 	REGISTRY=localhost IMAGE_TAG=0 make build
 
 sched-up:
-	docker compose up -d socket-proxy scheduler
+        docker compose up -d scheduler
 
 sched-logs:
 	docker compose logs -f scheduler
