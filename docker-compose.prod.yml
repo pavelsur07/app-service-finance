@@ -176,6 +176,7 @@ services:
             TZ: Europe/Zurich
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
             APP_ENV: PROD
+            APP_DEBUG: 0
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
