@@ -162,7 +162,7 @@ services:
             - default
 
     socket-proxy:
-        image: tecnativa/docker-socket-proxy:0.2.3
+        image: tecnativa/docker-socket-proxy:0.2.4
         environment:
             - LOG=1
             - EVENTS=1
