@@ -55,6 +55,9 @@ ssh $SERVER_USER@$SERVER_HOST << EOF
   unzip -o app.zip -d ./current
   rm app.zip
 
+  echo "🪵 Создаю директорию для логов cron..."
+  mkdir -p ./current/var/log/cron
+
   echo "📄 Копирую .env.prod внутрь каталога site/"
   cp $ENV_FILE ./current/site/.env
   cp $ENV_FILE ./current/.env
