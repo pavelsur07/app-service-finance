@@ -93,3 +93,15 @@ build-site:
 
 try-build:
 	REGISTRY=localhost IMAGE_TAG=0 make build
+
+sched-up:
+	docker compose up -d socket-proxy scheduler
+
+sched-logs:
+	docker compose logs -f scheduler
+
+sched-test:
+	docker compose exec scheduler supercronic -test /etc/crontabs/app.cron
+
+sched-down:
+	docker compose stop scheduler
