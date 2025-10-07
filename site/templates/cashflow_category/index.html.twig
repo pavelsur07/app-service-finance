@@ -5,8 +5,8 @@
     <ul class="list-unstyled">
     {% for item in items %}
         <li>
-            <div class="d-flex align-items-center">
-                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="text-reset text-decoration-none" style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</a>
+            <div class="cashflow-category-item d-flex align-items-center">
+                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none flex-grow-1" style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</a>
                 <span class="ms-auto d-inline-flex gap-1">
                     <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
@@ -23,6 +23,25 @@
 {% endmacro %}
 
 {% import _self as macros %}
+
+{% block stylesheets %}
+    <style>
+        .cashflow-category-item {
+            border-radius: .5rem;
+            padding: .5rem .75rem;
+            transition: background-color .2s ease-in-out;
+        }
+
+        .cashflow-category-item:hover,
+        .cashflow-category-item:focus-within {
+            background-color: rgba(24, 144, 255, 0.12);
+        }
+
+        .cashflow-category-link {
+            display: inline-block;
+        }
+    </style>
+{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
