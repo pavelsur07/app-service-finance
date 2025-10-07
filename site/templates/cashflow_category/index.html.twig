@@ -1,12 +1,20 @@
 {% extends 'base.html.twig' %}
 {% block title %}Статьи ДДС{% endblock %}
 
-{% macro render_items(items, level) %}
-    <ul class="list-unstyled">
+{% macro render_items(items) %}
+    <ul class="cashflow-category-list list-unstyled mb-0">
     {% for item in items %}
-        <li>
+        {% set has_children = item.children|length > 0 %}
+        <li class="cashflow-category-node">
             <div class="cashflow-category-item d-flex align-items-center">
-                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none flex-grow-1" style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</a>
+                {% if has_children %}
+                    <button class="cashflow-category-toggle btn btn-link btn-sm p-0 me-2 collapsed" type="button" aria-expanded="false">
+                        <span class="visually-hidden">Переключить вложенные статьи</span>
+                    </button>
+                {% else %}
+                    <span class="cashflow-category-toggle-placeholder me-2"></span>
+                {% endif %}
+                <a href="{{ path('cashflow_category_edit', {'id': item.id}) }}" class="cashflow-category-link text-reset text-decoration-none flex-grow-1">{{ item.name }}</a>
                 <span class="ms-auto d-inline-flex gap-1">
                     <form method="post" action="{{ path('cashflow_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
@@ -14,8 +22,10 @@
                     </form>
                 </span>
             </div>
-            {% if item.children|length > 0 %}
-                {{ _self.render_items(item.children, level + 1) }}
+            {% if has_children %}
+                <div class="cashflow-category-children" hidden>
+                    {{ _self.render_items(item.children) }}
+                </div>
             {% endif %}
         </li>
     {% endfor %}
@@ -40,6 +50,41 @@
         .cashflow-category-link {
             display: inline-block;
         }
+
+        .cashflow-category-toggle {
+            color: inherit;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .cashflow-category-toggle::before {
+            content: '\25B8';
+            font-size: .8rem;
+            transition: transform .2s ease-in-out;
+        }
+
+        .cashflow-category-toggle:hover,
+        .cashflow-category-toggle:focus {
+            text-decoration: none;
+        }
+
+        .cashflow-category-toggle:not(.collapsed)::before {
+            transform: rotate(90deg);
+        }
+
+        .cashflow-category-toggle-placeholder {
+            display: inline-flex;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .cashflow-category-children {
+            margin-left: 1.5rem;
+        }
     </style>
 {% endblock %}
 
@@ -57,10 +102,49 @@
         </div>
     </div>
     <div class="container-xl mt-3">
-        <div class="card">
+            <div class="card">
             <div class="card-body">
-                {{ macros.render_items(items, 1) }}
+                {{ macros.render_items(items) }}
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.cashflow-category-toggle').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var node = button.closest('.cashflow-category-node');
+                    if (!node) {
+                        return;
+                    }
+
+                    var children = null;
+                    for (var i = 0; i < node.children.length; i++) {
+                        var child = node.children[i];
+                        if (child.classList && child.classList.contains('cashflow-category-children')) {
+                            children = child;
+                            break;
+                        }
+                    }
+
+                    if (!children) {
+                        return;
+                    }
+
+                    var isHidden = children.hasAttribute('hidden');
+                    if (isHidden) {
+                        children.removeAttribute('hidden');
+                    } else {
+                        children.setAttribute('hidden', '');
+                    }
+
+                    button.classList.toggle('collapsed', !isHidden);
+                    button.setAttribute('aria-expanded', String(isHidden));
+                });
+            });
+        });
+    </script>
 {% endblock %}
