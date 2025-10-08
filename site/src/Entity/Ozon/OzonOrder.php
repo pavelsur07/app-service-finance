@@ -11,6 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Index(name: 'idx_scheme', columns: ['scheme'])]
 #[ORM\Index(name: 'idx_status', columns: ['status'])]
 #[ORM\Index(name: 'idx_ozon_updated_at', columns: ['ozon_updated_at'])]
+#[ORM\Index(name: 'idx_company_scheme_ozon_updated_at', columns: ['company_id', 'scheme', 'ozon_updated_at'])]
 class OzonOrder
 {
     #[ORM\Id]
