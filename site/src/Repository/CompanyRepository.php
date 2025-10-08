@@ -28,4 +28,14 @@ class CompanyRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['name' => $name]);
     }
+
+    public function findAllWithOzonCredentials(): array
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere("c.ozonSellerId IS NOT NULL AND c.ozonSellerId <> ''")
+            ->andWhere("c.ozonApiKey   IS NOT NULL AND c.ozonApiKey   <> ''")
+            ->orderBy('c.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }
