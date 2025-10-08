@@ -6,6 +6,9 @@
 # Раз в час: пересчёт оперативных P&L-агрегатов
 #5 * * * * php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
 
+# Ежечасно: постановка задач на синхронизацию заказов Ozon
+5 * * * * php /app/bin/console ozon:orders:enqueue --no-interaction >> /var/log/cron/app.log 2>&1
+
 # Ежедневно в 02:10: снапшоты остатков по счетам
 10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction >> /var/log/cron/app.log 2>&1
 
