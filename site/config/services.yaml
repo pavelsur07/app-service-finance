@@ -33,3 +33,13 @@ services:
     App\Service\RateLimiter\ReportsApiRateLimiter:
         arguments:
             $factory: '@?limiter.reports_api'
+
+    # Логгер для HTTP-клиента Ozon
+    App\Api\Ozon\OzonApiClient:
+        arguments:
+            $logger: '@monolog.logger.ozon.http'
+
+    # Логгер для синка заказов
+    App\Service\Ozon\OzonOrderSyncService:
+        arguments:
+            $logger: '@monolog.logger.ozon.sync'
