@@ -1,5 +1,8 @@
 FROM php:8.2-cli-alpine AS builder
 
+# После ("щадящий" вариант):
+ENV MAKEFLAGS="-j1"
+
 RUN apk add --no-cache libpq-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
