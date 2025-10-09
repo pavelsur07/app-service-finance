@@ -16,11 +16,15 @@ final class Version20240604000000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE INDEX idx_company_scheme_ozon_updated_at ON ozon_orders (company_id, scheme, ozon_updated_at)');
+        if (!$schema->hasTable('ozon_orders')) {
+            return;
+        }
+
+        $this->addSql('CREATE INDEX IF NOT EXISTS idx_company_scheme_ozon_updated_at ON ozon_orders (company_id, scheme, ozon_updated_at)');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP INDEX idx_company_scheme_ozon_updated_at');
+        $this->addSql('DROP INDEX IF EXISTS idx_company_scheme_ozon_updated_at');
     }
 }
