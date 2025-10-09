@@ -13,9 +13,9 @@
     {% endfor %}
 
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h1 class="mb-0">Заказы Wildberries</h1>
-        <form method="post" action="{{ path('wildberries_orders_update') }}">
-            <input type="hidden" name="_token" value="{{ csrf_token('wildberries_orders_update') }}">
+        <h1 class="mb-0">Продажи Wildberries</h1>
+        <form method="post" action="{{ path('wildberries_sales_update') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('wildberries_sales_update') }}">
             <button type="submit" class="btn btn-outline-primary">Обновить</button>
         </form>
     </div>
@@ -38,7 +38,7 @@
             <input id="filter-to" type="datetime-local" name="to" value="{{ filters.to }}" class="form-control">
         </div>
         <div class="col-12 d-flex justify-content-end gap-2 mt-2">
-            <a href="{{ path('wildberries_orders') }}" class="btn btn-outline-secondary">Сбросить</a>
+            <a href="{{ path('wildberries_sales') }}" class="btn btn-outline-secondary">Сбросить</a>
             <button type="submit" class="btn btn-primary">Применить</button>
         </div>
     </form>
@@ -98,32 +98,32 @@
                 {% set baseParams = baseParams|merge({ (key): value }) %}
             {% endif %}
         {% endfor %}
-        <nav aria-label="Wildberries orders pagination">
+        <nav aria-label="Wildberries sales pagination">
             <ul class="pagination">
                 <li class="page-item {{ pagination.currentPage <= 1 ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage - 1})) }}">Назад</a>
+                    <a class="page-link" href="{{ path('wildberries_sales', baseParams|merge({'page': pagination.currentPage - 1})) }}">Назад</a>
                 </li>
                 {% if pagination.pages > 10 %}
                     {% for pageNumber in 1..4 %}
                         <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
-                            <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                            <a class="page-link" href="{{ path('wildberries_sales', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
                         </li>
                     {% endfor %}
                     <li class="page-item disabled">
                         <span class="page-link">…</span>
                     </li>
                     <li class="page-item {{ pagination.pages == pagination.currentPage ? 'active' : '' }}">
-                        <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.pages})) }}">{{ pagination.pages }}</a>
+                        <a class="page-link" href="{{ path('wildberries_sales', baseParams|merge({'page': pagination.pages})) }}">{{ pagination.pages }}</a>
                     </li>
                 {% else %}
                     {% for pageNumber in 1..pagination.pages %}
                         <li class="page-item {{ pageNumber == pagination.currentPage ? 'active' : '' }}">
-                            <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                            <a class="page-link" href="{{ path('wildberries_sales', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
                         </li>
                     {% endfor %}
                 {% endif %}
                 <li class="page-item {{ pagination.currentPage >= pagination.pages ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('wildberries_orders', baseParams|merge({'page': pagination.currentPage + 1})) }}">Вперёд</a>
+                    <a class="page-link" href="{{ path('wildberries_sales', baseParams|merge({'page': pagination.currentPage + 1})) }}">Вперёд</a>
                 </li>
             </ul>
         </nav>

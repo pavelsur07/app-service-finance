@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 
-class WildberriesOrderController extends AbstractController
+class WildberriesSalesController extends AbstractController
 {
     public function __construct(
         private LoggerInterface $logger,
@@ -28,7 +28,7 @@ class WildberriesOrderController extends AbstractController
     ) {
     }
 
-    #[Route('/wildberries/orders', name: 'wildberries_orders')]
+    #[Route('/wildberries/sales', name: 'wildberries_sales')]
     public function index(Request $request, WildberriesSaleRepository $repository): Response
     {
         $user = $this->getUser();
@@ -90,13 +90,13 @@ class WildberriesOrderController extends AbstractController
 
         $pagination = $repository->paginateByCompany($company, $page, 50, $filters);
 
-        return $this->render('wildberries/orders/index.html.twig', [
+        return $this->render('wildberries/sales/index.html.twig', [
             'pagination' => $pagination,
             'filters' => $filtersForTemplate,
         ]);
     }
 
-    #[Route('/wildberries/orders/update', name: 'wildberries_orders_update', methods: ['POST'])]
+    #[Route('/wildberries/sales/update', name: 'wildberries_sales_update', methods: ['POST'])]
     public function update(Request $request): Response
     {
         $user = $this->getUser();
@@ -110,7 +110,7 @@ class WildberriesOrderController extends AbstractController
         }
 
         $token = (string) $request->request->get('_token');
-        if (!$this->csrfTokenManager->isTokenValid(new CsrfToken('wildberries_orders_update', $token))) {
+        if (!$this->csrfTokenManager->isTokenValid(new CsrfToken('wildberries_sales_update', $token))) {
             throw $this->createAccessDeniedException('Недопустимый CSRF токен');
         }
 
@@ -118,7 +118,7 @@ class WildberriesOrderController extends AbstractController
         $application->setAutoExit(false);
 
         $input = new ArrayInput([
-            'command' => 'app:wildberries:update-orders',
+            'command' => 'app:wildberries:sync-sales',
             '--company' => $company->getId(),
         ]);
         $output = new BufferedOutput();
@@ -126,7 +126,7 @@ class WildberriesOrderController extends AbstractController
         try {
             $exitCode = $application->run($input, $output);
         } catch (\Throwable $exception) {
-            $this->logger->error('Wildberries orders update failed', [
+            $this->logger->error('Wildberries sales update failed', [
                 'companyId' => $company->getId(),
                 'exception' => $exception->getMessage(),
             ]);
@@ -137,11 +137,11 @@ class WildberriesOrderController extends AbstractController
         $message = trim($output->fetch());
 
         if (Command::SUCCESS === $exitCode) {
-            $this->addFlash('success', '' !== $message ? $message : 'Заказы Wildberries обновлены');
+            $this->addFlash('success', '' !== $message ? $message : 'Продажи Wildberries обновлены');
         } else {
-            $this->addFlash('error', '' !== $message ? $message : 'Не удалось обновить заказы Wildberries');
+            $this->addFlash('error', '' !== $message ? $message : 'Не удалось обновить продажи Wildberries');
         }
 
-        return $this->redirectToRoute('wildberries_orders');
+        return $this->redirectToRoute('wildberries_sales');
     }
 }
