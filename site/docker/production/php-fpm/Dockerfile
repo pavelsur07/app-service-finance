@@ -1,7 +1,7 @@
 FROM php:8.2-cli-alpine AS builder
 
-RUN apk add --no-cache libpq-dev \
-    && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+RUN apk add --no-cache postgresql-dev \
+    && docker-php-ext-configure pgsql --with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # Install ext-redis for the build stage so that Composer sees the extension
@@ -26,8 +26,8 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 ### FPM ###
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache libpq-dev fcgi \
-    && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+RUN apk add --no-cache postgresql-dev fcgi \
+    && docker-php-ext-configure pgsql --with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # ⬇️ Добавляем ext-redis для рантайма PHP-FPM
