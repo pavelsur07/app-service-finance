@@ -58,8 +58,12 @@
                         <a class="dropdown-item " href="{{ path('report_debug_daily_facts') }}">
                             <span class="nav-link-title">Отчёт “Фактические дневные остатки”</span>
                         </a>
+                        {% set is_active_raw = app.request.attributes.get('_route') == 'finance_report_raw' %}
                         <a class="dropdown-item {{ current_route == 'finance_report_preview' ? 'active' : '' }}" href="{{ path('finance_report_preview') }}">
                             <span class="nav-link-title">Отчет ОПиУ (P&amp;N)</span>
+                        </a>
+                        <a class="dropdown-item {{ is_active_raw ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
+                            <span class="nav-link-title">Сырые транзакции ОПиУ (P&amp;L)</span>
                         </a>
                     </div>
                 </li>
