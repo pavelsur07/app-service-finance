@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}P&L Preview{% endblock %}
+{% block body %}
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title">P&L Preview — {{ company.name }} — {{ period|date('Y-m') }}</h3>
+        <form class="d-flex" method="get">
+          <input class="form-control me-2" type="month" name="period" value="{{ period|date('Y-m') }}">
+          <button class="btn btn-primary">Показать</button>
+        </form>
+      </div>
+
+      {% if warnings is not empty %}
+      <div class="alert alert-warning m-3">
+        <strong>Предупреждения:</strong>
+        <ul class="mb-0">
+          {% for w in warnings %}<li>{{ w }}</li>{% endfor %}
+        </ul>
+      </div>
+      {% endif %}
+
+      <div class="table-responsive">
+        <table class="table table-vcenter">
+          <thead>
+            <tr>
+              <th>Строка</th>
+              <th>Код</th>
+              <th>Тип</th>
+              <th class="text-end">Значение</th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
+              <td><code>{{ r.code ?? '—' }}</code></td>
+              <td>{{ r.type }}</td>
+              <td class="text-end">{{ r.formatted }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="text-muted">Нет строк отчёта</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
