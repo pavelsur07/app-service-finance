@@ -1,22 +1,31 @@
 {% extends 'base.html.twig' %}
 {% block title %}Категории P&L{% endblock %}
 
-{% macro render_items(items, level) %}
-    <ul class="list-unstyled">
+{% macro render_items(items) %}
+    <ul class="pl-category-list list-unstyled mb-0">
     {% for item in items %}
-        <li>
-            <div class="d-flex align-items-center">
-                <span style="margin-left: {{ (level - 1) * 20 }}px;">{{ item.name }}</span>
+        {% set has_children = item.children|length > 0 %}
+        <li class="pl-category-node">
+            <div class="pl-category-item d-flex align-items-center">
+                {% if has_children %}
+                    <button class="pl-category-toggle btn btn-link btn-sm p-0 me-2 collapsed" type="button" aria-expanded="false">
+                        <span class="visually-hidden">Переключить вложенные категории</span>
+                    </button>
+                {% else %}
+                    <span class="pl-category-toggle-placeholder me-2"></span>
+                {% endif %}
+                <a href="{{ path('pl_category_edit', {'id': item.id}) }}" class="pl-category-link text-reset text-decoration-none flex-grow-1">{{ item.name }}</a>
                 <span class="ms-auto d-inline-flex gap-1">
-                    <a href="{{ path('pl_category_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
                     <form method="post" action="{{ path('pl_category_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
                         <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
                         <button class="btn btn-sm btn-danger">🗑</button>
                     </form>
                 </span>
             </div>
-            {% if item.children|length > 0 %}
-                {{ _self.render_items(item.children, level + 1) }}
+            {% if has_children %}
+                <div class="pl-category-children" hidden>
+                    {{ _self.render_items(item.children) }}
+                </div>
             {% endif %}
         </li>
     {% endfor %}
@@ -24,6 +33,60 @@
 {% endmacro %}
 
 {% import _self as macros %}
+
+{% block stylesheets %}
+    <style>
+        .pl-category-item {
+            border-radius: .5rem;
+            padding: .5rem .75rem;
+            transition: background-color .2s ease-in-out;
+        }
+
+        .pl-category-item:hover,
+        .pl-category-item:focus-within {
+            background-color: rgba(24, 144, 255, 0.12);
+        }
+
+        .pl-category-link {
+            display: inline-block;
+        }
+
+        .pl-category-toggle {
+            color: inherit;
+            width: 1.5rem;
+            height: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            text-decoration: none;
+        }
+
+        .pl-category-toggle::before {
+            content: '\25B8';
+            font-size: .8rem;
+            transition: transform .2s ease-in-out;
+        }
+
+        .pl-category-toggle:hover,
+        .pl-category-toggle:focus {
+            text-decoration: none;
+        }
+
+        .pl-category-toggle:not(.collapsed)::before {
+            transform: rotate(90deg);
+        }
+
+        .pl-category-toggle-placeholder {
+            display: inline-flex;
+            width: 1.5rem;
+            height: 1.5rem;
+        }
+
+        .pl-category-children {
+            margin-left: 1.5rem;
+        }
+    </style>
+{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
@@ -41,8 +104,47 @@
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">
-                {{ macros.render_items(items, 1) }}
+                {{ macros.render_items(items) }}
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.pl-category-toggle').forEach(function (button) {
+                button.addEventListener('click', function () {
+                    var node = button.closest('.pl-category-node');
+                    if (!node) {
+                        return;
+                    }
+
+                    var children = null;
+                    for (var i = 0; i < node.children.length; i++) {
+                        var child = node.children[i];
+                        if (child.classList && child.classList.contains('pl-category-children')) {
+                            children = child;
+                            break;
+                        }
+                    }
+
+                    if (!children) {
+                        return;
+                    }
+
+                    var isHidden = children.hasAttribute('hidden');
+                    if (isHidden) {
+                        children.removeAttribute('hidden');
+                    } else {
+                        children.setAttribute('hidden', '');
+                    }
+
+                    button.classList.toggle('collapsed', !isHidden);
+                    button.setAttribute('aria-expanded', String(isHidden));
+                });
+            });
+        });
+    </script>
 {% endblock %}
