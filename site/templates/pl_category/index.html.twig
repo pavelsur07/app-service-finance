@@ -1,6 +1,17 @@
 {% extends 'base.html.twig' %}
 {% block title %}Категории P&L{% endblock %}
 
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Справочники'},
+            {'label': 'Категории P&L'}
+        ]
+    } %}
+{% endblock %}
+
 {% macro render_items(items) %}
     <ul class="pl-category-list list-unstyled mb-0">
     {% for item in items %}
