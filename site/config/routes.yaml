@@ -4,5 +4,11 @@ controllers:
         namespace: App\Controller
     type: attribute
 
+finance_controllers:
+    resource:
+        path: ../src/Finance/Controller/
+        namespace: App\Finance\Controller
+    type: attribute
+
 admin:
     resource: routes/admin.yaml
