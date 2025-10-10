@@ -24,7 +24,7 @@ final class PlRawFactsController extends AbstractController
         PLCategoryRepository $categories,
         FactsProviderInterface $facts
     ): Response {
-        $company = $activeCompany->getCompany();
+        $company = $activeCompany->getActiveCompany();
         $periodParam = $request->query->get('period') ?? (new \DateTimeImmutable('first day of this month'))->format('Y-m-01');
         $period = new \DateTimeImmutable($periodParam);
 
