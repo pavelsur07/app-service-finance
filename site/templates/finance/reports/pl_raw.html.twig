@@ -1,0 +1,68 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Сырые данные P&L{% endblock %}
+
+{% block body %}
+<div class="container-xl mt-4">
+    <h2>Сырые данные P&L (ОПиУ)</h2>
+    <p>Компания: {{ company.name }} | Период: {{ from|date('Y-m-d') }} — {{ to|date('Y-m-d') }}</p>
+
+    <h3>1. Транзакции (DocumentOperation)</h3>
+    <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Документ</th>
+                    <th>Категория</th>
+                    <th>Природа</th>
+                    <th>Сумма</th>
+                    <th>Сумма (+/-)</th>
+                    <th>Контрагент</th>
+                    <th>Комментарий</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.date }}</td>
+                    <td>{{ row.document }}</td>
+                    <td>{{ row.category }}</td>
+                    <td>{{ row.nature }}</td>
+                    <td class="text-end">{{ row.amount_raw }}</td>
+                    <td class="text-end">{{ row.amount_signed|number_format(2, '.', ' ') }}</td>
+                    <td>{{ row.counterparty }}</td>
+                    <td>{{ row.comment }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <h3>2. Промежуточные итоги (PLDailyTotal)</h3>
+    <div class="table-responsive">
+        <table class="table table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Категория</th>
+                    <th class="text-end">Доход</th>
+                    <th class="text-end">Расход</th>
+                    <th class="text-end">Нетто</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in totals %}
+                <tr>
+                    <td>{{ t.date }}</td>
+                    <td>{{ t.category }}</td>
+                    <td class="text-end text-success">{{ t.income|number_format(2, '.', ' ') }}</td>
+                    <td class="text-end text-danger">{{ t.expense|number_format(2, '.', ' ') }}</td>
+                    <td class="text-end fw-bold">{{ t.net|number_format(2, '.', ' ') }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

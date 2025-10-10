@@ -65,6 +65,9 @@
                         <a class="dropdown-item {{ is_active_raw ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
                             <span class="nav-link-title">Сырые транзакции ОПиУ (P&amp;L)</span>
                         </a>
+                        <a class="dropdown-item {{ current_route == 'finance_report_pl_raw' ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
+                            <span class="nav-link-title">Сырые данные ОПиУ</span>
+                        </a>
                     </div>
                 </li>
 
