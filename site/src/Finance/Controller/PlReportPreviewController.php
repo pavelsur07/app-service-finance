@@ -18,7 +18,7 @@ final class PlReportPreviewController extends AbstractController
         ActiveCompanyService $activeCompany,
         PlReportCalculator $calc
     ): Response {
-        $company = $activeCompany->getCompany(); // существующий механизм
+        $company = $activeCompany->getActiveCompany();
         $periodParam = $request->query->get('period') ?? (new \DateTimeImmutable('first day of this month'))->format('Y-m-01');
         $period = new \DateTimeImmutable($periodParam);
 
