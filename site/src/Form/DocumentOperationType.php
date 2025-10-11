@@ -8,7 +8,6 @@ use App\Entity\PLCategory;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
-use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -34,10 +33,6 @@ class DocumentOperationType extends AbstractType
                 'choice_label' => 'name',
                 'required' => false,
                 'label' => 'Контрагент',
-            ])
-            ->add('comment', TextType::class, [
-                'required' => false,
-                'label' => 'Комментарий',
             ]);
     }
 
