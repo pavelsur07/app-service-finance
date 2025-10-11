@@ -31,7 +31,7 @@ class RawPlReportController extends AbstractController
         // --- 1. Получаем операции документов ---
         $qb = $documentRepo->createQueryBuilder('d')
             ->leftJoin('d.operations', 'o')
-            ->leftJoin('o.plCategory', 'c')
+            ->leftJoin('o.category', 'c')
             ->andWhere('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
             ->setParameter('company', $company)
