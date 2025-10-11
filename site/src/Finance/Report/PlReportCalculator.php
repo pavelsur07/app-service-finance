@@ -28,6 +28,7 @@ final class PlReportCalculator
     {
         // получаем плоский список (или дерево) категорий компании
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
+        $displayOrder = $this->orderByTree($all);
         /** @var array<string,PLCategory> $byId */
         $byId = [];
         foreach ($all as $c) $byId[$c->getId()] = $c;
@@ -123,7 +124,7 @@ final class PlReportCalculator
 
         // форматирование и сбор строк
         $rows = [];
-        foreach ($all as $c) {
+        foreach ($displayOrder as $c) {
             $rows[] = new PlComputedRow(
                 id: $c->getId(),
                 code: $c->getCode(),
@@ -136,6 +137,52 @@ final class PlReportCalculator
         }
 
         return new PlReportResult($rows, array_values(array_unique($warnings)));
+    }
+
+    /**
+     * Возвращает категории в порядке «родитель → дети», с сортировкой по sortOrder на каждом уровне.
+     * @param \App\Entity\PLCategory[] $all
+     * @return \App\Entity\PLCategory[]
+     */
+    private function orderByTree(array $all): array
+    {
+        // Индексация: parentId => [children...]
+        $childrenByParent = [];
+        $roots = [];
+
+        foreach ($all as $c) {
+            $parent = $c->getParent();
+            if ($parent === null) {
+                $roots[] = $c;
+            } else {
+                $childrenByParent[$parent->getId()][] = $c;
+            }
+        }
+
+        $bySort = function(\App\Entity\PLCategory $a, \App\Entity\PLCategory $b): int {
+            return $a->getSortOrder() <=> $b->getSortOrder();
+        };
+
+        // Сортируем корни и каждого набора детей по sortOrder
+        usort($roots, $bySort);
+        foreach ($childrenByParent as $pid => $list) {
+            usort($childrenByParent[$pid], $bySort);
+        }
+
+        // Префиксный обход
+        $out = [];
+        $walk = function(\App\Entity\PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
+            $out[] = $node;
+            foreach ($childrenByParent[$node->getId()] ?? [] as $ch) {
+                $walk($ch);
+            }
+        };
+
+        foreach ($roots as $r) {
+            $walk($r);
+        }
+
+        return $out;
     }
 
     /** @param PLCategory[] $all */
