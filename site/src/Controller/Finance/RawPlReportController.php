@@ -54,7 +54,7 @@ class RawPlReportController extends AbstractController
 
                 $rows[] = [
                     'date' => $doc->getDate()->format('Y-m-d'),
-                    'document' => sprintf('%s #%d', $doc->getType(), $doc->getId()),
+                    'document' => sprintf('%s #%s', $doc->getType()->label(), $doc->getId()),
                     'operation_id' => $op->getId(),
                     'category' => $op->getPlCategory()?->getName() ?? '-',
                     'nature' => $nature?->value ?? '-',
