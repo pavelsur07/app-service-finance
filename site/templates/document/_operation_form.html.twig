@@ -1,12 +1,20 @@
 <div class="row g-3 align-items-end">
-    <div class="col-md-5">
+    <div class="col-md-5 col-xl-6">
         {{ form_row(operationForm.category) }}
     </div>
-    <div class="col-md-3">
+    <div class="col-md-3 col-xl-2">
         {{ form_row(operationForm.amount) }}
     </div>
-    <div class="col-md-4">
+    <div class="col-md-4 col-xl-3">
         {{ form_row(operationForm.counterparty) }}
     </div>
+    <div class="col-auto ms-auto">
+        <button type="button"
+                class="btn btn-sm btn-icon btn-outline-danger remove-item"
+                title="Удалить операцию"
+                aria-label="Удалить операцию">
+            <i class="ti ti-trash"></i>
+            <span class="visually-hidden">Удалить</span>
+        </button>
+    </div>
 </div>
-{{ form_row(operationForm.comment) }}
