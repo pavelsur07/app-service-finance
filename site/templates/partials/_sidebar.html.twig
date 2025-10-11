@@ -30,13 +30,6 @@
                         <span class="nav-link-title">Остатки по счетам</span>
                     </a>
                 </li>
-
-                <li class="nav-item">
-                    <a class="nav-link {{ current_route starts with 'report_account_balances' ? 'active' }}" href="{{ path('admin_messenger_ping') }}">
-                        <span class="nav-link-title">Test Message</span>
-                    </a>
-                </li>
-
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
@@ -44,7 +37,11 @@
                     </a>
                     <div class="dropdown-menu" data-bs-popper="static">
                         <a class="dropdown-item {{ current_route starts with 'report_cashflow' ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}">
-                            <span class="nav-link-title">Отчет ДДС</span>
+                            <span class="nav-link-title">Отчет ДДС (Cashflow)</span>
+                        </a>
+                        {% set is_active_raw = app.request.attributes.get('_route') == 'finance_report_raw' %}
+                        <a class="dropdown-item {{ current_route == 'finance_report_preview' ? 'active' : '' }}" href="{{ path('finance_report_preview') }}">
+                            <span class="nav-link-title">Отчет ОПиУ (P&amp;L)</span>
                         </a>
                         <a class="dropdown-item {{ current_route starts with 'report_transactions_statement' ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
                             <span class="nav-link-title">Выписка по транзакциям</span>
@@ -58,15 +55,11 @@
                         <a class="dropdown-item " href="{{ path('report_debug_daily_facts') }}">
                             <span class="nav-link-title">Отчёт “Фактические дневные остатки”</span>
                         </a>
-                        {% set is_active_raw = app.request.attributes.get('_route') == 'finance_report_raw' %}
-                        <a class="dropdown-item {{ current_route == 'finance_report_preview' ? 'active' : '' }}" href="{{ path('finance_report_preview') }}">
-                            <span class="nav-link-title">Отчет ОПиУ (P&amp;N)</span>
-                        </a>
                         <a class="dropdown-item {{ is_active_raw ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
-                            <span class="nav-link-title">Сырые транзакции ОПиУ (P&amp;L)</span>
+                            <span class="nav-link-title">Отчет "Сырые транзакции ОПиУ (P&amp;L)"</span>
                         </a>
                         <a class="dropdown-item {{ current_route == 'finance_report_pl_raw' ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
-                            <span class="nav-link-title">Сырые данные ОПиУ</span>
+                            <span class="nav-link-title">Отчет "Сырые данные ОПиУ"</span>
                         </a>
                     </div>
                 </li>
