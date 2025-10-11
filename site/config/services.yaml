@@ -51,3 +51,9 @@ services:
     App\Service\Ozon\OzonOrderSyncService:
         arguments:
             $logger: '@monolog.logger.ozon.sync'
+
+    App\Finance\Facts\PLDailyTotalFactsProvider:
+        autowire: true
+        autoconfigure: true
+
+    App\Finance\Facts\FactsProviderInterface: '@App\Finance\Facts\PLDailyTotalFactsProvider'
