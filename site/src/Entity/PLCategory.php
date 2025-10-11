@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\PLCategoryType;
+use App\Enum\PLFlow;
 use App\Enum\PlNature;
 use App\Enum\PLValueFormat;
 use App\Repository\PLCategoryRepository;
@@ -49,6 +50,9 @@ class PLCategory
 
     #[ORM\Column(enumType: PLValueFormat::class, options: ['default' => 'MONEY'])]
     private PLValueFormat $format = PLValueFormat::MONEY;
+
+    #[ORM\Column(enumType: PLFlow::class, options: ['default' => 'NONE'])]
+    private PLFlow $flow = PLFlow::NONE;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 4, options: ['default' => '1.0000'])]
     private string $weightInParent = '1.0000'; // вес при суммировании родителем
@@ -194,6 +198,14 @@ class PLCategory
 
     public function nature(): PlNature
     {
+        if ($this->flow === PLFlow::INCOME) {
+            return PlNature::INCOME;
+        }
+
+        if ($this->flow === PLFlow::EXPENSE) {
+            return PlNature::EXPENSE;
+        }
+
         return $this->isIncomeRoot() ? PlNature::INCOME : PlNature::EXPENSE;
     }
 
@@ -259,6 +271,18 @@ class PLCategory
     public function setFormat(PLValueFormat $format): self
     {
         $this->format = $format;
+
+        return $this;
+    }
+
+    public function getFlow(): PLFlow
+    {
+        return $this->flow;
+    }
+
+    public function setFlow(PLFlow $flow): self
+    {
+        $this->flow = $flow;
 
         return $this;
     }
