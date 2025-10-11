@@ -21,14 +21,17 @@
             <div class="card-body">
                 {{ form_start(form) }}
                 <div class="row">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         {{ form_row(form.date) }}
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         {{ form_row(form.number) }}
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         {{ form_row(form.type) }}
+                    </div>
+                    <div class="col-md-3">
+                        {{ form_row(form.counterparty) }}
                     </div>
                 </div>
                 {{ form_row(form.description) }}

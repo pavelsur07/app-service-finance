@@ -35,6 +35,10 @@ class Document
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\ManyToOne(targetEntity: Counterparty::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?Counterparty $counterparty = null;
+
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentOperation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $operations;
 
@@ -122,6 +126,18 @@ class Document
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getCounterparty(): ?Counterparty
+    {
+        return $this->counterparty;
+    }
+
+    public function setCounterparty(?Counterparty $counterparty): self
+    {
+        $this->counterparty = $counterparty;
 
         return $this;
     }
