@@ -29,7 +29,7 @@
                             <th>Дата</th>
                             <th>Номер</th>
                             <th>Тип</th>
-                            <th>Тип Движения</th>
+                            <th>Контрагент</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -39,12 +39,7 @@
                                 <td>{{ item.date|date('Y-m-d') }}</td>
                                 <td>{{ item.number }}</td>
                                 <td><span class="badge bg-blue-lt">{{ item.type.label }}</span></td>
-                                {% set docNature = documentNatures[item.id] ?? null %}
-                                <td>
-                                    {% if docNature %}
-                                        <span class="badge {{ docNature.badgeClass }}">{{ docNature.label }}</span>
-                                    {% endif %}
-                                </td>
+                                <td>{{ item.counterparty ? item.counterparty.name : '' }}</td>
                                 <td class="text-end">
                                     <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-info">👁</a>
                                     <a href="{{ path('document_edit', {'id': item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
