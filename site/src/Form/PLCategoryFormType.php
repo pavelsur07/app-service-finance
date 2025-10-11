@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\PLCategory;
 use App\Enum\PLCategoryType as PLCategoryTypeEnum;
+use App\Enum\PLFlow;
 use App\Enum\PLValueFormat;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -47,6 +48,14 @@ class PLCategoryFormType extends AbstractType
                     'Лист (из фактов)' => PLCategoryTypeEnum::LEAF_INPUT,
                     'Итог (subtotal)' => PLCategoryTypeEnum::SUBTOTAL,
                     'Показатель (KPI)' => PLCategoryTypeEnum::KPI,
+                ],
+            ])
+            ->add('flow', ChoiceType::class, [
+                'label' => 'Движение',
+                'choices' => [
+                    'Доход' => PLFlow::INCOME,
+                    'Расход' => PLFlow::EXPENSE,
+                    'Нейтральная / составная' => PLFlow::NONE,
                 ],
             ])
             ->add('format', ChoiceType::class, [
