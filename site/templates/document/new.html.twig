@@ -46,9 +46,6 @@
                                 <div class="card-body">
                                     {% include 'document/_operation_form.html.twig' with { operationForm: op } %}
                                 </div>
-                                <div class="card-footer text-end">
-                                    <button type="button" class="btn btn-sm btn-danger remove-item">Удалить</button>
-                                </div>
                             </div>
                         {% endfor %}
                     </div>
@@ -74,15 +71,6 @@
                 cardBody.innerHTML = formHtml;
                 card.appendChild(cardBody);
 
-                const cardFooter = document.createElement('div');
-                cardFooter.classList.add('card-footer', 'text-end');
-                const removeButton = document.createElement('button');
-                removeButton.type = 'button';
-                removeButton.classList.add('btn', 'btn-sm', 'btn-danger', 'remove-item');
-                removeButton.textContent = 'Удалить';
-                cardFooter.appendChild(removeButton);
-                card.appendChild(cardFooter);
-
                 return card;
             };
 
@@ -95,8 +83,9 @@
             });
 
             collectionHolder.addEventListener('click', function(e){
-                if (e.target && e.target.classList.contains('remove-item')) {
-                    const card = e.target.closest('.document-operation-card');
+                const removeButton = e.target.closest('.remove-item');
+                if (removeButton) {
+                    const card = removeButton.closest('.document-operation-card');
                     if (card) {
                         card.remove();
                     }
