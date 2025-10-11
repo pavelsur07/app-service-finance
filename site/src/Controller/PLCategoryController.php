@@ -7,6 +7,7 @@ use App\Form\PLCategoryFormType;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -24,6 +25,21 @@ class PLCategoryController extends AbstractController
 
         return $this->render('pl_category/index.html.twig', [
             'items' => $items,
+        ]);
+    }
+
+    #[Route('/export/json', name: 'pl_category_export_json', methods: ['GET'])]
+    public function exportJson(PLCategoryRepository $repo, ActiveCompanyService $companyService): JsonResponse
+    {
+        $company = $companyService->getActiveCompany();
+        $items = $repo->findRootByCompany($company);
+
+        $data = array_map(function (PLCategory $category): array {
+            return $this->serializeCategory($category);
+        }, $items);
+
+        return $this->json($data, Response::HTTP_OK, [], [
+            'json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES,
         ]);
     }
 
@@ -95,5 +111,29 @@ class PLCategoryController extends AbstractController
         }
 
         return $this->redirectToRoute('pl_category_index');
+    }
+
+    private function serializeCategory(PLCategory $category): array
+    {
+        $children = [];
+        foreach ($category->getChildren() as $child) {
+            $children[] = $this->serializeCategory($child);
+        }
+
+        return [
+            'id' => $category->getId(),
+            'name' => $category->getName(),
+            'code' => $category->getCode(),
+            'level' => $category->getLevel(),
+            'sortOrder' => $category->getSortOrder(),
+            'type' => $category->getType()->value,
+            'format' => $category->getFormat()->value,
+            'flow' => $category->getFlow()->value,
+            'weightInParent' => $category->getWeightInParent(),
+            'isVisible' => $category->isVisible(),
+            'formula' => $category->getFormula(),
+            'calcOrder' => $category->getCalcOrder(),
+            'children' => $children,
+        ];
     }
 }
