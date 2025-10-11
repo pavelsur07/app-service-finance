@@ -196,17 +196,13 @@ class PLCategory
         return in_array($key, $expenseKeys, true);
     }
 
-    public function nature(): PlNature
+    public function nature(): ?PlNature
     {
-        if ($this->flow === PLFlow::INCOME) {
-            return PlNature::INCOME;
-        }
-
-        if ($this->flow === PLFlow::EXPENSE) {
-            return PlNature::EXPENSE;
-        }
-
-        return $this->isIncomeRoot() ? PlNature::INCOME : PlNature::EXPENSE;
+        return match ($this->flow) {
+            PLFlow::INCOME => PlNature::INCOME,
+            PLFlow::EXPENSE => PlNature::EXPENSE,
+            default => null,
+        };
     }
 
     private function resolveRootKey(): string

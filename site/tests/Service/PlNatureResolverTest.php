@@ -10,6 +10,7 @@ use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\User;
 use App\Enum\DocumentType;
+use App\Enum\PLFlow;
 use App\Enum\PlNature;
 use App\Service\PlNatureResolver;
 use PHPUnit\Framework\TestCase;
@@ -27,6 +28,7 @@ final class PlNatureResolverTest extends TestCase
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
+        $revenueChild->setFlow(PLFlow::INCOME);
 
         $operation = new DocumentOperation();
         $operation->setDocument($document);
@@ -35,7 +37,7 @@ final class PlNatureResolverTest extends TestCase
         self::assertSame(PlNature::INCOME, $resolver->forOperation($operation));
     }
 
-    public function testFallbackUsesDocumentTypeWhenCategoryMissing(): void
+    public function testReturnsNullWhenCategoryMissing(): void
     {
         $resolver = new PlNatureResolver();
 
@@ -46,7 +48,7 @@ final class PlNatureResolverTest extends TestCase
         $operation = new DocumentOperation();
         $operation->setDocument($document);
 
-        self::assertSame(PlNature::INCOME, $resolver->forOperation($operation));
+        self::assertNull($resolver->forOperation($operation));
     }
 
     public function testDocumentReturnsMixedWhenHasIncomeAndExpenseOperations(): void
@@ -59,8 +61,10 @@ final class PlNatureResolverTest extends TestCase
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
+        $revenueChild->setFlow(PLFlow::INCOME);
         $expenseRoot = $this->createCategory($company, 'OPEX');
         $expenseChild = $this->createCategory($company, 'Marketing', $expenseRoot);
+        $expenseChild->setFlow(PLFlow::EXPENSE);
 
         $incomeOperation = new DocumentOperation();
         $incomeOperation->setCategory($revenueChild);
