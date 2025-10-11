@@ -96,6 +96,17 @@
         .pl-category-children {
             margin-left: 1.5rem;
         }
+
+        .pl-category-json-output {
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: .5rem;
+            padding: 1rem;
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: var(--tblr-font-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace);
+            max-height: 32rem;
+            overflow: auto;
+        }
     </style>
 {% endblock %}
 
@@ -107,7 +118,12 @@
                     <h2 class="page-title">Категории P&amp;L</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
+                    <div class="btn-list">
+                        <a href="{{ path('pl_category_new') }}" class="btn btn-primary">+ Добавить категорию</a>
+                        <button type="button" class="btn btn-outline-secondary" data-export-json="{{ path('pl_category_export_json') }}">
+                            Выгрузить в JSON
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -116,6 +132,7 @@
         <div class="card">
             <div class="card-body">
                 {{ macros.render_items(items) }}
+                <pre id="pl-category-json-output" class="pl-category-json-output mt-4" hidden></pre>
             </div>
         </div>
     </div>
@@ -125,6 +142,50 @@
     {{ parent() }}
     <script>
         document.addEventListener('DOMContentLoaded', function () {
+            var exportButton = document.querySelector('[data-export-json]');
+            var exportOutput = document.getElementById('pl-category-json-output');
+
+            if (exportButton && exportOutput) {
+                exportButton.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    var endpoint = exportButton.getAttribute('data-export-json');
+                    if (!endpoint) {
+                        return;
+                    }
+
+                    exportButton.setAttribute('disabled', 'disabled');
+                    exportButton.classList.add('disabled');
+
+                    fetch(endpoint, {
+                        headers: {
+                            'Accept': 'application/json'
+                        }
+                    })
+                        .then(function (response) {
+                            if (!response.ok) {
+                                return response.text().then(function (text) {
+                                    throw new Error(text || response.statusText);
+                                });
+                            }
+
+                            return response.json();
+                        })
+                        .then(function (data) {
+                            exportOutput.textContent = JSON.stringify(data, null, 2);
+                            exportOutput.hidden = false;
+                            exportOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        })
+                        .catch(function (error) {
+                            exportOutput.textContent = 'Ошибка выгрузки: ' + error.message;
+                            exportOutput.hidden = false;
+                        })
+                        .finally(function () {
+                            exportButton.removeAttribute('disabled');
+                            exportButton.classList.remove('disabled');
+                        });
+                });
+            }
+
             document.querySelectorAll('.pl-category-toggle').forEach(function (button) {
                 button.addEventListener('click', function () {
                     var node = button.closest('.pl-category-node');
