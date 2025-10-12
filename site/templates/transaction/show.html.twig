@@ -38,7 +38,14 @@
     </div>
     <div class="card-footer text-end">
         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-warning">Редактировать</a>
-        <button class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#delete-modal-{{ tx.id }}">Удалить</button>
+        <button class="btn btn-icon btn-danger"
+                data-bs-toggle="modal"
+                data-bs-target="#delete-modal-{{ tx.id }}"
+                title="Удалить"
+                aria-label="Удалить">
+            <i class="ti ti-trash"></i>
+            <span class="visually-hidden">Удалить</span>
+        </button>
         <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">Назад к списку</a>
     </div>
 </div>
