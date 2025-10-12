@@ -66,7 +66,14 @@
                            data-bs-target="#autoRuleModal">
                           A+
                         </a>
-                        <button class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#delete-modal-{{ tx.id }}">Удалить</button>
+                        <button class="btn btn-sm btn-icon btn-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#delete-modal-{{ tx.id }}"
+                                title="Удалить"
+                                aria-label="Удалить">
+                            <i class="ti ti-trash"></i>
+                            <span class="visually-hidden">Удалить</span>
+                        </button>
                         {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
                     </td>
                 </tr>
