@@ -50,6 +50,11 @@ class PLCategoryController extends AbstractController
         $category = new PLCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $repo->findTreeByCompany($company);
+        $nextSortOrder = $repo->getNextSortOrder($company, $category->getParent());
+        if (null === $category->getSortOrder()) {
+            $category->setSortOrder($nextSortOrder);
+        }
+
         $form = $this->createForm(PLCategoryFormType::class, $category, ['parents' => $parents]);
         $form->handleRequest($request);
 
