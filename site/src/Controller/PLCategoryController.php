@@ -57,6 +57,8 @@ class PLCategoryController extends AbstractController
             if ($category->getParent() && $category->getParent()->getLevel() >= 5) {
                 $this->addFlash('danger', 'Максимальная вложенность — 5 уровней');
             } else {
+                $nextSortOrder = $repo->getNextSortOrder($company, $category->getParent());
+                $category->setSortOrder($nextSortOrder);
                 $em->persist($category);
                 $em->flush();
 
