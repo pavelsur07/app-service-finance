@@ -3,10 +3,10 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Enum\PLCategoryType;
 use App\Finance\Facts\FactsProviderInterface;
+use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,7 +26,8 @@ final class PlRawFactsController extends AbstractController
     ): Response {
         $company = $activeCompany->getActiveCompany();
         $periodParam = $request->query->get('period') ?? (new \DateTimeImmutable('first day of this month'))->format('Y-m-01');
-        $period = new \DateTimeImmutable($periodParam);
+        $periodDate = new \DateTimeImmutable($periodParam);
+        $period = PlReportPeriod::forMonth($periodDate);
 
         /** @var PLCategory[] $all */
         $all = $categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
@@ -54,7 +55,7 @@ final class PlRawFactsController extends AbstractController
 
         return $this->render('finance/report/raw.html.twig', [
             'company' => $company,
-            'period' => $period,
+            'period' => $periodDate,
             'rows' => $rows,
         ]);
     }

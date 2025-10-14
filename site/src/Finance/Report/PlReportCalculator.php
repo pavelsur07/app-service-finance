@@ -7,8 +7,8 @@ use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Enum\PLCategoryType;
 use App\Finance\Engine\{DependencyExtractor, Graph, TopoSort, ValueFormatter};
-use App\Finance\Formula\{Evaluator, Parser, Tokenizer};
 use App\Finance\Facts\FactsProviderInterface;
+use App\Finance\Formula\{Evaluator, Parser, Tokenizer};
 use App\Repository\PLCategoryRepository;
 
 final class PlReportCalculator
@@ -24,16 +24,16 @@ final class PlReportCalculator
         private readonly ValueFormatter $fmt = new ValueFormatter(),
     ) {}
 
-    public function calculate(Company $company, \DateTimeInterface $period): PlReportResult
+    public function calculate(Company $company, PlReportPeriod $period): PlReportResult
     {
-        // получаем плоский список (или дерево) категорий компании
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
         /** @var array<string,PLCategory> $byId */
         $byId = [];
-        foreach ($all as $c) $byId[$c->getId()] = $c;
+        foreach ($all as $c) {
+            $byId[$c->getId()] = $c;
+        }
 
-        // подготовка: формулы -> AST, зависимости -> граф
         $astById = [];
         $g = new Graph();
         $warnings = [];
@@ -43,22 +43,24 @@ final class PlReportCalculator
             $formula = trim((string)($cat->getFormula() ?? ''));
 
             if ($cat->getType() === PLCategoryType::SUBTOTAL && $formula === '') {
-                // зависимость от прямых детей
                 foreach ($cat->getChildren() as $child) {
                     $g->addEdge($child->getId(), $cat->getId());
                 }
                 continue;
             }
+
             if ($cat->getType() === PLCategoryType::KPI || ($cat->getType() === PLCategoryType::SUBTOTAL && $formula !== '')) {
                 try {
                     $tokens = $this->tokenizer->tokenize($formula);
                     $ast = $this->parser->parse($tokens);
                     $astById[$cat->getId()] = $ast;
                     foreach ($this->deps->extract($ast) as $code) {
-                        // найдём категорию по code
                         $depCat = $this->findByCode($all, $code);
-                        if ($depCat) $g->addEdge($depCat->getId(), $cat->getId());
-                        else $warnings[] = "Unknown code `$code` in formula of `{$cat->getName()}`";
+                        if ($depCat) {
+                            $g->addEdge($depCat->getId(), $cat->getId());
+                        } else {
+                            $warnings[] = "Unknown code `$code` in formula of `{$cat->getName()}`";
+                        }
                     }
                 } catch (\Throwable $e) {
                     $warnings[] = "Formula error in `{$cat->getName()}`: ".$e->getMessage();
@@ -66,34 +68,37 @@ final class PlReportCalculator
             }
         }
 
-        // порядок вычислений
         $order = $this->topo->sort($g, $byId);
 
-        // окружение для Evaluator
-        $values = []; // id => float
+        $values = [];
         $env = new class($values, $all, $company, $period, $this->facts, $warnings) implements \App\Finance\Formula\Env {
             public function __construct(
                 public array &$values,
                 private array $all,
                 private Company $company,
-                private \DateTimeInterface $period,
+                private PlReportPeriod $period,
                 private FactsProviderInterface $facts,
                 private array &$warnings
             ) {}
-            public function get(string $code): float {
+
+            public function get(string $code): float
+            {
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
                         $v = $this->values[$c->getId()] ?? $this->facts->value($this->company, $this->period, $code);
-                        return (float)$v;
+                        return (float) $v;
                     }
                 }
                 $this->warn("Unknown code `$code` at eval-time");
                 return 0.0;
             }
-            public function warn(string $message): void { $this->warnings[] = $message; }
+
+            public function warn(string $message): void
+            {
+                $this->warnings[] = $message;
+            }
         };
 
-        // расчёт
         foreach ($order as $id) {
             /** @var PLCategory $c */
             $c = $byId[$id];
@@ -101,28 +106,31 @@ final class PlReportCalculator
             $val = 0.0;
 
             if ($t === PLCategoryType::LEAF_INPUT) {
-                $code = (string)$c->getCode();
+                $code = (string) $c->getCode();
                 $val = $this->facts->value($company, $period, $code);
             } elseif ($t === PLCategoryType::SUBTOTAL) {
                 $formula = trim((string)($c->getFormula() ?? ''));
                 if ($formula === '') {
                     foreach ($c->getChildren() as $child) {
                         $childVal = $values[$child->getId()] ?? 0.0;
-                        $val += $childVal * (float)$child->getWeightInParent();
+                        $val += $childVal * (float) $child->getWeightInParent();
                     }
                 } else {
                     $ast = $astById[$id] ?? null;
-                    if ($ast) $val = $this->evaluator->eval($ast, $env);
+                    if ($ast) {
+                        $val = $this->evaluator->eval($ast, $env);
+                    }
                 }
             } elseif ($t === PLCategoryType::KPI) {
                 $ast = $astById[$id] ?? null;
-                if ($ast) $val = $this->evaluator->eval($ast, $env);
+                if ($ast) {
+                    $val = $this->evaluator->eval($ast, $env);
+                }
             }
 
             $values[$id] = $val;
         }
 
-        // форматирование и сбор строк
         $rows = [];
         foreach ($displayOrder as $c) {
             $rows[] = new PlComputedRow(
@@ -136,17 +144,11 @@ final class PlReportCalculator
             );
         }
 
-        return new PlReportResult($rows, array_values(array_unique($warnings)));
+        return new PlReportResult($period, $rows, array_values(array_unique($warnings)));
     }
 
-    /**
-     * Возвращает категории в порядке «родитель → дети», с сортировкой по sortOrder на каждом уровне.
-     * @param \App\Entity\PLCategory[] $all
-     * @return \App\Entity\PLCategory[]
-     */
     private function orderByTree(array $all): array
     {
-        // Индексация: parentId => [children...]
         $childrenByParent = [];
         $roots = [];
 
@@ -159,19 +161,17 @@ final class PlReportCalculator
             }
         }
 
-        $bySort = function(\App\Entity\PLCategory $a, \App\Entity\PLCategory $b): int {
+        $bySort = function(PLCategory $a, PLCategory $b): int {
             return $a->getSortOrder() <=> $b->getSortOrder();
         };
 
-        // Сортируем корни и каждого набора детей по sortOrder
         usort($roots, $bySort);
         foreach ($childrenByParent as $pid => $list) {
             usort($childrenByParent[$pid], $bySort);
         }
 
-        // Префиксный обход
         $out = [];
-        $walk = function(\App\Entity\PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
+        $walk = function(PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
             $out[] = $node;
             foreach ($childrenByParent[$node->getId()] ?? [] as $ch) {
                 $walk($ch);
@@ -185,10 +185,13 @@ final class PlReportCalculator
         return $out;
     }
 
-    /** @param PLCategory[] $all */
     private function findByCode(array $all, string $code): ?PLCategory
     {
-        foreach ($all as $c) if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) return $c;
+        foreach ($all as $c) {
+            if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
+                return $c;
+            }
+        }
         return null;
     }
 }
