@@ -6,6 +6,7 @@ namespace Tests\Integration\Finance;
 use App\Entity\Company;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
+use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
 use PHPUnit\Framework\TestCase;
 use Tests\Integration\Finance\Fixtures\MiniTreeFactory;
@@ -23,7 +24,7 @@ final class PlReportCalculatorTest extends TestCase
 
         // Факты: REV_WB = 500, COGS = 100
         $facts = new class implements FactsProviderInterface {
-            public function value(Company $company, \DateTimeInterface $period, string $code): float
+            public function value(Company $company, PlReportPeriod $period, string $code): float
             {
                 return match($code) {
                     'REV_WB' => 500.0,
@@ -34,7 +35,7 @@ final class PlReportCalculatorTest extends TestCase
         };
 
         $calc = new PlReportCalculator($repo, $facts);
-        $res = $calc->calculate($company, new \DateTimeImmutable('2025-01-01'));
+        $res = $calc->calculate($company, PlReportPeriod::forMonth(new \DateTimeImmutable('2025-01-01')));
 
         $map = [];
         foreach ($res->rows as $r) $map[$r->code ?? $r->id] = $r->rawValue;

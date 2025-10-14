@@ -4,10 +4,23 @@
 <div class="page-body">
   <div class="container-xl">
     <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <h3 class="card-title">P&L Preview — {{ company.name }} — {{ period|date('Y-m') }}</h3>
-        <form class="d-flex" method="get">
-          <input class="form-control me-2" type="month" name="period" value="{{ period|date('Y-m') }}">
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам'} %}
+        <h3 class="card-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }} ({{ groupingLabels[grouping] ?? grouping }})</h3>
+        <form class="d-flex align-items-center flex-wrap gap-2" method="get">
+          <select class="form-select w-auto" name="grouping">
+            <option value="day" {{ grouping == 'day' ? 'selected' }}>
+              По дням
+            </option>
+            <option value="week" {{ grouping == 'week' ? 'selected' }}>
+              По неделям
+            </option>
+            <option value="month" {{ grouping == 'month' ? 'selected' }}>
+              По месяцам
+            </option>
+          </select>
+          <input class="form-control" type="date" name="from" value="{{ from|date('Y-m-d') }}">
+          <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
           <button class="btn btn-primary">Показать</button>
         </form>
       </div>
@@ -28,7 +41,9 @@
               <th>Строка</th>
               <th>Код</th>
               <th>Тип</th>
-              <th class="text-end">Значение</th>
+              {% for period in periods %}
+                <th class="text-end">{{ period.label }}</th>
+              {% endfor %}
             </tr>
           </thead>
           <tbody>
@@ -37,10 +52,12 @@
               <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
               <td><code>{{ r.code ?? '—' }}</code></td>
               <td>{{ r.type }}</td>
-              <td class="text-end">{{ r.formatted }}</td>
+              {% for period in periods %}
+                <td class="text-end">{{ r.values[period.id] ?? '—' }}</td>
+              {% endfor %}
             </tr>
           {% else %}
-            <tr><td colspan="4" class="text-muted">Нет строк отчёта</td></tr>
+            <tr><td colspan="{{ 3 + periods|length }}" class="text-muted">Нет строк отчёта</td></tr>
           {% endfor %}
           </tbody>
         </table>
