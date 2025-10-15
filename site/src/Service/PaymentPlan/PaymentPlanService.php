@@ -8,6 +8,7 @@ use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Util\StringNormalizer;
 use DomainException;
 
@@ -36,10 +37,16 @@ final class PaymentPlanService
     ];
 
     /**
-     * Определяет тип операции по категории.
+     * Определяет тип операции по явному признаку CashflowCategory.
+     * Поднимаемся по иерархии категорий, пока не встретим заданный тип.
+     * Если признак не найден ни у одного предка, откатываемся к эвристике по ключевым словам.
      */
     public function resolveTypeByCategory(CashflowCategory $category): string
     {
+        if (null !== ($resolved = $this->resolveTypeFromHierarchy($category))) {
+            return $resolved;
+        }
+
         $names = $this->collectCategoryNames($category);
 
         foreach ($names as $name) {
@@ -55,6 +62,31 @@ final class PaymentPlanService
         }
 
         return PaymentPlanType::OUTFLOW;
+    }
+
+    /*
+     * CashflowCategory::getOperationType() хранит enum App\Enum\PaymentPlanType (INFLOW/OUTFLOW/TRANSFER).
+     * Значение может быть null, поэтому поднимаемся к родителю до первого установленного признака.
+     */
+    private function resolveTypeFromHierarchy(CashflowCategory $category): ?string
+    {
+        $node = $category;
+
+        while (null !== $node) {
+            // читаем признак из CashflowCategory::getOperationType()
+            $operationType = $node->getOperationType();
+            if (null !== $operationType) {
+                return match ($operationType) {
+                    PaymentPlanTypeEnum::INFLOW => PaymentPlanType::INFLOW,
+                    PaymentPlanTypeEnum::OUTFLOW => PaymentPlanType::OUTFLOW,
+                    PaymentPlanTypeEnum::TRANSFER => PaymentPlanType::TRANSFER,
+                };
+            }
+
+            $node = $node->getParent();
+        }
+
+        return null;
     }
 
     /**

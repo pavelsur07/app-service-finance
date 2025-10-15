@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Enum\CashflowCategoryStatus;
+use App\Enum\PaymentPlanType;
 use App\Repository\CashflowCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -39,6 +40,9 @@ class CashflowCategory
     #[ORM\ManyToOne(targetEntity: Company::class)]
     #[ORM\JoinColumn(nullable: false)]
     private Company $company;
+
+    #[ORM\Column(enumType: PaymentPlanType::class, nullable: true)]
+    private ?PaymentPlanType $operationType = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -127,6 +131,18 @@ class CashflowCategory
     public function setCompany(Company $company): self
     {
         $this->company = $company;
+
+        return $this;
+    }
+
+    public function getOperationType(): ?PaymentPlanType
+    {
+        return $this->operationType;
+    }
+
+    public function setOperationType(?PaymentPlanType $operationType): self
+    {
+        $this->operationType = $operationType;
 
         return $this;
     }

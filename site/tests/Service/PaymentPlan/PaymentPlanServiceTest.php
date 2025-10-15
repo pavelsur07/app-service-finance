@@ -9,6 +9,7 @@ use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Entity\User;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Service\PaymentPlan\PaymentPlanService;
 use DomainException;
 use PHPUnit\Framework\TestCase;
@@ -21,10 +22,10 @@ final class PaymentPlanServiceTest extends TestCase
         $service = new PaymentPlanService();
         $company = $this->createCompany();
 
-        $root = $this->createCategory($company, 'Доходы от продаж');
-        $child = $this->createCategory($company, 'Поступления с маркетплейсов', $root);
+        $category = $this->createCategory($company, 'Любая категория');
+        $category->setOperationType(PaymentPlanTypeEnum::INFLOW);
 
-        self::assertSame(PaymentPlanTypeValue::INFLOW, $service->resolveTypeByCategory($child));
+        self::assertSame(PaymentPlanTypeValue::INFLOW, $service->resolveTypeByCategory($category));
     }
 
     public function testResolveTypeByCategoryForTransfer(): void
@@ -32,10 +33,10 @@ final class PaymentPlanServiceTest extends TestCase
         $service = new PaymentPlanService();
         $company = $this->createCompany();
 
-        $root = $this->createCategory($company, 'Технические операции');
-        $child = $this->createCategory($company, 'Перевод между счетами', $root);
+        $category = $this->createCategory($company, 'Перемещение');
+        $category->setOperationType(PaymentPlanTypeEnum::TRANSFER);
 
-        self::assertSame(PaymentPlanTypeValue::TRANSFER, $service->resolveTypeByCategory($child));
+        self::assertSame(PaymentPlanTypeValue::TRANSFER, $service->resolveTypeByCategory($category));
     }
 
     public function testResolveTypeByCategoryDefaultsToOutflow(): void
@@ -43,10 +44,33 @@ final class PaymentPlanServiceTest extends TestCase
         $service = new PaymentPlanService();
         $company = $this->createCompany();
 
-        $root = $this->createCategory($company, 'Операционные расходы');
-        $child = $this->createCategory($company, 'Аренда офиса', $root);
+        $category = $this->createCategory($company, 'Расходы');
+        $category->setOperationType(PaymentPlanTypeEnum::OUTFLOW);
+
+        self::assertSame(PaymentPlanTypeValue::OUTFLOW, $service->resolveTypeByCategory($category));
+    }
+
+    public function testResolveTypeByCategoryInheritsFromParent(): void
+    {
+        $service = new PaymentPlanService();
+        $company = $this->createCompany();
+
+        $root = $this->createCategory($company, 'Родитель');
+        $root->setOperationType(PaymentPlanTypeEnum::OUTFLOW);
+        $child = $this->createCategory($company, 'Дочерний', $root);
 
         self::assertSame(PaymentPlanTypeValue::OUTFLOW, $service->resolveTypeByCategory($child));
+    }
+
+    public function testResolveTypeByCategoryFallsBackToKeywords(): void
+    {
+        $service = new PaymentPlanService();
+        $company = $this->createCompany();
+
+        $root = $this->createCategory($company, 'Доходы от продаж');
+        $child = $this->createCategory($company, 'Поступления с маркетплейсов', $root);
+
+        self::assertSame(PaymentPlanTypeValue::INFLOW, $service->resolveTypeByCategory($child));
     }
 
     public function testTransitionStatusFollowsHappyPath(): void
