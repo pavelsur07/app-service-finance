@@ -12,6 +12,7 @@ use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
+use App\Service\PaymentPlan\PaymentPlanMatcher;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
@@ -24,6 +25,7 @@ class CashTransactionService
         private DailyBalanceRecalculator $recalculator,   // ← как и было: после CRUD пересчитываем факты
         private CashTransactionRepository $txRepo,
         private MessageBusInterface $messageBus,
+        private PaymentPlanMatcher $paymentPlanMatcher,
     ) {
     }
 
@@ -84,6 +86,8 @@ class CashTransactionService
         // Сохраняем
         $this->em->persist($tx);
         $this->em->flush(); // ← flush перед пересчётом обязателен
+
+        $this->paymentPlanMatcher->matchForTransaction($tx);
 
         $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
             (string) $tx->getId(),

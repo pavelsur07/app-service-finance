@@ -9,12 +9,18 @@ use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
+use App\Entity\PaymentPlan;
+use App\Entity\PaymentPlanMatch;
 use App\Entity\User;
 use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
 use App\Enum\MoneyAccountType;
+use App\Repository\PaymentPlanMatchRepository;
+use App\Repository\PaymentPlanRepository;
 use App\Service\AccountBalanceService;
 use App\Service\CashTransactionService;
+use App\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;
@@ -118,13 +124,18 @@ class CashTransactionServiceTest extends TestCase
             $this->em->getClassMetadata(MoneyAccountDailyBalance::class),
             $this->em->getClassMetadata(CashflowCategory::class),
             $this->em->getClassMetadata(Counterparty::class),
+            $this->em->getClassMetadata(PaymentPlan::class),
+            $this->em->getClassMetadata(PaymentPlanMatch::class),
         ];
         $schemaTool->createSchema($classes);
         $registry = new SimpleManagerRegistry($this->em);
         $txRepo = new \App\Repository\CashTransactionRepository($registry);
         $balanceRepo = new \App\Repository\MoneyAccountDailyBalanceRepository($registry);
         $balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo, new NullMessageBus());
+        $planRepository = new PaymentPlanRepository($registry);
+        $planMatchRepository = new PaymentPlanMatchRepository($registry);
+        $paymentPlanMatcher = new PaymentPlanMatcher($this->em, $planRepository, $planMatchRepository, new PaymentPlanService());
+        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo, new NullMessageBus(), $paymentPlanMatcher);
     }
 
     public function testAddPersistsAllFields(): void
