@@ -133,7 +133,7 @@
                         } %}
                         {% for plan in plans %}
                             {% set planType = plan.type.value %}
-                            {% set amountValue = plan.amount|float %}
+                            {% set amountValue = plan.amount ?? 0 %}
                             {% if planType == 'INFLOW' %}
                                 {% set totalInflow = totalInflow + amountValue %}
                                 {% set badgeClass = 'bg-green-lt text-green' %}
