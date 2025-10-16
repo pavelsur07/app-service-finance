@@ -34,9 +34,27 @@
                             <td>
                                 <a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a>
                             </td>
-                            <td>{{ company.wildberriesApiKey }}</td>
-                            <td>{{ company.ozonSellerId }}</td>
-                            <td>{{ company.ozonApiKey }}</td>
+                            <td>
+                                {% if company.wildberriesApiKey %}
+                                    <span class="badge bg-green-lt">Есть</span>
+                                {% else %}
+                                    <span class="badge bg-red-lt">Нет</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if company.ozonSellerId %}
+                                    <span class="badge bg-green-lt">Есть</span>
+                                {% else %}
+                                    <span class="badge bg-red-lt">Нет</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if company.ozonApiKey %}
+                                    <span class="badge bg-green-lt">Есть</span>
+                                {% else %}
+                                    <span class="badge bg-red-lt">Нет</span>
+                                {% endif %}
+                            </td>
                             <td>
                                 <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-sm btn-warning">✏️</a>
                                 <form method="post" action="{{ path('company_delete', {'id': company.id}) }}" style="display:inline;" onsubmit="return confirm('Вы уверены?');">
