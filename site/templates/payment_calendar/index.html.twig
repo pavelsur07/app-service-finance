@@ -2,119 +2,281 @@
 
 {% block title %}Платёжный календарь{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .table-sticky-head thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--tblr-bg-surface);
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
-<div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4">
-    <div>
-        <h1 class="mb-1">Платёжный календарь</h1>
-        {% if period %}
-            <div class="text-muted">Период: {{ period.from|date('Y-m-d') }} — {{ period.to|date('Y-m-d') }}</div>
-        {% endif %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Платёжный календарь</h2>
+                    <div class="text-secondary">
+                        {% if period %}
+                            Период: {{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}
+                        {% else %}
+                            Укажите период, чтобы увидеть прогноз поступлений и платежей
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <div class="btn-group" role="group" aria-label="View switch">
+                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-day">
+                            <label class="btn" for="payment-calendar-view-day"><i class="ti ti-calendar-day"></i> День</label>
+                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-week" checked>
+                            <label class="btn" for="payment-calendar-view-week"><i class="ti ti-calendar-week"></i> Неделя</label>
+                            <input type="radio" class="btn-check" name="calendar-view" id="payment-calendar-view-month">
+                            <label class="btn" for="payment-calendar-view-month"><i class="ti ti-calendar-month"></i> Месяц</label>
+                        </div>
+                        <a href="#" class="btn" data-bs-toggle="offcanvas" data-bs-target="#payment-calendar-filters">
+                            <i class="ti ti-filter"></i> Фильтры
+                        </a>
+                        <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">
+                            <i class="ti ti-plus"></i> Добавить
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="mt-3 mt-md-0">
-        <a class="btn btn-primary" href="{{ path('payment_calendar_new', filterQuery) }}">Добавить</a>
-    </div>
-</div>
 
-<form method="get" class="card card-body mb-4">
-    <div class="row g-3">
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-from" class="form-label">С</label>
-            <input type="date" id="filter-from" name="from" class="form-control" value="{{ filters.from }}" required>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-to" class="form-label">По</label>
-            <input type="date" id="filter-to" name="to" class="form-control" value="{{ filters.to }}" required>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-account" class="form-label">Счёт</label>
-            <select id="filter-account" name="account_id" class="form-select">
-                <option value="">Все</option>
-                {% for account in accounts %}
-                    <option value="{{ account.id }}" {% if filters.account_id == account.id %}selected{% endif %}>{{ account.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-category" class="form-label">Категория</label>
-            <select id="filter-category" name="category_id" class="form-select">
-                <option value="">Все</option>
-                {% for category in categories %}
-                    <option value="{{ category.id }}" {% if filters.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-status" class="form-label">Статус</label>
-            <select id="filter-status" name="status" class="form-select">
-                <option value="">Все</option>
-                {% for value, label in statuses %}
-                    <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <label for="filter-counterparty" class="form-label">Контрагент</label>
-            <select id="filter-counterparty" name="counterparty_id" class="form-select">
-                <option value="">Все</option>
-                {% for counterparty in counterparties %}
-                    <option value="{{ counterparty.id }}" {% if filters.counterparty_id == counterparty.id %}selected{% endif %}>{{ counterparty.name }}</option>
-                {% endfor %}
-            </select>
-        </div>
-        <div class="col-12 d-flex gap-2">
-            <button type="submit" class="btn btn-primary">Применить</button>
-            <a href="{{ path('payment_calendar_index', {'from': filters.from, 'to': filters.to}) }}" class="btn btn-outline-secondary">Сбросить дополнительные фильтры</a>
-        </div>
-    </div>
-</form>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="row g-3 mb-4">
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <span class="avatar avatar-sm bg-success-lt text-success me-2">
+                                    <i class="ti ti-wallet"></i>
+                                </span>
+                                <div class="text-secondary">Остаток на начало</div>
+                            </div>
+                            <div class="h2 mt-2">0 ₽</div>
+                            <div class="text-secondary">Будет рассчитан позже</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <span class="avatar avatar-sm bg-info-lt text-info me-2">
+                                    <i class="ti ti-trending-up"></i>
+                                </span>
+                                <div class="text-secondary">Прогноз на конец</div>
+                            </div>
+                            <div class="h2 mt-2">0 ₽</div>
+                            <div class="text-secondary">Будет рассчитан позже</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center">
+                                <span class="avatar avatar-sm bg-danger-lt text-danger me-2">
+                                    <i class="ti ti-alert-octagon"></i>
+                                </span>
+                                <div class="text-secondary">Кассовый разрыв</div>
+                            </div>
+                            <div class="h2 mt-2 text-success">0 ₽</div>
+                            <div class="text-secondary">Покажем, если появится отрицательный баланс</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-<div class="card">
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter">
-            <thead>
-                <tr>
-                    <th>Дата</th>
-                    <th>Категория</th>
-                    <th>Контрагент</th>
-                    <th class="text-end">Сумма</th>
-                    <th>Счёт</th>
-                    <th>Статус</th>
-                    <th>Комментарий</th>
-                    <th class="w-1">Действия</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for plan in plans %}
-                    <tr>
-                        <td>{{ plan.plannedAt|date('Y-m-d') }}</td>
-                        <td>{{ plan.cashflowCategory.name }}</td>
-                        <td>{{ plan.counterparty ? plan.counterparty.name : '—' }}</td>
-                        <td class="text-end">{{ plan.amount|number_format(2, '.', ' ') }}</td>
-                        <td>{{ plan.moneyAccount ? plan.moneyAccount.name : '—' }}</td>
-                        <td>{{ plan.status.value }}</td>
-                        <td>{{ plan.comment ?? '' }}</td>
-                        <td>
-                            <a class="btn btn-link p-0" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': plan.id})) }}">Редактировать</a>
-                        </td>
-                    </tr>
-                {% else %}
-                    <tr>
-                        <td colspan="8" class="text-center text-muted">Записей не найдено</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-</div>
+            {% set totalInflow = 0 %}
+            {% set totalOutflow = 0 %}
 
-{% if showForm is defined and showForm and form is defined %}
-    <div class="card mt-4">
-        <div class="card-header">
-            <h2 class="card-title mb-0">{{ formTitle ?? 'Запись' }}</h2>
-        </div>
-        <div class="card-body">
-            {% include 'payment_calendar/_form.html.twig' with {form: form, filterQuery: filterQuery} %}
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-title">Плановые операции</div>
+                    <div class="card-actions">
+                        {% if period %}
+                            <span class="text-secondary">{{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="table-responsive table-sticky-head">
+                    <table class="table table-hover card-table align-middle">
+                        <thead>
+                        <tr>
+                            <th style="width: 120px;">Дата</th>
+                            <th>Категория ДДС</th>
+                            <th>Контрагент</th>
+                            <th class="text-end" style="width: 140px;">Сумма</th>
+                            <th style="width: 160px;">Счёт</th>
+                            <th style="width: 140px;">Статус</th>
+                            <th>Комментарий</th>
+                            <th class="w-1 text-end">Действия</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% set statusClasses = {
+                            'DRAFT': 'bg-gray-lt text-body',
+                            'PLANNED': 'bg-secondary text-white',
+                            'APPROVED': 'bg-yellow-lt text-yellow',
+                            'PAID': 'bg-lime-lt text-lime',
+                            'CANCELED': 'bg-gray-lt text-body'
+                        } %}
+                        {% for plan in plans %}
+                            {% set planType = plan.type.value %}
+                            {% set amountValue = plan.amount|float %}
+                            {% if planType == 'INFLOW' %}
+                                {% set totalInflow = totalInflow + amountValue %}
+                                {% set badgeClass = 'bg-green-lt text-green' %}
+                                {% set amountClass = 'text-green' %}
+                                {% set amountPrefix = '+ ' %}
+                            {% elseif planType == 'OUTFLOW' %}
+                                {% set totalOutflow = totalOutflow + amountValue %}
+                                {% set badgeClass = 'bg-red-lt text-red' %}
+                                {% set amountClass = 'text-red' %}
+                                {% set amountPrefix = '− ' %}
+                            {% else %}
+                                {% set badgeClass = 'bg-gray-lt text-body' %}
+                                {% set amountClass = '' %}
+                                {% set amountPrefix = '' %}
+                            {% endif %}
+                            {% set status = plan.status.value %}
+                            <tr>
+                                <td>{{ plan.plannedAt|date('d.m.Y') }}</td>
+                                <td><span class="badge {{ badgeClass }}">{{ plan.cashflowCategory.name }}</span></td>
+                                <td>{{ plan.counterparty ? plan.counterparty.name : '—' }}</td>
+                                <td class="text-end {{ amountClass }}">{{ amountPrefix }}{{ amountValue|number_format(2, '.', ' ') }}</td>
+                                <td>{{ plan.moneyAccount ? plan.moneyAccount.name : '—' }}</td>
+                                <td>
+                                    {% set statusClass = statusClasses[status] ?? 'bg-secondary text-white' %}
+                                    <span class="badge {{ statusClass }}">{{ status }}</span>
+                                </td>
+                                <td>{{ plan.comment is not empty ? plan.comment : '—' }}</td>
+                                <td class="text-end">
+                                    <a class="btn btn-icon" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': plan.id})) }}" data-bs-toggle="tooltip" data-bs-placement="left" title="Редактировать">
+                                        <i class="ti ti-pencil"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-secondary py-4">Записей не найдено</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                        {% set netTotal = totalInflow - totalOutflow %}
+                        {% set netClass = netTotal > 0 ? 'text-green' : (netTotal < 0 ? 'text-red' : '') %}
+                        <tr>
+                            <td colspan="3" class="text-end fw-bold">Итого за период:</td>
+                            <td class="text-end fw-bold {{ netClass }}">
+                                {% if netTotal > 0 %}+ {% elseif netTotal < 0 %}− {% endif %}{{ netTotal|abs|number_format(2, '.', ' ') }}
+                            </td>
+                            <td colspan="4"></td>
+                        </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
-{% endif %}
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="payment-calendar-filters" aria-labelledby="payment-calendar-filters-label">
+        <div class="offcanvas-header">
+            <h2 class="offcanvas-title" id="payment-calendar-filters-label">Фильтры</h2>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+        </div>
+        <div class="offcanvas-body">
+            <form method="get" action="{{ path('payment_calendar_index') }}" class="d-flex flex-column gap-3">
+                <div>
+                    <label for="filter-from" class="form-label">С</label>
+                    <input type="date" id="filter-from" name="from" class="form-control" value="{{ filters.from }}" required>
+                </div>
+                <div>
+                    <label for="filter-to" class="form-label">По</label>
+                    <input type="date" id="filter-to" name="to" class="form-control" value="{{ filters.to }}" required>
+                </div>
+                <div>
+                    <label for="filter-account" class="form-label">Счёт</label>
+                    <select id="filter-account" name="account_id" class="form-select">
+                        <option value="">Все счета</option>
+                        {% for account in accounts %}
+                            <option value="{{ account.id }}" {% if filters.account_id == account.id %}selected{% endif %}>{{ account.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-category" class="form-label">Категория ДДС</label>
+                    <select id="filter-category" name="category_id" class="form-select">
+                        <option value="">Все категории</option>
+                        {% for category in categories %}
+                            <option value="{{ category.id }}" {% if filters.category_id == category.id %}selected{% endif %}>{{ category.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-status" class="form-label">Статус</label>
+                    <select id="filter-status" name="status" class="form-select">
+                        <option value="">Все статусы</option>
+                        {% for value, label in statuses %}
+                            <option value="{{ value }}" {% if filters.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label for="filter-counterparty" class="form-label">Контрагент</label>
+                    <select id="filter-counterparty" name="counterparty_id" class="form-select">
+                        <option value="">Все контрагенты</option>
+                        {% for counterparty in counterparties %}
+                            <option value="{{ counterparty.id }}" {% if filters.counterparty_id == counterparty.id %}selected{% endif %}>{{ counterparty.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="d-grid gap-2 mt-2">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a class="btn" href="{{ path('payment_calendar_index', {'from': filters.from, 'to': filters.to}) }}">Сбросить</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {% if form is defined %}
+        <div class="modal modal-blur fade" id="payment-plan-modal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h2 class="modal-title">{{ formTitle ?? 'Запись' }}</h2>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        {% include 'payment_calendar/_form.html.twig' with {form: form, filterQuery: filterQuery} %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {% if showForm is defined and showForm and form is defined %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                var modalElement = document.getElementById('payment-plan-modal');
+                if (modalElement) {
+                    var modal = new bootstrap.Modal(modalElement);
+                    modal.show();
+                }
+            });
+        </script>
+    {% endif %}
 {% endblock %}
