@@ -30,6 +30,11 @@
                         <span class="nav-link-title">Остатки по счетам</span>
                     </a>
                 </li>
+                <li class="nav-item">
+                    <a class="nav-link {{ current_route starts with 'payment_calendar_' ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}">
+                        <span class="nav-link-title">Платежный календарь</span>
+                    </a>
+                </li>
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
 
