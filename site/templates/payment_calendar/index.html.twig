@@ -50,7 +50,7 @@
         </div>
     </div>
 
-    <div class="page-body">
+    <div class="page-body" data-forecast-series="{{ forecastSeries|json_encode|e('html_attr') }}">
         <div class="container-xl">
             <div class="row g-3 mb-4">
                 <div class="col-sm-6 col-lg-4">
@@ -62,8 +62,12 @@
                                 </span>
                                 <div class="text-secondary">Остаток на начало</div>
                             </div>
-                            <div class="h2 mt-2">0 ₽</div>
-                            <div class="text-secondary">Будет рассчитан позже</div>
+                            <div class="h2 mt-2">{{ forecast.openingBalance|number_format(2, '.', ' ') }} ₽</div>
+                            {% if period %}
+                                <div class="text-secondary">На {{ period.from|date('d.m.Y') }}</div>
+                            {% else %}
+                                <div class="text-secondary">Укажите период, чтобы увидеть остаток</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -76,8 +80,12 @@
                                 </span>
                                 <div class="text-secondary">Прогноз на конец</div>
                             </div>
-                            <div class="h2 mt-2">0 ₽</div>
-                            <div class="text-secondary">Будет рассчитан позже</div>
+                            <div class="h2 mt-2">{{ forecast.closingForecast|number_format(2, '.', ' ') }} ₽</div>
+                            {% if period %}
+                                <div class="text-secondary">На {{ period.to|date('d.m.Y') }}</div>
+                            {% else %}
+                                <div class="text-secondary">Будет рассчитан после выбора периода</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -90,8 +98,18 @@
                                 </span>
                                 <div class="text-secondary">Кассовый разрыв</div>
                             </div>
-                            <div class="h2 mt-2 text-success">0 ₽</div>
-                            <div class="text-secondary">Покажем, если появится отрицательный баланс</div>
+                            {% if period %}
+                                {% if forecast.hasGap %}
+                                    <div class="h2 mt-2 text-danger">Есть</div>
+                                    <div class="text-secondary">В выбранном периоде ожидается отрицательный баланс</div>
+                                {% else %}
+                                    <div class="h2 mt-2 text-success">Нет</div>
+                                    <div class="text-secondary">Баланс остаётся неотрицательным</div>
+                                {% endif %}
+                            {% else %}
+                                <div class="h2 mt-2 text-secondary">—</div>
+                                <div class="text-secondary">Расчёт появится после выбора периода</div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>

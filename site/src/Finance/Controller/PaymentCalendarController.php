@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
@@ -14,6 +15,7 @@ use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Form\PaymentPlanType;
 use App\Repository\PaymentPlanRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\PaymentPlan\ForecastBalanceService;
 use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +33,7 @@ final class PaymentCalendarController extends AbstractController
         private PaymentPlanRepository $paymentPlanRepository,
         private EntityManagerInterface $entityManager,
         private PaymentPlanService $paymentPlanService,
+        private ForecastBalanceService $forecastBalanceService,
     ) {
     }
 
@@ -163,6 +166,8 @@ final class PaymentCalendarController extends AbstractController
 
         $plans = [];
         $period = null;
+        $forecast = new ForecastDTO();
+        $forecastSeries = [];
         $from = $this->parseDate($filters['from'] ?? null);
         $to = $this->parseDate($filters['to'] ?? null);
 
@@ -173,6 +178,17 @@ final class PaymentCalendarController extends AbstractController
         } else {
             $plans = $this->loadPlans($company, $from, $to, $filters);
             $period = ['from' => $from, 'to' => $to];
+
+            $account = null;
+            if (!empty($filters['account_id'])) {
+                $candidate = $this->entityManager->getRepository(MoneyAccount::class)->find($filters['account_id']);
+                if ($candidate instanceof MoneyAccount && $candidate->getCompany()->getId() === $company->getId()) {
+                    $account = $candidate;
+                }
+            }
+
+            $forecast = $this->forecastBalanceService->buildForecast($company, $from, $to, $account);
+            $forecastSeries = $forecast->series;
         }
 
         $filterQuery = $this->buildFilterQuery($filters);
@@ -186,6 +202,8 @@ final class PaymentCalendarController extends AbstractController
             'categories' => $this->entityManager->getRepository(CashflowCategory::class)->findBy(['company' => $company], ['name' => 'ASC']),
             'counterparties' => $this->entityManager->getRepository(Counterparty::class)->findBy(['company' => $company], ['name' => 'ASC']),
             'statuses' => $this->statusChoices(),
+            'forecast' => $forecast,
+            'forecastSeries' => $forecastSeries,
         ];
 
         return $this->render('payment_calendar/index.html.twig', array_merge($context, $extra));

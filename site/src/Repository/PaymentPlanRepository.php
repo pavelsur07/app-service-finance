@@ -3,6 +3,7 @@
 namespace App\Repository;
 
 use App\Entity\Company;
+use App\Entity\MoneyAccount;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;
@@ -53,7 +54,7 @@ class PaymentPlanRepository extends ServiceEntityRepository
     /**
      * @return array<string, array{inflow:string,outflow:string,transfer:string}>
      */
-    public function sumByDay(Company $company, \DateTimeInterface $from, \DateTimeInterface $to): array
+    public function sumByDay(Company $company, \DateTimeInterface $from, \DateTimeInterface $to, ?MoneyAccount $account = null): array
     {
         $qb = $this->createQueryBuilder('plan')
             ->select('plan.plannedAt AS plannedDate')
@@ -71,11 +72,26 @@ class PaymentPlanRepository extends ServiceEntityRepository
             ))
             ->where('plan.company = :company')
             ->andWhere('plan.plannedAt BETWEEN :from AND :to')
+            ->andWhere('plan.status IN (:statuses)')
             ->groupBy('plannedDate')
             ->orderBy('plannedDate', 'ASC')
             ->setParameter('company', $company)
             ->setParameter('from', \DateTimeImmutable::createFromInterface($from), Types::DATE_IMMUTABLE)
-            ->setParameter('to', \DateTimeImmutable::createFromInterface($to), Types::DATE_IMMUTABLE);
+            ->setParameter('to', \DateTimeImmutable::createFromInterface($to), Types::DATE_IMMUTABLE)
+            ->setParameter(
+                'statuses',
+                [
+                    PaymentPlanStatus::DRAFT->value,
+                    PaymentPlanStatus::PLANNED->value,
+                    PaymentPlanStatus::APPROVED->value,
+                ],
+                ArrayParameterType::STRING
+            );
+
+        if (null !== $account) {
+            $qb->andWhere('plan.moneyAccount = :account')
+                ->setParameter('account', $account);
+        }
 
         $rawResults = $qb->getQuery()->getArrayResult();
 
