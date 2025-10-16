@@ -12,21 +12,28 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center mb-3">
-    <h2 class="page-title">Транзакции (ДДС)</h2>
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Транзакции (ДДС)</h2>
     <div class="ms-auto d-print-none">
-        <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
-        <a href="/cash/import/bank1c"
-           class="btn btn-primary"
-           data-testid="btn-import-1c">
-            <i class="ti ti-upload me-1"></i>
-            Импорт 1С
-        </a>
-        <a href="#" class="btn btn-outline-secondary">Экспорт</a>
+        <div class="btn-list">
+            <a href="#"
+               class="btn btn-outline-secondary"
+               data-bs-toggle="offcanvas"
+               data-bs-target="#transaction-filters-offcanvas">
+                <i class="ti ti-filter"></i>
+                Фильтры
+            </a>
+            <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
+            <a href="/cash/import/bank1c"
+               class="btn btn-primary"
+               data-testid="btn-import-1c">
+                <i class="ti ti-upload me-1"></i>
+                Импорт 1С
+            </a>
+            <a href="#" class="btn btn-outline-secondary">Экспорт</a>
+        </div>
     </div>
 </div>
-
-{{ include('transaction/_filters.html.twig') }}
 
 <div class="card mt-3">
     <div class="table-responsive">
@@ -105,6 +112,8 @@
         </div>
     </div>
 </div>
+
+{{ include('transaction/_filters.html.twig') }}
 
 <div class="modal fade" id="autoRuleModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
