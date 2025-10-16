@@ -21,7 +21,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Uid\Uuid;
+use Ramsey\Uuid\Uuid;
 
 #[Route('/finance/payment-calendar')]
 final class PaymentCalendarController extends AbstractController
@@ -57,7 +57,7 @@ final class PaymentCalendarController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid() && null !== $dto->cashflowCategory) {
             $plan = new PaymentPlan(
-                Uuid::v4()->toRfc4122(),
+                Uuid::uuid4()->toString(),
                 $company,
                 $dto->cashflowCategory,
                 \DateTimeImmutable::createFromInterface($dto->plannedAt),
