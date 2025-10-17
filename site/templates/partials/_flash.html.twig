@@ -4,13 +4,46 @@
     'alert': 'warning',
 } %}
 
+{% set flashMessages = [] %}
 {% for label, messages in app.flashes %}
     {% set bootstrapLabel = labelClassMap[label]|default(label) %}
     {% for message in messages %}
-        <div class="alert alert-{{ bootstrapLabel }} alert-dismissible" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
+        {% set flashMessages = flashMessages|merge([{ type: bootstrapLabel, message: message }]) %}
     {% endfor %}
 {% endfor %}
+
+{% if flashMessages is not empty %}
+    <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1090;">
+        {% for flash in flashMessages %}
+            <div class="toast text-bg-{{ flash.type }}" role="alert" aria-live="assertive" aria-atomic="true" data-bs-delay="5000" data-bs-autohide="true">
+                <div class="toast-body d-flex align-items-center gap-2">
+                    <span class="toast-icon">
+                        {% if flash.type == 'success' %}
+                            <i class="ti ti-check"></i>
+                        {% elseif flash.type == 'danger' %}
+                            <i class="ti ti-alert-circle"></i>
+                        {% elseif flash.type == 'warning' %}
+                            <i class="ti ti-alert-triangle"></i>
+                        {% elseif flash.type == 'info' %}
+                            <i class="ti ti-info-circle"></i>
+                        {% else %}
+                            <i class="ti ti-bell"></i>
+                        {% endif %}
+                    </span>
+                    <span>{{ flash.message }}</span>
+                    <button type="button" class="btn-close btn-close-white ms-auto" data-bs-dismiss="toast" aria-label="Закрыть"></button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.toast[data-bs-autohide]').forEach(function (toastEl) {
+                var toast = new bootstrap.Toast(toastEl);
+                toast.show();
+            });
+        });
+    </script>
+{% endif %}
 
