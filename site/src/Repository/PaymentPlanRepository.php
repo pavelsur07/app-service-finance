@@ -2,9 +2,11 @@
 
 namespace App\Repository;
 
+use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Entity\PaymentPlan;
+use App\Entity\PaymentRecurrenceRule;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
@@ -112,5 +114,37 @@ class PaymentPlanRepository extends ServiceEntityRepository
         }
 
         return $totals;
+    }
+
+    public function findTemplateForRecurrenceRule(PaymentRecurrenceRule $rule): ?PaymentPlan
+    {
+        return $this->createQueryBuilder('plan')
+            ->where('plan.recurrenceRule = :rule')
+            ->orderBy('plan.plannedAt', 'ASC')
+            ->setMaxResults(1)
+            ->setParameter('rule', $rule)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function existsRecurrenceDuplicate(Company $company, PaymentRecurrenceRule $rule, \DateTimeInterface $plannedAt, string $amount, CashflowCategory $category): bool
+    {
+        $result = $this->createQueryBuilder('plan')
+            ->select('1')
+            ->where('plan.company = :company')
+            ->andWhere('plan.recurrenceRule = :rule')
+            ->andWhere('plan.plannedAt = :plannedAt')
+            ->andWhere('plan.amount = :amount')
+            ->andWhere('plan.cashflowCategory = :category')
+            ->setMaxResults(1)
+            ->setParameter('company', $company)
+            ->setParameter('rule', $rule)
+            ->setParameter('plannedAt', \DateTimeImmutable::createFromInterface($plannedAt), Types::DATE_IMMUTABLE)
+            ->setParameter('amount', $amount)
+            ->setParameter('category', $category)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return null !== $result;
     }
 }
