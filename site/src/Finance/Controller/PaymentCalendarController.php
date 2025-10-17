@@ -5,6 +5,7 @@ namespace App\Finance\Controller;
 
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
+use App\Domain\PaymentPlan\PaymentPlanStatus;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
@@ -20,11 +21,12 @@ use App\Service\PaymentPlan\PaymentPlanService;
 use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
+use DomainException;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Ramsey\Uuid\Uuid;
 
 #[Route('/finance/payment-calendar')]
 final class PaymentCalendarController extends AbstractController
@@ -150,6 +152,98 @@ final class PaymentCalendarController extends AbstractController
             'showForm' => true,
             'formTitle' => 'Редактирование',
         ], $filters);
+    }
+
+    #[Route('/{id}/status', name: 'payment_calendar_status', methods: ['POST'])]
+    public function changeStatus(Request $request, PaymentPlan $plan): Response
+    {
+        $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($plan->getCompany()->getId() !== $company->getId()) {
+            throw $this->createAccessDeniedException();
+        }
+
+        if (!$this->isCsrfTokenValid('payment_plan_status_' . $plan->getId(), (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $filters = $this->extractFilters($request);
+        $action = (string) $request->request->get('action');
+        $statusMap = [
+            'approve' => PaymentPlanStatus::APPROVED,
+            'pay' => PaymentPlanStatus::PAID,
+            'cancel' => PaymentPlanStatus::CANCELED,
+        ];
+
+        if (!\array_key_exists($action, $statusMap)) {
+            $this->addFlash('danger', 'Неизвестное действие.');
+
+            return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+        }
+
+        $targetStatus = $statusMap[$action];
+
+        if ($plan->getStatus()->value === $targetStatus) {
+            $this->addFlash('info', 'Статус уже установлен.');
+
+            return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+        }
+
+        try {
+            $this->paymentPlanService->transitionStatus($plan, $targetStatus);
+            $this->entityManager->flush();
+        } catch (DomainException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+
+            return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+        }
+
+        $messages = [
+            'approve' => 'Платёж одобрен.',
+            'pay' => 'Платёж помечен как оплаченный.',
+            'cancel' => 'Платёж отменён.',
+        ];
+
+        $this->addFlash('success', $messages[$action] ?? 'Статус обновлён.');
+
+        return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+    }
+
+    #[Route('/{id}/postpone', name: 'payment_calendar_postpone', methods: ['POST'])]
+    public function postpone(Request $request, PaymentPlan $plan): Response
+    {
+        $company = $this->activeCompanyService->getActiveCompany();
+
+        if ($plan->getCompany()->getId() !== $company->getId()) {
+            throw $this->createAccessDeniedException();
+        }
+
+        if (!$this->isCsrfTokenValid('payment_plan_postpone_' . $plan->getId(), (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $filters = $this->extractFilters($request);
+        $days = (int) $request->request->get('days', 0);
+
+        if ($days <= 0) {
+            $this->addFlash('danger', 'Количество дней должно быть больше нуля.');
+
+            return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+        }
+
+        $plannedAt = $plan->getPlannedAt();
+        if (null === $plannedAt) {
+            $this->addFlash('danger', 'Не удалось перенести платёж.');
+
+            return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
+        }
+
+        $plan->setPlannedAt($plannedAt->modify(sprintf('+%d day', $days)));
+        $this->entityManager->flush();
+
+        $this->addFlash('success', sprintf('Платёж перенесён на %d дн.', $days));
+
+        return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
     }
 
     /**

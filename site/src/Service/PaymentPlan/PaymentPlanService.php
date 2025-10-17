@@ -111,7 +111,7 @@ final class PaymentPlanService
 
         $allowed = [
             PaymentPlanStatus::DRAFT => [PaymentPlanStatus::PLANNED],
-            PaymentPlanStatus::PLANNED => [PaymentPlanStatus::APPROVED, PaymentPlanStatus::CANCELED],
+            PaymentPlanStatus::PLANNED => [PaymentPlanStatus::APPROVED, PaymentPlanStatus::PAID, PaymentPlanStatus::CANCELED],
             PaymentPlanStatus::APPROVED => [PaymentPlanStatus::PAID, PaymentPlanStatus::CANCELED],
         ];
 

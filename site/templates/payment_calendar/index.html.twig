@@ -179,10 +179,52 @@
                                     <span class="badge {{ statusClass }}">{{ status }}</span>
                                 </td>
                                 <td>{{ plan.comment is not empty ? plan.comment : '—' }}</td>
+                                {% set allowApprove = status == 'PLANNED' %}
+                                {% set allowPay = status in ['PLANNED', 'APPROVED'] %}
+                                {% set allowCancel = status in ['PLANNED', 'APPROVED'] %}
+                                {% set allowPostpone = status in ['PLANNED', 'APPROVED'] %}
                                 <td class="text-end">
-                                    <a class="btn btn-icon" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': plan.id})) }}" data-bs-toggle="tooltip" data-bs-placement="left" title="Редактировать">
-                                        <i class="ti ti-pencil"></i>
-                                    </a>
+                                    <div class="btn-list justify-content-end">
+                                        {% if allowApprove %}
+                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
+                                                <input type="hidden" name="action" value="approve">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
+                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Одобрить">
+                                                    <i class="ti ti-checks"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if allowPay %}
+                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
+                                                <input type="hidden" name="action" value="pay">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
+                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отметить как оплаченный">
+                                                    <i class="ti ti-cash"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if allowPostpone %}
+                                            <form method="post" action="{{ path('payment_calendar_postpone', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
+                                                <input type="hidden" name="days" value="3">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_postpone_' ~ plan.id) }}">
+                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отложить на 3 дня">
+                                                    <i class="ti ti-clock-pause"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        {% if allowCancel %}
+                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
+                                                <input type="hidden" name="action" value="cancel">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
+                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отменить">
+                                                    <i class="ti ti-x"></i>
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                        <a class="btn btn-icon" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': plan.id})) }}" data-bs-toggle="tooltip" data-bs-placement="left" title="Редактировать">
+                                            <i class="ti ti-pencil"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
