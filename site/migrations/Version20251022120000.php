@@ -16,7 +16,7 @@ final class Version20251022120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('CREATE TABLE payment_plan_match (id CHAR(36) NOT NULL, company_id CHAR(36) NOT NULL, plan_id CHAR(36) NOT NULL, transaction_id CHAR(36) NOT NULL, matched_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL --(DC2Type:datetime_immutable)
+        $this->addSql('CREATE TABLE payment_plan_match (id UUID NOT NULL, company_id UUID NOT NULL, plan_id UUID NOT NULL, transaction_id UUID NOT NULL, matched_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL --(DC2Type:datetime_immutable)
         , PRIMARY KEY(id))');
         $this->addSql('CREATE UNIQUE INDEX uniq_payment_plan_match_transaction ON payment_plan_match (transaction_id)');
         $this->addSql('CREATE INDEX idx_payment_plan_match_company_plan ON payment_plan_match (company_id, plan_id)');
