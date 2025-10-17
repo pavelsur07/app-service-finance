@@ -17,6 +17,7 @@ use App\Repository\PaymentPlanRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\PaymentPlan\ForecastBalanceService;
 use App\Service\PaymentPlan\PaymentPlanService;
+use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -34,6 +35,7 @@ final class PaymentCalendarController extends AbstractController
         private EntityManagerInterface $entityManager,
         private PaymentPlanService $paymentPlanService,
         private ForecastBalanceService $forecastBalanceService,
+        private RecurrenceMaterializer $recurrenceMaterializer,
     ) {
     }
 
@@ -176,6 +178,7 @@ final class PaymentCalendarController extends AbstractController
         } elseif ($from > $to) {
             $this->addFlash('danger', 'Дата начала периода не может быть позже даты окончания.');
         } else {
+            $this->recurrenceMaterializer->materialize($company, $from, $to);
             $plans = $this->loadPlans($company, $from, $to, $filters);
             $period = ['from' => $from, 'to' => $to];
 
