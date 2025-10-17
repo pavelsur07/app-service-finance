@@ -37,7 +37,10 @@
         </dl>
     </div>
     <div class="card-footer text-end">
-        <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-warning">Редактировать</a>
+        <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-icon btn-warning" title="Редактировать" aria-label="Редактировать">
+            <i class="ti ti-pencil"></i>
+            <span class="visually-hidden">Редактировать</span>
+        </a>
         <button class="btn btn-icon btn-danger"
                 data-bs-toggle="modal"
                 data-bs-target="#delete-modal-{{ tx.id }}"
