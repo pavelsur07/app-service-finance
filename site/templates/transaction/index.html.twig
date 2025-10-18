@@ -35,6 +35,17 @@
     </div>
 </div>
 
+{% if transactions is defined and transactions|length == 0 %}
+  <div class="card my-3">
+    <div class="card-body text-center">
+      <h3 class="mb-2">Пока нет операций</h3>
+      <p class="text-muted mb-3">Загрузите выписку в формате 1С или добавьте операцию вручную.</p>
+      <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
+      <a href="{{ path('finance_cash_transaction_new') }}" class="btn btn-outline-primary">Добавить операцию</a>
+    </div>
+  </div>
+{% endif %}
+
 <div class="card mt-3">
     <div class="table-responsive">
         <table class="table table-striped table-hover">
