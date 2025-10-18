@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Repository\MoneyAccountDailyBalanceRepository;
+use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,6 +19,7 @@ class HomeController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly MoneyAccountDailyBalanceRepository $dailyBalanceRepository,
         private readonly CashflowReportBuilder $cashflowReportBuilder,
+        private readonly MoneyAccountRepository $moneyAccountRepository,
     ) {
     }
 
@@ -27,7 +29,29 @@ class HomeController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        $todayBalance = (float) $this->dailyBalanceRepository->getOpeningBalanceForDate($company, $today);
+        $accounts = $this->moneyAccountRepository->findBy(['company' => $company]);
+
+        $todayBalance = 0.0;
+        foreach ($accounts as $account) {
+            $snapshot = $this->dailyBalanceRepository->findOneBy([
+                'company' => $company,
+                'moneyAccount' => $account,
+                'date' => $today,
+            ]);
+
+            if (null !== $snapshot) {
+                $opening = (float) $snapshot->getOpeningBalance();
+            } else {
+                $previous = $this->dailyBalanceRepository->findLastBefore($company, $account, $today);
+                if (null !== $previous) {
+                    $opening = (float) $previous->getClosingBalance();
+                } else {
+                    $opening = (float) $account->getOpeningBalance();
+                }
+            }
+
+            $todayBalance += $opening;
+        }
 
         $from = $today->modify('-30 days');
         $params = new CashflowReportParams($company, 'day', $from, $today);
