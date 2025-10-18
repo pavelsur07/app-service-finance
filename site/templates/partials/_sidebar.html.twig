@@ -31,8 +31,28 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ current_route starts with 'payment_calendar_' ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}">
-                        <span class="nav-link-title">Платежный календарь</span>
+                    <a class="nav-link {{ current_route starts with 'payment_calendar_' ? 'active' : '' }}" href="{{ path('finance_payment_calendar_index') }}">
+                        <i class="ti ti-calendar"></i> Платёжный календарь
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('finance_cash_transaction_index') }}">
+                        <i class="ti ti-arrows-exchange"></i> Операции
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('cash_bank1c_import_upload') }}">
+                        <i class="ti ti-upload"></i> Импорт 1С (выписки)
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('finance_report_cashflow') }}">
+                        <i class="ti ti-chart-bar"></i> Отчёт ДДС
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('finance_report_transactions_statement') }}">
+                        <i class="ti ti-list"></i> Выписка/Стейтмент
                     </a>
                 </li>
                 <li class="nav-item dropdown">

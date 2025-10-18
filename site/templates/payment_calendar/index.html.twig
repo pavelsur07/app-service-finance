@@ -118,6 +118,16 @@
             {% set totalInflow = 0 %}
             {% set totalOutflow = 0 %}
 
+            {% if plans is defined and plans|length == 0 %}
+                <div class="card my-3">
+                    <div class="card-body text-center">
+                        <h3 class="mb-2">Пока нет плановых платежей</h3>
+                        <p class="text-muted mb-3">Создайте первую запись, чтобы спланировать движение средств.</p>
+                        <a href="{{ path('payment_calendar_new', filterQuery) }}" class="btn btn-primary">Создать плановый платёж</a>
+                    </div>
+                </div>
+            {% endif %}
+
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">Плановые операции</div>
