@@ -4,6 +4,7 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    feature_funds_and_widget: '%env(bool:FEATURE_FUNDS_AND_WIDGET)%'
 
 services:
     # default configuration for services in *this* file
@@ -41,6 +42,10 @@ services:
     App\Service\RateLimiter\ReportsApiRateLimiter:
         arguments:
             $factory: '@?limiter.reports_api'
+
+    App\Service\FeatureFlagService:
+        arguments:
+            $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
 
     # Логгер для HTTP-клиента Ozon
     App\Api\Ozon\OzonApiClient:

@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Движение по фонду{% endblock %}
+
+{% block breadcrumbs %}
+    {{ include('partials/_breadcrumbs.html.twig', { crumbs: [
+        { label: 'Финансы' },
+        { label: 'Фонды', url: path('finance_funds_index') },
+        { label: fund.name, url: path('finance_funds_add_movement', { id: fund.id }) },
+        { label: 'Добавить движение' }
+    ] }) }}
+{% endblock %}
+
+{% block body %}
+    <h2 class="page-title mb-3">Добавить движение: {{ fund.name }}</h2>
+    {{ include('fund/_movement_form.html.twig', { form: form }) }}
+{% endblock %}
