@@ -1,21 +1,48 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Hello HomeController!{% endblock %}
+{% block title %}Главная{% endblock %}
 
-{% block body %}
-    <style>
-        .example-wrapper { margin: 1em auto; max-width: 800px; width: 95%; font: 18px/1.5 sans-serif; }
-        .example-wrapper code { background: #F5F5F5; padding: 2px 6px; }
-    </style>
-
-    <div class="example-wrapper">
-        <h1>Hello {{ controller_name }}! ✅</h1>
-
-        This friendly message is coming from:
-        <ul>
-            <li>Your controller at <code>/var/www/html/src/Controller/HomeController.php</code></li>
-            <li>Your template at <code>/var/www/html/templates/home/index.html.twig</code></li>
-            <li>Your template at MyTest<code>/var/www/html/templates/home/index.html.twig</code></li>
-        </ul>
+{% block content %}
+<div class="row">
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="subheader">Остаток на сегодня</div>
+        <div class="h1 mb-0">{{ kpi.todayBalance|number_format(0, '.', ' ') }} ₽</div>
+      </div>
     </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="subheader">Приход (30 дней)</div>
+        <div class="h1 mb-0">{{ kpi.inflow30|number_format(0, '.', ' ') }} ₽</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="subheader">Расход (30 дней)</div>
+        <div class="h1 mb-0">{{ kpi.outflow30|number_format(0, '.', ' ') }} ₽</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-3">
+    <div class="card">
+      <div class="card-body">
+        <div class="subheader">Чистый поток (30 дней)</div>
+        <div class="h1 mb-0">{{ (kpi.inflow30 - kpi.outflow30)|number_format(0, '.', ' ') }} ₽</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
+    <a href="{{ path('report_cashflow_index') }}" class="btn btn-outline-primary me-2">Отчёт ДДС</a>
+    <a href="{{ path('payment_calendar_index') }}" class="btn btn-outline-primary">Платёжный календарь</a>
+  </div>
+</div>
 {% endblock %}
