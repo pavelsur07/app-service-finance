@@ -9,6 +9,11 @@ use Doctrine\Migrations\AbstractMigration;
 
 final class Version20251102120000 extends AbstractMigration
 {
+    public function isTransactional(): bool
+    {
+        return false;
+    }
+
     public function getDescription(): string
     {
         return 'Adjust cash_transaction external_id indexes for multi-tenant uniqueness';
