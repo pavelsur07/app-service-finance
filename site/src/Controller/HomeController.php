@@ -8,7 +8,6 @@ use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Service\ActiveCompanyService;
-use Doctrine\DBAL\Types\Types;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -28,14 +27,7 @@ class HomeController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
-        $todayBalance = (float) $this->dailyBalanceRepository->createQueryBuilder('b')
-            ->select('COALESCE(SUM(b.closingBalance), 0) as totalClosing')
-            ->where('b.company = :company')
-            ->andWhere('b.date = :date')
-            ->setParameter('company', $company)
-            ->setParameter('date', $today, Types::DATE_IMMUTABLE)
-            ->getQuery()
-            ->getSingleScalarResult();
+        $todayBalance = (float) $this->dailyBalanceRepository->getOpeningBalanceForDate($company, $today);
 
         $from = $today->modify('-30 days');
         $params = new CashflowReportParams($company, 'day', $from, $today);
