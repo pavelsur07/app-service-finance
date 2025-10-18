@@ -5,8 +5,10 @@ namespace App\Twig;
 use App\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
 use App\Service\MoneyTotalsWidgetProvider;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Throwable;
 use Twig\Environment;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFunction;
@@ -19,6 +21,7 @@ class MoneyTotalsExtension extends AbstractExtension
         private readonly MoneyTotalsWidgetProvider $widgetProvider,
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly Security $security,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -44,14 +47,22 @@ class MoneyTotalsExtension extends AbstractExtension
         }
 
         try {
-            $company = $this->activeCompanyService->getActiveCompany();
-        } catch (NotFoundHttpException) {
+            try {
+                $company = $this->activeCompanyService->getActiveCompany();
+            } catch (NotFoundHttpException) {
+                return '';
+            }
+
+            $data = $this->widgetProvider->build($company);
+
+            return $this->twig->render('_partials/money_totals_widget.html.twig', $data);
+        } catch (Throwable $exception) {
+            $this->logger->error('Failed to render money totals widget.', [
+                'exception' => $exception,
+            ]);
+
             return '';
         }
-
-        $data = $this->widgetProvider->build($company);
-
-        return $this->twig->render('_partials/money_totals_widget.html.twig', $data);
     }
 
     public function isFeatureEnabled(): bool
