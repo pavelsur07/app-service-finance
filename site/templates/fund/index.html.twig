@@ -1,0 +1,61 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Фонды{% endblock %}
+
+{% block breadcrumbs %}
+    {{ include('partials/_breadcrumbs.html.twig', { crumbs: [
+        { label: 'Финансы' },
+        { label: 'Фонды', url: path('finance_funds_index') }
+    ] }) }}
+{% endblock %}
+
+{% block body %}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="page-title">Фонды / Резервы</h2>
+        <a class="btn btn-primary" href="{{ path('finance_funds_new') }}">Создать фонд</a>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-vcenter">
+                <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Валюта</th>
+                    <th class="text-end">Баланс</th>
+                    <th class="text-end">Действия</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% if funds is empty %}
+                    <tr>
+                        <td colspan="4" class="text-center text-muted py-4">Фонды ещё не созданы.</td>
+                    </tr>
+                {% else %}
+                    {% for fund in funds %}
+                        {% set balanceMinor = balances[fund.id] ?? 0 %}
+                        {% set balanceValue = balancesDecimal[fund.id] ?? 0 %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ fund.name }}</div>
+                                {% if fund.description %}
+                                    <div class="text-muted small">{{ fund.description }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ fund.currency }}</td>
+                            <td class="text-end {{ balanceMinor < 0 ? 'text-danger' : '' }}">
+                                {{ balanceValue|format_currency(fund.currency) }}
+                            </td>
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ path('finance_funds_add_movement', {id: fund.id}) }}">
+                                    Добавить движение
+                                </a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% if rows is not defined %}
+    {% set rows = [] %}
+{% endif %}
+{% if rows|length > 0 %}
+    <div class="card mb-4 money-totals-widget">
+        <div class="card-header">
+            <h3 class="card-title">Итого денег</h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm mb-0">
+                <thead>
+                <tr>
+                    <th>Валюта</th>
+                    <th class="text-end">Доступно на счетах/кассах</th>
+                    <th class="text-end">Фонды/резервы (вирт.)</th>
+                    <th class="text-end">Деньги в пути</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                    <tr>
+                        <td>{{ row.currency }}</td>
+                        <td class="text-end">{{ row.available|format_currency(row.currency) }}</td>
+                        <td class="text-end {{ row.funds < 0 ? 'text-danger' : '' }}">{{ row.funds|format_currency(row.currency) }}</td>
+                        <td class="text-end">{{ row.inTransit|format_currency(row.currency) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% else %}
+    <div class="card mb-4 money-totals-widget">
+        <div class="card-header">
+            <h3 class="card-title">Итого денег</h3>
+        </div>
+        <div class="card-body text-muted">Нет данных для отображения.</div>
+    </div>
+{% endif %}

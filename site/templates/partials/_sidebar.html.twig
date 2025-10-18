@@ -98,8 +98,13 @@
                         <a class="dropdown-item {% if current_route == 'money_account_index' %}active{% endif %}" href="{{ path('money_account_index') }}">
                             <span class="nav-link-title">Счета / Кассы / Кошельки</span>
                         </a>
+                        {% if is_funds_feature_enabled() %}
+                            <a class="dropdown-item {{ current_route starts with 'finance_funds_' ? 'active' : '' }}" href="{{ path('finance_funds_index') }}">
+                                <span class="nav-link-title">Фонды / Резервы</span>
+                            </a>
+                        {% endif %}
                         <a class="dropdown-item {% if current_route == 'counterparty_index' %}active{% endif %}" href="{{ path('counterparty_index') }}">
-                        <span class="nav-link-title">Контрагенты</span>
+                            <span class="nav-link-title">Контрагенты</span>
                         </a>
                         <a class="dropdown-item {% if current_route == 'cashflow_category_index' %}active{% endif %}" href="{{ path('cashflow_category_index') }}">
                             <span class="nav-link-title">Статьи ДДС</span>

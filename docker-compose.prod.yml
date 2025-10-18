@@ -100,6 +100,7 @@ services:
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-0}
         networks:
             - default
         depends_on:
@@ -116,6 +117,7 @@ services:
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-0}
         networks:
             - default
         depends_on:
@@ -134,6 +136,7 @@ services:
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-0}
         networks:
             - default
         depends_on:
@@ -180,6 +183,7 @@ services:
             APP_SECRET: ${APP_SECRET}
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-0}
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - ./var/log/cron:/var/log/cron:rw

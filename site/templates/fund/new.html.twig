@@ -1,0 +1,16 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Создать фонд{% endblock %}
+
+{% block breadcrumbs %}
+    {{ include('partials/_breadcrumbs.html.twig', { crumbs: [
+        { label: 'Финансы' },
+        { label: 'Фонды', url: path('finance_funds_index') },
+        { label: 'Создать фонд' }
+    ] }) }}
+{% endblock %}
+
+{% block body %}
+    <h2 class="page-title mb-3">Создать фонд</h2>
+    {{ include('fund/_form.html.twig', { form: form }) }}
+{% endblock %}
