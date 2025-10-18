@@ -6,6 +6,7 @@ use App\Repository\MoneyAccountRepository;
 use App\Service\AccountMasker;
 use App\Service\ActiveCompanyService;
 use App\Service\Import\ClientBank1CImportService;
+use App\Service\Import\ImportLogger;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,6 +21,7 @@ class Bank1CImportController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly ClientBank1CImportService $clientBank1CImportService,
+        private readonly ImportLogger $importLogger,
         private readonly AccountMasker $accountMasker,
     ) {
     }
@@ -357,13 +359,21 @@ class Bank1CImportController extends AbstractController
         $periodStart = is_string($state['statement_period_start'] ?? null) ? $state['statement_period_start'] : null;
         $periodEnd = is_string($state['statement_period_end'] ?? null) ? $state['statement_period_end'] : null;
 
-        $summary = $this->clientBank1CImportService->import($preview, $account, $overwrite, [
-            'user' => $userIdentifier,
-            'file' => $fileName,
-            'statement_account' => $statementAccount,
-            'date_start' => $periodStart,
-            'date_end' => $periodEnd,
-        ]);
+        $importLog = $this->importLogger->start($company, 'bank1c', false, $userIdentifier, $fileName);
+
+        try {
+            $summary = $this->clientBank1CImportService->import($preview, $account, $overwrite, [
+                'user' => $userIdentifier,
+                'file' => $fileName,
+                'statement_account' => $statementAccount,
+                'date_start' => $periodStart,
+                'date_end' => $periodEnd,
+                'preview' => false,
+                'import_log' => $importLog,
+            ]);
+        } finally {
+            $this->importLogger->finish($importLog);
+        }
 
         $session->remove('bank1c_import');
 
@@ -371,6 +381,7 @@ class Bank1CImportController extends AbstractController
             'filename' => $fileName,
             'selectedAccount' => $account,
             'summary' => $summary,
+            'importLog' => $importLog,
         ]);
     }
 

@@ -38,4 +38,19 @@ class CashTransactionRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getArrayResult();
     }
+
+    public function existsByCompanyAndDedupe(string $companyId, string $dedupeHash): bool
+    {
+        return (bool) $this->createQueryBuilder('t')
+            ->select('1')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->andWhere('t.dedupeHash = :dedupeHash')
+            ->setMaxResults(1)
+            ->setParameters([
+                'companyId' => $companyId,
+                'dedupeHash' => $dedupeHash,
+            ])
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }

@@ -62,6 +62,9 @@ class CashTransaction
     #[ORM\Column(length: 128, nullable: true, unique: true)]
     private ?string $externalId = null;
 
+    #[ORM\Column(name: 'dedupe_hash', length: 64, nullable: true)]
+    private ?string $dedupeHash = null;
+
     #[ORM\Column(type: 'boolean')]
     private bool $isTransfer = false;
 
@@ -188,6 +191,16 @@ class CashTransaction
         $this->currency = strtoupper($c);
 
         return $this;
+    }
+
+    public function getDedupeHash(): ?string
+    {
+        return $this->dedupeHash;
+    }
+
+    public function setDedupeHash(?string $hash): void
+    {
+        $this->dedupeHash = $hash;
     }
 
     public function getOccurredAt(): \DateTimeImmutable

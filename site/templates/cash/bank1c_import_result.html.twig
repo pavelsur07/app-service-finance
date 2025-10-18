@@ -22,6 +22,33 @@
     </div>
 
     <div class="container-xl mt-3">
+        {% if importLog is defined and importLog %}
+            <div class="card my-3">
+                <div class="card-header"><h3 class="card-title">Итоги импорта</h3></div>
+                <div class="card-body">
+                    <div class="row row-cards">
+                        {% set stats = [
+                            {'label':'Создано транзакций','val':importLog.createdCount},
+                            {'label':'Пропущено дублей','val':importLog.skippedDuplicates},
+                            {'label':'Ошибок','val':importLog.errorsCount},
+                            {'label':'Предпросмотр','val': importLog.preview ? 'Да' : 'Нет'}
+                        ] %}
+                        {% for s in stats %}
+                            <div class="col-sm-6 col-md-3">
+                                <div class="card"><div class="card-body">
+                                    <div class="h1">{{ s.val }}</div>
+                                    <div class="text-secondary">{{ s.label }}</div>
+                                </div></div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="mt-2 text-secondary">
+                        Источник: <b>{{ importLog.source }}</b> · Файл: <b>{{ importLog.fileName ?? '—' }}</b><br>
+                        Начало: {{ importLog.startedAt|date('Y-m-d H:i:s') }} · Конец: {{ importLog.finishedAt|date('Y-m-d H:i:s') }}
+                    </div>
+                </div>
+            </div>
+        {% endif %}
         <div class="row g-3">
             <div class="col-12 col-lg-6">
                 <div class="card h-100">
