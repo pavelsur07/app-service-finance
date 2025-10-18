@@ -5,20 +5,20 @@ namespace App\Service\Import;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
+use App\Entity\ImportLog;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
-use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Service\AccountBalanceService;
 use App\Service\ActiveCompanyService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 class ClientBank1CImportService
 {
@@ -29,13 +29,13 @@ class ClientBank1CImportService
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly CashTransactionRepository $cashTransactionRepository,
+        private readonly ImportLogger $importLogger,
         private readonly EntityManagerInterface $entityManager,
         private readonly AccountBalanceService $accountBalanceService,
-        private readonly MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.import.bank1c')]
-        private ?LoggerInterface $importLogger = null,
+        private ?LoggerInterface $logger = null,
     ) {
-        $this->importLogger ??= new NullLogger();
+        $this->logger ??= new NullLogger();
     }
 
     // --- parseHeaderAndDocuments (без изменений) ---
@@ -219,18 +219,38 @@ class ClientBank1CImportService
             'overwrite' => $overwrite,
         ];
 
-        $this->importLogger->info('Bank1C import started', $baseLogContext);
+        $isPreview = (bool) ($context['preview'] ?? false);
+        $importLog = $context['import_log'] ?? null;
+        if (!$importLog instanceof ImportLog) {
+            $importLog = null;
+        }
+
+        $baseLogContext['preview'] = (int) $isPreview;
+        $this->logger->info('Bank1C import started', $baseLogContext);
 
         $created = 0;
         $duplicates = 0;
         $errors = 0;
         $createdMinDate = null;
         $createdMaxDate = null;
-        $processedTransactions = [];
 
-        foreach ($preview as $row) {
+        $companyId = $company->getId();
+        $accountId = $account->getId();
+
+        foreach ($preview as $rowNo => $row) {
+            $currentRow = $rowNo + 1;
+            $counterparty = null;
+
             if (!is_array($row)) {
                 ++$errors;
+                if (null !== $importLog) {
+                    $this->importLogger->incError($importLog);
+                }
+                $this->logger->warning('[1C Import] row.error', [
+                    'company' => $companyId,
+                    'rowNo' => $currentRow,
+                    'error' => 'row_not_array',
+                ]);
                 continue;
             }
 
@@ -242,18 +262,42 @@ class ClientBank1CImportService
             $direction = $this->resolveDirection($row);
             if (null === $direction) {
                 ++$errors;
+                if (null !== $importLog) {
+                    $this->importLogger->incError($importLog);
+                }
+                $this->logger->warning('[1C Import] row.error', [
+                    'company' => $companyId,
+                    'rowNo' => $currentRow,
+                    'error' => 'direction_not_resolved',
+                ]);
                 continue;
             }
 
             $occurredAt = $this->resolveOccurredAt($row, $direction);
             if (null === $occurredAt) {
                 ++$errors;
+                if (null !== $importLog) {
+                    $this->importLogger->incError($importLog);
+                }
+                $this->logger->warning('[1C Import] row.error', [
+                    'company' => $companyId,
+                    'rowNo' => $currentRow,
+                    'error' => 'occurred_at_not_resolved',
+                ]);
                 continue;
             }
 
             $amount = $this->resolveAmount($row, $direction);
             if (null === $amount) {
                 ++$errors;
+                if (null !== $importLog) {
+                    $this->importLogger->incError($importLog);
+                }
+                $this->logger->warning('[1C Import] row.error', [
+                    'company' => $companyId,
+                    'rowNo' => $currentRow,
+                    'error' => 'amount_not_numeric',
+                ]);
                 continue;
             }
 
@@ -266,13 +310,35 @@ class ClientBank1CImportService
                 'externalId' => $externalId,
             ]);
 
+            $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
+            $amountMinor = (int) str_replace('.', '', $amount);
+            $dedupeHash = $this->makeDedupeHash(
+                $companyId,
+                $accountId,
+                $occurredAtUtc,
+                $amountMinor,
+                $purpose ?? ''
+            );
+
+            $shouldFlush = false;
             $isNewTransaction = false;
-            if (null !== $transaction) {
-                ++$duplicates;
-                if (!$overwrite) {
+
+            if (null === $transaction) {
+                if (!$isPreview && $this->cashTransactionRepository->existsByCompanyAndDedupe($companyId, $dedupeHash)) {
+                    ++$duplicates;
+                    if (null !== $importLog) {
+                        $this->importLogger->incSkippedDuplicate($importLog);
+                    }
+                    $this->logger->info('[1C Import] row.skip_dedupe', [
+                        'company' => $companyId,
+                        'dedupeHash' => $dedupeHash,
+                        'rowNo' => $currentRow,
+                        'occurredAt' => $occurredAtUtc->format(DATE_ATOM),
+                        'amountMinor' => $amountMinor,
+                    ]);
                     continue;
                 }
-            } else {
+
                 $transaction = new CashTransaction(
                     Uuid::uuid4()->toString(),
                     $company,
@@ -283,13 +349,39 @@ class ClientBank1CImportService
                     $occurredAt,
                 );
                 $transaction->setExternalId($externalId);
-                $this->entityManager->persist($transaction);
-                ++$created;
+                $transaction->setDedupeHash($dedupeHash);
+
+                if (!$isPreview) {
+                    $this->entityManager->persist($transaction);
+                    $shouldFlush = true;
+                }
+
                 $isNewTransaction = true;
+            } else {
+                ++$duplicates;
+
+                if (!$overwrite) {
+                    if (null !== $importLog) {
+                        $this->importLogger->incSkippedDuplicate($importLog);
+                    }
+                    $this->logger->info('[1C Import] row.skip_externalId', [
+                        'company' => $companyId,
+                        'externalId' => $externalId,
+                        'rowNo' => $currentRow,
+                    ]);
+                    continue;
+                }
+
+                $transaction->setDedupeHash($dedupeHash);
+
+                if (!$isPreview) {
+                    $shouldFlush = true;
+                }
             }
 
-            // ⚠️ вместо прежнего resolveCounterparty() — вызов новой логики с кэшем
-            $counterparty = $this->getOrCreateCounterpartyFromRow($row, $direction, $company);
+            if (!$isPreview) {
+                $counterparty = $this->getOrCreateCounterpartyFromRow($row, $direction, $company);
+            }
 
             if ($isNewTransaction) {
                 $transaction
@@ -321,27 +413,58 @@ class ClientBank1CImportService
                 }
             }
 
-            $processedTransactions[] = $transaction;
-
-            if ($isNewTransaction) {
-                if (null === $createdMinDate || $occurredAt < $createdMinDate) {
-                    $createdMinDate = $occurredAt;
-                }
-                if (null === $createdMaxDate || $occurredAt > $createdMaxDate) {
-                    $createdMaxDate = $occurredAt;
-                }
+            if ($isPreview || !$shouldFlush) {
+                continue;
             }
-        }
 
-        if (!empty($processedTransactions)) {
-            $this->entityManager->flush();
+            try {
+                $this->entityManager->flush();
 
-            foreach ($processedTransactions as $processedTransaction) {
-                $this->messageBus->dispatch(new ApplyAutoRulesForTransaction(
-                    (string) $processedTransaction->getId(),
-                    (string) $company->getId(),
-                    new \DateTimeImmutable(),
-                ));
+                if ($isNewTransaction) {
+                    ++$created;
+                    if (null !== $importLog) {
+                        $this->importLogger->incCreated($importLog);
+                    }
+                    $this->logger->info('[1C Import] row.created', [
+                        'company' => $companyId,
+                        'externalId' => $externalId,
+                        'rowNo' => $currentRow,
+                    ]);
+
+                    if (null === $createdMinDate || $occurredAt < $createdMinDate) {
+                        $createdMinDate = $occurredAt;
+                    }
+                    if (null === $createdMaxDate || $occurredAt > $createdMaxDate) {
+                        $createdMaxDate = $occurredAt;
+                    }
+                } else {
+                    $this->logger->info('[1C Import] row.overwrite', [
+                        'company' => $companyId,
+                        'externalId' => $externalId,
+                        'rowNo' => $currentRow,
+                    ]);
+                }
+            } catch (UniqueConstraintViolationException $e) {
+                if ($isNewTransaction) {
+                    ++$duplicates;
+                }
+                if (null !== $importLog) {
+                    $this->importLogger->incSkippedDuplicate($importLog);
+                }
+                $this->logger->warning('[1C Import] unique_violation_externalId', [
+                    'company' => $companyId,
+                    'externalId' => $externalId,
+                    'rowNo' => $currentRow,
+                    'message' => $e->getMessage(),
+                ]);
+
+                $this->entityManager->detach($transaction);
+                if ($counterparty instanceof Counterparty) {
+                    $this->entityManager->detach($counterparty);
+                }
+                $this->cpCache = [];
+
+                continue;
             }
         }
 
@@ -358,15 +481,17 @@ class ClientBank1CImportService
             'created' => $created,
             'duplicates' => $duplicates,
             'errors' => $errors,
+            'skippedDuplicates' => $importLog?->getSkippedDuplicates() ?? 0,
             'minDate' => $createdMinDate,
             'maxDate' => $createdMaxDate,
         ];
 
-        $this->importLogger->info('Bank1C import finished', array_merge($baseLogContext, [
+        $this->logger->info('Bank1C import finished', array_merge($baseLogContext, [
             'result' => [
                 'created' => $created,
                 'duplicates' => $duplicates,
                 'errors' => $errors,
+                'skippedDuplicates' => $importLog?->getSkippedDuplicates() ?? 0,
                 'minDate' => $createdMinDate?->format('Y-m-d'),
                 'maxDate' => $createdMaxDate?->format('Y-m-d'),
             ],
@@ -506,6 +631,27 @@ class ClientBank1CImportService
             12 => CounterpartyType::INDIVIDUAL_ENTREPRENEUR,
             default => CounterpartyType::LEGAL_ENTITY,
         };
+    }
+
+    private function normalizePurposeForDedupe(?string $value): string
+    {
+        $value = (string) $value;
+        $value = mb_strtolower($value);
+        $value = preg_replace('/[\(\)\[\]\{\}]/u', ' ', $value) ?? $value;
+        $value = preg_replace('/\s+/u', ' ', trim($value)) ?? trim($value);
+
+        return $value;
+    }
+
+    private function makeDedupeHash(string $companyId, string $moneyAccountId, \DateTimeImmutable $occurredAtUtc, int $amountMinor, string $purposeRaw): string
+    {
+        $payload = $companyId
+            .'|'.$moneyAccountId
+            .'|'.$occurredAtUtc->format('Y-m-d')
+            .'|'.$amountMinor
+            .'|'.$this->normalizePurposeForDedupe($purposeRaw);
+
+        return hash('sha256', $payload);
     }
 
     // --- extractRawData / normalizeRawArray / generateExternalId / shouldMarkAsTransfer / containsInsensitive ---
