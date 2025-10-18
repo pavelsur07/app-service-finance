@@ -1,4 +1,4 @@
-{% set current_route = app.request.attributes.get('_route') %}
+{% set current_route = app.request ? app.request.attributes.get('_route') : '' %}
 {% set user_roles = [] %}
 {% if app.user %}
     {% set user_roles = app.user.roles|default([]) %}
