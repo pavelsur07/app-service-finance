@@ -64,7 +64,7 @@
             {% for tx in transactions %}
                 <tr>
                     <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
-                    <td>{{ tx.moneyAccount.name }}</td>
+                    <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
                     <td class="text-end"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
                         {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
