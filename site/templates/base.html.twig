@@ -27,7 +27,6 @@
             <div class="container-fluid">
                 {% block breadcrumbs %}{% endblock %}
                 {{ include('partials/_flash.html.twig') }}
-                {{ money_totals_widget() }}
                 {% block content %}{% block body %}{% endblock %}{% endblock %}
             </div>
         </div>
