@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+{% block title %}Журнал импортов{% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col"><h2 class="page-title">Журнал импортов</h2></div>
+      <div class="col-auto ms-auto">
+        <form class="row g-2" method="get">
+          <div class="col-auto"><input type="date" class="form-control" name="date_from" value="{{ date_from }}"></div>
+          <div class="col-auto"><input type="date" class="form-control" name="date_to" value="{{ date_to }}"></div>
+          <div class="col-auto">
+            <select class="form-select" name="source">
+              <option value="">Все источники</option>
+              <option value="bank1c" {{ source == 'bank1c' ? 'selected' }}>1С (выписки)</option>
+            </select>
+          </div>
+          <div class="col-auto"><button class="btn btn-primary" type="submit">Фильтровать</button></div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Начало</th>
+              <th>Источник</th>
+              <th>Файл</th>
+              <th>Создано</th>
+              <th>Пропущено дублей</th>
+              <th>Ошибок</th>
+              <th>Предпросмотр</th>
+              <th>Окончание</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for log in items %}
+              <tr>
+                <td>{{ log.startedAt|date('Y-m-d H:i') }}</td>
+                <td>{{ log.source }}</td>
+                <td>{{ log.fileName ?? '—' }}</td>
+                <td>{{ log.createdCount }}</td>
+                <td>{{ log.skippedDuplicates }}</td>
+                <td>{{ log.errorsCount }}</td>
+                <td>{{ log.preview ? 'Да' : 'Нет' }}</td>
+                <td>{{ log.finishedAt ? log.finishedAt|date('Y-m-d H:i') : '—' }}</td>
+              </tr>
+            {% else %}
+              <tr><td colspan="8" class="text-secondary">Записей не найдено.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% set pages = (total / limit)|round(0, 'ceil') %}
+      {% if pages > 1 %}
+        <div class="card-footer d-flex align-items-center">
+          <p class="m-0 text-secondary">Всего: <strong>{{ total }}</strong></p>
+          <ul class="pagination m-0 ms-auto">
+            {% for p in 1..pages %}
+              <li class="page-item {{ p == page ? 'active' : '' }}">
+                <a class="page-link" href="{{ path('import_logs_index', app.request.query.all|merge({'page': p})) }}">{{ p }}</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="mt-3 text-secondary">
+      <div>Логи импорта пишутся через канал <code>import.bank1c</code> (service-id <code>monolog.logger.import.bank1c</code>).</div>
+      <div>В dev — файл <code>var/log/dev.log</code> (из <code>%kernel.logs_dir%/%kernel.environment%.log</code>).</div>
+    </div>
+  </div>
+</div>
+{% endblock %}
