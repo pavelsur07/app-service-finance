@@ -2,9 +2,10 @@
 
 namespace App\Entity;
 
+use App\Repository\ImportLogRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: ImportLogRepository::class)]
 #[ORM\Table(name: 'import_log')]
 #[ORM\Index(name: 'idx_import_log_company_started', columns: ['company_id', 'started_at'])]
 #[ORM\Index(name: 'idx_import_log_company_finished', columns: ['company_id', 'finished_at'], options: ['order' => ['finished_at' => 'DESC']])]
