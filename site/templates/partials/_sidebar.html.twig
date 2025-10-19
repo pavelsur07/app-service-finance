@@ -46,6 +46,11 @@
                     </a>
                 </li>
                 <li class="nav-item">
+                    <a class="nav-link {{ current_route starts with 'import_logs_' ? 'active' : '' }}" href="{{ path('import_logs_index') }}">
+                        <span class="nav-link-title"> Журнал импортов </span>
+                    </a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="{{ path('report_cashflow_index') }}">
                         <i class="ti ti-chart-bar"></i> Отчёт ДДС
                     </a>
