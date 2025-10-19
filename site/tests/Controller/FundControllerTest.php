@@ -86,8 +86,7 @@ final class FundControllerTest extends WebTestCase
         $client->request('GET', '/finance/reports/account-balances');
 
         self::assertResponseIsSuccessful();
-        self::assertSelectorExists('.money-totals-widget');
-        self::assertSelectorTextContains('.money-totals-widget', 'Итого денег');
+        self::assertSelectorNotExists('.money-totals-widget');
 
         unset($_ENV['FEATURE_FUNDS_AND_WIDGET'], $_SERVER['FEATURE_FUNDS_AND_WIDGET']);
     }
