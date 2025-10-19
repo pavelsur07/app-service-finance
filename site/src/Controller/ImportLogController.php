@@ -18,7 +18,7 @@ class ImportLogController extends AbstractController
         ActiveCompanyService $activeCompanyService,
         ImportLogRepository $repo
     ): Response {
-        $company = $activeCompanyService->getCompanyOrThrow();
+        $company = $activeCompanyService->getActiveCompany();
 
         $page  = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(10, (int) $request->query->get('limit', 20)));
