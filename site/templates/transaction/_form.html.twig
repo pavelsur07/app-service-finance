@@ -2,20 +2,22 @@
 {{ form_widget(form._token) }}
 <div class="card">
     <div class="card-body">
-        <div class="mb-3">
-            {{ form_label(form.occurredAt, 'Дата', {'label_attr': {'class': 'form-label'}}) }}
-            {{ form_widget(form.occurredAt, {'attr': {'class': 'form-control'}}) }}
-            <div class="invalid-feedback d-block">{{ form_errors(form.occurredAt) }}</div>
-        </div>
-        <div class="mb-3">
-            {{ form_label(form.moneyAccount, 'Счет', {'label_attr': {'class': 'form-label'}}) }}
-            {{ form_widget(form.moneyAccount, {'attr': {'class': 'form-select'}}) }}
-            <div class="invalid-feedback d-block">{{ form_errors(form.moneyAccount) }}</div>
-        </div>
-        <div class="mb-3">
-            {{ form_label(form.direction, 'Направление', {'label_attr': {'class': 'form-label'}}) }}
-            {{ form_widget(form.direction, {'attr': {'class': 'form-select'}}) }}
-            <div class="invalid-feedback d-block">{{ form_errors(form.direction) }}</div>
+        <div class="row g-2 mb-3">
+            <div class="col-md-4">
+                {{ form_label(form.occurredAt, 'Дата', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.occurredAt, {'attr': {'class': 'form-control'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.occurredAt) }}</div>
+            </div>
+            <div class="col-md-4">
+                {{ form_label(form.moneyAccount, 'Счет', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.moneyAccount, {'attr': {'class': 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.moneyAccount) }}</div>
+            </div>
+            <div class="col-md-4">
+                {{ form_label(form.direction, 'Направление', {'label_attr': {'class': 'form-label'}}) }}
+                {{ form_widget(form.direction, {'attr': {'class': 'form-select'}}) }}
+                <div class="invalid-feedback d-block">{{ form_errors(form.direction) }}</div>
+            </div>
         </div>
         <div class="row g-2">
             <div class="col-md-6">
