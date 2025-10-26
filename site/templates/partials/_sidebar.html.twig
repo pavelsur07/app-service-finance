@@ -17,7 +17,6 @@
     {%- set disabled = route_name is empty -%}
     <a class="dropdown-item d-flex align-items-center justify-content-between {{ is_active ? 'active' : '' }} {{ disabled ? 'disabled opacity-75' : '' }}" href="{{ href }}" {% if disabled %}tabindex="-1" aria-disabled="true"{% endif %}>
         <span class="flex-fill">{{ title }}</span>
-        {%- if dev_badge %}<span class="badge bg-secondary ms-2">в разработке</span>{% endif -%}
     </a>
 {%- endmacro %}
 
@@ -53,11 +52,11 @@
                     </a>
                     <div class="dropdown-menu {{ money_active ? 'show' : '' }}">
                         <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Операций ДДС', 'cash_transaction_index', macros.is_active(current_route, ['cash_transaction_index', 'cash_transaction_']), false) }}
                             {{ macros.dropdown_item('Остатки и счета', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), false) }}
                             {% if is_funds_feature_enabled() %}
                                 {{ macros.dropdown_item('Фонды (конверты)', 'finance_funds_index', macros.is_active(current_route, ['finance_funds_']), false) }}
                             {% endif %}
-                            {{ macros.dropdown_item('Лента операций (ДДС-факт)', 'cash_transaction_index', macros.is_active(current_route, ['cash_transaction_index', 'cash_transaction_']), false) }}
                             {{ macros.dropdown_item('Переводы', null, false, true) }}
                             {{ macros.dropdown_item('Сверка', null, false, true) }}
                         </div>
@@ -67,14 +66,14 @@
                 {% set documents_active = macros.is_active(current_route, ['document_']) %}
                 <li class="nav-item dropdown {{ documents_active ? 'show' : '' }}">
                     <a class="nav-link dropdown-toggle {{ documents_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ documents_active ? 'true' : 'false' }}">
-                        <span class="nav-link-title">Документы (начисления P&amp;L)</span>
+                        <span class="nav-link-title">Документы ОПиУ</span>
                     </a>
                     {% set documents_show = documents_active ? 'show' : macros.collapse_state(current_route, 'document_') %}
                     <div class="dropdown-menu {{ documents_show }}">
                         <div class="dropdown-menu-column">
                             {{ macros.dropdown_item('Реестр документов', 'document_index', macros.is_active(current_route, ['document_index', 'document_']), false) }}
                             {{ macros.dropdown_item('Карточка документа', null, false, true) }}
-                            {{ macros.dropdown_item('Правила маппинга в P&amp;L', null, false, true) }}
+                            {{ macros.dropdown_item('Правила маппинга ОПиУ', null, false, true) }}
                             {{ macros.dropdown_item('Качество данных', null, false, true) }}
                         </div>
                     </div>
@@ -89,9 +88,9 @@
                     <div class="dropdown-menu {{ import_show }}">
                         <div class="dropdown-menu-column">
                             {{ macros.dropdown_item('Импорт документов', null, false, true) }}
-                            {{ macros.dropdown_item('Импорт выписок (ДДС)', 'cash_bank1c_import_upload', macros.is_active(current_route, ['cash_bank1c_import_upload']), false) }}
+                            {{ macros.dropdown_item('Импорт выписок 1C', 'cash_bank1c_import_upload', macros.is_active(current_route, ['cash_bank1c_import_upload']), false) }}
                             {{ macros.dropdown_item('Журнал импортов', 'import_logs_index', macros.is_active(current_route, ['import_logs_']), false) }}
-                            {{ macros.dropdown_item('Автоправила (ДДС)', 'cash_transaction_auto_rule_index', macros.is_active(current_route, ['cash_transaction_auto_rule_']), false) }}
+                            {{ macros.dropdown_item('Автоправила ДДС', 'cash_transaction_auto_rule_index', macros.is_active(current_route, ['cash_transaction_auto_rule_']), false) }}
                         </div>
                     </div>
                 </li>
@@ -104,7 +103,7 @@
                     {% set planning_show = planning_active ? 'show' : macros.collapse_state(current_route, 'payment_calendar_') %}
                     <div class="dropdown-menu {{ planning_show }}">
                         <div class="dropdown-menu-column">
-                            {{ macros.dropdown_item('Платёжный календарь (план-факт)', 'payment_calendar_index', macros.is_active(current_route, ['payment_calendar_']), false) }}
+                            {{ macros.dropdown_item('Платёжный календарь', 'payment_calendar_index', macros.is_active(current_route, ['payment_calendar_']), false) }}
                             {{ macros.dropdown_item('Планы платежей', null, false, true) }}
                             {{ macros.dropdown_item('Кредиты и графики', null, false, true) }}
                             {{ macros.dropdown_item('Депозиты', null, false, true) }}
@@ -121,8 +120,7 @@
                     <div class="dropdown-menu {{ reports_show }}">
                         <div class="dropdown-menu-column">
                             {{ macros.dropdown_item('ДДС (Cash Flow)', 'report_cashflow_index', macros.is_active(current_route, ['report_cashflow_']), false) }}
-                            {{ macros.dropdown_item('P&amp;L (ОПиУ)', 'finance_report_preview', macros.is_active(current_route, ['finance_report_preview']), false) }}
-                            {{ macros.dropdown_item('Баланс денег', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), false) }}
+                            {{ macros.dropdown_item('ОПиУ (PnL)', 'finance_report_preview', macros.is_active(current_route, ['finance_report_preview']), false) }}
                             {{ macros.dropdown_item('Упрощённый баланс', null, false, true) }}
                             {{ macros.dropdown_item('Экспорт', null, false, true) }}
                             {% set reports_debug_active = macros.is_active(current_route, ['report_transactions_statement_', 'report_transactions_debug_', 'report_debug_', 'finance_report_raw', 'finance_report_pl_raw']) %}
@@ -153,7 +151,7 @@
                     <div class="dropdown-menu {{ directories_show }}">
                         <div class="dropdown-menu-column">
                             {{ macros.dropdown_item('Категории ДДС', 'cashflow_category_index', macros.is_active(current_route, ['cashflow_category_']), false) }}
-                            {{ macros.dropdown_item('Категории P&amp;L', 'pl_category_index', macros.is_active(current_route, ['pl_category_']), false) }}
+                            {{ macros.dropdown_item('Категории ОПиУ', 'pl_category_index', macros.is_active(current_route, ['pl_category_']), false) }}
                             {{ macros.dropdown_item('Счета / Кассы / Кошельки', 'money_account_index', macros.is_active(current_route, ['money_account_']), false) }}
                             {{ macros.dropdown_item('Контрагенты', 'counterparty_index', macros.is_active(current_route, ['counterparty_']), false) }}
                             {{ macros.dropdown_item('Проекты / ЦФО', 'project_direction_index', macros.is_active(current_route, ['project_direction_']), false) }}
