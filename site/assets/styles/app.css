@@ -1,5 +1,41 @@
+/*
+ * Align the base typography and palette with Tabler defaults so that the
+ * application keeps a consistent look even when we extend or override Tabler's
+ * components locally.
+ */
+:root {
+    --app-font-sans: "Inter", "Inter var", -apple-system, BlinkMacSystemFont,
+        "Segoe UI", "Roboto", "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+    --app-body-color: #232e3c;
+    --app-body-muted: #8c98ad;
+    --app-body-bg: #f4f6fa;
+    --app-surface-bg: #ffffff;
+    --app-border-color: #dce1e7;
+    --app-primary: #206bc4;
+    color-scheme: light;
+}
+
 body {
-    background-color: white;
+    font-family: var(--app-font-sans);
+    color: var(--app-body-color);
+    background-color: var(--app-body-bg);
+    -webkit-font-smoothing: antialiased;
+}
+
+body .card,
+body .table,
+body .modal-content,
+body .dropdown-menu {
+    background-color: var(--app-surface-bg);
+    color: var(--app-body-color);
+}
+
+body .text-muted {
+    color: var(--app-body-muted) !important;
+}
+
+body a {
+    color: var(--app-primary);
 }
 
 .page-body .container {
