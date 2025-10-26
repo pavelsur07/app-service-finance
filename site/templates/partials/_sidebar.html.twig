@@ -15,7 +15,7 @@
 {% macro link_item(title, route_name, is_active, icon, dev_badge) -%}
     {%- set href = route_name ? path(route_name) : '#' -%}
     <a class="nav-link {{ is_active ? 'active' : '' }} {{ not route_name ? 'disabled opacity-75' : '' }}" href="{{ href }}">
-        {%- if icon %}<span class="nav-link-icon">{{ icon|raw }}</span>{% endif -%}
+        {%- if icon %}<span class="nav-link-icon d-md-none d-lg-inline-block">{{ icon|raw }}</span>{% endif -%}
         <span class="nav-link-title">{{ title }}</span>
         {%- if dev_badge %}<span class="badge bg-secondary ms-2">в разработке</span>{% endif -%}
     </a>
@@ -29,15 +29,20 @@
     {% set user_roles = app.user.roles|default([]) %}
 {% endif %}
 
-<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+<aside class="navbar navbar-vertical navbar-expand-lg navbar-transparent" data-bs-theme="light">
     <div class="container-fluid">
-        <a class="navbar-brand" href="{{ path('app_home_index') }}">Финансы</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Переключить навигацию">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <h1 class="navbar-brand navbar-brand-autodark">
+            <a href="{{ path('app_home_index') }}">Финансы</a>
+        </h1>
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
                 {% set dashboard_active = macros.is_active(current_route, ['app_home_index']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ dashboard_active ? '' : 'collapsed' }}" href="#sidebar-main" data-bs-toggle="collapse" role="button" aria-expanded="{{ dashboard_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">📊</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span>
                         <span class="nav-link-title">Главная</span>
                     </a>
                     <div class="collapse {{ dashboard_active ? 'show' : '' }}" id="sidebar-main">
@@ -52,7 +57,7 @@
                 {% set money_active = macros.is_active(current_route, ['cash_transaction_', 'report_account_balances', 'finance_funds_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ money_active ? '' : 'collapsed' }}" href="#sidebar-money" data-bs-toggle="collapse" role="button" aria-expanded="{{ money_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">💼</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-wallet"></i></span>
                         <span class="nav-link-title">Деньги</span>
                     </a>
                     <div class="collapse {{ money_active ? 'show' : '' }}" id="sidebar-money">
@@ -81,7 +86,7 @@
                 {% set documents_active = macros.is_active(current_route, ['document_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ documents_active ? '' : 'collapsed' }}" href="#sidebar-documents" data-bs-toggle="collapse" role="button" aria-expanded="{{ documents_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">📄</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-text"></i></span>
                         <span class="nav-link-title">Документы (начисления P&amp;L)</span>
                     </a>
                     {% set documents_show = documents_active ? 'show' : macros.collapse_state(current_route, 'document_') %}
@@ -106,7 +111,7 @@
                 {% set import_active = macros.is_active(current_route, ['cash_bank1c_import_upload', 'import_logs_', 'cash_transaction_auto_rule_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ import_active ? '' : 'collapsed' }}" href="#sidebar-import" data-bs-toggle="collapse" role="button" aria-expanded="{{ import_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">⬇️</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-cloud-upload"></i></span>
                         <span class="nav-link-title">Импорт</span>
                     </a>
                     {% set import_show = import_active ? 'show' : (macros.collapse_state(current_route, 'import_') ?: macros.collapse_state(current_route, 'cash_transaction_auto_rule_')) %}
@@ -131,7 +136,7 @@
                 {% set planning_active = macros.is_active(current_route, ['payment_calendar_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ planning_active ? '' : 'collapsed' }}" href="#sidebar-planning" data-bs-toggle="collapse" role="button" aria-expanded="{{ planning_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">📅</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar"></i></span>
                         <span class="nav-link-title">Планирование</span>
                     </a>
                     {% set planning_show = planning_active ? 'show' : macros.collapse_state(current_route, 'payment_calendar_') %}
@@ -156,7 +161,7 @@
                 {% set reports_active = macros.is_active(current_route, ['report_cashflow_', 'finance_report_', 'report_transactions_statement_', 'report_transactions_debug_', 'report_debug_', 'report_account_balances']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ reports_active ? '' : 'collapsed' }}" href="#sidebar-reports" data-bs-toggle="collapse" role="button" aria-expanded="{{ reports_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">📈</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-chart-line"></i></span>
                         <span class="nav-link-title">Отчёты</span>
                     </a>
                     {% set reports_show = reports_active ? 'show' : (macros.collapse_state(current_route, 'report_') ?: macros.collapse_state(current_route, 'finance_report_')) %}
@@ -213,7 +218,7 @@
                 {% set directories_active = macros.is_active(current_route, ['cashflow_category_', 'pl_category_', 'money_account_', 'counterparty_', 'project_direction_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ directories_active ? '' : 'collapsed' }}" href="#sidebar-directories" data-bs-toggle="collapse" role="button" aria-expanded="{{ directories_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">📚</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-books"></i></span>
                         <span class="nav-link-title">Справочники</span>
                     </a>
                     {% set directories_show = directories_active ? 'show' : (macros.collapse_state(current_route, 'cashflow_category_') ?: macros.collapse_state(current_route, 'pl_category_') ?: macros.collapse_state(current_route, 'money_account_') ?: macros.collapse_state(current_route, 'counterparty_') ?: macros.collapse_state(current_route, 'project_direction_')) %}
@@ -244,7 +249,7 @@
                 {% set integrations_active = macros.is_active(current_route, ['ozon_', 'wildberries_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ integrations_active ? '' : 'collapsed' }}" href="#sidebar-integrations" data-bs-toggle="collapse" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">🔌</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-plug"></i></span>
                         <span class="nav-link-title">Интеграции</span>
                     </a>
                     {% set integrations_show = integrations_active ? 'show' : (macros.collapse_state(current_route, 'ozon_') ?: macros.collapse_state(current_route, 'wildberries_')) %}
@@ -286,7 +291,7 @@
                 {% set company_active = macros.is_active(current_route, ['company_', 'settings_report_api_key_']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ company_active ? '' : 'collapsed' }}" href="#sidebar-company" data-bs-toggle="collapse" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon">🏢</span>
+                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-building"></i></span>
                         <span class="nav-link-title">Компания и доступ</span>
                     </a>
                     {% set company_show = company_active ? 'show' : (macros.collapse_state(current_route, 'company_') ?: macros.collapse_state(current_route, 'settings_report_api_key_')) %}
