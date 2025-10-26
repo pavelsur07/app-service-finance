@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Controller;
@@ -22,7 +23,7 @@ final class PlRawFactsController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompany,
         PLCategoryRepository $categories,
-        FactsProviderInterface $facts
+        FactsProviderInterface $facts,
     ): Response {
         $company = $activeCompany->getActiveCompany();
         $periodParam = $request->query->get('period') ?? (new \DateTimeImmutable('first day of this month'))->format('Y-m-01');
@@ -37,7 +38,7 @@ final class PlRawFactsController extends AbstractController
             $code = $c->getCode();
             $value = null;
 
-            if ($code && $c->getType() === PLCategoryType::LEAF_INPUT) {
+            if ($code && PLCategoryType::LEAF_INPUT === $c->getType()) {
                 $value = (float) $facts->value($company, $period, $code);
             }
 
@@ -49,7 +50,7 @@ final class PlRawFactsController extends AbstractController
                 'type' => $c->getType()->value,
                 'format' => $c->getFormat()->value,
                 'value' => $value,
-                'isLeaf' => $c->getType() === PLCategoryType::LEAF_INPUT,
+                'isLeaf' => PLCategoryType::LEAF_INPUT === $c->getType(),
             ];
         }
 

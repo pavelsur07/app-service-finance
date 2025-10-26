@@ -10,7 +10,6 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
-use Throwable;
 
 readonly class WildberriesSalesImporter
 {
@@ -128,7 +127,7 @@ readonly class WildberriesSalesImporter
     {
         try {
             $orders = $this->client->fetchOrders($company, $dateFrom, $dateTo);
-        } catch (Throwable $exception) {
+        } catch (\Throwable $exception) {
             $this->logger->error('Failed to load Wildberries order statuses', [
                 'companyId' => $company->getId(),
                 'exception' => $exception->getMessage(),

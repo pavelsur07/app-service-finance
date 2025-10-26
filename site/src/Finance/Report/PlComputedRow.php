@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Report;
@@ -12,6 +13,7 @@ final class PlComputedRow
         public readonly int $level,
         public readonly string $type,
         public readonly float $rawValue,
-        public readonly string $formatted
-    ) {}
+        public readonly string $formatted,
+    ) {
+    }
 }

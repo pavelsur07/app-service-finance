@@ -9,8 +9,6 @@ use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\PaymentPlanRepository;
-use DateTimeImmutable;
-use DateTimeInterface;
 
 final class ForecastBalanceService
 {
@@ -22,14 +20,14 @@ final class ForecastBalanceService
 
     public function buildForecast(
         Company $company,
-        DateTimeInterface $from,
-        DateTimeInterface $to,
-        ?MoneyAccount $account = null
+        \DateTimeInterface $from,
+        \DateTimeInterface $to,
+        ?MoneyAccount $account = null,
     ): ForecastDTO {
         $dto = new ForecastDTO();
 
-        $fromDate = DateTimeImmutable::createFromInterface($from)->setTime(0, 0);
-        $toDate = DateTimeImmutable::createFromInterface($to)->setTime(0, 0);
+        $fromDate = \DateTimeImmutable::createFromInterface($from)->setTime(0, 0);
+        $toDate = \DateTimeImmutable::createFromInterface($to)->setTime(0, 0);
 
         if ($fromDate > $toDate) {
             return $dto;

@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Report;
@@ -6,9 +7,14 @@ namespace App\Finance\Report;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Enum\PLCategoryType;
-use App\Finance\Engine\{DependencyExtractor, Graph, TopoSort, ValueFormatter};
+use App\Finance\Engine\DependencyExtractor;
+use App\Finance\Engine\Graph;
+use App\Finance\Engine\TopoSort;
+use App\Finance\Engine\ValueFormatter;
 use App\Finance\Facts\FactsProviderInterface;
-use App\Finance\Formula\{Evaluator, Parser, Tokenizer};
+use App\Finance\Formula\Evaluator;
+use App\Finance\Formula\Parser;
+use App\Finance\Formula\Tokenizer;
 use App\Repository\PLCategoryRepository;
 
 final class PlReportCalculator
@@ -22,7 +28,8 @@ final class PlReportCalculator
         private readonly DependencyExtractor $deps = new DependencyExtractor(),
         private readonly TopoSort $topo = new TopoSort(),
         private readonly ValueFormatter $fmt = new ValueFormatter(),
-    ) {}
+    ) {
+    }
 
     public function calculate(Company $company, PlReportPeriod $period): PlReportResult
     {
@@ -40,16 +47,16 @@ final class PlReportCalculator
 
         foreach ($all as $cat) {
             $g->addNode($cat->getId());
-            $formula = trim((string)($cat->getFormula() ?? ''));
+            $formula = trim((string) ($cat->getFormula() ?? ''));
 
-            if ($cat->getType() === PLCategoryType::SUBTOTAL && $formula === '') {
+            if (PLCategoryType::SUBTOTAL === $cat->getType() && '' === $formula) {
                 foreach ($cat->getChildren() as $child) {
                     $g->addEdge($child->getId(), $cat->getId());
                 }
                 continue;
             }
 
-            if ($cat->getType() === PLCategoryType::KPI || ($cat->getType() === PLCategoryType::SUBTOTAL && $formula !== '')) {
+            if (PLCategoryType::KPI === $cat->getType() || (PLCategoryType::SUBTOTAL === $cat->getType() && '' !== $formula)) {
                 try {
                     $tokens = $this->tokenizer->tokenize($formula);
                     $ast = $this->parser->parse($tokens);
@@ -78,18 +85,21 @@ final class PlReportCalculator
                 private Company $company,
                 private PlReportPeriod $period,
                 private FactsProviderInterface $facts,
-                private array &$warnings
-            ) {}
+                private array &$warnings,
+            ) {
+            }
 
             public function get(string $code): float
             {
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
                         $v = $this->values[$c->getId()] ?? $this->facts->value($this->company, $this->period, $code);
+
                         return (float) $v;
                     }
                 }
                 $this->warn("Unknown code `$code` at eval-time");
+
                 return 0.0;
             }
 
@@ -105,12 +115,12 @@ final class PlReportCalculator
             $t = $c->getType();
             $val = 0.0;
 
-            if ($t === PLCategoryType::LEAF_INPUT) {
+            if (PLCategoryType::LEAF_INPUT === $t) {
                 $code = (string) $c->getCode();
                 $val = $this->facts->value($company, $period, $code);
-            } elseif ($t === PLCategoryType::SUBTOTAL) {
-                $formula = trim((string)($c->getFormula() ?? ''));
-                if ($formula === '') {
+            } elseif (PLCategoryType::SUBTOTAL === $t) {
+                $formula = trim((string) ($c->getFormula() ?? ''));
+                if ('' === $formula) {
                     foreach ($c->getChildren() as $child) {
                         $childVal = $values[$child->getId()] ?? 0.0;
                         $val += $childVal * (float) $child->getWeightInParent();
@@ -121,7 +131,7 @@ final class PlReportCalculator
                         $val = $this->evaluator->eval($ast, $env);
                     }
                 }
-            } elseif ($t === PLCategoryType::KPI) {
+            } elseif (PLCategoryType::KPI === $t) {
                 $ast = $astById[$id] ?? null;
                 if ($ast) {
                     $val = $this->evaluator->eval($ast, $env);
@@ -139,8 +149,8 @@ final class PlReportCalculator
                 name: $c->getName(),
                 level: $c->getLevel(),
                 type: $c->getType()->value,
-                rawValue: (float)($values[$c->getId()] ?? 0.0),
-                formatted: $this->fmt->format((float)($values[$c->getId()] ?? 0.0), $c->getFormat())
+                rawValue: (float) ($values[$c->getId()] ?? 0.0),
+                formatted: $this->fmt->format((float) ($values[$c->getId()] ?? 0.0), $c->getFormat())
             );
         }
 
@@ -154,14 +164,14 @@ final class PlReportCalculator
 
         foreach ($all as $c) {
             $parent = $c->getParent();
-            if ($parent === null) {
+            if (null === $parent) {
                 $roots[] = $c;
             } else {
                 $childrenByParent[$parent->getId()][] = $c;
             }
         }
 
-        $bySort = function(PLCategory $a, PLCategory $b): int {
+        $bySort = function (PLCategory $a, PLCategory $b): int {
             return $a->getSortOrder() <=> $b->getSortOrder();
         };
 
@@ -171,7 +181,7 @@ final class PlReportCalculator
         }
 
         $out = [];
-        $walk = function(PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
+        $walk = function (PLCategory $node) use (&$walk, &$out, $childrenByParent): void {
             $out[] = $node;
             foreach ($childrenByParent[$node->getId()] ?? [] as $ch) {
                 $walk($ch);
@@ -192,6 +202,7 @@ final class PlReportCalculator
                 return $c;
             }
         }
+
         return null;
     }
 }

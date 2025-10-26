@@ -11,7 +11,6 @@ use App\Entity\User;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Service\PaymentPlan\PaymentPlanService;
-use DomainException;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
@@ -93,7 +92,7 @@ final class PaymentPlanServiceTest extends TestCase
         $service = new PaymentPlanService();
         $plan = $this->createPlan();
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Cannot transition payment plan status');
         $service->transitionStatus($plan, PaymentPlanStatusValue::APPROVED);
     }
@@ -104,7 +103,7 @@ final class PaymentPlanServiceTest extends TestCase
         $plan = $this->createPlan();
         $plan->setStatus(PaymentPlanStatusEnum::PAID);
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('terminal status');
         $service->transitionStatus($plan, PaymentPlanStatusValue::CANCELED);
     }
@@ -132,7 +131,7 @@ final class PaymentPlanServiceTest extends TestCase
 
         $foreignCompany = $this->createCompany();
 
-        $this->expectException(DomainException::class);
+        $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('different company');
         $service->applyCompanyScope($plan, $foreignCompany);
     }

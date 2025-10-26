@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Report;
@@ -10,6 +11,7 @@ final class PlReportResult
         public readonly PlReportPeriod $period,
         public readonly array $rows,
         /** @var string[] $warnings */
-        public readonly array $warnings = []
-    ) {}
+        public readonly array $warnings = [],
+    ) {
+    }
 }

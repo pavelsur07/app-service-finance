@@ -26,6 +26,6 @@ final class PaymentPlanStatus
 
     public static function isTerminal(string $status): bool
     {
-        return $status === self::PAID;
+        return self::PAID === $status;
     }
 }

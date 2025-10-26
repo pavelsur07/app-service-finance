@@ -147,7 +147,7 @@ class FundController extends AbstractController
             return (int) round((float) $normalized);
         }
 
-        $scale = (string) pow(10, $fractionDigits);
+        $scale = (string) 10 ** $fractionDigits;
         $scaled = bcmul($normalized, $scale, 0);
 
         return (int) $scaled;

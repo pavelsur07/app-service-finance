@@ -7,7 +7,6 @@ use App\Entity\Company;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Message\EnqueueAutoRulesForRange;
 use App\Repository\CashTransactionRepository;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;
 use Psr\Log\LoggerInterface;
@@ -38,13 +37,13 @@ final class EnqueueAutoRulesForRangeHandler
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'ASC');
 
-        if ($message->from instanceof DateTimeImmutable) {
+        if ($message->from instanceof \DateTimeImmutable) {
             $qb
                 ->andWhere('t.occurredAt >= :from')
                 ->setParameter('from', $message->from->setTime(0, 0, 0));
         }
 
-        if ($message->to instanceof DateTimeImmutable) {
+        if ($message->to instanceof \DateTimeImmutable) {
             $qb
                 ->andWhere('t.occurredAt <= :to')
                 ->setParameter('to', $message->to->setTime(23, 59, 59));
@@ -72,7 +71,7 @@ final class EnqueueAutoRulesForRangeHandler
             $this->bus->dispatch(new ApplyAutoRulesForTransaction(
                 (string) $transaction->getId(),
                 $message->companyId,
-                new DateTimeImmutable(),
+                new \DateTimeImmutable(),
             ));
 
             ++$enqueued;
@@ -86,8 +85,8 @@ final class EnqueueAutoRulesForRangeHandler
             'companyId' => $message->companyId,
             'selected' => $selected,
             'enqueued' => $enqueued,
-            'from' => $message->from?->format(DATE_ATOM),
-            'to' => $message->to?->format(DATE_ATOM),
+            'from' => $message->from?->format(\DATE_ATOM),
+            'to' => $message->to?->format(\DATE_ATOM),
             'moneyAccountIds' => $message->moneyAccountIds,
             'durationMs' => (int) ((microtime(true) - $startTime) * 1000),
         ]);

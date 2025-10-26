@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Report;
@@ -27,7 +28,7 @@ final class PlReportPeriod
         $normalizedFrom = $from->setTime(0, 0, 0);
         $normalizedTo = $to->setTime(23, 59, 59);
 
-        if ($label === null) {
+        if (null === $label) {
             if ($normalizedFrom->format('Ymd') === $normalizedTo->format('Ymd')) {
                 $label = $normalizedFrom->format('d.m.Y');
             } else {

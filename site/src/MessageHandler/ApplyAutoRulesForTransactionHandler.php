@@ -29,7 +29,7 @@ final class ApplyAutoRulesForTransactionHandler
             $this->logger->warning('Cash auto rules: transaction not found', [
                 'transactionId' => $message->transactionId,
                 'companyId' => $message->companyId,
-                'createdAt' => $message->createdAt->format(DATE_ATOM),
+                'createdAt' => $message->createdAt->format(\DATE_ATOM),
             ]);
 
             return;
@@ -41,7 +41,7 @@ final class ApplyAutoRulesForTransactionHandler
                 'transactionId' => $message->transactionId,
                 'expectedCompanyId' => $message->companyId,
                 'actualCompanyId' => $transactionCompanyId,
-                'createdAt' => $message->createdAt->format(DATE_ATOM),
+                'createdAt' => $message->createdAt->format(\DATE_ATOM),
             ]);
 
             $this->entityManager->clear(CashTransaction::class);
@@ -63,7 +63,7 @@ final class ApplyAutoRulesForTransactionHandler
         $this->logger->info('Cash auto rules applied', [
             'transactionId' => $transaction->getId(),
             'companyId' => $message->companyId,
-            'messageCreatedAt' => $message->createdAt->format(DATE_ATOM),
+            'messageCreatedAt' => $message->createdAt->format(\DATE_ATOM),
             'changed' => $changed,
             'ruleId' => $ruleId,
             'ruleName' => $ruleName,

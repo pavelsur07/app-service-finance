@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Controller;
 
 use App\Repository\ImportLogRepository;
@@ -16,16 +17,16 @@ class ImportLogController extends AbstractController
     public function index(
         Request $request,
         ActiveCompanyService $activeCompanyService,
-        ImportLogRepository $repo
+        ImportLogRepository $repo,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
 
-        $page  = max(1, (int) $request->query->get('page', 1));
+        $page = max(1, (int) $request->query->get('page', 1));
         $limit = min(100, max(10, (int) $request->query->get('limit', 20)));
 
-        $source   = $request->query->get('source');
+        $source = $request->query->get('source');
         $dateFrom = $request->query->get('date_from');
-        $dateTo   = $request->query->get('date_to');
+        $dateTo = $request->query->get('date_to');
 
         $qb = $repo->createQueryBuilder('l')
             ->andWhere('l.company = :c')->setParameter('c', $company)
@@ -35,10 +36,10 @@ class ImportLogController extends AbstractController
             $qb->andWhere('l.source = :s')->setParameter('s', $source);
         }
         if ($dateFrom) {
-            $qb->andWhere('l.startedAt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom . ' 00:00:00'));
+            $qb->andWhere('l.startedAt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom.' 00:00:00'));
         }
         if ($dateTo) {
-            $qb->andWhere('l.startedAt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo . ' 23:59:59'));
+            $qb->andWhere('l.startedAt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo.' 23:59:59'));
         }
 
         $query = $qb->getQuery();
@@ -59,4 +60,3 @@ class ImportLogController extends AbstractController
         ]);
     }
 }
-

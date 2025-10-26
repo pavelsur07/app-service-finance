@@ -9,8 +9,6 @@ use App\Entity\PaymentPlanMatch;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Repository\PaymentPlanMatchRepository;
 use App\Repository\PaymentPlanRepository;
-use DateInterval;
-use DateTimeImmutable;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
@@ -35,8 +33,8 @@ final class PaymentPlanMatcher
 
         $company = $transaction->getCompany();
         $txDate = $transaction->getOccurredAt();
-        $from = $txDate->sub(new DateInterval('P1D'));
-        $to = $txDate->add(new DateInterval('P1D'));
+        $from = $txDate->sub(new \DateInterval('P1D'));
+        $to = $txDate->add(new \DateInterval('P1D'));
 
         $qb = $this->paymentPlanRepository->createQueryBuilder('plan')
             ->leftJoin(PaymentPlanMatch::class, 'match', 'WITH', 'match.plan = plan')
@@ -135,7 +133,7 @@ final class PaymentPlanMatcher
             $company,
             $bestPlan,
             $transaction,
-            new DateTimeImmutable(),
+            new \DateTimeImmutable(),
         );
 
         $this->em->persist($match);

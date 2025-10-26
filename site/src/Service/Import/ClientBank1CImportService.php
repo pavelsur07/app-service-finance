@@ -333,7 +333,7 @@ class ClientBank1CImportService
                         'company' => $companyId,
                         'dedupeHash' => $dedupeHash,
                         'rowNo' => $currentRow,
-                        'occurredAt' => $occurredAtUtc->format(DATE_ATOM),
+                        'occurredAt' => $occurredAtUtc->format(\DATE_ATOM),
                         'amountMinor' => $amountMinor,
                     ]);
                     continue;

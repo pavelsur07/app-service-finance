@@ -1,4 +1,5 @@
 <?php
+
 namespace App\MessageHandler\Ozon;
 
 use App\Entity\Ozon\OzonSyncCursor;
@@ -29,7 +30,8 @@ final class SyncOzonOrdersHandler
         private EntityManagerInterface $em,
         private LockFactory $lockFactory,
         private LoggerInterface $logger, // через services.yaml привязан к monolog.logger.ozon.sync
-    ) {}
+    ) {
+    }
 
     public function __invoke(SyncOzonOrders $m): void
     {
@@ -38,6 +40,7 @@ final class SyncOzonOrdersHandler
 
         if (!$lock->acquire()) {
             $this->logger->info('Skip: lock busy', ['key' => $lockKey]);
+
             return;
         }
 
@@ -45,6 +48,7 @@ final class SyncOzonOrdersHandler
             $company = $this->companies->find($m->companyId);
             if (!$company) {
                 $this->logger->warning('Company not found', ['companyId' => $m->companyId]);
+
                 return;
             }
 
@@ -56,7 +60,7 @@ final class SyncOzonOrdersHandler
             $since = $m->sinceIso
                 ? new \DateTimeImmutable($m->sinceIso)
                 : ($cursor->getLastTo()
-                    ? $cursor->getLastTo()->sub(new \DateInterval('PT' . $m->overlapMinutes . 'M'))
+                    ? $cursor->getLastTo()->sub(new \DateInterval('PT'.$m->overlapMinutes.'M'))
                     : $now->sub(new \DateInterval('PT70M'))); // 60м + 10м оверлапа
             $to = $m->toIso ? new \DateTimeImmutable($m->toIso) : $now;
 
@@ -75,8 +79,8 @@ final class SyncOzonOrdersHandler
             $this->logger->info('Ozon synced', [
                 'company' => $company->getName(),
                 'scheme' => $m->scheme,
-                'since' => $since->format(DATE_ATOM),
-                'to' => $to->format(DATE_ATOM),
+                'since' => $since->format(\DATE_ATOM),
+                'to' => $to->format(\DATE_ATOM),
                 'orders' => $result['orders'] ?? 0,
                 'statusChanges' => $result['statusChanges'] ?? 0,
             ]);

@@ -6,8 +6,6 @@ use App\Entity\Company;
 use App\Repository\CompanyRepository;
 use App\Repository\Wildberries\WildberriesSaleRepository;
 use App\Service\Wildberries\WildberriesSalesImporter;
-use DateInterval;
-use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -57,24 +55,24 @@ class WildberriesSalesSyncCommand extends Command
             return Command::SUCCESS;
         }
 
-        $dateTo = new DateTimeImmutable('now');
+        $dateTo = new \DateTimeImmutable('now');
         if (!$this->saleRepository->hasSalesForCompany($company)) {
-            $dateFrom = $dateTo->sub(new DateInterval('P80D'));
+            $dateFrom = $dateTo->sub(new \DateInterval('P80D'));
             $this->logger->info('Wildberries initial sync period calculated', [
                 'companyId' => $company->getId(),
-                'dateFrom' => $dateFrom->format(DateTimeImmutable::ATOM),
-                'dateTo' => $dateTo->format(DateTimeImmutable::ATOM),
+                'dateFrom' => $dateFrom->format(\DateTimeImmutable::ATOM),
+                'dateTo' => $dateTo->format(\DateTimeImmutable::ATOM),
             ]);
         } else {
             $oldestOpen = $this->saleRepository->findOldestOpenSoldAt($company);
-            if ($oldestOpen instanceof DateTimeImmutable) {
+            if ($oldestOpen instanceof \DateTimeImmutable) {
                 $dateFrom = $oldestOpen;
             } else {
                 $latestSoldAt = $this->saleRepository->findLatestSoldAt($company);
-                if ($latestSoldAt instanceof DateTimeImmutable) {
-                    $dateFrom = $latestSoldAt->sub(new DateInterval('P3D'));
+                if ($latestSoldAt instanceof \DateTimeImmutable) {
+                    $dateFrom = $latestSoldAt->sub(new \DateInterval('P3D'));
                 } else {
-                    $dateFrom = $dateTo->sub(new DateInterval('P3D'));
+                    $dateFrom = $dateTo->sub(new \DateInterval('P3D'));
                 }
             }
 
@@ -84,8 +82,8 @@ class WildberriesSalesSyncCommand extends Command
 
             $this->logger->info('Wildberries incremental sync period calculated', [
                 'companyId' => $company->getId(),
-                'dateFrom' => $dateFrom->format(DateTimeImmutable::ATOM),
-                'dateTo' => $dateTo->format(DateTimeImmutable::ATOM),
+                'dateFrom' => $dateFrom->format(\DateTimeImmutable::ATOM),
+                'dateTo' => $dateTo->format(\DateTimeImmutable::ATOM),
             ]);
         }
 

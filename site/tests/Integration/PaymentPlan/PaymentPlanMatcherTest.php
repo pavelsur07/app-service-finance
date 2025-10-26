@@ -2,8 +2,8 @@
 
 namespace App\Tests\Integration\PaymentPlan;
 
-use App\Entity\CashTransaction;
 use App\Entity\CashflowCategory;
+use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\MoneyAccount;

@@ -13,10 +13,10 @@ use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
 use App\Service\PaymentPlan\PaymentPlanMatcher;
-use Symfony\Component\Messenger\MessageBusInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 class CashTransactionService
 {

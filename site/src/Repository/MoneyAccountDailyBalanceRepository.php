@@ -5,8 +5,6 @@ namespace App\Repository;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
-use DateTimeImmutable;
-use DateTimeInterface;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
@@ -35,15 +33,15 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
 
     public function getOpeningBalanceForDate(
         Company $company,
-        DateTimeInterface $date,
-        ?MoneyAccount $account = null
+        \DateTimeInterface $date,
+        ?MoneyAccount $account = null,
     ): string {
         $qb = $this->createQueryBuilder('b')
             ->select('COALESCE(SUM(b.openingBalance), 0) as totalOpening')
             ->where('b.company = :company')
             ->andWhere('b.date = :date')
             ->setParameter('company', $company)
-            ->setParameter('date', DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE);
+            ->setParameter('date', \DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE);
 
         if (null !== $account) {
             $qb->andWhere('b.moneyAccount = :account')

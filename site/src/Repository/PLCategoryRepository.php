@@ -67,7 +67,7 @@ class PLCategoryRepository extends ServiceEntityRepository
         }
 
         $maxSortOrder = $qb->getQuery()->getSingleScalarResult();
-        $maxSortOrder = $maxSortOrder !== null ? (int) $maxSortOrder : null;
+        $maxSortOrder = null !== $maxSortOrder ? (int) $maxSortOrder : null;
 
         return ($maxSortOrder ?? 0) + self::SORT_ORDER_STEP;
     }

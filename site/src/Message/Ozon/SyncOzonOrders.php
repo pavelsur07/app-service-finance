@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Message\Ozon;
 
 final class SyncOzonOrders
@@ -17,5 +18,6 @@ final class SyncOzonOrders
         public readonly int $overlapMinutes = 10,
         /** TTL лок-блокировки в секундах, по умолчанию 55 минут */
         public readonly int $lockTtlSec = 3300,
-    ) {}
+    ) {
+    }
 }

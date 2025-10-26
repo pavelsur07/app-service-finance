@@ -5,7 +5,6 @@ namespace App\Controller\Wildberries;
 use App\Entity\Company;
 use App\Entity\User;
 use App\Repository\Wildberries\WildberriesSaleRepository;
-use DateTimeImmutable;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -64,7 +63,7 @@ class WildberriesSalesController extends AbstractController
 
         if (is_string($fromRaw) && '' !== $fromRaw) {
             try {
-                $filters['from'] = new DateTimeImmutable($fromRaw);
+                $filters['from'] = new \DateTimeImmutable($fromRaw);
             } catch (\Exception $exception) {
                 $this->addFlash('error', sprintf('Некорректная дата начала "%s"', $fromRaw));
                 $this->logger->warning('Invalid Wildberries from date', [
@@ -77,7 +76,7 @@ class WildberriesSalesController extends AbstractController
 
         if (is_string($toRaw) && '' !== $toRaw) {
             try {
-                $filters['to'] = new DateTimeImmutable($toRaw);
+                $filters['to'] = new \DateTimeImmutable($toRaw);
             } catch (\Exception $exception) {
                 $this->addFlash('error', sprintf('Некорректная дата окончания "%s"', $toRaw));
                 $this->logger->warning('Invalid Wildberries to date', [

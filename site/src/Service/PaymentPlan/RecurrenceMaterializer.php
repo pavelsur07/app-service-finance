@@ -76,7 +76,7 @@ final class RecurrenceMaterializer
                 $plan->setStatus(PaymentPlanStatusEnum::PLANNED);
 
                 $this->entityManager->persist($plan);
-                $created++;
+                ++$created;
             }
         }
 

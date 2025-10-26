@@ -86,7 +86,7 @@ final class PaymentRecurrenceService
                 $occurrences[] = $candidate;
             }
 
-            $weekIndex++;
+            ++$weekIndex;
         }
 
         return $occurrences;
@@ -107,7 +107,7 @@ final class PaymentRecurrenceService
         $baseMonth = (int) $start->format('n');
         $occurrences = [];
 
-        for ($offset = $interval; ; $offset += $interval) {
+        for ($offset = $interval;; $offset += $interval) {
             $totalMonths = ($baseMonth - 1) + $offset;
             $targetYear = $baseYear + intdiv($totalMonths, 12);
             $targetMonth = ($totalMonths % 12) + 1;

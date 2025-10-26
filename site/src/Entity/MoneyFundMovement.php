@@ -3,7 +3,6 @@
 namespace App\Entity;
 
 use Doctrine\ORM\Mapping as ORM;
-use InvalidArgumentException;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: \App\Repository\MoneyFundMovementRepository::class)]
@@ -45,7 +44,7 @@ class MoneyFundMovement
     ) {
         Assert::uuid($id);
         if ($fund->getCompany()->getId() !== $company->getId()) {
-            throw new InvalidArgumentException('Fund and movement company mismatch.');
+            throw new \InvalidArgumentException('Fund and movement company mismatch.');
         }
 
         $this->id = $id;
@@ -73,7 +72,7 @@ class MoneyFundMovement
     public function setFund(MoneyFund $fund): self
     {
         if ($fund->getCompany()->getId() !== $this->company->getId()) {
-            throw new InvalidArgumentException('Fund and movement company mismatch.');
+            throw new \InvalidArgumentException('Fund and movement company mismatch.');
         }
 
         $this->fund = $fund;

@@ -2,7 +2,6 @@
 
 namespace App\Twig;
 
-use InvalidArgumentException;
 use Symfony\Component\Intl\Currencies;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
@@ -47,7 +46,7 @@ class CurrencyFormatExtension extends AbstractExtension
     {
         try {
             return Currencies::getSymbol($currency);
-        } catch (InvalidArgumentException) {
+        } catch (\InvalidArgumentException) {
             return $currency;
         }
     }
@@ -56,9 +55,8 @@ class CurrencyFormatExtension extends AbstractExtension
     {
         try {
             return Currencies::getFractionDigits($currency);
-        } catch (InvalidArgumentException) {
+        } catch (\InvalidArgumentException) {
             return 2;
         }
     }
 }
-

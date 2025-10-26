@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace Tests\Integration\Finance;
@@ -26,10 +27,10 @@ final class PlReportCalculatorTest extends TestCase
         $facts = new class implements FactsProviderInterface {
             public function value(Company $company, PlReportPeriod $period, string $code): float
             {
-                return match($code) {
+                return match ($code) {
                     'REV_WB' => 500.0,
-                    'COGS'   => 100.0,
-                    default  => 0.0,
+                    'COGS' => 100.0,
+                    default => 0.0,
                 };
             }
         };
@@ -38,7 +39,9 @@ final class PlReportCalculatorTest extends TestCase
         $res = $calc->calculate($company, PlReportPeriod::forMonth(new \DateTimeImmutable('2025-01-01')));
 
         $map = [];
-        foreach ($res->rows as $r) $map[$r->code ?? $r->id] = $r->rawValue;
+        foreach ($res->rows as $r) {
+            $map[$r->code ?? $r->id] = $r->rawValue;
+        }
 
         $this->assertSame(500.0, $map['REV_TOTAL']);        // subtotal по детям
         $this->assertSame(100.0, $map['VAR_COSTS_TOTAL']);  // subtotal по детям

@@ -10,7 +10,6 @@ use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Util\StringNormalizer;
-use DomainException;
 
 final class PaymentPlanService
 {
@@ -95,7 +94,7 @@ final class PaymentPlanService
     public function transitionStatus(PaymentPlan $plan, string $to): void
     {
         if (!\in_array($to, PaymentPlanStatus::all(), true)) {
-            throw new DomainException(sprintf('Unknown payment plan status "%s".', $to));
+            throw new \DomainException(sprintf('Unknown payment plan status "%s".', $to));
         }
 
         $currentEnum = $plan->getStatus();
@@ -106,7 +105,7 @@ final class PaymentPlanService
         }
 
         if (PaymentPlanStatus::isTerminal($current)) {
-            throw new DomainException(sprintf('Cannot transition payment plan from terminal status "%s".', $current));
+            throw new \DomainException(sprintf('Cannot transition payment plan from terminal status "%s".', $current));
         }
 
         $allowed = [
@@ -116,7 +115,7 @@ final class PaymentPlanService
         ];
 
         if (!\in_array($to, $allowed[$current] ?? [], true)) {
-            throw new DomainException(sprintf('Cannot transition payment plan status from "%s" to "%s".', $current, $to));
+            throw new \DomainException(sprintf('Cannot transition payment plan status from "%s" to "%s".', $current, $to));
         }
 
         $plan->setStatus(PaymentPlanStatusEnum::from($to));
@@ -140,7 +139,7 @@ final class PaymentPlanService
         }
 
         if ($current->getId() !== $company->getId()) {
-            throw new DomainException('Cannot operate on a payment plan that belongs to a different company.');
+            throw new \DomainException('Cannot operate on a payment plan that belongs to a different company.');
         }
     }
 

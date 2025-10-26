@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Facts;
@@ -6,8 +7,8 @@ namespace App\Finance\Facts;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
-use App\Repository\PLCategoryRepository;
 use App\Finance\Report\PlReportPeriod;
+use App\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PLDailyTotalFactsProvider implements FactsProviderInterface
@@ -15,7 +16,8 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PLCategoryRepository $plCategories,
-    ) {}
+    ) {
+    }
 
     /**
      * Возвращает сумму за период по коду категории:
@@ -24,21 +26,21 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
     public function value(Company $company, PlReportPeriod $period, string $code): float
     {
         $code = trim((string) $code);
-        if ($code === '') {
+        if ('' === $code) {
             return 0.0;
         }
 
         /** @var PLCategory|null $cat */
         $cat = $this->plCategories->findOneBy([
             'company' => $company,
-            'code'    => $code,
+            'code' => $code,
         ]);
         if (!$cat) {
             return 0.0;
         }
 
         $from = $period->from;
-        $to   = $period->to;
+        $to = $period->to;
 
         $qb = $this->em->createQueryBuilder();
         $qb
@@ -53,7 +55,7 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             ->setParameter('to', $to);
 
         $row = $qb->getQuery()->getOneOrNullResult();
-        $income  = isset($row['sIncome']) ? (float) $row['sIncome'] : 0.0;
+        $income = isset($row['sIncome']) ? (float) $row['sIncome'] : 0.0;
         $expense = isset($row['sExpense']) ? (float) $row['sExpense'] : 0.0;
 
         return $income - $expense;

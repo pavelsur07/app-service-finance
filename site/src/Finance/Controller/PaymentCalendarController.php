@@ -1,11 +1,12 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Domain\PaymentPlan\PaymentPlanStatus;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
-use App\Domain\PaymentPlan\PaymentPlanStatus;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
@@ -21,7 +22,6 @@ use App\Service\PaymentPlan\PaymentPlanService;
 use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
-use DomainException;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -163,7 +163,7 @@ final class PaymentCalendarController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        if (!$this->isCsrfTokenValid('payment_plan_status_' . $plan->getId(), (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('payment_plan_status_'.$plan->getId(), (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
         }
 
@@ -192,7 +192,7 @@ final class PaymentCalendarController extends AbstractController
         try {
             $this->paymentPlanService->transitionStatus($plan, $targetStatus);
             $this->entityManager->flush();
-        } catch (DomainException $exception) {
+        } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());
 
             return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
@@ -218,7 +218,7 @@ final class PaymentCalendarController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        if (!$this->isCsrfTokenValid('payment_plan_postpone_' . $plan->getId(), (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('payment_plan_postpone_'.$plan->getId(), (string) $request->request->get('_token'))) {
             throw $this->createAccessDeniedException();
         }
 

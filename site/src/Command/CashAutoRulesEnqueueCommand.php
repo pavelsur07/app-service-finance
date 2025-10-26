@@ -3,7 +3,6 @@
 namespace App\Command;
 
 use App\Message\EnqueueAutoRulesForRange;
-use DateTimeImmutable;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -91,10 +90,7 @@ final class CashAutoRulesEnqueueCommand extends Command
         return Command::SUCCESS;
     }
 
-    /**
-     * @return DateTimeImmutable|false|null
-     */
-    private function parseDateOption(string $value): DateTimeImmutable|false|null
+    private function parseDateOption(string $value): \DateTimeImmutable|false|null
     {
         $trimmed = trim($value);
         if ('' === $trimmed) {
@@ -102,7 +98,7 @@ final class CashAutoRulesEnqueueCommand extends Command
         }
 
         try {
-            return new DateTimeImmutable($trimmed);
+            return new \DateTimeImmutable($trimmed);
         } catch (\Throwable) {
             return false;
         }

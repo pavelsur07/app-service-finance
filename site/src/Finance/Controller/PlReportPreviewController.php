@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace App\Finance\Controller;
@@ -17,7 +18,7 @@ final class PlReportPreviewController extends AbstractController
     public function preview(
         Request $request,
         ActiveCompanyService $activeCompany,
-        PlReportCalculator $calc
+        PlReportCalculator $calc,
     ): Response {
         $company = $activeCompany->getActiveCompany();
 
@@ -51,7 +52,7 @@ final class PlReportPreviewController extends AbstractController
         $warnings = array_values(array_unique($warnings));
 
         $rows = [];
-        if ($results !== []) {
+        if ([] !== $results) {
             foreach ($results[0]->rows as $row) {
                 $rows[$row->id] = [
                     'id' => $row->id,
@@ -134,7 +135,7 @@ final class PlReportPreviewController extends AbstractController
                 $periodEnd = $candidateEnd;
             }
 
-            if ($grouping === 'week') {
+            if ('week' === $grouping) {
                 $label = sprintf(
                     'Неделя %s (%s — %s)',
                     $periodStart->format('W'),
