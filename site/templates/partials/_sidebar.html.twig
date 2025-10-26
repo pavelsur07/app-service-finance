@@ -12,11 +12,11 @@
     {{- current_route starts with prefix ? 'show' : '' -}}
 {%- endmacro %}
 
-{% macro link_item(title, route_name, is_active, icon, dev_badge) -%}
+{% macro dropdown_item(title, route_name, is_active, dev_badge) -%}
     {%- set href = route_name ? path(route_name) : '#' -%}
-    <a class="nav-link {{ is_active ? 'active' : '' }} {{ not route_name ? 'disabled opacity-75' : '' }}" href="{{ href }}">
-        {%- if icon %}<span class="nav-link-icon d-md-none d-lg-inline-block">{{ icon|raw }}</span>{% endif -%}
-        <span class="nav-link-title">{{ title }}</span>
+    {%- set disabled = route_name is empty -%}
+    <a class="dropdown-item d-flex align-items-center justify-content-between {{ is_active ? 'active' : '' }} {{ disabled ? 'disabled opacity-75' : '' }}" href="{{ href }}" {% if disabled %}tabindex="-1" aria-disabled="true"{% endif %}>
+        <span class="flex-fill">{{ title }}</span>
         {%- if dev_badge %}<span class="badge bg-secondary ms-2">в разработке</span>{% endif -%}
     </a>
 {%- endmacro %}
@@ -41,174 +41,103 @@
             <ul class="navbar-nav pt-lg-3">
                 {% set dashboard_active = macros.is_active(current_route, ['app_home_index']) %}
                 <li class="nav-item">
-                    <a class="nav-link {{ dashboard_active ? '' : 'collapsed' }}" href="#sidebar-main" data-bs-toggle="collapse" role="button" aria-expanded="{{ dashboard_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-layout-dashboard"></i></span>
+                    <a class="nav-link {{ dashboard_active ? 'active' : '' }}" href="{{ path('app_home_index') }}">
                         <span class="nav-link-title">Главная</span>
                     </a>
-                    <div class="collapse {{ dashboard_active ? 'show' : '' }}" id="sidebar-main">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Дашборд', 'app_home_index', dashboard_active, null, false) }}
-                            </div>
-                        </div>
-                    </div>
                 </li>
 
                 {% set money_active = macros.is_active(current_route, ['cash_transaction_', 'report_account_balances', 'finance_funds_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ money_active ? '' : 'collapsed' }}" href="#sidebar-money" data-bs-toggle="collapse" role="button" aria-expanded="{{ money_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-wallet"></i></span>
+                <li class="nav-item dropdown {{ money_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ money_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ money_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Деньги</span>
                     </a>
-                    <div class="collapse {{ money_active ? 'show' : '' }}" id="sidebar-money">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Остатки и счета', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), null, false) }}
-                            </div>
+                    <div class="dropdown-menu {{ money_active ? 'show' : '' }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Остатки и счета', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), false) }}
                             {% if is_funds_feature_enabled() %}
-                                <div class="nav-item">
-                                    {{ macros.link_item('Фонды (конверты)', 'finance_funds_index', macros.is_active(current_route, ['finance_funds_']), null, false) }}
-                                </div>
+                                {{ macros.dropdown_item('Фонды (конверты)', 'finance_funds_index', macros.is_active(current_route, ['finance_funds_']), false) }}
                             {% endif %}
-                            <div class="nav-item">
-                                {{ macros.link_item('Лента операций (ДДС-факт)', 'cash_transaction_index', macros.is_active(current_route, ['cash_transaction_index', 'cash_transaction_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Переводы', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Сверка', null, false, null, true) }}
-                            </div>
+                            {{ macros.dropdown_item('Лента операций (ДДС-факт)', 'cash_transaction_index', macros.is_active(current_route, ['cash_transaction_index', 'cash_transaction_']), false) }}
+                            {{ macros.dropdown_item('Переводы', null, false, true) }}
+                            {{ macros.dropdown_item('Сверка', null, false, true) }}
                         </div>
                     </div>
                 </li>
 
                 {% set documents_active = macros.is_active(current_route, ['document_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ documents_active ? '' : 'collapsed' }}" href="#sidebar-documents" data-bs-toggle="collapse" role="button" aria-expanded="{{ documents_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-file-text"></i></span>
+                <li class="nav-item dropdown {{ documents_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ documents_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ documents_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Документы (начисления P&amp;L)</span>
                     </a>
                     {% set documents_show = documents_active ? 'show' : macros.collapse_state(current_route, 'document_') %}
-                    <div class="collapse {{ documents_show }}" id="sidebar-documents">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Реестр документов', 'document_index', macros.is_active(current_route, ['document_index', 'document_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Карточка документа', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Правила маппинга в P&amp;L', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Качество данных', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ documents_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Реестр документов', 'document_index', macros.is_active(current_route, ['document_index', 'document_']), false) }}
+                            {{ macros.dropdown_item('Карточка документа', null, false, true) }}
+                            {{ macros.dropdown_item('Правила маппинга в P&amp;L', null, false, true) }}
+                            {{ macros.dropdown_item('Качество данных', null, false, true) }}
                         </div>
                     </div>
                 </li>
 
                 {% set import_active = macros.is_active(current_route, ['cash_bank1c_import_upload', 'import_logs_', 'cash_transaction_auto_rule_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ import_active ? '' : 'collapsed' }}" href="#sidebar-import" data-bs-toggle="collapse" role="button" aria-expanded="{{ import_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-cloud-upload"></i></span>
+                <li class="nav-item dropdown {{ import_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ import_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ import_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Импорт</span>
                     </a>
                     {% set import_show = import_active ? 'show' : (macros.collapse_state(current_route, 'import_') ?: macros.collapse_state(current_route, 'cash_transaction_auto_rule_')) %}
-                    <div class="collapse {{ import_show }}" id="sidebar-import">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Импорт документов', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Импорт выписок (ДДС)', 'cash_bank1c_import_upload', macros.is_active(current_route, ['cash_bank1c_import_upload']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Журнал импортов', 'import_logs_index', macros.is_active(current_route, ['import_logs_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Автоправила (ДДС)', 'cash_transaction_auto_rule_index', macros.is_active(current_route, ['cash_transaction_auto_rule_']), null, false) }}
-                            </div>
+                    <div class="dropdown-menu {{ import_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Импорт документов', null, false, true) }}
+                            {{ macros.dropdown_item('Импорт выписок (ДДС)', 'cash_bank1c_import_upload', macros.is_active(current_route, ['cash_bank1c_import_upload']), false) }}
+                            {{ macros.dropdown_item('Журнал импортов', 'import_logs_index', macros.is_active(current_route, ['import_logs_']), false) }}
+                            {{ macros.dropdown_item('Автоправила (ДДС)', 'cash_transaction_auto_rule_index', macros.is_active(current_route, ['cash_transaction_auto_rule_']), false) }}
                         </div>
                     </div>
                 </li>
 
                 {% set planning_active = macros.is_active(current_route, ['payment_calendar_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ planning_active ? '' : 'collapsed' }}" href="#sidebar-planning" data-bs-toggle="collapse" role="button" aria-expanded="{{ planning_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar"></i></span>
+                <li class="nav-item dropdown {{ planning_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ planning_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ planning_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Планирование</span>
                     </a>
                     {% set planning_show = planning_active ? 'show' : macros.collapse_state(current_route, 'payment_calendar_') %}
-                    <div class="collapse {{ planning_show }}" id="sidebar-planning">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Платёжный календарь (план-факт)', 'payment_calendar_index', macros.is_active(current_route, ['payment_calendar_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Планы платежей', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Кредиты и графики', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Депозиты', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ planning_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Платёжный календарь (план-факт)', 'payment_calendar_index', macros.is_active(current_route, ['payment_calendar_']), false) }}
+                            {{ macros.dropdown_item('Планы платежей', null, false, true) }}
+                            {{ macros.dropdown_item('Кредиты и графики', null, false, true) }}
+                            {{ macros.dropdown_item('Депозиты', null, false, true) }}
                         </div>
                     </div>
                 </li>
 
                 {% set reports_active = macros.is_active(current_route, ['report_cashflow_', 'finance_report_', 'report_transactions_statement_', 'report_transactions_debug_', 'report_debug_', 'report_account_balances']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ reports_active ? '' : 'collapsed' }}" href="#sidebar-reports" data-bs-toggle="collapse" role="button" aria-expanded="{{ reports_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-chart-line"></i></span>
+                <li class="nav-item dropdown {{ reports_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ reports_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Отчёты</span>
                     </a>
                     {% set reports_show = reports_active ? 'show' : (macros.collapse_state(current_route, 'report_') ?: macros.collapse_state(current_route, 'finance_report_')) %}
-                    <div class="collapse {{ reports_show }}" id="sidebar-reports">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('ДДС (Cash Flow)', 'report_cashflow_index', macros.is_active(current_route, ['report_cashflow_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('P&amp;L (ОПиУ)', 'finance_report_preview', macros.is_active(current_route, ['finance_report_preview']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Баланс денег', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Упрощённый баланс', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Экспорт', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ reports_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('ДДС (Cash Flow)', 'report_cashflow_index', macros.is_active(current_route, ['report_cashflow_']), false) }}
+                            {{ macros.dropdown_item('P&amp;L (ОПиУ)', 'finance_report_preview', macros.is_active(current_route, ['finance_report_preview']), false) }}
+                            {{ macros.dropdown_item('Баланс денег', 'report_account_balances_index', macros.is_active(current_route, ['report_account_balances']), false) }}
+                            {{ macros.dropdown_item('Упрощённый баланс', null, false, true) }}
+                            {{ macros.dropdown_item('Экспорт', null, false, true) }}
                             {% set reports_debug_active = macros.is_active(current_route, ['report_transactions_statement_', 'report_transactions_debug_', 'report_debug_', 'finance_report_raw', 'finance_report_pl_raw']) %}
-                            <div class="nav-item">
-                                <a class="nav-link {{ reports_debug_active ? '' : 'collapsed' }}" href="#sidebar-reports-debug" data-bs-toggle="collapse" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
-                                    <span class="nav-link-title">Отладка</span>
+                            <div class="dropend {{ reports_debug_active ? 'show' : '' }}">
+                                <a class="dropdown-item dropdown-toggle d-flex align-items-center justify-content-between {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
+                                    <span class="flex-fill">Отладка</span>
                                 </a>
                                 {% set reports_debug_show = reports_debug_active ? 'show' : (macros.collapse_state(current_route, 'report_transactions_statement_') ?: macros.collapse_state(current_route, 'report_debug_') ?: macros.collapse_state(current_route, 'finance_report_raw') ?: macros.collapse_state(current_route, 'finance_report_pl_raw')) %}
-                                <div class="collapse {{ reports_debug_show }}" id="sidebar-reports-debug">
-                                    <div class="nav nav-pills flex-column ms-3">
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Выписка/Стейтмент', 'report_transactions_statement_index', macros.is_active(current_route, ['report_transactions_statement_']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Отчёт отладка', 'report_transactions_debug_index', macros.is_active(current_route, ['report_transactions_debug_']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Отчёт «Сырые транзакции»', 'report_debug_transactions_raw', macros.is_active(current_route, ['report_debug_transactions_raw']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Отчёт «Фактические дневные остатки»', 'report_debug_daily_facts', macros.is_active(current_route, ['report_debug_daily_facts']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Сырые транзакции ОПиУ', 'finance_report_raw', macros.is_active(current_route, ['finance_report_raw']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Сырые данные ОПиУ', 'finance_report_pl_raw', macros.is_active(current_route, ['finance_report_pl_raw']), null, false) }}
-                                        </div>
-                                    </div>
+                                <div class="dropdown-menu {{ reports_debug_show }}">
+                                    {{ macros.dropdown_item('Выписка/Стейтмент', 'report_transactions_statement_index', macros.is_active(current_route, ['report_transactions_statement_']), false) }}
+                                    {{ macros.dropdown_item('Отчёт отладка', 'report_transactions_debug_index', macros.is_active(current_route, ['report_transactions_debug_']), false) }}
+                                    {{ macros.dropdown_item('Отчёт «Сырые транзакции»', 'report_debug_transactions_raw', macros.is_active(current_route, ['report_debug_transactions_raw']), false) }}
+                                    {{ macros.dropdown_item('Отчёт «Фактические дневные остатки»', 'report_debug_daily_facts', macros.is_active(current_route, ['report_debug_daily_facts']), false) }}
+                                    {{ macros.dropdown_item('Сырые транзакции ОПиУ', 'finance_report_raw', macros.is_active(current_route, ['finance_report_raw']), false) }}
+                                    {{ macros.dropdown_item('Сырые данные ОПиУ', 'finance_report_pl_raw', macros.is_active(current_route, ['finance_report_pl_raw']), false) }}
                                 </div>
                             </div>
                         </div>
@@ -216,72 +145,44 @@
                 </li>
 
                 {% set directories_active = macros.is_active(current_route, ['cashflow_category_', 'pl_category_', 'money_account_', 'counterparty_', 'project_direction_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ directories_active ? '' : 'collapsed' }}" href="#sidebar-directories" data-bs-toggle="collapse" role="button" aria-expanded="{{ directories_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-books"></i></span>
+                <li class="nav-item dropdown {{ directories_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ directories_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ directories_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Справочники</span>
                     </a>
                     {% set directories_show = directories_active ? 'show' : (macros.collapse_state(current_route, 'cashflow_category_') ?: macros.collapse_state(current_route, 'pl_category_') ?: macros.collapse_state(current_route, 'money_account_') ?: macros.collapse_state(current_route, 'counterparty_') ?: macros.collapse_state(current_route, 'project_direction_')) %}
-                    <div class="collapse {{ directories_show }}" id="sidebar-directories">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Категории ДДС', 'cashflow_category_index', macros.is_active(current_route, ['cashflow_category_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Категории P&amp;L', 'pl_category_index', macros.is_active(current_route, ['pl_category_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Счета / Кассы / Кошельки', 'money_account_index', macros.is_active(current_route, ['money_account_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Контрагенты', 'counterparty_index', macros.is_active(current_route, ['counterparty_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Проекты / ЦФО', 'project_direction_index', macros.is_active(current_route, ['project_direction_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Теги', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ directories_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Категории ДДС', 'cashflow_category_index', macros.is_active(current_route, ['cashflow_category_']), false) }}
+                            {{ macros.dropdown_item('Категории P&amp;L', 'pl_category_index', macros.is_active(current_route, ['pl_category_']), false) }}
+                            {{ macros.dropdown_item('Счета / Кассы / Кошельки', 'money_account_index', macros.is_active(current_route, ['money_account_']), false) }}
+                            {{ macros.dropdown_item('Контрагенты', 'counterparty_index', macros.is_active(current_route, ['counterparty_']), false) }}
+                            {{ macros.dropdown_item('Проекты / ЦФО', 'project_direction_index', macros.is_active(current_route, ['project_direction_']), false) }}
+                            {{ macros.dropdown_item('Теги', null, false, true) }}
                         </div>
                     </div>
                 </li>
 
                 {% set integrations_active = macros.is_active(current_route, ['ozon_', 'wildberries_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ integrations_active ? '' : 'collapsed' }}" href="#sidebar-integrations" data-bs-toggle="collapse" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-plug"></i></span>
+                <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Интеграции</span>
                     </a>
                     {% set integrations_show = integrations_active ? 'show' : (macros.collapse_state(current_route, 'ozon_') ?: macros.collapse_state(current_route, 'wildberries_')) %}
-                    <div class="collapse {{ integrations_show }}" id="sidebar-integrations">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('МойСклад', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('1С', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Банки', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ integrations_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('МойСклад', null, false, true) }}
+                            {{ macros.dropdown_item('1С', null, false, true) }}
+                            {{ macros.dropdown_item('Банки', null, false, true) }}
                             {% set marketplaces_active = macros.is_active(current_route, ['ozon_', 'wildberries_']) %}
-                            <div class="nav-item">
-                                <a class="nav-link {{ marketplaces_active ? '' : 'collapsed' }}" href="#sidebar-marketplaces" data-bs-toggle="collapse" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
-                                    <span class="nav-link-title">Маркетплейсы</span>
+                            <div class="dropend {{ marketplaces_active ? 'show' : '' }}">
+                                <a class="dropdown-item dropdown-toggle d-flex align-items-center justify-content-between {{ marketplaces_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
+                                    <span class="flex-fill">Маркетплейсы</span>
                                 </a>
                                 {% set marketplaces_show = marketplaces_active ? 'show' : (macros.collapse_state(current_route, 'ozon_') ?: macros.collapse_state(current_route, 'wildberries_')) %}
-                                <div class="collapse {{ marketplaces_show }}" id="sidebar-marketplaces">
-                                    <div class="nav nav-pills flex-column ms-3">
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Ozon / Заказы', 'ozon_orders', macros.is_active(current_route, ['ozon_order']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Ozon / Товары', 'ozon_products', macros.is_active(current_route, ['ozon_products']), null, false) }}
-                                        </div>
-                                        <div class="nav-item">
-                                            {{ macros.link_item('Wildberries / Продажи', 'wildberries_sales', macros.is_active(current_route, ['wildberries_sales']), null, false) }}
-                                        </div>
-                                    </div>
+                                <div class="dropdown-menu {{ marketplaces_show }}">
+                                    {{ macros.dropdown_item('Ozon / Заказы', 'ozon_orders', macros.is_active(current_route, ['ozon_order']), false) }}
+                                    {{ macros.dropdown_item('Ozon / Товары', 'ozon_products', macros.is_active(current_route, ['ozon_products']), false) }}
+                                    {{ macros.dropdown_item('Wildberries / Продажи', 'wildberries_sales', macros.is_active(current_route, ['wildberries_sales']), false) }}
                                 </div>
                             </div>
                         </div>
@@ -289,26 +190,17 @@
                 </li>
 
                 {% set company_active = macros.is_active(current_route, ['company_', 'settings_report_api_key_']) %}
-                <li class="nav-item">
-                    <a class="nav-link {{ company_active ? '' : 'collapsed' }}" href="#sidebar-company" data-bs-toggle="collapse" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-building"></i></span>
+                <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
+                    <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Компания и доступ</span>
                     </a>
                     {% set company_show = company_active ? 'show' : (macros.collapse_state(current_route, 'company_') ?: macros.collapse_state(current_route, 'settings_report_api_key_')) %}
-                    <div class="collapse {{ company_show }}" id="sidebar-company">
-                        <div class="nav nav-pills flex-column">
-                            <div class="nav-item">
-                                {{ macros.link_item('Профиль компании', 'company_index', macros.is_active(current_route, ['company_index', 'company_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Пользователи и роли', null, false, null, true) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Настройки отчётов (API-ключ)', 'settings_report_api_key_index', macros.is_active(current_route, ['settings_report_api_key_']), null, false) }}
-                            </div>
-                            <div class="nav-item">
-                                {{ macros.link_item('Логи и аудит', null, false, null, true) }}
-                            </div>
+                    <div class="dropdown-menu {{ company_show }}">
+                        <div class="dropdown-menu-column">
+                            {{ macros.dropdown_item('Профиль компании', 'company_index', macros.is_active(current_route, ['company_index', 'company_']), false) }}
+                            {{ macros.dropdown_item('Пользователи и роли', null, false, true) }}
+                            {{ macros.dropdown_item('Настройки отчётов (API-ключ)', 'settings_report_api_key_index', macros.is_active(current_route, ['settings_report_api_key_']), false) }}
+                            {{ macros.dropdown_item('Логи и аудит', null, false, true) }}
                         </div>
                     </div>
                 </li>
