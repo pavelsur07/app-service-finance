@@ -13,7 +13,7 @@ final class DebouncedRangeEnqueuer
 
     public function shouldEnqueueCompanyDay(string $companyId, \DateTimeImmutable $day): bool
     {
-        $key = 'auto_rules:enqueue:'.$companyId.':'.$day->format('Y-m-d');
+        $key = 'auto_rules.enqueue.'.$companyId.'.'.$day->format('Y-m-d');
 
         return $this->cache->get($key, function (ItemInterface $item) {
             $item->expiresAfter(120);
