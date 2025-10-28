@@ -1,15 +1,21 @@
-{% set subject = subject ?? 'ФинПлан — аккаунт создан' %}
+{% extends 'notifications/email/base.html.twig' %}
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-  <tr>
-    <td>
-      <h2 style="margin:0 0 12px;">Ваш аккаунт в ФинПлан создан</h2>
-      <p style="margin:0 0 8px;">Компания: <strong>{{ company_name }}</strong></p>
-      <p style="margin:0 0 8px;">ID компании: <strong>{{ company_id }}</strong></p>
-      {% if company_slug %}
-        <p style="margin:0 0 8px;">Адрес компании (slug): <strong>{{ company_slug }}</strong></p>
-      {% endif %}
-      <p style="margin:16px 0 0;">Это уведомление об открытии аккаунта на сервисе <strong>«ФинПлан»</strong>.</p>
-    </td>
-  </tr>
-</table>
+{% set subject = subject ?? 'ФинПлан — аккаунт создан' %}
+{% set preheader = preheader ?? ('Аккаунт создан для: ' ~ company_name) %}
+{% set app_name = app_name ?? 'FinPlan' %}
+
+{% block content %}
+  <h2 style="margin-top:0;">Ваш аккаунт создан</h2>
+  <p>Компания: <strong>{{ company_name }}</strong></p>
+  <p>ID компании: <strong>{{ company_id }}</strong></p>
+  {% if company_slug %}
+    <p>Адрес компании (slug): <strong>{{ company_slug }}</strong></p>
+  {% endif %}
+
+  {# Пример CTA (опционально, если есть URL) #}
+  {% if dashboard_url is defined and dashboard_url %}
+    <p style="margin-top:16px;">
+      <a class="cta" href="{{ dashboard_url }}">Открыть дашборд</a>
+    </p>
+  {% endif %}
+{% endblock %}
