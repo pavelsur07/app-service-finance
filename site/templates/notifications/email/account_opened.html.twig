@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ subject|default('ФинПлан — аккаунт создан') }}</title>
+</head>
+<body>
+<p>Здравствуйте!</p>
+<p>Компания <strong>{{ company_name }}</strong> успешно активирована в ФинПлан.</p>
+<p>Идентификатор компании: {{ company_id }}{% if company_slug %} ({{ company_slug }}){% endif %}.</p>
+<p>Спасибо, что используете наш сервис.</p>
+</body>
+</html>
