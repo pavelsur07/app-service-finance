@@ -38,11 +38,17 @@
   </div>
 </div>
 
-<div class="card mt-3">
-  <div class="card-body">
-    <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
-    <a href="{{ path('report_cashflow_index') }}" class="btn btn-outline-primary me-2">Отчёт ДДС</a>
-    <a href="{{ path('payment_calendar_index') }}" class="btn btn-outline-primary">Платёжный календарь</a>
+  <div class="card mt-3">
+    <div class="card-body">
+      <form method="post" action="{{ path('dashboard_notify') }}" style="display:inline;">
+        <input type="hidden" name="_token" value="{{ csrf_token('dashboard_notify') }}">
+        <button type="submit" class="btn btn-primary me-2">
+          Отправить уведомление
+        </button>
+      </form>
+      <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
+      <a href="{{ path('report_cashflow_index') }}" class="btn btn-outline-primary me-2">Отчёт ДДС</a>
+      <a href="{{ path('payment_calendar_index') }}" class="btn btn-outline-primary">Платёжный календарь</a>
+    </div>
   </div>
-</div>
 {% endblock %}
