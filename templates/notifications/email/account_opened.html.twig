@@ -1,0 +1,15 @@
+{% set subject = subject ?? 'ФинПлан — аккаунт создан' %}
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+  <tr>
+    <td>
+      <h2 style="margin:0 0 12px;">Ваш аккаунт в ФинПлан создан</h2>
+      <p style="margin:0 0 8px;">Компания: <strong>{{ company_name }}</strong></p>
+      <p style="margin:0 0 8px;">ID компании: <strong>{{ company_id }}</strong></p>
+      {% if company_slug %}
+        <p style="margin:0 0 8px;">Адрес компании (slug): <strong>{{ company_slug }}</strong></p>
+      {% endif %}
+      <p style="margin:16px 0 0;">Это уведомление об открытии аккаунта на сервисе <strong>«ФинПлан»</strong>.</p>
+    </td>
+  </tr>
+</table>
