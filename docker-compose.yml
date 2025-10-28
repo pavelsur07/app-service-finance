@@ -91,6 +91,17 @@ services:
         command: [ "redis-server", "--appendonly", "yes" ]
         volumes:
           - site-redis-data:/data
+    site-mailer:
+        image: mailhog/mailhog
+        networks:
+            - traefik-public
+            - default
+        labels:
+            - traefik.enable=true
+            - traefik.docker.network=traefik-public
+            - traefik.http.routers.mailer.rule=Host(`mailer.localhost`)
+            - traefik.http.routers.mailer.entryPoints=http
+            - traefik.http.services.mailer.loadBalancer.server.port=8025
 volumes:
     postgres_data:
     site-redis-data:
