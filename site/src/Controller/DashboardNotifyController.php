@@ -9,9 +9,9 @@ use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 #[IsGranted('ROLE_USER')]
 final class DashboardNotifyController extends AbstractController
@@ -35,6 +35,7 @@ final class DashboardNotifyController extends AbstractController
             $company = $this->activeCompanyService->getActiveCompany();
         } catch (NotFoundHttpException) {
             $this->addFlash('danger', 'Не выбрана активная компания.');
+
             return $this->redirectToRoute('app_home_index');
         }
 
@@ -44,6 +45,7 @@ final class DashboardNotifyController extends AbstractController
 
         if (!$toEmail) {
             $this->addFlash('danger', 'Не удалось определить email получателя.');
+
             return $this->redirectToRoute('app_home_index');
         }
 

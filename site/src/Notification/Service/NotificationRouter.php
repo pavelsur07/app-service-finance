@@ -17,8 +17,7 @@ final class NotificationRouter
     public function __construct(
         #[TaggedIterator('app.notification.sender')]
         iterable $senders,
-    )
-    {
+    ) {
         $map = [];
         foreach ($senders as $sender) {
             $map[$sender->supports()] = $sender;
@@ -36,6 +35,7 @@ final class NotificationRouter
         if (!$sender) {
             return false;
         }
+
         return $sender->send($message, $ctx);
     }
 }
