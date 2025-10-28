@@ -1,0 +1,10 @@
+{% extends 'notifications/email/base.html.twig' %}
+
+{% block content %}
+  <h2 style="margin-top:0;">{{ subject|default('Уведомление') }}</h2>
+  {% if message is defined %}
+    <p>{{ message|nl2br }}</p>
+  {% else %}
+    <p>Это уведомление от {{ app_name|default('FinPlan') }}.</p>
+  {% endif %}
+{% endblock %}
