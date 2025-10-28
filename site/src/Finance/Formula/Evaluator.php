@@ -26,7 +26,7 @@ final class Evaluator
             $v = $this->eval($node->expr, $env);
 
             return match ($node->op) {
-                '-' => -$v, default => throw new \RuntimeException('Bad unary')
+                '-' => -$v, default => throw new \RuntimeException('Bad unary'),
             };
         }
         if ($node instanceof BinaryNode) {
