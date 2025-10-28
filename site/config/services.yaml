@@ -62,3 +62,14 @@ services:
         autoconfigure: true
 
     App\Finance\Facts\FactsProviderInterface: '@App\Finance\Facts\PLDailyTotalFactsProvider'
+
+    App\Notification\Channel\:
+        resource: '../src/Notification/Channel/'
+        tags: ['app.notification.sender']
+
+    App\Notification\Contract\TemplateRendererInterface: '@App\Notification\Template\TwigTemplateRenderer'
+
+    App\Notification\Channel\EmailSender:
+        arguments:
+            $defaultFrom: '%env(string:APP_MAIL_FROM)%'
+            $defaultReplyTo: '%env(string:APP_MAIL_REPLY_TO)%'
