@@ -6,13 +6,13 @@ use App\Notification\Contract\NotificationSenderInterface;
 use App\Notification\Contract\TemplateRendererInterface;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\DTO\NotificationContext;
-use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Mailer\Transport\TransportInterface;
 use Symfony\Component\Mime\Email;
 
 final class EmailSender implements NotificationSenderInterface
 {
     public function __construct(
-        private MailerInterface $mailer,
+        private TransportInterface $transport,
         private TemplateRendererInterface $renderer,
         private string $defaultFrom,     // из параметров/ENV
         private ?string $defaultReplyTo = null,
@@ -59,8 +59,8 @@ final class EmailSender implements NotificationSenderInterface
             $email->getHeaders()->addTextHeader('X-Idempotency-Key', $ctx->idempotencyKey);
         }
 
-        // Отправка синхронно. Позже можно спрятать за Messenger без изменения контракта.
-        $this->mailer->send($email);
+        // Отправляем через транспорт напрямую, чтобы обойти Messenger и доставить письмо синхронно.
+        $this->transport->send($email);
 
         return true;
     }
