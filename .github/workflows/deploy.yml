@@ -52,6 +52,7 @@ jobs:
                     APP_SECRET="${{ secrets.APP_SECRET }}" \
                     DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                     POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+                    SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}" \
                     docker compose -f docker-compose.prod.yml up -d --build
                   
                     echo "✅ Деплой завершён"
