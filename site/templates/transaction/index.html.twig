@@ -53,7 +53,7 @@
             <tr>
                 <th>Дата</th>
                 <th>Счет</th>
-                <th class="text-end">Сумма</th>
+                <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
                 <th>Статья / Проект</th>
                 <th>Контрагент</th>
                 <th>Описание</th>
@@ -65,7 +65,7 @@
                 <tr>
                     <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                     <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
-                    <td class="text-end"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
+                    <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
                         {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
                         {% if tx.projectDirection %}
@@ -73,7 +73,10 @@
                         {% endif %}
                     </td>
                     <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
-                    <td>{{ tx.description }}</td>
+                    <td>
+                        {% set description = tx.description|default('') %}
+                        {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
+                    </td>
                     <td class="text-nowrap">
                         <a href="{{ path('cash_transaction_edit', {id: tx.id}) }}" class="btn btn-sm btn-icon btn-warning" title="Редактировать" aria-label="Редактировать">
                             <i class="ti ti-pencil"></i>
