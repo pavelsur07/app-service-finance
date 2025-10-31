@@ -1,0 +1,48 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Пользователи{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">{{ title }}</h2>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      {% if users is not empty %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th scope="col">Email</th>
+                <th scope="col">Идентификатор</th>
+                <th scope="col">Роли</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for user in users %}
+                <tr>
+                  <td>{{ user.email }}</td>
+                  <td><code>{{ user.id }}</code></td>
+                  <td>
+                    {% for role in user.roles %}
+                      <span class="badge bg-blue-lt text-uppercase">{{ role }}</span>
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endfor %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Нет зарегистрированных пользователей.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
