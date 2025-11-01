@@ -20,7 +20,7 @@
     {% set user_roles = app.user.roles|default([]) %}
 {% endif %}
 
-<aside class="navbar navbar-vertical navbar-expand-lg navbar-transparent" data-bs-theme="light">
+<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Переключить навигацию">
             <span class="navbar-toggler-icon"></span>
@@ -29,7 +29,7 @@
             <a href="{{ path('app_home_index') }}">Финансы</a>
         </h1>
         <div class="collapse navbar-collapse" id="sidebar-menu">
-            <ul class="navbar-nav pt-lg-3">
+            <ul class="navbar-nav">
                 {% set dashboard_active = macros.is_active(current_route, ['app_home_index']) %}
                 <li class="nav-item">
                     <a class="nav-link {{ dashboard_active ? 'active' : '' }}" href="{{ path('app_home_index') }}">
@@ -45,24 +45,24 @@
                     <div class="dropdown-menu {{ money_active ? 'show' : '' }}">
                         <div class="dropdown-menu-column">
                             {% set cash_transactions_active = macros.is_active(current_route, ['cash_transaction_index', 'cash_transaction_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}">
-                                <span class="flex-fill">Операций ДДС</span>
+                            <a class="dropdown-item {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}">
+                                <span>Операций ДДС</span>
                             </a>
                             {% set account_balances_active = macros.is_active(current_route, ['report_account_balances']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ account_balances_active ? 'active' : '' }}" href="{{ path('report_account_balances_index') }}">
-                                <span class="flex-fill">Остатки и счета</span>
+                            <a class="dropdown-item {{ account_balances_active ? 'active' : '' }}" href="{{ path('report_account_balances_index') }}">
+                                <span>Остатки и счета</span>
                             </a>
                             {% if is_funds_feature_enabled() %}
                                 {% set funds_active = macros.is_active(current_route, ['finance_funds_']) %}
-                                <a class="dropdown-item d-flex align-items-center justify-content-between {{ funds_active ? 'active' : '' }}" href="{{ path('finance_funds_index') }}">
-                                    <span class="flex-fill">Фонды (конверты)</span>
+                                <a class="dropdown-item {{ funds_active ? 'active' : '' }}" href="{{ path('finance_funds_index') }}">
+                                    <span>Фонды (конверты)</span>
                                 </a>
                             {% endif %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Переводы</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Переводы</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Сверка</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Сверка</span>
                             </a>
                         </div>
                     </div>
@@ -77,17 +77,17 @@
                     <div class="dropdown-menu {{ documents_show }}">
                         <div class="dropdown-menu-column">
                             {% set documents_index_active = macros.is_active(current_route, ['document_index', 'document_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ documents_index_active ? 'active' : '' }}" href="{{ path('document_index') }}">
-                                <span class="flex-fill">Реестр документов</span>
+                            <a class="dropdown-item {{ documents_index_active ? 'active' : '' }}" href="{{ path('document_index') }}">
+                                <span>Реестр документов</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Карточка документа</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Карточка документа</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Правила маппинга ОПиУ</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Правила маппинга ОПиУ</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Качество данных</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Качество данных</span>
                             </a>
                         </div>
                     </div>
@@ -101,20 +101,20 @@
                     {% set import_show = import_active ? 'show' : (macros.collapse_state(current_route, 'import_') ?: macros.collapse_state(current_route, 'cash_transaction_auto_rule_')) %}
                     <div class="dropdown-menu {{ import_show }}">
                         <div class="dropdown-menu-column">
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Импорт документов</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Импорт документов</span>
                             </a>
                             {% set bank_import_active = macros.is_active(current_route, ['cash_bank1c_import_upload']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ bank_import_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}">
-                                <span class="flex-fill">Импорт выписок 1C</span>
+                            <a class="dropdown-item {{ bank_import_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}">
+                                <span>Импорт выписок 1C</span>
                             </a>
                             {% set import_logs_active = macros.is_active(current_route, ['import_logs_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ import_logs_active ? 'active' : '' }}" href="{{ path('import_logs_index') }}">
-                                <span class="flex-fill">Журнал импортов</span>
+                            <a class="dropdown-item {{ import_logs_active ? 'active' : '' }}" href="{{ path('import_logs_index') }}">
+                                <span>Журнал импортов</span>
                             </a>
                             {% set auto_rules_active = macros.is_active(current_route, ['cash_transaction_auto_rule_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ auto_rules_active ? 'active' : '' }}" href="{{ path('cash_transaction_auto_rule_index') }}">
-                                <span class="flex-fill">Автоправила ДДС</span>
+                            <a class="dropdown-item {{ auto_rules_active ? 'active' : '' }}" href="{{ path('cash_transaction_auto_rule_index') }}">
+                                <span>Автоправила ДДС</span>
                             </a>
                         </div>
                     </div>
@@ -129,17 +129,17 @@
                     <div class="dropdown-menu {{ planning_show }}">
                         <div class="dropdown-menu-column">
                             {% set payment_calendar_active = macros.is_active(current_route, ['payment_calendar_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ payment_calendar_active ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}">
-                                <span class="flex-fill">Платёжный календарь</span>
+                            <a class="dropdown-item {{ payment_calendar_active ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}">
+                                <span>Платёжный календарь</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Планы платежей</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Планы платежей</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Кредиты и графики</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Кредиты и графики</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Депозиты</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Депозиты</span>
                             </a>
                         </div>
                     </div>
@@ -156,49 +156,49 @@
                     <div class="dropdown-menu {{ reports_show }}">
                         <div class="dropdown-menu-column">
                             {% set report_cashflow_active = macros.is_active(current_route, ['report_cashflow_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_cashflow_active ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}">
-                                <span class="flex-fill">ДДС (Cash Flow)</span>
+                            <a class="dropdown-item {{ report_cashflow_active ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}">
+                                <span>ДДС (Cash Flow)</span>
                             </a>
                             {% set report_pnl_active = macros.is_active(current_route, ['finance_report_preview']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_pnl_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}">
-                                <span class="flex-fill">ОПиУ (PnL)</span>
+                            <a class="dropdown-item {{ report_pnl_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}">
+                                <span>ОПиУ (PnL)</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Упрощённый баланс</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Упрощённый баланс</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Экспорт</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Экспорт</span>
                             </a>
                             {% set reports_debug_active = macros.is_active(current_route, ['report_transactions_statement_', 'report_transactions_debug_', 'report_debug_', 'finance_report_raw', 'finance_report_pl_raw']) %}
                             <div class="dropend {{ reports_debug_active ? 'show' : '' }}">
-                                <a class="dropdown-item dropdown-toggle d-flex align-items-center justify-content-between {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
-                                    <span class="flex-fill">Отладка</span>
+                                <a class="dropdown-item dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
+                                    <span>Отладка</span>
                                 </a>
                                 {% set reports_debug_show = reports_debug_active ? 'show' : (macros.collapse_state(current_route, 'report_transactions_statement_') ?: macros.collapse_state(current_route, 'report_debug_') ?: macros.collapse_state(current_route, 'finance_report_raw') ?: macros.collapse_state(current_route, 'finance_report_pl_raw')) %}
                                 <div class="dropdown-menu {{ reports_debug_show }}">
                                     {% set report_statement_active = macros.is_active(current_route, ['report_transactions_statement_']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
-                                        <span class="flex-fill">Выписка/Стейтмент</span>
+                                    <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
+                                        <span>Выписка/Стейтмент</span>
                                     </a>
                                     {% set report_debug_active = macros.is_active(current_route, ['report_transactions_debug_']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
-                                        <span class="flex-fill">Отчёт отладка</span>
+                                    <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
+                                        <span>Отчёт отладка</span>
                                     </a>
                                     {% set report_raw_transactions_active = macros.is_active(current_route, ['report_debug_transactions_raw']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
-                                        <span class="flex-fill">Отчёт «Сырые транзакции»</span>
+                                    <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
+                                        <span>Отчёт «Сырые транзакции»</span>
                                     </a>
                                     {% set report_daily_facts_active = macros.is_active(current_route, ['report_debug_daily_facts']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
-                                        <span class="flex-fill">Отчёт «Фактические дневные остатки»</span>
+                                    <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
+                                        <span>Отчёт «Фактические дневные остатки»</span>
                                     </a>
                                     {% set finance_report_raw_active = macros.is_active(current_route, ['finance_report_raw']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
-                                        <span class="flex-fill">Сырые транзакции ОПиУ</span>
+                                    <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
+                                        <span>Сырые транзакции ОПиУ</span>
                                     </a>
                                     {% set finance_report_pl_raw_active = macros.is_active(current_route, ['finance_report_pl_raw']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
-                                        <span class="flex-fill">Сырые данные ОПиУ</span>
+                                    <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
+                                        <span>Сырые данные ОПиУ</span>
                                     </a>
                                 </div>
                             </div>
@@ -215,27 +215,27 @@
                     <div class="dropdown-menu {{ directories_show }}">
                         <div class="dropdown-menu-column">
                             {% set cashflow_category_active = macros.is_active(current_route, ['cashflow_category_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}">
-                                <span class="flex-fill">Категории ДДС</span>
+                            <a class="dropdown-item {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}">
+                                <span>Категории ДДС</span>
                             </a>
                             {% set pl_category_active = macros.is_active(current_route, ['pl_category_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}">
-                                <span class="flex-fill">Категории ОПиУ</span>
+                            <a class="dropdown-item {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}">
+                                <span>Категории ОПиУ</span>
                             </a>
                             {% set money_account_active = macros.is_active(current_route, ['money_account_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ money_account_active ? 'active' : '' }}" href="{{ path('money_account_index') }}">
-                                <span class="flex-fill">Счета / Кассы / Кошельки</span>
+                            <a class="dropdown-item {{ money_account_active ? 'active' : '' }}" href="{{ path('money_account_index') }}">
+                                <span>Счета / Кассы / Кошельки</span>
                             </a>
                             {% set counterparty_active = macros.is_active(current_route, ['counterparty_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ counterparty_active ? 'active' : '' }}" href="{{ path('counterparty_index') }}">
-                                <span class="flex-fill">Контрагенты</span>
+                            <a class="dropdown-item {{ counterparty_active ? 'active' : '' }}" href="{{ path('counterparty_index') }}">
+                                <span>Контрагенты</span>
                             </a>
                             {% set project_direction_active = macros.is_active(current_route, ['project_direction_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ project_direction_active ? 'active' : '' }}" href="{{ path('project_direction_index') }}">
-                                <span class="flex-fill">Проекты / ЦФО</span>
+                            <a class="dropdown-item {{ project_direction_active ? 'active' : '' }}" href="{{ path('project_direction_index') }}">
+                                <span>Проекты / ЦФО</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Теги</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Теги</span>
                             </a>
                         </div>
                     </div>
@@ -249,33 +249,33 @@
                     {% set integrations_show = integrations_active ? 'show' : (macros.collapse_state(current_route, 'ozon_') ?: macros.collapse_state(current_route, 'wildberries_')) %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">МойСклад</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>МойСклад</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">1С</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>1С</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Банки</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Банки</span>
                             </a>
                             {% set marketplaces_active = macros.is_active(current_route, ['ozon_', 'wildberries_']) %}
                             <div class="dropend {{ marketplaces_active ? 'show' : '' }}">
-                                <a class="dropdown-item dropdown-toggle d-flex align-items-center justify-content-between {{ marketplaces_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
-                                    <span class="flex-fill">Маркетплейсы</span>
+                                <a class="dropdown-item dropdown-toggle {{ marketplaces_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
+                                    <span>Маркетплейсы</span>
                                 </a>
                                 {% set marketplaces_show = marketplaces_active ? 'show' : (macros.collapse_state(current_route, 'ozon_') ?: macros.collapse_state(current_route, 'wildberries_')) %}
                                 <div class="dropdown-menu {{ marketplaces_show }}">
                                     {% set ozon_orders_active = macros.is_active(current_route, ['ozon_order']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                        <span class="flex-fill">Ozon / Заказы</span>
+                                    <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                                        <span>Ozon / Заказы</span>
                                     </a>
                                     {% set ozon_products_active = macros.is_active(current_route, ['ozon_products']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                                        <span class="flex-fill">Ozon / Товары</span>
+                                    <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                                        <span>Ozon / Товары</span>
                                     </a>
                                     {% set wildberries_sales_active = macros.is_active(current_route, ['wildberries_sales']) %}
-                                    <a class="dropdown-item d-flex align-items-center justify-content-between {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                        <span class="flex-fill">Wildberries / Продажи</span>
+                                    <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
+                                        <span>Wildberries / Продажи</span>
                                     </a>
                                 </div>
                             </div>
@@ -292,18 +292,18 @@
                     <div class="dropdown-menu {{ company_show }}">
                         <div class="dropdown-menu-column">
                             {% set company_profile_active = macros.is_active(current_route, ['company_index', 'company_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
-                                <span class="flex-fill">Профиль компании</span>
+                            <a class="dropdown-item {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
+                                <span>Профиль компании</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Пользователи и роли</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Пользователи и роли</span>
                             </a>
                             {% set report_api_key_active = macros.is_active(current_route, ['settings_report_api_key_']) %}
-                            <a class="dropdown-item d-flex align-items-center justify-content-between {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
-                                <span class="flex-fill">Настройки отчётов (API-ключ)</span>
+                            <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
+                                <span>Настройки отчётов (API-ключ)</span>
                             </a>
-                            <a class="dropdown-item d-flex align-items-center justify-content-between disabled opacity-75" href="#" tabindex="-1" aria-disabled="true">
-                                <span class="flex-fill">Логи и аудит</span>
+                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
+                                <span>Логи и аудит</span>
                             </a>
                         </div>
                     </div>
