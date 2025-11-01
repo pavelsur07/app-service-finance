@@ -126,10 +126,10 @@
 <script>
     (function() {
         const initPasswordMeter = function () {
-            const toggle = document.getElementById('togglePass');
-            const pwd    = document.getElementById('password');
-            const meter  = document.getElementById('meterFill');
             const form   = document.getElementById('signupForm');
+            const toggle = form ? form.querySelector('#togglePass') : document.getElementById('togglePass');
+            const pwd    = form ? form.querySelector('input[type="password"]') : document.getElementById('password');
+            const meter  = form ? form.querySelector('.password-meter > div') : document.getElementById('meterFill');
 
             if (toggle && !toggle.dataset.boundToggle && pwd) {
                 toggle.addEventListener('click', function(){
