@@ -2,6 +2,7 @@
 
 namespace App\Admin\Controller;
 
+use App\Admin\Service\UserDeletionService;
 use App\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -77,6 +78,48 @@ final class UserController extends AbstractController
             'user' => $user,
             'roleLabels' => self::ROLE_LABELS,
             'selectedRole' => $selectedRole,
+        ]);
+    }
+
+    #[Route('/{id}/delete', name: 'delete', methods: ['GET', 'POST'])]
+    public function delete(
+        User $user,
+        Request $request,
+        UserDeletionService $userDeletionService
+    ): Response {
+        $currentUser = $this->getUser();
+        if ($currentUser instanceof User && $currentUser->getId() === $user->getId()) {
+            throw $this->createAccessDeniedException('Вы не можете удалить собственную учётную запись.');
+        }
+
+        $enteredEmail = '';
+        $userEmail = (string) $user->getEmail();
+
+        if ($request->isMethod('POST')) {
+            $csrfToken = (string) $request->request->get('_token', '');
+            if (!$this->isCsrfTokenValid('admin_user_delete_' . $user->getId(), $csrfToken)) {
+                throw $this->createAccessDeniedException('Недействительный CSRF токен.');
+            }
+
+            $enteredEmail = trim((string) $request->request->get('email', ''));
+
+            if ($enteredEmail === '') {
+                $this->addFlash('error', 'Введите email пользователя для подтверждения удаления.');
+            } elseif (mb_strtolower($enteredEmail) !== mb_strtolower($userEmail)) {
+                $this->addFlash('error', 'Введённый email не совпадает с email пользователя. Удаление отменено.');
+            } else {
+                $userDeletionService->deleteUser($user);
+
+                $this->addFlash('success', sprintf('Пользователь %s и связанные с ним данные удалены.', $userEmail));
+
+                return $this->redirectToRoute('admin_user_index');
+            }
+        }
+
+        return $this->render('admin/users/delete.html.twig', [
+            'user' => $user,
+            'enteredEmail' => $enteredEmail,
+            'userEmail' => $userEmail,
         ]);
     }
 }
