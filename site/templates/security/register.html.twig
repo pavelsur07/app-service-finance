@@ -92,9 +92,9 @@
                                 {{ form_widget(registrationForm.agreeTerms, {
                                     attr: { class: 'form-check-input', id: registrationForm.agreeTerms.vars.id }
                                 }) }}
-                                <label class="form-check-label" for="{{ registrationForm.agreeTerms.vars.id }}">
+                                {#<label class="form-check-label" for="{{ registrationForm.agreeTerms.vars.id }}">
                                     Я принимаю Пользовательское соглашение и Политику конфиденциальности
-                                </label>
+                                </label>#}
                                 <div class="invalid-feedback">Нужно подтвердить согласие</div>
                             </div>
                             {{ form_errors(registrationForm.agreeTerms) }}
