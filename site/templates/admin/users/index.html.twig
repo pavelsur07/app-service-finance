@@ -39,12 +39,22 @@
                     {% endfor %}
                   </td>
                   <td class="text-end">
-                    <a
-                      href="{{ path('admin_user_update_roles', { id: user.id }) }}"
-                      class="btn btn-primary btn-sm"
-                    >
-                      Изменить роль
-                    </a>
+                    <div class="btn-list justify-content-end">
+                      <a
+                        href="{{ path('admin_user_update_roles', { id: user.id }) }}"
+                        class="btn btn-primary btn-sm"
+                      >
+                        Изменить роль
+                      </a>
+                      <a
+                        href="{{ path('admin_user_delete', { id: user.id }) }}"
+                        class="btn btn-sm btn-icon btn-outline-danger"
+                        title="Удалить пользователя"
+                        aria-label="Удалить пользователя"
+                      >
+                        <i class="ti ti-trash"></i>
+                      </a>
+                    </div>
                   </td>
                 </tr>
               {% endfor %}
