@@ -41,13 +41,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column]
     private ?string $password = null;
 
+    #[ORM\Column(type: 'datetime_immutable')]
+    private ?\DateTimeImmutable $createdAt = null;
+
     #[ORM\OneToMany(targetEntity: Company::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $companies;
 
-    public function __construct(string $id)
+    public function __construct(string $id, ?\DateTimeImmutable $createdAt = null)
     {
         Assert::uuid($id);
         $this->id = $id;
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
         $this->companies = new ArrayCollection();
     }
 
@@ -150,6 +154,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function getCompanies(): Collection
     {
         return $this->companies;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        Assert::notNull($this->createdAt);
+
+        return $this->createdAt;
     }
 
     #[\Deprecated]
