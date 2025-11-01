@@ -67,8 +67,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function setEmail(string $email): static
     {
+        Assert::email($email);
         $this->email = $email;
-
         return $this;
     }
 
