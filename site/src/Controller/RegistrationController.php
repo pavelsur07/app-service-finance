@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Entity\Company;
 use App\Entity\User;
 use App\Form\RegistrationFormType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,6 +38,12 @@ class RegistrationController extends AbstractController
             $user->setRoles(['ROLE_COMPANY_OWNER']);
 
             $entityManager->persist($user);
+
+            $company = new Company(Uuid::uuid4()->toString(), $user);
+            $company->setName('Новая компания');
+            $user->addCompany($company);
+            $entityManager->persist($company);
+
             $entityManager->flush();
 
             // Мгновенный логин
