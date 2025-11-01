@@ -21,6 +21,7 @@
                 <th scope="col">Email</th>
                 <th scope="col">Идентификатор</th>
                 <th scope="col">Роли</th>
+                <th scope="col" class="text-end">Действия</th>
               </tr>
             </thead>
             <tbody>
@@ -34,6 +35,14 @@
                     {% else %}
                       <span class="text-muted">—</span>
                     {% endfor %}
+                  </td>
+                  <td class="text-end">
+                    <a
+                      href="{{ path('admin_user_update_roles', { id: user.id }) }}"
+                      class="btn btn-primary btn-sm"
+                    >
+                      Изменить роль
+                    </a>
                   </td>
                 </tr>
               {% endfor %}
