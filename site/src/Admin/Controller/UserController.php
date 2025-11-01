@@ -81,6 +81,7 @@ final class UserController extends AbstractController
         ]);
     }
 
+    /*
     #[Route('/{id}/delete', name: 'delete', methods: ['GET', 'POST'])]
     public function delete(
         User $user,
@@ -122,4 +123,5 @@ final class UserController extends AbstractController
             'userEmail' => $userEmail,
         ]);
     }
+    */
 }
