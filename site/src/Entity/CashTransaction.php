@@ -11,6 +11,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'cash_transaction')]
 #[ORM\Index(name: 'idx_company_account_occurred', columns: ['company_id', 'money_account_id', 'occurred_at'])]
 #[ORM\Index(name: 'idx_company_occurred', columns: ['company_id', 'occurred_at'])]
+#[ORM\UniqueConstraint(name: 'uniq_cashflow_import', columns: ['company_id', 'import_source', 'import_external_id'])]
 class CashTransaction
 {
     #[ORM\Id]
@@ -61,6 +62,12 @@ class CashTransaction
 
     #[ORM\Column(length: 128, nullable: true, unique: true)]
     private ?string $externalId = null;
+
+    #[ORM\Column(length: 32, nullable: true)]
+    private ?string $importSource = null;
+
+    #[ORM\Column(length: 128, nullable: true)]
+    private ?string $importExternalId = null;
 
     #[ORM\Column(name: 'dedupe_hash', length: 64, nullable: true)]
     private ?string $dedupeHash = null;
@@ -271,6 +278,30 @@ class CashTransaction
     public function setExternalId(?string $e): self
     {
         $this->externalId = $e;
+
+        return $this;
+    }
+
+    public function getImportSource(): ?string
+    {
+        return $this->importSource;
+    }
+
+    public function setImportSource(?string $importSource): self
+    {
+        $this->importSource = $importSource;
+
+        return $this;
+    }
+
+    public function getImportExternalId(): ?string
+    {
+        return $this->importExternalId;
+    }
+
+    public function setImportExternalId(?string $importExternalId): self
+    {
+        $this->importExternalId = $importExternalId;
 
         return $this;
     }
