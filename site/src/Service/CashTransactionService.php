@@ -43,6 +43,44 @@ class CashTransactionService
         // --- Безопасность: запрет операций в закрытом периоде компании
         $this->assertNotLockedForCompany($company, $dto->occurredAt);
 
+        $existingTransaction = null;
+        if (null !== $dto->importSource && null !== $dto->externalId) {
+            $existingTransaction = $this->txRepo->findOneByImport(
+                $dto->companyId,
+                $dto->importSource,
+                $dto->externalId,
+            );
+        }
+
+        if ($existingTransaction instanceof CashTransaction) {
+            $changed = false;
+
+            if ($dto->description !== $existingTransaction->getDescription()) {
+                $existingTransaction->setDescription($dto->description);
+                $changed = true;
+            }
+
+            $existingCounterparty = $existingTransaction->getCounterparty();
+            $existingCounterpartyId = $existingCounterparty?->getId();
+
+            if (null !== $dto->counterpartyId) {
+                if ($existingCounterpartyId !== $dto->counterpartyId) {
+                    $counterparty = $this->em->getReference(Counterparty::class, $dto->counterpartyId);
+                    $existingTransaction->setCounterparty($counterparty);
+                    $changed = true;
+                }
+            } elseif (null !== $existingCounterparty) {
+                $existingTransaction->setCounterparty(null);
+                $changed = true;
+            }
+
+            if ($changed) {
+                $this->em->flush();
+            }
+
+            return $existingTransaction;
+        }
+
         /** @var MoneyAccount $account */
         $account = $this->em->getReference(MoneyAccount::class, $dto->moneyAccountId);
 
@@ -79,9 +117,8 @@ class CashTransactionService
             ->setCashflowCategory($category)
             ->setProjectDirection($projectDirection);
 
-        if ($dto->externalId) {
-            $tx->setExternalId($dto->externalId);
-        }
+        $tx->setImportSource($dto->importSource);
+        $tx->setExternalId($dto->externalId);
 
         // Сохраняем
         $this->em->persist($tx);

@@ -53,4 +53,20 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function findOneByImport(string $companyId, string $source, string $externalId): ?CashTransaction
+    {
+        return $this->createQueryBuilder('t')
+            ->andWhere('IDENTITY(t.company) = :companyId')
+            ->andWhere('t.importSource = :source')
+            ->andWhere('t.externalId = :externalId')
+            ->setMaxResults(1)
+            ->setParameters([
+                'companyId' => $companyId,
+                'source' => $source,
+                'externalId' => $externalId,
+            ])
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }
