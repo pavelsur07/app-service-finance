@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
-{% block title %}Категории P&L{% endblock %}
+{% block title %}Категории ОПиУ (PnL){% endblock %}
 
-{% block breadcrumbs %}
+{#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
             {'label': 'Главная', 'path': 'app_home_index'},
@@ -10,7 +10,7 @@
             {'label': 'Категории P&L'}
         ]
     } %}
-{% endblock %}
+{% endblock %}#}
 
 {% macro render_items(items) %}
     <ul class="pl-category-list list-unstyled mb-0">
@@ -116,7 +116,7 @@
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Категории P&amp;L</h2>
+                    <h2 class="page-title">Категории ОПиУ (PnL)</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
