@@ -33,6 +33,15 @@ class CashTransactionDTO
     public ?\DateTimeImmutable $bookedAt = null;
 
     public ?string $description = null;
+
+    /**
+     * Код источника импорта (для составного ключа идемпотентности).
+     */
+    public ?string $importSource = null;
+
+    /**
+     * Внешний идентификатор транзакции из источника (банк/файл и т.д.).
+     */
     public ?string $externalId = null;
 
     public ?string $payerInn = null;
