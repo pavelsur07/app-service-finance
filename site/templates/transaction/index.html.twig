@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
-{% block title %}Транзакции (ДДС){% endblock %}
+{% block title %}Операции ДДС{% endblock %}
 
-{% block breadcrumbs %}
+{#{% block breadcrumbs %}
     {% include 'partials/_breadcrumbs.html.twig' with {
         breadcrumbs: [
             {'label': 'Главная', 'path': 'app_home_index'},
@@ -9,11 +9,11 @@
             {'label': 'Транзакции', 'path': 'cash_transaction_index'}
         ]
     } %}
-{% endblock %}
+{% endblock %}#}
 
 {% block content %}
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-    <h2 class="page-title mb-0">Транзакции (ДДС)</h2>
+    <h2 class="page-title mb-0">Операции ДДС</h2>
     <div class="ms-auto d-print-none">
         <div class="btn-list">
             <a href="#"

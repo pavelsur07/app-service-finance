@@ -31,7 +31,7 @@ class FundController extends AbstractController
     #[Route('', name: 'finance_funds_index', methods: ['GET'])]
     public function index(MoneyFundRepository $fundRepository, FundBalanceService $fundBalanceService): Response
     {
-        $this->assertFeatureEnabled();
+        /*$this->assertFeatureEnabled();*/
         $company = $this->activeCompanyService->getActiveCompany();
 
         $funds = $fundRepository->findByCompany($company);
