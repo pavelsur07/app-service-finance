@@ -83,12 +83,15 @@
                             <span class="visually-hidden">Редактировать</span>
                         </a>
                         <a href="#"
-                           class="btn btn-sm btn-outline-secondary js-auto-rule"
+                           class="btn btn-sm btn-icon btn-outline-secondary js-auto-rule"
                            data-transaction-id="{{ tx.id }}"
                            data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
                            data-bs-toggle="modal"
-                           data-bs-target="#autoRuleModal">
-                          A+
+                           data-bs-target="#autoRuleModal"
+                           title="Автоправило"
+                           aria-label="Автоправило">
+                          <span class="fw-bold">A+</span>
+                          <span class="visually-hidden">Автоправило</span>
                         </a>
                         <button class="btn btn-sm btn-icon btn-danger"
                                 data-bs-toggle="modal"
