@@ -1,0 +1,82 @@
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Политика безопасности — Fin‑Plan</title>
+  <meta name="description" content="Меры защиты данных, токенов и сертификатов в SaaS‑сервисе Fin‑Plan.">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root{
+      --brand-primary:#0A1548;
+      --accent:#FF1F1F;
+      --text:#1C1C1C;
+      --bg:#ffffff;
+    }
+    body{color:var(--text); background:var(--bg);}
+    .brand{color:var(--brand-primary)}
+    .accent{color:var(--accent)}
+    .doc h1,.doc h2{font-weight:800; letter-spacing:-0.01em}
+    .doc .lead{color:#6c757d}
+    .doc code{background:#f8f9fa; padding:.1rem .3rem; border-radius:.25rem}
+    .footer a{color:inherit; text-decoration:none}
+    .footer a:hover{text-decoration:underline}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg bg-white border-bottom">
+  <div class="container">
+    <a class="navbar-brand fw-bold brand" href="/">Fin‑Plan</a>
+    <span class="navbar-text small text-muted">Юридические документы</span>
+  </div>
+</nav>
+<main class="doc container py-5">
+
+  <h1 class="mb-3">Политика безопасности Fin‑Plan</h1>
+  <p class="lead mb-1">Редакция от 03.11.2025</p>
+  <p>Политика описывает организационные и технические меры защиты данных, применяемые в Сервисе Fin‑Plan.</p>
+
+  <h2 class="mt-4">1. Архитектура и доступ</h2>
+  <ul>
+    <li>Транспортная защита: HTTPS/TLS 1.2+; HSTS.</li>
+    <li>Контроль доступа: роли пользователей, минимально необходимые права, аудит.</li>
+    <li>Разделение окружений (prod/stage/test), журналирование событий.</li>
+  </ul>
+
+  <h2 class="mt-4">2. Ключи, токены и сертификаты</h2>
+  <ul>
+    <li>Хранение интеграционных секретов (OAuth‑токены, API‑ключи, PFX) в зашифрованном виде (AES‑256) с раздельным хранением паролей/секретов.</li>
+    <li>Регулярная ротация, отзыв доступа по запросу клиента, удаление при деактивации интеграции.</li>
+  </ul>
+
+  <h2 class="mt-4">3. Данные клиентов</h2>
+  <ul>
+    <li>Изоляция по компаниям, контроль на уровне БД и приложений.</li>
+    <li>Шифрование резервных копий, тестовые выборки без чувствительных данных.</li>
+  </ul>
+
+  <h2 class="mt-4">4. Инциденты и уведомления</h2>
+  <ul>
+    <li>Регистрация и классификация инцидентов, анализ причин, корректирующие действия.</li>
+    <li>Оповещение пользователей в разумные сроки при значимых инцидентах.</li>
+  </ul>
+
+  <h2 class="mt-4">5. Аудит и улучшения</h2>
+  <ul>
+    <li>Периодическая проверка уязвимостей, обновление зависимостей и контейнеров.</li>
+    <li>Обучение сотрудников по безопасной разработке и работе с данными.</li>
+  </ul>
+
+  <h2 class="mt-4">6. Контакты</h2>
+  <p>E‑mail: security@finplan.app</p>
+
+</main>
+<footer class="footer border-top">
+  <div class="container py-4 small text-muted">
+    © 2025, Fin‑Plan (ИП Новикова Наталья Анатольевна). Все права защищены.
+  </div>
+</footer>
+</body>
+</html>
