@@ -25,7 +25,7 @@ final class UserDeletionService
         $this->entityManager->wrapInTransaction(function (EntityManagerInterface $entityManager) use ($user): void {
             $companyIds = $this->collectCompanyIds($user);
 
-            if ($companyIds !== []) {
+            if ([] !== $companyIds) {
                 $this->deleteCompanyRelatedData($companyIds);
 
                 /** @var list<Company> $companies */
@@ -127,7 +127,7 @@ final class UserDeletionService
     {
         $userId = $user->getId();
 
-        if ($userId === null) {
+        if (null === $userId) {
             return;
         }
 
@@ -159,4 +159,3 @@ final class UserDeletionService
         }
     }
 }
-

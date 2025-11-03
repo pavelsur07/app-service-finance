@@ -36,7 +36,7 @@ final class UserController extends AbstractController
     public function updateRoles(
         User $user,
         Request $request,
-        EntityManagerInterface $entityManager
+        EntityManagerInterface $entityManager,
     ): Response {
         $currentUser = $this->getUser();
         if ($currentUser instanceof User && $currentUser->getId() === $user->getId()) {
@@ -45,18 +45,18 @@ final class UserController extends AbstractController
 
         if ($request->isMethod('POST')) {
             $csrfToken = (string) $request->request->get('_token', '');
-            if (!$this->isCsrfTokenValid('admin_user_roles_' . $user->getId(), $csrfToken)) {
+            if (!$this->isCsrfTokenValid('admin_user_roles_'.$user->getId(), $csrfToken)) {
                 throw $this->createAccessDeniedException('Недействительный CSRF токен.');
             }
 
             $selectedRole = (string) $request->request->get('role', '');
-            if ($selectedRole !== '' && !array_key_exists($selectedRole, self::ROLE_LABELS)) {
+            if ('' !== $selectedRole && !array_key_exists($selectedRole, self::ROLE_LABELS)) {
                 $this->addFlash('error', 'Выбрана неизвестная роль.');
 
                 return $this->redirectToRoute('admin_user_update_roles', ['id' => $user->getId()]);
             }
 
-            $normalizedRoles = $selectedRole === '' ? [] : [$selectedRole];
+            $normalizedRoles = '' === $selectedRole ? [] : [$selectedRole];
 
             $user->setRoles($normalizedRoles);
             $entityManager->flush();

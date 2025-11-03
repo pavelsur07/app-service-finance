@@ -97,7 +97,7 @@ final class AccountBootstrapper
         Company $company,
         string $name,
         ?CashflowCategory $parent,
-        int $sort
+        int $sort,
     ): CashflowCategory {
         $existing = $this->cashflowCategories->findOneBy([
             'company' => $company,
@@ -149,7 +149,7 @@ final class AccountBootstrapper
         Company $company,
         string $name,
         ?PLCategory $parent,
-        int $sortOrder
+        int $sortOrder,
     ): PLCategory {
         $existing = $this->plCategories->findOneBy([
             'company' => $company,

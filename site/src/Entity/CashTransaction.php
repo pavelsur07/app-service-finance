@@ -291,7 +291,6 @@ class CashTransaction
         return $this;
     }
 
-
     public function isTransfer(): bool
     {
         return $this->isTransfer;
