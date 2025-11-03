@@ -69,26 +69,12 @@
                     </a>
                 </li>
 
-                {% set cash_bank_import_active = current_route == 'cash_bank1c_import_upload' %}
-                <li class="nav-item {{ cash_bank_import_active ? 'active' : '' }}">
-                    <a class="nav-link {{ cash_bank_import_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}" title="Импорт выписок">
-                        <span class="nav-link-icon"><i class="ti ti-upload"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Импорт выписок</span>
-                    </a>
-                </li>
-
                 <div class="nav-section-title hide-when-collapsed">Документы</div>
                 {% set documents_active = current_route == 'document_index' %}
                 <li class="nav-item {{ documents_active ? 'active' : '' }}">
                     <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
                         <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
                         <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Импорт документов">
-                        <span class="nav-link-icon"><i class="ti ti-file-import"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Импорт документов</span>
                     </a>
                 </li>
 
@@ -189,40 +175,44 @@
                                     <span class="hide-when-collapsed">Проекты</span>
                                 </a>
                             </li>
+
+                            <li class="nav-item">
+                                <a class="nav-link"  href="{{ path('cash_transaction_auto_rule_index') }}" title="Журнал импорта">
+                                    <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
+                                    <span class="hide-when-collapsed">Автоправила ДДС</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </li>
 
-
-
-                {% set import_active =
-                    current_route == 'cash_bank1c_import_upload'
-                    or current_route starts with 'import_logs_'
-                    or current_route starts with 'cash_transaction_auto_rule_'
-                %}
-                <li class="nav-item dropdown {{ import_active ? 'show' : '' }}">
-                    <a class="nav-link dropdown-toggle {{ import_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ import_active ? 'true' : 'false' }}">
-                        <span class="nav-link-title">Импорт</span>
+                <li class="nav-item">
+                    <a class="nav-link" data-bs-toggle="collapse" data-bs-target="#menu-import" href="#" role="button" aria-expanded="true" aria-controls="menu-import" title="Импорт">
+                        <span class="nav-link-icon"><i class="ti ti-download"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Импорт</span>
+                        <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
                     </a>
-                    {% set import_show = (import_active or current_route starts with 'import_' or current_route starts with 'cash_transaction_auto_rule_') ? 'show' : '' %}
-                    <div class="dropdown-menu {{ import_show }}">
-                        <div class="dropdown-menu-column">
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Импорт документов</span>
-                            </a>
-                            {% set bank_import_active = current_route == 'cash_bank1c_import_upload' %}
-                            <a class="dropdown-item {{ bank_import_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}">
-                                <span>Импорт выписок 1C</span>
-                            </a>
-                            {% set import_logs_active = current_route starts with 'import_logs_' %}
-                            <a class="dropdown-item {{ import_logs_active ? 'active' : '' }}" href="{{ path('import_logs_index') }}">
-                                <span>Журнал импортов</span>
-                            </a>
-                            {% set auto_rules_active = current_route starts with 'cash_transaction_auto_rule_' %}
-                            <a class="dropdown-item {{ auto_rules_active ? 'active' : '' }}" href="{{ path('cash_transaction_auto_rule_index') }}">
-                                <span>Автоправила ДДС</span>
-                            </a>
-                        </div>
+                    <div class="collapse show" id="menu-import" data-bs-parent="#sidebar-menu">
+                        <ul class="nav nav-pills nav-sub">
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ path('cash_bank1c_import_upload') }}" title="Импорт выписок">
+                                    <span class="nav-link-icon"><i class="ti ti-upload"></i></span>
+                                    <span class="hide-when-collapsed">Импорт выписок 1С</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="#" title="Импорт документов">
+                                    <span class="nav-link-icon"><i class="ti ti-file-import"></i></span>
+                                    <span class="hide-when-collapsed">Импорт документов</span>
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ path('import_logs_index') }}" title="Журнал импорта">
+                                    <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
+                                    <span class="hide-when-collapsed">Журнал импорта</span>
+                                </a>
+                            </li>
+                        </ul>
                     </div>
                 </li>
 
