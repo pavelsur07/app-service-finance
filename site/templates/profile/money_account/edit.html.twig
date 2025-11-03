@@ -13,6 +13,72 @@
         </div>
     </div>
     <div class="container-xl mt-3">
-        {% include 'profile/money_account/_form.html.twig' with {'form': form, 'button_label': 'Update'} %}
+        {{ form_start(form) }}
+        <div class="card">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+                    <li class="nav-item">
+                        <a href="#tab-main" class="nav-link active" data-bs-toggle="tab">Основное</a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#tab-integration" class="nav-link" data-bs-toggle="tab">Интеграция</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                {{ form_errors(form) }}
+                <div class="tab-content">
+                    <div class="tab-pane active show" id="tab-main">
+                        {{ form_widget(form) }}
+                    </div>
+                    <div class="tab-pane" id="tab-integration">
+                        <div class="mb-3">
+                            <label for="bank_provider" class="form-label">Провайдер</label>
+                            <select class="form-select" id="bank_provider" name="bank_provider">
+                                <option value="" {% if bankIntegration.provider is empty %}selected{% endif %}>Не выбрано</option>
+                                <option value="demo" {% if bankIntegration.provider == 'demo' %}selected{% endif %}>demo</option>
+                                <option value="alfa" {% if bankIntegration.provider == 'alfa' %}selected{% endif %}>alfa</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="bank_external_account_id" class="form-label">Внешний ID счёта</label>
+                            <input type="text" class="form-control" id="bank_external_account_id" name="bank_external_account_id" value="{{ bankIntegration.external_account_id }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="bank_number" class="form-label">Отображаемый номер</label>
+                            <input type="text" class="form-control" id="bank_number" name="bank_number" value="{{ bankIntegration.number }}">
+                        </div>
+                        <div class="mb-3">
+                            <label for="bank_auth" class="form-label">Auth (JSON)</label>
+                            <textarea class="form-control" id="bank_auth" name="bank_auth" rows="6" placeholder='{"token":"..."}'>{{ bankIntegration.auth }}</textarea>
+                            <small class="form-hint">Укажите данные авторизации в формате JSON.</small>
+                        </div>
+                        <div class="row">
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Текущий cursor.sinceId</label>
+                                    <input type="text" class="form-control" value="{{ bankCursor.sinceId ?? '' }}" readonly>
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <div class="mb-3">
+                                    <label class="form-label">Текущий cursor.sinceDate</label>
+                                    <input type="text" class="form-control" value="{{ bankCursor.sinceDate ?? '' }}" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex justify-content-end">
+                            <button type="submit" name="clear_bank_link" value="1" class="btn btn-outline-danger" formnovalidate>
+                                Очистить привязку
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button class="btn btn-primary">Update</button>
+            </div>
+        </div>
+        {{ form_end(form, { render_rest: false }) }}
     </div>
 {% endblock %}
