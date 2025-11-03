@@ -63,7 +63,7 @@ services:
 
     App\Finance\Facts\FactsProviderInterface: '@App\Finance\Facts\PLDailyTotalFactsProvider'
 
-    # Notification
+    # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'
         tags: ['app.notification.sender']
@@ -84,8 +84,12 @@ services:
             $senders:
                 - '@App\Notification\Channel\EmailSender'
 
-    # Banking - Провайдеры
+    # ---------- Banking  ------------ #
+    # Провайдеры
     App\Banking\Provider\DemoProvider:
+        tags: ['app.banking.provider']
+
+    App\Banking\Provider\AlfaProvider:
         tags: ['app.banking.provider']
 
     # Реестр провайдеров
