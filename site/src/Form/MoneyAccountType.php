@@ -20,11 +20,12 @@ class MoneyAccountType extends AbstractType
         $builder
             ->add('type', ChoiceType::class, [
                 'choices' => [
-                    'Bank' => MoneyAccountTypeEnum::BANK,
-                    'Cash' => MoneyAccountTypeEnum::CASH,
-                    'E-wallet' => MoneyAccountTypeEnum::EWALLET,
+                    'Банк' => MoneyAccountTypeEnum::BANK,
+                    'Касса' => MoneyAccountTypeEnum::CASH,
+                    'Кошелёк' => MoneyAccountTypeEnum::EWALLET,
+                    'Крипто-кошелёк' => MoneyAccountTypeEnum::CRYPTO_WALLET,
                 ],
-                'label' => 'Тип',
+                'label' => 'Тип счёта',
             ])
             ->add('name', TextType::class, [
                 'label' => 'Название',

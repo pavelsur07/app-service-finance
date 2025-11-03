@@ -1,0 +1,31 @@
+{% set config = {
+    'bank': {
+        'label': 'Банк',
+        'icon': 'ti-building-bank',
+        'class': 'bg-blue-lt text-blue'
+    },
+    'cash': {
+        'label': 'Касса',
+        'icon': 'ti-cash',
+        'class': 'bg-green-lt text-green'
+    },
+    'ewallet': {
+        'label': 'Кошелёк',
+        'icon': 'ti-wallet',
+        'class': 'bg-purple-lt text-purple'
+    },
+    'crypto_wallet': {
+        'label': 'Крипто-кошелёк',
+        'icon': 'ti-brand-bitcoin',
+        'class': 'bg-orange-lt text-orange'
+    }
+} %}
+{% set info = config[type|default('')] ?? {
+    'label': type|default('Неизвестно'),
+    'icon': 'ti-help',
+    'class': 'bg-secondary-lt text-secondary'
+} %}
+<span class="badge d-inline-flex align-items-center gap-1 {{ info.class }}">
+    <i class="ti {{ info.icon }}"></i>
+    <span>{{ info.label }}</span>
+</span>
