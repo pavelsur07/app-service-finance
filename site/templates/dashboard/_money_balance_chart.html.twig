@@ -1,0 +1,115 @@
+<div class="card shadow-sm p-4 mb-4 mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3 class="m-0 fw-bold text-dark">Динамика остатков денег (демо)</h3>
+
+        <div class="d-flex align-items-center gap-2">
+            <label for="periodSelect" class="form-label m-0 text-muted small">Период:</label>
+            <select id="periodSelect" class="form-select form-select-sm" style="width:140px;">
+                <option value="months" selected>По месяцам</option>
+                <option value="quarters">По кварталам</option>
+                <option value="years">По годам</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="chart-wrapper" style="position:relative; height:320px; width:100%;">
+        <canvas id="moneyBalanceChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvas = document.getElementById('moneyBalanceChart');
+        const ctx = canvas.getContext('2d');
+        const select = document.getElementById('periodSelect');
+
+        // вспомогательная функция: штриховка для "уменьшения"
+        function makeStripePattern(color = '#9B59B6') {
+            const patternCanvas = document.createElement('canvas');
+            const pctx = patternCanvas.getContext('2d');
+            patternCanvas.width = 10;
+            patternCanvas.height = 10;
+            pctx.strokeStyle = color;
+            pctx.lineWidth = 2;
+            pctx.beginPath();
+            pctx.moveTo(0, 10);
+            pctx.lineTo(10, 0);
+            pctx.stroke();
+            return pctx.createPattern(patternCanvas, 'repeat');
+        }
+
+        const pattern = makeStripePattern('#9B59B6');
+
+        // демо-данные
+        const datasets = {
+            months: {
+                labels: ['Янв', 'Фев', 'Мар', 'Апр', 'Май', 'Июн', 'Июл', 'Авг', 'Сен', 'Окт', 'Ноя', 'Дек'],
+                start: [270, 314, 420, 286, 135, 47, 315, 260, 388, 505, 286, 689],
+                inc:   [44, 80, 40, 0, 0, 0, 60, 70, 120, 180, 60, 140],
+                dec:   [0, 0, 0, 120, 80, 50, 0, 0, 0, 0, 40, 0]
+            },
+            quarters: {
+                labels: ['Q1', 'Q2', 'Q3', 'Q4'],
+                start: [270, 286, 260, 505],
+                inc:   [164, 0, 250, 380],
+                dec:   [0, 250, 0, 40]
+            },
+            years: {
+                labels: ['2023', '2024', '2025'],
+                start: [240, 420, 505],
+                inc:   [460, 580, 760],
+                dec:   [220, 260, 320]
+            }
+        };
+
+        // функция построения графика
+        function buildChart(period = 'months') {
+            const d = datasets[period];
+            if (!d) return;
+            const data = {
+                labels: d.labels,
+                datasets: [
+                    { label: 'Остаток на начало', data: d.start, backgroundColor: 'rgba(10,21,72,0.6)', borderRadius: 6, stack: 'stack' },
+                    { label: 'Увеличение', data: d.inc, backgroundColor: 'rgba(46,204,113,0.85)', borderRadius: 6, stack: 'stack' },
+                    { label: 'Уменьшение', data: d.dec, backgroundColor: pattern, borderRadius: 6, stack: 'stack' },
+                ]
+            };
+
+            if (window.moneyChart) window.moneyChart.destroy();
+
+            window.moneyChart = new Chart(ctx, {
+                type: 'bar',
+                data,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 600 },
+                    plugins: {
+                        legend: { position: 'bottom', labels: { font: { size: 13 }, color: '#0A1548' } },
+                        tooltip: {
+                            callbacks: { label: (i) => `${i.dataset.label}: ${i.formattedValue} тыс. ₽` }
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true },
+                        y: {
+                            stacked: true,
+                            beginAtZero: true,
+                            ticks: { callback: (v) => v + ' тыс. ₽' },
+                            grid: { color: 'rgba(0,0,0,0.05)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // начальный рендер
+        buildChart('months');
+
+        // обработчик селектора
+        select.addEventListener('change', (e) => {
+            buildChart(e.target.value);
+        });
+    });
+</script>

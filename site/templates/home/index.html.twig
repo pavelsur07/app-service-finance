@@ -51,4 +51,8 @@
       <a href="{{ path('payment_calendar_index') }}" class="btn btn-outline-primary">Платёжный календарь</a>
     </div>
   </div>
+
+    {# ... твои виджеты/карточки ... #}
+    {% include 'dashboard/_money_balance_chart.html.twig' %}
+    {# ... другие блоки ... #}
 {% endblock %}
