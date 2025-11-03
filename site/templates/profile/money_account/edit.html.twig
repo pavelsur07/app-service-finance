@@ -56,14 +56,14 @@
                         <div class="row">
                             <div class="col-sm-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Текущий cursor.sinceId</label>
-                                    <input type="text" class="form-control" value="{{ bankCursor.sinceId ?? '' }}" readonly>
+                                    <label class="form-label">Текущий cursor.sinceId (только для отображения)</label>
+                                    <input type="text" class="form-control" value="{{ bankCursor.sinceId ?? '' }}" disabled>
                                 </div>
                             </div>
                             <div class="col-sm-6">
                                 <div class="mb-3">
-                                    <label class="form-label">Текущий cursor.sinceDate</label>
-                                    <input type="text" class="form-control" value="{{ bankCursor.sinceDate ?? '' }}" readonly>
+                                    <label class="form-label">Текущий cursor.sinceDate (только для отображения)</label>
+                                    <input type="text" class="form-control" value="{{ bankCursor.sinceDate ?? '' }}" disabled>
                                 </div>
                             </div>
                         </div>
@@ -76,7 +76,7 @@
                 </div>
             </div>
             <div class="card-footer text-end">
-                <button class="btn btn-primary">Update</button>
+                <button class="btn btn-primary">Сохранить</button>
             </div>
         </div>
         {{ form_end(form, { render_rest: false }) }}
