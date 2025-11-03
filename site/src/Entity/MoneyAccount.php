@@ -355,9 +355,161 @@ class MoneyAccount
         return $this->meta;
     }
 
+    /*
+     * "bank": {
+            "provider": "alfa",
+            "external_account_id": "acc_123",
+            "number": "40817810XXXXXXXXXXXX",
+            "auth": { "token": "XXX" },
+            "cursor": { "sinceId": "abc", "sinceDate": "2025-11-01T00:00:00Z" }
+    *  }
+    */
     public function setMeta(?array $meta): self
     {
         $this->meta = $meta;
+
+        return $this;
+    }
+
+    /**
+     * Вернуть весь блок meta['bank'] или null.
+     */
+    public function getBankMeta(): ?array
+    {
+        $meta = $this->getMeta() ?? [];
+
+        return $meta['bank'] ?? null;
+    }
+
+    /**
+     * Установить весь блок meta['bank'] (полностью заменить).
+     */
+    public function setBankMeta(?array $bank): self
+    {
+        $meta = $this->getMeta() ?? [];
+        if (null === $bank) {
+            unset($meta['bank']);
+        } else {
+            $meta['bank'] = $bank;
+        }
+        $this->setMeta($meta);
+
+        return $this;
+    }
+
+    /**
+     * Код провайдера банка (например, 'alfa', 'sber', 'tinkoff', 'demo') или null.
+     */
+    public function getBankProviderCode(): ?string
+    {
+        $bank = $this->getBankMeta();
+
+        return $bank['provider'] ?? null;
+    }
+
+    /**
+     * Внешний ID счёта в банке (opaque ID, используется для API-вызовов провайдера).
+     */
+    public function getBankExternalAccountId(): ?string
+    {
+        $bank = $this->getBankMeta();
+
+        return $bank['external_account_id'] ?? null;
+    }
+
+    /**
+     * Читаемый номер счёта/IBAN (для отображения/сверки; не используется как ключ импорта).
+     */
+    public function getBankAccountNumber(): ?string
+    {
+        $bank = $this->getBankMeta();
+
+        return $bank['number'] ?? null;
+    }
+
+    /**
+     * Секреты/токены авторизации для провайдера (как есть, без расшифровки).
+     */
+    public function getBankAuth(): ?array
+    {
+        $bank = $this->getBankMeta();
+        $auth = $bank['auth'] ?? null;
+
+        return is_array($auth) ? $auth : null;
+    }
+
+    /**
+     * Курсор инкрементальной загрузки (массив вида ['sinceId'=>?, 'sinceDate'=>?] или null).
+     */
+    public function getBankCursor(): ?array
+    {
+        $bank = $this->getBankMeta();
+        $cursor = $bank['cursor'] ?? null;
+
+        return is_array($cursor) ? $cursor : null;
+    }
+
+    /**
+     * Установить курсор инкрементальной загрузки (массив или null).
+     * Ожидается формат:
+     *   ['sinceId' => ?string, 'sinceDate' => ?string(ISO8601)].
+     */
+    public function setBankCursor(?array $cursor): self
+    {
+        $meta = $this->getMeta() ?? [];
+        $bank = $meta['bank'] ?? [];
+
+        if (null === $cursor) {
+            unset($bank['cursor']);
+        } else {
+            // нормализуем ключи
+            $bank['cursor'] = [
+                'sinceId' => $cursor['sinceId'] ?? null,
+                'sinceDate' => $cursor['sinceDate'] ?? null,
+            ];
+        }
+
+        if (empty($bank)) {
+            unset($meta['bank']);
+        } else {
+            $meta['bank'] = $bank;
+        }
+
+        $this->setMeta($meta);
+
+        return $this;
+    }
+
+    /**
+     * Сохранить связку с банковским счётом (provider/external_account_id/number).
+     * Не трогает auth/cursor.
+     */
+    public function setBankLink(string $providerCode, string $externalAccountId, ?string $number = null): self
+    {
+        $meta = $this->getMeta() ?? [];
+        $bank = $meta['bank'] ?? [];
+
+        $bank['provider'] = $providerCode;
+        $bank['external_account_id'] = $externalAccountId;
+
+        if (null !== $number) {
+            $bank['number'] = $number;
+        }
+
+        $meta['bank'] = $bank;
+        $this->setMeta($meta);
+
+        return $this;
+    }
+
+    /**
+     * Очистить привязку к банковскому счёту (удаляет meta['bank'] целиком).
+     */
+    public function clearBankLink(): self
+    {
+        $meta = $this->getMeta() ?? [];
+        unset($meta['bank']);
+        $this->setMeta($meta);
 
         return $this;
     }
