@@ -70,7 +70,12 @@
         </div>
     </div>
 
-    {% set typeLabels = {'bank': 'Банк', 'cash': 'Касса', 'ewallet': 'Кошелёк'} %}
+    {% set typeLabels = {
+        'bank': 'Банк',
+        'cash': 'Касса',
+        'ewallet': 'Кошелёк',
+        'crypto_wallet': 'Крипто-кошелёк'
+    } %}
 
     {% for currency, groups in accountsByCurrency %}
         <div class="card mb-4">
@@ -112,6 +117,10 @@
                     <tr>
                         <td colspan="2" class="text-end">Подытог Кошелёк</td>
                         <td class="text-end">{{ totalsByCurrency[currency].totalsByType.ewallet|number_format(2, '.', ' ') }}</td>
+                    </tr>
+                    <tr>
+                        <td colspan="2" class="text-end">Подытог Крипто-кошелёк</td>
+                        <td class="text-end">{{ totalsByCurrency[currency].totalsByType.crypto_wallet|number_format(2, '.', ' ') }}</td>
                     </tr>
                     <tr>
                         <td colspan="2" class="text-end fw-bold">Итог по компании ({{ currency }})</td>

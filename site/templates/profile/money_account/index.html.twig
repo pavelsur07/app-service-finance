@@ -1,16 +1,16 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Accounts{% endblock %}
+{% block title %}Счета{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Money Accounts</h2>
+                    <h2 class="page-title">Денежные счета</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('money_account_new') }}" class="btn btn-primary">Create</a>
+                    <a href="{{ path('money_account_new') }}" class="btn btn-primary">Добавить счёт</a>
                 </div>
             </div>
         </div>
@@ -21,9 +21,9 @@
                 <table class="table table-vcenter">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Type</th>
-                            <th>Currency</th>
+                            <th>Название</th>
+                            <th>Тип</th>
+                            <th>Валюта</th>
                             <th class="w-1"></th>
                         </tr>
                     </thead>
@@ -31,17 +31,17 @@
                     {% for acc in accounts %}
                         <tr>
                             <td>{{ acc.name }}</td>
-                            <td>{{ acc.type.value }}</td>
+                            <td>{% include 'profile/money_account/_type_badge.html.twig' with { type: acc.type.value } only %}</td>
                             <td>{{ acc.currency }}</td>
                             <td class="text-end">
-                                <a href="{{ path('money_account_edit', {'id': acc.id}) }}" class="btn btn-icon" title="Edit">
+                                <a href="{{ path('money_account_edit', {'id': acc.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>
                             </td>
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="4" class="text-center">No accounts.</td>
+                            <td colspan="4" class="text-center text-secondary">Счета ещё не добавлены.</td>
                         </tr>
                     {% endfor %}
                     </tbody>

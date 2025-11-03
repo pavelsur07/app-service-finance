@@ -1,13 +1,13 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Edit Account{% endblock %}
+{% block title %}Редактирование счёта{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Edit Money Account</h2>
+                    <h2 class="page-title">Редактирование денежного счёта</h2>
                 </div>
             </div>
         </div>
@@ -80,7 +80,7 @@
                             <input type="text" class="form-control" id="bank_number" name="bank_number" value="{{ bankIntegration.number }}">
                         </div>
                         <div class="mb-3">
-                            <label for="bank_auth" class="form-label">Auth (JSON)</label>
+                            <label for="bank_auth" class="form-label">Авторизация (JSON)</label>
                             <textarea class="form-control" id="bank_auth" name="bank_auth" rows="6" placeholder='{"token":"..."}'>{{ bankIntegration.auth }}</textarea>
                             <small class="form-hint">Укажите данные авторизации в формате JSON.</small>
                         </div>

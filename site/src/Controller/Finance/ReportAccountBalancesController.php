@@ -48,6 +48,7 @@ class ReportAccountBalancesController extends AbstractController
                     MoneyAccountType::BANK->value => [],
                     MoneyAccountType::CASH->value => [],
                     MoneyAccountType::EWALLET->value => [],
+                    MoneyAccountType::CRYPTO_WALLET->value => [],
                 ];
             }
             $accountsByCurrency[$currency][$account->getType()->value][] = $account;
@@ -84,6 +85,7 @@ class ReportAccountBalancesController extends AbstractController
                 MoneyAccountType::BANK->value => '0.00',
                 MoneyAccountType::CASH->value => '0.00',
                 MoneyAccountType::EWALLET->value => '0.00',
+                MoneyAccountType::CRYPTO_WALLET->value => '0.00',
             ];
             foreach ($groups as $type => $accs) {
                 foreach ($accs as $acc) {
@@ -92,11 +94,9 @@ class ReportAccountBalancesController extends AbstractController
                     $totalsByType[$type] = bcadd($totalsByType[$type], $balance, 2);
                 }
             }
-            $totalCompany = bcadd(
-                bcadd($totalsByType[MoneyAccountType::BANK->value], $totalsByType[MoneyAccountType::CASH->value], 2),
-                $totalsByType[MoneyAccountType::EWALLET->value],
-                2
-            );
+            $bankAndCash = bcadd($totalsByType[MoneyAccountType::BANK->value], $totalsByType[MoneyAccountType::CASH->value], 2);
+            $walletsTotal = bcadd($totalsByType[MoneyAccountType::EWALLET->value], $totalsByType[MoneyAccountType::CRYPTO_WALLET->value], 2);
+            $totalCompany = bcadd($bankAndCash, $walletsTotal, 2);
             $totalsByCurrency[$currency] = [
                 'totalsByType' => $totalsByType,
                 'totalCompany' => $totalCompany,
