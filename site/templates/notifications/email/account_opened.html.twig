@@ -12,6 +12,7 @@
     <p>Адрес компании (slug): <strong>{{ company_slug }}</strong></p>
   {% endif %}
 
+  {# Пример CTA (опционально, если есть URL) #}
   {% if dashboard_url is defined and dashboard_url %}
     <p style="margin-top:16px;">
       <a class="cta" href="{{ dashboard_url }}">Открыть дашборд</a>
