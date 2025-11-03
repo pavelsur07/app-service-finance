@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Banking\Service;
 
 use App\Banking\Dto\Cursor;
@@ -43,80 +45,80 @@ final class BankImportService
 
         $provider = $this->registry->get($providerCode);
 
-        // Старт лога импорта — требуется сущность Company, а не строка ID
+        // TODO перенести в репозиторий
+        /** @var Company $company */
         $company = $this->em->getReference(Company::class, $companyId);
         $log = $this->importLogger->start(
             $company,
             'bank:'.$providerCode,
-            false,   // preview
-            null,    // userId (если есть — подставьте)
-            null     // fileName (для API-импорта не нужен)
+            false, // preview
+            null,  // userId
+            null   // fileName
         );
 
         try {
             // Находим банковские MoneyAccount компании
+            // TODO перенести в репозиторий
             $qb = $this->em->getRepository(MoneyAccount::class)->createQueryBuilder('a');
             $accounts = $qb
                 ->andWhere('a.company = :company')
                 ->andWhere('a.type = :type')
                 ->setParameter('company', $company)
-                ->setParameter(
-                    'type',
-                    \enum_exists(MoneyAccountType::class) ? MoneyAccountType::BANK->value : 'BANK'
-                )
+                ->setParameter('type', \enum_exists(MoneyAccountType::class) ? MoneyAccountType::BANK->value : 'BANK')
                 ->getQuery()
                 ->getResult();
 
             foreach ($accounts as $acc) {
                 \assert($acc instanceof MoneyAccount);
 
-                $meta = $acc->getMeta() ?? [];
-                $bank = $meta['bank'] ?? null;
-
-                // Берём только те счета, которые привязаны к нужному провайдеру
-                if (!$bank || ($bank['provider'] ?? null) !== $providerCode) {
+                // Только счета нужного провайдера
+                if (($acc->getBankProviderCode() ?? '') !== $providerCode) {
                     continue;
                 }
 
-                $auth = $bank['auth'] ?? [];
-                $extAcc = $bank['external_account_id'] ?? null;
-
+                $extAcc = $acc->getBankExternalAccountId();
                 if (!$extAcc) {
                     // Нет внешнего ID счёта — пропускаем этот MoneyAccount
                     $this->importLogger->incError($log);
                     continue;
                 }
 
-                $cursor = $this->restoreCursor($bank['cursor'] ?? null);
+                $auth = $acc->getBankAuth() ?? [];
+                $cursor = $this->restoreCursor($acc->getBankCursor());
 
                 try {
                     while (true) {
                         $batch = $provider->fetchTransactions($auth, $extAcc, $cursor, $since, $until);
 
                         foreach ($batch['transactions'] as $tx) {
+                            // Нормализуем валюты к 3-символьному upper
+                            $txCurrency = strtoupper(substr($tx->currency, 0, 3));
+                            $accountCurrency = strtoupper(substr($acc->getCurrency(), 0, 3));
+
                             // Валидация валюты счёта
-                            if ($tx->currency !== $acc->getCurrency()) {
+                            if ($txCurrency !== $accountCurrency) {
                                 $this->importLogger->incError($log);
                                 continue;
                             }
 
-                            // Формируем DTO под ваш CashTransactionService::add()
+                            // Подготовка DTO под CashTransactionService::add()
                             $dto = new CashTransactionDTO();
                             $dto->companyId = $companyId;
                             $dto->moneyAccountId = $acc->getId();
                             $dto->occurredAt = $tx->postedAt;
-                            $dto->currency = $tx->currency;
+                            $dto->currency = $txCurrency;
 
-                            // Направление — через enum проекта
-                            $dto->direction = 'in' === $tx->direction
+                            // Направление — enum
+                            $dto->direction = ('in' === $tx->direction)
                                 ? CashDirection::INFLOW
                                 : CashDirection::OUTFLOW;
 
-                            // В вашем DTO, как правило, сумма в основных единицах
-                            $dto->amount = $tx->amountMinor / 100;
+                            // ВАЖНО: amount — СТРОКА, положительная, 2 знака
+                            // amountMinor всегда положительный (абсолют), переводим в основные единицы
+                            $dto->amount = number_format($tx->amountMinor / 100, 2, '.', '');
                             $dto->description = $tx->description;
 
-                            // Идемпотентность: внешний ID + источник импорта
+                            // Идемпотентность: внешний ID + источник
                             $dto->externalId = $tx->externalId;
                             $dto->importSource = 'bank:'.$providerCode;
 
@@ -132,9 +134,14 @@ final class BankImportService
                             }
                         }
 
-                        // Обновляем курсор и сохраняем в meta
+                        // Обновляем курсор и сохраняем в meta через хелпер
+                        /** @var Cursor|null $cursor */
                         $cursor = $batch['nextCursor'];
-                        $this->saveCursor($acc, $cursor);
+                        $acc->setBankCursor([
+                            'sinceId' => $cursor?->sinceId,
+                            'sinceDate' => $cursor?->sinceDate?->format(\DateTimeInterface::ATOM),
+                        ]);
+
                         $this->em->flush();
 
                         if (null === $cursor) {
@@ -164,18 +171,5 @@ final class BankImportService
             $raw['sinceId'] ?? null,
             isset($raw['sinceDate']) ? new \DateTimeImmutable($raw['sinceDate']) : null
         );
-    }
-
-    private function saveCursor(MoneyAccount $acc, ?Cursor $cursor): void
-    {
-        $meta = $acc->getMeta() ?? [];
-        $meta['bank'] ??= [];
-
-        $meta['bank']['cursor'] = [
-            'sinceId' => $cursor?->sinceId,
-            'sinceDate' => $cursor?->sinceDate?->format(\DateTimeInterface::ATOM),
-        ];
-
-        $acc->setMeta($meta);
     }
 }
