@@ -29,7 +29,38 @@
                 {{ form_errors(form) }}
                 <div class="tab-content">
                     <div class="tab-pane active show" id="tab-main">
-                        {{ form_widget(form) }}
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                {{ form_row(form.name) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.type) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.currency) }}
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                {{ form_row(form.openingBalance) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.openingBalanceDate) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.isDefault) }}
+                            </div>
+                        </div>
+                        {{ form_row(form.bankName) }}
+                        {{ form_row(form.accountNumber) }}
+                        {{ form_row(form.iban) }}
+                        {{ form_row(form.bic) }}
+                        {{ form_row(form.corrAccount) }}
+                        {{ form_row(form.location) }}
+                        {{ form_row(form.responsiblePerson) }}
+                        {{ form_row(form.provider) }}
+                        {{ form_row(form.walletId) }}
+                        {{ form_rest(form) }}
                     </div>
                     <div class="tab-pane" id="tab-integration">
                         <div class="mb-3">
