@@ -2,7 +2,7 @@
 
 namespace App\Repository\Ozon;
 
-use App\Entity\Ozon\OzonOrderStatusHistory;
+use App\Marketplace\Ozon\Entity\OzonOrderStatusHistory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

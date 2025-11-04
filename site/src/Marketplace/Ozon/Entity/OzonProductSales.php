@@ -1,14 +1,15 @@
 <?php
 
-namespace App\Entity\Ozon;
+namespace App\Marketplace\Ozon\Entity;
 
 use App\Entity\Company;
-use App\Repository\Ozon\OzonProductStockRepository;
+use App\Repository\Ozon\OzonProductSalesRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: OzonProductStockRepository::class)]
-#[ORM\Table(name: '`ozon_product_stocks`')]
-class OzonProductStock
+#[ORM\Entity(repositoryClass: OzonProductSalesRepository::class)]
+#[ORM\Table(name: '`ozon_product_sales`')]
+#[ORM\UniqueConstraint(name: 'uniq_sales_period', columns: ['product_id', 'company_id', 'date_from', 'date_to'])]
+class OzonProductSales
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -26,14 +27,18 @@ class OzonProductStock
     private int $qty = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private \DateTimeImmutable $updatedAt;
+    private \DateTimeImmutable $dateFrom;
 
-    public function __construct(string $id, OzonProduct $product, Company $company)
+    #[ORM\Column(type: 'datetime_immutable')]
+    private \DateTimeImmutable $dateTo;
+
+    public function __construct(string $id, OzonProduct $product, Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo)
     {
         $this->id = $id;
         $this->product = $product;
         $this->company = $company;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->dateFrom = $dateFrom;
+        $this->dateTo = $dateTo;
     }
 
     public function getId(): ?string
@@ -71,13 +76,23 @@ class OzonProductStock
         $this->qty = $qty;
     }
 
-    public function getUpdatedAt(): \DateTimeImmutable
+    public function getDateFrom(): \DateTimeImmutable
     {
-        return $this->updatedAt;
+        return $this->dateFrom;
     }
 
-    public function setUpdatedAt(\DateTimeImmutable $updatedAt): void
+    public function setDateFrom(\DateTimeImmutable $dateFrom): void
     {
-        $this->updatedAt = $updatedAt;
+        $this->dateFrom = $dateFrom;
+    }
+
+    public function getDateTo(): \DateTimeImmutable
+    {
+        return $this->dateTo;
+    }
+
+    public function setDateTo(\DateTimeImmutable $dateTo): void
+    {
+        $this->dateTo = $dateTo;
     }
 }

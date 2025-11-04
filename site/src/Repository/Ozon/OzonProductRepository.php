@@ -3,7 +3,7 @@
 namespace App\Repository\Ozon;
 
 use App\Entity\Company;
-use App\Entity\Ozon\OzonProduct;
+use App\Marketplace\Ozon\Entity\OzonProduct;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
