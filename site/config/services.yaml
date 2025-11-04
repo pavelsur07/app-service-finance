@@ -48,7 +48,7 @@ services:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
 
     # Логгер для HTTP-клиента Ozon
-    App\Api\Ozon\OzonApiClient:
+    App\Marketplace\Ozon\Adapter\OzonApiClient:
         arguments:
             $logger: '@monolog.logger.ozon.http'
 

@@ -4,7 +4,7 @@
 
 namespace App\Command;
 
-use App\Api\Ozon\OzonApiClient;
+use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Repository\CompanyRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

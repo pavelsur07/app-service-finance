@@ -2,7 +2,7 @@
 
 namespace App\Controller\Ozon;
 
-use App\Api\Ozon\OzonApiClient;
+use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonOrder;
 use App\Marketplace\Ozon\Entity\OzonOrderItem;
 use App\Repository\Ozon\OzonOrderRepository;

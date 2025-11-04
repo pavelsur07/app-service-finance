@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Api\Wildberries;
+namespace App\Marketplace\Wildberries\Adapter;
 
 use App\Entity\Company;
 use Psr\Log\LoggerInterface;

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Api\Ozon;
+namespace App\Marketplace\Ozon\Adapter;
 
 use App\Entity\Company;
 use Psr\Log\LoggerInterface;
