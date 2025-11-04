@@ -44,3 +44,35 @@ body {
 .navbar-vertical .dropdown-menu.show {
     display: block;
 }
+
+/* Компактная таблица для платёжного календаря */
+.table-compact tbody tr > * {
+    padding-top: .35rem;
+    padding-bottom: .35rem;
+}
+
+.table-compact .badge {
+    font-size: .75rem;
+}
+
+.nowrap {
+    white-space: nowrap;
+}
+
+.text-truncate {
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 992px) {
+    .table-compact tbody tr > * {
+        padding-top: .3rem;
+        padding-bottom: .3rem;
+    }
+
+    .text-truncate {
+        max-width: 200px;
+    }
+}

@@ -1,0 +1,139 @@
+{% set totalInflow = 0 %}
+{% set totalOutflow = 0 %}
+<div class="table-responsive table-sticky-head">
+    <table class="table table-vcenter table-striped table-compact align-middle">
+        <thead>
+        <tr>
+            <th class="nowrap" style="width: 120px;">Дата</th>
+            <th>Категория ДДС</th>
+            <th class="text-truncate">Контрагент</th>
+            <th class="text-end nowrap" style="width: 140px;">Сумма</th>
+            <th class="text-truncate" style="width: 160px;">Счёт</th>
+            <th style="width: 140px;">Статус</th>
+            <th class="d-none d-lg-table-cell text-truncate">Комментарий</th>
+            <th class="w-1 text-end">Действия</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% set statusClasses = {
+            'DRAFT': 'bg-gray-lt text-body',
+            'PLANNED': 'bg-secondary text-white',
+            'APPROVED': 'bg-yellow-lt text-yellow',
+            'PAID': 'bg-lime-lt text-lime',
+            'CANCELED': 'bg-gray-lt text-body'
+        } %}
+        {% for payment in payments %}
+            {% set paymentType = payment.type.value %}
+            {% set amountValue = payment.amount ?? 0 %}
+            {% if paymentType == 'INFLOW' %}
+                {% set totalInflow = totalInflow + amountValue %}
+                {% set badgeClass = 'bg-green-lt text-green' %}
+                {% set amountClass = 'text-green' %}
+                {% set amountPrefix = '+ ' %}
+            {% elseif paymentType == 'OUTFLOW' %}
+                {% set totalOutflow = totalOutflow + amountValue %}
+                {% set badgeClass = 'bg-red-lt text-red' %}
+                {% set amountClass = 'text-red' %}
+                {% set amountPrefix = '− ' %}
+            {% else %}
+                {% set badgeClass = 'bg-gray-lt text-body' %}
+                {% set amountClass = '' %}
+                {% set amountPrefix = '' %}
+            {% endif %}
+            {% set status = payment.status.value %}
+            {% set allowApprove = status == 'PLANNED' %}
+            {% set allowPay = status in ['PLANNED', 'APPROVED'] %}
+            {% set allowCancel = status in ['PLANNED', 'APPROVED'] %}
+            {% set allowPostpone = status in ['PLANNED', 'APPROVED'] %}
+            <tr>
+                <td class="nowrap">{{ payment.plannedAt|date('d.m.Y') }}</td>
+                <td><span class="badge {{ badgeClass }}">{{ payment.cashflowCategory.name }}</span></td>
+                <td class="text-truncate">{{ payment.counterparty ? payment.counterparty.name : '—' }}</td>
+                <td class="text-end {{ amountClass }} nowrap">{{ amountPrefix }}{{ amountValue|number_format(2, '.', ' ') }}</td>
+                <td class="text-truncate">{{ payment.moneyAccount ? payment.moneyAccount.name : '—' }}</td>
+                <td>
+                    {% set statusClass = statusClasses[status] ?? 'bg-secondary text-white' %}
+                    <span class="badge {{ statusClass }}">{{ status }}</span>
+                </td>
+                <td class="d-none d-lg-table-cell text-truncate">{{ payment.comment is not empty ? payment.comment : '—' }}</td>
+                <td class="text-end">
+                    <div class="dropdown">
+                        <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke="none" d="M0 0h24v24H0z"/>
+                                <circle cx="5" cy="12" r="1"/>
+                                <circle cx="12" cy="12" r="1"/>
+                                <circle cx="19" cy="12" r="1"/>
+                            </svg>
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            {% if allowApprove %}
+                                <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': payment.id})) }}" class="m-0">
+                                    <input type="hidden" name="action" value="approve">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ payment.id) }}">
+                                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2">
+                                        <i class="ti ti-checks"></i>
+                                        <span>Одобрить</span>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if allowPay %}
+                                <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': payment.id})) }}" class="m-0">
+                                    <input type="hidden" name="action" value="pay">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ payment.id) }}">
+                                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2">
+                                        <i class="ti ti-cash"></i>
+                                        <span>Отметить как оплаченный</span>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if allowPostpone %}
+                                <form method="post" action="{{ path('payment_calendar_postpone', filterQuery|merge({'id': payment.id})) }}" class="m-0">
+                                    <input type="hidden" name="days" value="3">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_postpone_' ~ payment.id) }}">
+                                    <button type="submit" class="dropdown-item d-flex align-items-center gap-2">
+                                        <i class="ti ti-clock-pause"></i>
+                                        <span>Отложить на 3 дня</span>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if allowCancel %}
+                                <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': payment.id})) }}" class="m-0">
+                                    <input type="hidden" name="action" value="cancel">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ payment.id) }}">
+                                    <button type="submit" class="dropdown-item text-danger d-flex align-items-center gap-2">
+                                        <i class="ti ti-x"></i>
+                                        <span>Отменить</span>
+                                    </button>
+                                </form>
+                            {% endif %}
+                            {% if allowApprove or allowPay or allowPostpone or allowCancel %}
+                                <div class="dropdown-divider"></div>
+                            {% endif %}
+                            <a class="dropdown-item d-flex align-items-center gap-2" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': payment.id})) }}">
+                                <i class="ti ti-pencil"></i>
+                                <span>Редактировать</span>
+                            </a>
+                        </div>
+                    </div>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="8" class="text-center text-secondary py-4">Записей не найдено</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        {% set netTotal = totalInflow - totalOutflow %}
+        {% set netClass = netTotal > 0 ? 'text-green' : (netTotal < 0 ? 'text-red' : '') %}
+        <tr>
+            <td colspan="3" class="text-end fw-bold">Итого за период:</td>
+            <td class="text-end fw-bold {{ netClass }}">
+                {% if netTotal > 0 %}+ {% elseif netTotal < 0 %}− {% endif %}{{ netTotal|abs|number_format(2, '.', ' ') }}
+            </td>
+            <td colspan="4"></td>
+        </tr>
+        </tfoot>
+    </table>
+</div>
