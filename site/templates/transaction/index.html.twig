@@ -84,39 +84,41 @@
                         {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
                     </td>
                     <td class="text-end">
-                      <div class="dropdown position-static">
-                        <button class="btn btn-link p-0 text-muted"
-                                data-bs-toggle="dropdown"
-                                data-bs-display="static"
-                                aria-label="Действия">
-                          <i class="ti ti-dots-vertical" style="font-size:22px;"></i>
-                        </button>
+                        <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
+                            <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                    {#<path stroke="none" d="M0 0h24v24H0z"/>#}
+                                    <circle cx="5" cy="12" r="1"/>
+                                    <circle cx="12" cy="12" r="1"/>
+                                    <circle cx="19" cy="12" r="1"/>
+                                </svg>
+                            </button>
 
-                        <div class="dropdown-menu dropdown-menu-end shadow-sm">
-                          <a class="dropdown-item"
-                             href="{{ path('cash_transaction_edit', {id: tx.id}) }}">
-                            <i class="ti ti-pencil me-2"></i> Редактировать
-                          </a>
+                            <div class="dropdown-menu dropdown-menu-end shadow-sm">
+                                <a class="dropdown-item"
+                                 href="{{ path('cash_transaction_edit', {id: tx.id}) }}">
+                                <i class="ti ti-pencil me-2"></i> Редактировать
+                                </a>
 
-                          <button type="button"
-                                  class="dropdown-item js-auto-rule"
-                                  data-transaction-id="{{ tx.id }}"
-                                  data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
-                                  data-bs-toggle="modal"
-                                  data-bs-target="#autoRuleModal">
-                            <i class="ti ti-settings-automation me-2"></i> Автоправило
-                          </button>
+                                <button type="button"
+                                      class="dropdown-item js-auto-rule"
+                                      data-transaction-id="{{ tx.id }}"
+                                      data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#autoRuleModal">
+                                <i class="ti ti-settings-automation me-2"></i> Автоправило
+                                </button>
 
-                          <div class="dropdown-divider"></div>
+                                <div class="dropdown-divider"></div>
 
-                          <button type="button"
-                                  class="dropdown-item text-danger"
-                                  data-bs-toggle="modal"
-                                  data-bs-target="#delete-modal-{{ tx.id }}">
-                            <i class="ti ti-trash me-2"></i> Удалить
-                          </button>
+                                <button type="button"
+                                      class="dropdown-item text-danger"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#delete-modal-{{ tx.id }}">
+                                <i class="ti ti-trash me-2"></i> Удалить
+                                </button>
+                            </div>
                         </div>
-                      </div>
 
                       {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
                     </td>
