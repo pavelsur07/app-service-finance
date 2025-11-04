@@ -5,7 +5,7 @@ namespace App\Command;
 use App\Entity\Company;
 use App\Repository\CompanyRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;
-use App\Service\Ozon\OzonOrderSyncService;
+use App\Marketplace\Ozon\Service\OzonOrderSyncService;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

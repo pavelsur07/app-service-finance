@@ -5,7 +5,7 @@ namespace App\Command;
 use App\Entity\Company;
 use App\Repository\CompanyRepository;
 use App\Repository\Wildberries\WildberriesSaleRepository;
-use App\Service\Wildberries\WildberriesSalesImporter;
+use App\Marketplace\Wildberries\Service\WildberriesSalesImporter;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

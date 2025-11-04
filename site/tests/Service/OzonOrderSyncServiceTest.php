@@ -13,7 +13,7 @@ use App\Entity\User;
 use App\Repository\Ozon\OzonOrderRepository;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;
-use App\Service\Ozon\OzonOrderSyncService;
+use App\Marketplace\Ozon\Service\OzonOrderSyncService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;

@@ -4,9 +4,9 @@ namespace App\Controller\Ozon;
 
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Repository\Ozon\OzonProductRepository;
-use App\Service\Ozon\OzonProductSalesService;
-use App\Service\Ozon\OzonProductStockService;
-use App\Service\Ozon\OzonProductSyncService;
+use App\Marketplace\Ozon\Service\OzonProductSalesService;
+use App\Marketplace\Ozon\Service\OzonProductStockService;
+use App\Marketplace\Ozon\Service\OzonProductSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

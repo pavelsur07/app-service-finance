@@ -6,7 +6,7 @@ use App\Marketplace\Ozon\Entity\OzonSyncCursor;
 use App\Message\Ozon\SyncOzonOrders;
 use App\Repository\CompanyRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;
-use App\Service\Ozon\OzonOrderSyncService;
+use App\Marketplace\Ozon\Service\OzonOrderSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;

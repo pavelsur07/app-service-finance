@@ -7,7 +7,7 @@ use App\Marketplace\Ozon\Entity\OzonOrder;
 use App\Marketplace\Ozon\Entity\OzonOrderItem;
 use App\Repository\Ozon\OzonOrderRepository;
 use App\Repository\Ozon\OzonOrderStatusHistoryRepository;
-use App\Service\Ozon\OzonOrderSyncService;
+use App\Marketplace\Ozon\Service\OzonOrderSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
