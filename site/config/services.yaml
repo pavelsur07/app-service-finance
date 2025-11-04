@@ -53,7 +53,7 @@ services:
             $logger: '@monolog.logger.ozon.http'
 
     # Логгер для синка заказов
-    App\Service\Ozon\OzonOrderSyncService:
+    App\Marketplace\Ozon\Service\OzonOrderSyncService:
         arguments:
             $logger: '@monolog.logger.ozon.sync'
 

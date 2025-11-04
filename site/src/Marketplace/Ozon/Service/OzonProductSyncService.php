@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service\Ozon;
+namespace App\Marketplace\Ozon\Service;
 
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Entity\Company;

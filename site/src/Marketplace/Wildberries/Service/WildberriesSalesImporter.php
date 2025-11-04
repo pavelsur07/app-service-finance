@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service\Wildberries;
+namespace App\Marketplace\Wildberries\Service;
 
 use App\Marketplace\Wildberries\Adapter\WildberriesReportsApiClient;
 use App\Entity\Company;
