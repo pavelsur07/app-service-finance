@@ -341,6 +341,17 @@
     {% if showForm is defined and showForm and form is defined %}
         <script>
             function hideFallbackModal(modalElement) {
+                var activeElement = document.activeElement;
+                if (activeElement && modalElement.contains(activeElement)) {
+                    if (typeof activeElement.blur === 'function') {
+                        activeElement.blur();
+                    }
+
+                    if (document.body && typeof document.body.focus === 'function') {
+                        document.body.focus({preventScroll: true});
+                    }
+                }
+
                 modalElement.classList.remove('show');
                 modalElement.style.display = 'none';
                 modalElement.setAttribute('aria-hidden', 'true');
