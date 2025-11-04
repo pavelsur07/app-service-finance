@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Wildberries;
+namespace App\Marketplace\Wildberries\Controller;
 
 use App\Entity\Company;
 use App\Entity\User;

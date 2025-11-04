@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Ozon;
+namespace App\Marketplace\Ozon\Controller;
 
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonOrder;

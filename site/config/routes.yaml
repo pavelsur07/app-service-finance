@@ -10,5 +10,17 @@ finance_controllers:
         namespace: App\Finance\Controller
     type: attribute
 
+ozon_controllers:
+    resource:
+        path: ../src/Marketplace/Ozon/Controller/
+        namespace: App\Marketplace\Ozon\Controller
+    type: attribute
+
+wildberries_controllers:
+    resource:
+        path: ../src/Marketplace/Wildberries/Controller/
+        namespace: App\Marketplace\Wildberries\Controller
+    type: attribute
+
 admin:
     resource: routes/admin.yaml
