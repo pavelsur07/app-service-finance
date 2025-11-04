@@ -2,7 +2,7 @@
 
 namespace App\Service\Wildberries;
 
-use App\Api\Wildberries\WildberriesReportsApiClient;
+use App\Marketplace\Wildberries\Adapter\WildberriesReportsApiClient;
 use App\Entity\Company;
 use App\Entity\Wildberries\WildberriesSale;
 use App\Repository\Wildberries\WildberriesSaleRepository;
