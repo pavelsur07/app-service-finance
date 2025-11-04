@@ -357,6 +357,20 @@
                     modalElement.setAttribute('aria-modal', 'true');
                     modalElement.scrollTop = 0;
 
+                    var dismissButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
+                    var hideModal = function () {
+                        modalElement.classList.remove('show');
+                        modalElement.style.display = 'none';
+                        modalElement.setAttribute('aria-hidden', 'true');
+                        modalElement.removeAttribute('aria-modal');
+                    };
+
+                    dismissButtons.forEach(function (button) {
+                        button.addEventListener('click', function () {
+                            hideModal();
+                        });
+                    });
+
                     return;
                 }
 
