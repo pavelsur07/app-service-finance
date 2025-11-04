@@ -242,7 +242,7 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $rule = $autoRuleService->findMatchingRule($t);
 
-        return $this->render('cash_transaction/_auto_rule_modal_body.html.twig', [
+        return $this->render('cash_transaction_auto_rule/_auto_rule_modal_body.html.twig', [
             'transaction' => $t,
             'rule' => $rule,
         ]);
