@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Entity\Ozon;
+namespace App\Marketplace\Ozon\Entity;
 
 use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;

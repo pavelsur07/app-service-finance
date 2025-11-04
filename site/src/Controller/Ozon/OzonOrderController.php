@@ -3,8 +3,8 @@
 namespace App\Controller\Ozon;
 
 use App\Api\Ozon\OzonApiClient;
-use App\Entity\Ozon\OzonOrder;
-use App\Entity\Ozon\OzonOrderItem;
+use App\Marketplace\Ozon\Entity\OzonOrder;
+use App\Marketplace\Ozon\Entity\OzonOrderItem;
 use App\Repository\Ozon\OzonOrderRepository;
 use App\Repository\Ozon\OzonOrderStatusHistoryRepository;
 use App\Service\Ozon\OzonOrderSyncService;

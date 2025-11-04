@@ -4,7 +4,7 @@ namespace App\Service\Ozon;
 
 use App\Api\Ozon\OzonApiClient;
 use App\Entity\Company;
-use App\Entity\Ozon\OzonProduct;
+use App\Marketplace\Ozon\Entity\OzonProduct;
 use Doctrine\ORM\EntityManagerInterface;
 
 class OzonProductSyncService

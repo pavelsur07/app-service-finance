@@ -2,7 +2,7 @@
 
 namespace App\MessageHandler\Ozon;
 
-use App\Entity\Ozon\OzonSyncCursor;
+use App\Marketplace\Ozon\Entity\OzonSyncCursor;
 use App\Message\Ozon\SyncOzonOrders;
 use App\Repository\CompanyRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;

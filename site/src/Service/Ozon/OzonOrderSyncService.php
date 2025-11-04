@@ -4,10 +4,10 @@ namespace App\Service\Ozon;
 
 use App\Api\Ozon\OzonApiClient;
 use App\Entity\Company;
-use App\Entity\Ozon\OzonOrder;
-use App\Entity\Ozon\OzonOrderItem;
-use App\Entity\Ozon\OzonOrderStatusHistory;
-use App\Entity\Ozon\OzonSyncCursor;
+use App\Marketplace\Ozon\Entity\OzonOrder;
+use App\Marketplace\Ozon\Entity\OzonOrderItem;
+use App\Marketplace\Ozon\Entity\OzonOrderStatusHistory;
+use App\Marketplace\Ozon\Entity\OzonSyncCursor;
 use App\Repository\Ozon\OzonOrderRepository;
 use App\Repository\Ozon\OzonProductRepository;
 use App\Repository\Ozon\OzonSyncCursorRepository;
