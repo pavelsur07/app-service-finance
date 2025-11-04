@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repository\Ozon;
+namespace App\Marketplace\Ozon\Repository;
 
 use App\Entity\Company;
 use App\Marketplace\Ozon\Entity\OzonSyncCursor;
