@@ -115,9 +115,6 @@
                 </div>
             </div>
 
-            {% set totalInflow = 0 %}
-            {% set totalOutflow = 0 %}
-
             {% if plans is defined and plans|length == 0 %}
                 <div class="card my-3">
                     <div class="card-body text-center">
@@ -137,125 +134,8 @@
                         {% endif %}
                     </div>
                 </div>
-                <div class="table-responsive table-sticky-head">
-                    <table class="table table-hover card-table align-middle">
-                        <thead>
-                        <tr>
-                            <th style="width: 120px;">Дата</th>
-                            <th>Категория ДДС</th>
-                            <th>Контрагент</th>
-                            <th class="text-end" style="width: 140px;">Сумма</th>
-                            <th style="width: 160px;">Счёт</th>
-                            <th style="width: 140px;">Статус</th>
-                            <th>Комментарий</th>
-                            <th class="w-1 text-end">Действия</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% set statusClasses = {
-                            'DRAFT': 'bg-gray-lt text-body',
-                            'PLANNED': 'bg-secondary text-white',
-                            'APPROVED': 'bg-yellow-lt text-yellow',
-                            'PAID': 'bg-lime-lt text-lime',
-                            'CANCELED': 'bg-gray-lt text-body'
-                        } %}
-                        {% for plan in plans %}
-                            {% set planType = plan.type.value %}
-                            {% set amountValue = plan.amount ?? 0 %}
-                            {% if planType == 'INFLOW' %}
-                                {% set totalInflow = totalInflow + amountValue %}
-                                {% set badgeClass = 'bg-green-lt text-green' %}
-                                {% set amountClass = 'text-green' %}
-                                {% set amountPrefix = '+ ' %}
-                            {% elseif planType == 'OUTFLOW' %}
-                                {% set totalOutflow = totalOutflow + amountValue %}
-                                {% set badgeClass = 'bg-red-lt text-red' %}
-                                {% set amountClass = 'text-red' %}
-                                {% set amountPrefix = '− ' %}
-                            {% else %}
-                                {% set badgeClass = 'bg-gray-lt text-body' %}
-                                {% set amountClass = '' %}
-                                {% set amountPrefix = '' %}
-                            {% endif %}
-                            {% set status = plan.status.value %}
-                            <tr>
-                                <td>{{ plan.plannedAt|date('d.m.Y') }}</td>
-                                <td><span class="badge {{ badgeClass }}">{{ plan.cashflowCategory.name }}</span></td>
-                                <td>{{ plan.counterparty ? plan.counterparty.name : '—' }}</td>
-                                <td class="text-end {{ amountClass }}">{{ amountPrefix }}{{ amountValue|number_format(2, '.', ' ') }}</td>
-                                <td>{{ plan.moneyAccount ? plan.moneyAccount.name : '—' }}</td>
-                                <td>
-                                    {% set statusClass = statusClasses[status] ?? 'bg-secondary text-white' %}
-                                    <span class="badge {{ statusClass }}">{{ status }}</span>
-                                </td>
-                                <td>{{ plan.comment is not empty ? plan.comment : '—' }}</td>
-                                {% set allowApprove = status == 'PLANNED' %}
-                                {% set allowPay = status in ['PLANNED', 'APPROVED'] %}
-                                {% set allowCancel = status in ['PLANNED', 'APPROVED'] %}
-                                {% set allowPostpone = status in ['PLANNED', 'APPROVED'] %}
-                                <td class="text-end">
-                                    <div class="btn-list justify-content-end">
-                                        {% if allowApprove %}
-                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
-                                                <input type="hidden" name="action" value="approve">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
-                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Одобрить">
-                                                    <i class="ti ti-checks"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                        {% if allowPay %}
-                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
-                                                <input type="hidden" name="action" value="pay">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
-                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отметить как оплаченный">
-                                                    <i class="ti ti-cash"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                        {% if allowPostpone %}
-                                            <form method="post" action="{{ path('payment_calendar_postpone', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
-                                                <input type="hidden" name="days" value="3">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_postpone_' ~ plan.id) }}">
-                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отложить на 3 дня">
-                                                    <i class="ti ti-clock-pause"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                        {% if allowCancel %}
-                                            <form method="post" action="{{ path('payment_calendar_status', filterQuery|merge({'id': plan.id})) }}" class="d-inline">
-                                                <input type="hidden" name="action" value="cancel">
-                                                <input type="hidden" name="_token" value="{{ csrf_token('payment_plan_status_' ~ plan.id) }}">
-                                                <button type="submit" class="btn btn-icon" data-bs-toggle="tooltip" data-bs-placement="left" title="Отменить">
-                                                    <i class="ti ti-x"></i>
-                                                </button>
-                                            </form>
-                                        {% endif %}
-                                        <a class="btn btn-icon" href="{{ path('payment_calendar_edit', filterQuery|merge({'id': plan.id})) }}" data-bs-toggle="tooltip" data-bs-placement="left" title="Редактировать">
-                                            <i class="ti ti-pencil"></i>
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="8" class="text-center text-secondary py-4">Записей не найдено</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                        <tfoot>
-                        {% set netTotal = totalInflow - totalOutflow %}
-                        {% set netClass = netTotal > 0 ? 'text-green' : (netTotal < 0 ? 'text-red' : '') %}
-                        <tr>
-                            <td colspan="3" class="text-end fw-bold">Итого за период:</td>
-                            <td class="text-end fw-bold {{ netClass }}">
-                                {% if netTotal > 0 %}+ {% elseif netTotal < 0 %}− {% endif %}{{ netTotal|abs|number_format(2, '.', ' ') }}
-                            </td>
-                            <td colspan="4"></td>
-                        </tr>
-                        </tfoot>
-                    </table>
-                </div>
+                {% set payments = plans %}
+                {% include 'payment/calendar/_table_compact.html.twig' with { payments: payments } %}
             </div>
         </div>
     </div>
