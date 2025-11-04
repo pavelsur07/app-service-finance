@@ -2,8 +2,6 @@
 
 namespace App\Tests\Service\PaymentPlan;
 
-use App\Domain\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusValue;
-use App\Domain\PaymentPlan\PaymentPlanType as PaymentPlanTypeValue;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
@@ -24,7 +22,7 @@ final class PaymentPlanServiceTest extends TestCase
         $category = $this->createCategory($company, 'Любая категория');
         $category->setOperationType(PaymentPlanTypeEnum::INFLOW);
 
-        self::assertSame(PaymentPlanTypeValue::INFLOW, $service->resolveTypeByCategory($category));
+        self::assertSame(PaymentPlanTypeEnum::INFLOW->value, $service->resolveTypeByCategory($category));
     }
 
     public function testResolveTypeByCategoryForTransfer(): void
@@ -35,7 +33,7 @@ final class PaymentPlanServiceTest extends TestCase
         $category = $this->createCategory($company, 'Перемещение');
         $category->setOperationType(PaymentPlanTypeEnum::TRANSFER);
 
-        self::assertSame(PaymentPlanTypeValue::TRANSFER, $service->resolveTypeByCategory($category));
+        self::assertSame(PaymentPlanTypeEnum::TRANSFER->value, $service->resolveTypeByCategory($category));
     }
 
     public function testResolveTypeByCategoryDefaultsToOutflow(): void
@@ -46,7 +44,7 @@ final class PaymentPlanServiceTest extends TestCase
         $category = $this->createCategory($company, 'Расходы');
         $category->setOperationType(PaymentPlanTypeEnum::OUTFLOW);
 
-        self::assertSame(PaymentPlanTypeValue::OUTFLOW, $service->resolveTypeByCategory($category));
+        self::assertSame(PaymentPlanTypeEnum::OUTFLOW->value, $service->resolveTypeByCategory($category));
     }
 
     public function testResolveTypeByCategoryInheritsFromParent(): void
@@ -58,7 +56,7 @@ final class PaymentPlanServiceTest extends TestCase
         $root->setOperationType(PaymentPlanTypeEnum::OUTFLOW);
         $child = $this->createCategory($company, 'Дочерний', $root);
 
-        self::assertSame(PaymentPlanTypeValue::OUTFLOW, $service->resolveTypeByCategory($child));
+        self::assertSame(PaymentPlanTypeEnum::OUTFLOW->value, $service->resolveTypeByCategory($child));
     }
 
     public function testResolveTypeByCategoryFallsBackToKeywords(): void
@@ -69,7 +67,7 @@ final class PaymentPlanServiceTest extends TestCase
         $root = $this->createCategory($company, 'Доходы от продаж');
         $child = $this->createCategory($company, 'Поступления с маркетплейсов', $root);
 
-        self::assertSame(PaymentPlanTypeValue::INFLOW, $service->resolveTypeByCategory($child));
+        self::assertSame(PaymentPlanTypeEnum::INFLOW->value, $service->resolveTypeByCategory($child));
     }
 
     public function testTransitionStatusFollowsHappyPath(): void
@@ -77,13 +75,13 @@ final class PaymentPlanServiceTest extends TestCase
         $service = new PaymentPlanService();
         $plan = $this->createPlan();
 
-        $service->transitionStatus($plan, PaymentPlanStatusValue::PLANNED);
+        $service->transitionStatus($plan, PaymentPlanStatusEnum::PLANNED->value);
         self::assertSame(PaymentPlanStatusEnum::PLANNED, $plan->getStatus());
 
-        $service->transitionStatus($plan, PaymentPlanStatusValue::APPROVED);
+        $service->transitionStatus($plan, PaymentPlanStatusEnum::APPROVED->value);
         self::assertSame(PaymentPlanStatusEnum::APPROVED, $plan->getStatus());
 
-        $service->transitionStatus($plan, PaymentPlanStatusValue::PAID);
+        $service->transitionStatus($plan, PaymentPlanStatusEnum::PAID->value);
         self::assertSame(PaymentPlanStatusEnum::PAID, $plan->getStatus());
     }
 
@@ -94,7 +92,7 @@ final class PaymentPlanServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('Cannot transition payment plan status');
-        $service->transitionStatus($plan, PaymentPlanStatusValue::APPROVED);
+        $service->transitionStatus($plan, PaymentPlanStatusEnum::APPROVED->value);
     }
 
     public function testTransitionStatusRejectsAfterPaid(): void
@@ -105,7 +103,7 @@ final class PaymentPlanServiceTest extends TestCase
 
         $this->expectException(\DomainException::class);
         $this->expectExceptionMessage('terminal status');
-        $service->transitionStatus($plan, PaymentPlanStatusValue::CANCELED);
+        $service->transitionStatus($plan, PaymentPlanStatusEnum::CANCELED->value);
     }
 
     public function testApplyCompanyScopeSetsCompanyWhenMissing(): void

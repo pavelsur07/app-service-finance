@@ -2,8 +2,6 @@
 
 namespace App\Service\PaymentPlan;
 
-use App\Domain\PaymentPlan\PaymentPlanStatus;
-use App\Domain\PaymentPlan\PaymentPlanType;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
@@ -50,17 +48,17 @@ final class PaymentPlanService
 
         foreach ($names as $name) {
             if ($this->containsAny($name, self::TRANSFER_KEYWORDS)) {
-                return PaymentPlanType::TRANSFER;
+                return PaymentPlanTypeEnum::TRANSFER->value;
             }
         }
 
         foreach ($names as $name) {
             if ($this->containsAny($name, self::INFLOW_KEYWORDS)) {
-                return PaymentPlanType::INFLOW;
+                return PaymentPlanTypeEnum::INFLOW->value;
             }
         }
 
-        return PaymentPlanType::OUTFLOW;
+        return PaymentPlanTypeEnum::OUTFLOW->value;
     }
 
     /*
@@ -76,9 +74,9 @@ final class PaymentPlanService
             $operationType = $node->getOperationType();
             if (null !== $operationType) {
                 return match ($operationType) {
-                    PaymentPlanTypeEnum::INFLOW => PaymentPlanType::INFLOW,
-                    PaymentPlanTypeEnum::OUTFLOW => PaymentPlanType::OUTFLOW,
-                    PaymentPlanTypeEnum::TRANSFER => PaymentPlanType::TRANSFER,
+                    PaymentPlanTypeEnum::INFLOW => PaymentPlanTypeEnum::INFLOW->value,
+                    PaymentPlanTypeEnum::OUTFLOW => PaymentPlanTypeEnum::OUTFLOW->value,
+                    PaymentPlanTypeEnum::TRANSFER => PaymentPlanTypeEnum::TRANSFER->value,
                 };
             }
 
@@ -93,7 +91,12 @@ final class PaymentPlanService
      */
     public function transitionStatus(PaymentPlan $plan, string $to): void
     {
-        if (!\in_array($to, PaymentPlanStatus::all(), true)) {
+        $knownStatuses = array_map(
+            static fn (PaymentPlanStatusEnum $status): string => $status->value,
+            PaymentPlanStatusEnum::cases(),
+        );
+
+        if (!\in_array($to, $knownStatuses, true)) {
             throw new \DomainException(sprintf('Unknown payment plan status "%s".', $to));
         }
 
@@ -104,14 +107,21 @@ final class PaymentPlanService
             return;
         }
 
-        if (PaymentPlanStatus::isTerminal($current)) {
+        if ($currentEnum === PaymentPlanStatusEnum::PAID) {
             throw new \DomainException(sprintf('Cannot transition payment plan from terminal status "%s".', $current));
         }
 
         $allowed = [
-            PaymentPlanStatus::DRAFT => [PaymentPlanStatus::PLANNED],
-            PaymentPlanStatus::PLANNED => [PaymentPlanStatus::APPROVED, PaymentPlanStatus::PAID, PaymentPlanStatus::CANCELED],
-            PaymentPlanStatus::APPROVED => [PaymentPlanStatus::PAID, PaymentPlanStatus::CANCELED],
+            PaymentPlanStatusEnum::DRAFT->value => [PaymentPlanStatusEnum::PLANNED->value],
+            PaymentPlanStatusEnum::PLANNED->value => [
+                PaymentPlanStatusEnum::APPROVED->value,
+                PaymentPlanStatusEnum::PAID->value,
+                PaymentPlanStatusEnum::CANCELED->value,
+            ],
+            PaymentPlanStatusEnum::APPROVED->value => [
+                PaymentPlanStatusEnum::PAID->value,
+                PaymentPlanStatusEnum::CANCELED->value,
+            ],
         ];
 
         if (!\in_array($to, $allowed[$current] ?? [], true)) {

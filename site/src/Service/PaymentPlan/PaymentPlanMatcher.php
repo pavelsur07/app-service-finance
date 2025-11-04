@@ -2,7 +2,6 @@
 
 namespace App\Service\PaymentPlan;
 
-use App\Domain\PaymentPlan\PaymentPlanStatus;
 use App\Entity\CashTransaction;
 use App\Entity\PaymentPlan;
 use App\Entity\PaymentPlanMatch;
@@ -137,7 +136,7 @@ final class PaymentPlanMatcher
         );
 
         $this->em->persist($match);
-        $this->paymentPlanService->transitionStatus($bestPlan, PaymentPlanStatus::PAID);
+        $this->paymentPlanService->transitionStatus($bestPlan, PaymentPlanStatusEnum::PAID->value);
         $this->em->flush();
 
         return $bestPlan;

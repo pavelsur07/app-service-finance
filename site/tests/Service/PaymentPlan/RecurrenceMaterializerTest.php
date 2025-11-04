@@ -2,7 +2,6 @@
 
 namespace App\Tests\Service\PaymentPlan;
 
-use App\Domain\PaymentPlan\PaymentPlanType as PaymentPlanTypeValue;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
@@ -94,7 +93,7 @@ final class RecurrenceMaterializerTest extends TestCase
         $planService->expects($this->once())
             ->method('resolveTypeByCategory')
             ->with($category)
-            ->willReturn(PaymentPlanTypeValue::OUTFLOW);
+            ->willReturn(PaymentPlanTypeEnum::OUTFLOW->value);
 
         $entityManager = $this->createMock(EntityManagerInterface::class);
         $entityManager->expects($this->once())

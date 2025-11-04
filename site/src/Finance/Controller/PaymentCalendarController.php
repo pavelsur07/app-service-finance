@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Domain\PaymentPlan\PaymentPlanStatus;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
@@ -170,9 +169,9 @@ final class PaymentCalendarController extends AbstractController
         $filters = $this->extractFilters($request);
         $action = (string) $request->request->get('action');
         $statusMap = [
-            'approve' => PaymentPlanStatus::APPROVED,
-            'pay' => PaymentPlanStatus::PAID,
-            'cancel' => PaymentPlanStatus::CANCELED,
+            'approve' => PaymentPlanStatusEnum::APPROVED->value,
+            'pay' => PaymentPlanStatusEnum::PAID->value,
+            'cancel' => PaymentPlanStatusEnum::CANCELED->value,
         ];
 
         if (!\array_key_exists($action, $statusMap)) {
