@@ -346,9 +346,23 @@
                     return;
                 }
 
-                var modal = bootstrap.Modal.getInstance(modalElement);
+                var BootstrapModal = window.bootstrap && typeof window.bootstrap.Modal === 'function'
+                    ? window.bootstrap.Modal
+                    : null;
+
+                if (!BootstrapModal) {
+                    modalElement.classList.add('show');
+                    modalElement.style.display = 'block';
+                    modalElement.removeAttribute('aria-hidden');
+                    modalElement.setAttribute('aria-modal', 'true');
+                    modalElement.scrollTop = 0;
+
+                    return;
+                }
+
+                var modal = BootstrapModal.getInstance(modalElement);
                 if (!modal) {
-                    modal = new bootstrap.Modal(modalElement);
+                    modal = new BootstrapModal(modalElement);
                 }
 
                 modal.show();

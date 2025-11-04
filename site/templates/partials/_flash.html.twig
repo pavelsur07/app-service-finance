@@ -38,12 +38,31 @@
     </div>
 
     <script>
-        document.addEventListener('DOMContentLoaded', function () {
+        function showFlashToasts() {
+            var BootstrapToast = window.bootstrap && typeof window.bootstrap.Toast === 'function'
+                ? window.bootstrap.Toast
+                : null;
+
             document.querySelectorAll('.toast[data-bs-autohide]').forEach(function (toastEl) {
-                var toast = new bootstrap.Toast(toastEl);
+                if (!BootstrapToast) {
+                    toastEl.classList.add('show');
+                    toastEl.style.display = 'block';
+                    toastEl.setAttribute('aria-hidden', 'false');
+                    toastEl.setAttribute('aria-live', 'assertive');
+                    return;
+                }
+
+                var toast = BootstrapToast.getInstance(toastEl);
+                if (!toast) {
+                    toast = new BootstrapToast(toastEl);
+                }
+
                 toast.show();
             });
-        });
+        }
+
+        document.addEventListener('DOMContentLoaded', showFlashToasts);
+        document.addEventListener('turbo:load', showFlashToasts);
     </script>
 {% endif %}
 
