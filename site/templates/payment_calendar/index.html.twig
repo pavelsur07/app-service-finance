@@ -319,7 +319,7 @@
         </div>
     </div>
 
-    {% if form is defined %}
+    {% if form is defined and form.vars is defined %}
         <div class="modal modal-blur fade" id="payment-plan-modal" tabindex="-1" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
                 <div class="modal-content">
@@ -338,7 +338,7 @@
 
 {% block javascripts %}
     {{ parent() }}
-    {% if showForm is defined and showForm and form is defined %}
+    {% if showForm is defined and showForm and form is defined and form.vars is defined %}
         <script>
             function hideFallbackModal(modalElement) {
                 var activeElement = document.activeElement;
