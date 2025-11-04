@@ -1,0 +1,352 @@
+{# templates/finance/scenario/demo.html.twig #}
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Демо сценарного планирования — Fin-Plan{% endblock %}
+
+{% block body %}
+    <style>
+        :root {
+            --brand:#0A1548;
+            --accent:#FF1F1F;
+        }
+        .scenario-container {max-width: 1180px;}
+        .brand-shadow {box-shadow: 0 6px 18px rgba(10,21,72,0.08);}
+        .kpi {font-weight:600; font-size: 1.05rem;}
+        .kpi .val {font-size: 1.35rem;}
+        .muted {color:#6c7a91;}
+        .table th {white-space: nowrap;}
+        .badge-scenario {background: #eef2ff; color:#1f3ccf;}
+        .slider-row input[type=range] {width: 100%;}
+        .mini {font-size:.85rem}
+        .pill {border-radius: 999px; padding: .25rem .65rem;}
+        .progress {height: .5rem;}
+        .switcher button {border:1px solid #e5e7eb;}
+        .switcher button.active {border-color: var(--brand); color:#fff; background: var(--brand);}
+        .hr {border-top:1px dashed #e5e7eb; margin: 1rem 0;}
+    </style>
+
+    <div class="container py-4 scenario-container">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h2 class="mb-1">Сценарное планирование</h2>
+                <div class="muted">Быстрый «what-if»: как изменятся прибыль и деньги при новых допущениях</div>
+            </div>
+            <div>
+                <span class="pill mini" style="background:#f6f8fb;color:#334155;">Demo • client-side</span>
+            </div>
+        </div>
+
+        <!-- Preset switcher -->
+        <div class="switcher d-flex gap-2 mb-3">
+            <button class="btn btn-sm" data-preset="base">База</button>
+            <button class="btn btn-sm" data-preset="growth">Рост +30%</button>
+            <button class="btn btn-sm" data-preset="stress">Стресс −20%</button>
+        </div>
+
+        <!-- Assumptions -->
+        <div class="card brand-shadow mb-3">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <div class="d-flex align-items-center gap-2">
+                    <strong>Допущения (Assumptions)</strong>
+                    <span class="badge badge-scenario" id="scenario-name">Base</span>
+                </div>
+                <div class="mini muted">Изменяйте слайдеры — цифры пересчитаются мгновенно</div>
+            </div>
+            <div class="card-body">
+                <div class="row g-4 slider-row">
+                    <div class="col-md-6">
+                        <label class="form-label">Рост выручки, % к базе</label>
+                        <input type="range" min="-50" max="100" step="1" value="0" id="inp-rev-growth">
+                        <div class="d-flex justify-content-between mini">
+                            <span>−50%</span><span id="lbl-rev-growth">0%</span><span>+100%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">COGS как % от выручки</label>
+                        <input type="range" min="20" max="90" step="1" value="50" id="inp-cogs-pct">
+                        <div class="d-flex justify-content-between mini">
+                            <span>20%</span><span id="lbl-cogs-pct">50%</span><span>90%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Маркетинг, % к базе</label>
+                        <input type="range" min="-50" max="200" step="1" value="0" id="inp-mkt-growth">
+                        <div class="d-flex justify-content-between mini">
+                            <span>−50%</span><span id="lbl-mkt-growth">0%</span><span>+200%</span>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">OPEX, фикс. изменение (₽)</label>
+                        <input type="range" min="-500000" max="500000" step="10000" value="0" id="inp-opex-delta">
+                        <div class="d-flex justify-content-between mini">
+                            <span>−500k</span><span id="lbl-opex-delta">0 ₽</span><span>+500k</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="hr"></div>
+                <div class="row g-3">
+                    <div class="col-md-3">
+                        <div class="card p-3 brand-shadow">
+                            <div class="kpi">Выручка<br><span class="val" id="kpi-revenue">—</span></div>
+                            <div class="mini muted">С учётом % роста</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 brand-shadow">
+                            <div class="kpi">Валовая прибыль<br><span class="val" id="kpi-gp">—</span></div>
+                            <div class="mini muted">Выручка − COGS</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 brand-shadow">
+                            <div class="kpi">Чистая прибыль<br><span class="val" id="kpi-np">—</span></div>
+                            <div class="mini muted">После маркетинга, OPEX, % без налога</div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card p-3 brand-shadow">
+                            <div class="kpi">Runway<br><span class="val" id="kpi-runway">— мес.</span></div>
+                            <div class="mini muted">Запас денег при текущем CF</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Comparison table -->
+        <div class="card brand-shadow">
+            <div class="card-header"><strong>Сравнение: База vs Сценарий</strong></div>
+            <div class="card-body table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th>Показатель</th>
+                        <th class="text-end">База</th>
+                        <th class="text-end">Сценарий</th>
+                        <th class="text-end">Δ</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td>Выручка</td>
+                        <td class="text-end" id="t-base-rev">—</td>
+                        <td class="text-end" id="t-scn-rev">—</td>
+                        <td class="text-end" id="t-delta-rev">—</td>
+                    </tr>
+                    <tr>
+                        <td>COGS</td>
+                        <td class="text-end" id="t-base-cogs">—</td>
+                        <td class="text-end" id="t-scn-cogs">—</td>
+                        <td class="text-end" id="t-delta-cogs">—</td>
+                    </tr>
+                    <tr>
+                        <td>Маркетинг</td>
+                        <td class="text-end" id="t-base-mkt">—</td>
+                        <td class="text-end" id="t-scn-mkt">—</td>
+                        <td class="text-end" id="t-delta-mkt">—</td>
+                    </tr>
+                    <tr>
+                        <td>OPEX</td>
+                        <td class="text-end" id="t-base-opex">—</td>
+                        <td class="text-end" id="t-scn-opex">—</td>
+                        <td class="text-end" id="t-delta-opex">—</td>
+                    </tr>
+                    <tr>
+                        <td>Фин. расходы</td>
+                        <td class="text-end" id="t-base-fin">—</td>
+                        <td class="text-end" id="t-scn-fin">—</td>
+                        <td class="text-end" id="t-delta-fin">—</td>
+                    </tr>
+                    <tr class="table-active">
+                        <td><strong>Чистая прибыль</strong></td>
+                        <td class="text-end" id="t-base-np"><strong>—</strong></td>
+                        <td class="text-end" id="t-scn-np"><strong>—</strong></td>
+                        <td class="text-end" id="t-delta-np"><strong>—</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Денежный остаток (после месяца)</td>
+                        <td class="text-end" id="t-base-cash">—</td>
+                        <td class="text-end" id="t-scn-cash">—</td>
+                        <td class="text-end" id="t-delta-cash">—</td>
+                    </tr>
+                    <tr>
+                        <td>Runway (мес.)</td>
+                        <td class="text-end" id="t-base-runway">—</td>
+                        <td class="text-end" id="t-scn-runway">—</td>
+                        <td class="text-end" id="t-delta-runway">—</td>
+                    </tr>
+                    </tbody>
+                </table>
+                <div class="mini muted">*В демо налог не учитывается; CF≈NP; Runway = Cash / max(0, −CF) при отрицательном CF, иначе «∞».</div>
+            </div>
+        </div>
+    </div>
+
+    {# Базовые данные (как в примере из обсуждения) #}
+    <script id="base-data" type="application/json">
+        {
+            "currency":"₽",
+            "base":{
+                "revenue": 3000000,
+                "cogs": 1500000,
+                "marketing": 300000,
+                "opex": 700000,
+                "fin": 50000,
+                "openingCash": 1200000
+            },
+            "defaults":{
+                "revGrowthPct": 0,
+                "cogsPctOfRevenue": 50,
+                "mktGrowthPct": 0,
+                "opexDelta": 0
+            },
+            "presets":{
+                "base":{"name":"Base","revGrowthPct":0,"cogsPctOfRevenue":50,"mktGrowthPct":0,"opexDelta":0},
+                "growth":{"name":"+30% sales","revGrowthPct":30,"cogsPctOfRevenue":50,"mktGrowthPct":30,"opexDelta":20000},
+                "stress":{"name":"Stress −20%","revGrowthPct":-20,"cogsPctOfRevenue":52,"mktGrowthPct":0,"opexDelta":0}
+            }
+        }
+    </script>
+
+    <script>
+        (function(){
+            const fmt = (n, cur='₽') => n===Infinity ? '∞' : (n===-Infinity ? '−∞' : new Intl.NumberFormat('ru-RU').format(Math.round(n))) + (cur?` ${cur}`:'');
+            const fmt0 = n => new Intl.NumberFormat('ru-RU').format(Math.round(n));
+            const json = JSON.parse(document.getElementById('base-data').textContent);
+            const C = json.currency || '₽';
+            const base = json.base;
+            const defaults = json.defaults;
+            const presets = json.presets;
+
+            // UI nodes
+            const el = id => document.getElementById(id);
+            const inputs = {
+                revGrowthPct: el('inp-rev-growth'),
+                cogsPctOfRevenue: el('inp-cogs-pct'),
+                mktGrowthPct: el('inp-mkt-growth'),
+                opexDelta: el('inp-opex-delta')
+            };
+            const labels = {
+                revGrowthPct: el('lbl-rev-growth'),
+                cogsPctOfRevenue: el('lbl-cogs-pct'),
+                opexDelta: el('lbl-opex-delta')
+            };
+
+            const KPIs = {
+                revenue: el('kpi-revenue'),
+                gp: el('kpi-gp'),
+                np: el('kpi-np'),
+                runway: el('kpi-runway')
+            };
+
+            const T = {
+                base: {
+                    rev: el('t-base-rev'), cogs: el('t-base-cogs'), mkt: el('t-base-mkt'),
+                    opex: el('t-base-opex'), fin: el('t-base-fin'),
+                    np: el('t-base-np'), cash: el('t-base-cash'), runway: el('t-base-runway')
+                },
+                scn: {
+                    rev: el('t-scn-rev'), cogs: el('t-scn-cogs'), mkt: el('t-scn-mkt'),
+                    opex: el('t-scn-opex'), fin: el('t-scn-fin'),
+                    np: el('t-scn-np'), cash: el('t-scn-cash'), runway: el('t-scn-runway')
+                },
+                d: {
+                    rev: el('t-delta-rev'), cogs: el('t-delta-cogs'), mkt: el('t-delta-mkt'),
+                    opex: el('t-delta-opex'), fin: el('t-delta-fin'),
+                    np: el('t-delta-np'), cash: el('t-delta-cash'), runway: el('t-delta-runway')
+                }
+            };
+
+            const scenarioName = el('scenario-name');
+            const switcherButtons = Array.from(document.querySelectorAll('.switcher button'));
+
+            // Base computed
+            const baseNP = base.revenue - base.cogs - base.marketing - base.opex - base.fin;
+            const baseCashAfter = base.openingCash + baseNP;
+            const baseRunway = (baseNP < 0) ? base.openingCash / Math.abs(baseNP) : Infinity;
+
+            // Fill base table
+            T.base.rev.textContent = fmt(base.revenue, C);
+            T.base.cogs.textContent = fmt(base.cogs, C);
+            T.base.mkt.textContent = fmt(base.marketing, C);
+            T.base.opex.textContent = fmt(base.opex, C);
+            T.base.fin.textContent = fmt(base.fin, C);
+            T.base.np.textContent = fmt(baseNP, C);
+            T.base.cash.textContent = fmt(baseCashAfter, C);
+            T.base.runway.textContent = baseRunway===Infinity ? '∞' : (baseRunway.toFixed(1) + ' мес.');
+
+            // Set defaults
+            inputs.revGrowthPct.value = defaults.revGrowthPct;
+            inputs.cogsPctOfRevenue.value = defaults.cogsPctOfRevenue;
+            inputs.mktGrowthPct.value = defaults.mktGrowthPct;
+            inputs.opexDelta.value = defaults.opexDelta;
+
+            const syncLabels = () => {
+                labels.revGrowthPct.textContent = inputs.revGrowthPct.value + '%';
+                labels.cogsPctOfRevenue.textContent = inputs.cogsPctOfRevenue.value + '%';
+                const v = parseInt(inputs.opexDelta.value,10);
+                labels.opexDelta.textContent = (v>=0?'+':'') + fmt0(v) + ` ${C}`;
+            };
+
+            function compute(){
+                syncLabels();
+
+                const rev = base.revenue * (1 + (+inputs.revGrowthPct.value)/100);
+                const cogs = rev * (+inputs.cogsPctOfRevenue.value)/100;
+                const mkt = base.marketing * (1 + (+inputs.mktGrowthPct.value)/100);
+                const opex = base.opex + (+inputs.opexDelta.value);
+                const fin = base.fin;
+
+                const np = rev - cogs - mkt - opex - fin;
+                const cashAfter = base.openingCash + np;
+                const runway = (np < 0) ? base.openingCash / Math.abs(np) : Infinity;
+
+                // KPIs
+                KPIs.revenue.textContent = fmt(rev, C);
+                KPIs.gp.textContent = fmt(rev - cogs, C);
+                KPIs.np.textContent = fmt(np, C);
+                KPIs.runway.textContent = (runway===Infinity ? '∞' : (runway.toFixed(1)+' мес.'));
+
+                // Table scenario
+                T.scn.rev.textContent = fmt(rev, C);
+                T.scn.cogs.textContent = fmt(cogs, C);
+                T.scn.mkt.textContent = fmt(mkt, C);
+                T.scn.opex.textContent = fmt(opex, C);
+                T.scn.fin.textContent = fmt(fin, C);
+                T.scn.np.textContent = fmt(np, C);
+                T.scn.cash.textContent = fmt(cashAfter, C);
+                T.scn.runway.textContent = (runway===Infinity ? '∞' : (runway.toFixed(1)+' мес.'));
+
+                // Deltas
+                T.d.rev.textContent = fmt(rev - base.revenue, C);
+                T.d.cogs.textContent = fmt(cogs - base.cogs, C);
+                T.d.mkt.textContent = fmt(mkt - base.marketing, C);
+                T.d.opex.textContent = fmt(opex - base.opex, C);
+                T.d.fin.textContent = fmt(fin - base.fin, C);
+                T.d.np.textContent = fmt(np - baseNP, C);
+                T.d.cash.textContent = fmt(cashAfter - baseCashAfter, C);
+                const dRunway = (runway===Infinity?Infinity:runway) - (baseRunway===Infinity?Infinity:baseRunway);
+                T.d.runway.textContent = (isFinite(dRunway) ? ( (dRunway>=0?'+':'') + dRunway.toFixed(1) + ' мес.' ) : '—');
+            }
+
+            // Preset switcher
+            function applyPreset(key){
+                const p = presets[key];
+                inputs.revGrowthPct.value = p.revGrowthPct;
+                inputs.cogsPctOfRevenue.value = p.cogsPctOfRevenue;
+                inputs.mktGrowthPct.value = p.mktGrowthPct;
+                inputs.opexDelta.value = p.opexDelta;
+                scenarioName.textContent = p.name;
+                switcherButtons.forEach(b=>b.classList.toggle('active', b.dataset.preset===key));
+                compute();
+            }
+
+            // Events
+            Object.values(inputs).forEach(i=> i.addEventListener('input', compute));
+            switcherButtons.forEach(btn => btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+
+            // Init
+            applyPreset('base');
+        })();
+    </script>
+{% endblock %}
