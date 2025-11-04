@@ -3,9 +3,9 @@
 namespace App\Command;
 
 use App\Entity\Company;
-use App\Repository\CompanyRepository;
 use App\Marketplace\Wildberries\Repository\WildberriesSaleRepository;
 use App\Marketplace\Wildberries\Service\WildberriesSalesImporter;
+use App\Repository\CompanyRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

@@ -2,8 +2,8 @@
 
 namespace App\Marketplace\Wildberries\Service;
 
-use App\Marketplace\Wildberries\Adapter\WildberriesReportsApiClient;
 use App\Entity\Company;
+use App\Marketplace\Wildberries\Adapter\WildberriesReportsApiClient;
 use App\Marketplace\Wildberries\Entity\WildberriesSale;
 use App\Marketplace\Wildberries\Repository\WildberriesSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;

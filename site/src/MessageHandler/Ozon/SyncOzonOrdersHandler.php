@@ -3,10 +3,10 @@
 namespace App\MessageHandler\Ozon;
 
 use App\Marketplace\Ozon\Entity\OzonSyncCursor;
-use App\Message\Ozon\SyncOzonOrders;
-use App\Repository\CompanyRepository;
 use App\Marketplace\Ozon\Repository\OzonSyncCursorRepository;
 use App\Marketplace\Ozon\Service\OzonOrderSyncService;
+use App\Message\Ozon\SyncOzonOrders;
+use App\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;

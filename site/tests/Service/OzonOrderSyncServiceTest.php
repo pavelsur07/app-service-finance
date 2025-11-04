@@ -2,14 +2,14 @@
 
 namespace App\Tests\Service;
 
-use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Entity\Company;
+use App\Entity\User;
+use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonOrder;
 use App\Marketplace\Ozon\Entity\OzonOrderItem;
 use App\Marketplace\Ozon\Entity\OzonOrderStatusHistory;
 use App\Marketplace\Ozon\Entity\OzonProduct;
 use App\Marketplace\Ozon\Entity\OzonSyncCursor;
-use App\Entity\User;
 use App\Marketplace\Ozon\Repository\OzonOrderRepository;
 use App\Marketplace\Ozon\Repository\OzonProductRepository;
 use App\Marketplace\Ozon\Repository\OzonSyncCursorRepository;

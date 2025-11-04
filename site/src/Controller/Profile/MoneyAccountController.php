@@ -8,14 +8,13 @@ use App\Form\MoneyAccountType as MoneyAccountFormType;
 use App\Repository\MoneyAccountRepository;
 use App\Service\AccountBalanceService;
 use App\Service\ActiveCompanyService;
-use JsonException;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Symfony\Component\Form\FormError;
 
 #[Route('/accounts')]
 class MoneyAccountController extends AbstractController
@@ -80,9 +79,9 @@ class MoneyAccountController extends AbstractController
         ];
 
         $existingAuth = $account->getBankAuth();
-        if ($existingAuth !== null) {
-            $encodedAuth = json_encode($existingAuth, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-            $bankIntegration['auth'] = $encodedAuth !== false ? $encodedAuth : '';
+        if (null !== $existingAuth) {
+            $encodedAuth = json_encode($existingAuth, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE);
+            $bankIntegration['auth'] = false !== $encodedAuth ? $encodedAuth : '';
         }
 
         $clearBankLinkRequested = false;
@@ -97,25 +96,25 @@ class MoneyAccountController extends AbstractController
             $clearBankLinkRequested = $request->request->has('clear_bank_link');
 
             if (!$clearBankLinkRequested) {
-                if ($bankIntegration['provider'] !== '' && $bankIntegration['external_account_id'] === '') {
+                if ('' !== $bankIntegration['provider'] && '' === $bankIntegration['external_account_id']) {
                     $form->addError(new FormError('Для выбранного провайдера необходимо указать внешний ID счёта.'));
                 }
 
-                if ($bankIntegration['provider'] === '' && $bankIntegration['external_account_id'] !== '') {
+                if ('' === $bankIntegration['provider'] && '' !== $bankIntegration['external_account_id']) {
                     $form->addError(new FormError('Укажите провайдера для внешнего ID счёта.'));
                 }
 
                 $authRaw = trim($bankIntegration['auth']);
-                if ($authRaw !== '') {
+                if ('' !== $authRaw) {
                     try {
-                        $authPayload = json_decode($authRaw, true, 512, JSON_THROW_ON_ERROR);
+                        $authPayload = json_decode($authRaw, true, 512, \JSON_THROW_ON_ERROR);
                         if (!is_array($authPayload)) {
                             $form->addError(new FormError('Поле авторизации должно содержать объект JSON.'));
                             $authPayload = null;
                         } else {
                             $authProvided = true;
                         }
-                    } catch (JsonException) {
+                    } catch (\JsonException) {
                         $form->addError(new FormError('Поле авторизации должно содержать корректный JSON.'));
                     }
                 }
@@ -127,19 +126,19 @@ class MoneyAccountController extends AbstractController
                 $account->clearBankLink();
                 $account->setBankCursor(null);
             } else {
-                $shouldLinkBank = $bankIntegration['provider'] !== '' && $bankIntegration['external_account_id'] !== '';
+                $shouldLinkBank = '' !== $bankIntegration['provider'] && '' !== $bankIntegration['external_account_id'];
 
                 if ($shouldLinkBank) {
                     $account->setBankLink(
                         $bankIntegration['provider'],
                         $bankIntegration['external_account_id'],
-                        $bankIntegration['number'] !== '' ? $bankIntegration['number'] : null
+                        '' !== $bankIntegration['number'] ? $bankIntegration['number'] : null
                     );
                 }
 
                 $bankMeta = $account->getBankMeta() ?? [];
 
-                if ($bankIntegration['number'] !== '') {
+                if ('' !== $bankIntegration['number']) {
                     $bankMeta['number'] = $bankIntegration['number'];
                 } else {
                     unset($bankMeta['number']);
@@ -147,7 +146,7 @@ class MoneyAccountController extends AbstractController
 
                 if ($authProvided) {
                     $bankMeta['auth'] = $authPayload;
-                } elseif (array_key_exists('auth', $bankMeta) && trim($bankIntegration['auth']) === '') {
+                } elseif (array_key_exists('auth', $bankMeta) && '' === trim($bankIntegration['auth'])) {
                     unset($bankMeta['auth']);
                 }
 

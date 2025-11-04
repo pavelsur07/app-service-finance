@@ -107,7 +107,7 @@ final class PaymentPlanService
             return;
         }
 
-        if ($currentEnum === PaymentPlanStatusEnum::PAID) {
+        if (PaymentPlanStatusEnum::PAID === $currentEnum) {
             throw new \DomainException(sprintf('Cannot transition payment plan from terminal status "%s".', $current));
         }
 

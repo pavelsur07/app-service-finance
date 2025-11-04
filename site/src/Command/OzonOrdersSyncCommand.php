@@ -3,9 +3,9 @@
 namespace App\Command;
 
 use App\Entity\Company;
-use App\Repository\CompanyRepository;
 use App\Marketplace\Ozon\Repository\OzonSyncCursorRepository;
 use App\Marketplace\Ozon\Service\OzonOrderSyncService;
+use App\Repository\CompanyRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

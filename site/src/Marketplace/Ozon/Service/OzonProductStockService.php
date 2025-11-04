@@ -2,8 +2,8 @@
 
 namespace App\Marketplace\Ozon\Service;
 
-use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Entity\Company;
+use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonProduct;
 use App\Marketplace\Ozon\Entity\OzonProductStock;
 use App\Marketplace\Ozon\Repository\OzonProductRepository;
