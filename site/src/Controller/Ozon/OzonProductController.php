@@ -3,7 +3,7 @@
 namespace App\Controller\Ozon;
 
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
-use App\Repository\Ozon\OzonProductRepository;
+use App\Marketplace\Ozon\Repository\OzonProductRepository;
 use App\Marketplace\Ozon\Service\OzonProductSalesService;
 use App\Marketplace\Ozon\Service\OzonProductStockService;
 use App\Marketplace\Ozon\Service\OzonProductSyncService;

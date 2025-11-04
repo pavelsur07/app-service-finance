@@ -6,8 +6,8 @@ use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Entity\Company;
 use App\Marketplace\Ozon\Entity\OzonProduct;
 use App\Marketplace\Ozon\Entity\OzonProductSales;
-use App\Repository\Ozon\OzonProductRepository;
-use App\Repository\Ozon\OzonProductSalesRepository;
+use App\Marketplace\Ozon\Repository\OzonProductRepository;
+use App\Marketplace\Ozon\Repository\OzonProductSalesRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

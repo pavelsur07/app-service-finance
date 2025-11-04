@@ -4,7 +4,7 @@ namespace App\Controller\Wildberries;
 
 use App\Entity\Company;
 use App\Entity\User;
-use App\Repository\Wildberries\WildberriesSaleRepository;
+use App\Marketplace\Wildberries\Repository\WildberriesSaleRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

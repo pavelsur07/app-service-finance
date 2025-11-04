@@ -3,7 +3,7 @@
 namespace App\Marketplace\Wildberries\Entity;
 
 use App\Entity\Company;
-use App\Repository\Wildberries\WildberriesSaleRepository;
+use App\Marketplace\Wildberries\Repository\WildberriesSaleRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: WildberriesSaleRepository::class)]
