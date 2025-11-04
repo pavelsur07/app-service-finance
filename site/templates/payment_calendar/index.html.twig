@@ -340,13 +340,22 @@
     {{ parent() }}
     {% if showForm is defined and showForm and form is defined %}
         <script>
-            document.addEventListener('DOMContentLoaded', function () {
+            function showPaymentPlanModal() {
                 var modalElement = document.getElementById('payment-plan-modal');
-                if (modalElement) {
-                    var modal = new bootstrap.Modal(modalElement);
-                    modal.show();
+                if (!modalElement) {
+                    return;
                 }
-            });
+
+                var modal = bootstrap.Modal.getInstance(modalElement);
+                if (!modal) {
+                    modal = new bootstrap.Modal(modalElement);
+                }
+
+                modal.show();
+            }
+
+            document.addEventListener('DOMContentLoaded', showPaymentPlanModal);
+            document.addEventListener('turbo:load', showPaymentPlanModal);
         </script>
     {% endif %}
 {% endblock %}
