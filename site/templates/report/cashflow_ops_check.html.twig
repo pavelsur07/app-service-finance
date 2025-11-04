@@ -1,0 +1,412 @@
+{# templates/report/cashflow_ops_check.html.twig #}
+{% extends 'base.html.twig' %}
+
+{# Хлебные крошки #}
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' ignore missing with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Проверка операций ДДС', 'path': 'report_cashflow_ops_check_index'}
+        ]
+    } %}
+{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center mb-3">
+        <h2 class="page-title me-3">
+            <i class="ti ti-report-search me-2"></i>Проверка операций ДДС
+        </h2>
+
+        {# Кнопки экспорта — тот же маршрут, параметры export=csv&part=... #}
+        <div class="ms-auto d-flex gap-2">
+            <a class="btn btn-outline-primary"
+               href="{{ path('report_cashflow_ops_check_index',
+                   app.request.query.all|merge({'export':'csv','part':'trx'})) }}">
+                <i class="ti ti-download me-1"></i> Экспорт транзакций (CSV)
+            </a>
+
+            <a class="btn btn-outline-primary"
+               href="{{ path('report_cashflow_ops_check_index',
+                   app.request.query.all|merge({'export':'csv','part':'recon'})) }}">
+                <i class="ti ti-download me-1"></i> Экспорт сверки (CSV)
+            </a>
+        </div>
+    </div>
+
+    {# ───────────────── ОПИСАНИЕ ОТЧЁТА ───────────────── #}
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-2">
+                <i class="ti ti-report-search me-2"></i>
+                <h3 class="card-title mb-0">Что это за отчёт</h3>
+            </div>
+
+            <div class="alert alert-info mt-3" role="alert">
+                <div class="d-flex">
+                    <div class="me-3"><i class="ti ti-info-circle"></i></div>
+                    <div>
+                        <strong>Проверка операций ДДС</strong> — диагностика денег после импорта и автоправил.
+                        Помогает найти: неверные знаки сумм (приход/расход), операции без категории, возможные дубли
+                        и расхождения между операциями за день и ежедневными остатками по счёту.
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="card card-borderless">
+                        <div class="card-header px-0">
+                            <h4 class="card-title">1) Транзакции — быстрые флаги</h4>
+                        </div>
+                        <div class="card-body px-0 pt-0">
+                            <ul class="list-unstyled mb-2">
+                                <li class="mb-1">
+                                    <span class="badge bg-danger me-1">Знак</span>
+                                    сумма не соответствует направлению (INFLOW/OUTFLOW).
+                                </li>
+                                <li class="mb-1">
+                                    <span class="badge bg-warning-lt me-1">Нет категории</span>
+                                    операцию нужно привязать к статье ДДС.
+                                </li>
+                                <li class="mb-1">
+                                    <span class="badge bg-danger me-1">Дубль</span>
+                                    одинаковые <code>import_source + external_id</code> встретились более одного раза.
+                                </li>
+                            </ul>
+                            <div class="text-muted small">
+                                Совет: сначала исправь ошибки в этой таблице — это часто снимает расхождения в сверке.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card card-borderless">
+                        <div class="card-header px-0">
+                            <h4 class="card-title">2) Сверка «дата × счёт»</h4>
+                        </div>
+                        <div class="card-body px-0 pt-0">
+                            <p class="mb-2">
+                                Сравнивает дневные итоги из <em>ежедневных остатков</em> с суммой операций за тот же день и счёт.
+                                Если строка подсвечена красным и <strong>Δ закрытия</strong> ≠ 0 — где-то недостаёт операция,
+                                перепутан знак или есть дубль.
+                            </p>
+                            <ul class="text-muted small ps-3">
+                                <li>Формула: <code>Открытие + Приход - Расход = Закрытие</code>.</li>
+                                <li>«по транз.» — расчёт по сумме операций за день (CashTransaction).</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr class="my-3"/>
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <h4 class="card-title">Фильтры</h4>
+                    <ul class="text-muted mb-0">
+                        <li><strong>Период</strong> — по дате операции.</li>
+                        <li><strong>Счёт</strong> — можно анализировать все счета или один конкретный.</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h4 class="card-title">Экспорт</h4>
+                    <p class="text-muted mb-0">
+                        Кнопки «Экспорт CSV» выгружают обе части отчёта отдельно (удобно для Excel/разбора).
+                    </p>
+                </div>
+            </div>
+
+            <div class="alert alert-secondary mt-3" role="alert">
+                <div class="d-flex">
+                    <div class="me-3"><i class="ti ti-bulb"></i></div>
+                    <div class="small">
+                        <strong>Как разруливать расхождения:</strong>
+                        1) проверь знак и категорию в «Транзакциях»;
+                        2) убедись, что все операции за день импортированы (нет пропусков);
+                        3) проверь дубли по <code>import_source + external_id</code>.
+                        После исправлений пересчёт ежедневных остатков снимет красные строки.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ───────────────── FAQ ───────────────── #}
+    <div class="card mt-4 mb-4">
+        <div class="card-header">
+            <h3 class="card-title d-flex align-items-center">
+                <i class="ti ti-question-mark me-2 text-primary"></i>
+                Часто задаваемые вопросы (FAQ)
+            </h3>
+        </div>
+
+        <div class="card-body">
+            <div class="accordion" id="faqCashflowOps">
+                {# 1. Почему Δ закрытия не сходится? #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq1">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#faq1body" aria-expanded="true" aria-controls="faq1body">
+                            Почему <strong>Δ закрытия</strong> не равен нулю?
+                        </button>
+                    </h2>
+                    <div id="faq1body" class="accordion-collapse collapse show" aria-labelledby="faq1"
+                         data-bs-parent="#faqCashflowOps">
+                        <div class="accordion-body">
+                            Это значит, что фактический баланс на конец дня (<em>MoneyAccountDailyBalance</em>)
+                            не совпадает с расчётом по операциям (<em>CashTransaction</em>).
+                            <br><br>
+                            Возможные причины:
+                            <ul>
+                                <li>Отсутствует хотя бы одна операция за этот день;</li>
+                                <li>Есть операция с неверным знаком (приход вместо расхода или наоборот);</li>
+                                <li>Задвоение одной и той же операции в импорте;</li>
+                                <li>Ещё не выполнен пересчёт ежедневных остатков (cron).</li>
+                            </ul>
+                            После исправлений запусти пересчёт — красные строки исчезнут.
+                        </div>
+                    </div>
+                </div>
+
+                {# 2. Дубли операций #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq2">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#faq2body" aria-expanded="false" aria-controls="faq2body">
+                            Как найти и убрать дубли операций?
+                        </button>
+                    </h2>
+                    <div id="faq2body" class="accordion-collapse collapse" aria-labelledby="faq2"
+                         data-bs-parent="#faqCashflowOps">
+                        <div class="accordion-body">
+                            Дубль определяется по комбинации <code>company_id + import_source + external_id</code>.
+                            <br><br>
+                            Что делать:
+                            <ul>
+                                <li>Отфильтруй период/счёт, где виден флаг «Дубль»;</li>
+                                <li>Проверь <code>external_id</code> — если одинаковые, оставь один;</li>
+                                <li>Удалить лишние можно через журнал импорта или вручную (в тестовой БД);</li>
+                                <li>Пересчитай ежедневные остатки за день.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {# 3. Флаг "Знак" #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq3">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#faq3body" aria-expanded="false" aria-controls="faq3body">
+                            Что значит флаг <strong>«Знак»</strong>?
+                        </button>
+                    </h2>
+                    <div id="faq3body" class="accordion-collapse collapse" aria-labelledby="faq3"
+                         data-bs-parent="#faqCashflowOps">
+                        <div class="accordion-body">
+                            Флаг <span class="badge bg-danger">Знак</span> означает, что направление операции
+                            (приход/расход) не совпадает с её суммой.
+                            <br><br>
+                            Примеры:
+                            <ul>
+                                <li><code>direction = INFLOW</code>, но сумма отрицательная;</li>
+                                <li><code>direction = OUTFLOW</code>, но сумма положительная.</li>
+                            </ul>
+                            Такие операции нужно исправить: поменять знак суммы или направление.
+                        </div>
+                    </div>
+                </div>
+
+                {# 4. Категории ДДС #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq4">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#faq4body" aria-expanded="false" aria-controls="faq4body">
+                            Зачем нужны категории ДДС?
+                        </button>
+                    </h2>
+                    <div id="faq4body" class="accordion-collapse collapse" aria-labelledby="faq4"
+                         data-bs-parent="#faqCashflowOps">
+                        <div class="accordion-body">
+                            Категория ДДС — «смысл» операции: на что потратили / откуда пришли деньги.
+                            Без неё отчёты по движению денег и план-факт будут неполными.
+                            Если операция без категории, появится флаг
+                            <span class="badge bg-warning-lt">Нет категории</span>.
+                            <br>
+                            Исправление:
+                            <ul>
+                                <li>Проверь справочник <em>Категории ДДС</em>;</li>
+                                <li>Назначь категорию вручную или настрой автоправило;</li>
+                                <li>При необходимости повтори импорт с новыми правилами.</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                {# 5. Частота обновления #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="faq5">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                data-bs-target="#faq5body" aria-expanded="false" aria-controls="faq5body">
+                            Как часто обновляется отчёт?
+                        </button>
+                    </h2>
+                    <div id="faq5body" class="accordion-collapse collapse" aria-labelledby="faq5"
+                         data-bs-parent="#faqCashflowOps">
+                        <div class="accordion-body">
+                            Отчёт строится «на лету» при открытии страницы из текущих данных
+                            <em>CashTransaction</em> и <em>MoneyAccountDailyBalance</em>.
+                            После исправлений обнови страницу или дождись ночного пересчёта (если включен cron).
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ───────────────── ФИЛЬТРЫ ───────────────── #}
+    <form method="get" class="card card-body mb-4">
+        <div class="row g-3">
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата с</label>
+                <input type="date" name="date_from" value="{{ filters.date_from|date('Y-m-d') }}" class="form-control" required>
+            </div>
+            <div class="col-sm-6 col-md-3">
+                <label class="form-label">Дата по</label>
+                <input type="date" name="date_to" value="{{ filters.date_to|date('Y-m-d') }}" class="form-control" required>
+            </div>
+            <div class="col-sm-6 col-md-4">
+                <label class="form-label">Счёт</label>
+                <select name="account" class="form-select">
+                    <option value="">Все счета</option>
+                    {% for acc in accounts %}
+                        <option value="{{ acc.id }}" {{ filters.account == acc.id ? 'selected' : '' }}>{{ acc.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6 col-md-2 align-self-end">
+                <button class="btn btn-primary w-100">
+                    <i class="ti ti-search me-1"></i> Показать
+                </button>
+            </div>
+        </div>
+    </form>
+
+    <div class="row">
+        <div class="col-12">
+            {# Блок 1 — Транзакции (быстрые флаги) #}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ti ti-list-search me-2"></i>1) Транзакции — быстрые флаги
+                    </h3>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Счёт</th>
+                            <th class="text-end">Сумма</th>
+                            <th>Направление</th>
+                            <th>Категория</th>
+                            <th>Источник</th>
+                            <th>ExternalId</th>
+                            <th>Флаги</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if rows_trx is empty %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted py-5">Нет транзакций</td>
+                            </tr>
+                        {% else %}
+                            {% for r in rows_trx %}
+                                {% set has_err = r.flag_wrong_sign or r.flag_no_category or r.flag_dup %}
+                                <tr class="{{ has_err ? 'table-warning' : '' }}">
+                                    <td>{{ r.date|date('d.m.Y') }}</td>
+                                    <td>{{ r.account_name }}</td>
+                                    <td class="text-end">{{ r.amount_signed|number_format(2, '.', ' ') }} {{ r.currency }}</td>
+                                    <td>{{ r.direction }}</td>
+                                    <td>{{ r.category_name ?? '—' }}</td>
+                                    <td>{{ r.import_source ?? '—' }}</td>
+                                    <td class="text-truncate" style="max-width: 220px;" title="{{ r.external_id ?? '' }}">{{ r.external_id ?? '—' }}</td>
+                                    <td>
+                                        {% if r.flag_wrong_sign %}<span class="badge bg-danger me-1"><i class="ti ti-alert-triangle me-1"></i>Знак</span>{% endif %}
+                                        {% if r.flag_no_category %}<span class="badge bg-warning-lt me-1"><i class="ti ti-tag-off me-1"></i>Нет категории</span>{% endif %}
+                                        {% if r.flag_dup %}<span class="badge bg-danger me-1"><i class="ti ti-copy me-1"></i>Дубль</span>{% endif %}
+                                        {% if not has_err %}<span class="text-muted">OK</span>{% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {# Блок 2 — Сверка с ежедневными остатками #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ti ti-arrows-diff me-2"></i>2) Сверка «дата × счёт» с ежедневными остатками
+                    </h3>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Счёт</th>
+                            <th class="text-end">Открытие (баланс)</th>
+                            <th class="text-end">Приход (баланс)</th>
+                            <th class="text-end">Расход (баланс)</th>
+                            <th class="text-end">Закрытие (баланс)</th>
+                            <th class="text-end">Приход (по транз.)</th>
+                            <th class="text-end">Расход (по транз.)</th>
+                            <th class="text-end">Закрытие (по транз.)</th>
+                            <th class="text-end">Δ закрытия</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if rows_recon is empty %}
+                            <tr>
+                                <td colspan="10" class="text-center text-muted py-5">Нет данных</td>
+                            </tr>
+                        {% else %}
+                            {% for r in rows_recon %}
+                                {% set bad = (r.diff_closing is not null) and (r.diff_closing|abs > 0.01) %}
+                                <tr class="{{ bad ? 'table-danger' : '' }}">
+                                    <td>{{ r.date|date('d.m.Y') }}</td>
+                                    <td>{{ r.account_name }}</td>
+                                    <td class="text-end">{{ r.opening|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.inflow_bal|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.outflow_bal|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.closing|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.inflow_trx|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.outflow_trx|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ r.closing_by_trx|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end fw-bold">
+                                        {% if bad %}
+                                            <span class="text-danger">
+                                              <i class="ti ti-alert-octagon me-1"></i>{{ r.diff_closing|number_format(2, '.', ' ') }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted">0.00</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}
