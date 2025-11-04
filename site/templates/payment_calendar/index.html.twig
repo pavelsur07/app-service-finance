@@ -340,6 +340,29 @@
     {{ parent() }}
     {% if showForm is defined and showForm and form is defined %}
         <script>
+            function hideFallbackModal(modalElement) {
+                modalElement.classList.remove('show');
+                modalElement.style.display = 'none';
+                modalElement.setAttribute('aria-hidden', 'true');
+                modalElement.removeAttribute('aria-modal');
+            }
+
+            function setupFallbackDismiss(modalElement) {
+                var dismissButtons = modalElement.querySelectorAll('[data-bs-dismiss="modal"]');
+                dismissButtons.forEach(function (button) {
+                    if (button.dataset.dismissListenerAttached === 'true') {
+                        return;
+                    }
+
+                    button.addEventListener('click', function (event) {
+                        event.preventDefault();
+                        hideFallbackModal(modalElement);
+                    });
+
+                    button.dataset.dismissListenerAttached = 'true';
+                });
+            }
+
             function showPaymentPlanModal() {
                 var modalElement = document.getElementById('payment-plan-modal');
                 if (!modalElement) {
@@ -356,6 +379,8 @@
                     modalElement.removeAttribute('aria-hidden');
                     modalElement.setAttribute('aria-modal', 'true');
                     modalElement.scrollTop = 0;
+
+                    setupFallbackDismiss(modalElement);
 
                     return;
                 }
