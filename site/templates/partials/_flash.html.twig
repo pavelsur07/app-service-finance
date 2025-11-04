@@ -43,12 +43,39 @@
                 ? window.bootstrap.Toast
                 : null;
 
+            function hideToastFallback(toastEl) {
+                toastEl.classList.remove('show');
+                toastEl.classList.add('hide');
+                toastEl.style.display = 'none';
+                toastEl.setAttribute('aria-hidden', 'true');
+                toastEl.removeAttribute('aria-live');
+            }
+
             document.querySelectorAll('.toast[data-bs-autohide]').forEach(function (toastEl) {
                 if (!BootstrapToast) {
                     toastEl.classList.add('show');
                     toastEl.style.display = 'block';
                     toastEl.setAttribute('aria-hidden', 'false');
                     toastEl.setAttribute('aria-live', 'assertive');
+
+                    var delayAttr = toastEl.getAttribute('data-bs-delay');
+                    var delay = parseInt(delayAttr, 10);
+                    if (!Number.isFinite(delay) || delay < 0) {
+                        delay = 5000;
+                    }
+
+                    if (toastEl.getAttribute('data-bs-autohide') === 'true') {
+                        window.setTimeout(function () {
+                            hideToastFallback(toastEl);
+                        }, delay);
+                    }
+
+                    toastEl.querySelectorAll('[data-bs-dismiss="toast"]').forEach(function (dismissButton) {
+                        dismissButton.addEventListener('click', function () {
+                            hideToastFallback(toastEl);
+                        });
+                    });
+
                     return;
                 }
 
