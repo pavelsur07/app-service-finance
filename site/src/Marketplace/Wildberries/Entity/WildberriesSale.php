@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Entity\Wildberries;
+namespace App\Marketplace\Wildberries\Entity;
 
 use App\Entity\Company;
 use App\Repository\Wildberries\WildberriesSaleRepository;

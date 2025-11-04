@@ -4,7 +4,7 @@ namespace App\Service\Wildberries;
 
 use App\Marketplace\Wildberries\Adapter\WildberriesReportsApiClient;
 use App\Entity\Company;
-use App\Entity\Wildberries\WildberriesSale;
+use App\Marketplace\Wildberries\Entity\WildberriesSale;
 use App\Repository\Wildberries\WildberriesSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

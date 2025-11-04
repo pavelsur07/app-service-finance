@@ -3,7 +3,7 @@
 namespace App\Repository\Wildberries;
 
 use App\Entity\Company;
-use App\Entity\Wildberries\WildberriesSale;
+use App\Marketplace\Wildberries\Entity\WildberriesSale;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
