@@ -135,11 +135,11 @@ class ClientBank1CImportService
             $docDate = $this->getStringValue($document['Дата'] ?? null);
             $amount = $this->parseAmount($document['Сумма'] ?? null);
 
-            $payerName = $this->getStringValue($document['Плательщик'] ?? null);
+            $payerName = $this->getStringValue($document['Плательщик'] ?? $document['Плательщик1'] ?? null);
             $payerInn = $this->getStringValue($document['ПлательщикИНН'] ?? null);
             $payerAccount = $this->getStringValue($document['ПлательщикСчет'] ?? $document['ПлательщикРасчСчет'] ?? null);
 
-            $receiverName = $this->getStringValue($document['Получатель'] ?? null);
+            $receiverName = $this->getStringValue($document['Получатель'] ?? $document['Получатель1'] ?? null);
             $receiverInn = $this->getStringValue($document['ПолучательИНН'] ?? null);
             $receiverAccount = $this->getStringValue($document['ПолучательСчет'] ?? $document['ПолучательРасчСчет'] ?? null);
 
