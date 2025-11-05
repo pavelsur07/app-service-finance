@@ -46,10 +46,8 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('IDENTITY(t.company) = :companyId')
             ->andWhere('t.dedupeHash = :dedupeHash')
             ->setMaxResults(1)
-            ->setParameters([
-                'companyId' => $companyId,
-                'dedupeHash' => $dedupeHash,
-            ])
+            ->setParameter('companyId', $companyId)
+            ->setParameter('dedupeHash', $dedupeHash)
             ->getQuery()
             ->getOneOrNullResult();
     }
@@ -61,11 +59,9 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.importSource = :source')
             ->andWhere('t.externalId = :externalId')
             ->setMaxResults(1)
-            ->setParameters([
-                'companyId' => $companyId,
-                'source' => $source,
-                'externalId' => $externalId,
-            ])
+            ->setParameter('companyId', $companyId)
+            ->setParameter('source', $source)
+            ->setParameter('externalId', $externalId)
             ->getQuery()
             ->getOneOrNullResult();
     }
