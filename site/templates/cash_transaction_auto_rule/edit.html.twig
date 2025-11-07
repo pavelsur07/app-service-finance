@@ -1,6 +1,17 @@
 {% extends 'base.html.twig' %}
 {% block title %}Изменить автоправило{% endblock %}
 
+{% block breadcrumbs %}
+    {% include 'partials/_breadcrumbs.html.twig' with {
+        breadcrumbs: [
+            {'label': 'Главная', 'path': 'app_home_index'},
+            {'label': 'Финансы'},
+            {'label': 'Автоправила ДДС', 'path': 'cash_transaction_auto_rule_index'},
+            {'label': 'Изменить автоправило'}
+        ]
+    } %}
+{% endblock %}
+
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
