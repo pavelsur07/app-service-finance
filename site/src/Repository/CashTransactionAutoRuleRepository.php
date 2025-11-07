@@ -3,7 +3,10 @@
 namespace App\Repository;
 
 use App\Entity\CashTransactionAutoRule;
+use App\Entity\CashflowCategory;
 use App\Entity\Company;
+use App\Enum\CashTransactionAutoRuleAction;
+use App\Enum\CashTransactionAutoRuleOperationType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -20,8 +23,30 @@ class CashTransactionAutoRuleRepository extends ServiceEntityRepository
     /**
      * @return CashTransactionAutoRule[]
      */
-    public function findByCompany(Company $company): array
-    {
-        return $this->findBy(['company' => $company], ['name' => 'ASC']);
+    public function findByCompany(
+        Company $company,
+        ?CashTransactionAutoRuleAction $action = null,
+        ?CashTransactionAutoRuleOperationType $operationType = null,
+        ?CashflowCategory $category = null,
+    ): array {
+        $qb = $this->createQueryBuilder('r')
+            ->andWhere('r.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('r.name', 'ASC');
+
+        if ($action) {
+            $qb->andWhere('r.action = :action')->setParameter('action', $action);
+        }
+
+        if ($operationType) {
+            $qb->andWhere('r.operationType = :operationType')
+                ->setParameter('operationType', $operationType);
+        }
+
+        if ($category) {
+            $qb->andWhere('r.cashflowCategory = :category')->setParameter('category', $category);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

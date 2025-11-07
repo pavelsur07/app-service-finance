@@ -14,6 +14,41 @@
     <div class="container-xl mt-3">
         <div class="card">
             <div class="card-body">
+                <form method="get" class="row g-2 mb-3">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="filter-category">Категория ДДС</label>
+                        <select id="filter-category" name="category" class="form-select">
+                            <option value="">Все категории</option>
+                            {% for category in categoryOptions %}
+                                <option value="{{ category.id }}" {{ filters.category == category.id ? 'selected' : '' }}>{{ category.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label class="form-label" for="filter-action">Действие</label>
+                        <select id="filter-action" name="action" class="form-select">
+                            <option value="">Все действия</option>
+                            {% for action in actionOptions %}
+                                <option value="{{ action.value }}" {{ filters.action == action.value ? 'selected' : '' }}>{{ action.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-md-4 col-lg-3">
+                        <label class="form-label" for="filter-operation">Тип операции</label>
+                        <select id="filter-operation" name="operationType" class="form-select">
+                            <option value="">Все типы</option>
+                            {% for type in operationOptions %}
+                                <option value="{{ type.value }}" {{ filters.operationType == type.value ? 'selected' : '' }}>{{ type.label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12 col-lg-2">
+                        <div class="d-flex flex-column flex-sm-row flex-lg-column gap-2 align-items-stretch justify-content-end">
+                            <button type="submit" class="btn btn-primary w-100">Применить</button>
+                            <a href="{{ path('cash_transaction_auto_rule_index') }}" class="btn btn-outline-secondary w-100">Сбросить</a>
+                        </div>
+                    </div>
+                </form>
                 <div class="mb-3 text-end">
                     <a href="{{ path('cash_transaction_auto_rule_new') }}" class="btn btn-success">+ Добавить</a>
                 </div>
