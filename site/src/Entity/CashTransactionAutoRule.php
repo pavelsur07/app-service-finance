@@ -14,6 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'cash_transaction_auto_rule')]
 #[ORM\Index(name: 'idx_ctar_company', columns: ['company_id'])]
 #[ORM\Index(name: 'idx_ctar_category', columns: ['cashflow_category_id'])]
+#[ORM\Index(name: 'idx_ctar_counterparty', columns: ['counterparty_id'])]
 class CashTransactionAutoRule
 {
     #[ORM\Id]
@@ -32,6 +33,10 @@ class CashTransactionAutoRule
 
     #[ORM\Column(enumType: CashTransactionAutoRuleOperationType::class)]
     private CashTransactionAutoRuleOperationType $operationType;
+
+    #[ORM\ManyToOne(targetEntity: Counterparty::class)]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?Counterparty $counterparty = null;
 
     #[ORM\ManyToOne(targetEntity: CashflowCategory::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
@@ -52,6 +57,7 @@ class CashTransactionAutoRule
         CashTransactionAutoRuleAction $action,
         CashTransactionAutoRuleOperationType $operationType,
         ?CashflowCategory $cashflowCategory = null,
+        ?Counterparty $counterparty = null,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -61,6 +67,9 @@ class CashTransactionAutoRule
         $this->operationType = $operationType;
         if ($cashflowCategory) {
             $this->cashflowCategory = $cashflowCategory;
+        }
+        if ($counterparty) {
+            $this->counterparty = $counterparty;
         }
         $this->conditions = new ArrayCollection();
     }
@@ -114,6 +123,18 @@ class CashTransactionAutoRule
     public function setOperationType(CashTransactionAutoRuleOperationType $operationType): self
     {
         $this->operationType = $operationType;
+
+        return $this;
+    }
+
+    public function getCounterparty(): ?Counterparty
+    {
+        return $this->counterparty;
+    }
+
+    public function setCounterparty(?Counterparty $counterparty): self
+    {
+        $this->counterparty = $counterparty;
 
         return $this;
     }
