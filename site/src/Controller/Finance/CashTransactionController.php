@@ -163,7 +163,10 @@ class CashTransactionController extends AbstractController
                     $service->add($data);
                     $this->addFlash('success', 'Транзакция добавлена');
 
-                    return $this->redirectToRoute('cash_transaction_index');
+                    return $this->redirectToRoute('cash_transaction_index', array_filter(
+                        $request->query->all(),
+                        static fn($value) => $value !== null && $value !== ''
+                    ));
                 } catch (\DomainException $e) {
                     // Период закрыт — показать ошибку пользователю
                     $form->addError(new FormError($e->getMessage()));
@@ -215,7 +218,10 @@ class CashTransactionController extends AbstractController
                     $service->update($tx, $data);
                     $this->addFlash('success', 'Транзакция обновлена');
 
-                    return $this->redirectToRoute('cash_transaction_index');
+                    return $this->redirectToRoute('cash_transaction_index', array_filter(
+                        $request->query->all(),
+                        static fn($value) => $value !== null && $value !== ''
+                    ));
                 } catch (\DomainException $e) {
                     // Период закрыт — показать ошибку и остаться на форме
                     $form->addError(new FormError($e->getMessage()));

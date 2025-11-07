@@ -29,7 +29,7 @@
                 <i class="ti ti-filter"></i>
                 Фильтры
             </a>
-            <a href="{{ path('cash_transaction_new') }}" class="btn btn-primary">Добавить</a>
+            <a href="{{ path('cash_transaction_new', app.request.query.all) }}" class="btn btn-primary">Добавить</a>
             <a href="/cash/import/bank1c"
                class="btn btn-primary"
                data-testid="btn-import-1c">
@@ -47,7 +47,7 @@
       <h3 class="mb-2">Пока нет операций</h3>
       <p class="text-muted mb-3">Загрузите выписку в формате 1С или добавьте операцию вручную.</p>
       <a href="{{ path('cash_bank1c_import_upload') }}" class="btn btn-primary me-2">Импорт 1С</a>
-      <a href="{{ path('cash_transaction_new') }}" class="btn btn-outline-primary">Добавить операцию</a>
+      <a href="{{ path('cash_transaction_new', app.request.query.all) }}" class="btn btn-outline-primary">Добавить операцию</a>
     </div>
   </div>
 {% endif %}
@@ -96,7 +96,7 @@
 
                             <div class="dropdown-menu dropdown-menu-end shadow-sm">
                                 <a class="dropdown-item"
-                                 href="{{ path('cash_transaction_edit', {id: tx.id}) }}">
+                                 href="{{ path('cash_transaction_edit', app.request.query.all|merge({'id': tx.id})) }}">
                                 <i class="ti ti-pencil me-2"></i> Редактировать
                                 </a>
 
