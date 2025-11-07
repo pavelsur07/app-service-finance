@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
+use App\Entity\CashflowCategory;
 use App\Enum\CashDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
@@ -30,13 +31,80 @@ use Symfony\Component\Routing\Attribute\Route;
 class CashTransactionAutoRuleController extends AbstractController
 {
     #[Route('/', name: 'cash_transaction_auto_rule_index', methods: ['GET'])]
-    public function index(CashTransactionAutoRuleRepository $repo, ActiveCompanyService $companyService): Response
-    {
+    public function index(
+        Request $request,
+        CashTransactionAutoRuleRepository $repo,
+        ActiveCompanyService $companyService,
+        CashflowCategoryRepository $categoryRepo,
+    ): Response {
         $company = $companyService->getActiveCompany();
-        $items = $repo->findByCompany($company);
+        $categories = $categoryRepo->findTreeByCompany($company);
+
+        $actionValue = $request->query->get('action');
+        $operationTypeValue = $request->query->get('operationType');
+        $categoryValue = $request->query->get('category');
+
+        $actionFilter = $actionValue ? CashTransactionAutoRuleAction::tryFrom($actionValue) : null;
+        $operationTypeFilter = $operationTypeValue ? CashTransactionAutoRuleOperationType::tryFrom($operationTypeValue) : null;
+
+        $categoryFilter = null;
+        if ($categoryValue) {
+            foreach ($categories as $category) {
+                if ($category->getId() === $categoryValue) {
+                    $categoryFilter = $category;
+                    break;
+                }
+            }
+        }
+
+        $items = $repo->findByCompany($company, $actionFilter, $operationTypeFilter, $categoryFilter);
+
+        $actionOptions = array_map(
+            static fn (CashTransactionAutoRuleAction $action) => [
+                'value' => $action->value,
+                'label' => match ($action) {
+                    CashTransactionAutoRuleAction::FILL => 'Заполнить поля операции',
+                    CashTransactionAutoRuleAction::UPDATE => 'Изменить поля операции',
+                },
+            ],
+            CashTransactionAutoRuleAction::cases(),
+        );
+
+        $operationOptions = array_map(
+            static fn (CashTransactionAutoRuleOperationType $type) => [
+                'value' => $type->value,
+                'label' => match ($type) {
+                    CashTransactionAutoRuleOperationType::OUTFLOW => 'Отток',
+                    CashTransactionAutoRuleOperationType::INFLOW => 'Приток',
+                    CashTransactionAutoRuleOperationType::ANY => 'Любое',
+                },
+            ],
+            [
+                CashTransactionAutoRuleOperationType::OUTFLOW,
+                CashTransactionAutoRuleOperationType::INFLOW,
+                CashTransactionAutoRuleOperationType::ANY,
+            ],
+        );
+
+        $categoryOptions = array_map(
+            static fn (CashflowCategory $category) => [
+                'id' => $category->getId(),
+                'label' => trim(str_repeat('—', $category->getLevel() - 1).' '.$category->getName()),
+            ],
+            $categories,
+        );
 
         return $this->render('cash_transaction_auto_rule/index.html.twig', [
             'items' => $items,
+            'categories' => $categories,
+            'actionOptions' => $actionOptions,
+            'operationOptions' => $operationOptions,
+            'categoryOptions' => $categoryOptions,
+            'filters' => [
+                'category' => $categoryValue,
+                'action' => $actionValue,
+                'operationType' => $operationTypeValue,
+            ],
         ]);
     }
 
