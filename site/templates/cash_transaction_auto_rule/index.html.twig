@@ -25,6 +25,7 @@
                             <th>Тип операции</th>
                             <th>Категория</th>
                             <th>Направление / проект</th>
+                            <th>Контрагент</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -36,6 +37,7 @@
                             <td>{{ item.operationType.name }}</td>
                             <td>{{ item.cashflowCategory.name }}</td>
                             <td>{{ item.projectDirection ? item.projectDirection.name : '' }}</td>
+                            <td>{{ item.counterparty ? item.counterparty.name : '' }}</td>
                             <td class="text-end">
                                 <a href="{{ path('cash_transaction_auto_rule_check', {id: item.id}) }}" class="btn btn-sm btn-secondary">пров.</a>
                                 <a href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
@@ -46,7 +48,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="6" class="text-center">Нет данных</td></tr>
+                        <tr><td colspan="7" class="text-center">Нет данных</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>

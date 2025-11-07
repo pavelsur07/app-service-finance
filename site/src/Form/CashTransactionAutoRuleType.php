@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
+use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
@@ -64,6 +65,14 @@ class CashTransactionAutoRuleType extends AbstractType
                 'placeholder' => 'Не выбрано',
                 'required' => false,
                 'label' => 'Направление / проект',
+            ])
+            ->add('counterparty', EntityType::class, [
+                'class' => Counterparty::class,
+                'choices' => $options['counterparties'],
+                'choice_label' => fn (Counterparty $item) => $item->getName(),
+                'placeholder' => 'Не выбран',
+                'required' => false,
+                'label' => 'Контрагент',
             ])
             ->add('conditions', CollectionType::class, [
                 'entry_type' => CashTransactionAutoRuleConditionType::class,
