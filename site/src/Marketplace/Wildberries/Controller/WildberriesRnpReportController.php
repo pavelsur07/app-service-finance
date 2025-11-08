@@ -21,7 +21,7 @@ final class WildberriesRnpReportController extends AbstractController
     ) {
     }
 
-    #[Route(path: '/wb/reports/rnp', name: 'wb_reports_rnp', methods: ['GET'])]
+    #[Route(path: '/wb/reports/rnp/data', name: 'wb_reports_rnp_data', methods: ['GET'])]
     public function __invoke(Request $request): JsonResponse
     {
         $company = $this->companyContext->getActiveCompany();
