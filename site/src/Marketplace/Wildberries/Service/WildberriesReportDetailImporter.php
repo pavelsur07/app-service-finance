@@ -38,8 +38,10 @@ final class WildberriesReportDetailImporter
         }
 
         $companyId = (string) $companyId;
-
-        $company = $this->em->getReference(Company::class, $companyId);
+        $company = $this->em->find(Company::class, $companyId);
+        if (null === $company) {
+            throw new \RuntimeException(sprintf('Cannot import WB report details: company %s not found', $companyId));
+        }
 
         $this->logger->info(sprintf(
             '[WB:ReportDetail] Start import: company=%s, from=%s, to=%s, period=%s',
