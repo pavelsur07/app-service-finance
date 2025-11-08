@@ -142,7 +142,7 @@
           <div class="card-body">
             <div class="d-flex align-items-center">
               <span class="text-muted">Выкуп, %</span>
-              <span class="ms-auto h3 mb-0">{{ (totals.buyout_rate_weighted|float * 100)|number_format(2, '.', ' ') }}%</span>
+              <span class="ms-auto h3 mb-0">{{ ((totals.buyout_rate_weighted ?? 0) * 100)|number_format(2, '.', ' ') }}%</span>
             </div>
           </div>
         </div>
@@ -195,7 +195,7 @@
                   <td class="text-end">{{ (item.gross_profit_minor / 100)|number_format(2, '.', ' ') }}</td>
                   <td class="text-end">{{ (item.ad_cost_sum_minor / 100)|number_format(2, '.', ' ') }}</td>
                   <td class="text-end">{{ (item.contribution_minor / 100)|number_format(2, '.', ' ') }}</td>
-                  <td class="text-end">{{ (item.buyout_rate|float * 100)|number_format(2, '.', ' ') }}%</td>
+                  <td class="text-end">{{ ((item.buyout_rate ?? 0) * 100)|number_format(2, '.', ' ') }}%</td>
                 </tr>
               {% else %}
                 <tr>
