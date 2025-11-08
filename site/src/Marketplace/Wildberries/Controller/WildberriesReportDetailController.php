@@ -203,6 +203,7 @@ SQL;
         $perPage = max(10, min(100, (int) $request->query->get('per_page', 20)));
 
         $qbCount = clone $qb;
+        $qbCount->resetDQLPart('orderBy');
         $qbCount->select('COUNT(il.id)');
         $total = (int) $qbCount->getQuery()->getSingleScalarResult();
 
