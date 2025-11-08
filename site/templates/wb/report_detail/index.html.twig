@@ -1,0 +1,161 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Операции Wildberries{% endblock %}
+
+{% block body %}
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="mb-0">Детализация Wildberries</h1>
+        <div class="text-muted">Всего операций: {{ total }}</div>
+    </div>
+
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-4 col-xl-3">
+            <label for="filter-import" class="form-label">ID импорта</label>
+            <input id="filter-import" type="text" name="importId" value="{{ filters.importId }}" class="form-control" placeholder="UUID импорта">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-nmid" class="form-label">Артикул (nmId)</label>
+            <input id="filter-nmid" type="number" name="nmId" value="{{ filters.nmId }}" class="form-control" min="0" step="1">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-brand" class="form-label">Бренд</label>
+            <input id="filter-brand" type="text" name="brand" value="{{ filters.brand }}" class="form-control" placeholder="например: WB" autocomplete="off">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-subject" class="form-label">Предмет</label>
+            <input id="filter-subject" type="text" name="subject" value="{{ filters.subject }}" class="form-control" placeholder="например: Одежда" autocomplete="off">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-site-country" class="form-label">Страна площадки</label>
+            <select id="filter-site-country" name="siteCountry" class="form-select">
+                <option value="">Все</option>
+                {% for country in site_countries %}
+                    <option value="{{ country }}" {{ filters.siteCountry == country ? 'selected' : '' }}>{{ country }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-date-from" class="form-label">Дата продажи с</label>
+            <input id="filter-date-from" type="date" name="dateFrom" value="{{ filters.dateFrom }}" class="form-control">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-date-to" class="form-label">Дата продажи по</label>
+            <input id="filter-date-to" type="date" name="dateTo" value="{{ filters.dateTo }}" class="form-control">
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl-2">
+            <label for="filter-per-page" class="form-label">Записей на странице</label>
+            <select id="filter-per-page" name="per_page" class="form-select">
+                {% for size in [20, 50, 100, 200] %}
+                    <option value="{{ size }}" {{ per_page == size ? 'selected' : '' }}>{{ size }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 d-flex justify-content-end gap-2">
+            <a href="{{ path('wb_report_detail_index') }}" class="btn btn-outline-secondary">Сбросить</a>
+            <button type="submit" class="btn btn-primary">Применить</button>
+        </div>
+    </form>
+
+    <div class="table-responsive">
+        <table class="table table-striped align-middle">
+            <thead>
+            <tr>
+                <th>Дата продажи</th>
+                <th>Дата заказа</th>
+                <th>Дата отчёта</th>
+                <th>RRD ID</th>
+                <th>Номер отчёта</th>
+                <th>Артикул</th>
+                <th>Бренд</th>
+                <th>Предмет</th>
+                <th>Операция</th>
+                <th>Тип документа</th>
+                <th>Страна площадки</th>
+                <th class="text-end">Цена со скидкой</th>
+                <th class="text-end">Комиссия</th>
+                <th class="text-end">К выплате</th>
+                <th class="text-end">Доставка</th>
+                <th class="text-end">Хранение</th>
+                <th class="text-end">Штраф</th>
+                <th class="text-end">Эквайринг</th>
+                <th>Import ID</th>
+                <th>RAW</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for row in rows %}
+                <tr>
+                    <td>{{ row.saleDt ? row.saleDt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>{{ row.orderDt ? row.orderDt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>{{ row.rrDt ? row.rrDt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>{{ row.rrdId }}</td>
+                    <td>{{ row.realizationreportId ?? '—' }}</td>
+                    <td>{{ row.nmId ?? '—' }}</td>
+                    <td>{{ row.brandName ?? '—' }}</td>
+                    <td>{{ row.subjectName ?? '—' }}</td>
+                    <td>{{ row.supplierOperName ?? '—' }}</td>
+                    <td>{{ row.docTypeName ?? '—' }}</td>
+                    <td>{{ row.siteCountry ?? '—' }}</td>
+                    <td class="text-end">{{ row.retailPriceWithDiscRub ?? '—' }}</td>
+                    <td class="text-end">{{ row.ppvzSalesCommission ?? '—' }}</td>
+                    <td class="text-end">{{ row.ppvzForPay ?? '—' }}</td>
+                    <td class="text-end">{{ row.deliveryRub ?? '—' }}</td>
+                    <td class="text-end">{{ row.storageFee ?? '—' }}</td>
+                    <td class="text-end">{{ row.penalty ?? '—' }}</td>
+                    <td class="text-end">{{ row.acquiringFee ?? '—' }}</td>
+                    <td><code>{{ row.importId }}</code></td>
+                    <td>
+                        <details>
+                            <summary>Показать</summary>
+                            <pre class="mb-0"><code>{{ row.raw|json_encode(constant('JSON_PRETTY_PRINT')) }}</code></pre>
+                        </details>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="20" class="text-center">Операции не найдены</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if pages > 1 %}
+        {% set baseParams = {} %}
+        {% for key, value in filters %}
+            {% if value is not empty %}
+                {% set baseParams = baseParams|merge({ (key): value }) %}
+            {% endif %}
+        {% endfor %}
+        {% set baseParams = baseParams|merge({'per_page': per_page}) %}
+        <nav aria-label="Пагинация Wildberries report details">
+            <ul class="pagination">
+                <li class="page-item {{ page <= 1 ? 'disabled' : '' }}">
+                    <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': page - 1})) }}">Назад</a>
+                </li>
+                {% if pages > 10 %}
+                    {% for pageNumber in 1..4 %}
+                        <li class="page-item {{ pageNumber == page ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="page-item disabled">
+                        <span class="page-link">…</span>
+                    </li>
+                    <li class="page-item {{ pages == page ? 'active' : '' }}">
+                        <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pages})) }}">{{ pages }}</a>
+                    </li>
+                {% else %}
+                    {% for pageNumber in 1..pages %}
+                        <li class="page-item {{ pageNumber == page ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                        </li>
+                    {% endfor %}
+                {% endif %}
+                <li class="page-item {{ page >= pages ? 'disabled' : '' }}">
+                    <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': page + 1})) }}">Вперёд</a>
+                </li>
+            </ul>
+        </nav>
+    {% endif %}
+{% endblock %}
