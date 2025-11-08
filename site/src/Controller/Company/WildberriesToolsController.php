@@ -3,7 +3,12 @@
 namespace App\Controller\Company;
 
 use App\Service\ActiveCompanyService;
+use Psr\Log\LoggerInterface;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\ArrayInput;
+use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -11,6 +16,7 @@ use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
+use Symfony\Component\HttpKernel\KernelInterface;
 
 #[IsGranted('ROLE_USER')]
 #[Route('/company/wb/tools', name: 'company_wb_tools_')]
@@ -18,7 +24,9 @@ final class WildberriesToolsController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly CsrfTokenManagerInterface $csrf
+        private readonly CsrfTokenManagerInterface $csrf,
+        private readonly KernelInterface $kernel,
+        private readonly LoggerInterface $logger
     ) {}
 
     #[Route('', name: 'index', methods: ['GET'])]
@@ -46,13 +54,39 @@ final class WildberriesToolsController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
 
-        // TODO: подключить реальный сервис загрузки фин. отчётов WB для $company
-        // Пример: $this->wbFinanceFetcher->runForCompany($company->getId());
+        $application = new Application($this->kernel);
+        $application->setAutoExit(false);
 
-        $this->addFlash('success', sprintf(
-            'Запущена задача: Финансовые отчёты WB для компании «%s».',
-            (string) $company->getName()
-        ));
+        $input = new ArrayInput([
+            'command' => 'app:wb:report-detail:sync',
+            '--company' => $company->getId(),
+        ]);
+        $output = new BufferedOutput();
+
+        try {
+            $exitCode = $application->run($input, $output);
+        } catch (\Throwable $exception) {
+            $this->logger->error('Wildberries finance sync failed', [
+                'companyId' => $company->getId(),
+                'exception' => $exception->getMessage(),
+            ]);
+            $exitCode = Command::FAILURE;
+            $output->writeln($exception->getMessage());
+        }
+
+        $message = trim($output->fetch());
+
+        if (Command::SUCCESS === $exitCode) {
+            $this->addFlash('success', '' !== $message ? $message : sprintf(
+                'Запущена задача: Финансовые отчёты WB для компании «%s».',
+                (string) $company->getName()
+            ));
+        } else {
+            $this->addFlash('danger', '' !== $message ? $message : sprintf(
+                'Не удалось запустить загрузку фин. отчётов WB для компании «%s».',
+                (string) $company->getName()
+            ));
+        }
 
         return $this->redirectToRoute('company_wb_tools_index');
     }
@@ -70,13 +104,39 @@ final class WildberriesToolsController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
 
-        // TODO: подключить реальный сервис загрузки продаж WB для $company
-        // Пример: $this->wbSalesFetcher->runForCompany($company->getId());
+        $application = new Application($this->kernel);
+        $application->setAutoExit(false);
 
-        $this->addFlash('success', sprintf(
-            'Запущена задача: Продажи WB для компании «%s».',
-            (string) $company->getName()
-        ));
+        $input = new ArrayInput([
+            'command' => 'app:wildberries:sync-sales',
+            '--company' => $company->getId(),
+        ]);
+        $output = new BufferedOutput();
+
+        try {
+            $exitCode = $application->run($input, $output);
+        } catch (\Throwable $exception) {
+            $this->logger->error('Wildberries sales sync failed', [
+                'companyId' => $company->getId(),
+                'exception' => $exception->getMessage(),
+            ]);
+            $exitCode = Command::FAILURE;
+            $output->writeln($exception->getMessage());
+        }
+
+        $message = trim($output->fetch());
+
+        if (Command::SUCCESS === $exitCode) {
+            $this->addFlash('success', '' !== $message ? $message : sprintf(
+                'Запущена задача: Продажи WB для компании «%s».',
+                (string) $company->getName()
+            ));
+        } else {
+            $this->addFlash('danger', '' !== $message ? $message : sprintf(
+                'Не удалось запустить загрузку продаж WB для компании «%s».',
+                (string) $company->getName()
+            ));
+        }
 
         return $this->redirectToRoute('company_wb_tools_index');
     }
