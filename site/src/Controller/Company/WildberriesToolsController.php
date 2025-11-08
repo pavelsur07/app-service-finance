@@ -2,7 +2,7 @@
 
 namespace App\Controller\Company;
 
-use App\Service\CompanyContextService;
+use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,14 +17,14 @@ use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 final class WildberriesToolsController extends AbstractController
 {
     public function __construct(
-        private readonly CompanyContextService $companyContext,
+        private readonly ActiveCompanyService $activeCompanyService,
         private readonly CsrfTokenManagerInterface $csrf
     ) {}
 
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(): Response
     {
-        $company = $this->companyContext->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
 
         return $this->render('company/wb/tools.html.twig', [
             'company' => $company,
@@ -44,7 +44,7 @@ final class WildberriesToolsController extends AbstractController
             return $this->redirectToRoute('company_wb_tools_index');
         }
 
-        $company = $this->companyContext->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
 
         // TODO: подключить реальный сервис загрузки фин. отчётов WB для $company
         // Пример: $this->wbFinanceFetcher->runForCompany($company->getId());
@@ -68,7 +68,7 @@ final class WildberriesToolsController extends AbstractController
             return $this->redirectToRoute('company_wb_tools_index');
         }
 
-        $company = $this->companyContext->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
 
         // TODO: подключить реальный сервис загрузки продаж WB для $company
         // Пример: $this->wbSalesFetcher->runForCompany($company->getId());
