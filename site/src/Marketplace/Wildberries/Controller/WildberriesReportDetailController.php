@@ -202,10 +202,19 @@ SQL;
         $page = max(1, (int) $request->query->get('page', 1));
         $perPage = max(10, min(100, (int) $request->query->get('per_page', 20)));
 
-        $qbCount = clone $qb;
-        $qbCount->resetDQLPart('orderBy');
-        $qbCount->select('COUNT(il.id)');
-        $total = (int) $qbCount->getQuery()->getSingleScalarResult();
+        $conn = $em->getConnection();
+        $total = (int) $conn->createQueryBuilder()
+            ->select('COUNT(*)')
+            ->from('import_log', 'il')
+            ->where('il.company_id = :companyId')
+            ->andWhere('il.source = :source')
+            ->andWhere('il.started_at >= :start')
+            ->andWhere('il.started_at < :end')
+            ->setParameter('companyId', $company->getId(), Types::GUID)
+            ->setParameter('source', $source)
+            ->setParameter('start', $weekStart, Types::DATETIME_IMMUTABLE)
+            ->setParameter('end', $weekEnd, Types::DATETIME_IMMUTABLE)
+            ->fetchOne();
 
         $rows = $qb
             ->setFirstResult(($page - 1) * $perPage)
