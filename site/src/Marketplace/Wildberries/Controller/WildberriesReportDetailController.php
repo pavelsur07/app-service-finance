@@ -294,6 +294,7 @@ SQL;
         $qb->orderBy('d.saleDt', 'ASC')->addOrderBy('d.rrdId', 'ASC');
 
         $qbCount = clone $qb;
+        $qbCount->resetDQLPart('orderBy');
         $qbCount->select('COUNT(d.id)');
         $total = (int) $qbCount->getQuery()->getSingleScalarResult();
 
