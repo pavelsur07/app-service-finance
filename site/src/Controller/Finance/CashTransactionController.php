@@ -165,7 +165,7 @@ class CashTransactionController extends AbstractController
 
                     return $this->redirectToRoute('cash_transaction_index', array_filter(
                         $request->query->all(),
-                        static fn($value) => $value !== null && $value !== ''
+                        static fn ($value) => null !== $value && '' !== $value
                     ));
                 } catch (\DomainException $e) {
                     // Период закрыт — показать ошибку пользователю
@@ -220,7 +220,7 @@ class CashTransactionController extends AbstractController
 
                     return $this->redirectToRoute('cash_transaction_index', array_filter(
                         $request->query->all(),
-                        static fn($value) => $value !== null && $value !== ''
+                        static fn ($value) => null !== $value && '' !== $value
                     ));
                 } catch (\DomainException $e) {
                     // Период закрыт — показать ошибку и остаться на форме
