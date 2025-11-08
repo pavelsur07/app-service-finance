@@ -39,6 +39,13 @@ final class WildberriesReportDetailImporter
 
         $processed = 0;
         $rrdIdCursor = 0;
+        $log = $this->importLogger->start(
+            $company,
+            'wildberries_report_detail',
+            false,
+            null,
+            null
+        );
 
         try {
             while (true) {
@@ -59,7 +66,7 @@ final class WildberriesReportDetailImporter
                 foreach ($payload as $row) {
                     if (!isset($row['rrd_id'])) {
                         $this->logger->warning('[WB:ReportDetail] Skip row without rrd_id', ['row' => $row]);
-                        $this->importLogger->incError();
+                        $this->importLogger->incError($log);
                         continue;
                     }
 
@@ -69,6 +76,7 @@ final class WildberriesReportDetailImporter
                     }
 
                     $entity = $this->repository->findOneByCompanyAndRrdId($company, $rrdId);
+                    $isNewEntity = null === $entity;
                     if (!$entity) {
                         $entity = new WildberriesReportDetail();
                         $entity->setId(Uuid::uuid4()->toString());
@@ -113,6 +121,10 @@ final class WildberriesReportDetailImporter
                     $entity->setUpdatedAt(new \DateTimeImmutable());
 
                     $this->em->persist($entity);
+
+                    if ($isNewEntity) {
+                        $this->importLogger->incCreated($log);
+                    }
                 }
 
                 $this->em->flush();
@@ -130,14 +142,6 @@ final class WildberriesReportDetailImporter
                 ));
             }
 
-            $this->importLogger->success(
-                'wildberries_report_detail',
-                $company,
-                $processed,
-                $dateFrom,
-                $dateTo
-            );
-
             $this->logger->info(sprintf(
                 '[WB:ReportDetail] Import finished: company=%s, processed=%d, window=[%s .. %s]',
                 $company->getId(),
@@ -148,7 +152,7 @@ final class WildberriesReportDetailImporter
 
             return $processed;
         } catch (\Throwable $e) {
-            $this->importLogger->incError();
+            $this->importLogger->incError($log);
             $this->logger->error('[WB:ReportDetail] Import failed', [
                 'company' => $company->getId(),
                 'from' => $dateFrom->format(\DATE_ATOM),
@@ -157,6 +161,8 @@ final class WildberriesReportDetailImporter
                 'error' => $e->getMessage(),
             ]);
             throw $e;
+        } finally {
+            $this->importLogger->finish($log);
         }
     }
 
