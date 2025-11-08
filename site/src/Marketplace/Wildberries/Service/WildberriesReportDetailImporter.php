@@ -29,6 +29,9 @@ final class WildberriesReportDetailImporter
      */
     public function import(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, string $period = 'daily'): int
     {
+        $dateFrom = $this->normalizeDate($dateFrom);
+        $dateTo = $this->normalizeDate($dateTo);
+
         $this->logger->info(sprintf(
             '[WB:ReportDetail] Start import: company=%s, from=%s, to=%s, period=%s',
             $company->getId(),
@@ -192,6 +195,9 @@ final class WildberriesReportDetailImporter
      */
     private function iterateDateWindows(\DateTimeImmutable $from, \DateTimeImmutable $to, string $period): iterable
     {
+        $from = $this->normalizeDate($from);
+        $to = $this->normalizeDate($to);
+
         $chunkSize = $this->windowSizeDays($period);
         $cursor = $from;
 
@@ -222,6 +228,11 @@ final class WildberriesReportDetailImporter
         $candidate = $start->add(new \DateInterval(sprintf('P%dD', $days)));
 
         return $candidate > $globalEnd ? $globalEnd : $candidate;
+    }
+
+    private function normalizeDate(\DateTimeImmutable $value): \DateTimeImmutable
+    {
+        return $value->setTime(0, 0, 0, 0);
     }
 
     private function parseDt(?string $value): ?\DateTimeImmutable
