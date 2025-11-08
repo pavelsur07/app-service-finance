@@ -1,0 +1,94 @@
+{% extends 'base.html.twig' %}
+{% block title %}Импорты за неделю {{ iso_year }}-{{ '%02d'|format(iso_week) }}{% endblock %}
+
+{% block body %}
+{% set key_current = iso_year ~ '-' ~ ('%02d'|format(iso_week)) %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Импорты за неделю {{ iso_year }}-{{ '%02d'|format(iso_week) }}</h2>
+        <div class="text-secondary">Компания: {{ company.name ?? company.id }}</div>
+        <div class="text-secondary">Период: {{ week_from|date('d.m.Y H:i') }} — {{ week_to|date('d.m.Y H:i') }}</div>
+      </div>
+      <div class="col-auto ms-auto d-flex gap-2">
+        <a class="btn btn-outline-secondary" href="{{ path('wb_report_detail_month_show', {'ym': ym, 'source': source}) }}">Назад к неделям</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>ID импорта</th>
+              <th>Файл</th>
+              <th class="text-center">Preview</th>
+              <th>Источник</th>
+              <th>Начало</th>
+              <th>Окончание</th>
+              <th class="text-center">Создано</th>
+              <th class="text-center">Пропущено</th>
+              <th class="text-center">Ошибок</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><code class="small">{{ row.id }}</code></td>
+              <td>{{ row.fileName ?? '—' }}</td>
+              <td class="text-center">
+                {% if row.preview %}
+                  <span class="badge bg-yellow-lt">preview</span>
+                {% else %}
+                  <span class="text-secondary">—</span>
+                {% endif %}
+              </td>
+              <td>{{ row.source }}</td>
+              <td>{{ row.startedAt ? row.startedAt|date('Y-m-d H:i') : '—' }}</td>
+              <td>{{ row.finishedAt ? row.finishedAt|date('Y-m-d H:i') : '—' }}</td>
+              <td class="text-center">{{ row.createdCount }}</td>
+              <td class="text-center">{{ row.skippedDuplicates }}</td>
+              <td class="text-center">
+                {% if row.errorsCount > 0 %}
+                  <span class="text-danger fw-bold">{{ row.errorsCount }}</span>
+                {% else %}
+                  <span class="text-secondary">0</span>
+                {% endif %}
+              </td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-primary" href="{{ path('wb_report_detail_import_show', {'importId': row.id}) }}">Открыть импорт</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="10" class="text-secondary">Импорты за эту неделю не найдены.</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% set pages = total ? (total / per_page)|round(0, 'ceil') : 1 %}
+      {% if pages > 1 %}
+        <div class="card-footer d-flex align-items-center">
+          <p class="m-0 text-secondary">Всего импортов: {{ total }}</p>
+          <ul class="pagination m-0 ms-auto">
+            <li class="page-item {{ page <= 1 ? 'disabled' : '' }}">
+              <a class="page-link" href="{{ path('wb_report_detail_week_show', {'ym': ym, 'key': key_current, 'source': source, 'page': page > 1 ? page - 1 : 1, 'per_page': per_page}) }}">Назад</a>
+            </li>
+            <li class="page-item {{ page >= pages ? 'disabled' : '' }}">
+              <a class="page-link" href="{{ path('wb_report_detail_week_show', {'ym': ym, 'key': key_current, 'source': source, 'page': page < pages ? page + 1 : pages, 'per_page': per_page}) }}">Вперёд</a>
+            </li>
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

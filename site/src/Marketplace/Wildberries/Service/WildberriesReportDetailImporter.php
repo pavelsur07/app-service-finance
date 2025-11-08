@@ -85,6 +85,8 @@ final class WildberriesReportDetailImporter
                         $entity->setCreatedAt(new \DateTimeImmutable());
                     }
 
+                    $entity->setImportId($log->getId());
+
                     // WB identifiers
                     $entity->setRealizationreportId(isset($row['realizationreport_id']) ? (int) $row['realizationreport_id'] : null);
 

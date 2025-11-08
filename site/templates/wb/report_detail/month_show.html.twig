@@ -1,0 +1,63 @@
+{% extends 'base.html.twig' %}
+{% block title %}Журнал WB за {{ ym }}{% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Журнал за {{ ym }} (недели)</h2>
+        <div class="text-secondary">Компания: {{ company.name ?? company.id }}</div>
+        <div class="text-secondary">Период: {{ period.from|date('d.m.Y') }} — {{ period.to|date('d.m.Y') }}</div>
+      </div>
+      <div class="col-auto ms-auto">
+        <a class="btn btn-outline-secondary" href="{{ path('wb_report_detail_months', {'source': source}) }}">Назад к месяцам</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>ISO-неделя</th>
+              <th>Начало</th>
+              <th>Окончание</th>
+              <th class="text-center">Импортов</th>
+              <th class="text-center">Создано</th>
+              <th class="text-center">Пропущено</th>
+              <th class="text-center">Ошибок</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for week in weeks %}
+            {% set key = week.iso_year ~ '-' ~ ('%02d'|format(week.iso_week|int)) %}
+            <tr>
+              <td><span class="badge bg-primary-lt">{{ week.iso_year }}-{{ '%02d'|format(week.iso_week|int) }}</span></td>
+              <td>{{ week.started_min ? week.started_min|date('Y-m-d H:i') : '—' }}</td>
+              <td>{{ week.finished_max ? week.finished_max|date('Y-m-d H:i') : '—' }}</td>
+              <td class="text-center">{{ week.imports_count }}</td>
+              <td class="text-center">{{ week.created_sum }}</td>
+              <td class="text-center">{{ week.skipped_sum }}</td>
+              <td class="text-center">{{ week.errors_sum }}</td>
+              <td class="text-end">
+                <a class="btn btn-sm btn-primary" href="{{ path('wb_report_detail_week_show', {'ym': ym, 'key': key, 'source': source}) }}">Открыть</a>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="8" class="text-secondary">Нет импортов в выбранном месяце.</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

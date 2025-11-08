@@ -18,6 +18,9 @@ class WildberriesReportDetail
     #[ORM\JoinColumn(name: 'company_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private Company $company;
 
+    #[ORM\Column(name: 'import_id', type: 'guid')]
+    private string $importId;
+
     // WB identifiers
     #[ORM\Column(name: 'realizationreport_id', type: 'bigint', nullable: true)]
     private ?int $realizationreportId = null;
@@ -122,6 +125,18 @@ class WildberriesReportDetail
     public function setCompany(Company $company): self
     {
         $this->company = $company;
+
+        return $this;
+    }
+
+    public function getImportId(): string
+    {
+        return $this->importId;
+    }
+
+    public function setImportId(string $importId): self
+    {
+        $this->importId = $importId;
 
         return $this;
     }
