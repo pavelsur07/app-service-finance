@@ -306,6 +306,10 @@
                             <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
                                 <span>Настройки отчётов (API-ключ)</span>
                             </a>
+                            {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
+                            <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
+                                <span>Доступ → WB: Тех. операции</span>
+                            </a>
                             <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
                                 <span>Логи и аудит</span>
                             </a>
