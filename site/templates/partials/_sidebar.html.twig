@@ -78,26 +78,6 @@
                     </a>
                 </li>
 
-                <!-- Отчетность -->
-{#                <div class="nav-section-title hide-when-collapsed">Отчётность</div>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Движение денег (ДДС)">
-                        <span class="nav-link-icon"><i class="ti ti-arrows-left-right"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Движение денег</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Прибыль и убытки (ОПиУ)">
-                        <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Баланс">
-                        <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Баланс</span>
-                    </a>
-                </li>#}
 
                 {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
                 {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
@@ -125,16 +105,16 @@
                                     <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
                                 </a>
                             </li>
-                            <li class="nav-item {{ wb_report_detail_active ? 'active' : '' }}">
-                                <a class="nav-link {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_months') }}" title="Фин. отчёты WB (детализация)">
-                                    <span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Фин. отчёты WB (детализация)</span>
-                                </a>
-                            </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="#" title="Счета / касса / кошелек">
                                     <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
                                     <span class="nav-link-title hide-when-collapsed">Баланс</span>
+                                </a>
+                            </li>
+                            <li class="nav-item {{ wb_report_detail_active ? 'active' : '' }}">
+                                <a class="nav-link {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_months') }}" title="Фин. отчёты WB (детализация)">
+                                    <span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span>
+                                    <span class="nav-link-title hide-when-collapsed">Фин. отчёты WB (детализация)</span>
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -299,19 +279,14 @@
                             <a class="dropdown-item {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
                                 <span>Профиль компании</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Пользователи и роли</span>
-                            </a>
+
                             {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
                             <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
                                 <span>Настройки отчётов (API-ключ)</span>
                             </a>
                             {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
                             <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
-                                <span>Доступ → WB: Тех. операции</span>
-                            </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Логи и аудит</span>
+                                <span>WB: Тех. операции</span>
                             </a>
 
                             {% set reports_debug_active =
