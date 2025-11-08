@@ -32,9 +32,18 @@ final class WildberriesReportDetailImporter
         $dateFrom = $this->normalizeDate($dateFrom);
         $dateTo = $this->normalizeDate($dateTo);
 
+        $companyId = $company->getId();
+        if (null === $companyId) {
+            throw new \RuntimeException('Cannot import WB report details for a company without identifier');
+        }
+
+        $companyId = (string) $companyId;
+
+        $company = $this->em->getReference(Company::class, $companyId);
+
         $this->logger->info(sprintf(
             '[WB:ReportDetail] Start import: company=%s, from=%s, to=%s, period=%s',
-            $company->getId(),
+            $companyId,
             $dateFrom->format(\DATE_ATOM),
             $dateTo->format(\DATE_ATOM),
             $period
@@ -142,7 +151,7 @@ final class WildberriesReportDetailImporter
 
                     $this->logger->info(sprintf(
                         '[WB:ReportDetail] Batch imported: company=%s, window=[%s .. %s], batch=%d, processed_total=%d, next_rrd_cursor=%d',
-                        $company->getId(),
+                        $companyId,
                         $windowFrom->format(\DATE_ATOM),
                         $windowTo->format(\DATE_ATOM),
                         \count($payload),
@@ -152,7 +161,7 @@ final class WildberriesReportDetailImporter
 
                     if ($nextCursor === $rrdIdCursor) {
                         $this->logger->warning('[WB:ReportDetail] Cursor did not advance, stop pagination to avoid infinite loop', [
-                            'company' => $company->getId(),
+                            'company' => $companyId,
                             'window_from' => $windowFrom->format(\DATE_ATOM),
                             'window_to' => $windowTo->format(\DATE_ATOM),
                             'cursor' => $rrdIdCursor,
@@ -166,7 +175,7 @@ final class WildberriesReportDetailImporter
 
             $this->logger->info(sprintf(
                 '[WB:ReportDetail] Import finished: company=%s, processed=%d, window=[%s .. %s]',
-                $company->getId(),
+                $companyId,
                 $processed,
                 $dateFrom->format(\DATE_ATOM),
                 $dateTo->format(\DATE_ATOM)
@@ -176,7 +185,7 @@ final class WildberriesReportDetailImporter
         } catch (\Throwable $e) {
             $this->importLogger->incError($log);
             $this->logger->error('[WB:ReportDetail] Import failed', [
-                'company' => $company->getId(),
+                'company' => $companyId,
                 'from' => $dateFrom->format(\DATE_ATOM),
                 'to' => $dateTo->format(\DATE_ATOM),
                 'period' => $period,
