@@ -148,6 +148,10 @@ final class WildberriesReportDetailImporter
                     $this->em->flush();
                     $this->em->clear(WildberriesReportDetail::class);
 
+                    // Doctrine может отделить компанию после очистки контекста, поэтому убеждаемся,
+                    // что в дальнейшем используем управляемый экземпляр.
+                    $company = $this->em->getReference(Company::class, $companyId);
+
                     $processed += \count($payload);
                     $nextCursor = $maxInBatch;
 
