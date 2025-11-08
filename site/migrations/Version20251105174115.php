@@ -111,7 +111,7 @@ final class Version20251105174115 extends AbstractMigration
         $this->addSql('COMMENT ON COLUMN ozon_orders.updated_at IS \'(DC2Type:datetime_immutable)\'');
         $this->addSql('ALTER TABLE ozon_orders ADD CONSTRAINT FK_8E0BFFAC979B1AD6 FOREIGN KEY (company_id) REFERENCES "companies" (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('CREATE INDEX IDX_8E0BFFAC979B1AD6 ON ozon_orders (company_id)');
-        $this->addSql('CREATE INDEX idx_company_scheme_ozon_updated_at ON ozon_orders (company_id, scheme, ozon_updated_at)');
+        $this->addSql('CREATE INDEX IF NOT EXISTS idx_company_scheme_ozon_updated_at ON ozon_orders (company_id, scheme, ozon_updated_at)');
         $this->addSql('ALTER INDEX idx_ozon_product_sales_product RENAME TO IDX_8CE737854584665A');
         $this->addSql('ALTER INDEX idx_ozon_product_sales_company RENAME TO IDX_8CE73785979B1AD6');
         $this->addSql('ALTER INDEX uniq_ozon_product_sales_period RENAME TO uniq_sales_period');
