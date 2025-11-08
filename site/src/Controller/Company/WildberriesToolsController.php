@@ -58,7 +58,7 @@ final class WildberriesToolsController extends AbstractController
         $application->setAutoExit(false);
 
         $input = new ArrayInput([
-            'command' => 'app:wb:report-detail:sync',
+            'command' => 'wb:report-detail:import',
             '--company' => $company->getId(),
         ]);
         $output = new BufferedOutput();

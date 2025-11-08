@@ -16,8 +16,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Throwable;
 
 #[AsCommand(
-    name: 'app:wb:report-detail:sync',
-    description: 'Синхронизация детализации фин. отчётов Wildberries (v5) с курсором rrd_id'
+    name: 'wb:report-detail:import',
+    description: 'Импорт детализации фин. отчётов Wildberries (v5) за интервал дат'
 )]
 class WildberriesReportDetailSyncCommand extends Command
 {
@@ -54,7 +54,8 @@ class WildberriesReportDetailSyncCommand extends Command
                 'period',
                 null,
                 InputOption::VALUE_REQUIRED,
-                'Период агрегации (daily|weekly)'
+                'Период агрегации (daily|weekly)',
+                'weekly'
             );
     }
 
@@ -63,7 +64,13 @@ class WildberriesReportDetailSyncCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         $companyId = $input->getOption('company');
-        $period = strtolower((string) ($input->getOption('period') ?? 'daily'));
+        if (null === $companyId || '' === $companyId) {
+            $io->error('Опция --company обязательна.');
+
+            return Command::INVALID;
+        }
+
+        $period = strtolower((string) ($input->getOption('period') ?? 'weekly'));
         if (!in_array($period, ['daily', 'weekly'], true)) {
             $io->error('Опция --period должна быть daily или weekly.');
 
@@ -93,90 +100,49 @@ class WildberriesReportDetailSyncCommand extends Command
             return Command::INVALID;
         }
 
-        $companyRepository = $this->registry->getRepository(Company::class);
+        /** @var Company|null $company */
+        $company = $this->registry->getRepository(Company::class)->find($companyId);
+        if (!$company) {
+            $io->error(sprintf('Компания с id=%s не найдена.', $companyId));
 
-        $companies = [];
-        if ($companyId) {
-            /** @var Company|null $company */
-            $company = $companyRepository->find($companyId);
-            if (!$company) {
-                $io->error(sprintf('Компания с id=%s не найдена.', $companyId));
-
-                return Command::FAILURE;
-            }
-
-            $companies = [$company];
-        } else {
-            if (!method_exists($companyRepository, 'createQueryBuilder')) {
-                $io->error('Репозиторий Company не поддерживает построение запросов.');
-
-                return Command::FAILURE;
-            }
-
-            $companies = $companyRepository
-                ->createQueryBuilder('c')
-                ->andWhere("c.wildberriesApiKey IS NOT NULL AND c.wildberriesApiKey <> ''")
-                ->orderBy('c.name', 'ASC')
-                ->getQuery()
-                ->getResult();
-        }
-
-        if (!$companies) {
-            $io->warning('Компании с Wildberries API ключом не найдены.');
-
-            return Command::SUCCESS;
-        }
-
-        $hasErrors = false;
-        foreach ($companies as $company) {
-            \assert($company instanceof Company);
-
-            if (!method_exists($company, 'getWildberriesApiKey') || !$company->getWildberriesApiKey()) {
-                $message = sprintf('Пропуск компании %s: не задан wildberriesApiKey.', (string) $company->getId());
-                if ($companyId) {
-                    $io->error($message);
-
-                    return Command::FAILURE;
-                }
-
-                $io->warning($message);
-
-                continue;
-            }
-
-            if ($manualFrom && $manualTo) {
-                $dateFrom = $manualFrom;
-                $dateTo = $manualTo;
-            } else {
-                [$dateFrom, $dateTo] = $this->calculateAutoWindow($company);
-            }
-
-            $io->section(sprintf(
-                'Старт импорта WB детализации: company=%s (%s)',
-                $company->getId(),
-                $company->getName() ?? 'без названия'
-            ));
-            $io->text(sprintf(
-                'Интервал: [%s .. %s], period=%s',
-                $dateFrom->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM),
-                $dateTo->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM),
-                $period
-            ));
-
-            try {
-                $processed = $this->importer->import($company, $dateFrom, $dateTo, $period);
-                $io->success(sprintf('Импорт завершён. Обработано записей: %d.', $processed));
-            } catch (Throwable $exception) {
-                $hasErrors = true;
-                $io->error(sprintf('Ошибка импорта: %s', $exception->getMessage()));
-            }
-        }
-
-        if ($hasErrors) {
             return Command::FAILURE;
         }
 
-        return Command::SUCCESS;
+        if (!method_exists($company, 'getWildberriesApiKey') || !$company->getWildberriesApiKey()) {
+            $io->error(sprintf('У компании %s не задан wildberriesApiKey.', (string) $company->getId()));
+
+            return Command::FAILURE;
+        }
+
+        if ($manualFrom && $manualTo) {
+            $dateFrom = $manualFrom;
+            $dateTo = $manualTo;
+        } else {
+            [$dateFrom, $dateTo] = $this->calculateAutoWindow($company);
+        }
+
+        $io->section(sprintf(
+            'Старт импорта WB детализации: company=%s (%s)',
+            $company->getId(),
+            $company->getName() ?? 'без названия'
+        ));
+        $io->text(sprintf(
+            'Интервал: [%s .. %s], period=%s',
+            $dateFrom->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM),
+            $dateTo->setTimezone(new \DateTimeZone('UTC'))->format(\DateTimeInterface::ATOM),
+            $period
+        ));
+
+        try {
+            $this->importer->importPeriodForCompany($company, $dateFrom, $dateTo, $period);
+            $io->success('Импорт завершён.');
+
+            return Command::SUCCESS;
+        } catch (Throwable $exception) {
+            $io->error(sprintf('Ошибка импорта: %s', $exception->getMessage()));
+
+            return Command::FAILURE;
+        }
     }
 
     private function parseDateOption(?string $value, string $optionName, bool $endOfDay): ?\DateTimeImmutable

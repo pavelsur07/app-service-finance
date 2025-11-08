@@ -22,12 +22,26 @@ final class WildberriesReportDetailImporter
     ) {
     }
 
+    public function importPeriodForCompany(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $period = 'weekly'
+    ): void {
+        $this->doImport($company, $dateFrom, $dateTo, $period);
+    }
+
     /**
      * Импорт детализации за интервал дат (WB v5, period=daily|weekly).
      *
      * @return int Количество обработанных строк
      */
     public function import(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, string $period = 'daily'): int
+    {
+        return $this->doImport($company, $dateFrom, $dateTo, $period);
+    }
+
+    private function doImport(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, string $period): int
     {
         $dateFrom = $this->normalizeDate($dateFrom);
         $dateTo = $this->normalizeDate($dateTo);
@@ -38,9 +52,8 @@ final class WildberriesReportDetailImporter
         }
 
         $companyId = (string) $companyId;
-        $company = $this->em->find(Company::class, $companyId);
-        if (null === $company) {
-            throw new \RuntimeException(sprintf('Cannot import WB report details: company %s not found', $companyId));
+        if (!$this->em->contains($company)) {
+            $company = $this->em->getReference(Company::class, $companyId);
         }
 
         $this->logger->info(sprintf(
