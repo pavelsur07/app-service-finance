@@ -1,0 +1,252 @@
+{% extends 'base.html.twig' %}
+{% block title %}Импорт {{ import.id }} · {{ import.startedAt ? import.startedAt|date('d.m.Y') : '' }}{% endblock %}
+
+{% set started_at = import.startedAt %}
+{% set week_params = started_at ? {'ym': started_at|date('Y-m'), 'key': started_at|date('o-W'), 'source': import.source} : {} %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Импорт: {{ import.id }} · {{ import.startedAt ? import.startedAt|date('d.m.Y H:i') : '—' }}</h2>
+        <div class="text-secondary">Компания: {{ company.name ?? company.id }}</div>
+        <div class="text-secondary">Источник: {{ import.source }} · Создано: {{ import.createdCount }}, пропущено: {{ import.skippedDuplicates }}, ошибок: {{ import.errorsCount }}</div>
+      </div>
+      <div class="col-auto ms-auto">
+        {% if started_at %}
+          <a class="btn btn-outline-secondary" href="{{ path('wb_report_detail_week_show', week_params) }}">Назад к неделе</a>
+        {% else %}
+          <span class="btn btn-outline-secondary disabled">Неделя неизвестна</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card mb-3">
+      <div class="card-body">
+        <form class="row g-3" method="get">
+          <div class="col-sm-2">
+            <label class="form-label" for="filter-nmid">nmId</label>
+            <input type="number" class="form-control" id="filter-nmid" name="nmId" value="{{ filters.nmId }}" min="0">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label" for="filter-brand">Бренд</label>
+            <input type="text" class="form-control" id="filter-brand" name="brand" value="{{ filters.brand }}" placeholder="например, wildberries">
+          </div>
+          <div class="col-sm-3">
+            <label class="form-label" for="filter-subject">Предмет</label>
+            <input type="text" class="form-control" id="filter-subject" name="subject" value="{{ filters.subject }}">
+          </div>
+          <div class="col-sm-2">
+            <label class="form-label" for="filter-site-country">Страна сайта</label>
+            <select class="form-select" id="filter-site-country" name="siteCountry">
+              <option value="">Все</option>
+              {% for country in site_countries %}
+                <option value="{{ country }}" {{ filters.siteCountry == country ? 'selected' }}>{{ country }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-sm-2">
+            <label class="form-label" for="filter-date-from">Дата с</label>
+            <input type="date" class="form-control" id="filter-date-from" name="dateFrom" value="{{ filters.dateFrom }}">
+          </div>
+          <div class="col-sm-2">
+            <label class="form-label" for="filter-date-to">Дата по</label>
+            <input type="date" class="form-control" id="filter-date-to" name="dateTo" value="{{ filters.dateTo }}">
+          </div>
+          <div class="col-sm-2">
+            <label class="form-label" for="filter-per-page">На странице</label>
+            <input type="number" class="form-control" id="filter-per-page" name="per_page" value="{{ per_page }}" min="20" max="200">
+          </div>
+          <div class="col-sm-2 align-self-end">
+            <button class="btn btn-primary w-100" type="submit">Применить</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Дата продажи</th>
+              <th>nmId</th>
+              <th>Бренд</th>
+              <th>Предмет</th>
+              <th class="text-end">Цена (со скидкой)</th>
+              <th class="text-end">Комиссия</th>
+              <th class="text-end">Логистика</th>
+              <th class="text-end">Эквайринг</th>
+              <th class="text-end">Хранение</th>
+              <th class="text-end">Штраф</th>
+              <th class="text-end">К выплате</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+          {% for r in rows %}
+            <tr>
+              <td>{{ r.saleDt ? r.saleDt|date('d.m.Y') : '—' }}</td>
+              <td>{{ r.nmId ?? '—' }}</td>
+              <td>{{ r.brandName ?? '—' }}</td>
+              <td>{{ r.subjectName ?? '—' }}</td>
+              <td class="text-end">{{ r.retailPriceWithDiscRub is not null ? r.retailPriceWithDiscRub|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.ppvzSalesCommission is not null ? r.ppvzSalesCommission|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.deliveryRub is not null ? r.deliveryRub|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.acquiringFee is not null ? r.acquiringFee|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.storageFee is not null ? r.storageFee|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.penalty is not null ? r.penalty|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">{{ r.ppvzForPay is not null ? r.ppvzForPay|number_format(2, ',', ' ') : '—' }}</td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-toggle="offcanvas" data-bs-target="#rowOffcanvas" data-row-id="{{ r.id }}" onclick="openRow(this)">Подробнее</button>
+              </td>
+            </tr>
+          {% else %}
+            <tr>
+              <td colspan="12" class="text-secondary">Строки детализации не найдены.</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      {% set pages = total ? (total / per_page)|round(0, 'ceil') : 1 %}
+      {% if pages > 1 %}
+        <div class="card-footer d-flex align-items-center">
+          <p class="m-0 text-secondary">Всего строк: {{ total }}</p>
+          <ul class="pagination m-0 ms-auto">
+            <li class="page-item {{ page <= 1 ? 'disabled' : '' }}">
+              <a class="page-link" href="{{ path('wb_report_detail_import_show', app.request.query.all|merge({'importId': import.id, 'page': page > 1 ? page - 1 : 1, 'per_page': per_page})) }}">Назад</a>
+            </li>
+            <li class="page-item {{ page >= pages ? 'disabled' : '' }}">
+              <a class="page-link" href="{{ path('wb_report_detail_import_show', app.request.query.all|merge({'importId': import.id, 'page': page < pages ? page + 1 : pages, 'per_page': per_page})) }}">Вперёд</a>
+            </li>
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="offcanvas offcanvas-end" tabindex="-1" id="rowOffcanvas" aria-labelledby="rowOffcanvasLabel">
+  <div class="offcanvas-header">
+    <h2 class="offcanvas-title h4" id="rowOffcanvasLabel">Детализация строки</h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body">
+    <dl class="row mb-3" id="rowDetails">
+      <dt class="col-5 text-secondary">RRD ID</dt>
+      <dd class="col-7" data-field="rrd_id">—</dd>
+      <dt class="col-5 text-secondary">nmId</dt>
+      <dd class="col-7" data-field="nm_id">—</dd>
+      <dt class="col-5 text-secondary">Бренд</dt>
+      <dd class="col-7" data-field="brand_name">—</dd>
+      <dt class="col-5 text-secondary">Предмет</dt>
+      <dd class="col-7" data-field="subject_name">—</dd>
+      <dt class="col-5 text-secondary">Дата продажи</dt>
+      <dd class="col-7" data-field="sale_dt">—</dd>
+      <dt class="col-5 text-secondary">Дата заказа</dt>
+      <dd class="col-7" data-field="order_dt">—</dd>
+      <dt class="col-5 text-secondary">Дата расчёта</dt>
+      <dd class="col-7" data-field="rr_dt">—</dd>
+      <dt class="col-5 text-secondary">Комиссия</dt>
+      <dd class="col-7" data-field="ppvz_sales_commission">—</dd>
+      <dt class="col-5 text-secondary">Доставка</dt>
+      <dd class="col-7" data-field="delivery_rub">—</dd>
+      <dt class="col-5 text-secondary">Хранение</dt>
+      <dd class="col-7" data-field="storage_fee">—</dd>
+      <dt class="col-5 text-secondary">Эквайринг</dt>
+      <dd class="col-7" data-field="acquiring_fee">—</dd>
+      <dt class="col-5 text-secondary">Штраф</dt>
+      <dd class="col-7" data-field="penalty">—</dd>
+      <dt class="col-5 text-secondary">К выплате</dt>
+      <dd class="col-7" data-field="ppvz_for_pay">—</dd>
+      <dt class="col-5 text-secondary">Страна</dt>
+      <dd class="col-7" data-field="site_country">—</dd>
+      <dt class="col-5 text-secondary">Операция</dt>
+      <dd class="col-7" data-field="supplier_oper_name">—</dd>
+      <dt class="col-5 text-secondary">Тип документа</dt>
+      <dd class="col-7" data-field="doc_type_name">—</dd>
+    </dl>
+    <div>
+      <h3 class="h5">RAW</h3>
+      <pre class="bg-light p-2 rounded small text-break" id="rowRaw">{}</pre>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+  {{ parent() }}
+  <script>
+    const numberFormatter = new Intl.NumberFormat('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+    function formatNumber(value) {
+      if (value === null || value === undefined) {
+        return '—';
+      }
+      if (typeof value === 'number') {
+        return numberFormatter.format(value);
+      }
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? numberFormatter.format(parsed) : value;
+    }
+
+    async function openRow(btn) {
+      const id = btn.getAttribute('data-row-id');
+      if (!id) {
+        return;
+      }
+      const url = '{{ path('wb_report_detail_row_show', {'id': 'ROWID'}) }}'.replace('ROWID', encodeURIComponent(id));
+      try {
+        const response = await fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+        if (!response.ok) {
+          throw new Error('Network error');
+        }
+        const data = await response.json();
+        fillRowDetails(data);
+      } catch (error) {
+        console.error('Failed to load row', error);
+      }
+    }
+
+    function fillRowDetails(data) {
+      const container = document.getElementById('rowDetails');
+      if (!container) {
+        return;
+      }
+      container.querySelector('[data-field="rrd_id"]').textContent = data.rrd_id ?? '—';
+      container.querySelector('[data-field="nm_id"]').textContent = data.nm_id ?? '—';
+      container.querySelector('[data-field="brand_name"]').textContent = data.brand_name ?? '—';
+      container.querySelector('[data-field="subject_name"]').textContent = data.subject_name ?? '—';
+      container.querySelector('[data-field="sale_dt"]').textContent = data.sale_dt ?? '—';
+      container.querySelector('[data-field="order_dt"]').textContent = data.order_dt ?? '—';
+      container.querySelector('[data-field="rr_dt"]').textContent = data.rr_dt ?? '—';
+      container.querySelector('[data-field="ppvz_sales_commission"]').textContent = formatNumber(data.ppvz_sales_commission);
+      container.querySelector('[data-field="delivery_rub"]').textContent = formatNumber(data.delivery_rub);
+      container.querySelector('[data-field="storage_fee"]').textContent = formatNumber(data.storage_fee);
+      container.querySelector('[data-field="acquiring_fee"]').textContent = formatNumber(data.acquiring_fee);
+      container.querySelector('[data-field="penalty"]').textContent = formatNumber(data.penalty);
+      container.querySelector('[data-field="ppvz_for_pay"]').textContent = formatNumber(data.ppvz_for_pay);
+      container.querySelector('[data-field="site_country"]').textContent = data.site_country ?? '—';
+      container.querySelector('[data-field="supplier_oper_name"]').textContent = data.supplier_oper_name ?? '—';
+      container.querySelector('[data-field="doc_type_name"]').textContent = data.doc_type_name ?? '—';
+
+      const rawEl = document.getElementById('rowRaw');
+      if (rawEl) {
+        rawEl.textContent = JSON.stringify(data.raw ?? {}, null, 2);
+      }
+
+      const offcanvasTitle = document.getElementById('rowOffcanvasLabel');
+      if (offcanvasTitle) {
+        offcanvasTitle.textContent = `Строка #${data.rrd_id ?? data.id ?? ''}`.trim();
+      }
+    }
+  </script>
+{% endblock %}

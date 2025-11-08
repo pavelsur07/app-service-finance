@@ -101,7 +101,8 @@
 
                 {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
                 {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
-                {% set reports_menu_open = report_cashflow_active or finance_report_preview_active %}
+                {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+                {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active %}
                 <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
                     <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
                         <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
@@ -122,6 +123,12 @@
                                 <a class="nav-link {{ finance_report_preview_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}" title="Категории ОПиУ">
                                     <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
                                     <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
+                                </a>
+                            </li>
+                            <li class="nav-item {{ wb_report_detail_active ? 'active' : '' }}">
+                                <a class="nav-link {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_months') }}" title="Фин. отчёты WB (детализация)">
+                                    <span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span>
+                                    <span class="nav-link-title hide-when-collapsed">Фин. отчёты WB (детализация)</span>
                                 </a>
                             </li>
                             <li class="nav-item">
