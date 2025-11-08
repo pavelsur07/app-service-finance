@@ -242,36 +242,18 @@
                     {% set integrations_show = (integrations_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>МойСклад</span>
+                            {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
+                            <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
+                                <span>Wb / Продажи</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>1С</span>
+                            {% set ozon_orders_active = current_route starts with 'ozon_order' %}
+                            <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                                <span>Ozon / Заказы</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Банки</span>
+                            {% set ozon_products_active = current_route starts with 'ozon_products' %}
+                            <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                                <span>Ozon / Товары</span>
                             </a>
-                            {% set marketplaces_active = current_route starts with 'ozon_' or current_route starts with 'wildberries_' %}
-                            <div class="dropend {{ marketplaces_active ? 'show' : '' }}">
-                                <a class="dropdown-item dropdown-toggle {{ marketplaces_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
-                                    <span>Маркетплейсы</span>
-                                </a>
-                                {% set marketplaces_show = (marketplaces_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
-                                <div class="dropdown-menu {{ marketplaces_show }}">
-                                    {% set ozon_orders_active = current_route starts with 'ozon_order' %}
-                                    <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                        <span>Ozon / Заказы</span>
-                                    </a>
-                                    {% set ozon_products_active = current_route starts with 'ozon_products' %}
-                                    <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                                        <span>Ozon / Товары</span>
-                                    </a>
-                                    {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
-                                    <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                        <span>Wildberries / Продажи</span>
-                                    </a>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </li>
