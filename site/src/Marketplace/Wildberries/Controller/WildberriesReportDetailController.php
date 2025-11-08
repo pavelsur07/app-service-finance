@@ -7,6 +7,7 @@ namespace App\Marketplace\Wildberries\Controller;
 use App\Entity\ImportLog;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
 use App\Service\ActiveCompanyService;
+use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -137,12 +138,21 @@ GROUP BY to_char(il.started_at AT TIME ZONE 'UTC', 'IYYY'),
 ORDER BY iso_year DESC, iso_week DESC
 SQL;
 
-        $weeks = $conn->executeQuery($sql, [
-            'companyId' => $company->getId(),
-            'source' => $source,
-            'start' => $start,
-            'end' => $end,
-        ])->fetchAllAssociative();
+        $weeks = $conn->executeQuery(
+            $sql,
+            [
+                'companyId' => $company->getId(),
+                'source' => $source,
+                'start' => $start,
+                'end' => $end,
+            ],
+            [
+                'companyId' => \PDO::PARAM_STR,
+                'source' => \PDO::PARAM_STR,
+                'start' => Types::DATETIME_IMMUTABLE,
+                'end' => Types::DATETIME_IMMUTABLE,
+            ]
+        )->fetchAllAssociative();
 
         return $this->render('wb/report_detail/month_show.html.twig', [
             'company' => $company,
