@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'wildberries_report_details')]
 #[ORM\UniqueConstraint(name: 'uniq_company_rrd', columns: ['company_id', 'rrd_id'])]
+#[ORM\Index(name: 'idx_wb_report_detail_import_id', columns: ['import_id'])]
 class WildberriesReportDetail
 {
     #[ORM\Id]
