@@ -150,6 +150,7 @@ class CashTransactionAutoRuleService
 
         $category = $rule->getCashflowCategory(); // в сущности правила поле not-null
         $projectDirection = $rule->getProjectDirection();
+        $counterparty = $rule->getCounterparty();
         $action = $rule->getAction();
 
         // Семантика:
@@ -164,6 +165,10 @@ class CashTransactionAutoRuleService
                 $t->setProjectDirection($projectDirection);
                 $changed = true;
             }
+            if (null === $t->getCounterparty() && null !== $counterparty) {
+                $t->setCounterparty($counterparty);
+                $changed = true;
+            }
         } else { // UPDATE
             if ($t->getCashflowCategory() !== $category) {
                 $t->setCashflowCategory($category);
@@ -171,6 +176,10 @@ class CashTransactionAutoRuleService
             }
             if ($t->getProjectDirection() !== $projectDirection) {
                 $t->setProjectDirection($projectDirection);
+                $changed = true;
+            }
+            if ($t->getCounterparty() !== $counterparty) {
+                $t->setCounterparty($counterparty);
                 $changed = true;
             }
         }

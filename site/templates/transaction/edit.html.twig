@@ -6,7 +6,7 @@
         breadcrumbs: [
             {'label':'Главная','path':'app_home_index'},
             {'label':'Финансы'},
-            {'label':'Транзакции','path':'cash_transaction_index'},
+            {'label':'Транзакции','path':'cash_transaction_index','params': app.request.query.all},
             {'label':'Редактирование'}
         ]
     } %}

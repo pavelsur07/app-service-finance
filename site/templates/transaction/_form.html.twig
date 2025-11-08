@@ -56,7 +56,7 @@
     </div>
     <div class="card-footer text-end">
         <button class="btn btn-primary" type="submit">Сохранить</button>
-        <a href="{{ path('cash_transaction_index') }}" class="btn btn-secondary">Отмена</a>
+        <a href="{{ path('cash_transaction_index', app.request.query.all) }}" class="btn btn-secondary">Отмена</a>
     </div>
 </div>
 {{ form_end(form, {'render_rest': false}) }}

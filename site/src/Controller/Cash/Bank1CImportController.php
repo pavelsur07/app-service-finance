@@ -2,11 +2,13 @@
 
 namespace App\Controller\Cash;
 
+use App\Entity\User;
 use App\Repository\MoneyAccountRepository;
 use App\Service\AccountMasker;
 use App\Service\ActiveCompanyService;
 use App\Service\Import\ClientBank1CImportService;
 use App\Service\Import\ImportLogger;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
@@ -348,9 +350,14 @@ class Bank1CImportController extends AbstractController
 
         $user = $this->getUser();
         $userIdentifier = null;
-        if ($user instanceof UserInterface) {
-            $userIdentifier = $user->getUserIdentifier();
-        } elseif (is_string($user)) {
+        if ($user instanceof User) {
+            $userIdentifier = $user->getId();
+        } elseif ($user instanceof UserInterface) {
+            $candidate = $user->getUserIdentifier();
+            if (is_string($candidate) && Uuid::isValid($candidate)) {
+                $userIdentifier = $candidate;
+            }
+        } elseif (is_string($user) && Uuid::isValid($user)) {
             $userIdentifier = $user;
         }
 

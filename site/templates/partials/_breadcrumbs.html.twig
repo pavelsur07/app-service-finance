@@ -4,7 +4,7 @@
             {% for crumb in breadcrumbs %}
                 <li class="breadcrumb-item{% if loop.last %} active{% endif %}">
                     {% if crumb.path is defined and crumb.path and not loop.last %}
-                        <a href="{{ path(crumb.path) }}">{{ crumb.label }}</a>
+                        <a href="{{ path(crumb.path, crumb.params|default({})) }}">{{ crumb.label }}</a>
                     {% else %}
                         {{ crumb.label }}
                     {% endif %}
