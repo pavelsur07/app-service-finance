@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Marketplace\Wildberries;
 use App\Entity\Company;
 use App\Marketplace\Wildberries\Repository\WildberriesRnpDailyRepository;
 use App\Marketplace\Wildberries\Service\WildberriesRnpReportService;
-use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
 final class WildberriesRnpReportServiceTest extends TestCase
@@ -17,8 +16,8 @@ final class WildberriesRnpReportServiceTest extends TestCase
         $company = $this->createStub(Company::class);
         $company->method('getId')->willReturn('11111111-1111-1111-1111-111111111111');
 
-        $from = new DateTimeImmutable('2024-01-01');
-        $to = new DateTimeImmutable('2024-01-02');
+        $from = new \DateTimeImmutable('2024-01-01');
+        $to = new \DateTimeImmutable('2024-01-02');
 
         $repository = $this->createMock(WildberriesRnpDailyRepository::class);
         $repository
@@ -27,7 +26,7 @@ final class WildberriesRnpReportServiceTest extends TestCase
             ->with($company, $from, $to, ['sku' => [], 'brand' => [], 'category' => []])
             ->willReturn([
                 [
-                    'date' => new DateTimeImmutable('2024-01-01'),
+                    'date' => new \DateTimeImmutable('2024-01-01'),
                     'sku' => 'SKU-1',
                     'category' => 'Cat-A',
                     'brand' => 'Brand-A',
@@ -40,7 +39,7 @@ final class WildberriesRnpReportServiceTest extends TestCase
                     'cogs_sum_spp_minor' => '800',
                 ],
                 [
-                    'date' => new DateTimeImmutable('2024-01-02'),
+                    'date' => new \DateTimeImmutable('2024-01-02'),
                     'sku' => 'SKU-2',
                     'category' => null,
                     'brand' => 'Brand-B',
@@ -102,7 +101,7 @@ final class WildberriesRnpReportServiceTest extends TestCase
         $repository = $this->createMock(WildberriesRnpDailyRepository::class);
         $service = new WildberriesRnpReportService($repository);
 
-        $anchor = new DateTimeImmutable('2024-07-17'); // Wednesday
+        $anchor = new \DateTimeImmutable('2024-07-17'); // Wednesday
         ['from' => $from, 'to' => $to] = $service->resolvePeriod('week', $anchor);
 
         self::assertSame('2024-07-15', $from->format('Y-m-d'));

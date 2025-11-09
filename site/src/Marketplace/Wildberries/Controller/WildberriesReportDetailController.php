@@ -51,19 +51,19 @@ final class WildberriesReportDetailController extends AbstractController
             $qb->andWhere('d.nmId = :nmId')->setParameter('nmId', (int) $nmId);
         }
         if ($brand) {
-            $qb->andWhere('LOWER(d.brandName) LIKE :brand')->setParameter('brand', '%' . mb_strtolower($brand) . '%');
+            $qb->andWhere('LOWER(d.brandName) LIKE :brand')->setParameter('brand', '%'.mb_strtolower($brand).'%');
         }
         if ($subject) {
-            $qb->andWhere('LOWER(d.subjectName) LIKE :subject')->setParameter('subject', '%' . mb_strtolower($subject) . '%');
+            $qb->andWhere('LOWER(d.subjectName) LIKE :subject')->setParameter('subject', '%'.mb_strtolower($subject).'%');
         }
         if ($siteCountry) {
             $qb->andWhere('d.siteCountry = :sc')->setParameter('sc', $siteCountry);
         }
         if ($dateFrom) {
-            $qb->andWhere('d.saleDt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom . ' 00:00:00'));
+            $qb->andWhere('d.saleDt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom.' 00:00:00'));
         }
         if ($dateTo) {
-            $qb->andWhere('d.saleDt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo . ' 23:59:59'));
+            $qb->andWhere('d.saleDt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo.' 23:59:59'));
         }
 
         $qb->orderBy('d.saleDt', 'DESC')->addOrderBy('d.rrdId', 'DESC');

@@ -12,11 +12,11 @@ use Symfony\Component\Console\Output\BufferedOutput;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\HttpKernel\KernelInterface;
 use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Security\Csrf\CsrfToken;
 use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
-use Symfony\Component\HttpKernel\KernelInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
 #[Route('/company/wb/tools', name: 'company_wb_tools_')]
@@ -26,8 +26,9 @@ final class WildberriesToolsController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly CsrfTokenManagerInterface $csrf,
         private readonly KernelInterface $kernel,
-        private readonly LoggerInterface $logger
-    ) {}
+        private readonly LoggerInterface $logger,
+    ) {
+    }
 
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(): Response
@@ -37,7 +38,7 @@ final class WildberriesToolsController extends AbstractController
         return $this->render('company/wb/tools.html.twig', [
             'company' => $company,
             'csrf_finance' => $this->csrf->getToken('wb_finance_run')->getValue(),
-            'csrf_sales'   => $this->csrf->getToken('wb_sales_run')->getValue(),
+            'csrf_sales' => $this->csrf->getToken('wb_sales_run')->getValue(),
         ]);
     }
 
@@ -49,6 +50,7 @@ final class WildberriesToolsController extends AbstractController
         $token = new CsrfToken('wb_finance_run', (string) $request->request->get('_token'));
         if (!$this->csrf->isTokenValid($token)) {
             $this->addFlash('danger', 'Неверный CSRF токен для запуска финансовых отчётов WB.');
+
             return $this->redirectToRoute('company_wb_tools_index');
         }
 
@@ -99,6 +101,7 @@ final class WildberriesToolsController extends AbstractController
         $token = new CsrfToken('wb_sales_run', (string) $request->request->get('_token'));
         if (!$this->csrf->isTokenValid($token)) {
             $this->addFlash('danger', 'Неверный CSRF токен для запуска продаж WB.');
+
             return $this->redirectToRoute('company_wb_tools_index');
         }
 

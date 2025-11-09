@@ -6,7 +6,6 @@ namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Service\WildberriesRnpReportService;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -54,9 +53,9 @@ final class WildberriesRnpReportController extends AbstractController
         return new JsonResponse($this->reportService->buildReport($company, $from, $to, $filters));
     }
 
-    private function parseDate(string $value, string $name): DateTimeImmutable
+    private function parseDate(string $value, string $name): \DateTimeImmutable
     {
-        $date = DateTimeImmutable::createFromFormat('Y-m-d', $value) ?: false;
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $value) ?: false;
         if (false === $date) {
             throw new BadRequestHttpException(sprintf('Invalid "%s" date. Expected format YYYY-MM-DD.', $name));
         }

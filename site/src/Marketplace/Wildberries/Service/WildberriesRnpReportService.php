@@ -6,8 +6,6 @@ namespace App\Marketplace\Wildberries\Service;
 
 use App\Entity\Company;
 use App\Marketplace\Wildberries\Repository\WildberriesRnpDailyRepository;
-use DateTimeImmutable;
-use InvalidArgumentException;
 
 final class WildberriesRnpReportService
 {
@@ -20,7 +18,7 @@ final class WildberriesRnpReportService
      *
      * @return array<string, mixed>
      */
-    public function buildReport(Company $company, DateTimeImmutable $from, DateTimeImmutable $to, array $filters = []): array
+    public function buildReport(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to, array $filters = []): array
     {
         $from = $from->setTime(0, 0);
         $to = $to->setTime(0, 0);
@@ -34,7 +32,7 @@ final class WildberriesRnpReportService
             $dateValue = $row['date'];
             $date = $dateValue instanceof \DateTimeInterface
                 ? $dateValue
-                : new DateTimeImmutable((string) $dateValue);
+                : new \DateTimeImmutable((string) $dateValue);
 
             $ordersCount = (int) $row['orders_count_spp'];
             $ordersSum = (int) $row['orders_sum_spp_minor'];
@@ -48,8 +46,8 @@ final class WildberriesRnpReportService
             $items[] = [
                 'date' => $date->format('Y-m-d'),
                 'sku' => (string) $row['sku'],
-                'category' => $row['category'] !== null ? (string) $row['category'] : null,
-                'brand' => $row['brand'] !== null ? (string) $row['brand'] : null,
+                'category' => null !== $row['category'] ? (string) $row['category'] : null,
+                'brand' => null !== $row['brand'] ? (string) $row['brand'] : null,
                 'orders_count_spp' => $ordersCount,
                 'orders_sum_spp_minor' => $ordersSum,
                 'sales_count_spp' => $salesCount,
@@ -73,7 +71,7 @@ final class WildberriesRnpReportService
                 'companyId' => (string) $company->getId(),
                 'from' => $from->format('Y-m-d'),
                 'to' => $to->format('Y-m-d'),
-                'generatedAt' => (new DateTimeImmutable())->format(DateTimeImmutable::ATOM),
+                'generatedAt' => (new \DateTimeImmutable())->format(\DateTimeImmutable::ATOM),
                 'currency' => 'RUB',
                 'filters' => [
                     'sku' => $normalizedFilters['sku'],
@@ -97,17 +95,17 @@ final class WildberriesRnpReportService
     }
 
     /**
-     * @return array{from: DateTimeImmutable, to: DateTimeImmutable}
+     * @return array{from: \DateTimeImmutable, to: \DateTimeImmutable}
      */
-    public function resolvePeriod(string $period, ?DateTimeImmutable $anchor = null): array
+    public function resolvePeriod(string $period, ?\DateTimeImmutable $anchor = null): array
     {
-        $anchor = ($anchor ?? new DateTimeImmutable('today'))->setTime(0, 0);
+        $anchor = ($anchor ?? new \DateTimeImmutable('today'))->setTime(0, 0);
 
         return match ($period) {
             'week' => $this->resolveWeekPeriod($anchor),
             'month' => $this->resolveMonthPeriod($anchor),
             'quarter' => $this->resolveQuarterPeriod($anchor),
-            default => throw new InvalidArgumentException(sprintf('Unsupported period "%s"', $period)),
+            default => throw new \InvalidArgumentException(sprintf('Unsupported period "%s"', $period)),
         };
     }
 
@@ -125,7 +123,7 @@ final class WildberriesRnpReportService
 
             $result = [];
             foreach ($value as $item) {
-                if (\is_string($item) && $item !== '') {
+                if (\is_string($item) && '' !== $item) {
                     $result[] = $item;
                 }
             }
@@ -146,9 +144,9 @@ final class WildberriesRnpReportService
     }
 
     /**
-     * @return array{from: DateTimeImmutable, to: DateTimeImmutable}
+     * @return array{from: \DateTimeImmutable, to: \DateTimeImmutable}
      */
-    private function resolveWeekPeriod(DateTimeImmutable $anchor): array
+    private function resolveWeekPeriod(\DateTimeImmutable $anchor): array
     {
         $dayOfWeek = (int) $anchor->format('N');
         $start = $anchor->modify(sprintf('-%d days', $dayOfWeek - 1));
@@ -158,9 +156,9 @@ final class WildberriesRnpReportService
     }
 
     /**
-     * @return array{from: DateTimeImmutable, to: DateTimeImmutable}
+     * @return array{from: \DateTimeImmutable, to: \DateTimeImmutable}
      */
-    private function resolveMonthPeriod(DateTimeImmutable $anchor): array
+    private function resolveMonthPeriod(\DateTimeImmutable $anchor): array
     {
         $start = $anchor->modify('first day of this month');
         $end = $start->modify('last day of this month');
@@ -169,9 +167,9 @@ final class WildberriesRnpReportService
     }
 
     /**
-     * @return array{from: DateTimeImmutable, to: DateTimeImmutable}
+     * @return array{from: \DateTimeImmutable, to: \DateTimeImmutable}
      */
-    private function resolveQuarterPeriod(DateTimeImmutable $anchor): array
+    private function resolveQuarterPeriod(\DateTimeImmutable $anchor): array
     {
         $year = (int) $anchor->format('Y');
         $month = (int) $anchor->format('n');

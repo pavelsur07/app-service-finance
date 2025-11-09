@@ -6,8 +6,6 @@ namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Service\WildberriesRnpReportService;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
-use InvalidArgumentException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -34,7 +32,7 @@ final class WildberriesRnpReportPageController extends AbstractController
         try {
             if ('custom' === $period) {
                 if (null === $fromParam || null === $toParam) {
-                    throw new InvalidArgumentException('Укажите обе даты периода.');
+                    throw new \InvalidArgumentException('Укажите обе даты периода.');
                 }
 
                 $from = $this->parseDate((string) $fromParam, 'Дата с');
@@ -42,7 +40,7 @@ final class WildberriesRnpReportPageController extends AbstractController
             } else {
                 try {
                     ['from' => $from, 'to' => $to] = $this->reportService->resolvePeriod($period);
-                } catch (InvalidArgumentException) {
+                } catch (\InvalidArgumentException) {
                     ['from' => $from, 'to' => $to] = $this->reportService->resolvePeriod('month');
                     $errors[] = 'Выбран неподдерживаемый период, показан отчёт за месяц.';
                     $period = 'month';
@@ -50,9 +48,9 @@ final class WildberriesRnpReportPageController extends AbstractController
             }
 
             if ($from > $to) {
-                throw new InvalidArgumentException('Дата начала должна быть не позже даты окончания.');
+                throw new \InvalidArgumentException('Дата начала должна быть не позже даты окончания.');
             }
-        } catch (InvalidArgumentException $e) {
+        } catch (\InvalidArgumentException $e) {
             $errors[] = $e->getMessage();
             ['from' => $from, 'to' => $to] = $this->reportService->resolvePeriod('month');
             $period = 'month';
@@ -94,11 +92,11 @@ final class WildberriesRnpReportPageController extends AbstractController
         ]);
     }
 
-    private function parseDate(string $value, string $name): DateTimeImmutable
+    private function parseDate(string $value, string $name): \DateTimeImmutable
     {
-        $date = DateTimeImmutable::createFromFormat('Y-m-d', $value) ?: false;
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $value) ?: false;
         if (false === $date) {
-            throw new InvalidArgumentException(sprintf('Некорректная дата "%s". Ожидается формат ГГГГ-ММ-ДД.', $name));
+            throw new \InvalidArgumentException(sprintf('Некорректная дата "%s". Ожидается формат ГГГГ-ММ-ДД.', $name));
         }
 
         return $date->setTime(0, 0);
@@ -127,9 +125,6 @@ final class WildberriesRnpReportPageController extends AbstractController
         return array_values(array_unique($result));
     }
 
-    /**
-     * @param mixed $value
-     */
     private function stringifyFilterValue($value): string
     {
         if (\is_array($value)) {

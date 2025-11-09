@@ -6,14 +6,12 @@ use App\Entity\Company;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailImporter;
 use Doctrine\Persistence\ManagerRegistry;
-use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
-use Throwable;
 
 #[AsCommand(
     name: 'wb:report-detail:import',
@@ -88,7 +86,7 @@ class WildberriesReportDetailSyncCommand extends Command
         try {
             $manualFrom = $this->parseDateOption($fromOption, 'from', false);
             $manualTo = $this->parseDateOption($toOption, 'to', true);
-        } catch (InvalidArgumentException $exception) {
+        } catch (\InvalidArgumentException $exception) {
             $io->error($exception->getMessage());
 
             return Command::INVALID;
@@ -138,7 +136,7 @@ class WildberriesReportDetailSyncCommand extends Command
             $io->success('Импорт завершён.');
 
             return Command::SUCCESS;
-        } catch (Throwable $exception) {
+        } catch (\Throwable $exception) {
             $io->error(sprintf('Ошибка импорта: %s', $exception->getMessage()));
 
             return Command::FAILURE;
@@ -153,7 +151,7 @@ class WildberriesReportDetailSyncCommand extends Command
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value, new \DateTimeZone('UTC'));
         if (!$date) {
-            throw new InvalidArgumentException(sprintf('Некорректное значение опции --%s: %s', $optionName, $value));
+            throw new \InvalidArgumentException(sprintf('Некорректное значение опции --%s: %s', $optionName, $value));
         }
 
         return $endOfDay ? $date->setTime(23, 59, 59) : $date->setTime(0, 0, 0);
