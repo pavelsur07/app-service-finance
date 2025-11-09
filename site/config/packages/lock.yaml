@@ -1,3 +1,4 @@
 framework:
-    lock: 'flock://%kernel.project_dir%/var/lock'
-    #lock: '%env(LOCK_DSN)%'
+    # Храним файлы блокировок в каталоге var/lock/<environment>, чтобы они не
+    # появлялись в корне проекта и не конфликтовали между окружениями.
+    lock: 'flock://%kernel.project_dir%/var/lock/%kernel.environment%'
