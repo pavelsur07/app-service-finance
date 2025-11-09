@@ -43,6 +43,17 @@ final class WildberriesReportDetailImporter
         return $this->doImport($company, $dateFrom, $dateTo, $period);
     }
 
+    public function importWindowWithCursor(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $importId,
+        int $rrdCursor = 0,
+        string $period = 'daily',
+    ): int {
+        return $this->runWindowImport($company, $dateFrom, $dateTo, $period, $importId, $rrdCursor, true);
+    }
+
     private function doImport(
         Company $company,
         \DateTimeImmutable $dateFrom,
@@ -52,14 +63,7 @@ final class WildberriesReportDetailImporter
         $dateFrom = $this->normalizeDate($dateFrom);
         $dateTo = $this->normalizeDate($dateTo);
 
-        $companyId = $company->getId();
-        if (null === $companyId) {
-            throw new \RuntimeException('Cannot import WB report details for a company without identifier');
-        }
-        $companyId = (string) $companyId;
-
-        /** @var Connection $conn */
-        $conn = $this->em->getConnection();
+        $companyId = $this->requireCompanyId($company);
 
         $this->logger->info('[WB:ReportDetail] Start', [
             'company' => $companyId,
@@ -69,73 +73,19 @@ final class WildberriesReportDetailImporter
         ]);
 
         $processed = 0;
-        $currentImportId = Uuid::uuid4()->toString(); // единый import_id на запуск
-        $nowIso = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
         try {
             foreach ($this->iterateDateWindows($dateFrom, $dateTo, $period) as [$windowFrom, $windowTo]) {
-                $rrdIdCursor = 0;
-
-                while (true) {
-                    // 1 страница от WB
-                    $page = $this->client->fetchReportDetailByPeriod(
-                        $company,
-                        $windowFrom,
-                        $windowTo,
-                        $rrdIdCursor,
-                        $period
-                    );
-
-                    if (empty($page)) {
-                        break;
-                    }
-
-                    $rows = [];
-                    $rowsCount = 0;
-                    $maxInBatch = $rrdIdCursor;
-
-                    foreach ($page as $r) {
-                        if (!isset($r['rrd_id'])) {
-                            // строка без ключа — пропускаем
-                            continue;
-                        }
-
-                        $rrd = (int) $r['rrd_id'];
-                        if ($rrd > $maxInBatch) {
-                            $maxInBatch = $rrd;
-                        }
-
-                        $rows[] = $this->mapRowToDb($r, $companyId, $currentImportId, $nowIso);
-                        ++$rowsCount;
-
-                        if ($rowsCount >= self::BATCH_SIZE) {
-                            $this->upsertChunk($conn, $rows);
-                            $processed += $rowsCount;
-                            $rows = [];
-                            $rowsCount = 0;
-                        }
-                    }
-
-                    if ($rowsCount > 0) {
-                        $this->upsertChunk($conn, $rows);
-                        $processed += $rowsCount;
-                    }
-
-                    $this->logger->info('[WB:ReportDetail] Page done', [
-                        'company' => $companyId,
-                        'window_from' => $windowFrom->format(\DATE_ATOM),
-                        'window_to' => $windowTo->format(\DATE_ATOM),
-                        'count' => \count($page),
-                        'processed' => $processed,
-                        'next_rrd' => $maxInBatch,
-                    ]);
-
-                    if ($maxInBatch === $rrdIdCursor) {
-                        // курсор не сдвинулся — выходим, чтобы не зациклиться
-                        break;
-                    }
-                    $rrdIdCursor = $maxInBatch;
-                }
+                $windowImportId = Uuid::uuid4()->toString();
+                $processed += $this->runWindowImport(
+                    $company,
+                    $windowFrom,
+                    $windowTo,
+                    $period,
+                    $windowImportId,
+                    0,
+                    false
+                );
             }
 
             $this->logger->info('[WB:ReportDetail] Finished', [
@@ -144,7 +94,6 @@ final class WildberriesReportDetailImporter
                 'from' => $dateFrom->format(\DATE_ATOM),
                 'to' => $dateTo->format(\DATE_ATOM),
                 'period' => $period,
-                'import_id' => $currentImportId,
             ]);
 
             return $processed;
@@ -158,6 +107,116 @@ final class WildberriesReportDetailImporter
             ]);
             throw $e;
         }
+    }
+
+    private function runWindowImport(
+        Company $company,
+        \DateTimeImmutable $windowFrom,
+        \DateTimeImmutable $windowTo,
+        string $period,
+        string $importId,
+        int $rrdCursor,
+        bool $logWindowBoundaries,
+    ): int {
+        $windowFrom = $this->normalizeDate($windowFrom);
+        $windowTo = $this->normalizeDate($windowTo);
+
+        $companyId = $this->requireCompanyId($company);
+
+        /** @var Connection $conn */
+        $conn = $this->em->getConnection();
+
+        $cursor = max(0, $rrdCursor);
+        $processed = 0;
+        $nowIso = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        if ($logWindowBoundaries) {
+            $this->logger->info('[WB:ReportDetail] Window start', [
+                'company' => $companyId,
+                'from' => $windowFrom->format(\DATE_ATOM),
+                'to' => $windowTo->format(\DATE_ATOM),
+                'period' => $period,
+                'import_id' => $importId,
+                'rrdid' => $cursor,
+            ]);
+        }
+
+        while (true) {
+            $page = $this->client->fetchReportDetailByPeriod(
+                $company,
+                $windowFrom,
+                $windowTo,
+                $cursor,
+                $period
+            );
+
+            if (empty($page)) {
+                break;
+            }
+
+            $rows = [];
+            $rowsCount = 0;
+            $maxInBatch = $cursor;
+            $pageProcessed = 0;
+
+            foreach ($page as $r) {
+                if (!isset($r['rrd_id'])) {
+                    continue;
+                }
+
+                $rrd = (int) $r['rrd_id'];
+                if ($rrd > $maxInBatch) {
+                    $maxInBatch = $rrd;
+                }
+
+                $rows[] = $this->mapRowToDb($r, $companyId, $importId, $nowIso);
+                ++$rowsCount;
+                ++$pageProcessed;
+
+                if ($rowsCount >= self::BATCH_SIZE) {
+                    $this->upsertChunk($conn, $rows);
+                    $processed += $rowsCount;
+                    $rows = [];
+                    $rowsCount = 0;
+                }
+            }
+
+            if ($rowsCount > 0) {
+                $this->upsertChunk($conn, $rows);
+                $processed += $rowsCount;
+            }
+
+            $this->logger->info('[WB:ReportDetail] Page done', [
+                'company' => $companyId,
+                'window_from' => $windowFrom->format(\DATE_ATOM),
+                'window_to' => $windowTo->format(\DATE_ATOM),
+                'count' => \count($page),
+                'processed_page' => $pageProcessed,
+                'processed_total' => $processed,
+                'next_rrd' => $maxInBatch,
+                'import_id' => $importId,
+            ]);
+
+            if ($maxInBatch === $cursor) {
+                break;
+            }
+
+            $cursor = $maxInBatch;
+        }
+
+        if ($logWindowBoundaries) {
+            $this->logger->info('[WB:ReportDetail] Window finished', [
+                'company' => $companyId,
+                'from' => $windowFrom->format(\DATE_ATOM),
+                'to' => $windowTo->format(\DATE_ATOM),
+                'period' => $period,
+                'import_id' => $importId,
+                'rrdid' => $cursor,
+                'processed' => $processed,
+            ]);
+        }
+
+        return $processed;
     }
 
     /** Трансформация WB-строки -> плоский массив для UPSERT. */
@@ -344,5 +403,15 @@ SQL;
         }
 
         return (string) $v; // WB иногда отдаёт строки — сохраняем как есть
+    }
+
+    private function requireCompanyId(Company $company): string
+    {
+        $companyId = $company->getId();
+        if (null === $companyId) {
+            throw new \RuntimeException('Cannot import WB report details for a company without identifier');
+        }
+
+        return (string) $companyId;
     }
 }
