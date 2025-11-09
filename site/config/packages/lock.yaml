@@ -1,5 +1,6 @@
 framework:
-    # Храним файлы блокировок в каталоге кеша, который Symfony гарантированно
-    # создаёт для каждого окружения. Так исключаем появление артефактов в
-    # корневой директории проекта.
-    lock: 'flock://%kernel.cache_dir%/locks'
+    lock:
+        # Используем отдельный каталог var/lock/<env> для файловых блокировок,
+        # чтобы Symfony не создавал их в рабочей директории (site).
+        resources:
+            default: 'flock://%kernel.project_dir%/var/lock/%kernel.environment%'
