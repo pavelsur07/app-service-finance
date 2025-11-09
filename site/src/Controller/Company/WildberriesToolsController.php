@@ -3,6 +3,9 @@
 namespace App\Controller\Company;
 
 use App\Service\ActiveCompanyService;
+use DateInterval;
+use DateTimeImmutable;
+use DateTimeZone;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -56,12 +59,17 @@ final class WildberriesToolsController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
 
+        $dateTo = (new DateTimeImmutable('now', new DateTimeZone('UTC')))->setTime(0, 0);
+        $dateFrom = $dateTo->sub(new DateInterval('P59D'));
+
         $application = new Application($this->kernel);
         $application->setAutoExit(false);
 
         $input = new ArrayInput([
-            'command' => 'wb:report-detail:import',
-            '--company' => $company->getId(),
+            'command' => 'wb:finance:import',
+            '--companyId' => (string) $company->getId(),
+            '--dateFrom' => $dateFrom->format('Y-m-d'),
+            '--dateTo' => $dateTo->format('Y-m-d'),
         ]);
         $output = new BufferedOutput();
 
