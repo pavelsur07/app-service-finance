@@ -38,4 +38,13 @@ class CompanyRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    public function findAllWithWildberriesCredentials(): array
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere("c.wildberriesApiKey IS NOT NULL AND c.wildberriesApiKey <> ''")
+            ->orderBy('c.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
 }
