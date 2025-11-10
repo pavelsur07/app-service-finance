@@ -1,7 +1,5 @@
 framework:
     lock:
-        # Symfony по умолчанию создаёт файлы блокировок flock в рабочем каталоге,
-        # если не указать путь. Направляем их в каталог кеша, который и так
-        # игнорируется и гарантированно существует.
+        # Храним блокировки в Redis, чтобы избежать файловых артефактов flock
         resources:
-            default: 'flock://%kernel.cache_dir%/lock'
+            default: '%env(resolve:REDIS_DSN)%?prefix=symfony-locks'
