@@ -68,13 +68,17 @@ final class Version20251110153155 extends AbstractMigration
         $this->addSql('ALTER TABLE report_subscriptions ADD CONSTRAINT FK_8DAACB71979B1AD6 FOREIGN KEY (company_id) REFERENCES "companies" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE report_subscriptions ADD CONSTRAINT FK_8DAACB71FC28B263 FOREIGN KEY (telegram_user_id) REFERENCES telegram_users (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE telegram_bots ADD CONSTRAINT FK_DACD6ED979B1AD6 FOREIGN KEY (company_id) REFERENCES "companies" (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_count_spp DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_sum_spp_minor DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER ad_cost_sum_minor DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER buyout_rate DROP DEFAULT');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER cogs_sum_spp_minor DROP DEFAULT');
+        $schemaManager = $this->connection->createSchemaManager();
+
+        if ($schemaManager->tablesExist(['wildberries_rnp_daily'])) {
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_count_spp DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_sum_spp_minor DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER ad_cost_sum_minor DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER buyout_rate DROP DEFAULT');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER cogs_sum_spp_minor DROP DEFAULT');
+        }
     }
 
     public function down(Schema $schema): void
@@ -98,12 +102,16 @@ final class Version20251110153155 extends AbstractMigration
         $this->addSql('DROP TABLE report_subscriptions');
         $this->addSql('DROP TABLE telegram_bots');
         $this->addSql('DROP TABLE telegram_users');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp SET DEFAULT 0');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor SET DEFAULT 0');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_count_spp SET DEFAULT 0');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_sum_spp_minor SET DEFAULT 0');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER ad_cost_sum_minor SET DEFAULT 0');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER buyout_rate SET DEFAULT \'0\'');
-        $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER cogs_sum_spp_minor SET DEFAULT 0');
+        $schemaManager = $this->connection->createSchemaManager();
+
+        if ($schemaManager->tablesExist(['wildberries_rnp_daily'])) {
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp SET DEFAULT 0');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor SET DEFAULT 0');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_count_spp SET DEFAULT 0');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER sales_sum_spp_minor SET DEFAULT 0');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER ad_cost_sum_minor SET DEFAULT 0');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER buyout_rate SET DEFAULT \'0\'');
+            $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER cogs_sum_spp_minor SET DEFAULT 0');
+        }
     }
 }
