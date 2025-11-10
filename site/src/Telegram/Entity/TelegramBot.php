@@ -35,13 +35,77 @@ class TelegramBot
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
-    public function __construct(Company $company, string $token)
+    public function __construct(string $id, Company $company, string $token)
     {
+        $this->id = $id;
         $this->company = $company;
         $this->token = $token;
         $this->createdAt = new \DateTimeImmutable();
         $this->isActive = true;
     }
 
-    // getters/setters ...
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function setCompany(Company $company): void
+    {
+        $this->company = $company;
+    }
+
+    public function getToken(): string
+    {
+        return $this->token;
+    }
+
+    public function setToken(string $token): void
+    {
+        $this->token = $token;
+    }
+
+    public function getUsername(): ?string
+    {
+        return $this->username;
+    }
+
+    public function setUsername(?string $username): void
+    {
+        $this->username = $username;
+    }
+
+    public function getWebhookUrl(): ?string
+    {
+        return $this->webhookUrl;
+    }
+
+    public function setWebhookUrl(?string $webhookUrl): void
+    {
+        $this->webhookUrl = $webhookUrl;
+    }
+
+    public function isActive(): bool
+    {
+        return $this->isActive;
+    }
+
+    public function setIsActive(bool $isActive): void
+    {
+        $this->isActive = $isActive;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function setCreatedAt(\DateTimeImmutable $createdAt): void
+    {
+        $this->createdAt = $createdAt;
+    }
 }

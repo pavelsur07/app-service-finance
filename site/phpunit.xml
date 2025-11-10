@@ -17,6 +17,10 @@
         <testsuite name="integration">
             <directory>tests/Integration</directory>
         </testsuite>
+        <!-- По модулю, если хочется запускать точечно -->
+        <testsuite name="telegram">
+            <directory>tests/Telegram</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include><directory>src</directory></include>

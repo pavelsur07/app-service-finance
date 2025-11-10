@@ -54,5 +54,57 @@ class BotLink
         $this->usedAt = new \DateTimeImmutable();
     }
 
-    // getters/setters ...
+    // --- Бизнес-проверки без внешних зависимостей ---
+    public function isUsed(): bool
+    {
+        return null !== $this->usedAt;
+    }
+
+    public function isExpired(\DateTimeImmutable $now, int $leewaySeconds = 0): bool
+    {
+        $edge = $now->modify(sprintf('+%d seconds', max(0, $leewaySeconds)));
+
+        return $this->expiresAt <= $edge;
+    }
+
+    // --- Геттеры ---
+    public function getId(): ?string
+    {
+        return $this->id;
+    }
+
+    public function getCompany(): Company
+    {
+        return $this->company;
+    }
+
+    public function getBot(): TelegramBot
+    {
+        return $this->bot;
+    }
+
+    public function getToken(): string
+    {
+        return $this->token;
+    }
+
+    public function getScope(): string
+    {
+        return $this->scope;
+    }
+
+    public function getExpiresAt(): \DateTimeImmutable
+    {
+        return $this->expiresAt;
+    }
+
+    public function getUsedAt(): ?\DateTimeImmutable
+    {
+        return $this->usedAt;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }
