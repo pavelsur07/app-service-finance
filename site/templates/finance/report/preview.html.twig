@@ -23,6 +23,26 @@
           <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
           <button class="btn btn-primary">Показать</button>
         </form>
+        <form
+          class="d-flex align-items-center gap-2 mt-2"
+          method="post"
+          action="{{ path('finance_report_preview_recalc') }}"
+        >
+          <input type="hidden" name="_token" value="{{ csrf_token('recalc_pl_preview') }}">
+          <input type="hidden" name="grouping" value="{{ grouping }}">
+          <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
+          <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+          <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
+          <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
+          <input
+            class="form-control"
+            type="date"
+            id="recalc_from"
+            name="recalc_from"
+            value="{{ from|date('Y-m-d') }}"
+          >
+          <button class="btn btn-outline-primary" type="submit">Пересчитать</button>
+        </form>
       </div>
 
       {% if warnings is not empty %}

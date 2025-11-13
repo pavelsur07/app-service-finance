@@ -7,7 +7,9 @@ namespace App\Finance\Controller;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Service\ActiveCompanyService;
+use App\Service\PLRegisterUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -149,5 +151,74 @@ final class PlReportPreviewController extends AbstractController
         }
 
         return $periods;
+    }
+
+    #[Route('/finance/report/preview/recalc', name: 'finance_report_preview_recalc', methods: ['POST'])]
+    public function recalc(
+        Request $request,
+        ActiveCompanyService $activeCompany,
+        PLRegisterUpdater $registerUpdater,
+    ): RedirectResponse {
+        if (!$this->isCsrfTokenValid('recalc_pl_preview', (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF-токен.');
+
+            return $this->redirectToRoute('finance_report_preview', [
+                'grouping' => $request->request->get('grouping', 'month'),
+                'from' => $request->request->get('from'),
+                'to' => $request->request->get('to'),
+            ]);
+        }
+
+        $company = $activeCompany->getActiveCompany();
+
+        $fromInput = (string) $request->request->get('recalc_from');
+        $toInput = (string) ($request->request->get('recalc_to') ?? $request->request->get('to'));
+
+        try {
+            $from = (new \DateTimeImmutable($fromInput))->setTime(0, 0, 0);
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Неверная дата начала пересчёта.');
+
+            return $this->redirectToRoute('finance_report_preview', [
+                'grouping' => $request->request->get('grouping', 'month'),
+                'from' => $request->request->get('from'),
+                'to' => $request->request->get('to'),
+            ]);
+        }
+
+        try {
+            $to = $toInput
+                ? (new \DateTimeImmutable((string) $toInput))->setTime(0, 0, 0)
+                : (new \DateTimeImmutable('today'))->setTime(0, 0, 0);
+        } catch (\Throwable) {
+            $this->addFlash('danger', 'Неверная дата окончания пересчёта.');
+
+            return $this->redirectToRoute('finance_report_preview', [
+                'grouping' => $request->request->get('grouping', 'month'),
+                'from' => $request->request->get('from'),
+                'to' => $request->request->get('to'),
+            ]);
+        }
+
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        try {
+            $registerUpdater->recalcRange($company, $from, $to);
+            $this->addFlash('success', sprintf(
+                'Пересчёт P&L выполнен: %s — %s.',
+                $from->format('d.m.Y'),
+                $to->format('d.m.Y')
+            ));
+        } catch (\Throwable $exception) {
+            $this->addFlash('danger', 'Ошибка пересчёта: '.$exception->getMessage());
+        }
+
+        return $this->redirectToRoute('finance_report_preview', [
+            'grouping' => $request->request->get('grouping', 'month'),
+            'from' => $request->request->get('from', $from->format('Y-m-d')),
+            'to' => $request->request->get('to', $to->format('Y-m-d')),
+        ]);
     }
 }
