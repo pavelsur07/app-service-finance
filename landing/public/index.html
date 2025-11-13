@@ -13,21 +13,37 @@
         :root{
             --brand-primary:#0A1548; /* глубокий синий (ваш бренд) */
             --brand-secondary:#101940;
-            --accent:#FF1F1F;        /* акцент в стиле Альфа */
+            --accent:#FF1F1F;        /* акцент */
             --text:#1C1C1C;
             --muted:#6c757d;
             --bg:#ffffff;
             --bg-soft:#f7f8fb;
+            /* Вертикальный ритм секций: от 56px до 112px адаптивно */
+            --section-space: clamp(56px, 7vw, 112px);
+            --block-space: clamp(24px, 3vw, 48px);
+            --heading-space: clamp(12px, 2vw, 20px);
+            --stack-space: clamp(8px, 1.6vw, 16px);
+            /* компенсация фикс-навигации для якорей */
+            --anchor-offset: 96px;
         }
         html,body{scroll-behavior:smooth; color:var(--text);}
+        /* якоря не прячутся под navbar */
+        :is(header, section)[id]{scroll-margin-top: var(--anchor-offset);}
+
         .navbar{--bs-navbar-brand-font-size:1.125rem}
         .navbar-brand b{color:var(--brand-primary)}
         .btn-accent{--bs-btn-bg:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:#e11a1a;--bs-btn-hover-border-color:#e11a1a;--bs-btn-color:#fff}
         .btn-outline-accent{--bs-btn-color:var(--accent);--bs-btn-border-color:var(--accent);--bs-btn-hover-bg:var(--accent);--bs-btn-hover-border-color:var(--accent);--bs-btn-hover-color:#fff}
         .text-accent{color:var(--accent)!important}
-        .bg-primary-hero{background: radial-gradient(1200px 500px at 80% -50%, rgba(255,31,31,.15), transparent 60%), radial-gradient(1000px 600px at -20% -40%, rgba(10,21,72,.25), transparent 60%), var(--bg-soft);}
+        .bg-primary-hero{
+            background:
+                    radial-gradient(1200px 500px at 80% -50%, rgba(255,31,31,.15), transparent 60%),
+                    radial-gradient(1000px 600px at -20% -40%, rgba(10,21,72,.25), transparent 60%),
+                    var(--bg-soft);
+        }
         .hero-title{font-weight:800; letter-spacing:-0.02em}
-        .section-title{font-weight:800; letter-spacing:-0.01em}
+        .section-title{font-weight:800; letter-spacing:-0.01em; margin-bottom: var(--heading-space);}
+        .section-intro{color:var(--muted); margin-top: calc(var(--heading-space) * .25); margin-bottom: 0;}
         .feature-icon{width:48px;height:48px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:rgba(255,31,31,.1);color:var(--accent)}
         .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;background:#f1f3f5;border:1px solid #dee2e6;border-bottom-width:2px;border-radius:.375rem;padding:.125rem .375rem}
         .card-shadow{box-shadow:0 10px 30px rgba(16,25,64,.08);}
@@ -43,6 +59,28 @@
         /* demo dashboard placeholder */
         .dash{background:linear-gradient(180deg,#fff, #f6f8ff); border:1px solid #e7eaf3}
         .dash .bar{height:120px;background:linear-gradient(180deg, rgba(10,21,72,.1), rgba(255,31,31,.15));}
+
+        /* === Вертикальные отступы секций по лучшим практикам === */
+        header[id], section[id]{padding-top: var(--section-space); padding-bottom: var(--section-space);}
+        /* локальная «воздушность» внутри секций */
+        .stack > * + *{margin-top: var(--stack-space);}
+        .block-gap{margin-top: var(--block-space);}
+
+        /* === Доп. стили для блока тарифов === */
+        .badge-brand{background: var(--accent);}
+        .btn-brand{background: var(--brand-primary); color:#fff;}
+        .btn-brand:hover{background:#0d1b66; color:#fff;}
+        .pricing-card{border:none; box-shadow:0 8px 24px rgba(16,25,64,.08);}
+        .pricing-card.featured{outline:2px solid var(--brand-primary);}
+        .price-xl{font-weight:800; font-size: clamp(28px, 4vw, 44px); letter-spacing:-0.02em;}
+        .price-xl small{font-weight:600; font-size:.55em; color:#6b7280}
+        .switcher input:checked + .form-check-label{background: var(--brand-primary); color:#fff;}
+        .switcher .form-check-label{cursor:pointer; padding:.375rem .75rem; border-radius:999px; border:1px solid #e5e7eb; background:#fff;}
+        .muted{color:#6b7280}
+
+        /* Утончим вертикальные интервалы внутри карточек */
+        .pricing-card .card-body > .mt-3{margin-top: calc(var(--stack-space) * 1.25)!important;}
+        .pricing-card .card-body > .mb-3{margin-bottom: calc(var(--stack-space) * 1.25)!important;}
     </style>
 </head>
 <body>
@@ -53,7 +91,7 @@
           <span class="me-2 d-inline-flex align-items-center justify-content-center rounded" style="width:34px;height:34px;background:rgba(255,31,31,.12)">
             <i class="bi bi-graph-up-arrow text-accent"></i>
           </span>
-            <b>Fin-Plan</b><!--<span class="ms-1 text-muted">SaaS</span>-->
+            <b>Fin-Plan</b>
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
@@ -65,7 +103,6 @@
                 <li class="nav-item"><a class="nav-link" href="#metrics">Показатели</a></li>
                 <li class="nav-item"><a class="nav-link" href="#pricing">Цены</a></li>
                 <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
-                <!-- ▼ Добавлен пункт "Документы" -->
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">Документы</a>
                     <ul class="dropdown-menu">
@@ -74,7 +111,6 @@
                         <li><a class="dropdown-item" href="/legal/security.html" rel="noopener">Политика безопасности</a></li>
                     </ul>
                 </li>
-                <!-- ▲ -->
             </ul>
             <div class="d-flex gap-2">
                 <a href="https://app.2bstock.ru" class="btn btn-sm btn-outline-secondary">Вход</a>
@@ -85,18 +121,18 @@
 </nav>
 
 <!-- HERO -->
-<header id="home" class="bg-primary-hero py-5 py-lg-6">
-    <div class="container py-4">
+<header id="home" class="bg-primary-hero">
+    <div class="container">
         <div class="row align-items-center g-5">
             <div class="col-12 col-lg-6">
                 <span class="badge badge-soft rounded-pill mb-3"><i class="bi bi-lightning-charge me-1"></i>Запуск за 5 минут • 7 дней бесплатно</span>
                 <h1 class="display-5 hero-title">Оптимизируйте финансы бизнеса <span class="text-accent">без Excel</span></h1>
-                <p class="lead text-muted mt-3">Сервис финансового учёта для e-commerce и SMB: P&amp;L, ДДС, баланс и отчёты в реальном времени. Интеграции с банками и маркетплейсами.</p>
-                <div class="d-flex flex-wrap gap-3 mt-4">
+                <p class="lead section-intro">Сервис финансового учёта для e-commerce и SMB: P&amp;L, ДДС, баланс и отчёты в реальном времени. Интеграции с банками и маркетплейсами.</p>
+                <div class="d-flex flex-wrap gap-3 block-gap">
                     <a href="#cta" class="btn btn-lg btn-accent">Попробовать бесплатно</a>
                     <a href="#product" class="btn btn-lg btn-outline-accent">Смотреть интерфейс</a>
                 </div>
-                <div class="d-flex align-items-center gap-3 mt-4 text-muted small">
+                <div class="d-flex align-items-center gap-3 text-muted small block-gap">
                     <span class="d-flex align-items-center"><i class="bi bi-shield-check me-2"></i>SSL/2FA</span>
                     <span class="d-flex align-items-center"><i class="bi bi-cloud-arrow-down me-2"></i>Бэкапы</span>
                     <span class="d-flex align-items-center"><i class="bi bi-lock me-2"></i>Роли и доступы</span>
@@ -166,42 +202,42 @@
 </header>
 
 <!-- FEATURES -->
-<section id="features" class="py-6">
-    <div class="container py-4">
-        <div class="row mb-4 align-items-end">
+<section id="features">
+    <div class="container">
+        <div class="row align-items-end g-2 mb-2">
             <div class="col-lg-8">
                 <h2 class="section-title">Почему выбирают Fin-Plan</h2>
-                <p class="text-muted mb-0">Соберите финансы в одном месте: от автоматической категоризации до отчётов для собственника.</p>
+                <p class="section-intro">Соберите финансы в одном месте: от автоматической категоризации до отчётов для собственника.</p>
             </div>
         </div>
-        <div class="row g-4">
+        <div class="row g-5">
             <div class="col-12 col-md-6 col-lg-3">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="feature-icon mb-3"><i class="bi bi-bank"></i></div>
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow stack">
+                    <div class="feature-icon"><i class="bi bi-bank"></i></div>
                     <h5>Интеграции с банками</h5>
                     <p class="text-muted small">Импорт выписок, автосверка и правила для распределения платежей.</p>
                     <span class="badge rounded-pill text-bg-light">Альфа • Тинькофф • Сбер</span>
                 </div>
             </div>
             <div class="col-12 col-md-6 col-lg-3">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="feature-icon mb-3"><i class="bi bi-shop"></i></div>
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow stack">
+                    <div class="feature-icon"><i class="bi bi-shop"></i></div>
                     <h5>Маркетплейсы</h5>
                     <p class="text-muted small">WB, Ozon: выручка, комиссии, возвраты и аналитика по SKU.</p>
                     <span class="badge rounded-pill text-bg-light">API подключение</span>
                 </div>
             </div>
             <div class="col-12 col-md-6 col-lg-3">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="feature-icon mb-3"><i class="bi bi-graph-up"></i></div>
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow stack">
+                    <div class="feature-icon"><i class="bi bi-graph-up"></i></div>
                     <h5>P&amp;L и ДДС</h5>
                     <p class="text-muted small">Отчёты в реальном времени с план-факт анализом и сценариями.</p>
                     <span class="badge rounded-pill text-bg-light">Гибкая структура</span>
                 </div>
             </div>
             <div class="col-12 col-md-6 col-lg-3">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="feature-icon mb-3"><i class="bi bi-cpu"></i></div>
+                <div class="h-100 p-4 bg-white border rounded-3 card-shadow stack">
+                    <div class="feature-icon"><i class="bi bi-cpu"></i></div>
                     <h5>AI-помощник</h5>
                     <p class="text-muted small">Автокатегоризация, подсказки по экономии и риск-алерты.</p>
                     <span class="badge rounded-pill text-bg-light">Рекомендации</span>
@@ -212,18 +248,18 @@
 </section>
 
 <!-- PRODUCT / SCREENSHOTS -->
-<section id="product" class="py-6 bg-light">
-    <div class="container py-4">
-        <div class="row mb-4 align-items-end">
+<section id="product" class="bg-light">
+    <div class="container">
+        <div class="row align-items-end g-2 mb-2">
             <div class="col-lg-8">
                 <h2 class="section-title">Как выглядит сервис</h2>
-                <p class="text-muted mb-0">Чистый интерфейс, быстрый доступ к ключевым метрикам и отчётам.</p>
+                <p class="section-intro">Чистый интерфейс, быстрый доступ к ключевым метрикам и отчётам.</p>
             </div>
             <div class="col-lg-4 text-lg-end">
                 <a class="link-arrow" href="#cta">Запросить демо <i class="bi bi-arrow-right"></i></a>
             </div>
         </div>
-        <div class="row g-4">
+        <div class="row g-5">
             <div class="col-12 col-lg-7">
                 <div class="dash rounded-2xl p-3 card-shadow bg-white h-100">
                     <div class="bar rounded-2 mb-3"></div>
@@ -257,9 +293,9 @@
 </section>
 
 <!-- METRICS / SOCIAL PROOF -->
-<section id="metrics" class="py-6">
-    <div class="container py-4">
-        <div class="row g-4 text-center">
+<section id="metrics">
+    <div class="container">
+        <div class="row g-5 text-center">
             <div class="col-6 col-lg-3"><div class="stat">500+</div><div class="text-muted">компаний</div></div>
             <div class="col-6 col-lg-3"><div class="stat">1.2 млрд ₽</div><div class="text-muted">учтённый оборот</div></div>
             <div class="col-6 col-lg-3"><div class="stat">7 дней</div><div class="text-muted">бесплатный период</div></div>
@@ -269,69 +305,197 @@
 </section>
 
 <!-- PRICING -->
-<section id="pricing" class="py-6 bg-light">
-    <div class="container py-4">
-        <div class="text-center mb-5">
-            <h2 class="section-title">Тарифы</h2>
-            <p class="text-muted">Прозрачно и без лишнего. Можно начать бесплатно и перейти на платный план в любой момент.</p>
+<section id="pricing" class="bg-light">
+    <div class="container">
+        <div class="text-center stack">
+            <span class="badge rounded-pill badge-brand">Финансовый сервис для e-commerce</span>
+            <h2 class="section-title">Тарифы Fin-Plan</h2>
+            <p class="section-intro">ДДС → P&L → Баланс. Выберите глубину учёта под свой этап роста.</p>
         </div>
-        <div class="row g-4">
-            <div class="col-12 col-lg-4">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h5>Free</h5><span class="badge text-bg-light">Старт</span>
-                    </div>
-                    <div class="display-6 fw-bold my-2">0 ₽</div>
-                    <ul class="list-unstyled small">
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>1 компания</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>P&amp;L, ДДС, баланс</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Импорт выписок (ручной)</li>
-                        <li class="mb-2 text-muted"><i class="bi bi-dash me-2"></i>Без интеграций</li>
-                    </ul>
-                    <a href="#cta" class="btn btn-outline-secondary w-100">Начать</a>
-                </div>
+
+        <!-- Billing toggle -->
+        <div class="d-flex justify-content-center align-items-center gap-2 switcher block-gap">
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="billing" id="billMonthly" checked>
+                <label class="form-check-label" for="billMonthly">Помесечно</label>
             </div>
-            <div class="col-12 col-lg-4">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow position-relative">
-                    <span class="position-absolute top-0 start-50 translate-middle badge rounded-pill text-bg-danger">Популярно</span>
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h5>Pro</h5><span class="badge text-bg-light">Рост</span>
-                    </div>
-                    <div class="display-6 fw-bold my-2">4 900 ₽<span class="fs-6 text-muted">/мес</span></div>
-                    <ul class="list-unstyled small">
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>До 3 компаний</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Интеграции с банками</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Интеграции WB/Ozon</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Автоправила и алерты</li>
-                    </ul>
-                    <a href="#cta" class="btn btn-accent w-100">Выбрать Pro</a>
-                </div>
-            </div>
-            <div class="col-12 col-lg-4">
-                <div class="h-100 p-4 bg-white border rounded-3 card-shadow">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <h5>Enterprise</h5><span class="badge text-bg-light">Команда</span>
-                    </div>
-                    <div class="display-6 fw-bold my-2">По запросу</div>
-                    <ul class="list-unstyled small">
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Неограниченно компаний</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>SLA/Доступы/Аудит</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>On-premise вариант</li>
-                        <li class="mb-2"><i class="bi bi-check2 text-success me-2"></i>Приоритетная поддержка</li>
-                    </ul>
-                    <a href="#cta" class="btn btn-outline-accent w-100">Связаться с нами</a>
-                </div>
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="radio" name="billing" id="billYearly">
+                <label class="form-check-label" for="billYearly">Годом <span class="badge text-bg-light ms-1">−15%</span></label>
             </div>
         </div>
+
+        <div class="row g-5 align-items-stretch block-gap">
+            <!-- Start -->
+            <div class="col-12 col-lg-4">
+                <div class="card pricing-card h-100">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="mb-1">Денежный поток</h5>
+                                <div class="muted">Базовый ДДС и контроль остатков</div>
+                            </div>
+                            <span class="badge rounded-pill text-bg-secondary">Start</span>
+                        </div>
+
+                        <div class="mt-3 mb-3">
+                            <div class="price-xl" data-monthly="2 990 ₽" data-yearly="2 490 ₽">2 990 ₽<small>/мес</small></div>
+                            <div class="muted">включая 1 интеграцию МП</div>
+                        </div>
+
+                        <ul class="list-unstyled flex-grow-1">
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> ДДС + актуальные остатки</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Импорт выписок и выгрузок МП (WB/Ozon)</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Автоправила, автосверка, антидубли</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Фонды/резервы, виджет «Итого денег»</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Базовые отчёты по статьям</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Пользователи: без ограничений</li>
+                        </ul>
+
+                        <div class="mt-2 d-grid"><a href="#cta" class="btn btn-brand">Попробовать 14 дней бесплатно</a></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Growth -->
+            <div class="col-12 col-lg-4">
+                <div class="card pricing-card h-100 featured">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="mb-1">Деньги и прибыль</h5>
+                                <div class="muted">P&L и рентабельность направлений</div>
+                            </div>
+                            <span class="badge rounded-pill badge-brand">Рекомендуем</span>
+                        </div>
+
+                        <div class="mt-3 mb-3">
+                            <div class="price-xl" data-monthly="9 400 ₽" data-yearly="7 900 ₽">9 400 ₽<small>/мес</small></div>
+                            <div class="muted">включая 2 интеграции МП + API</div>
+                        </div>
+
+                        <ul class="list-unstyled flex-grow-1">
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Всё из «Денежного потока»</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Отчёт о прибылях и убытках (настраиваемая структура)</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Рентабельность направлений/категорий/проектов</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Согласование заявок на оплату, лимиты</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Расширенный импорт и API</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Пользователи: без ограничений</li>
+                        </ul>
+
+                        <div class="mt-2 d-grid"><a href="#cta" class="btn btn-brand">Попробовать 14 дней бесплатно</a></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scale -->
+            <div class="col-12 col-lg-4">
+                <div class="card pricing-card h-100">
+                    <div class="card-body p-4 d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h5 class="mb-1">Баланс Pro</h5>
+                                <div class="muted">Полный периметр: Баланс, кредиты, С/С</div>
+                            </div>
+                            <span class="badge rounded-pill text-bg-secondary">Scale</span>
+                        </div>
+
+                        <div class="mt-3 mb-3">
+                            <div class="price-xl" data-monthly="18 900 ₽" data-yearly="15 900 ₽">18 900 ₽<small>/мес</small></div>
+                            <div class="muted">3+ интеграции, SLA-поддержка</div>
+                        </div>
+
+                        <ul class="list-unstyled flex-grow-1">
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Всё из «Деньги и прибыль»</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Себестоимость/закупки, базовый складской контур</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Зарплаты и налоги, кредиты (графики)</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Амортизация, управленческий Баланс, коэффициенты</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> 3+ интеграции (МП/банки/учётные сервисы)</li>
+                            <li class="d-flex gap-2 align-items-start mb-2"><i class="bi bi-check2 text-success"></i> Пользователи: без ограничений</li>
+                        </ul>
+
+                        <div class="mt-2 d-grid"><a href="#cta" class="btn btn-brand">Запросить демо</a></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add-ons -->
+        <div class="block-gap">
+            <h5 class="text-center mb-3" style="color:var(--brand-primary)">Дополнительные модули</h5>
+            <div class="row g-4">
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <strong>Финплан</strong>
+                                <span class="muted">1 490 ₽/мес</span>
+                            </div>
+                            <ul class="mt-2 mb-0 small">
+                                <li>Платёжный календарь</li>
+                                <li>БДДС/БДР, план-факт</li>
+                                <li>Лимиты расходов</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <strong>НДС</strong>
+                                <span class="muted">1 690 ₽/мес</span>
+                            </div>
+                            <ul class="mt-2 mb-0 small">
+                                <li>Учёт НДС по операциям</li>
+                                <li>Предрасчёт к кварталу</li>
+                                <li>P&L без НДС</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <strong>Мультивалютность</strong>
+                                <span class="muted">1 590 ₽/мес</span>
+                            </div>
+                            <ul class="mt-2 mb-0 small">
+                                <li>Счета в разных валютах</li>
+                                <li>Курс ЦБ на дату операции</li>
+                                <li>Пересчёт отчётов</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-12 col-md-6 col-lg-3">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-baseline">
+                                <strong>Доп. интеграции</strong>
+                                <span class="muted">от 490 ₽/мес</span>
+                            </div>
+                            <ul class="mt-2 mb-0 small">
+                                <li>МП/банки/учётные сервисы</li>
+                                <li>Коннекторы сверх лимита тарифа</li>
+                                <li>Гибкая конфигурация</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 </section>
 
 <!-- FAQ -->
-<section id="faq" class="py-6">
-    <div class="container py-4">
-        <div class="row g-4">
+<section id="faq">
+    <div class="container">
+        <div class="row g-5">
             <div class="col-lg-6">
-                <h2 class="section-title mb-3">Частые вопросы</h2>
+                <h2 class="section-title">Частые вопросы</h2>
                 <div class="accordion" id="faqAcc">
                     <div class="accordion-item">
                         <h2 class="accordion-header" id="q1">
@@ -372,12 +536,12 @@
                 </div>
             </div>
             <div class="col-lg-5 offset-lg-1">
-                <div class="p-4 bg-white border rounded-3 card-shadow h-100">
-                    <h5 class="mb-2">Какие показатели отслеживать?</h5>
-                    <p class="text-muted small mb-1">Коротко: выручка, маржа, COGS, OPEX, EBITDA, денежный разрыв, запасы, оборот капитала.</p>
+                <div class="p-4 bg-white border rounded-3 card-shadow h-100 stack">
+                    <h5 class="mb-0">Какие показатели отслеживать?</h5>
+                    <p class="text-muted small">Коротко: выручка, маржа, COGS, OPEX, EBITDA, денежный разрыв, запасы, оборот капитала.</p>
                     <a class="link-arrow" href="#metrics">Смотреть показатели <i class="bi bi-arrow-right"></i></a>
                     <hr>
-                    <h6 class="mb-2">Готовы перейти от хаоса к системе?</h6>
+                    <h6 class="mb-0">Готовы перейти от хаоса к системе?</h6>
                     <ul class="list-unstyled small mb-0">
                         <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Видимость прибыли по каналам</li>
                         <li class="check mb-2"><i class="bi bi-check2-circle me-2"></i>Контроль денег и обязательств</li>
@@ -390,16 +554,16 @@
 </section>
 
 <!-- CTA -->
-<section id="cta" class="py-6 bg-brand text-white">
-    <div class="container py-4">
-        <div class="row align-items-center g-4">
+<section id="cta" class="bg-brand text-white">
+    <div class="container">
+        <div class="row align-items-center g-5">
             <div class="col-lg-7">
-                <h2 class="section-title">Готовы перестать терять деньги?</h2>
+                <h2 class="section-title text-white">Готовы перестать терять деньги?</h2>
                 <p class="text-white-50 mb-0">Запустите Fin-Plan сегодня. 7 дней бесплатно, без карты и обязательств.</p>
             </div>
             <div class="col-lg-5">
                 <form class="bg-white text-dark rounded-2xl p-4 card-shadow">
-                    <div class="row g-2">
+                    <div class="row g-3">
                         <div class="col-12 col-md-6">
                             <label class="form-label small">Имя</label>
                             <input type="text" class="form-control" placeholder="Иван" required>
@@ -412,9 +576,7 @@
                             <label class="form-label small">Компания</label>
                             <input type="text" class="form-control" placeholder="ООО Ромашка" required>
                         </div>
-
-                        <!-- ▼ Добавлен чекбокс согласий -->
-                        <div class="col-12 mt-2">
+                        <div class="col-12">
                             <div class="form-check">
                                 <input class="form-check-input" type="checkbox" id="agree" required>
                                 <label class="form-check-label small" for="agree">
@@ -423,9 +585,7 @@
                                 </label>
                             </div>
                         </div>
-                        <!-- ▲ -->
-
-                        <div class="col-12 d-grid mt-2">
+                        <div class="col-12 d-grid">
                             <button type="button" class="btn btn-accent btn-lg">Получить доступ</button>
                         </div>
                         <div class="col-12">
@@ -440,7 +600,7 @@
 
 <!-- FOOTER -->
 <footer class="footer border-top">
-    <div class="container py-5">
+    <div class="container" style="padding-top: calc(var(--section-space) * .7); padding-bottom: calc(var(--section-space) * .7);">
         <div class="row gy-4">
             <div class="col-12 col-lg-4">
                 <a class="navbar-brand d-flex align-items-center mb-2" href="#home">
@@ -497,6 +657,29 @@
 <!-- /Yandex.Metrika counter -->
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+<!-- Тоггл цен (месяц/год) для блока тарифов -->
+<script>
+    (function(){
+        const monthly = document.getElementById('billMonthly');
+        const yearly  = document.getElementById('billYearly');
+        const priceEls = document.querySelectorAll('#pricing .price-xl');
+
+        function updatePrices(){
+            const yearlyActive = yearly && yearly.checked;
+            priceEls.forEach(el => {
+                const m = el.getAttribute('data-monthly');
+                const y = el.getAttribute('data-yearly');
+                el.innerHTML = (yearlyActive ? y : m) + '<small>/мес</small>';
+            });
+        }
+        if (monthly && yearly){
+            monthly.addEventListener('change', updatePrices);
+            yearly.addEventListener('change', updatePrices);
+        }
+    })();
+</script>
+
 <script async src="https://chat.2bstock.ru/webchat/widget.js"
         data-site-key="jUtf9WB2qDI27oVvo-Y1hgrQ"></script>
 </body>
