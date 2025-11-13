@@ -4,22 +4,29 @@ namespace App\Marketplace\Wildberries\Service;
 
 use App\Entity\Company;
 use App\Marketplace\Wildberries\Adapter\WildberriesStatisticsV5Client;
-use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
-use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
-use App\Service\Import\ImportLogger;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 final class WildberriesReportDetailImporter
 {
+    private const BATCH_SIZE = 800; // баланс скорость/память
+
     public function __construct(
         private readonly WildberriesStatisticsV5Client $client,
-        private readonly WildberriesReportDetailRepository $repository,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
-        private readonly ImportLogger $importLogger,
     ) {
+    }
+
+    public function importPeriodForCompany(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $period = 'weekly',
+    ): void {
+        $this->doImport($company, $dateFrom, $dateTo, $period);
     }
 
     /**
@@ -27,130 +34,72 @@ final class WildberriesReportDetailImporter
      *
      * @return int Количество обработанных строк
      */
-    public function import(Company $company, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo, string $period = 'daily'): int
-    {
-        $this->logger->info(sprintf(
-            '[WB:ReportDetail] Start import: company=%s, from=%s, to=%s, period=%s',
-            $company->getId(),
-            $dateFrom->format(\DATE_ATOM),
-            $dateTo->format(\DATE_ATOM),
-            $period
-        ));
+    public function import(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $period = 'daily',
+    ): int {
+        return $this->doImport($company, $dateFrom, $dateTo, $period);
+    }
+
+    public function importWindowWithCursor(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $importId,
+        int $rrdCursor = 0,
+        string $period = 'daily',
+    ): int {
+        return $this->runWindowImport($company, $dateFrom, $dateTo, $period, $importId, $rrdCursor, true);
+    }
+
+    private function doImport(
+        Company $company,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $period,
+    ): int {
+        $dateFrom = $this->normalizeDate($dateFrom);
+        $dateTo = $this->normalizeDate($dateTo);
+
+        $companyId = $this->requireCompanyId($company);
+
+        $this->logger->info('[WB:ReportDetail] Start', [
+            'company' => $companyId,
+            'from' => $dateFrom->format(\DATE_ATOM),
+            'to' => $dateTo->format(\DATE_ATOM),
+            'period' => $period,
+        ]);
 
         $processed = 0;
-        $rrdIdCursor = 0;
 
         try {
-            while (true) {
-                $payload = $this->client->fetchReportDetailByPeriod(
+            foreach ($this->iterateDateWindows($dateFrom, $dateTo, $period) as [$windowFrom, $windowTo]) {
+                $windowImportId = Uuid::uuid4()->toString();
+                $processed += $this->runWindowImport(
                     $company,
-                    $dateFrom,
-                    $dateTo,
-                    $rrdIdCursor,
-                    $period
+                    $windowFrom,
+                    $windowTo,
+                    $period,
+                    $windowImportId,
+                    0,
+                    false
                 );
-
-                if (empty($payload)) {
-                    break;
-                }
-
-                $maxInBatch = $rrdIdCursor;
-
-                foreach ($payload as $row) {
-                    if (!isset($row['rrd_id'])) {
-                        $this->logger->warning('[WB:ReportDetail] Skip row without rrd_id', ['row' => $row]);
-                        $this->importLogger->incError();
-                        continue;
-                    }
-
-                    $rrdId = (int) $row['rrd_id'];
-                    if ($rrdId > $maxInBatch) {
-                        $maxInBatch = $rrdId;
-                    }
-
-                    $entity = $this->repository->findOneByCompanyAndRrdId($company, $rrdId);
-                    if (!$entity) {
-                        $entity = new WildberriesReportDetail();
-                        $entity->setId(Uuid::uuid4()->toString());
-                        $entity->setCompany($company);
-                        $entity->setRrdId($rrdId);
-                        $entity->setCreatedAt(new \DateTimeImmutable());
-                    }
-
-                    // WB identifiers
-                    $entity->setRealizationreportId(isset($row['realizationreport_id']) ? (int) $row['realizationreport_id'] : null);
-
-                    // Dates
-                    $entity->setSaleDt($this->parseDt($row['sale_dt'] ?? null));
-                    $entity->setRrDt($this->parseDt($row['rr_dt'] ?? null));
-                    $entity->setOrderDt($this->parseDt($row['order_dt'] ?? null));
-
-                    // Nomenclature
-                    $entity->setNmId(isset($row['nm_id']) ? (int) $row['nm_id'] : null);
-                    $entity->setBarcode($row['barcode'] ?? null);
-                    $entity->setSubjectName($row['subject_name'] ?? null);
-                    $entity->setBrandName($row['brand_name'] ?? null);
-
-                    // Amounts (decimal(15,2) — строки)
-                    $entity->setRetailPrice($this->toDecimalString($row['retail_price'] ?? null));
-                    $entity->setRetailPriceWithDiscRub($this->toDecimalString($row['retail_price_with_disc_rub'] ?? null));
-                    $entity->setPpvzSalesCommission($this->toDecimalString($row['ppvz_sales_commission'] ?? null));
-                    $entity->setPpvzForPay($this->toDecimalString($row['ppvz_for_pay'] ?? null));
-                    $entity->setDeliveryRub($this->toDecimalString($row['delivery_rub'] ?? null));
-                    $entity->setStorageFee($this->toDecimalString($row['storage_fee'] ?? null));
-                    $entity->setAcceptance($this->toDecimalString($row['acceptance'] ?? null));
-                    $entity->setPenalty($this->toDecimalString($row['penalty'] ?? null));
-                    $entity->setAcquiringFee($this->toDecimalString($row['acquiring_fee'] ?? null));
-
-                    // Other fields
-                    $entity->setSiteCountry($row['site_country'] ?? null);
-                    $entity->setSupplierOperName($row['supplier_oper_name'] ?? null);
-                    $entity->setDocTypeName($row['doc_type_name'] ?? null);
-
-                    // Status / Updated
-                    $entity->setStatusUpdatedAt($entity->getRrDt() ?: new \DateTimeImmutable());
-                    $entity->setRaw(is_array($row) ? $row : []);
-                    $entity->setUpdatedAt(new \DateTimeImmutable());
-
-                    $this->em->persist($entity);
-                }
-
-                $this->em->flush();
-                $this->em->clear(WildberriesReportDetail::class);
-
-                $processed += \count($payload);
-                $rrdIdCursor = $maxInBatch;
-
-                $this->logger->info(sprintf(
-                    '[WB:ReportDetail] Batch imported: company=%s, batch=%d, processed_total=%d, next_rrd_cursor=%d',
-                    $company->getId(),
-                    \count($payload),
-                    $processed,
-                    $rrdIdCursor
-                ));
             }
 
-            $this->importLogger->success(
-                'wildberries_report_detail',
-                $company,
-                $processed,
-                $dateFrom,
-                $dateTo
-            );
-
-            $this->logger->info(sprintf(
-                '[WB:ReportDetail] Import finished: company=%s, processed=%d, window=[%s .. %s]',
-                $company->getId(),
-                $processed,
-                $dateFrom->format(\DATE_ATOM),
-                $dateTo->format(\DATE_ATOM)
-            ));
+            $this->logger->info('[WB:ReportDetail] Finished', [
+                'company' => $companyId,
+                'processed' => $processed,
+                'from' => $dateFrom->format(\DATE_ATOM),
+                'to' => $dateTo->format(\DATE_ATOM),
+                'period' => $period,
+            ]);
 
             return $processed;
         } catch (\Throwable $e) {
-            $this->importLogger->incError();
-            $this->logger->error('[WB:ReportDetail] Import failed', [
-                'company' => $company->getId(),
+            $this->logger->error('[WB:ReportDetail] Failed', [
+                'company' => $companyId,
                 'from' => $dateFrom->format(\DATE_ATOM),
                 'to' => $dateTo->format(\DATE_ATOM),
                 'period' => $period,
@@ -160,13 +109,285 @@ final class WildberriesReportDetailImporter
         }
     }
 
-    private function parseDt(?string $value): ?\DateTimeImmutable
+    private function runWindowImport(
+        Company $company,
+        \DateTimeImmutable $windowFrom,
+        \DateTimeImmutable $windowTo,
+        string $period,
+        string $importId,
+        int $rrdCursor,
+        bool $logWindowBoundaries,
+    ): int {
+        $windowFrom = $this->normalizeDate($windowFrom);
+        $windowTo = $this->normalizeDate($windowTo);
+
+        $companyId = $this->requireCompanyId($company);
+
+        /** @var Connection $conn */
+        $conn = $this->em->getConnection();
+
+        $cursor = max(0, $rrdCursor);
+        $processed = 0;
+        $nowIso = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        if ($logWindowBoundaries) {
+            $this->logger->info('[WB:ReportDetail] Window start', [
+                'company' => $companyId,
+                'from' => $windowFrom->format(\DATE_ATOM),
+                'to' => $windowTo->format(\DATE_ATOM),
+                'period' => $period,
+                'import_id' => $importId,
+                'rrdid' => $cursor,
+            ]);
+        }
+
+        while (true) {
+            $page = $this->client->fetchReportDetailByPeriod(
+                $company,
+                $windowFrom,
+                $windowTo,
+                $cursor,
+                $period
+            );
+
+            if (empty($page)) {
+                break;
+            }
+
+            $rows = [];
+            $rowsCount = 0;
+            $maxInBatch = $cursor;
+            $pageProcessed = 0;
+
+            foreach ($page as $r) {
+                if (!isset($r['rrd_id'])) {
+                    continue;
+                }
+
+                $rrd = (int) $r['rrd_id'];
+                if ($rrd > $maxInBatch) {
+                    $maxInBatch = $rrd;
+                }
+
+                $rows[] = $this->mapRowToDb($r, $companyId, $importId, $nowIso);
+                ++$rowsCount;
+                ++$pageProcessed;
+
+                if ($rowsCount >= self::BATCH_SIZE) {
+                    $this->upsertChunk($conn, $rows);
+                    $processed += $rowsCount;
+                    $rows = [];
+                    $rowsCount = 0;
+                }
+            }
+
+            if ($rowsCount > 0) {
+                $this->upsertChunk($conn, $rows);
+                $processed += $rowsCount;
+            }
+
+            $this->logger->info('[WB:ReportDetail] Page done', [
+                'company' => $companyId,
+                'window_from' => $windowFrom->format(\DATE_ATOM),
+                'window_to' => $windowTo->format(\DATE_ATOM),
+                'count' => \count($page),
+                'processed_page' => $pageProcessed,
+                'processed_total' => $processed,
+                'next_rrd' => $maxInBatch,
+                'import_id' => $importId,
+            ]);
+
+            if ($maxInBatch === $cursor) {
+                break;
+            }
+
+            $cursor = $maxInBatch;
+        }
+
+        if ($logWindowBoundaries) {
+            $this->logger->info('[WB:ReportDetail] Window finished', [
+                'company' => $companyId,
+                'from' => $windowFrom->format(\DATE_ATOM),
+                'to' => $windowTo->format(\DATE_ATOM),
+                'period' => $period,
+                'import_id' => $importId,
+                'rrdid' => $cursor,
+                'processed' => $processed,
+            ]);
+        }
+
+        return $processed;
+    }
+
+    /** Трансформация WB-строки -> плоский массив для UPSERT. */
+    private function mapRowToDb(array $r, string $companyId, string $importId, string $nowIso): array
+    {
+        $saleDt = $this->formatDbTs($r['sale_dt'] ?? null);
+        $rrDt = $this->formatDbTs($r['rr_dt'] ?? null);
+        $orderDt = $this->formatDbTs($r['order_dt'] ?? null);
+
+        return [
+            'id' => Uuid::uuid4()->toString(),
+            'company_id' => $companyId,
+            'import_id' => $importId,
+            'rrd_id' => (int) $r['rrd_id'],
+            'realizationreport_id' => isset($r['realizationreport_id']) ? (int) $r['realizationreport_id'] : null,
+
+            'sale_dt' => $saleDt,
+            'rr_dt' => $rrDt,
+            'order_dt' => $orderDt,
+
+            'nm_id' => isset($r['nm_id']) ? (int) $r['nm_id'] : null,
+            'barcode' => $r['barcode'] ?? null,
+            'subject_name' => $r['subject_name'] ?? null,
+            'brand_name' => $r['brand_name'] ?? null,
+
+            'retail_price' => $this->toDecimalString($r['retail_price'] ?? null),
+            'retail_price_with_disc_rub' => $this->toDecimalString($r['retail_price_with_disc_rub'] ?? null),
+            'ppvz_sales_commission' => $this->toDecimalString($r['ppvz_sales_commission'] ?? null),
+            'ppvz_for_pay' => $this->toDecimalString($r['ppvz_for_pay'] ?? null),
+            'delivery_rub' => $this->toDecimalString($r['delivery_rub'] ?? null),
+            'storage_fee' => $this->toDecimalString($r['storage_fee'] ?? null),
+            'acceptance' => $this->toDecimalString($r['acceptance'] ?? null),
+            'penalty' => $this->toDecimalString($r['penalty'] ?? null),
+            'acquiring_fee' => $this->toDecimalString($r['acquiring_fee'] ?? null),
+
+            'site_country' => $r['site_country'] ?? null,
+            'supplier_oper_name' => $r['supplier_oper_name'] ?? null,
+            'doc_type_name' => $r['doc_type_name'] ?? null,
+
+            'status_updated_at' => $rrDt ?: $nowIso,
+            'updated_at' => $nowIso,
+            'created_at' => $nowIso,
+
+            // jsonb RAW
+            'raw' => \json_encode($r, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES),
+        ];
+    }
+
+    /**
+     * Батчевый UPSERT: INSERT ... ON CONFLICT (company_id, rrd_id) DO UPDATE SET ...
+     * ВАЖНО: в массиве $params ключи БЕЗ двоеточия, двоеточие только в SQL.
+     */
+    private function upsertChunk(Connection $conn, array $rows): void
+    {
+        if (!$rows) {
+            return;
+        }
+
+        $columns = [
+            'id', 'company_id', 'import_id', 'rrd_id', 'realizationreport_id',
+            'sale_dt', 'rr_dt', 'order_dt',
+            'nm_id', 'barcode', 'subject_name', 'brand_name',
+            'retail_price', 'retail_price_with_disc_rub', 'ppvz_sales_commission', 'ppvz_for_pay',
+            'delivery_rub', 'storage_fee', 'acceptance', 'penalty', 'acquiring_fee',
+            'site_country', 'supplier_oper_name', 'doc_type_name',
+            'status_updated_at', 'updated_at', 'created_at', 'raw',
+        ];
+
+        $placeholders = [];
+        $params = [];
+        $i = 0;
+
+        foreach ($rows as $row) {
+            $rowPh = [];
+            foreach ($columns as $col) {
+                $name = 'p'.$i++;          // ключ без двоеточия
+                $rowPh[] = ':'.$name;         // плейсхолдер с двоеточием
+                $params[$name] = $row[$col] ?? null;
+            }
+            $placeholders[] = '('.\implode(',', $rowPh).')';
+        }
+
+        $sql = <<<SQL
+INSERT INTO wildberries_report_details
+  ("id","company_id","import_id","rrd_id","realizationreport_id",
+   "sale_dt","rr_dt","order_dt",
+   "nm_id","barcode","subject_name","brand_name",
+   "retail_price","retail_price_with_disc_rub","ppvz_sales_commission","ppvz_for_pay",
+   "delivery_rub","storage_fee","acceptance","penalty","acquiring_fee",
+   "site_country","supplier_oper_name","doc_type_name",
+   "status_updated_at","updated_at","created_at","raw")
+VALUES
+  %s
+ON CONFLICT ("company_id","rrd_id") DO UPDATE SET
+   "import_id"                    = EXCLUDED."import_id",
+   "realizationreport_id"         = EXCLUDED."realizationreport_id",
+   "sale_dt"                      = EXCLUDED."sale_dt",
+   "rr_dt"                        = EXCLUDED."rr_dt",
+   "order_dt"                     = EXCLUDED."order_dt",
+   "nm_id"                        = EXCLUDED."nm_id",
+   "barcode"                      = EXCLUDED."barcode",
+   "subject_name"                 = EXCLUDED."subject_name",
+   "brand_name"                   = EXCLUDED."brand_name",
+   "retail_price"                 = EXCLUDED."retail_price",
+   "retail_price_with_disc_rub"   = EXCLUDED."retail_price_with_disc_rub",
+   "ppvz_sales_commission"        = EXCLUDED."ppvz_sales_commission",
+   "ppvz_for_pay"                 = EXCLUDED."ppvz_for_pay",
+   "delivery_rub"                 = EXCLUDED."delivery_rub",
+   "storage_fee"                  = EXCLUDED."storage_fee",
+   "acceptance"                   = EXCLUDED."acceptance",
+   "penalty"                      = EXCLUDED."penalty",
+   "acquiring_fee"                = EXCLUDED."acquiring_fee",
+   "site_country"                 = EXCLUDED."site_country",
+   "supplier_oper_name"           = EXCLUDED."supplier_oper_name",
+   "doc_type_name"                = EXCLUDED."doc_type_name",
+   "status_updated_at"            = EXCLUDED."status_updated_at",
+   "updated_at"                   = EXCLUDED."updated_at",
+   "raw"                          = EXCLUDED."raw"
+SQL;
+
+        $sql = \sprintf($sql, \implode(',', $placeholders));
+        $conn->executeStatement($sql, $params);
+    }
+
+    /** Деление исходного интервала на окна без перекрытия. */
+    private function iterateDateWindows(\DateTimeImmutable $from, \DateTimeImmutable $to, string $period): iterable
+    {
+        $from = $this->normalizeDate($from);
+        $to = $this->normalizeDate($to);
+
+        $chunkSize = $this->windowSizeDays($period);
+        $cursor = $from;
+
+        while ($cursor <= $to) {
+            $windowEnd = $this->calculateWindowEnd($cursor, $to, $chunkSize);
+            yield [$cursor, $windowEnd];
+            $cursor = $windowEnd->add(new \DateInterval('P1D'));
+        }
+    }
+
+    private function windowSizeDays(string $period): int
+    {
+        return match ($period) {
+            'weekly' => 7,
+            default => 1,
+        };
+    }
+
+    private function calculateWindowEnd(\DateTimeImmutable $start, \DateTimeImmutable $globalEnd, int $chunkSizeDays): \DateTimeImmutable
+    {
+        if ($chunkSizeDays <= 1) {
+            return $start > $globalEnd ? $globalEnd : $start;
+        }
+        $days = max(0, $chunkSizeDays - 1);
+        $candidate = $start->add(new \DateInterval(\sprintf('P%dD', $days)));
+
+        return $candidate > $globalEnd ? $globalEnd : $candidate;
+    }
+
+    private function normalizeDate(\DateTimeImmutable $value): \DateTimeImmutable
+    {
+        return $value->setTime(0, 0, 0, 0);
+    }
+
+    private function formatDbTs(?string $value): ?string
     {
         if (!$value) {
             return null;
         }
         try {
-            return new \DateTimeImmutable($value);
+            return (new \DateTimeImmutable($value))->format('Y-m-d H:i:s');
         } catch (\Throwable) {
             return null;
         }
@@ -177,10 +398,20 @@ final class WildberriesReportDetailImporter
         if (null === $v || '' === $v) {
             return null;
         }
-        if (is_numeric($v)) {
-            return number_format((float) $v, 2, '.', '');
+        if (\is_numeric($v)) {
+            return \number_format((float) $v, 2, '.', '');
         }
 
-        return (string) $v;
+        return (string) $v; // WB иногда отдаёт строки — сохраняем как есть
+    }
+
+    private function requireCompanyId(Company $company): string
+    {
+        $companyId = $company->getId();
+        if (null === $companyId) {
+            throw new \RuntimeException('Cannot import WB report details for a company without identifier');
+        }
+
+        return (string) $companyId;
     }
 }

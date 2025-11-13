@@ -38,6 +38,9 @@ site-cs-fix:
 
 # ===== TESTS =====
 
+site-test-telegram:
+	 docker-compose run --rm site-php-cli composer test -- --testsuite telegram
+
 # Быстрые юнит-тесты (без БД)
 site-test-unit:
 	docker-compose run --rm site-php-cli composer test:unit

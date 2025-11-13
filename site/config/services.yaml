@@ -101,3 +101,8 @@ services:
     App\Banking\Service\BankImportService: ~
     App\Banking\Console\BankImportRunCommand:
         tags: ['console.command']
+
+    # Telegram
+    App\Telegram\Service\BotLinkService:
+        arguments:
+            $appSecret: '%kernel.secret%'

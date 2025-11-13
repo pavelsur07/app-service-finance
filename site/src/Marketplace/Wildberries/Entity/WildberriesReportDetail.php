@@ -8,6 +8,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity]
 #[ORM\Table(name: 'wildberries_report_details')]
 #[ORM\UniqueConstraint(name: 'uniq_company_rrd', columns: ['company_id', 'rrd_id'])]
+#[ORM\Index(name: 'idx_wb_report_detail_import_id', columns: ['import_id'])]
 class WildberriesReportDetail
 {
     #[ORM\Id]
@@ -17,6 +18,9 @@ class WildberriesReportDetail
     #[ORM\ManyToOne(targetEntity: Company::class)]
     #[ORM\JoinColumn(name: 'company_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private Company $company;
+
+    #[ORM\Column(name: 'import_id', type: 'guid')]
+    private string $importId;
 
     // WB identifiers
     #[ORM\Column(name: 'realizationreport_id', type: 'bigint', nullable: true)]
@@ -122,6 +126,18 @@ class WildberriesReportDetail
     public function setCompany(Company $company): self
     {
         $this->company = $company;
+
+        return $this;
+    }
+
+    public function getImportId(): string
+    {
+        return $this->importId;
+    }
+
+    public function setImportId(string $importId): self
+    {
+        $this->importId = $importId;
 
         return $this;
     }

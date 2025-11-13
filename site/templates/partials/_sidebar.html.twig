@@ -78,30 +78,12 @@
                     </a>
                 </li>
 
-                <!-- Отчетность -->
-{#                <div class="nav-section-title hide-when-collapsed">Отчётность</div>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Движение денег (ДДС)">
-                        <span class="nav-link-icon"><i class="ti ti-arrows-left-right"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Движение денег</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Прибыль и убытки (ОПиУ)">
-                        <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="#" title="Баланс">
-                        <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Баланс</span>
-                    </a>
-                </li>#}
 
                 {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
                 {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
-                {% set reports_menu_open = report_cashflow_active or finance_report_preview_active %}
+                {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+                {% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
+                {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active %}
                 <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
                     <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
                         <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
@@ -128,6 +110,20 @@
                                 <a class="nav-link" href="#" title="Счета / касса / кошелек">
                                     <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
                                     <span class="nav-link-title hide-when-collapsed">Баланс</span>
+                                </a>
+                            </li>
+                            <li class="nav-item {{ wb_report_detail_active ? 'active' : '' }}">
+                                <a class="nav-link {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}" title="Фин. отчёты WB (детализация)">
+                                    <span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span>
+                                    <span class="nav-link-title hide-when-collapsed">Фин. отчёты WB (детализация)</span>
+                                </a>
+                            </li>
+                            <li class="nav-item {{ wb_rnp_active ? 'active' : '' }}">
+                                <a class="nav-link {{ wb_rnp_active ? 'active' : '' }}"
+                                   href="{{ path('wb_reports_rnp', {'period':'month'}) }}"
+                                   title="РНП — Рука на пульсе (Wildberries)">
+                                    <span class="nav-link-icon"><i class="ti ti-activity"></i></span>
+                                    <span class="nav-link-title hide-when-collapsed">РНП (Wildberries)</span>
                                 </a>
                             </li>
                             <li class="nav-item">
@@ -246,36 +242,18 @@
                     {% set integrations_show = (integrations_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>МойСклад</span>
+                            {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
+                            <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
+                                <span>Wb / Продажи</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>1С</span>
+                            {% set ozon_orders_active = current_route starts with 'ozon_order' %}
+                            <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                                <span>Ozon / Заказы</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Банки</span>
+                            {% set ozon_products_active = current_route starts with 'ozon_products' %}
+                            <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                                <span>Ozon / Товары</span>
                             </a>
-                            {% set marketplaces_active = current_route starts with 'ozon_' or current_route starts with 'wildberries_' %}
-                            <div class="dropend {{ marketplaces_active ? 'show' : '' }}">
-                                <a class="dropdown-item dropdown-toggle {{ marketplaces_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplaces_active ? 'true' : 'false' }}">
-                                    <span>Маркетплейсы</span>
-                                </a>
-                                {% set marketplaces_show = (marketplaces_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
-                                <div class="dropdown-menu {{ marketplaces_show }}">
-                                    {% set ozon_orders_active = current_route starts with 'ozon_order' %}
-                                    <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                        <span>Ozon / Заказы</span>
-                                    </a>
-                                    {% set ozon_products_active = current_route starts with 'ozon_products' %}
-                                    <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                                        <span>Ozon / Товары</span>
-                                    </a>
-                                    {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
-                                    <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                        <span>Wildberries / Продажи</span>
-                                    </a>
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </li>
@@ -292,15 +270,14 @@
                             <a class="dropdown-item {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
                                 <span>Профиль компании</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Пользователи и роли</span>
-                            </a>
+
                             {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
                             <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
                                 <span>Настройки отчётов (API-ключ)</span>
                             </a>
-                            <a class="dropdown-item disabled" href="#" tabindex="-1" aria-disabled="true">
-                                <span>Логи и аудит</span>
+                            {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
+                            <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
+                                <span>WB: Тех. операции</span>
                             </a>
 
                             {% set reports_debug_active =

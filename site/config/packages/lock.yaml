@@ -1,2 +1,5 @@
 framework:
-    lock: '%env(LOCK_DSN)%'
+    lock:
+        # Храним блокировки в Redis, чтобы избежать файловых артефактов flock
+        resources:
+            default: '%env(resolve:REDIS_DSN)%?prefix=symfony-locks'

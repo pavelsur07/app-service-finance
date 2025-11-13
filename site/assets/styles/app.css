@@ -76,3 +76,17 @@ body {
         max-width: 200px;
     }
 }
+
+/* Улучшаем контрастность модалок с эффектом blur, чтобы данные оставались читаемыми */
+.modal.modal-blur .modal-content {
+    background-color: var(--tblr-bg-surface);
+    color: var(--tblr-body-color);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.modal.modal-blur .modal-header,
+.modal.modal-blur .modal-body,
+.modal.modal-blur .modal-footer {
+    color: inherit;
+}

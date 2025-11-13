@@ -1,0 +1,160 @@
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h3 class="card-title mb-0">Динамика поступлений и списаний</h3>
+
+        <div class="d-flex align-items-center gap-2">
+            {# Переключатель периода #}
+            <select id="periodSelect" class="form-select form-select-sm w-auto">
+                <option value="month" selected>По месяцам</option>
+                <option value="week">По неделям</option>
+                <option value="day">По дням</option>
+            </select>
+
+            {# Переключатель вида: линия / столбцы #}
+            <div class="btn-group btn-group-sm" role="group" aria-label="Chart view">
+                <button type="button"
+                        class="btn btn-outline-primary active"
+                        id="btnViewLine"
+                        data-view="line"
+                        title="Линейный график">
+                    <i class="ti ti-chart-line"></i>
+                </button>
+                <button type="button"
+                        class="btn btn-outline-primary"
+                        id="btnViewBar"
+                        data-view="bar"
+                        title="Столбчатая диаграмма">
+                    <i class="ti ti-chart-bar"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body" style="height: 360px;">
+        <canvas id="cashflowChart"></canvas>
+    </div>
+</div>
+
+
+{# Chart.js можно подключить глобально, здесь для демо через CDN #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const ctx = document.getElementById('cashflowChart').getContext('2d');
+    const periodSelect = document.getElementById('periodSelect');
+    const btnViewLine = document.getElementById('btnViewLine');
+    const btnViewBar = document.getElementById('btnViewBar');
+
+    // 💾 Демо-данные (без API)
+    const demoData = {
+        month: {
+            labels: ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август'],
+            income:  [358000, 520000, 460000, 322000, 789000, 1240000, 730000, 881000],
+            expenses:[248000, 417000, 322000, 297000, 512000, 1110000, 731000, 455000]
+        },
+        week: {
+            labels: ['1 нед.', '2 нед.', '3 нед.', '4 нед.', '5 нед.'],
+            income:  [120000, 160000, 90000, 210000, 180000],
+            expenses:[ 90000, 130000, 80000, 170000, 150000]
+        },
+        day: {
+            labels: ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'],
+            income:  [20000, 35000, 18000, 42000, 50000, 30000, 15000],
+            expenses:[15000, 20000, 17000, 30000, 38000, 25000, 12000]
+        }
+    };
+
+    let currentView = 'line';   // line | bar
+    let currentPeriod = 'month';// month | week | day
+    let chart = null;
+
+    function buildConfig(periodKey, viewType) {
+        const src = demoData[periodKey];
+
+        return {
+            type: viewType,
+            data: {
+                labels: src.labels,
+                datasets: [
+                    {
+                        label: 'Поступления',
+                        data: src.income,
+                        backgroundColor: 'rgba(34, 197, 94, 0.25)',  // зелёный под Tabler
+                        borderColor: 'rgba(34, 197, 94, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    },
+                    {
+                        label: 'Списания',
+                        data: src.expenses,
+                        backgroundColor: 'rgba(37, 99, 235, 0.25)',   // синий под Tabler
+                        borderColor: 'rgba(37, 99, 235, 1)',
+                        borderWidth: 2,
+                        tension: 0.3
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { display: true },
+                    tooltip: {
+                        callbacks: {
+                            label: function (context) {
+                                const v = context.parsed.y || 0;
+                                return context.dataset.label + ': ' +
+                                    v.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function (value) {
+                                return value.toLocaleString('ru-RU') + ' ₽';
+                            }
+                        }
+                    },
+                    x: {
+                        grid: { display: false }
+                    }
+                }
+            }
+        };
+    }
+
+    function renderChart() {
+        if (chart) {
+            chart.destroy();
+        }
+        const config = buildConfig(currentPeriod, currentView);
+        chart = new Chart(ctx, config);
+    }
+
+    // 🔁 Переключение периода
+    periodSelect.addEventListener('change', function () {
+        currentPeriod = this.value;
+        renderChart();
+    });
+
+    // 🔁 Переключение вида
+    function setView(view) {
+        currentView = view;
+        btnViewLine.classList.toggle('active', view === 'line');
+        btnViewBar.classList.toggle('active', view === 'bar');
+        renderChart();
+    }
+
+    btnViewLine.addEventListener('click', function () { setView('line'); });
+    btnViewBar.addEventListener('click', function () { setView('bar'); });
+
+    // Первый рендер
+    renderChart();
+});
+</script>
+

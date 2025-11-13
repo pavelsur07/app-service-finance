@@ -36,6 +36,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Marketplace/Wildberries/Entity'
                 prefix: 'App\Marketplace\Wildberries\Entity'
                 alias: MarketplaceWildberries
+            Telegram:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Telegram/Entity'
+                prefix: 'App\Telegram\Entity'
+                alias: Telegram
         controller_resolver:
             auto_mapping: false
 

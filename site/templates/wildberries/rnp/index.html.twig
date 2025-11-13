@@ -1,0 +1,235 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}РНП (Wildberries){% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h1 class="page-title">РНП — Рука на пульсе (Wildberries)</h1>
+        <div class="text-muted">{{ company.name }} · {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}</div>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a class="btn btn-outline-secondary" href="{{ path('wb_reports_rnp_data', export_params) }}" target="_blank" rel="noopener">
+          Скачать JSON
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    {% if errors is not empty %}
+      <div class="alert alert-warning" role="alert">
+        <ul class="mb-0">
+          {% for error in errors %}
+            <li>{{ error }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <div class="card mb-4">
+      <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-period" class="form-label">Период</label>
+            <select id="filter-period" name="period" class="form-select">
+              <option value="week" {{ period == 'week' ? 'selected' }}>Неделя</option>
+              <option value="month" {{ period == 'month' ? 'selected' }}>Месяц</option>
+              <option value="quarter" {{ period == 'quarter' ? 'selected' }}>Квартал</option>
+              <option value="custom" {{ period == 'custom' ? 'selected' }}>Произвольный</option>
+            </select>
+          </div>
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-from" class="form-label">Дата с</label>
+            <input id="filter-from" type="date" name="from" class="form-control" value="{{ from|date('Y-m-d') }}">
+          </div>
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-to" class="form-label">Дата по</label>
+            <input id="filter-to" type="date" name="to" class="form-control" value="{{ to|date('Y-m-d') }}">
+          </div>
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-sku" class="form-label">SKU</label>
+            <input id="filter-sku" type="text" name="sku" class="form-control" value="{{ filters_input.sku }}" placeholder="123456, 654321">
+            <div class="form-hint">Через пробел или запятую</div>
+          </div>
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-brand" class="form-label">Бренд</label>
+            <input id="filter-brand" type="text" name="brand" class="form-control" value="{{ filters_input.brand }}" placeholder="Бренд">
+          </div>
+          <div class="col-sm-6 col-md-3 col-lg-2">
+            <label for="filter-category" class="form-label">Категория</label>
+            <input id="filter-category" type="text" name="category" class="form-control" value="{{ filters_input.category }}" placeholder="Категория">
+          </div>
+          <div class="col-12 d-flex justify-content-end gap-2">
+            <a class="btn btn-outline-secondary" href="{{ path('wb_reports_rnp') }}">Сбросить</a>
+            <button type="submit" class="btn btn-primary">Показать</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    {% set totals = report.totals %}
+    <div class="row row-deck row-cards mb-4">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Продажи, ₽</span>
+              <span class="ms-auto h3 mb-0">{{ (totals.sales_sum_spp_minor / 100)|number_format(2, '.', ' ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Себестоимость, ₽</span>
+              <span class="ms-auto h3 mb-0">{{ (totals.cogs_sum_spp_minor / 100)|number_format(2, '.', ' ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Гросс-прибыль, ₽</span>
+              <span class="ms-auto h3 mb-0">{{ (totals.gross_profit_minor / 100)|number_format(2, '.', ' ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Вклад, ₽</span>
+              <span class="ms-auto h3 mb-0">{{ (totals.contribution_minor / 100)|number_format(2, '.', ' ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row row-deck row-cards mb-4">
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Заказы (шт.)</span>
+              <span class="ms-auto h3 mb-0">{{ totals.orders_count_spp }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Продажи (шт.)</span>
+              <span class="ms-auto h3 mb-0">{{ totals.sales_count_spp }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Выкуп, %</span>
+              <span class="ms-auto h3 mb-0">{{ ((totals.buyout_rate_weighted ?? 0) * 100)|number_format(2, '.', ' ') }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center">
+              <span class="text-muted">Реклама, ₽</span>
+              <span class="ms-auto h3 mb-0">{{ (totals.ad_cost_sum_minor / 100)|number_format(2, '.', ' ') }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-striped table-hover mb-0">
+            <thead>
+              <tr>
+                <th>Дата</th>
+                <th>SKU</th>
+                <th>Категория</th>
+                <th>Бренд</th>
+                <th class="text-end">Заказы</th>
+                <th class="text-end">Заказы, ₽</th>
+                <th class="text-end">Продажи</th>
+                <th class="text-end">Продажи, ₽</th>
+                <th class="text-end">Себестоимость, ₽</th>
+                <th class="text-end">Гросс-прибыль, ₽</th>
+                <th class="text-end">Реклама, ₽</th>
+                <th class="text-end">Вклад, ₽</th>
+                <th class="text-end">Выкуп, %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for item in report.items %}
+                <tr>
+                  <td>{{ item.date|date('d.m.Y') }}</td>
+                  <td><code>{{ item.sku }}</code></td>
+                  <td>{{ item.category ?? '—' }}</td>
+                  <td>{{ item.brand ?? '—' }}</td>
+                  <td class="text-end">{{ item.orders_count_spp }}</td>
+                  <td class="text-end">{{ (item.orders_sum_spp_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ item.sales_count_spp }}</td>
+                  <td class="text-end">{{ (item.sales_sum_spp_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ (item.cogs_sum_spp_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ (item.gross_profit_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ (item.ad_cost_sum_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ (item.contribution_minor / 100)|number_format(2, '.', ' ') }}</td>
+                  <td class="text-end">{{ ((item.buyout_rate ?? 0) * 100)|number_format(2, '.', ' ') }}%</td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="13" class="text-center text-muted py-4">Нет данных для выбранных параметров</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const periodSelect = document.getElementById('filter-period');
+    const fromInput = document.getElementById('filter-from');
+    const toInput = document.getElementById('filter-to');
+
+    const toggleDateInputs = () => {
+      const isCustom = periodSelect.value === 'custom';
+      fromInput.disabled = !isCustom;
+      toInput.disabled = !isCustom;
+    };
+
+    periodSelect.addEventListener('change', () => {
+      toggleDateInputs();
+      if (periodSelect.value !== 'custom') {
+        fromInput.form.submit();
+      }
+    });
+
+    toggleDateInputs();
+  });
+</script>
+{% endblock %}

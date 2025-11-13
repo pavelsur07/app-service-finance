@@ -48,13 +48,9 @@
             <thead>
             <tr>
                 <th>Дата заказа</th>
-                <th>Статус</th>
-                <th>Тип заказа</th>
-                <th>Кол-во</th>
                 <th>Цена</th>
                 <th>Итого</th>
                 <th>К выплате</th>
-                <th>Доставка</th>
                 <th>Склад</th>
                 <th>Регион</th>
                 <th>Обновлено</th>
@@ -65,15 +61,11 @@
             {% for sale in pagination.items %}
                 <tr>
                     <td>{{ sale.soldAt|date('Y-m-d H:i') }}</td>
-                    <td>{{ sale.saleStatus ?? '—' }}</td>
-                    <td>{{ sale.orderType ?? '—' }}</td>
-                    <td>{{ sale.quantity }}</td>
-                    <td>{{ sale.price }}</td>
+                    <td>{{ sale.raw.priceWithDisc ?? sale.price }}</td>
                     <td>{{ sale.finishedPrice }}</td>
                     <td>{{ sale.forPay ?? '—' }}</td>
-                    <td>{{ sale.deliveryAmount ?? '—' }}</td>
                     <td>{{ sale.warehouseName ?? '—' }}</td>
-                    <td>{{ sale.oblast ?? '—' }}</td>
+                    <td>{{ sale.raw.oblastOkrugName ?? sale.oblast ?? '—' }}</td>
                     <td>{{ sale.statusUpdatedAt ? sale.statusUpdatedAt|date('Y-m-d H:i') : '—' }}</td>
                     <td>
                         <details>
@@ -84,7 +76,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="12" class="text-center">Данные о заказах отсутствуют</td>
+                    <td colspan="8" class="text-center">Данные о заказах отсутствуют</td>
                 </tr>
             {% endfor %}
             </tbody>
