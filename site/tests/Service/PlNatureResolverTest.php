@@ -9,7 +9,6 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\User;
-use App\Enum\DocumentType;
 use App\Enum\PLFlow;
 use App\Enum\PlNature;
 use App\Service\PlNatureResolver;
@@ -18,13 +17,12 @@ use Ramsey\Uuid\Uuid;
 
 final class PlNatureResolverTest extends TestCase
 {
-    public function testOperationCategoryOverridesDocumentType(): void
+    public function testOperationCategoryDeterminesNature(): void
     {
         $resolver = new PlNatureResolver();
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::LIABILITIES);
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
@@ -43,7 +41,6 @@ final class PlNatureResolverTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::SALES);
 
         $operation = new DocumentOperation();
         $operation->setDocument($document);
@@ -57,7 +54,6 @@ final class PlNatureResolverTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::SALES);
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);

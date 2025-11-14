@@ -63,9 +63,16 @@ class RawPlReportController extends AbstractController
 
                 $sign = $nature->sign();
 
+                $documentLabel = $doc->getNumber();
+                if (null === $documentLabel || '' === trim((string) $documentLabel)) {
+                    $documentLabel = sprintf('#%s', $doc->getId());
+                } else {
+                    $documentLabel = sprintf('№%s', $documentLabel);
+                }
+
                 $rows[] = [
                     'date' => $doc->getDate()->format('Y-m-d'),
-                    'document' => sprintf('%s #%s', $doc->getType()->label(), $doc->getId()),
+                    'document' => $documentLabel,
                     'operation_id' => $op->getId(),
                     'category' => $category->getName(),
                     'nature' => $nature->value,

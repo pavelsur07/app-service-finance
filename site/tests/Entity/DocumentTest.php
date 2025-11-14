@@ -9,29 +9,11 @@ use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\User;
 use App\Enum\CounterpartyType;
-use App\Enum\DocumentType;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
 final class DocumentTest extends TestCase
 {
-    public function testDefaultTypeIsSales(): void
-    {
-        $document = $this->createDocument();
-
-        self::assertSame(DocumentType::SALES, $document->getType());
-        self::assertSame('SALES', $document->getTypeValue());
-    }
-
-    public function testSetTypeUpdatesValue(): void
-    {
-        $document = $this->createDocument();
-        $document->setType(DocumentType::PAYROLL);
-
-        self::assertSame(DocumentType::PAYROLL, $document->getType());
-        self::assertSame('PAYROLL', $document->getTypeValue());
-    }
-
     public function testCounterpartyIsNullByDefault(): void
     {
         $document = $this->createDocument();
