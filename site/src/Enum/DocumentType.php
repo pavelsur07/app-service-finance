@@ -14,13 +14,28 @@ enum DocumentType: string
     case LOANS = 'LOANS';             // Кредиты
     case OTHER = 'OTHER';             // Прочее
 
+    public static function fromValue(string $value): self
+    {
+        $normalized = strtoupper(trim($value));
+
+        $enum = self::tryFrom($normalized);
+        if (null !== $enum) {
+            return $enum;
+        }
+
+        return match ($normalized) {
+            'SERVICE_ACT' => self::SALES,
+            default => throw new \ValueError(sprintf('"%s" is not a valid backing value for enum %s', $value, self::class)),
+        };
+    }
+
     public static function fromLegacy(string $value): self
     {
         $v = strtoupper(trim($value));
 
         return match ($v) {
             'НАКЛАДНАЯ', 'ТОРГ-12', 'УПД', 'СЧЕТ-ФАКТУРА', 'РЕАЛИЗАЦИЯ', 'ЧЕК', 'ККТ',
-            'АКТ', 'АКТ ВЫПОЛНЕННЫХ РАБОТ', 'АКТ ОКАЗАННЫХ УСЛУГ',
+            'АКТ', 'АКТ ВЫПОЛНЕННЫХ РАБОТ', 'АКТ ОКАЗАННЫХ УСЛУГ', 'SERVICE_ACT',
             'ОТЧЕТ КОМИССИОНЕРА', 'ОТЧЕТ АГЕНТА', 'ОТЧЕТ МАРКЕТПЛЕЙСА', 'WB', 'OZON', 'YANDEX',
             'ВОЗВРАТ ОТ ПОКУПАТЕЛЯ', 'ВОЗВРАТ ПОСТАВЩИКУ', 'ВОЗВРАТ'
                 => self::SALES,
