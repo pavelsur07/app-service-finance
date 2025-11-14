@@ -41,6 +41,9 @@ class DocumentType extends AbstractType
                 'placeholder' => '—',
                 'required' => false,
                 'label' => 'Контрагент',
+                'attr' => [
+                    'data-document-counterparty' => 'true',
+                ],
             ])
             ->add('description', TextareaType::class, [
                 'required' => false,
