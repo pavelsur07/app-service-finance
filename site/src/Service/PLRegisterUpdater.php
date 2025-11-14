@@ -109,7 +109,9 @@ final class PLRegisterUpdater
                     continue;
                 }
 
-                $category = $operation->getCategory();
+                $category = method_exists($operation, 'getPlCategory')
+                    ? $operation->getPlCategory()
+                    : (method_exists($operation, 'getCategory') ? $operation->getCategory() : null);
 
                 if (!$category instanceof PLCategory) {
                     continue;

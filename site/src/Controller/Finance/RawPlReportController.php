@@ -4,11 +4,13 @@ namespace App\Controller\Finance;
 
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
+use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
 use App\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\PlNatureResolver;
+use App\Enum\PlNature;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -49,15 +51,24 @@ class RawPlReportController extends AbstractController
                     continue;
                 }
 
+                $category = $op->getPlCategory();
+                if (!$category instanceof PLCategory) {
+                    continue;
+                }
+
                 $nature = $natureResolver->forOperation($op);
-                $sign = $nature?->sign() ?? 1;
+                if (!$nature instanceof PlNature) {
+                    continue;
+                }
+
+                $sign = $nature->sign();
 
                 $rows[] = [
                     'date' => $doc->getDate()->format('Y-m-d'),
                     'document' => sprintf('%s #%s', $doc->getType()->label(), $doc->getId()),
                     'operation_id' => $op->getId(),
-                    'category' => $op->getPlCategory()?->getName() ?? '-',
-                    'nature' => $nature?->value ?? '-',
+                    'category' => $category->getName(),
+                    'nature' => $nature->value,
                     'amount_raw' => $op->getAmount(),
                     'amount_signed' => (float) $op->getAmount() * $sign,
                     'counterparty' => $op->getCounterparty()?->getName() ?? '-',
