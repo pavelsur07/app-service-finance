@@ -23,6 +23,9 @@ class DocumentOperationType extends AbstractType
                     return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
                 },
                 'label' => 'Категория',
+                'placeholder' => '—',
+                'required' => false,
+                'empty_data' => null,
             ])
             ->add('amount', NumberType::class, [
                 'label' => 'Сумма',
