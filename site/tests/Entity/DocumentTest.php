@@ -15,21 +15,21 @@ use Ramsey\Uuid\Uuid;
 
 final class DocumentTest extends TestCase
 {
-    public function testDefaultTypeIsOther(): void
+    public function testDefaultTypeIsSales(): void
     {
         $document = $this->createDocument();
 
-        self::assertSame(DocumentType::OTHER, $document->getType());
-        self::assertSame('OTHER', $document->getTypeValue());
+        self::assertSame(DocumentType::SALES, $document->getType());
+        self::assertSame('SALES', $document->getTypeValue());
     }
 
     public function testSetTypeUpdatesValue(): void
     {
         $document = $this->createDocument();
-        $document->setType(DocumentType::PAYROLL_ACCRUAL);
+        $document->setType(DocumentType::PAYROLL);
 
-        self::assertSame(DocumentType::PAYROLL_ACCRUAL, $document->getType());
-        self::assertSame('PAYROLL_ACCRUAL', $document->getTypeValue());
+        self::assertSame(DocumentType::PAYROLL, $document->getType());
+        self::assertSame('PAYROLL', $document->getTypeValue());
     }
 
     public function testCounterpartyIsNullByDefault(): void

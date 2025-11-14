@@ -11,12 +11,12 @@ final class DocumentTypeFromLegacyTest extends TestCase
 {
     public function testDeliveryNoteMapping(): void
     {
-        self::assertSame(DocumentType::SALES_DELIVERY_NOTE, DocumentType::fromLegacy('Накладная'));
+        self::assertSame(DocumentType::SALES, DocumentType::fromLegacy('Накладная'));
     }
 
     public function testMarketplaceReportMapping(): void
     {
-        self::assertSame(DocumentType::COMMISSION_REPORT, DocumentType::fromLegacy('Отчет маркетплейса'));
+        self::assertSame(DocumentType::SALES, DocumentType::fromLegacy('Отчет маркетплейса'));
     }
 
     public function testUnknownMappingFallsBackToOther(): void
