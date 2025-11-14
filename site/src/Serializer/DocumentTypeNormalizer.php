@@ -35,7 +35,7 @@ final class DocumentTypeNormalizer implements ContextAwareNormalizerInterface, C
         }
 
         try {
-            return DocumentType::from($data);
+            return DocumentType::fromValue($data);
         } catch (\ValueError $e) {
             throw new NotNormalizableValueException(sprintf('Unknown document type "%s".', $data), previous: $e);
         }
