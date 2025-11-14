@@ -28,7 +28,6 @@
                         <tr>
                             <th>Дата</th>
                             <th>Номер</th>
-                            <th>Тип</th>
                             <th>Контрагент</th>
                             <th></th>
                         </tr>
@@ -38,7 +37,6 @@
                             <tr>
                                 <td>{{ item.date|date('Y-m-d') }}</td>
                                 <td>{{ item.number }}</td>
-                                <td><span class="badge bg-blue-lt">{{ item.type.label }}</span></td>
                                 <td>{{ item.counterparty ? item.counterparty.name : '' }}</td>
                                 <td class="text-end">
                                     <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-info">👁</a>
@@ -50,7 +48,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            <tr><td colspan="5" class="text-center">Нет данных</td></tr>
+                            <tr><td colspan="4" class="text-center">Нет данных</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

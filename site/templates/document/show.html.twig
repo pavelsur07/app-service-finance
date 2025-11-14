@@ -3,7 +3,7 @@
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
-            <h2 class="page-title">Документ {{ item.type.label }}</h2>
+            <h2 class="page-title">Документ {{ item.number ? '№' ~ item.number : item.id }}</h2>
         </div>
     </div>
     <div class="container-xl mt-3">
@@ -14,13 +14,12 @@
                     <dd class="col-sm-9">{{ item.date|date('Y-m-d H:i') }}</dd>
                     <dt class="col-sm-3">Номер</dt>
                     <dd class="col-sm-9">{{ item.number }}</dd>
-                    <dt class="col-sm-3">Тип</dt>
-                    <dd class="col-sm-9">
-                        <span class="badge bg-blue-lt">{{ item.type.label }}</span>
-                        {% if documentNature is defined %}
+                    {% if documentNature is defined %}
+                        <dt class="col-sm-3">Природа</dt>
+                        <dd class="col-sm-9">
                             <span class="badge {{ documentNature.badgeClass }}">{{ documentNature.label }}</span>
-                        {% endif %}
-                    </dd>
+                        </dd>
+                    {% endif %}
                     <dt class="col-sm-3">Контрагент</dt>
                     <dd class="col-sm-9">{{ item.counterparty ? item.counterparty.name : '' }}</dd>
                     <dt class="col-sm-3">Описание</dt>
@@ -52,7 +51,6 @@
                                     {% if view.natureLabel %}
                                         <span class="badge {{ view.badgeClass }}">{{ view.natureLabel }}</span>
                                         {% if view.isFallback %}
-                                            <span class="text-muted small">по типу документа</span>
                                             <span class="text-warning small ms-1">нужно указать статью</span>
                                         {% endif %}
                                     {% elseif view.needsCategorization %}

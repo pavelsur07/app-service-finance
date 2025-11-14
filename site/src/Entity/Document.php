@@ -2,12 +2,10 @@
 
 namespace App\Entity;
 
-use App\Enum\DocumentType;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
-use Symfony\Component\Validator\Constraints as AssertConstraints;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: DocumentRepository::class)]
@@ -28,10 +26,6 @@ class Document
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $number = null;
 
-    #[ORM\Column(enumType: DocumentType::class)]
-    #[AssertConstraints\NotNull]
-    private DocumentType $type;
-
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
@@ -49,7 +43,6 @@ class Document
         $this->company = $company;
         $this->date = new \DateTimeImmutable();
         $this->operations = new ArrayCollection();
-        $this->type = DocumentType::SALES;
     }
 
     public function getId(): ?string
@@ -89,31 +82,6 @@ class Document
     public function setNumber(?string $number): self
     {
         $this->number = $number;
-
-        return $this;
-    }
-
-    public function getType(): DocumentType
-    {
-        return $this->type;
-    }
-
-    public function setType(DocumentType $type): self
-    {
-        $this->type = $type;
-
-        return $this;
-    }
-
-    public function getTypeValue(): string
-    {
-        return $this->type->value;
-    }
-
-    /** @deprecated временно для миграций/старых вызовов */
-    public function setTypeFromString(string $legacy): self
-    {
-        $this->type = DocumentType::fromLegacy($legacy);
 
         return $this;
     }
