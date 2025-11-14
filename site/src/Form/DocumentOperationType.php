@@ -33,6 +33,9 @@ class DocumentOperationType extends AbstractType
                 'choice_label' => 'name',
                 'required' => false,
                 'label' => 'Контрагент',
+                'attr' => [
+                    'data-operation-counterparty' => 'true',
+                ],
             ]);
     }
 

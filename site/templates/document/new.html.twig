@@ -60,6 +60,24 @@
 {% block javascripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        const documentCounterpartyField = document.querySelector('[data-document-counterparty]');
+        const prefillOperationCounterparty = function(card) {
+            if (!documentCounterpartyField) {
+                return;
+            }
+
+            const selectedCounterparty = documentCounterpartyField.value;
+            if (!selectedCounterparty) {
+                return;
+            }
+
+            const operationCounterpartyField = card.querySelector('[data-operation-counterparty]');
+            if (operationCounterpartyField && !operationCounterpartyField.value) {
+                operationCounterpartyField.value = selectedCounterparty;
+                operationCounterpartyField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+
         document.querySelectorAll('[data-collection-holder]').forEach(function(collectionHolder) {
             const addButton = collectionHolder.parentElement.querySelector('.add_item_link');
             const createOperationCard = function(formHtml) {
@@ -80,6 +98,7 @@
                 const newForm = prototype.replace(/__name__/g, index);
                 const card = createOperationCard(newForm);
                 collectionHolder.appendChild(card);
+                prefillOperationCounterparty(card);
             });
 
             collectionHolder.addEventListener('click', function(e){
