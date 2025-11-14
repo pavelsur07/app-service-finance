@@ -20,8 +20,8 @@ class DocumentOperation
     private ?Document $document = null;
 
     #[ORM\ManyToOne(targetEntity: PLCategory::class)]
-    #[ORM\JoinColumn(nullable: false)]
-    private PLCategory $category;
+    #[ORM\JoinColumn(nullable: true)]
+    private ?PLCategory $category = null;
 
     #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
     private string $amount;
@@ -56,12 +56,12 @@ class DocumentOperation
         return $this;
     }
 
-    public function getCategory(): PLCategory
+    public function getCategory(): ?PLCategory
     {
         return $this->category;
     }
 
-    public function setCategory(PLCategory $category): self
+    public function setCategory(?PLCategory $category): self
     {
         $this->category = $category;
 
@@ -73,7 +73,7 @@ class DocumentOperation
         return isset($this->category) ? $this->category : null;
     }
 
-    public function setPlCategory(PLCategory $category): self
+    public function setPlCategory(?PLCategory $category): self
     {
         return $this->setCategory($category);
     }
