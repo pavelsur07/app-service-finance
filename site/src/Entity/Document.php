@@ -49,7 +49,7 @@ class Document
         $this->company = $company;
         $this->date = new \DateTimeImmutable();
         $this->operations = new ArrayCollection();
-        $this->type = DocumentType::OTHER;
+        $this->type = DocumentType::SALES;
     }
 
     public function getId(): ?string

@@ -24,7 +24,7 @@ final class PlNatureResolverTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::PURCHASE_INVOICE);
+        $document->setType(DocumentType::LIABILITIES);
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);
@@ -43,7 +43,7 @@ final class PlNatureResolverTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::SALES_DELIVERY_NOTE);
+        $document->setType(DocumentType::SALES);
 
         $operation = new DocumentOperation();
         $operation->setDocument($document);
@@ -57,7 +57,7 @@ final class PlNatureResolverTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::SALES_DELIVERY_NOTE);
+        $document->setType(DocumentType::SALES);
 
         $revenueRoot = $this->createCategory($company, 'Revenue');
         $revenueChild = $this->createCategory($company, 'Marketplace Sales', $revenueRoot);

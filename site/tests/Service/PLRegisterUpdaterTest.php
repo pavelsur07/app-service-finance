@@ -35,7 +35,7 @@ final class PLRegisterUpdaterTest extends TestCase
 
         $company = $this->createCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
-        $document->setType(DocumentType::OTHER);
+        $document->setType(DocumentType::LIABILITIES);
         $document->setDate(new \DateTimeImmutable('2024-01-10'));
 
         $incomeCategory = $this->createCategory($company, 'Income', PLFlow::INCOME);
