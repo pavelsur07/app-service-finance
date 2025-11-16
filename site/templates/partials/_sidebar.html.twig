@@ -234,6 +234,15 @@
                 </li>
 
 
+                <div class="nav-section-title hide-when-collapsed">AI</div>
+                {% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
+                <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
+                    <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
+                        <span class="nav-link-icon"><i class="ti ti-sparkles"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">AI-рекомендации</span>
+                    </a>
+                </li>
+
                 {% set integrations_active = current_route starts with 'ozon_' or current_route starts with 'wildberries_' %}
                 <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                     <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
