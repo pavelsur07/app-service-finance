@@ -1,0 +1,61 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}AI-рекомендации{% endblock %}
+
+{% block breadcrumbs %}
+    <div class="page-pretitle">AI</div>
+    <h2 class="page-title">Рекомендации по компании</h2>
+{% endblock %}
+
+{% block content %}
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <div>
+                <h3 class="card-title">Последние рекомендации</h3>
+                <div class="card-subtitle text-muted">Сгенерированы агентами на основе ДДС и платежного календаря.</div>
+            </div>
+            <a href="{{ path('app_ai_suggestions_index') }}" class="btn btn-outline-primary">Обновить</a>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Агент</th>
+                    <th>Заголовок</th>
+                    <th>Описание</th>
+                    <th>Важность</th>
+                    <th>Статус</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for suggestion in suggestions %}
+                    <tr class="{{ suggestion.isRead ? '' : 'table-active' }}">
+                        <td class="text-nowrap">{{ suggestion.createdAt|date('d.m.Y H:i') }}</td>
+                        <td class="text-muted">{{ suggestion.agent.type.label }}</td>
+                        <td class="fw-bold">{{ suggestion.title }}</td>
+                        <td>{{ suggestion.description }}</td>
+                        <td>
+                            <span class="{{ suggestion.severity.badgeClass }}">{{ suggestion.severity.label }}</span>
+                        </td>
+                        <td>
+                            <div class="d-flex flex-column gap-1">
+                                <span class="status {{ suggestion.isRead ? 'status-green' : 'status-red' }}">
+                                    {{ suggestion.isRead ? 'Прочитано' : 'Не прочитано' }}
+                                </span>
+                                <span class="status {{ suggestion.isApplied ? 'status-green' : 'status-yellow' }}">
+                                    {{ suggestion.isApplied ? 'Применено' : 'Ожидает действий' }}
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-5">Пока нет рекомендаций. Запустите агента из консоли.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}
