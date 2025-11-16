@@ -103,6 +103,8 @@ services:
             APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
             APP_MAIL_REPLY_TO: "support@yourdomain.com"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
@@ -123,6 +125,8 @@ services:
             APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
             APP_MAIL_REPLY_TO: "support@yourdomain.com"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
@@ -145,6 +149,8 @@ services:
             APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
             APP_MAIL_REPLY_TO: "support@yourdomain.com"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
