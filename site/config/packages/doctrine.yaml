@@ -48,6 +48,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Telegram/Entity'
                 prefix: 'App\Telegram\Entity'
                 alias: Telegram
+            Loan:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Loan/Entity'
+                prefix: 'App\Loan\Entity'
+                alias: Loan
         controller_resolver:
             auto_mapping: false
 
