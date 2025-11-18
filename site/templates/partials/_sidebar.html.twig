@@ -69,6 +69,14 @@
                     </a>
                 </li>
 
+                {% set loans_active = current_route starts with 'loan_' %}
+                <li class="nav-item {{ loans_active ? 'active' : '' }}">
+                    <a class="nav-link {{ loans_active ? 'active' : '' }}" href="{{ path('loan_index') }}" title="Кредиты">
+                        <span class="nav-link-icon"><i class="ti ti-building-bank"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Кредиты</span>
+                    </a>
+                </li>
+
                 <div class="nav-section-title hide-when-collapsed">Документы</div>
                 {% set documents_active = current_route == 'document_index' %}
                 <li class="nav-item {{ documents_active ? 'active' : '' }}">
