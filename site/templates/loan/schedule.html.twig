@@ -1,0 +1,110 @@
+{% extends 'base.html.twig' %}
+{% block title %}График платежей по займу{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">График платежей — {{ loan.name }}</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <a href="{{ path('loan_index') }}" class="btn btn-link">Назад к займам</a>
+                        <a href="{{ path('loan_schedule_add', {id: loan.id}) }}" class="btn btn-primary">+ Добавить платеж</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter">
+                            <thead>
+                            <tr>
+                                <th>Дата платежа</th>
+                                <th class="text-end">Общая сумма</th>
+                                <th class="text-end">Тело</th>
+                                <th class="text-end">Проценты</th>
+                                <th class="text-end">Комиссия</th>
+                                <th class="text-center">Статус</th>
+                                <th class="w-1"></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for item in scheduleItems %}
+                                <tr>
+                                    <td>{{ item.dueDate|date('d.m.Y') }}</td>
+                                    <td class="text-end">{{ item.totalPaymentAmount|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ item.principalPart|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ item.interestPart|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ item.feePart|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-center">
+                                        {% if item.isPaid %}
+                                            <span class="badge bg-success">Оплачен</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Не оплачен</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="btn-list">
+                                            <a href="{{ path('loan_schedule_edit', {loanId: loan.id, itemId: item.id}) }}" class="btn btn-sm btn-outline-primary">✏️</a>
+                                            <form method="post" action="{{ path('loan_schedule_delete', {loanId: loan.id, itemId: item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить платеж?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('loan_schedule_delete_' ~ item.id) }}">
+                                                <button class="btn btn-sm btn-outline-danger" type="submit">🗑️</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="7" class="text-center text-muted">Нет запланированных платежей</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            {% if form is defined %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">{{ formTitle ?? 'Платеж' }}</h3>
+                    </div>
+                    <div class="card-body">
+                        {{ form_start(form) }}
+                        <div class="row">
+                            <div class="col-md-4">
+                                {{ form_row(form.dueDate) }}
+                            </div>
+                            <div class="col-md-4">
+                                {{ form_row(form.isPaid) }}
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-3">
+                                {{ form_row(form.totalPaymentAmount) }}
+                            </div>
+                            <div class="col-md-3">
+                                {{ form_row(form.principalPart) }}
+                            </div>
+                            <div class="col-md-3">
+                                {{ form_row(form.interestPart) }}
+                            </div>
+                            <div class="col-md-3">
+                                {{ form_row(form.feePart) }}
+                            </div>
+                        </div>
+                        <button class="btn btn-primary mt-3" type="submit">Сохранить</button>
+                        {{ form_end(form) }}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
