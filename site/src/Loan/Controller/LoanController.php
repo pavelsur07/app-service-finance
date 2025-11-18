@@ -8,16 +8,19 @@ use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;
 use App\Loan\Form\LoanType;
 use App\Loan\Form\LoanPaymentScheduleType;
+use App\Loan\Form\LoanScheduleUploadType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Service\ActiveCompanyService;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
+use SplFileObject;
 
 #[Route('/loans')]
 class LoanController extends AbstractController
@@ -100,6 +103,82 @@ class LoanController extends AbstractController
         return $this->render('loan/schedule.html.twig', [
             'loan' => $loan,
             'scheduleItems' => $paymentScheduleRepository->findByLoanOrderedByDueDate($loan),
+        ]);
+    }
+
+    #[Route('/{id}/schedule/upload', name: 'loan_schedule_upload', methods: ['GET', 'POST'])]
+    public function uploadSchedule(
+        string $id,
+        Request $request,
+        LoanRepository $loanRepository,
+        LoanPaymentScheduleRepository $paymentScheduleRepository,
+        EntityManagerInterface $entityManager,
+        ActiveCompanyService $activeCompanyService
+    ): Response {
+        $company = $activeCompanyService->getActiveCompany();
+        $loan = $loanRepository->find($id);
+
+        if (null === $loan || $loan->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $form = $this->createForm(LoanScheduleUploadType::class);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            /** @var UploadedFile|null $file */
+            $file = $form->get('file')->getData();
+
+            if ($file instanceof UploadedFile) {
+                $csv = new SplFileObject($file->getPathname());
+                $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
+                $csv->setCsvControl(';');
+
+                foreach ($paymentScheduleRepository->findByLoanOrderedByDueDate($loan) as $item) {
+                    $entityManager->remove($item);
+                }
+
+                $isHeaderSkipped = false;
+
+                foreach ($csv as $row) {
+                    if (!$isHeaderSkipped) {
+                        $isHeaderSkipped = true;
+                        continue;
+                    }
+
+                    if (!is_array($row) || count($row) < 6 || null === $row[0]) {
+                        continue;
+                    }
+
+                    [$date, $totalPayment, $principalPart, $interestPart, $feePart, $isPaid] = $row;
+
+                    $dueDate = DateTimeImmutable::createFromFormat('Y-m-d', (string) $date);
+                    if (false === $dueDate) {
+                        continue;
+                    }
+
+                    $schedule = new LoanPaymentSchedule(
+                        $loan,
+                        $dueDate,
+                        (string) $totalPayment,
+                        (string) $principalPart,
+                        (string) $interestPart,
+                        (string) $feePart
+                    );
+
+                    $schedule->setIsPaid('1' === trim((string) $isPaid));
+                    $entityManager->persist($schedule);
+                }
+
+                $entityManager->flush();
+
+                return $this->redirectToRoute('loan_schedule', ['id' => $loan->getId()]);
+            }
+        }
+
+        return $this->render('loan/schedule_upload.html.twig', [
+            'loan' => $loan,
+            'uploadForm' => $form->createView(),
         ]);
     }
 

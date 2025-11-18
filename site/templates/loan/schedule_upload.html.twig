@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+{% block title %}Загрузка графика платежей{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Загрузка графика платежей — {{ loan.name }}</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <div class="btn-list">
+                        <a href="{{ path('loan_schedule', {id: loan.id}) }}" class="btn btn-link">Назад к графику</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    <p class="text-muted mb-3">
+                        Загрузите CSV-файл с графиком платежей. Формат файла:
+                    </p>
+                    <ul>
+                        <li>Разделитель — точка с запятой (;)</li>
+                        <li>Первая строка: <code>date;total_payment;principal_part;interest_part;fee_part;is_paid</code></li>
+                        <li>Далее строки с данными, например: <code>2025-01-28;50000.00;35000.00;15000.00;0.00;0</code></li>
+                    </ul>
+
+                    {{ form_start(uploadForm) }}
+                    {{ form_row(uploadForm.file) }}
+                    <button class="btn btn-primary" type="submit">Загрузить</button>
+                    {{ form_end(uploadForm) }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
