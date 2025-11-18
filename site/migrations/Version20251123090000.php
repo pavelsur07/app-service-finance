@@ -19,17 +19,21 @@ final class Version20251123090000 extends AbstractMigration
         $platform = $this->connection->getDatabasePlatform()->getName();
         $allowedTypes = "'DEAL_SALE', 'PAYROLL', 'TAXES', 'LOANS', 'OBLIGATIONS', 'ASSETS', 'CASH', 'CASHFLOW_EXPENSE', 'OTHER'";
 
+        $this->addSql("ALTER TABLE documents ADD COLUMN IF NOT EXISTS type VARCHAR(255) DEFAULT 'OTHER'");
+
         $this->addSql("UPDATE documents SET type = 'OTHER'");
 
         if ('postgresql' === $platform) {
             $this->addSql('ALTER TABLE documents DROP CONSTRAINT IF EXISTS documents_type_enum_check');
             $this->addSql("ALTER TABLE documents ALTER COLUMN type SET DEFAULT 'OTHER'");
             $this->addSql("ALTER TABLE documents ADD CONSTRAINT documents_type_enum_check CHECK (type IN ($allowedTypes))");
+            $this->addSql('ALTER TABLE documents ALTER COLUMN type SET NOT NULL');
 
             return;
         }
 
         $this->addSql("ALTER TABLE documents ALTER COLUMN type SET DEFAULT 'OTHER'");
+        $this->addSql('ALTER TABLE documents ALTER COLUMN type SET NOT NULL');
     }
 
     public function down(Schema $schema): void
