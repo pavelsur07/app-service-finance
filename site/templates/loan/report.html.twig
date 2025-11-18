@@ -1,19 +1,16 @@
 {% extends 'base.html.twig' %}
-{% block title %}Займы{% endblock %}
+{% block title %}Отчёт по кредитам{% endblock %}
 
 {% block body %}
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">
                 <div class="col">
-                    <h2 class="page-title">Займы</h2>
+                    <h2 class="page-title">Отчёт по кредитам за {{ year }} год</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
-                        <a href="{{ path('loan_report') }}" class="btn btn-outline-secondary btn-sm">Отчёт</a>
-                        <a href="{{ path('loan_create') }}" class="btn btn-primary">
-                            + Новый займ
-                        </a>
+                        <a href="{{ path('loan_index') }}" class="btn btn-outline-secondary btn-sm">К списку займов</a>
                     </div>
                 </div>
             </div>
@@ -28,25 +25,20 @@
                         <table class="table table-vcenter">
                             <thead>
                             <tr>
-                                <th>Название</th>
-                                <th>Кредитор</th>
-                                <th class="text-end">Сумма</th>
-                                <th class="text-end">Остаток</th>
-                                <th class="text-end">Ставка</th>
-                                <th>Начало</th>
-                                <th>Окончание</th>
-                                <th class="text-center">День платежа</th>
-                                <th>Статус</th>
-                                <th></th>
+                                <th>Название кредита</th>
+                                <th class="text-end">Остаток долга</th>
+                                <th class="text-end">Сумма займа</th>
+                                <th class="text-end">Ставка, %</th>
+                                <th class="text-end">Следующий платёж</th>
+                                <th class="text-end">Всего процентов за год</th>
                             </tr>
                             </thead>
                             <tbody>
-                            {% for loan in loans %}
+                            {% for loan in loansReport %}
                                 <tr>
                                     <td>{{ loan.name }}</td>
-                                    <td>{{ loan.lenderName ?? '-' }}</td>
-                                    <td class="text-end">{{ loan.principalAmount|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ loan.remainingPrincipal|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end">{{ loan.principalAmount|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">
                                         {% if loan.interestRate is not null %}
                                             {{ loan.interestRate|number_format(2, '.', ' ') }}%
@@ -54,17 +46,18 @@
                                             -
                                         {% endif %}
                                     </td>
-                                    <td>{{ loan.startDate ? loan.startDate|date('d.m.Y') : '-' }}</td>
-                                    <td>{{ loan.endDate ? loan.endDate|date('d.m.Y') : '-' }}</td>
-                                    <td class="text-center">{{ loan.paymentDayOfMonth ?? '-' }}</td>
-                                    <td>{{ loan.status }}</td>
                                     <td class="text-end">
-                                        <a href="{{ path('loan_edit', {id: loan.id}) }}" class="btn btn-sm btn-outline-primary">✏️</a>
+                                        {% if loan.nextPaymentDate is not null and loan.nextPaymentAmount is not null %}
+                                            {{ loan.nextPaymentDate|date('d.m.Y') }} — {{ loan.nextPaymentAmount|number_format(2, '.', ' ') }}
+                                        {% else %}
+                                            —
+                                        {% endif %}
                                     </td>
+                                    <td class="text-end">{{ loan.totalInterestYear|number_format(2, '.', ' ') }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted">Нет займов</td>
+                                    <td colspan="6" class="text-center text-muted">Нет данных по займам</td>
                                 </tr>
                             {% endfor %}
                             </tbody>
