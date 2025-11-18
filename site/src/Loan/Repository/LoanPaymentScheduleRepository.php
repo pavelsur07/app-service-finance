@@ -55,4 +55,36 @@ class LoanPaymentScheduleRepository extends ServiceEntityRepository
 
         return $result;
     }
+
+    public function findNextPaymentForLoan(Loan $loan, \DateTimeImmutable $fromDate): ?LoanPaymentSchedule
+    {
+        /** @var LoanPaymentSchedule|null $result */
+        $result = $this->createQueryBuilder('schedule')
+            ->where('schedule.loan = :loan')
+            ->andWhere('schedule.dueDate >= :fromDate')
+            ->orderBy('schedule.dueDate', 'ASC')
+            ->addOrderBy('schedule.createdAt', 'ASC')
+            ->setParameter('loan', $loan)
+            ->setParameter('fromDate', $fromDate, Types::DATE_IMMUTABLE)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result;
+    }
+
+    public function sumInterestForLoanAndPeriod(Loan $loan, \DateTimeImmutable $from, \DateTimeImmutable $to): float
+    {
+        $result = $this->createQueryBuilder('schedule')
+            ->select('COALESCE(SUM(schedule.interestPart), 0) as totalInterest')
+            ->where('schedule.loan = :loan')
+            ->andWhere('schedule.dueDate BETWEEN :from AND :to')
+            ->setParameter('loan', $loan)
+            ->setParameter('from', $from, Types::DATE_IMMUTABLE)
+            ->setParameter('to', $to, Types::DATE_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return (float) $result;
+    }
 }
