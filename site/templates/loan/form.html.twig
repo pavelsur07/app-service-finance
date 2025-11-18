@@ -46,7 +46,12 @@
                         </div>
                     </div>
                     {{ form_row(form.status) }}
-                    <button class="btn btn-primary mt-3">Сохранить</button>
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <button class="btn btn-primary">Сохранить</button>
+                        {% if loan.id is not null %}
+                            <a href="{{ path('loan_schedule', { id: loan.id }) }}" class="btn btn-outline-secondary">График платежей</a>
+                        {% endif %}
+                    </div>
                     {{ form_end(form) }}
                 </div>
             </div>
