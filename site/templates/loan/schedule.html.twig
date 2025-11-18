@@ -10,6 +10,7 @@
                 </div>
                 <div class="col-auto ms-auto d-print-none">
                     <div class="btn-list">
+                        <a href="{{ path('loan_schedule_template') }}" class="btn btn-outline-secondary btn-sm">Пример графика</a>
                         <a href="{{ path('loan_index') }}" class="btn btn-link">Назад к займам</a>
                         <a href="{{ path('loan_schedule_add', {id: loan.id}) }}" class="btn btn-primary">+ Добавить платеж</a>
                     </div>
