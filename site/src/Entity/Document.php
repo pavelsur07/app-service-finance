@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\DocumentType;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -32,6 +33,9 @@ class Document
     #[ORM\ManyToOne(targetEntity: Counterparty::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?Counterparty $counterparty = null;
+
+    #[ORM\Column(enumType: DocumentType::class, options: ['default' => DocumentType::OTHER->value])]
+    private DocumentType $type = DocumentType::OTHER;
 
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentOperation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $operations;
@@ -106,6 +110,18 @@ class Document
     public function setCounterparty(?Counterparty $counterparty): self
     {
         $this->counterparty = $counterparty;
+
+        return $this;
+    }
+
+    public function getType(): DocumentType
+    {
+        return $this->type;
+    }
+
+    public function setType(DocumentType $type): self
+    {
+        $this->type = $type;
 
         return $this;
     }
