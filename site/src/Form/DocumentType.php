@@ -4,9 +4,11 @@ namespace App\Form;
 
 use App\Entity\Counterparty;
 use App\Entity\Document;
+use App\Enum\DocumentType as DocumentTypeEnum;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
@@ -26,6 +28,12 @@ class DocumentType extends AbstractType
             ->add('number', TextType::class, [
                 'required' => false,
                 'label' => 'Номер',
+            ])
+            ->add('type', ChoiceType::class, [
+                'choices' => DocumentTypeEnum::cases(),
+                'choice_label' => fn (DocumentTypeEnum $type) => $type->label(),
+                'choice_value' => 'value',
+                'label' => 'Тип документа',
             ])
             ->add('counterparty', EntityType::class, [
                 'class' => Counterparty::class,

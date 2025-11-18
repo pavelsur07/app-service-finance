@@ -14,6 +14,8 @@
                     <dd class="col-sm-9">{{ item.date|date('Y-m-d H:i') }}</dd>
                     <dt class="col-sm-3">Номер</dt>
                     <dd class="col-sm-9">{{ item.number }}</dd>
+                    <dt class="col-sm-3">Тип</dt>
+                    <dd class="col-sm-9">{{ item.type.label() }}</dd>
                     {% if documentNature is defined %}
                         <dt class="col-sm-3">Природа</dt>
                         <dd class="col-sm-9">
