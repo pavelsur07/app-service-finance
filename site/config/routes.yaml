@@ -16,6 +16,12 @@ finance_controllers:
         namespace: App\Finance\Controller
     type: attribute
 
+loan_controllers:
+    resource:
+        path: ../src/Loan/Controller/
+        namespace: App\Loan\Controller
+    type: attribute
+
 ozon_controllers:
     resource:
         path: ../src/Marketplace/Ozon/Controller/

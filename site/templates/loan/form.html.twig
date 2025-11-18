@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+{% set isEdit = is_edit ?? (loan is defined and loan.id is not null) %}
+{% block title %}{{ isEdit ? 'Редактирование займа' : 'Новый займ' }}{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">{{ isEdit ? 'Редактирование займа' : 'Новый займ' }}</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('loan_index') }}" class="btn btn-link">Назад к списку</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body">
+                    {{ form_start(form) }}
+                    {{ form_row(form.name) }}
+                    {{ form_row(form.lenderName) }}
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ form_row(form.principalAmount) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.remainingPrincipal) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.interestRate) }}
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ form_row(form.startDate) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.endDate) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.paymentDayOfMonth) }}
+                        </div>
+                    </div>
+                    {{ form_row(form.status) }}
+                    <button class="btn btn-primary mt-3">Сохранить</button>
+                    {{ form_end(form) }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
