@@ -22,6 +22,10 @@ class Document
     #[ORM\JoinColumn(nullable: false)]
     private Company $company;
 
+    #[ORM\ManyToOne(targetEntity: CashTransaction::class, inversedBy: 'documents')]
+    #[ORM\JoinColumn(onDelete: 'SET NULL')]
+    private ?CashTransaction $cashTransaction = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $date;
 
@@ -66,6 +70,18 @@ class Document
     public function setCompany(Company $company): self
     {
         $this->company = $company;
+
+        return $this;
+    }
+
+    public function getCashTransaction(): ?CashTransaction
+    {
+        return $this->cashTransaction;
+    }
+
+    public function setCashTransaction(?CashTransaction $cashTransaction): self
+    {
+        $this->cashTransaction = $cashTransaction;
 
         return $this;
     }
@@ -167,5 +183,18 @@ class Document
         }
 
         return $this;
+    }
+
+    public function getTotalAmount(): float
+    {
+        $total = 0.0;
+
+        foreach ($this->operations as $operation) {
+            if ($operation instanceof DocumentOperation) {
+                $total += (float) $operation->getAmount();
+            }
+        }
+
+        return $total;
     }
 }

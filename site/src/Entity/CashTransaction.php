@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Enum\CashDirection;
 use App\Repository\CashTransactionRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -35,6 +37,9 @@ class CashTransaction
     #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?ProjectDirection $projectDirection = null;
+
+    #[ORM\OneToMany(mappedBy: 'cashTransaction', targetEntity: Document::class)]
+    private Collection $documents;
 
     #[ORM\Column(enumType: CashDirection::class)]
     private CashDirection $direction;
@@ -75,6 +80,9 @@ class CashTransaction
     #[ORM\Column(type: 'json')]
     private array $rawData = [];
 
+    #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
+    private string $allocatedAmount = '0';
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -101,6 +109,7 @@ class CashTransaction
         $this->bookedAt = $occurredAt;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
+        $this->documents = new ArrayCollection();
     }
 
     public function getId(): ?string
@@ -313,6 +322,60 @@ class CashTransaction
         $this->rawData = $rawData;
 
         return $this;
+    }
+
+    /** @return Collection<int, Document> */
+    public function getDocuments(): Collection
+    {
+        return $this->documents;
+    }
+
+    public function addDocument(Document $document): self
+    {
+        if (!$this->documents->contains($document)) {
+            $this->documents->add($document);
+            $document->setCashTransaction($this);
+        }
+
+        $this->allocatedAmount = number_format(
+            $this->getAllocatedAmount() + $document->getTotalAmount(),
+            2,
+            '.',
+            '',
+        );
+
+        return $this;
+    }
+
+    public function recalculateAllocatedAmount(): self
+    {
+        $allocated = 0.0;
+
+        foreach ($this->documents as $document) {
+            if ($document instanceof Document) {
+                $allocated += $document->getTotalAmount();
+            }
+        }
+
+        $this->allocatedAmount = number_format($allocated, 2, '.', '');
+
+        return $this;
+    }
+
+    public function getAllocatedAmount(): float
+    {
+        return (float) $this->allocatedAmount;
+    }
+
+    public function getRemainingAmount(): float
+    {
+        if (null === $this->amount) {
+            return 0.0;
+        }
+
+        $remaining = (float) $this->amount - (float) $this->allocatedAmount;
+
+        return max($remaining, 0.0);
     }
 
     public function getCreatedAt(): \DateTimeImmutable
