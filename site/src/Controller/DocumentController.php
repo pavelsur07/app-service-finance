@@ -6,6 +6,7 @@ use App\DTO\DocumentListDTO;
 use App\Entity\Company;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
+use App\Enum\DocumentStatus;
 use App\Enum\PlNature;
 use App\Form\DocumentType;
 use App\Repository\CounterpartyRepository;
@@ -57,6 +58,7 @@ class DocumentController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
+        $document->setStatus(DocumentStatus::ACTIVE);
 
         $categories = $catRepo->findTreeByCompany($company);
         $counterparties = $cpRepo->findBy(['company' => $company]);
@@ -232,6 +234,7 @@ class DocumentController extends AbstractController
         $copy->setType($source->getType());
         $copy->setCounterparty($source->getCounterparty());
         $copy->setDescription($source->getDescription());
+        $copy->setStatus($source->getStatus());
 
         foreach ($source->getOperations() as $operation) {
             $operationCopy = new DocumentOperation();
