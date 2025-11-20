@@ -74,21 +74,34 @@
                                 <td class="text-end text-danger text-nowrap">{{ expense ? expense|number_format(0, ',', ' ') : '—' }}</td>
                                 <td class="text-end fw-semibold text-nowrap">{{ total ? total|number_format(0, ',', ' ') : '—' }}</td>
                                 <td class="text-end text-nowrap">
-                                    <a href="{{ path('document_show', {'id': item.id}) }}" class="btn btn-sm btn-outline-secondary" title="Просмотр">
-                                        <i class="ti ti-eye"></i>
-                                    </a>
-                                    <a href="{{ path('document_copy', {'id': item.id}) }}" class="btn btn-sm btn-outline-secondary" title="Копировать">
-                                        <i class="ti ti-copy"></i>
-                                    </a>
-                                    <a href="{{ path('document_edit', {'id': item.id}) }}" class="btn btn-sm btn-outline-secondary" title="Редактировать">
-                                        <i class="ti ti-pencil"></i>
-                                    </a>
-                                    <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Вы уверены?');">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
-                                        <button class="btn btn-sm btn-outline-danger" title="Удалить">
-                                            <i class="ti ti-trash"></i>
+                                    <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
+                                        <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                                <circle cx="5" cy="12" r="1"/>
+                                                <circle cx="12" cy="12" r="1"/>
+                                                <circle cx="19" cy="12" r="1"/>
+                                            </svg>
                                         </button>
-                                    </form>
+
+                                        <div class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            <a class="dropdown-item" href="{{ path('document_show', {'id': item.id}) }}">
+                                                <i class="ti ti-eye me-2"></i> Просмотр
+                                            </a>
+                                            <a class="dropdown-item" href="{{ path('document_copy', {'id': item.id}) }}">
+                                                <i class="ti ti-copy me-2"></i> Копировать
+                                            </a>
+                                            <a class="dropdown-item" href="{{ path('document_edit', {'id': item.id}) }}">
+                                                <i class="ti ti-pencil me-2"></i> Редактировать
+                                            </a>
+                                            <div class="dropdown-divider"></div>
+                                            <form method="post" action="{{ path('document_delete', {'id': item.id}) }}" class="m-0" onsubmit="return confirm('Вы уверены?');">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                                                <button type="submit" class="dropdown-item text-danger d-flex align-items-center gap-2">
+                                                    <i class="ti ti-trash"></i> Удалить
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
