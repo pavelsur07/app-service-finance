@@ -94,6 +94,20 @@
                     </tbody>
                 </table>
             </div>
+            <div class="card-footer d-flex flex-column flex-md-row align-items-center gap-2">
+                <form method="get" class="d-flex align-items-center gap-2">
+                    <label for="document-limit" class="form-label mb-0">Показывать по</label>
+                    <select id="document-limit" name="limit" class="form-select form-select-sm" onchange="this.form.submit()">
+                        {% for option in [20, 30, 50] %}
+                            <option value="{{ option }}" {{ option == limit ? 'selected' : '' }}>{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="page" value="1">
+                </form>
+                <div class="ms-md-auto w-100 w-md-auto">
+                    {{ pagerfanta(pager, {'routeName': 'document_index', 'routeParams': {'limit': limit}}) }}
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}

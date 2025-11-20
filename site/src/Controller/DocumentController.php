@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\DTO\DocumentListDTO;
 use App\Entity\Document;
 use App\Enum\PlNature;
 use App\Form\DocumentType;
@@ -26,10 +27,14 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/', name: 'document_index', methods: ['GET'])]
-    public function index(DocumentRepository $repo, ActiveCompanyService $companyService, PlNatureResolver $natureResolver): Response
+    public function index(Request $request, DocumentRepository $repo, ActiveCompanyService $companyService, PlNatureResolver $natureResolver): Response
     {
         $company = $companyService->getActiveCompany();
-        $items = $repo->findByCompany($company);
+        $page = max(1, (int) $request->query->get('page', 1));
+        $limit = (int) $request->query->get('limit', 20);
+
+        $pager = $repo->findByCompany(new DocumentListDTO($company, $page, $limit));
+        $items = iterator_to_array($pager->getCurrentPageResults());
 
         $documentNatures = [];
         foreach ($items as $item) {
@@ -40,6 +45,8 @@ class DocumentController extends AbstractController
         return $this->render('document/index.html.twig', [
             'items' => $items,
             'documentNatures' => $documentNatures,
+            'pager' => $pager,
+            'limit' => $pager->getMaxPerPage(),
         ]);
     }
 
