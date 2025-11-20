@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\CashflowCategory;
 use App\Form\CashflowCategoryType;
 use App\Repository\CashflowCategoryRepository;
+use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -35,13 +36,18 @@ class CashflowCategoryController extends AbstractController
         CashflowCategoryRepository $repo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
+        PLCategoryRepository $plCategoryRepository,
     ): Response {
         $company = $companyService->getActiveCompany();
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
 
         $parents = $repo->findBy(['company' => $company], ['sort' => 'ASC']);
+        $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
-        $form = $this->createForm(CashflowCategoryType::class, $article, ['parents' => $parents]);
+        $form = $this->createForm(CashflowCategoryType::class, $article, [
+            'parents' => $parents,
+            'plCategories' => $plCategories,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -67,6 +73,7 @@ class CashflowCategoryController extends AbstractController
         CashflowCategoryRepository $repo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
+        PLCategoryRepository $plCategoryRepository,
     ): Response {
         $company = $companyService->getActiveCompany();
         if ($article->getCompany() !== $company) {
@@ -74,8 +81,12 @@ class CashflowCategoryController extends AbstractController
         }
 
         $parents = $repo->findBy(['company' => $company], ['sort' => 'ASC']);
+        $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
-        $form = $this->createForm(CashflowCategoryType::class, $article, ['parents' => $parents]);
+        $form = $this->createForm(CashflowCategoryType::class, $article, [
+            'parents' => $parents,
+            'plCategories' => $plCategories,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
