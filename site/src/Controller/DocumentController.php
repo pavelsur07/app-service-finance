@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\DTO\DocumentListDTO;
+use App\Entity\Company;
 use App\Entity\Document;
+use App\Entity\DocumentOperation;
 use App\Enum\PlNature;
 use App\Form\DocumentType;
 use App\Repository\CounterpartyRepository;
@@ -69,6 +71,44 @@ class DocumentController extends AbstractController
             $em->flush();
 
             $this->plRegisterUpdater->updateForDocument($document);
+
+            return $this->redirectToRoute('document_index');
+        }
+
+        return $this->render('document/new.html.twig', [
+            'form' => $form->createView(),
+        ]);
+    }
+
+    #[Route('/{id}/copy', name: 'document_copy', methods: ['GET', 'POST'])]
+    public function copy(
+        Request $request,
+        Document $document,
+        PLCategoryRepository $catRepo,
+        CounterpartyRepository $cpRepo,
+        EntityManagerInterface $em,
+        ActiveCompanyService $companyService,
+    ): Response {
+        $company = $companyService->getActiveCompany();
+        if ($document->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $copy = $this->duplicateDocument($document, $company);
+
+        $categories = $catRepo->findTreeByCompany($company);
+        $counterparties = $cpRepo->findBy(['company' => $company]);
+        $form = $this->createForm(DocumentType::class, $copy, [
+            'categories' => $categories,
+            'counterparties' => $counterparties,
+        ]);
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $em->persist($copy);
+            $em->flush();
+
+            $this->plRegisterUpdater->updateForDocument($copy);
 
             return $this->redirectToRoute('document_index');
         }
@@ -182,5 +222,26 @@ class DocumentController extends AbstractController
             'label' => 'Неизвестно',
             'badgeClass' => 'bg-secondary',
         ];
+    }
+
+    private function duplicateDocument(Document $source, Company $company): Document
+    {
+        $copy = new Document(Uuid::uuid4()->toString(), $company);
+        $copy->setDate($source->getDate());
+        $copy->setNumber($source->getNumber());
+        $copy->setType($source->getType());
+        $copy->setCounterparty($source->getCounterparty());
+        $copy->setDescription($source->getDescription());
+
+        foreach ($source->getOperations() as $operation) {
+            $operationCopy = new DocumentOperation();
+            $operationCopy->setPlCategory($operation->getPlCategory());
+            $operationCopy->setAmount($operation->getAmount());
+            $operationCopy->setCounterparty($operation->getCounterparty());
+            $operationCopy->setComment($operation->getComment());
+            $copy->addOperation($operationCopy);
+        }
+
+        return $copy;
     }
 }
