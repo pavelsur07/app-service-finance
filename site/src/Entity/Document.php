@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -36,6 +37,9 @@ class Document
 
     #[ORM\Column(enumType: DocumentType::class, options: ['default' => DocumentType::OTHER->value])]
     private DocumentType $type = DocumentType::OTHER;
+
+    #[ORM\Column(enumType: DocumentStatus::class, options: ['default' => DocumentStatus::ACTIVE->value])]
+    private DocumentStatus $status = DocumentStatus::ACTIVE;
 
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentOperation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $operations;
@@ -122,6 +126,18 @@ class Document
     public function setType(DocumentType $type): self
     {
         $this->type = $type;
+
+        return $this;
+    }
+
+    public function getStatus(): DocumentStatus
+    {
+        return $this->status;
+    }
+
+    public function setStatus(DocumentStatus $status): self
+    {
+        $this->status = $status;
 
         return $this;
     }
