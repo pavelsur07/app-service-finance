@@ -4,6 +4,7 @@ namespace App\Controller;
 
 use App\DTO\DocumentListDTO;
 use App\Entity\Company;
+use App\Entity\CashTransaction;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Enum\DocumentStatus;
@@ -18,6 +19,7 @@ use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -168,17 +170,36 @@ class DocumentController extends AbstractController
         ]);
         $form->handleRequest($request);
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $em->flush();
+        $transactionAllocation = $this->buildTransactionAllocationView($document);
 
-            $this->plRegisterUpdater->updateForDocument($document);
+        if ($form->isSubmitted()) {
+            $cashTransaction = $document->getCashTransaction();
 
-            return $this->redirectToRoute('document_index');
+            if ($cashTransaction instanceof CashTransaction) {
+                try {
+                    $cashTransaction->assertCanAllocateAmount($document->getTotalAmount(), $document);
+                } catch (\DomainException $e) {
+                    $form->addError(new FormError($e->getMessage()));
+                }
+            }
+
+            if ($form->isValid()) {
+                if ($cashTransaction instanceof CashTransaction) {
+                    $cashTransaction->recalculateAllocatedAmount();
+                }
+
+                $em->flush();
+
+                $this->plRegisterUpdater->updateForDocument($document);
+
+                return $this->redirectToRoute('document_index');
+            }
         }
 
         return $this->render('document/edit.html.twig', [
             'form' => $form->createView(),
             'item' => $document,
+            'transactionAllocation' => $transactionAllocation,
         ]);
     }
 
@@ -246,5 +267,22 @@ class DocumentController extends AbstractController
         }
 
         return $copy;
+    }
+
+    private function buildTransactionAllocationView(Document $document): ?array
+    {
+        $transaction = $document->getCashTransaction();
+
+        if (!$transaction instanceof CashTransaction) {
+            return null;
+        }
+
+        $transaction->recalculateAllocatedAmount();
+
+        return [
+            'transactionAmount' => (float) $transaction->getAmount(),
+            'allocatedAmount' => $transaction->getAllocatedAmount(),
+            'remainingAmount' => $transaction->getRemainingAmount(),
+        ];
     }
 }

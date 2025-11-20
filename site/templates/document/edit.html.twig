@@ -17,6 +17,28 @@
     <div class="mt-3">
         <div class="card">
             <div class="card-body">
+                {% if transactionAllocation %}
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="text-muted">Сумма транзакции ДДС</div>
+                            <span class="badge bg-primary-lt text-primary mt-1">
+                                {{ transactionAllocation.transactionAmount|number_format(2, '.', ' ') }} ₽
+                            </span>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted">Уже распределено на документы ОПиУ</div>
+                            <span class="badge bg-yellow-lt text-yellow mt-1">
+                                {{ transactionAllocation.allocatedAmount|number_format(2, '.', ' ') }} ₽
+                            </span>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-muted">Остаток</div>
+                            <span class="badge bg-green-lt text-green mt-1">
+                                {{ transactionAllocation.remainingAmount|number_format(2, '.', ' ') }} ₽
+                            </span>
+                        </div>
+                    </div>
+                {% endif %}
                 {{ form_start(form) }}
                 <div class="row">
                     <div class="col-md-3">

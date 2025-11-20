@@ -367,15 +367,29 @@ class CashTransaction
         return (float) $this->allocatedAmount;
     }
 
-    public function getRemainingAmount(): float
+    public function getRemainingAmount(?Document $excludingDocument = null): float
     {
-        if (null === $this->amount) {
-            return 0.0;
+        return $this->calculateRemainingAmount($excludingDocument);
+    }
+
+    public function canAllocateAmount(float $amount, ?Document $excludingDocument = null): bool
+    {
+        if ($amount <= 0.0) {
+            return false;
         }
 
-        $remaining = (float) $this->amount - (float) $this->allocatedAmount;
+        return $amount <= $this->getRemainingAmount($excludingDocument);
+    }
 
-        return max($remaining, 0.0);
+    public function assertCanAllocateAmount(float $amount, ?Document $excludingDocument = null): void
+    {
+        if ($amount <= 0.0) {
+            throw new \DomainException('Сумма документа должна быть больше нуля.');
+        }
+
+        if (!$this->canAllocateAmount($amount, $excludingDocument)) {
+            throw new \DomainException('Сумма документа превышает доступный остаток транзакции ДДС.');
+        }
     }
 
     public function getCreatedAt(): \DateTimeImmutable
@@ -393,5 +407,24 @@ class CashTransaction
         $this->updatedAt = $u;
 
         return $this;
+    }
+
+    private function calculateRemainingAmount(?Document $excludingDocument): float
+    {
+        if (null === $this->amount) {
+            return 0.0;
+        }
+
+        $this->recalculateAllocatedAmount();
+
+        $allocated = (float) $this->allocatedAmount;
+
+        if ($excludingDocument instanceof Document && $this->documents->contains($excludingDocument)) {
+            $allocated -= $excludingDocument->getTotalAmount();
+        }
+
+        $remaining = (float) $this->amount - $allocated;
+
+        return max($remaining, 0.0);
     }
 }
