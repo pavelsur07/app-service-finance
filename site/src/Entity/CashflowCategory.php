@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Entity\PLCategory;
 use App\Enum\CashflowCategoryStatus;
 use App\Enum\PaymentPlanType;
 use App\Repository\CashflowCategoryRepository;
@@ -43,6 +44,12 @@ class CashflowCategory
 
     #[ORM\Column(enumType: PaymentPlanType::class, nullable: true)]
     private ?PaymentPlanType $operationType = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $allowPlDocument = false;
+
+    #[ORM\ManyToOne(targetEntity: PLCategory::class)]
+    private ?PLCategory $plCategory = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -143,6 +150,30 @@ class CashflowCategory
     public function setOperationType(?PaymentPlanType $operationType): self
     {
         $this->operationType = $operationType;
+
+        return $this;
+    }
+
+    public function isAllowPlDocument(): bool
+    {
+        return $this->allowPlDocument;
+    }
+
+    public function setAllowPlDocument(bool $allowPlDocument): self
+    {
+        $this->allowPlDocument = $allowPlDocument;
+
+        return $this;
+    }
+
+    public function getPlCategory(): ?PLCategory
+    {
+        return $this->plCategory;
+    }
+
+    public function setPlCategory(?PLCategory $plCategory): self
+    {
+        $this->plCategory = $plCategory;
 
         return $this;
     }

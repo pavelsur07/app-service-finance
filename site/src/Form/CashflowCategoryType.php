@@ -3,9 +3,11 @@
 namespace App\Form;
 
 use App\Entity\CashflowCategory;
+use App\Entity\PLCategory;
 use App\Enum\CashflowCategoryStatus;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
@@ -32,6 +34,10 @@ class CashflowCategoryType extends AbstractType
             ->add('sort', IntegerType::class, [
                 'label' => 'Сортировка',
             ])
+            ->add('allowPlDocument', CheckboxType::class, [
+                'label' => 'Разрешено создавать документы ОПиУ из этой категории',
+                'required' => false,
+            ])
             ->add('parent', EntityType::class, [
                 'class' => CashflowCategory::class,
                 'choices' => $options['parents'],
@@ -40,6 +46,16 @@ class CashflowCategoryType extends AbstractType
                 },
                 'required' => false,
                 'label' => 'Родитель',
+            ])
+            ->add('plCategory', EntityType::class, [
+                'class' => PLCategory::class,
+                'choices' => $options['plCategories'],
+                'choice_label' => function (PLCategory $item) {
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                },
+                'required' => false,
+                'placeholder' => '—',
+                'label' => 'Категория ОПиУ по умолчанию',
             ]);
     }
 
@@ -48,6 +64,7 @@ class CashflowCategoryType extends AbstractType
         $resolver->setDefaults([
             'data_class' => CashflowCategory::class,
             'parents' => [],
+            'plCategories' => [],
         ]);
     }
 }
