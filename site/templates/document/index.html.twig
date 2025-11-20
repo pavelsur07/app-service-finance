@@ -21,6 +21,18 @@
         'CASHFLOW_EXPENSE': 'Расход из ДДС',
         'OTHER': 'Прочие'
     } %}
+    {% set statusLabels = {
+        'DRAFT': 'Черновик',
+        'ACTIVE': 'Активен',
+        'INACTIVE': 'Неактивен',
+        'TO_DELETE': 'На удаление'
+    } %}
+    {% set statusClasses = {
+        'DRAFT': 'bg-secondary text-white',
+        'ACTIVE': 'bg-success text-white',
+        'INACTIVE': 'bg-warning text-dark',
+        'TO_DELETE': 'bg-danger text-white'
+    } %}
 
     <div class="page-header d-print-none">
         <div class="row g-2 align-items-center">
@@ -63,7 +75,13 @@
                             {% endfor %}
                             {% set total = income - expense %}
                             <tr>
-                                <td class="text-nowrap">{{ item.date|date('d.m.Y') }}</td>
+                                {% set statusValue = item.status.value %}
+                                {% set statusLabel = statusLabels[statusValue] ?? statusValue %}
+                                {% set statusClass = statusClasses[statusValue] ?? 'bg-secondary text-white' %}
+                                <td class="text-nowrap">
+                                    <div>{{ item.date|date('d.m.Y') }}</div>
+                                    <span class="badge {{ statusClass }} mt-1">{{ statusLabel }}</span>
+                                </td>
                                 <td>
                                     <div class="fw-semibold">{{ typeShortLabels[item.type.value] ?? item.type.label() }}</div>
                                     <div class="text-muted small">{{ item.description }}</div>
