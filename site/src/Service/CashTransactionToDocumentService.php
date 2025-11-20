@@ -17,13 +17,11 @@ class CashTransactionToDocumentService
      * @param CashTransaction $transaction
      *
      * @return Document
-     */
+    */
     public function createFromCashTransaction(CashTransaction $transaction): Document
     {
         $remaining = $transaction->getRemainingAmount();
-        if ($remaining <= 0.0) {
-            throw new \DomainException('Нельзя создать документ: остаток транзакции ДДС равен нулю.');
-        }
+        $transaction->assertCanAllocateAmount($remaining);
 
         return $this->createDocument($transaction, $remaining);
     }
@@ -38,14 +36,7 @@ class CashTransactionToDocumentService
      */
     public function createWithCustomAmount(CashTransaction $transaction, float $amount): Document
     {
-        if ($amount <= 0.0) {
-            throw new \DomainException('Сумма документа должна быть больше нуля.');
-        }
-
-        $remaining = $transaction->getRemainingAmount();
-        if ($amount > $remaining) {
-            throw new \DomainException('Сумма документа превышает доступный остаток транзакции ДДС.');
-        }
+        $transaction->assertCanAllocateAmount($amount);
 
         return $this->createDocument($transaction, $amount);
     }
