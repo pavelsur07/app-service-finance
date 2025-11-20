@@ -4,6 +4,8 @@ namespace App\Controller\Finance;
 
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashTransaction;
+use App\Entity\CashflowCategory;
+use App\Entity\Document;
 use App\Form\CashTransactionType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
@@ -11,12 +13,16 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
+use App\Service\CashTransactionToDocumentService;
+use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\Exception\ORMException;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Ramsey\Uuid\Uuid;
 
 #[Route('/finance/cash-transactions')]
 class CashTransactionController extends AbstractController
@@ -136,7 +142,100 @@ class CashTransactionController extends AbstractController
 
         return $this->render('transaction/show.html.twig', [
             'tx' => $tx,
+            'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
+            'pnlDocuments' => $this->getDocumentsForTransaction($tx),
         ]);
+    }
+
+    #[Route('/{id}/create-pnl-document', name: 'cash_transaction_create_pnl_document', methods: ['POST'])]
+    public function createPnlDocument(
+        Request $request,
+        CashTransaction $tx,
+        CashTransactionToDocumentService $operationFactory,
+        EntityManagerInterface $em,
+        PLRegisterUpdater $plRegisterUpdater,
+    ): Response {
+        $company = $this->companyService->getActiveCompany();
+        if ($tx->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('create_pnl_document'.$tx->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF токен');
+
+            return $this->redirectToRoute('cash_transaction_show', ['id' => $tx->getId()]);
+        }
+
+        if (!$this->canCreatePnlDocument($tx)) {
+            $this->addFlash('danger', 'Для этой транзакции нельзя создать документ ОПиУ.');
+
+            return $this->redirectToRoute('cash_transaction_show', ['id' => $tx->getId()]);
+        }
+
+        try {
+            $document = $this->createPnlDocumentFromTransaction($tx, $operationFactory, $em, $plRegisterUpdater);
+            $this->addFlash('success', 'Документ ОПиУ создан.');
+
+            return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
+        } catch (\DomainException $e) {
+            $this->addFlash('danger', $e->getMessage());
+        }
+
+        return $this->redirectToRoute('cash_transaction_show', ['id' => $tx->getId()]);
+    }
+
+    private function canCreatePnlDocument(CashTransaction $transaction): bool
+    {
+        $category = $transaction->getCashflowCategory();
+
+        return $transaction->getRemainingAmount() > 0
+            && $category instanceof CashflowCategory
+            && $category->isAllowPlDocument();
+    }
+
+    /**
+     * @return Document[]
+     */
+    private function getDocumentsForTransaction(CashTransaction $transaction): array
+    {
+        $documents = $transaction->getDocuments()->toArray();
+
+        usort(
+            $documents,
+            static fn (Document $a, Document $b): int => $b->getDate() <=> $a->getDate(),
+        );
+
+        return $documents;
+    }
+
+    private function createPnlDocumentFromTransaction(
+        CashTransaction $transaction,
+        CashTransactionToDocumentService $operationFactory,
+        EntityManagerInterface $em,
+        PLRegisterUpdater $plRegisterUpdater,
+    ): Document {
+        if (!$this->canCreatePnlDocument($transaction)) {
+            throw new \DomainException('Для транзакции нельзя создать документ ОПиУ.');
+        }
+
+        $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
+        $document->setDate($transaction->getOccurredAt());
+        $document->setDescription($transaction->getDescription());
+        $document->setCounterparty($transaction->getCounterparty());
+        $document->setCashTransaction($transaction);
+
+        $operation = $operationFactory->createOperationFromTransaction($transaction);
+        $operation->setAmount(number_format($transaction->getRemainingAmount(), 2, '.', ''));
+        $document->addOperation($operation);
+
+        $transaction->addDocument($document);
+
+        $em->persist($document);
+        $em->flush();
+
+        $plRegisterUpdater->updateForDocument($document);
+
+        return $document;
     }
 
     /**
