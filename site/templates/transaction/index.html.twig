@@ -59,6 +59,7 @@
             <tr>
                 <th>Дата</th>
                 <th>Счет</th>
+                <th class="text-center text-nowrap">ОПиУ</th>
                 <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
                 <th>Статья / Проект</th>
                 <th>Контрагент</th>
@@ -71,6 +72,15 @@
                 <tr>
                     <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                     <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
+                    <td class="text-center text-nowrap">
+                        {% if tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                            <i class="ti ti-file-plus" title="Создать документ ОПиУ на основании этой транзакции"></i>
+                        {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount == 0 and tx.documents is not empty %}
+                            <i class="ti ti-file-check text-success" title="Документы ОПиУ уже созданы на всю сумму"></i>
+                        {% else %}
+                            &nbsp;
+                        {% endif %}
+                    </td>
                     <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
                     <td>
                         {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
@@ -125,7 +135,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="7" class="text-center text-muted">Нет транзакций</td>
+                    <td colspan="8" class="text-center text-muted">Нет транзакций</td>
                 </tr>
             {% endfor %}
             </tbody>
