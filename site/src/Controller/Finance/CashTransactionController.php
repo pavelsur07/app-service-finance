@@ -332,6 +332,8 @@ class CashTransactionController extends AbstractController
         return $this->render('transaction/edit.html.twig', [
             'form' => $form->createView(),
             'tx' => $tx,
+            'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
+            'pnlDocuments' => $this->getDocumentsForTransaction($tx),
         ]);
     }
 
