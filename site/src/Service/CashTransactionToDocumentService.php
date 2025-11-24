@@ -7,6 +7,7 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\CashTransaction;
+use App\Enum\DocumentType;
 use Ramsey\Uuid\Uuid;
 
 class CashTransactionToDocumentService
@@ -86,6 +87,7 @@ class CashTransactionToDocumentService
         $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
         $document
             ->setDate($transaction->getOccurredAt())
+            ->setType(DocumentType::CASHFLOW_EXPENSE)
             ->setCounterparty($transaction->getCounterparty())
             ->setCashTransaction($transaction);
 

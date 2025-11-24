@@ -6,6 +6,7 @@ use App\DTO\CashTransactionDTO;
 use App\Entity\CashTransaction;
 use App\Entity\CashflowCategory;
 use App\Entity\Document;
+use App\Enum\DocumentType;
 use App\Form\CashTransactionType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
@@ -221,6 +222,7 @@ class CashTransactionController extends AbstractController
         $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
         $document->setDate($transaction->getOccurredAt());
         $document->setDescription($transaction->getDescription());
+        $document->setType(DocumentType::CASHFLOW_EXPENSE);
         $document->setCounterparty($transaction->getCounterparty());
         $document->setCashTransaction($transaction);
 
