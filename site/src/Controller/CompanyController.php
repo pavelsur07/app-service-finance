@@ -5,13 +5,13 @@ namespace App\Controller;
 use App\Entity\Company;
 use App\Form\CompanyType;
 use App\Repository\CompanyRepository;
-use App\Marketplace\Wildberries\Adapter\WildberriesStatisticsV5Client;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/company')]
 class CompanyController extends AbstractController
@@ -106,7 +106,7 @@ class CompanyController extends AbstractController
     public function checkWildberriesKey(
         Request $request,
         Company $company,
-        WildberriesStatisticsV5Client $wbStatsClient
+        HttpClientInterface $httpClient
     ): Response {
         // CSRF-проверка для защиты действия
         if (!$this->isCsrfTokenValid('company_check_wb_key'.$company->getId(), (string) $request->request->get('_token'))) {
@@ -118,34 +118,38 @@ class CompanyController extends AbstractController
         $token = trim((string) $company->getWildberriesApiKey());
 
         if ('' === $token) {
-            $this->addFlash('danger', 'WB Statistics API ключ не заполнен. Сначала укажите ключ и сохраните компанию.');
+            $this->addFlash('danger', 'WB API ключ не заполнен. Сначала укажите ключ и сохраните компанию.');
 
             return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
         }
 
         try {
-            // Используем легкий запрос к официальному методу Statistics API
-            // GET /api/v5/supplier/reportDetailByPeriod
-            $date = new \DateTimeImmutable('-1 day');
-            $wbStatsClient->fetchReportDetailByPeriod(
-                $company,
-                $date,
-                $date,
-                0,
-                'daily'
-            );
+            // Официальный метод проверки токена из документации WB:
+            // GET https://common-api.wildberries.ru/ping
+            $response = $httpClient->request('GET', 'https://common-api.wildberries.ru/ping', [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$token,
+                ],
+                'timeout' => 5.0,
+            ]);
 
-            // Если исключений не было — считаем ключ рабочим
-            $this->addFlash('success', 'WB Statistics API ключ активен. Проверочный запрос к reportDetailByPeriod выполнен успешно.');
-        } catch (\RuntimeException $e) {
-            // Уже известная ситуация: "WB v5 API unexpected status 401"
-            if (str_contains($e->getMessage(), 'WB v5 API unexpected status 401')) {
-                $this->addFlash('danger', 'WB API ключ неверный или не активен (401 Unauthorized). Проверьте токен в личном кабинете WB.');
+            $statusCode = $response->getStatusCode();
+
+            if (200 === $statusCode) {
+                $this->addFlash('success', 'WB API ключ активен. Соединение с WB API установлено успешно.');
+            } elseif (401 === $statusCode) {
+                $this->addFlash('danger', 'WB API ключ неверный или истёк (401 Unauthorized). Проверьте токен в личном кабинете WB.');
+            } elseif (403 === $statusCode) {
+                $this->addFlash('danger', 'WB API ключ не даёт доступ к этому сервису (403 Forbidden). Проверьте категории токена в личном кабинете WB.');
             } else {
-                $this->addFlash('warning', 'Ошибка при проверке WB API ключа: '.$e->getMessage());
+                $this->addFlash('warning', sprintf(
+                    'Не удалось однозначно проверить WB API ключ. Код ответа: %d.',
+                    $statusCode
+                ));
             }
         } catch (\Throwable $e) {
-            $this->addFlash('warning', 'Транспортная ошибка при проверке WB API ключа: '.$e->getMessage());
+            // Любые сетевые/транспортные ошибки не считаем автоматом «битым токеном»
+            $this->addFlash('warning', 'Ошибка при проверке WB API ключа: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
