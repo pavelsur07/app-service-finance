@@ -261,16 +261,20 @@
                         <span class="nav-link-title">Интеграции</span>
                     </a>
                     {% set integrations_show = (integrations_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
-                    <div class="dropdown-menu {{ integrations_show }}">
-                        <div class="dropdown-menu-column">
-                            {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
-                            <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                <span>Wb / Продажи</span>
-                            </a>
-                            {% set ozon_orders_active = current_route starts with 'ozon_order' %}
-                            <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                <span>Ozon / Заказы</span>
-                            </a>
+                        <div class="dropdown-menu {{ integrations_show }}">
+                            <div class="dropdown-menu-column">
+                                {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
+                                <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
+                                    <span>Wb / Продажи</span>
+                                </a>
+                                {% set wildberries_import_logs_active = current_route starts with 'wildberries_import_logs_' %}
+                                <a class="dropdown-item {{ wildberries_import_logs_active ? 'active' : '' }}" href="{{ path('wildberries_import_logs_index') }}">
+                                    <span>Wb / Журнал импорта отчётов</span>
+                                </a>
+                                {% set ozon_orders_active = current_route starts with 'ozon_order' %}
+                                <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                                    <span>Ozon / Заказы</span>
+                                </a>
                             {% set ozon_products_active = current_route starts with 'ozon_products' %}
                             <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
                                 <span>Ozon / Товары</span>
