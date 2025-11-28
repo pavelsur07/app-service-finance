@@ -38,7 +38,7 @@
                 <a href="{{ path('company_index') }}" class="btn btn-secondary">Назад</a>
                 {{ form_end(form) }}
 
-                {# Отдельная форма для проверки ключа WB — только для уже существующей компании #}
+                {# Отдельная форма для проверки ключа Wildberries — только для уже существующей компании #}
                 {% if company is defined %}
                     <form method="post"
                           action="{{ path('company_check_wb_key', {'id': company.id}) }}"
