@@ -76,9 +76,9 @@
             <tbody>
             {% for row in rows %}
                 <tr>
-                    <td>{{ row.saleDt ? row.saleDt|date('Y-m-d H:i') : '—' }}</td>
-                    <td>{{ row.orderDt ? row.orderDt|date('Y-m-d H:i') : '—' }}</td>
-                    <td>{{ row.rrDt ? row.rrDt|date('Y-m-d H:i') : '—' }}</td>
+                    <td>{{ row.saleDt ? row.saleDt|date('d-m-Y') : '—' }}</td>
+                    <td>{{ row.orderDt ? row.orderDt|date('d-m-Y') : '—' }}</td>
+                    <td>{{ row.rrDt ? row.rrDt|date('d-m-Y') : '—' }}</td>
                     <td>{{ row.nmId ?? '—' }}</td>
                     <td>{{ row.brandName ?? '—' }}</td>
                     <td>{{ row.subjectName ?? '—' }}</td>
