@@ -63,8 +63,6 @@
                 <th>Дата продажи</th>
                 <th>Дата заказа</th>
                 <th>Дата отчёта</th>
-                <th>RRD ID</th>
-                <th>Номер отчёта</th>
                 <th>Артикул</th>
                 <th>Бренд</th>
                 <th>Предмет</th>
@@ -72,13 +70,6 @@
                 <th>Тип документа</th>
                 <th>Страна площадки</th>
                 <th class="text-end">Цена со скидкой</th>
-                <th class="text-end">Комиссия</th>
-                <th class="text-end">К выплате</th>
-                <th class="text-end">Доставка</th>
-                <th class="text-end">Хранение</th>
-                <th class="text-end">Штраф</th>
-                <th class="text-end">Эквайринг</th>
-                <th>Import ID</th>
                 <th>RAW</th>
             </tr>
             </thead>
@@ -88,8 +79,6 @@
                     <td>{{ row.saleDt ? row.saleDt|date('Y-m-d H:i') : '—' }}</td>
                     <td>{{ row.orderDt ? row.orderDt|date('Y-m-d H:i') : '—' }}</td>
                     <td>{{ row.rrDt ? row.rrDt|date('Y-m-d H:i') : '—' }}</td>
-                    <td>{{ row.rrdId }}</td>
-                    <td>{{ row.realizationreportId ?? '—' }}</td>
                     <td>{{ row.nmId ?? '—' }}</td>
                     <td>{{ row.brandName ?? '—' }}</td>
                     <td>{{ row.subjectName ?? '—' }}</td>
@@ -97,13 +86,6 @@
                     <td>{{ row.docTypeName ?? '—' }}</td>
                     <td>{{ row.siteCountry ?? '—' }}</td>
                     <td class="text-end">{{ row.retailPriceWithDiscRub ?? '—' }}</td>
-                    <td class="text-end">{{ row.ppvzSalesCommission ?? '—' }}</td>
-                    <td class="text-end">{{ row.ppvzForPay ?? '—' }}</td>
-                    <td class="text-end">{{ row.deliveryRub ?? '—' }}</td>
-                    <td class="text-end">{{ row.storageFee ?? '—' }}</td>
-                    <td class="text-end">{{ row.penalty ?? '—' }}</td>
-                    <td class="text-end">{{ row.acquiringFee ?? '—' }}</td>
-                    <td><code>{{ row.importId }}</code></td>
                     <td>
                         <details>
                             <summary>Показать</summary>
@@ -113,7 +95,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="20" class="text-center">Операции не найдены</td>
+                    <td colspan="11" class="text-center">Операции не найдены</td>
                 </tr>
             {% endfor %}
             </tbody>
