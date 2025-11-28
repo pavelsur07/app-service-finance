@@ -9,6 +9,14 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
+/**
+ * Импорт детализации финансового отчёта Wildberries (reportDetailByPeriod).
+ *
+ * Поддерживает period=daily|weekly, но для финансовых отчётов в очереди
+ * используется режим daily: интервал режется на окна по 1 дню
+ * (iterateDateWindows() + windowSizeDays()), постранично обходится по rrd_id
+ * и сохраняется в таблицу wildberries_report_details батчами по BATCH_SIZE.
+ */
 final class WildberriesReportDetailImporter
 {
     private const BATCH_SIZE = 800; // баланс скорость/память
@@ -341,7 +349,12 @@ SQL;
         $conn->executeStatement($sql, $params);
     }
 
-    /** Деление исходного интервала на окна без перекрытия. */
+    /**
+     * Деление исходного интервала на окна без перекрытия.
+     * Нормализует границы к полуночи (normalizeDate), с учётом windowSizeDays()
+     * возвращает пары [windowFrom, windowTo]; в режиме daily даёт окна по 1 дню,
+     * что важно для дальнейшей помесячной агрегации данных.
+     */
     private function iterateDateWindows(\DateTimeImmutable $from, \DateTimeImmutable $to, string $period): iterable
     {
         $from = $this->normalizeDate($from);
@@ -357,6 +370,10 @@ SQL;
         }
     }
 
+    /**
+     * Размер окна в днях: для period=weekly возвращает 7, для daily и остальных
+     * значений — 1 день, что используется при загрузке финансовых отчётов за день.
+     */
     private function windowSizeDays(string $period): int
     {
         return match ($period) {
