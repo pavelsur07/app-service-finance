@@ -1,0 +1,97 @@
+{% extends 'base.html.twig' %}
+{% block title %}Журнал импорта отчётов WB{% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Журнал импорта отчётов Wildberries</h2>
+        <div class="text-secondary mt-1">
+          Показываются только логи источника <code>wb_report_detail</code> по активной компании.
+        </div>
+      </div>
+      <div class="col-auto ms-auto">
+        <form class="row g-2" method="get">
+          <div class="col-auto">
+            <input type="date" class="form-control" name="date_from" value="{{ date_from }}">
+          </div>
+          <div class="col-auto">
+            <input type="date" class="form-control" name="date_to" value="{{ date_to }}">
+          </div>
+          <div class="col-auto">
+            <button type="submit" class="btn btn-primary">
+              <i class="ti ti-filter me-1"></i>Фильтр
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vcenter table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Начало</th>
+                <th>Создано строк</th>
+                <th>Пропущено дублей</th>
+                <th>Ошибок</th>
+                <th>Предпросмотр</th>
+                <th>Окончание</th>
+                <th>Файл / источник</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in items %}
+                <tr>
+                  <td>{{ log.startedAt ? log.startedAt|date('Y-m-d H:i') : '—' }}</td>
+                  <td>{{ log.createdCount }}</td>
+                  <td>{{ log.skippedDuplicates }}</td>
+                  <td>{{ log.errorsCount }}</td>
+                  <td>{{ log.preview ? 'Да' : 'Нет' }}</td>
+                  <td>{{ log.finishedAt ? log.finishedAt|date('Y-m-d H:i') : '—' }}</td>
+                  <td>
+                    {{ log.source }}
+                    {% if log.fileName %}
+                      <br><span class="text-secondary">{{ log.fileName }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="7" class="text-secondary">Записей не найдено.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {% set pages = (total / limit)|round(0, 'ceil') %}
+      {% if pages > 1 %}
+        <div class="card-footer d-flex align-items-center">
+          <p class="m-0 text-secondary">
+            Всего: <strong>{{ total }}</strong>
+          </p>
+          <ul class="pagination m-0 ms-auto">
+            {% for p in 1..pages %}
+              <li class="page-item {{ p == page ? 'active' : '' }}">
+                <a class="page-link"
+                   href="{{ path('wildberries_import_logs_index', app.request.query.all|merge({'page': p})) }}">
+                  {{ p }}
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
