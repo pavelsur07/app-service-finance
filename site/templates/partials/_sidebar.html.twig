@@ -267,6 +267,11 @@
                                 <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
                                     <span>Wb / Продажи</span>
                                 </a>
+
+                                {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+                                <a class="dropdown-item {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
+                                    <span>Wb / Операции (фин. отчёт)</span>
+                                </a>
                                 {% set wildberries_import_logs_active = current_route starts with 'wildberries_import_logs_' %}
                                 <a class="dropdown-item {{ wildberries_import_logs_active ? 'active' : '' }}" href="{{ path('wildberries_import_logs_index') }}">
                                     <span>Wb / Журнал импорта отчётов</span>

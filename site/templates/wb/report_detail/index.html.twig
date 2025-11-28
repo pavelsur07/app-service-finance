@@ -120,40 +120,30 @@
         </table>
     </div>
 
-    {% if pages > 1 %}
-        {% set baseParams = {} %}
-        {% for key, value in filters %}
-            {% if value is not empty %}
-                {% set baseParams = baseParams|merge({ (key): value }) %}
-            {% endif %}
-        {% endfor %}
-        {% set baseParams = baseParams|merge({'per_page': per_page}) %}
+    {% if pager.nbPages > 1 %}
         <nav aria-label="Пагинация Wildberries report details">
             <ul class="pagination">
-                <li class="page-item {{ page <= 1 ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': page - 1})) }}">Назад</a>
+                <li class="page-item {{ pager.hasPreviousPage ? '' : 'disabled' }}">
+                    <a class="page-link"
+                       href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pager.hasPreviousPage ? pager.previousPage : pager.currentPage})) }}">
+                        Назад
+                    </a>
                 </li>
-                {% if pages > 10 %}
-                    {% for pageNumber in 1..4 %}
-                        <li class="page-item {{ pageNumber == page ? 'active' : '' }}">
-                            <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
-                        </li>
-                    {% endfor %}
-                    <li class="page-item disabled">
-                        <span class="page-link">…</span>
+
+                {% for pageNumber in 1..pager.nbPages %}
+                    <li class="page-item {{ pageNumber == pager.currentPage ? 'active' : '' }}">
+                        <a class="page-link"
+                           href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pageNumber})) }}">
+                            {{ pageNumber }}
+                        </a>
                     </li>
-                    <li class="page-item {{ pages == page ? 'active' : '' }}">
-                        <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pages})) }}">{{ pages }}</a>
-                    </li>
-                {% else %}
-                    {% for pageNumber in 1..pages %}
-                        <li class="page-item {{ pageNumber == page ? 'active' : '' }}">
-                            <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
-                        </li>
-                    {% endfor %}
-                {% endif %}
-                <li class="page-item {{ page >= pages ? 'disabled' : '' }}">
-                    <a class="page-link" href="{{ path('wb_report_detail_index', baseParams|merge({'page': page + 1})) }}">Вперёд</a>
+                {% endfor %}
+
+                <li class="page-item {{ pager.hasNextPage ? '' : 'disabled' }}">
+                    <a class="page-link"
+                       href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pager.hasNextPage ? pager.nextPage : pager.currentPage})) }}">
+                        Вперёд
+                    </a>
                 </li>
             </ul>
         </nav>

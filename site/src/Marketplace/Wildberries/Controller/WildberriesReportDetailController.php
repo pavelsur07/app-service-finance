@@ -7,6 +7,8 @@ namespace App\Marketplace\Wildberries\Controller;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
 use App\Service\ActiveCompanyService;
 use Doctrine\Persistence\ManagerRegistry;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -57,28 +59,18 @@ final class WildberriesReportDetailController extends AbstractController
             $qb->andWhere('LOWER(d.subjectName) LIKE :subject')->setParameter('subject', '%'.mb_strtolower($subject).'%');
         }
         if ($siteCountry) {
-            $qb->andWhere('d.siteCountry = :sc')->setParameter('sc', $siteCountry);
+            $qb->andWhere('d.siteCountry = :siteCountry')->setParameter('siteCountry', $siteCountry);
         }
         if ($dateFrom) {
-            $qb->andWhere('d.saleDt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom.' 00:00:00'));
+            $qb->andWhere('d.saleDt >= :dateFrom')->setParameter('dateFrom', new \DateTimeImmutable($dateFrom.' 00:00:00'));
         }
         if ($dateTo) {
-            $qb->andWhere('d.saleDt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo.' 23:59:59'));
+            $qb->andWhere('d.saleDt <= :dateTo')->setParameter('dateTo', new \DateTimeImmutable($dateTo.' 23:59:59'));
         }
 
-        $qb->orderBy('d.saleDt', 'DESC')->addOrderBy('d.rrdId', 'DESC');
+        $qb->orderBy('d.saleDt', 'DESC');
 
-        $qbCount = clone $qb;
-        $qbCount->resetDQLPart('orderBy');
-        $qbCount->select('COUNT(d.id)');
-        $total = (int) $qbCount->getQuery()->getSingleScalarResult();
-
-        $rows = $qb
-            ->setFirstResult(($page - 1) * $perPage)
-            ->setMaxResults($perPage)
-            ->getQuery()
-            ->getResult();
-
+        // Список стран площадки оставляем как есть (отдельный запрос)
         $siteCountryQuery = $repoDet->createQueryBuilder('d')
             ->select('DISTINCT d.siteCountry AS siteCountry')
             ->where('d.company = :company')
@@ -90,15 +82,20 @@ final class WildberriesReportDetailController extends AbstractController
             $siteCountryQuery->getQuery()->getArrayResult()
         )));
 
-        $pages = (int) ceil($total / $perPage);
+        // Pagerfanta для пагинации операций
+        $pager = new Pagerfanta(new QueryAdapter($qb));
+        $pager->setMaxPerPage($perPage);
+        $pager->setCurrentPage($page);
+
+        $rows = iterator_to_array($pager->getCurrentPageResults());
+        $total = $pager->getNbResults();
 
         return $this->render('wb/report_detail/index.html.twig', [
             'company' => $company,
             'rows' => $rows,
             'total' => $total,
-            'page' => $page,
-            'per_page' => $perPage,
-            'pages' => $pages,
+            'pager' => $pager,
+            'per_page' => $pager->getMaxPerPage(),
             'filters' => [
                 'nmId' => $nmId,
                 'brand' => $brand,
