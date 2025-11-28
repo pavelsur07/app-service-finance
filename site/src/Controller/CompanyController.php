@@ -110,7 +110,7 @@ class CompanyController extends AbstractController
     ): Response {
         // CSRF-проверка для защиты действия
         if (!$this->isCsrfTokenValid('company_check_wb_key'.$company->getId(), (string) $request->request->get('_token'))) {
-            $this->addFlash('danger', 'Неверный CSRF-токен при проверке ключа WB.');
+            $this->addFlash('danger', 'Неверный CSRF-токен при проверке ключа Wildberries.');
 
             return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
         }
@@ -124,10 +124,9 @@ class CompanyController extends AbstractController
         }
 
         try {
-            // Небольшое «окно» для проверки — один день (вчера)
+            // Используем легкий запрос к официальному методу Statistics API
+            // GET /api/v5/supplier/reportDetailByPeriod
             $date = new \DateTimeImmutable('-1 day');
-
-            // Используем уже существующий клиент и метод, НИЧЕГО в нём не меняя
             $wbStatsClient->fetchReportDetailByPeriod(
                 $company,
                 $date,
@@ -137,7 +136,7 @@ class CompanyController extends AbstractController
             );
 
             // Если исключений не было — считаем ключ рабочим
-            $this->addFlash('success', 'WB Statistics API ключ активен. Запрос к reportDetailByPeriod выполнен успешно.');
+            $this->addFlash('success', 'WB Statistics API ключ активен. Проверочный запрос к reportDetailByPeriod выполнен успешно.');
         } catch (\RuntimeException $e) {
             // Уже известная ситуация: "WB v5 API unexpected status 401"
             if (str_contains($e->getMessage(), 'WB v5 API unexpected status 401')) {
