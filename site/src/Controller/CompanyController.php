@@ -5,6 +5,7 @@ namespace App\Controller;
 use App\Entity\Company;
 use App\Form\CompanyType;
 use App\Repository\CompanyRepository;
+use App\Marketplace\Wildberries\Adapter\WildberriesStatisticsV5Client;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -99,5 +100,55 @@ class CompanyController extends AbstractController
         }
 
         return $this->redirectToRoute('company_index');
+    }
+
+    #[Route('/{id}/check-wb-key', name: 'company_check_wb_key', methods: ['POST'])]
+    public function checkWildberriesKey(
+        Request $request,
+        Company $company,
+        WildberriesStatisticsV5Client $wbStatsClient
+    ): Response {
+        // CSRF-проверка для защиты действия
+        if (!$this->isCsrfTokenValid('company_check_wb_key'.$company->getId(), (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF-токен при проверке ключа WB.');
+
+            return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
+        }
+
+        $token = trim((string) $company->getWildberriesApiKey());
+
+        if ('' === $token) {
+            $this->addFlash('danger', 'WB Statistics API ключ не заполнен. Сначала укажите ключ и сохраните компанию.');
+
+            return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
+        }
+
+        try {
+            // Небольшое «окно» для проверки — один день (вчера)
+            $date = new \DateTimeImmutable('-1 day');
+
+            // Используем уже существующий клиент и метод, НИЧЕГО в нём не меняя
+            $wbStatsClient->fetchReportDetailByPeriod(
+                $company,
+                $date,
+                $date,
+                0,
+                'daily'
+            );
+
+            // Если исключений не было — считаем ключ рабочим
+            $this->addFlash('success', 'WB Statistics API ключ активен. Запрос к reportDetailByPeriod выполнен успешно.');
+        } catch (\RuntimeException $e) {
+            // Уже известная ситуация: "WB v5 API unexpected status 401"
+            if (str_contains($e->getMessage(), 'WB v5 API unexpected status 401')) {
+                $this->addFlash('danger', 'WB API ключ неверный или не активен (401 Unauthorized). Проверьте токен в личном кабинете WB.');
+            } else {
+                $this->addFlash('warning', 'Ошибка при проверке WB API ключа: '.$e->getMessage());
+            }
+        } catch (\Throwable $e) {
+            $this->addFlash('warning', 'Транспортная ошибка при проверке WB API ключа: '.$e->getMessage());
+        }
+
+        return $this->redirectToRoute('company_edit', ['id' => $company->getId()]);
     }
 }
