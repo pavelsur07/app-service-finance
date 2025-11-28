@@ -56,6 +56,9 @@ final class WildberriesToolsController extends AbstractController
 
         $company = $this->activeCompanyService->getActiveCompany();
 
+        // Импорт финансовых отчётов WB за последние 60 дней (включая текущий день).
+        // Это окно синхронизировано с командой `wb:finance:import` без параметров
+        // и позволяет подтягивать возможные корректировки задним числом для помесячной аналитики.
         $dateTo = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->setTime(0, 0);
         $dateFrom = $dateTo->sub(new \DateInterval('P59D'));
 
