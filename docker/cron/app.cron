@@ -12,5 +12,9 @@
 # Ежедневно в 02:10: снапшоты остатков по счетам
 10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction >> /var/log/cron/app.log 2>&1
 
+# Ежедневно в 02:20: загрузка финансовых отчетов WB о всем компаниям у которых есть активный ключ API
+20 2 * * * php /app/bin/console wb:finance:import --no-interaction >> /var/log/cron/app.log 2>&1
+
 # Ежедневно в 03:00: чистка логов/временных таблиц
 0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod >> /var/log/cron/app.log 2>&1
+
