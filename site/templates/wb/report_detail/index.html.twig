@@ -121,8 +121,13 @@
     </div>
 
     {% if pager.nbPages > 1 %}
+        {% set current = pager.currentPage %}
+        {% set last = pager.nbPages %}
+        {% set window = 2 %}
+
         <nav aria-label="Пагинация Wildberries report details">
             <ul class="pagination">
+                {# Кнопка "Назад" #}
                 <li class="page-item {{ pager.hasPreviousPage ? '' : 'disabled' }}">
                     <a class="page-link"
                        href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pager.hasPreviousPage ? pager.previousPage : pager.currentPage})) }}">
@@ -130,15 +135,32 @@
                     </a>
                 </li>
 
-                {% for pageNumber in 1..pager.nbPages %}
-                    <li class="page-item {{ pageNumber == pager.currentPage ? 'active' : '' }}">
-                        <a class="page-link"
-                           href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pageNumber})) }}">
-                            {{ pageNumber }}
-                        </a>
-                    </li>
+                {# Страницы с "окном" вокруг текущей и многоточиями #}
+                {% set dotsPrevShown = false %}
+                {% set dotsNextShown = false %}
+
+                {% for i in 1..last %}
+                    {% if i == 1 or i == last or (i >= current - window and i <= current + window) %}
+                        <li class="page-item {{ i == current ? 'active' : '' }}">
+                            <a class="page-link"
+                               href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': i})) }}">
+                                {{ i }}
+                            </a>
+                        </li>
+                    {% elseif i < current and not dotsPrevShown %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                        {% set dotsPrevShown = true %}
+                    {% elseif i > current and not dotsNextShown %}
+                        <li class="page-item disabled">
+                            <span class="page-link">…</span>
+                        </li>
+                        {% set dotsNextShown = true %}
+                    {% endif %}
                 {% endfor %}
 
+                {# Кнопка "Вперёд" #}
                 <li class="page-item {{ pager.hasNextPage ? '' : 'disabled' }}">
                     <a class="page-link"
                        href="{{ path('wb_report_detail_index', app.request.query.all|merge({'page': pager.hasNextPage ? pager.nextPage : pager.currentPage})) }}">
