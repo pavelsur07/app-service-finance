@@ -108,7 +108,7 @@ final class WbFinanceReportImportCommand extends Command
         }
 
         $dateTo = $this->todayUtc();
-        $dateFrom = $dateTo->sub(new \DateInterval('P'.(self::WINDOW_DAYS - 1).'D'));
+        $dateFrom = $dateTo->sub(new \DateInterval('P59D'));
 
         foreach ($companies as $company) {
             if (!$company instanceof Company) {
