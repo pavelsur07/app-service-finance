@@ -42,7 +42,6 @@
                         <span class="nav-link-title hide-when-collapsed">Главная</span>
                     </a>
                 </li>
-                <div class="nav-section-title hide-when-collapsed">Деньги</div>
                 <!-- Деньги -->
                 {% set cash_transactions_active = current_route == 'cash_transaction_index' %}
                 <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
@@ -80,8 +79,6 @@
                         <span class="nav-link-title hide-when-collapsed">Кредиты</span>
                     </a>
                 </li>
-
-                <div class="nav-section-title hide-when-collapsed">Документы</div>
                 {% set documents_active = current_route == 'document_index' %}
                 <li class="nav-item {{ documents_active ? 'active' : '' }}">
                     <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
