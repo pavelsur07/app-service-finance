@@ -124,12 +124,6 @@
                                     <span class="nav-link-title hide-when-collapsed">Баланс</span>
                                 </a>
                             </li>
-                            <li class="nav-item {{ wb_report_detail_active ? 'active' : '' }}">
-                                <a class="nav-link {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}" title="Фин. отчёты WB (детализация)">
-                                    <span class="nav-link-icon"><i class="ti ti-report-analytics"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Фин. отчёты WB (детализация)</span>
-                                </a>
-                            </li>
                             <li class="nav-item {{ wb_rnp_active ? 'active' : '' }}">
                                 <a class="nav-link {{ wb_rnp_active ? 'active' : '' }}"
                                    href="{{ path('wb_reports_rnp', {'period':'month'}) }}"
@@ -244,9 +238,6 @@
                         </ul>
                     </div>
                 </li>
-
-
-                <div class="nav-section-title hide-when-collapsed">AI</div>
                 {% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
                 <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
                     <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
