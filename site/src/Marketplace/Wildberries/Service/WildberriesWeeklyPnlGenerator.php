@@ -57,9 +57,9 @@ final class WildberriesWeeklyPnlGenerator
         $unmapped = [];
 
         foreach ($rows as $row) {
-            $mapping = $this->mappingResolver->resolveForRow($company, $row);
+            $mappings = $this->mappingResolver->resolveManyForRow($company, $row);
 
-            if (null === $mapping) {
+            if ($mappings === []) {
                 $key = sprintf(
                     '%s|%s|%s',
                     $row->getSupplierOperName(),
@@ -81,25 +81,42 @@ final class WildberriesWeeklyPnlGenerator
                 continue;
             }
 
-            $sourceField = $mapping->getSourceField();
-            $value = match ($sourceField) {
-                'ppvzForPay' => $row->getPpvzForPay(),
-                'retailPriceWithDiscRub' => $row->getRetailPriceWithDiscRub(),
-                'deliveryRub' => $row->getDeliveryRub(),
-                'storageFee' => $row->getStorageFee(),
-                'penalty' => $row->getPenalty(),
-                'acquiringFee' => $row->getAcquiringFee(),
-                default => null,
-            };
+            foreach ($mappings as $mapping) {
+                if (!$mapping->isActive()) {
+                    continue;
+                }
 
-            if (null === $value) {
-                continue;
+                $sourceField = $mapping->getSourceField();
+
+                $value = match ($sourceField) {
+                    // Цена за единицу
+                    'retail_price' => $row->getRetailPrice(),
+                    // Сумма реализации (берём из raw)
+                    'retail_amount' => $row->getRaw()['retail_amount'] ?? null,
+                    // Эквайринг / комиссии за платежи
+                    'acquiring_fee' => $row->getAcquiringFee(),
+                    // Цена продажи с учётом скидки
+                    'retailPriceWithDiscRub' => $row->getRetailPriceWithDiscRub(),
+                    // Стоимость доставки
+                    'deliveryRub' => $row->getDeliveryRub(),
+                    // Плата за хранение
+                    'storageFee' => $row->getStorageFee(),
+                    // Штрафы
+                    'penalty' => $row->getPenalty(),
+                    // Эквайринг (альтернативное поле)
+                    'acquiringFee' => $row->getAcquiringFee(),
+                    default => null,
+                };
+
+                if (null === $value) {
+                    continue;
+                }
+
+                $amount = (float) $value;
+
+                $plCategoryId = (string) $mapping->getPlCategory()->getId();
+                $totals[$plCategoryId] = ($totals[$plCategoryId] ?? 0.0) + $amount;
             }
-
-            $amount = (float) $value;
-
-            $plCategoryId = (string) $mapping->getPlCategory()->getId();
-            $totals[$plCategoryId] = ($totals[$plCategoryId] ?? 0.0) + $amount;
         }
 
         return [
