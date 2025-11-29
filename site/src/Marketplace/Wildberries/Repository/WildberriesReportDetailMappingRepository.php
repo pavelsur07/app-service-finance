@@ -46,4 +46,26 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function findOneByKeyAndSourceField(
+        Company $company,
+        ?string $supplierOperName,
+        ?string $docTypeName,
+        ?string $siteCountry,
+        string $sourceField
+    ): ?WildberriesReportDetailMapping {
+        return $this->createQueryBuilder('m')
+            ->andWhere('m.company = :company')
+            ->andWhere('m.supplierOperName = :supplierOperName')
+            ->andWhere('m.docTypeName = :docTypeName')
+            ->andWhere('m.siteCountry = :siteCountry')
+            ->andWhere('m.sourceField = :sourceField')
+            ->setParameter('company', $company)
+            ->setParameter('supplierOperName', $supplierOperName)
+            ->setParameter('docTypeName', $docTypeName)
+            ->setParameter('siteCountry', $siteCountry)
+            ->setParameter('sourceField', $sourceField)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }
