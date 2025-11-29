@@ -62,39 +62,70 @@ final class WildberriesReportDetailMappingController extends AbstractController
             'acquiringFee',
         ];
 
-        $combinations = $this->mappingResolver->collectDistinctKeysForCompany($company, $from, $to, $this->detailRepository);
+        $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
+            $company,
+            $from,
+            $to,
+            $this->detailRepository
+        );
 
-        // Ключ: oper|docType|country|sourceField
-        $existingMappings = [];
-        foreach ($this->mappingRepository->findAllByCompany($company) as $mapping) {
-            $key = sprintf(
-                '%s|%s|%s|%s',
-                (string) $mapping->getSupplierOperName(),
-                (string) $mapping->getDocTypeName(),
-                (string) $mapping->getSiteCountry(),
-                (string) $mapping->getSourceField(),
+        // карта "combinationKey => rowsCount"
+        $combinationCounts = [];
+        foreach ($combinations as $combination) {
+            $combinationKey = sprintf(
+                '%s|%s|%s',
+                (string) ($combination['supplierOperName'] ?? ''),
+                (string) ($combination['docTypeName'] ?? ''),
+                (string) ($combination['siteCountry'] ?? '')
             );
-            $existingMappings[$key] = $mapping;
+            $combinationCounts[$combinationKey] = $combination['rowsCount'];
         }
 
-        $items = [];
-        foreach ($combinations as $combination) {
-            foreach ($sourceFieldOptions as $sourceField) {
-                $key = sprintf(
-                    '%s|%s|%s|%s',
-                    (string) ($combination['supplierOperName'] ?? ''),
-                    (string) ($combination['docTypeName'] ?? ''),
-                    (string) ($combination['siteCountry'] ?? ''),
-                    $sourceField,
-                );
+        // группируем существующие маппинги по комбинации
+        $mappingsByCombination = [];
+        foreach ($this->mappingRepository->findAllByCompany($company) as $mapping) {
+            $combinationKey = sprintf(
+                '%s|%s|%s',
+                (string) $mapping->getSupplierOperName(),
+                (string) $mapping->getDocTypeName(),
+                (string) $mapping->getSiteCountry()
+            );
 
+            $mappingsByCombination[$combinationKey][] = $mapping;
+        }
+
+        // строим items: по одному item на каждый mapping;
+        // плюс по одному пустому item для комбинаций без маппинга
+        $items = [];
+
+        foreach ($combinations as $combination) {
+            $combinationKey = sprintf(
+                '%s|%s|%s',
+                (string) ($combination['supplierOperName'] ?? ''),
+                (string) ($combination['docTypeName'] ?? ''),
+                (string) ($combination['siteCountry'] ?? '')
+            );
+
+            $rowsCount = $combinationCounts[$combinationKey] ?? $combination['rowsCount'];
+
+            if (!empty($mappingsByCombination[$combinationKey])) {
+                foreach ($mappingsByCombination[$combinationKey] as $mapping) {
+                    $items[] = [
+                        'supplierOperName' => $combination['supplierOperName'],
+                        'docTypeName' => $combination['docTypeName'],
+                        'siteCountry' => $combination['siteCountry'],
+                        'rowsCount' => $rowsCount,
+                        'mapping' => $mapping,
+                    ];
+                }
+            } else {
+                // нет ни одного правила для этой комбинации — добавляем пустую строку
                 $items[] = [
                     'supplierOperName' => $combination['supplierOperName'],
                     'docTypeName' => $combination['docTypeName'],
                     'siteCountry' => $combination['siteCountry'],
-                    'rowsCount' => $combination['rowsCount'],
-                    'sourceField' => $sourceField,
-                    'mapping' => $existingMappings[$key] ?? null,
+                    'rowsCount' => $rowsCount,
+                    'mapping' => null,
                 ];
             }
         }
