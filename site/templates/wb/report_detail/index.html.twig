@@ -8,6 +8,8 @@
         <div class="text-muted">Всего операций: {{ total }}</div>
     </div>
 
+    {% include 'wb/report_detail/_tabs.html.twig' %}
+
     <form method="get" class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-4 col-xl-3">
             <label for="filter-import" class="form-label">ID импорта</label>

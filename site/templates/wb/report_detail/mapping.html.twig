@@ -1,0 +1,171 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Детализация Wildberries — маппинг и ОПиУ{% endblock %}
+
+{% block body %}
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h1 class="mb-0">Детализация Wildberries — маппинг и ОПиУ</h1>
+    </div>
+
+    {% include 'wb/report_detail/_tabs.html.twig' %}
+
+    <form method="get" class="row g-3 mb-4">
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <label for="filter-from" class="form-label">Период с</label>
+            <input id="filter-from" type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control">
+        </div>
+        <div class="col-sm-6 col-md-4 col-lg-3">
+            <label for="filter-to" class="form-label">Период по</label>
+            <input id="filter-to" type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control">
+        </div>
+        <div class="col-12 d-flex justify-content-end align-items-end gap-2">
+            <a href="{{ path('wb_report_detail_mapping_index') }}" class="btn btn-outline-secondary">Последняя неделя</a>
+            <button type="submit" class="btn btn-primary">Показать</button>
+        </div>
+    </form>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h2 class="card-title mb-0">Маппинг операций</h2>
+                <div class="text-muted">Всего комбинаций: {{ items|length }}</div>
+            </div>
+
+            <form method="post" action="{{ path('wb_report_detail_mapping_save', { from: from|date('Y-m-d'), to: to|date('Y-m-d') }) }}">
+                <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping') }}">
+                <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
+                <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+
+                <div class="table-responsive mb-3">
+                    <table class="table table-striped align-middle">
+                        <thead>
+                        <tr>
+                            <th>Операция</th>
+                            <th>Тип документа</th>
+                            <th>Страна площадки</th>
+                            <th class="text-end">Строк</th>
+                            <th>Поле суммы</th>
+                            <th>PL категория</th>
+                            <th class="text-center">Активен</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in items %}
+                            {% set mapping = item.mapping %}
+                            <tr>
+                                <td>
+                                    <div class="fw-semibold">{{ item.supplierOperName ?? '—' }}</div>
+                                    <input type="hidden" name="mappings[{{ loop.index0 }}][supplierOperName]" value="{{ item.supplierOperName }}">
+                                </td>
+                                <td>
+                                    <div>{{ item.docTypeName ?? '—' }}</div>
+                                    <input type="hidden" name="mappings[{{ loop.index0 }}][docTypeName]" value="{{ item.docTypeName }}">
+                                </td>
+                                <td>
+                                    <div>{{ item.siteCountry ?? '—' }}</div>
+                                    <input type="hidden" name="mappings[{{ loop.index0 }}][siteCountry]" value="{{ item.siteCountry }}">
+                                </td>
+                                <td class="text-end">{{ item.rowsCount }}</td>
+                                <td>
+                                    <select name="mappings[{{ loop.index0 }}][sourceField]" class="form-select">
+                                        <option value="">—</option>
+                                        {% for option in sourceFieldOptions %}
+                                            <option value="{{ option }}" {{ mapping and mapping.sourceField == option ? 'selected' : '' }}>{{ option }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="mappings[{{ loop.index0 }}][plCategoryId]" class="form-select">
+                                        <option value="">Не выбрано</option>
+                                        {% for category in categoryOptions %}
+                                            <option value="{{ category.id }}" {{ mapping and mapping.plCategory.id == category.id ? 'selected' : '' }}>{{ category.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                <td class="text-center">
+                                    <input type="checkbox" name="mappings[{{ loop.index0 }}][isActive]" value="1" {{ (mapping is null or mapping.isActive) ? 'checked' : '' }}>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="7" class="text-center">Комбинации не найдены</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary">Сохранить маппинг</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                <h2 class="card-title mb-0">Недельный отчёт / Документ ОПиУ</h2>
+                <form method="post" action="{{ path('wb_report_detail_mapping_create_document') }}" class="d-flex gap-2 align-items-end flex-wrap">
+                    <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
+                    <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
+                    <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+                    <button type="submit" class="btn btn-success">Создать документ</button>
+                </form>
+            </div>
+
+            <div class="table-responsive mb-3">
+                <table class="table table-striped align-middle mb-0">
+                    <thead>
+                    <tr>
+                        <th>PL категория</th>
+                        <th class="text-end">Сумма</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for categoryId, amount in totals %}
+                        {% set category = categoryById[categoryId] ?? null %}
+                        <tr>
+                            <td>{{ category ? category.name : categoryId }}</td>
+                            <td class="text-end">{{ amount|number_format(2, '.', ' ') }}</td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="2" class="text-center">Нет данных для выбранного периода</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if unmapped is not empty %}
+                <div class="alert alert-warning mb-0">
+                    <div class="fw-semibold mb-2">Немапнутые комбинации — сначала закрой их в маппинге:</div>
+                    <div class="table-responsive mb-2">
+                        <table class="table table-sm mb-0">
+                            <thead>
+                            <tr>
+                                <th>Операция</th>
+                                <th>Тип документа</th>
+                                <th>Страна площадки</th>
+                                <th class="text-end">Строк</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for item in unmapped %}
+                                <tr>
+                                    <td>{{ item.supplierOperName ?? '—' }}</td>
+                                    <td>{{ item.docTypeName ?? '—' }}</td>
+                                    <td>{{ item.siteCountry ?? '—' }}</td>
+                                    <td class="text-end">{{ item.rowsCount }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="mb-0">После маппинга всех комбинаций станет доступно создание документа.</div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

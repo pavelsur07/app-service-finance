@@ -1,0 +1,149 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Wildberries\Service;
+
+use App\Entity\Company;
+use App\Entity\Document;
+use App\Entity\DocumentOperation;
+use App\Enum\DocumentType;
+use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
+use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
+use App\Repository\PLCategoryRepository;
+use App\Service\PLRegisterUpdater;
+use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
+use function sprintf;
+
+final class WildberriesWeeklyPnlGenerator
+{
+    public function __construct(
+        private readonly WildberriesReportDetailRepository $details,
+        private readonly WildberriesReportDetailMappingResolver $mappingResolver,
+        private readonly PLCategoryRepository $plCategories,
+        private readonly PLRegisterUpdater $plRegisterUpdater,
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
+
+    /**
+     * @return array{
+     *   totals: array<string, float>,
+     *   unmapped: array<int, array{
+     *     supplierOperName: ?string,
+     *     docTypeName: ?string,
+     *     siteCountry: ?string,
+     *     rowsCount: int
+     *   }>
+     * }
+     */
+    public function aggregateForPeriod(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to
+    ): array {
+        $rows = $this->details->createQueryBuilder('wrd')
+            ->andWhere('wrd.company = :company')
+            ->andWhere('wrd.rrDt IS NOT NULL')
+            ->andWhere('wrd.rrDt BETWEEN :from AND :to')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->getQuery()
+            ->getResult();
+
+        $totals = [];
+        $unmapped = [];
+
+        foreach ($rows as $row) {
+            $mapping = $this->mappingResolver->resolveForRow($company, $row);
+
+            if (null === $mapping) {
+                $key = sprintf(
+                    '%s|%s|%s',
+                    $row->getSupplierOperName(),
+                    $row->getDocTypeName(),
+                    $row->getSiteCountry(),
+                );
+
+                if (!isset($unmapped[$key])) {
+                    $unmapped[$key] = [
+                        'supplierOperName' => $row->getSupplierOperName(),
+                        'docTypeName' => $row->getDocTypeName(),
+                        'siteCountry' => $row->getSiteCountry(),
+                        'rowsCount' => 0,
+                    ];
+                }
+
+                ++$unmapped[$key]['rowsCount'];
+
+                continue;
+            }
+
+            $sourceField = $mapping->getSourceField();
+            $value = match ($sourceField) {
+                'ppvzForPay' => $row->getPpvzForPay(),
+                'retailPriceWithDiscRub' => $row->getRetailPriceWithDiscRub(),
+                'deliveryRub' => $row->getDeliveryRub(),
+                'storageFee' => $row->getStorageFee(),
+                'penalty' => $row->getPenalty(),
+                'acquiringFee' => $row->getAcquiringFee(),
+                default => null,
+            };
+
+            if (null === $value) {
+                continue;
+            }
+
+            $amount = (float) $value;
+
+            $plCategoryId = (string) $mapping->getPlCategory()->getId();
+            $totals[$plCategoryId] = ($totals[$plCategoryId] ?? 0.0) + $amount;
+        }
+
+        return [
+            'totals' => $totals,
+            'unmapped' => array_values($unmapped),
+        ];
+    }
+
+    public function createWeeklyDocumentFromTotals(
+        Company $company,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        array $totals
+    ): Document {
+        if ([] === $totals) {
+            throw new \DomainException('Cannot create WB weekly PnL document: totals are empty');
+        }
+
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+        $document
+            ->setDate($to)
+            ->setType(DocumentType::OTHER)
+            ->setDescription(sprintf('WB: ОПиУ за период %s–%s', $from->format('d.m.Y'), $to->format('d.m.Y')));
+
+        foreach ($totals as $plCategoryId => $amount) {
+            $plCategory = $this->plCategories->find($plCategoryId);
+
+            if (null === $plCategory) {
+                continue;
+            }
+
+            $operation = (new DocumentOperation())
+                ->setAmount(number_format($amount, 2, '.', ''))
+                ->setCategory($plCategory)
+                ->setComment('WB weekly aggregated');
+
+            $document->addOperation($operation);
+        }
+
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $this->plRegisterUpdater->updateForDocument($document);
+
+        return $document;
+    }
+}
