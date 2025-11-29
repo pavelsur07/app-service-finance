@@ -43,24 +43,47 @@ final class WildberriesReportDetailMappingController extends AbstractController
         $to = $toParam ? new DateTimeImmutable((string) $toParam) : new DateTimeImmutable('today');
         $from = $fromParam ? new DateTimeImmutable((string) $fromParam) : $to->modify('-6 days');
 
+        $sourceFieldOptions = [
+            'retail_price',
+            'retail_amount',
+            'acquiring_fee',
+        ];
+
         $combinations = $this->mappingResolver->collectDistinctKeysForCompany($company, $from, $to, $this->detailRepository);
 
+        // Ключ: oper|docType|country|sourceField
         $existingMappings = [];
         foreach ($this->mappingRepository->findAllByCompany($company) as $mapping) {
-            $key = sprintf('%s|%s|%s', $mapping->getSupplierOperName(), $mapping->getDocTypeName(), $mapping->getSiteCountry());
+            $key = sprintf(
+                '%s|%s|%s|%s',
+                (string) $mapping->getSupplierOperName(),
+                (string) $mapping->getDocTypeName(),
+                (string) $mapping->getSiteCountry(),
+                (string) $mapping->getSourceField(),
+            );
             $existingMappings[$key] = $mapping;
         }
 
         $items = [];
         foreach ($combinations as $combination) {
-            $key = sprintf('%s|%s|%s', $combination['supplierOperName'], $combination['docTypeName'], $combination['siteCountry']);
-            $items[] = [
-                'supplierOperName' => $combination['supplierOperName'],
-                'docTypeName' => $combination['docTypeName'],
-                'siteCountry' => $combination['siteCountry'],
-                'rowsCount' => $combination['rowsCount'],
-                'mapping' => $existingMappings[$key] ?? null,
-            ];
+            foreach ($sourceFieldOptions as $sourceField) {
+                $key = sprintf(
+                    '%s|%s|%s|%s',
+                    (string) ($combination['supplierOperName'] ?? ''),
+                    (string) ($combination['docTypeName'] ?? ''),
+                    (string) ($combination['siteCountry'] ?? ''),
+                    $sourceField,
+                );
+
+                $items[] = [
+                    'supplierOperName' => $combination['supplierOperName'],
+                    'docTypeName' => $combination['docTypeName'],
+                    'siteCountry' => $combination['siteCountry'],
+                    'rowsCount' => $combination['rowsCount'],
+                    'sourceField' => $sourceField,
+                    'mapping' => $existingMappings[$key] ?? null,
+                ];
+            }
         }
 
         $categories = $this->plCategoryRepository->findTreeByCompany($company);
@@ -78,15 +101,6 @@ final class WildberriesReportDetailMappingController extends AbstractController
 
             $categoryById[(string) $category->getId()] = $category;
         }
-
-        $sourceFieldOptions = [
-            'ppvzForPay',
-            'retailPriceWithDiscRub',
-            'deliveryRub',
-            'storageFee',
-            'penalty',
-            'acquiringFee',
-        ];
 
         $aggregated = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
 
@@ -134,7 +148,13 @@ final class WildberriesReportDetailMappingController extends AbstractController
                 continue;
             }
 
-            $mapping = $this->mappingRepository->findOneByKey($company, $supplierOperName, $docTypeName ?: null, $siteCountry ?: null);
+            $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
+                $company,
+                $supplierOperName,
+                $docTypeName ?: null,
+                $siteCountry ?: null,
+                (string) $sourceField
+            );
 
             if (!$mapping instanceof WildberriesReportDetailMapping) {
                 $mapping = new WildberriesReportDetailMapping(Uuid::uuid4()->toString(), $company);
