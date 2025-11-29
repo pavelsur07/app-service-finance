@@ -175,16 +175,35 @@ final class WildberriesReportDetailMappingController extends AbstractController
 
         foreach ($mappings as $mappingData) {
             $plCategoryId = $mappingData['plCategoryId'] ?? null;
-
-            if (empty($plCategoryId)) {
-                continue;
-            }
-
             $supplierOperName = $mappingData['supplierOperName'] ?? null;
             $docTypeName = $mappingData['docTypeName'] ?? null;
             $siteCountry = $mappingData['siteCountry'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
-            $isActive = (bool) ($mappingData['isActive'] ?? false);
+
+            $mapping = null;
+
+            if ($supplierOperName !== null && $sourceField !== null) {
+                $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
+                    $company,
+                    $supplierOperName,
+                    $docTypeName !== '' ? $docTypeName : null,
+                    $siteCountry !== '' ? $siteCountry : null,
+                    (string) $sourceField
+                );
+            }
+
+            if (empty($plCategoryId) && $mapping === null) {
+                continue;
+            }
+
+            if (!$mapping instanceof WildberriesReportDetailMapping) {
+                $mapping = new WildberriesReportDetailMapping(Uuid::uuid4()->toString(), $company);
+                $mapping->setSupplierOperName($supplierOperName);
+                $mapping->setDocTypeName($docTypeName !== '' ? $docTypeName : null);
+                $mapping->setSiteCountry($siteCountry !== '' ? $siteCountry : null);
+            }
+
+            $mapping->setSourceField((string) $sourceField);
 
             $plCategory = $this->plCategoryRepository->find($plCategoryId);
 
@@ -192,27 +211,12 @@ final class WildberriesReportDetailMappingController extends AbstractController
                 continue;
             }
 
-            $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
-                $company,
-                $supplierOperName,
-                $docTypeName ?: null,
-                $siteCountry ?: null,
-                (string) $sourceField
-            );
-
-            if (!$mapping instanceof WildberriesReportDetailMapping) {
-                $mapping = new WildberriesReportDetailMapping(Uuid::uuid4()->toString(), $company);
-                $this->em->persist($mapping);
-            }
-
             $mapping
-                ->setSupplierOperName((string) $supplierOperName)
-                ->setDocTypeName($docTypeName ?: null)
-                ->setSiteCountry($siteCountry ?: null)
-                ->setSourceField((string) $sourceField)
                 ->setPlCategory($plCategory)
-                ->setIsActive($isActive)
+                ->setIsActive(!empty($mappingData['isActive']))
                 ->setUpdatedAt(new DateTimeImmutable());
+
+            $this->em->persist($mapping);
         }
 
         $this->em->flush();
