@@ -20,21 +20,53 @@ final class WildberriesReportDetailMappingResolver
         Company $company,
         WildberriesReportDetail $row
     ): ?WildberriesReportDetailMapping {
+        $mappings = $this->resolveManyForRow($company, $row);
+
+        return $mappings[0] ?? null;
+    }
+
+    /**
+     * @return WildberriesReportDetailMapping[]
+     */
+    public function resolveManyForRow(
+        Company $company,
+        WildberriesReportDetail $row
+    ): array {
         $supplierOperName = $row->getSupplierOperName();
         $docTypeName = $row->getDocTypeName();
         $siteCountry = $row->getSiteCountry();
 
-        $mapping = $this->repository->findOneByKey($company, $supplierOperName, $docTypeName, $siteCountry);
-        if (null !== $mapping) {
-            return $mapping;
+        // 1. Полное совпадение: oper + doc_type + country
+        $result = $this->repository->findBy([
+            'company' => $company,
+            'supplierOperName' => $supplierOperName,
+            'docTypeName' => $docTypeName,
+            'siteCountry' => $siteCountry,
+        ]);
+
+        if ($result !== []) {
+            return $result;
         }
 
-        $mapping = $this->repository->findOneByKey($company, $supplierOperName, $docTypeName, null);
-        if (null !== $mapping) {
-            return $mapping;
+        // 2. Без страны: oper + doc_type + (siteCountry = null)
+        $result = $this->repository->findBy([
+            'company' => $company,
+            'supplierOperName' => $supplierOperName,
+            'docTypeName' => $docTypeName,
+            'siteCountry' => null,
+        ]);
+
+        if ($result !== []) {
+            return $result;
         }
 
-        return $this->repository->findOneByKey($company, $supplierOperName, null, null);
+        // 3. Только по oper: остальные поля = null
+        return $this->repository->findBy([
+            'company' => $company,
+            'supplierOperName' => $supplierOperName,
+            'docTypeName' => null,
+            'siteCountry' => null,
+        ]);
     }
 
     /**
