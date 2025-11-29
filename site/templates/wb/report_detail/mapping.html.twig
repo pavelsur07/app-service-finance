@@ -67,10 +67,14 @@
                                 </td>
                                 <td class="text-end">{{ item.rowsCount }}</td>
                                 <td>
+                                    {% set selectedSourceField = mapping ? mapping.sourceField : item.sourceField %}
+
                                     <select name="mappings[{{ loop.index0 }}][sourceField]" class="form-select">
                                         <option value="">—</option>
                                         {% for option in sourceFieldOptions %}
-                                            <option value="{{ option }}" {{ mapping and mapping.sourceField == option ? 'selected' : '' }}>{{ option }}</option>
+                                            <option value="{{ option }}" {{ selectedSourceField == option ? 'selected' : '' }}>
+                                                {{ option }}
+                                            </option>
                                         {% endfor %}
                                     </select>
                                 </td>
