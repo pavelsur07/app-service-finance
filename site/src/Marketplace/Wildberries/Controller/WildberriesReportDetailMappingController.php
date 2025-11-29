@@ -173,9 +173,14 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $docTypeName = $mappingData['docTypeName'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
 
+            // Пропускаем строки без выбранного поля суммы, чтобы не плодить лишние маппинги
+            if (empty($sourceField)) {
+                continue;
+            }
+
             $mapping = null;
 
-            if ($supplierOperName !== null && $sourceField !== null) {
+            if ($supplierOperName !== null && !empty($sourceField)) {
                 $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
                     $company,
                     $supplierOperName,
