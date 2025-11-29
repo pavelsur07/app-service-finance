@@ -51,7 +51,7 @@
                         </thead>
                         <tbody>
                         {% for item in items %}
-                            {% set mapping = item.mapping %}
+                            {% set mapping = item.mapping ?? null %}
                             <tr>
                                 <td>
                                     <div class="fw-semibold">{{ item.supplierOperName ?? '—' }}</div>
@@ -67,7 +67,7 @@
                                 </td>
                                 <td class="text-end">{{ item.rowsCount }}</td>
                                 <td>
-                                    {% set selectedSourceField = mapping ? mapping.sourceField : item.sourceField %}
+                                    {% set selectedSourceField = mapping ? mapping.sourceField : '' %}
 
                                     <select name="mappings[{{ loop.index0 }}][sourceField]" class="form-select">
                                         <option value="">—</option>
@@ -86,8 +86,19 @@
                                         {% endfor %}
                                     </select>
                                 </td>
-                                <td class="text-center">
-                                    <input type="checkbox" name="mappings[{{ loop.index0 }}][isActive]" value="1" {{ (mapping is null or mapping.isActive) ? 'checked' : '' }}>
+                                <td class="text-nowrap">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input type="checkbox"
+                                               name="mappings[{{ loop.index0 }}][isActive]"
+                                               value="1"
+                                               {% if mapping is null or mapping.isActive %}checked{% endif %}
+                                        >
+
+                                        <button type="button"
+                                                class="btn btn-link p-0 text-secondary js-wb-mapping-copy">
+                                            Копировать
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         {% else %}
@@ -172,4 +183,46 @@
             {% endif %}
         </div>
     </div>
+    <script>
+        document.addEventListener('click', function (event) {
+            const copyButton = event.target.closest('.js-wb-mapping-copy');
+            if (!copyButton) {
+                return;
+            }
+
+            event.preventDefault();
+
+            const row = copyButton.closest('tr');
+            if (!row) {
+                return;
+            }
+
+            const tbody = row.closest('tbody');
+            if (!tbody) {
+                return;
+            }
+
+            // Клонируем строку
+            const clone = row.cloneNode(true);
+
+            // Сбросим выбранную PL-категорию в копии,
+            // чтобы её явно выбрать под новую операцию
+            const categorySelect = clone.querySelector('select[name*="[plCategoryId]"]');
+            if (categorySelect) {
+                categorySelect.value = '';
+            }
+
+            // Вставляем клон сразу под исходной строкой
+            row.insertAdjacentElement('afterend', clone);
+
+            // Переиндексируем все имена полей: mappings[0], mappings[1], ...
+            const rows = tbody.querySelectorAll('tr');
+            rows.forEach(function (tr, index) {
+                const inputs = tr.querySelectorAll('input[name^="mappings["], select[name^="mappings["]');
+                inputs.forEach(function (input) {
+                    input.name = input.name.replace(/mappings\[\d+]/, 'mappings[' + index + ']');
+                });
+            });
+        });
+    </script>
 {% endblock %}
