@@ -34,38 +34,23 @@ final class WildberriesReportDetailMappingResolver
     ): array {
         $supplierOperName = $row->getSupplierOperName();
         $docTypeName = $row->getDocTypeName();
-        $siteCountry = $row->getSiteCountry();
-
-        // 1. Полное совпадение: oper + doc_type + country
+        
+        // 1. Полное совпадение: oper + doc_type (страна площадки не учитывается)
         $result = $this->repository->findBy([
             'company' => $company,
             'supplierOperName' => $supplierOperName,
             'docTypeName' => $docTypeName,
-            'siteCountry' => $siteCountry,
         ]);
 
         if ($result !== []) {
             return $result;
         }
 
-        // 2. Без страны: oper + doc_type + (siteCountry = null)
-        $result = $this->repository->findBy([
-            'company' => $company,
-            'supplierOperName' => $supplierOperName,
-            'docTypeName' => $docTypeName,
-            'siteCountry' => null,
-        ]);
-
-        if ($result !== []) {
-            return $result;
-        }
-
-        // 3. Только по oper: остальные поля = null
+        // 2. Только по oper: doc_type = null (страна не используется)
         return $this->repository->findBy([
             'company' => $company,
             'supplierOperName' => $supplierOperName,
             'docTypeName' => null,
-            'siteCountry' => null,
         ]);
     }
 

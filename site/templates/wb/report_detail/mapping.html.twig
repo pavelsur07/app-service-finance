@@ -42,7 +42,6 @@
                         <tr>
                             <th>Операция</th>
                             <th>Тип документа</th>
-                            <th>Страна площадки</th>
                             <th class="text-end">Строк</th>
                             <th>Поле суммы</th>
                             <th>PL категория</th>
@@ -60,10 +59,6 @@
                                 <td>
                                     <div>{{ item.docTypeName ?? '—' }}</div>
                                     <input type="hidden" name="mappings[{{ loop.index0 }}][docTypeName]" value="{{ item.docTypeName }}">
-                                </td>
-                                <td>
-                                    <div>{{ item.siteCountry ?? '—' }}</div>
-                                    <input type="hidden" name="mappings[{{ loop.index0 }}][siteCountry]" value="{{ item.siteCountry }}">
                                 </td>
                                 <td class="text-end">{{ item.rowsCount }}</td>
                                 <td>
@@ -105,7 +100,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="7" class="text-center">Комбинации не найдены</td>
+                                <td colspan="6" class="text-center">Комбинации не найдены</td>
                             </tr>
                         {% endfor %}
                         </tbody>

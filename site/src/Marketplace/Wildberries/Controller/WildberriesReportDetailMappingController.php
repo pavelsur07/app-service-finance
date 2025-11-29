@@ -69,26 +69,29 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $this->detailRepository
         );
 
-        // карта "combinationKey => rowsCount"
+        // карта "oper|docType => суммарный rowsCount по всем странам"
         $combinationCounts = [];
         foreach ($combinations as $combination) {
             $combinationKey = sprintf(
-                '%s|%s|%s',
+                '%s|%s',
                 (string) ($combination['supplierOperName'] ?? ''),
-                (string) ($combination['docTypeName'] ?? ''),
-                (string) ($combination['siteCountry'] ?? '')
+                (string) ($combination['docTypeName'] ?? '')
             );
-            $combinationCounts[$combinationKey] = $combination['rowsCount'];
+
+            if (!isset($combinationCounts[$combinationKey])) {
+                $combinationCounts[$combinationKey] = 0;
+            }
+
+            $combinationCounts[$combinationKey] += (int) $combination['rowsCount'];
         }
 
-        // группируем существующие маппинги по комбинации
+        // группируем существующие маппинги по oper|docType
         $mappingsByCombination = [];
         foreach ($this->mappingRepository->findAllByCompany($company) as $mapping) {
             $combinationKey = sprintf(
-                '%s|%s|%s',
+                '%s|%s',
                 (string) $mapping->getSupplierOperName(),
-                (string) $mapping->getDocTypeName(),
-                (string) $mapping->getSiteCountry()
+                (string) $mapping->getDocTypeName()
             );
 
             $mappingsByCombination[$combinationKey][] = $mapping;
@@ -98,22 +101,14 @@ final class WildberriesReportDetailMappingController extends AbstractController
         // плюс по одному пустому item для комбинаций без маппинга
         $items = [];
 
-        foreach ($combinations as $combination) {
-            $combinationKey = sprintf(
-                '%s|%s|%s',
-                (string) ($combination['supplierOperName'] ?? ''),
-                (string) ($combination['docTypeName'] ?? ''),
-                (string) ($combination['siteCountry'] ?? '')
-            );
-
-            $rowsCount = $combinationCounts[$combinationKey] ?? $combination['rowsCount'];
+        foreach ($combinationCounts as $combinationKey => $rowsCount) {
+            [$supplierOperName, $docTypeName] = explode('|', $combinationKey);
 
             if (!empty($mappingsByCombination[$combinationKey])) {
                 foreach ($mappingsByCombination[$combinationKey] as $mapping) {
                     $items[] = [
-                        'supplierOperName' => $combination['supplierOperName'],
-                        'docTypeName' => $combination['docTypeName'],
-                        'siteCountry' => $combination['siteCountry'],
+                        'supplierOperName' => $supplierOperName !== '' ? $supplierOperName : null,
+                        'docTypeName' => $docTypeName !== '' ? $docTypeName : null,
                         'rowsCount' => $rowsCount,
                         'mapping' => $mapping,
                     ];
@@ -121,9 +116,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             } else {
                 // нет ни одного правила для этой комбинации — добавляем пустую строку
                 $items[] = [
-                    'supplierOperName' => $combination['supplierOperName'],
-                    'docTypeName' => $combination['docTypeName'],
-                    'siteCountry' => $combination['siteCountry'],
+                    'supplierOperName' => $supplierOperName !== '' ? $supplierOperName : null,
+                    'docTypeName' => $docTypeName !== '' ? $docTypeName : null,
                     'rowsCount' => $rowsCount,
                     'mapping' => null,
                 ];
@@ -177,7 +171,6 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $plCategoryId = $mappingData['plCategoryId'] ?? null;
             $supplierOperName = $mappingData['supplierOperName'] ?? null;
             $docTypeName = $mappingData['docTypeName'] ?? null;
-            $siteCountry = $mappingData['siteCountry'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
 
             $mapping = null;
@@ -187,7 +180,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
                     $company,
                     $supplierOperName,
                     $docTypeName !== '' ? $docTypeName : null,
-                    $siteCountry !== '' ? $siteCountry : null,
+                    null,
                     (string) $sourceField
                 );
             }
@@ -200,7 +193,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
                 $mapping = new WildberriesReportDetailMapping(Uuid::uuid4()->toString(), $company);
                 $mapping->setSupplierOperName($supplierOperName);
                 $mapping->setDocTypeName($docTypeName !== '' ? $docTypeName : null);
-                $mapping->setSiteCountry($siteCountry !== '' ? $siteCountry : null);
+                $mapping->setSiteCountry(null);
             }
 
             $mapping->setSourceField((string) $sourceField);
