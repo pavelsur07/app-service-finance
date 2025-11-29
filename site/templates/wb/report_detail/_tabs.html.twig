@@ -1,0 +1,16 @@
+{% set currentRoute = app.request.attributes.get('_route') %}
+
+<nav class="mb-4">
+    <ul class="nav nav-tabs">
+        <li class="nav-item">
+            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_index' ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
+                Операции
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_mapping_' ? 'active' : '' }}" href="{{ path('wb_report_detail_mapping_index') }}">
+                Маппинг и ОПиУ
+            </a>
+        </li>
+    </ul>
+</nav>
