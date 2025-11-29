@@ -185,7 +185,15 @@ final class WildberriesReportDetailMappingController extends AbstractController
                 );
             }
 
+            // Если категория не выбрана и правила ещё нет — просто пропускаем строку
             if (empty($plCategoryId) && $mapping === null) {
+                continue;
+            }
+
+            // Если категория очищена, но правило уже существует —
+            // удаляем его и переходим к следующей строке
+            if (empty($plCategoryId) && $mapping instanceof WildberriesReportDetailMapping) {
+                $this->em->remove($mapping);
                 continue;
             }
 
