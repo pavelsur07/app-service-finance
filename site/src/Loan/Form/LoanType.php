@@ -61,14 +61,20 @@ class LoanType extends AbstractType
             ])
             ->add('plCategoryInterest', EntityType::class, [
                 'class' => PLCategory::class,
-                'choice_label' => 'name',
+                'choices' => $options['categories'],
+                'choice_label' => function (PLCategory $item): string {
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                },
                 'required' => false,
                 'placeholder' => '— не выбрана —',
                 'label' => 'Категория ОПиУ для процентов',
             ])
             ->add('plCategoryFee', EntityType::class, [
                 'class' => PLCategory::class,
-                'choice_label' => 'name',
+                'choices' => $options['categories'],
+                'choice_label' => function (PLCategory $item): string {
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                },
                 'required' => false,
                 'placeholder' => '— как проценты —',
                 'label' => 'Категория ОПиУ для комиссий',
@@ -90,6 +96,7 @@ class LoanType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => Loan::class,
+            'categories' => [],
         ]);
     }
 }
