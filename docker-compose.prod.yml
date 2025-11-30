@@ -29,17 +29,22 @@ services:
             - traefik.enable=true
             
             # Глобальный роутер HTTP -> HTTPS
-            - traefik.http.routers.http-catchall.rule=HostRegexp(app.2bstock.ru) || Host(www.app.2bstock.ru)
+            - traefik.http.routers.http-catchall.rule=Host(`app.vashfindir.ru`) || Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
             - traefik.http.routers.http-catchall.entrypoints=http
-            - traefik.http.routers.http-catchall.middlewares=frontend-redirect,redirect-to-https
+            - traefik.http.routers.http-catchall.middlewares=legacy-domain-redirect,redirect-to-https
             - traefik.http.routers.http-catchall.priority=1          # Низкий приоритет, чтобы не мешать ACME
             
             - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
             - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
             
-            - traefik.http.middlewares.frontend-redirect.redirectregex.regex=^(https?://)www.app.2bstock.ru/(.*)$$
-            - traefik.http.middlewares.frontend-redirect.redirectregex.replacement=$${1}app.2bstock.ru/$${2}
-            - traefik.http.middlewares.frontend-redirect.redirectregex.permanent=true
+            - traefik.http.middlewares.legacy-domain-redirect.redirectregex.regex=^https?://(?:www\.)?app\.2bstock\.ru/(.*)$$
+            - traefik.http.middlewares.legacy-domain-redirect.redirectregex.replacement=https://app.vashfindir.ru/$${1}
+            - traefik.http.middlewares.legacy-domain-redirect.redirectregex.permanent=true
+            - traefik.http.routers.legacy-app.rule=Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
+            - traefik.http.routers.legacy-app.entrypoints=https
+            - traefik.http.routers.legacy-app.middlewares=legacy-domain-redirect
+            - traefik.http.routers.legacy-app.tls=true
+            - traefik.http.routers.legacy-app.tls.certresolver=letsEncrypt
     land:
         build:
             context: landing
@@ -79,11 +84,15 @@ services:
             - default
         labels:
             - traefik.enable=true
-            - traefik.http.routers.myapp.rule=Host(`app.2bstock.ru`)
+            - traefik.http.routers.myapp.rule=Host(`app.vashfindir.ru`)
             - traefik.http.routers.myapp.entrypoints=https
             - traefik.http.routers.myapp.tls=true
             - traefik.http.routers.myapp.tls.certresolver=letsEncrypt
             - traefik.http.services.myapp.loadbalancer.server.port=80
+            - traefik.http.routers.myapp-http.rule=Host(`app.vashfindir.ru`)
+            - traefik.http.routers.myapp-http.entrypoints=http
+            - traefik.http.routers.myapp-http.middlewares=redirect-to-https
+            - traefik.http.routers.myapp-http.priority=10
             - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
     
     
