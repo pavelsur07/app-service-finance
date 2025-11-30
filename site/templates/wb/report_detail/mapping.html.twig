@@ -170,7 +170,6 @@
                             <tr>
                                 <th>Операция</th>
                                 <th>Тип документа</th>
-                                <th>Страна площадки</th>
                                 <th class="text-end">Строк</th>
                             </tr>
                             </thead>
@@ -179,7 +178,6 @@
                                 <tr>
                                     <td>{{ item.supplierOperName ?? '—' }}</td>
                                     <td>{{ item.docTypeName ?? '—' }}</td>
-                                    <td>{{ item.siteCountry ?? '—' }}</td>
                                     <td class="text-end">{{ item.rowsCount }}</td>
                                 </tr>
                             {% endfor %}

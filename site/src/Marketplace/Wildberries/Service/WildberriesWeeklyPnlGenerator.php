@@ -33,7 +33,6 @@ final class WildberriesWeeklyPnlGenerator
      *   unmapped: array<int, array{
      *     supplierOperName: ?string,
      *     docTypeName: ?string,
-     *     siteCountry: ?string,
      *     rowsCount: int
      *   }>
      * }
@@ -61,17 +60,15 @@ final class WildberriesWeeklyPnlGenerator
 
             if ($mappings === []) {
                 $key = sprintf(
-                    '%s|%s|%s',
-                    $row->getSupplierOperName(),
-                    $row->getDocTypeName(),
-                    $row->getSiteCountry(),
+                    '%s|%s',
+                    (string) $row->getSupplierOperName(),
+                    (string) $row->getDocTypeName(),
                 );
 
                 if (!isset($unmapped[$key])) {
                     $unmapped[$key] = [
                         'supplierOperName' => $row->getSupplierOperName(),
                         'docTypeName' => $row->getDocTypeName(),
-                        'siteCountry' => $row->getSiteCountry(),
                         'rowsCount' => 0,
                     ];
                 }

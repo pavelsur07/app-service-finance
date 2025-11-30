@@ -58,7 +58,6 @@ final class WildberriesReportDetailMappingResolver
      * @return array<int, array{
      *   supplierOperName: ?string,
      *   docTypeName: ?string,
-     *   siteCountry: ?string,
      *   rowsCount: int
      * }>
      */
@@ -69,11 +68,10 @@ final class WildberriesReportDetailMappingResolver
         WildberriesReportDetailRepository $detailRepository
     ): array {
         $qb = $detailRepository->createQueryBuilder('wrd')
-            ->select('wrd.supplierOperName', 'wrd.docTypeName', 'wrd.siteCountry', 'COUNT(wrd.id) AS rowsCount')
+            ->select('wrd.supplierOperName', 'wrd.docTypeName', 'COUNT(wrd.id) AS rowsCount')
             ->andWhere('wrd.company = :company')
             ->groupBy('wrd.supplierOperName')
             ->addGroupBy('wrd.docTypeName')
-            ->addGroupBy('wrd.siteCountry')
             ->setParameter('company', $company);
 
         if (null !== $from) {
