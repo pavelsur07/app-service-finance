@@ -48,6 +48,16 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function deleteByCompany(Company $company): void
+    {
+        $this->createQueryBuilder('m')
+            ->delete()
+            ->andWhere('m.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->execute();
+    }
+
     public function findOneByKeyAndSourceField(
         Company $company,
         ?string $supplierOperName,

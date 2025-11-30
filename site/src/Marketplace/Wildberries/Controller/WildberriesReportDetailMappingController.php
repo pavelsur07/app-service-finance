@@ -240,6 +240,25 @@ final class WildberriesReportDetailMappingController extends AbstractController
         ]);
     }
 
+    #[Route(path: '/clear', name: 'clear', methods: ['POST'])]
+    public function clear(Request $request): Response
+    {
+        $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('wb_report_detail_mapping_clear', $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token');
+        }
+
+        $this->mappingRepository->deleteByCompany($company);
+
+        $this->addFlash('success', 'Маппинг Wildberries очищен.');
+
+        return $this->redirectToRoute('wb_report_detail_mapping_index', [
+            'from' => $request->request->get('from'),
+            'to' => $request->request->get('to'),
+        ]);
+    }
+
     #[Route(path: '/create-document', name: 'create_document', methods: ['POST'])]
     public function createWeeklyDocument(Request $request): Response
     {
