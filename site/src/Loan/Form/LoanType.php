@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Loan\Form;
 
+use App\Entity\PLCategory;
 use App\Loan\Entity\Loan;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -55,6 +58,24 @@ class LoanType extends AbstractType
                     'min' => 1,
                     'max' => 31,
                 ],
+            ])
+            ->add('plCategoryInterest', EntityType::class, [
+                'class' => PLCategory::class,
+                'choice_label' => 'name',
+                'required' => false,
+                'placeholder' => '— не выбрана —',
+                'label' => 'Категория ОПиУ для процентов',
+            ])
+            ->add('plCategoryFee', EntityType::class, [
+                'class' => PLCategory::class,
+                'choice_label' => 'name',
+                'required' => false,
+                'placeholder' => '— как проценты —',
+                'label' => 'Категория ОПиУ для комиссий',
+            ])
+            ->add('includePrincipalInPnl', CheckboxType::class, [
+                'label' => 'Включать тело кредита в ОПиУ (управленческий учёт)',
+                'required' => false,
             ])
             ->add('status', ChoiceType::class, [
                 'label' => 'Статус',

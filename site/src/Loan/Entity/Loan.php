@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Loan\Entity;
 
 use App\Entity\Company;
+use App\Entity\PLCategory;
 use App\Loan\Repository\LoanRepository;
 use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -49,6 +50,15 @@ class Loan
 
     #[ORM\Column(type: Types::SMALLINT, nullable: true)]
     private ?int $paymentDayOfMonth = null;
+
+    #[ORM\ManyToOne(targetEntity: PLCategory::class)]
+    private ?PLCategory $plCategoryInterest = null;
+
+    #[ORM\ManyToOne(targetEntity: PLCategory::class)]
+    private ?PLCategory $plCategoryFee = null;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $includePrincipalInPnl = false;
 
     #[ORM\Column(length: 32)]
     private string $status;
@@ -253,6 +263,42 @@ class Loan
                 $schedule->setLoan(null);
             }
         }
+
+        return $this;
+    }
+
+    public function getPlCategoryInterest(): ?PLCategory
+    {
+        return $this->plCategoryInterest;
+    }
+
+    public function setPlCategoryInterest(?PLCategory $plCategoryInterest): self
+    {
+        $this->plCategoryInterest = $plCategoryInterest;
+
+        return $this;
+    }
+
+    public function getPlCategoryFee(): ?PLCategory
+    {
+        return $this->plCategoryFee;
+    }
+
+    public function setPlCategoryFee(?PLCategory $plCategoryFee): self
+    {
+        $this->plCategoryFee = $plCategoryFee;
+
+        return $this;
+    }
+
+    public function isIncludePrincipalInPnl(): bool
+    {
+        return $this->includePrincipalInPnl;
+    }
+
+    public function setIncludePrincipalInPnl(bool $includePrincipalInPnl): self
+    {
+        $this->includePrincipalInPnl = $includePrincipalInPnl;
 
         return $this;
     }

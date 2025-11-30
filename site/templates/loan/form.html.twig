@@ -45,6 +45,17 @@
                             {{ form_row(form.paymentDayOfMonth) }}
                         </div>
                     </div>
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ form_row(form.plCategoryInterest) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.plCategoryFee) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.includePrincipalInPnl) }}
+                        </div>
+                    </div>
                     {{ form_row(form.status) }}
                     <div class="d-flex justify-content-between align-items-center mt-3">
                         <button class="btn btn-primary">Сохранить</button>
