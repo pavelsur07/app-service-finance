@@ -11,6 +11,7 @@ use App\Loan\Form\LoanPaymentScheduleType;
 use App\Loan\Form\LoanScheduleUploadType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
+use App\Loan\Service\LoanScheduleToDocumentService;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use DateTimeImmutable;
@@ -329,5 +330,44 @@ class LoanController extends AbstractController
         });
 
         return $response;
+    }
+
+    #[Route(
+        '/{loanId}/schedule/{itemId}/create-document',
+        name: 'loan_schedule_create_document',
+        methods: ['POST']
+    )]
+    public function createDocumentFromSchedule(
+        string $loanId,
+        string $itemId,
+        Request $request,
+        LoanRepository $loanRepository,
+        LoanPaymentScheduleRepository $paymentScheduleRepository,
+        LoanScheduleToDocumentService $scheduleToDocumentService,
+        ActiveCompanyService $activeCompanyService,
+        EntityManagerInterface $entityManager
+    ): Response {
+        $company = $activeCompanyService->getActiveCompany();
+        $loan = $loanRepository->find($loanId);
+
+        if (null === $loan || $loan->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $schedule = $paymentScheduleRepository->find($itemId);
+        if (null === $schedule || $schedule->getLoan() !== $loan) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('loan_schedule_create_document_'.$itemId, (string) $request->request->get('_token'))) {
+            return $this->redirectToRoute('loan_schedule', ['id' => $loan->getId()]);
+        }
+
+        $document = $scheduleToDocumentService->createDocumentFromSchedule($loan, $schedule);
+
+        $entityManager->persist($document);
+        $entityManager->flush();
+
+        return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
     }
 }

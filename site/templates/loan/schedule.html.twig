@@ -55,6 +55,14 @@
                                     <td class="text-end">
                                         <div class="btn-list">
                                             <a href="{{ path('loan_schedule_edit', {loanId: loan.id, itemId: item.id}) }}" class="btn btn-sm btn-outline-primary">✏️</a>
+                                            <form method="post"
+                                                  action="{{ path('loan_schedule_create_document', {loanId: loan.id, itemId: item.id}) }}"
+                                                  class="d-inline">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('loan_schedule_create_document_' ~ item.id) }}">
+                                                <button class="btn btn-sm btn-outline-success" type="submit" title="Создать документ ОПиУ по этому платежу">
+                                                    <i class="ti ti-file-plus"></i>
+                                                </button>
+                                            </form>
                                             <form method="post" action="{{ path('loan_schedule_delete', {loanId: loan.id, itemId: item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить платеж?');">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('loan_schedule_delete_' ~ item.id) }}">
                                                 <button class="btn btn-sm btn-outline-danger" type="submit">🗑️</button>
