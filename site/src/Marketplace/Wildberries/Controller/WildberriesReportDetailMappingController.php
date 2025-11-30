@@ -168,19 +168,15 @@ final class WildberriesReportDetailMappingController extends AbstractController
         $mappings = $request->request->all('mappings');
 
         foreach ($mappings as $mappingData) {
+            $mappingId = $mappingData['id'] ?? null;
             $plCategoryId = $mappingData['plCategoryId'] ?? null;
             $supplierOperName = $mappingData['supplierOperName'] ?? null;
             $docTypeName = $mappingData['docTypeName'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
 
-            // Пропускаем строки без выбранного поля суммы, чтобы не плодить лишние маппинги
-            if (empty($sourceField)) {
-                continue;
-            }
+            $mapping = $mappingId ? $this->mappingRepository->find($mappingId) : null;
 
-            $mapping = null;
-
-            if ($supplierOperName !== null && !empty($sourceField)) {
+            if (!$mapping instanceof WildberriesReportDetailMapping && $supplierOperName !== null && !empty($sourceField)) {
                 $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
                     $company,
                     $supplierOperName,
@@ -188,6 +184,15 @@ final class WildberriesReportDetailMappingController extends AbstractController
                     null,
                     (string) $sourceField
                 );
+            }
+
+            // Если поле суммы очищено и правило уже существует — удаляем его
+            if (empty($sourceField)) {
+                if ($mapping instanceof WildberriesReportDetailMapping) {
+                    $this->em->remove($mapping);
+                }
+
+                continue;
             }
 
             // Если категория не выбрана и правила ещё нет — просто пропускаем строку
