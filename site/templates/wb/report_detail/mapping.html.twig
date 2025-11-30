@@ -55,6 +55,9 @@
                                 <td>
                                     <div class="fw-semibold">{{ item.supplierOperName ?? '—' }}</div>
                                     <input type="hidden" name="mappings[{{ loop.index0 }}][supplierOperName]" value="{{ item.supplierOperName }}">
+                                    {% if mapping %}
+                                        <input type="hidden" name="mappings[{{ loop.index0 }}][id]" value="{{ mapping.id }}">
+                                    {% endif %}
                                 </td>
                                 <td>
                                     <div>{{ item.docTypeName ?? '—' }}</div>
@@ -207,6 +210,12 @@
             const categorySelect = clone.querySelector('select[name*="[plCategoryId]"]');
             if (categorySelect) {
                 categorySelect.value = '';
+            }
+
+            // Удаляем id существующего маппинга в копии, чтобы создать новое правило
+            const mappingIdInput = clone.querySelector('input[name*="[id]"]');
+            if (mappingIdInput) {
+                mappingIdInput.value = '';
             }
 
             // Вставляем клон сразу под исходной строкой

@@ -7,6 +7,7 @@ namespace App\Marketplace\Wildberries\Repository;
 use App\Entity\Company;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetailMapping;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
@@ -34,15 +35,15 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
         ?string $docTypeName,
         ?string $siteCountry
     ): ?WildberriesReportDetailMapping {
-        return $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->andWhere('m.company = :company')
-            ->andWhere('m.supplierOperName = :supplierOperName')
-            ->andWhere('m.docTypeName = :docTypeName')
-            ->andWhere('m.siteCountry = :siteCountry')
-            ->setParameter('company', $company)
-            ->setParameter('supplierOperName', $supplierOperName)
-            ->setParameter('docTypeName', $docTypeName)
-            ->setParameter('siteCountry', $siteCountry)
+            ->setParameter('company', $company);
+
+        $this->addNullableEqual($qb, 'm.supplierOperName', 'supplierOperName', $supplierOperName);
+        $this->addNullableEqual($qb, 'm.docTypeName', 'docTypeName', $docTypeName);
+        $this->addNullableEqual($qb, 'm.siteCountry', 'siteCountry', $siteCountry);
+
+        return $qb
             ->getQuery()
             ->getOneOrNullResult();
     }
@@ -54,16 +55,31 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
         ?string $siteCountry,
         string $sourceField
     ): ?WildberriesReportDetailMapping {
-        return $this->createQueryBuilder('m')
+        $qb = $this->createQueryBuilder('m')
             ->andWhere('m.company = :company')
-            ->andWhere('m.supplierOperName = :supplierOperName')
-            ->andWhere('m.docTypeName = :docTypeName')
             ->andWhere('m.sourceField = :sourceField')
             ->setParameter('company', $company)
-            ->setParameter('supplierOperName', $supplierOperName)
-            ->setParameter('docTypeName', $docTypeName)
-            ->setParameter('sourceField', $sourceField)
+            ->setParameter('sourceField', $sourceField);
+
+        $this->addNullableEqual($qb, 'm.supplierOperName', 'supplierOperName', $supplierOperName);
+        $this->addNullableEqual($qb, 'm.docTypeName', 'docTypeName', $docTypeName);
+        $this->addNullableEqual($qb, 'm.siteCountry', 'siteCountry', $siteCountry);
+
+        return $qb
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    private function addNullableEqual(QueryBuilder $qb, string $field, string $paramName, mixed $value): void
+    {
+        if ($value === null) {
+            $qb->andWhere(sprintf('%s IS NULL', $field));
+
+            return;
+        }
+
+        $qb
+            ->andWhere(sprintf('%s = :%s', $field, $paramName))
+            ->setParameter($paramName, $value);
     }
 }
