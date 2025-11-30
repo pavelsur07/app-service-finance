@@ -69,7 +69,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $this->detailRepository
         );
 
-        // карта "oper|docType => суммарный rowsCount по всем странам"
+        // карта "oper|docType => суммарный rowsCount"
         $combinationCounts = [];
         foreach ($combinations as $combination) {
             $combinationKey = sprintf(
