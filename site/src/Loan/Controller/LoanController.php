@@ -11,6 +11,7 @@ use App\Loan\Form\LoanPaymentScheduleType;
 use App\Loan\Form\LoanScheduleUploadType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
+use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -42,11 +43,18 @@ class LoanController extends AbstractController
     }
 
     #[Route('/create', name: 'loan_create', methods: ['GET', 'POST'])]
-    public function create(Request $request, EntityManagerInterface $entityManager, ActiveCompanyService $activeCompanyService): Response
-    {
+    public function create(
+        Request $request,
+        EntityManagerInterface $entityManager,
+        ActiveCompanyService $activeCompanyService,
+        PLCategoryRepository $plCategoryRepository,
+    ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = new Loan($company, '', '0.00', new DateTimeImmutable());
-        $form = $this->createForm(LoanType::class, $loan);
+        $categories = $plCategoryRepository->findTreeByCompany($company);
+        $form = $this->createForm(LoanType::class, $loan, [
+            'categories' => $categories,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -65,14 +73,22 @@ class LoanController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'loan_edit', methods: ['GET', 'POST'])]
-    public function edit(Loan $loan, Request $request, EntityManagerInterface $entityManager, ActiveCompanyService $activeCompanyService): Response
-    {
+    public function edit(
+        Loan $loan,
+        Request $request,
+        EntityManagerInterface $entityManager,
+        ActiveCompanyService $activeCompanyService,
+        PLCategoryRepository $plCategoryRepository,
+    ): Response {
         $company = $activeCompanyService->getActiveCompany();
         if ($loan->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
 
-        $form = $this->createForm(LoanType::class, $loan);
+        $categories = $plCategoryRepository->findTreeByCompany($company);
+        $form = $this->createForm(LoanType::class, $loan, [
+            'categories' => $categories,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
