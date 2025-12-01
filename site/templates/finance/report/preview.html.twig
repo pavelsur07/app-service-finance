@@ -3,47 +3,65 @@
 {% block body %}
 <div class="page-body">
   <div class="container-xl">
-    <div class="card">
-      <div class="card-header">
-        {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам'} %}
-        <h3 class="card-title mb-2">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }} ({{ groupingLabels[grouping] ?? grouping }})</h3>
-        <form class="d-flex align-items-center gap-2" method="get">
-          <select class="form-select w-auto" name="grouping">
-            <option value="day" {{ grouping == 'day' ? 'selected' }}>
-              По дням
-            </option>
-            <option value="week" {{ grouping == 'week' ? 'selected' }}>
-              По неделям
-            </option>
-            <option value="month" {{ grouping == 'month' ? 'selected' }}>
-              По месяцам
-            </option>
-          </select>
-          <input class="form-control" type="date" name="from" value="{{ from|date('Y-m-d') }}">
-          <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
-          <button class="btn btn-primary">Показать</button>
-        </form>
-        <form
-          class="d-flex align-items-center gap-2 mt-2"
-          method="post"
-          action="{{ path('finance_report_preview_recalc') }}"
-        >
-          <input type="hidden" name="_token" value="{{ csrf_token('recalc_pl_preview') }}">
-          <input type="hidden" name="grouping" value="{{ grouping }}">
-          <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
-          <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
-          <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
-          <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
-          <input
-            class="form-control"
-            type="date"
-            id="recalc_from"
-            name="recalc_from"
-            value="{{ from|date('Y-m-d') }}"
-          >
-          <button class="btn btn-outline-primary" type="submit">Пересчитать</button>
-        </form>
+    {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам'} %}
+
+    <div class="d-flex align-items-center mb-3">
+      <h2 class="page-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }} ({{ groupingLabels[grouping] ?? grouping }})</h2>
+    </div>
+
+    <form class="row g-2 align-items-center mb-3" method="get">
+      <div class="col-auto">
+        <select class="form-select" name="grouping">
+          <option value="day" {{ grouping == 'day' ? 'selected' }}>
+            По дням
+          </option>
+          <option value="week" {{ grouping == 'week' ? 'selected' }}>
+            По неделям
+          </option>
+          <option value="month" {{ grouping == 'month' ? 'selected' }}>
+            По месяцам
+          </option>
+        </select>
       </div>
+      <div class="col-auto">
+        <input class="form-control" type="date" name="from" value="{{ from|date('Y-m-d') }}">
+      </div>
+      <div class="col-auto">
+        <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-primary">Показать</button>
+      </div>
+    </form>
+
+    <form
+      class="row g-2 align-items-center mb-3"
+      method="post"
+      action="{{ path('finance_report_preview_recalc') }}"
+    >
+      <input type="hidden" name="_token" value="{{ csrf_token('recalc_pl_preview') }}">
+      <input type="hidden" name="grouping" value="{{ grouping }}">
+      <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
+      <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+      <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
+      <div class="col-auto">
+        <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
+      </div>
+      <div class="col-auto">
+        <input
+          class="form-control"
+          type="date"
+          id="recalc_from"
+          name="recalc_from"
+          value="{{ from|date('Y-m-d') }}"
+        >
+      </div>
+      <div class="col-auto">
+        <button class="btn btn-outline-primary" type="submit">Пересчитать</button>
+      </div>
+    </form>
+
+    <div class="card">
 
       {% if warnings is not empty %}
       <div class="alert alert-warning m-3">
