@@ -173,6 +173,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $supplierOperName = $mappingData['supplierOperName'] ?? null;
             $docTypeName = $mappingData['docTypeName'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
+            $note = $mappingData['note'] ?? null;
 
             $mapping = $mappingId ? $this->mappingRepository->find($mappingId) : null;
 
@@ -215,6 +216,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             }
 
             $mapping->setSourceField((string) $sourceField);
+            $mapping->setNote($note !== '' ? $note : null);
 
             $plCategory = $this->plCategoryRepository->find($plCategoryId);
 

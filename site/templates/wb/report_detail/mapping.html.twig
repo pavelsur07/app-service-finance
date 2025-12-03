@@ -45,6 +45,7 @@
                             <th class="text-end">Строк</th>
                             <th>Поле суммы</th>
                             <th>PL категория</th>
+                            <th>Примечание</th>
                             <th class="text-center">Активен</th>
                         </tr>
                         </thead>
@@ -84,6 +85,14 @@
                                         {% endfor %}
                                     </select>
                                 </td>
+                                <td>
+                                    <input type="text"
+                                           name="mappings[{{ loop.index0 }}][note]"
+                                           value="{{ mapping ? mapping.note : '' }}"
+                                           class="form-control"
+                                           maxlength="1024"
+                                           placeholder="Комментарий к правилу">
+                                </td>
                                 <td class="text-nowrap">
                                     <div class="d-flex align-items-center gap-2">
                                         <input type="checkbox"
@@ -103,7 +112,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="6" class="text-center">Комбинации не найдены</td>
+                                <td colspan="7" class="text-center">Комбинации не найдены</td>
                             </tr>
                         {% endfor %}
                         </tbody>
