@@ -43,6 +43,9 @@ class WildberriesReportDetailMapping
     #[ORM\Column(name: 'is_active', type: Types::BOOLEAN, options: ['default' => true])]
     private bool $isActive = true;
 
+    #[ORM\Column(name: 'note', type: Types::STRING, length: 1024, nullable: true)]
+    private ?string $note = null;
+
     #[ORM\Column(name: 'created_at', type: Types::DATETIME_IMMUTABLE, nullable: false)]
     private \DateTimeImmutable $createdAt;
 
@@ -152,6 +155,18 @@ class WildberriesReportDetailMapping
     public function setIsActive(bool $isActive): self
     {
         $this->isActive = $isActive;
+
+        return $this;
+    }
+
+    public function getNote(): ?string
+    {
+        return $this->note;
+    }
+
+    public function setNote(?string $note): self
+    {
+        $this->note = $note;
 
         return $this;
     }
