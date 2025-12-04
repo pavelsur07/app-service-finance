@@ -40,8 +40,8 @@
                     <table class="table table-striped align-middle">
                         <thead>
                         <tr>
-                            <th>Операция</th>
                             <th>Тип документа</th>
+                            <th>Обоснование</th>
                             <th class="text-end">Строк</th>
                             <th>Поле суммы</th>
                             <th>PL категория</th>
@@ -54,15 +54,15 @@
                             {% set mapping = item.mapping ?? null %}
                             <tr>
                                 <td>
+                                    <div>{{ item.docTypeName ?? '—' }}</div>
+                                    <input type="hidden" name="mappings[{{ loop.index0 }}][docTypeName]" value="{{ item.docTypeName }}">
+                                </td>
+                                <td>
                                     <div class="fw-semibold">{{ item.supplierOperName ?? '—' }}</div>
                                     <input type="hidden" name="mappings[{{ loop.index0 }}][supplierOperName]" value="{{ item.supplierOperName }}">
                                     {% if mapping %}
                                         <input type="hidden" name="mappings[{{ loop.index0 }}][id]" value="{{ mapping.id }}">
                                     {% endif %}
-                                </td>
-                                <td>
-                                    <div>{{ item.docTypeName ?? '—' }}</div>
-                                    <input type="hidden" name="mappings[{{ loop.index0 }}][docTypeName]" value="{{ item.docTypeName }}">
                                 </td>
                                 <td class="text-end">{{ item.rowsCount }}</td>
                                 <td>
@@ -177,16 +177,16 @@
                         <table class="table table-sm mb-0">
                             <thead>
                             <tr>
-                                <th>Операция</th>
                                 <th>Тип документа</th>
+                                <th>Обоснование</th>
                                 <th class="text-end">Строк</th>
                             </tr>
                             </thead>
                             <tbody>
                             {% for item in unmapped %}
                                 <tr>
-                                    <td>{{ item.supplierOperName ?? '—' }}</td>
                                     <td>{{ item.docTypeName ?? '—' }}</td>
+                                    <td>{{ item.supplierOperName ?? '—' }}</td>
                                     <td class="text-end">{{ item.rowsCount }}</td>
                                 </tr>
                             {% endfor %}
