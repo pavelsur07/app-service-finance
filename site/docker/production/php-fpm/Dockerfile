@@ -5,6 +5,7 @@ ENV MAKEFLAGS="-j1"
 
 RUN apk add --no-cache libpq-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # Install ext-redis for the build stage so that Composer sees the extension
@@ -31,6 +32,7 @@ FROM php:8.2-fpm-alpine
 
 RUN apk add --no-cache libpq-dev fcgi \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # ⬇️ Добавляем ext-redis для рантайма PHP-FPM
