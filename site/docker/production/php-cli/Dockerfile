@@ -2,6 +2,7 @@ FROM php:8.2-fpm-alpine AS builder
 
 RUN apk add --no-cache libpq-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # ⬇️ ДОБАВЛЯЕМ ext-redis для стадии builder (чтобы composer не ругался на ext-redis)
@@ -29,6 +30,7 @@ FROM php:8.2-cli-alpine
 
 RUN apk add --no-cache libpq-dev bash coreutils \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath
 
 # ⬇️ ДОБАВЛЯЕМ ext-redis для рантайма (CLI-воркер)
