@@ -1,5 +1,8 @@
 FROM php:8.2-fpm-alpine AS builder
 
+# Ограничиваем параллелизм сборки расширений в builder-стадии
+ENV MAKEFLAGS="-j1"
+
 RUN apk add --no-cache libpq-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
@@ -26,6 +29,9 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 ### CLI ###
 
 FROM php:8.2-cli-alpine
+
+# И в финальной стадии тоже собираем расширения последовательно
+ENV MAKEFLAGS="-j1"
 
 RUN apk add --no-cache libpq-dev bash coreutils \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
