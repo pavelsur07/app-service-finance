@@ -29,9 +29,6 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 ### FPM ###
 FROM php:8.2-fpm-alpine
 
-# Ограничиваем параллелизм сборки расширений, чтобы не упираться в память CI
-ENV MAKEFLAGS="-j1"
-
 RUN apk add --no-cache libpq-dev fcgi \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-install pdo_pgsql opcache bcmath
