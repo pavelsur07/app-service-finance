@@ -109,7 +109,7 @@ final class WildberriesWeeklyPnlGenerator
                     continue;
                 }
 
-                $amount = (float) $value;
+                $amount = (float) $value * (float) $mapping->getSignMultiplier();
 
                 $plCategoryId = (string) $mapping->getPlCategory()->getId();
                 $totals[$plCategoryId] = ($totals[$plCategoryId] ?? 0.0) + $amount;

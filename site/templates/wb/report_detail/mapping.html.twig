@@ -44,6 +44,7 @@
                             <th>Обоснование</th>
                             <th class="text-end">Строк</th>
                             <th>Поле суммы</th>
+                            <th>Знак (+/−)</th>
                             <th>PL категория</th>
                             <th>Примечание</th>
                             <th class="text-center">Активен</th>
@@ -75,6 +76,13 @@
                                                 {{ option }}
                                             </option>
                                         {% endfor %}
+                                    </select>
+                                </td>
+                                <td>
+                                    {% set selectedSign = mapping ? mapping.signMultiplier : 1 %}
+                                    <select name="mappings[{{ loop.index0 }}][signMultiplier]" class="form-select">
+                                        <option value="1" {% if selectedSign == 1 %}selected{% endif %}>+</option>
+                                        <option value="-1" {% if selectedSign == -1 %}selected{% endif %}>−</option>
                                     </select>
                                 </td>
                                 <td>
@@ -112,7 +120,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="7" class="text-center">Комбинации не найдены</td>
+                                <td colspan="8" class="text-center">Комбинации не найдены</td>
                             </tr>
                         {% endfor %}
                         </tbody>
