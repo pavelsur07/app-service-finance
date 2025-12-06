@@ -48,6 +48,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             'retail_price',
             // Сумма реализации (берём из raw)
             'retail_amount',
+            // Компенсация скидки (кэшбэк)
+            'cashback_amount',
             // Эквайринг / комиссии за платежи
             'acquiring_fee',
             // Цена продажи с учётом скидки
