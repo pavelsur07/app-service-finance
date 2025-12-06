@@ -62,6 +62,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             'acquiringFee',
             // Вознаграждение за ПВЗ
             'ppvz_reward',
+            // Возмещение логистики/склада
+            'rebill_logistic_cost',
         ];
 
         $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
