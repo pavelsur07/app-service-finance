@@ -174,6 +174,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $docTypeName = $mappingData['docTypeName'] ?? null;
             $sourceField = $mappingData['sourceField'] ?? null;
             $note = $mappingData['note'] ?? null;
+            $signMultiplier = isset($mappingData['signMultiplier']) ? (int) $mappingData['signMultiplier'] : 1;
 
             $mapping = $mappingId ? $this->mappingRepository->find($mappingId) : null;
 
@@ -216,6 +217,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             }
 
             $mapping->setSourceField((string) $sourceField);
+            $mapping->setSignMultiplier($signMultiplier);
             $mapping->setNote($note !== '' ? $note : null);
 
             $plCategory = $this->plCategoryRepository->find($plCategoryId);

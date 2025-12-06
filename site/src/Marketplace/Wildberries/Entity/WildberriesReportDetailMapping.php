@@ -36,6 +36,9 @@ class WildberriesReportDetailMapping
     #[ORM\Column(name: 'source_field', type: Types::STRING, length: 64, nullable: false)]
     private string $sourceField;
 
+    #[ORM\Column(name: 'sign_multiplier', type: Types::SMALLINT, options: ['default' => 1])]
+    private int $signMultiplier = 1;
+
     #[ORM\ManyToOne(targetEntity: PLCategory::class)]
     #[ORM\JoinColumn(name: 'pl_category_id', referencedColumnName: 'id', nullable: false)]
     private PLCategory $plCategory;
@@ -131,6 +134,18 @@ class WildberriesReportDetailMapping
     public function setSourceField(string $sourceField): self
     {
         $this->sourceField = $sourceField;
+
+        return $this;
+    }
+
+    public function getSignMultiplier(): int
+    {
+        return $this->signMultiplier;
+    }
+
+    public function setSignMultiplier(int $signMultiplier): self
+    {
+        $this->signMultiplier = $signMultiplier;
 
         return $this;
     }
