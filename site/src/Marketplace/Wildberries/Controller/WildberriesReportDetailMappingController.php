@@ -60,6 +60,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             'penalty',
             // Эквайринг (альтернативное поле)
             'acquiringFee',
+            // Вознаграждение за ПВЗ
+            'ppvz_reward',
         ];
 
         $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
