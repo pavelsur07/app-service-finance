@@ -16,6 +16,8 @@ use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use App\Service\CashTransactionToDocumentService;
 use App\Service\PLRegisterUpdater;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Doctrine\ORM\Exception\ORMException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -90,24 +92,15 @@ class CashTransactionController extends AbstractController
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
 
-        $qbCount = clone $qb;
-        $qbCount->resetDQLPart('orderBy');
-        $total = (int) $qbCount->select('COUNT(t.id)')->getQuery()->getSingleScalarResult();
+        $sumQb = clone $qb;
+        $sumQb->resetDQLPart('orderBy');
 
-        $qb->setFirstResult(($page - 1) * $limit)->setMaxResults($limit);
-        $transactions = $qb->getQuery()->getResult();
+        $pager = new Pagerfanta(new QueryAdapter($qb));
+        $pager->setMaxPerPage($limit);
+        $pager->setAllowOutOfRangePages(true);
+        $pager->setCurrentPage($page);
 
-        $pages = (int) ceil($total / $limit);
-        $pager = [
-            'current' => $page,
-            'pages' => $pages,
-            'hasPrevious' => $page > 1,
-            'hasNext' => $page < $pages,
-            'previous' => $page - 1,
-            'next' => $page + 1,
-        ];
-
-        $sumQb = clone $qbCount;
+        $transactions = iterator_to_array($pager->getCurrentPageResults());
         $sum = $sumQb->select(
             "SUM(CASE WHEN t.direction = 'INFLOW' THEN t.amount ELSE 0 END) as inflow",
             "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN t.amount ELSE 0 END) as outflow"
