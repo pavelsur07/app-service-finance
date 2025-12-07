@@ -2,16 +2,53 @@
 {% set params = params ?? app.request.query.all %}
 
 {% if pager is defined and pager.nbPages > 1 %}
+    {% set totalPages = pager.nbPages %}
+    {% set currentPage = pager.currentPage %}
+    {% set delta = 2 %}
+
+    {% set pages = [] %}
+
+    {% if totalPages <= 9 %}
+        {% set pages = 1..totalPages %}
+    {% else %}
+        {% set pages = pages|merge([1]) %}
+
+        {% set startPage = max(2, currentPage - delta) %}
+        {% set endPage = min(totalPages - 1, currentPage + delta) %}
+
+        {% if startPage > 2 %}
+            {% set pages = pages|merge(['…']) %}
+        {% else %}
+            {% set startPage = 2 %}
+        {% endif %}
+
+        {% for pageNumber in startPage..endPage %}
+            {% set pages = pages|merge([pageNumber]) %}
+        {% endfor %}
+
+        {% if endPage < totalPages - 1 %}
+            {% set pages = pages|merge(['…']) %}
+        {% endif %}
+
+        {% set pages = pages|merge([totalPages]) %}
+    {% endif %}
+
     <nav aria-label="Пагинация" class="mt-3">
         <ul class="pagination justify-content-end mb-0 flex-wrap">
             <li class="page-item {{ pager.hasPreviousPage ? '' : 'disabled' }}">
                 <a class="page-link" href="{{ path(route, params|merge({'page': pager.hasPreviousPage ? pager.previousPage : pager.currentPage})) }}">Назад</a>
             </li>
 
-            {% for pageNumber in 1..pager.nbPages %}
-                <li class="page-item {{ pageNumber == pager.currentPage ? 'active' : '' }}">
-                    <a class="page-link" href="{{ path(route, params|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
-                </li>
+            {% for pageNumber in pages %}
+                {% if pageNumber == '…' %}
+                    <li class="page-item disabled">
+                        <span class="page-link">…</span>
+                    </li>
+                {% else %}
+                    <li class="page-item {{ pageNumber == currentPage ? 'active' : '' }}">
+                        <a class="page-link" href="{{ path(route, params|merge({'page': pageNumber})) }}">{{ pageNumber }}</a>
+                    </li>
+                {% endif %}
             {% endfor %}
 
             <li class="page-item {{ pager.hasNextPage ? '' : 'disabled' }}">
