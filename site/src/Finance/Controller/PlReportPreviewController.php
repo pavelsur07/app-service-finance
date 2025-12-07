@@ -29,6 +29,8 @@ final class PlReportPreviewController extends AbstractController
             $grouping = 'month';
         }
 
+        $showMetaColumns = $request->query->getBoolean('show_meta');
+
         $fromInput = $request->query->get('from');
         $toInput = $request->query->get('to');
 
@@ -76,6 +78,7 @@ final class PlReportPreviewController extends AbstractController
         return $this->render('finance/report/preview.html.twig', [
             'company' => $company,
             'grouping' => $grouping,
+            'showMetaColumns' => $showMetaColumns,
             'from' => $from,
             'to' => $to,
             'periods' => array_map(
@@ -166,6 +169,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'show_meta' => $request->request->getBoolean('show_meta'),
             ]);
         }
 
@@ -183,6 +187,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'show_meta' => $request->request->getBoolean('show_meta'),
             ]);
         }
 
@@ -197,6 +202,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'show_meta' => $request->request->getBoolean('show_meta'),
             ]);
         }
 
@@ -219,6 +225,7 @@ final class PlReportPreviewController extends AbstractController
             'grouping' => $request->request->get('grouping', 'month'),
             'from' => $request->request->get('from', $from->format('Y-m-d')),
             'to' => $request->request->get('to', $to->format('Y-m-d')),
+            'show_meta' => $request->request->getBoolean('show_meta'),
         ]);
     }
 }
