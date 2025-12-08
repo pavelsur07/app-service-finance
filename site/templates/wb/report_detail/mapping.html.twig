@@ -34,10 +34,13 @@
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <label for="wb-mapping-sort" class="form-label mb-0">Сортировка:</label>
                     <select id="wb-mapping-sort" class="form-select form-select-sm w-auto">
-                        <option value="order" selected>Как получено</option>
+                        <option value="order">Как получено</option>
                         <option value="doc">По типу документа</option>
                         <option value="supplier">По обоснованию</option>
                         <option value="rows">По количеству строк</option>
+                        <option value="note" selected>По примечанию</option>
+                        <option value="category">По PL категории</option>
+                        <option value="active">Активные сверху</option>
                     </select>
                 </div>
             </div>
@@ -422,13 +425,40 @@
 
                 const rows = Array.from(mappingTableBody.querySelectorAll('.js-wb-mapping-row'));
                 rows.sort(function (a, b) {
+                    const getText = function (row, selector, fallback = '') {
+                        const element = row.querySelector(selector);
+                        return element ? element.textContent.trim() : fallback;
+                    };
+
+                    const getNumber = function (row, selector, fallback = 0) {
+                        const textValue = getText(row, selector, String(fallback));
+                        const numberValue = Number(textValue.replace(/[^\d.-]/g, ''));
+                        return Number.isFinite(numberValue) ? numberValue : fallback;
+                    };
+
+                    const getBooleanFlag = function (row) {
+                        const value = row.querySelector('.js-wb-active-input')?.value;
+                        return value === '1';
+                    };
+
                     switch (sortType) {
                         case 'doc':
-                            return a.dataset.docType.localeCompare(b.dataset.docType) || a.dataset.supplier.localeCompare(b.dataset.supplier);
+                            return getText(a, '.js-wb-doc-type').localeCompare(getText(b, '.js-wb-doc-type'))
+                                || getText(a, '.js-wb-supplier').localeCompare(getText(b, '.js-wb-supplier'));
                         case 'supplier':
-                            return a.dataset.supplier.localeCompare(b.dataset.supplier) || a.dataset.docType.localeCompare(b.dataset.docType);
+                            return getText(a, '.js-wb-supplier').localeCompare(getText(b, '.js-wb-supplier'))
+                                || getText(a, '.js-wb-doc-type').localeCompare(getText(b, '.js-wb-doc-type'));
                         case 'rows':
-                            return Number(b.dataset.rows) - Number(a.dataset.rows);
+                            return getNumber(b, '.js-wb-rows', 0) - getNumber(a, '.js-wb-rows', 0);
+                        case 'note':
+                            return getText(a, '.js-wb-note-text').localeCompare(getText(b, '.js-wb-note-text'))
+                                || Number(a.dataset.originalOrder) - Number(b.dataset.originalOrder);
+                        case 'category':
+                            return getText(a, '.js-wb-category-text').localeCompare(getText(b, '.js-wb-category-text'))
+                                || Number(a.dataset.originalOrder) - Number(b.dataset.originalOrder);
+                        case 'active':
+                            return Number(getBooleanFlag(b)) - Number(getBooleanFlag(a))
+                                || Number(a.dataset.originalOrder) - Number(b.dataset.originalOrder);
                         default:
                             return Number(a.dataset.originalOrder) - Number(b.dataset.originalOrder);
                     }
@@ -442,6 +472,10 @@
             sortSelect?.addEventListener('change', function () {
                 sortRows(this.value);
             });
+
+            if (sortSelect) {
+                sortRows(sortSelect.value);
+            }
 
             // Копирование строки маппинга
             document.addEventListener('click', function (event) {
