@@ -60,6 +60,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             'storageFee',
             // Штрафы
             'penalty',
+            // Прочие удержания
+            'deduction',
             // Эквайринг (альтернативное поле)
             'acquiringFee',
             // Вознаграждение за ПВЗ
