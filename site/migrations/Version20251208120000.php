@@ -16,7 +16,7 @@ final class Version20251208120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
-        $this->addSql('ALTER TABLE wildberries_report_detail_mappings DROP INDEX uniq_wb_mapping_company_oper_doc_source');
+        $this->addSql('ALTER TABLE wildberries_report_detail_mappings DROP CONSTRAINT IF EXISTS uniq_wb_mapping_company_oper_doc_source');
     }
 
     public function down(Schema $schema): void
