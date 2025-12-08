@@ -163,16 +163,6 @@ final class WildberriesReportDetailMappingController extends AbstractController
 
             $mapping = $mappingId ? $this->mappingRepository->find($mappingId) : null;
 
-            if (!$mapping instanceof WildberriesReportDetailMapping && $supplierOperName !== null && !empty($sourceField)) {
-                $mapping = $this->mappingRepository->findOneByKeyAndSourceField(
-                    $company,
-                    $supplierOperName,
-                    $docTypeName !== '' ? $docTypeName : null,
-                    null,
-                    (string) $sourceField
-                );
-            }
-
             // Если поле суммы очищено и правило уже существует — удаляем его
             if (empty($sourceField)) {
                 if ($mapping instanceof WildberriesReportDetailMapping) {

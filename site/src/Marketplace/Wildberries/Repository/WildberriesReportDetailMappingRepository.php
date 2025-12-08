@@ -58,28 +58,6 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
             ->execute();
     }
 
-    public function findOneByKeyAndSourceField(
-        Company $company,
-        ?string $supplierOperName,
-        ?string $docTypeName,
-        ?string $siteCountry,
-        string $sourceField
-    ): ?WildberriesReportDetailMapping {
-        $qb = $this->createQueryBuilder('m')
-            ->andWhere('m.company = :company')
-            ->andWhere('m.sourceField = :sourceField')
-            ->setParameter('company', $company)
-            ->setParameter('sourceField', $sourceField);
-
-        $this->addNullableEqual($qb, 'm.supplierOperName', 'supplierOperName', $supplierOperName);
-        $this->addNullableEqual($qb, 'm.docTypeName', 'docTypeName', $docTypeName);
-        $this->addNullableEqual($qb, 'm.siteCountry', 'siteCountry', $siteCountry);
-
-        return $qb
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
     private function addNullableEqual(QueryBuilder $qb, string $field, string $paramName, mixed $value): void
     {
         if ($value === null) {

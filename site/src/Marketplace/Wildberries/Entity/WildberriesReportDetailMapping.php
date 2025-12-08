@@ -13,7 +13,6 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: WildberriesReportDetailMappingRepository::class)]
 #[ORM\Table(name: 'wildberries_report_detail_mappings')]
-#[ORM\UniqueConstraint(name: 'uniq_wb_mapping_company_oper_doc_source', columns: ['company_id', 'supplier_oper_name', 'doc_type_name', 'source_field'])]
 class WildberriesReportDetailMapping
 {
     #[ORM\Id]
