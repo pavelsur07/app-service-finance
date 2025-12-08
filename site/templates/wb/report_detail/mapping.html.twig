@@ -327,8 +327,13 @@
             const activeCheckbox = document.getElementById('wb-mapping-active');
             const saveButton = document.getElementById('wb-mapping-save');
             const deletedContainer = document.getElementById('wb-mapping-deleted');
+            const dropdownToggles = document.querySelectorAll('#wb-mapping-table-body [data-bs-toggle="dropdown"]');
 
             let currentRow = null;
+
+            dropdownToggles.forEach(function (toggle) {
+                bootstrap.Dropdown.getOrCreateInstance(toggle);
+            });
 
             // Общая переиндексация полей для корректной отправки формы
             function reindexRows(tbody) {
@@ -513,6 +518,11 @@
 
                 // Клонируем строку и переносим только видимые значения
                 const clone = row.cloneNode(true);
+
+                const cloneDropdownToggle = clone.querySelector('[data-bs-toggle="dropdown"]');
+                if (cloneDropdownToggle) {
+                    bootstrap.Dropdown.getOrCreateInstance(cloneDropdownToggle);
+                }
 
                 // Сбрасываем выбранную PL-категорию в копии, чтобы её явно выбрать
                 const categoryInput = clone.querySelector('.js-wb-category-input');
