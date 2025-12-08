@@ -129,32 +129,16 @@
                                            class="js-wb-active-input">
                                 </td>
                                 <td class="text-center">
-                                    <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
-                                        <button type="button"
-                                                class="btn btn-link p-0 text-muted"
-                                                data-bs-toggle="dropdown"
-                                                data-bs-display="static"
-                                                aria-label="Действия"
-                                                aria-expanded="false">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                                                <circle cx="5" cy="12" r="1"/>
-                                                <circle cx="12" cy="12" r="1"/>
-                                                <circle cx="19" cy="12" r="1"/>
-                                            </svg>
+                                    <div class="d-flex justify-content-center align-items-center gap-2">
+                                        <button type="button" class="btn btn-link p-1 text-muted js-wb-mapping-edit" aria-label="Редактировать">
+                                            <i class="ti ti-pencil"></i>
                                         </button>
-
-                                        <div class="dropdown-menu dropdown-menu-end shadow-sm">
-                                            <button type="button" class="dropdown-item js-wb-mapping-edit">
-                                                <i class="ti ti-pencil me-2"></i> Редактировать
-                                            </button>
-                                            <button type="button" class="dropdown-item js-wb-mapping-copy">
-                                                <i class="ti ti-copy me-2"></i> Копировать
-                                            </button>
-                                            <div class="dropdown-divider"></div>
-                                            <button type="button" class="dropdown-item text-danger js-wb-mapping-delete">
-                                                <i class="ti ti-trash me-2"></i> Удалить
-                                            </button>
-                                        </div>
+                                        <button type="button" class="btn btn-link p-1 text-muted js-wb-mapping-copy" aria-label="Копировать">
+                                            <i class="ti ti-copy"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-link p-1 text-danger js-wb-mapping-delete" aria-label="Удалить">
+                                            <i class="ti ti-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
