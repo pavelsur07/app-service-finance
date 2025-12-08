@@ -141,6 +141,12 @@
                                                 aria-label="Копировать">
                                             <i class="ti ti-copy"></i>
                                         </button>
+                                        <button type="button"
+                                                class="btn btn-link p-0 text-danger js-wb-mapping-delete"
+                                                title="Удалить"
+                                                aria-label="Удалить">
+                                            <i class="ti ti-trash"></i>
+                                        </button>
                                     </div>
                                 </td>
                             </tr>
@@ -522,6 +528,30 @@
                 row.insertAdjacentElement('afterend', clone);
 
                 // Переиндексируем имена полей после копирования
+                reindexRows(tbody);
+            });
+
+            // Удаление строки маппинга
+            document.addEventListener('click', function (event) {
+                const deleteButton = event.target.closest('.js-wb-mapping-delete');
+                if (!deleteButton) {
+                    return;
+                }
+
+                const row = deleteButton.closest('.js-wb-mapping-row');
+                const tbody = row?.closest('tbody');
+
+                if (!row || !tbody) {
+                    return;
+                }
+
+                // Закрываем оффканвас, если удаляем редактируемую строку
+                if (currentRow === row) {
+                    currentRow = null;
+                    offcanvas?.hide();
+                }
+
+                row.remove();
                 reindexRows(tbody);
             });
 
