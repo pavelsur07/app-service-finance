@@ -8,6 +8,7 @@ use App\Marketplace\Wildberries\Entity\WildberriesReportDetailMapping;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailMappingRepository;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
+use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvider;
 use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
@@ -29,6 +30,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
         private readonly WildberriesReportDetailRepository $detailRepository,
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly WildberriesWeeklyPnlGenerator $weeklyPnlGenerator,
+        private readonly WildberriesReportDetailSourceFieldProvider $sourceFieldProvider,
         private readonly EntityManagerInterface $em,
     ) {}
 
@@ -43,32 +45,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
         $to = $toParam ? new DateTimeImmutable((string) $toParam) : new DateTimeImmutable('today');
         $from = $fromParam ? new DateTimeImmutable((string) $fromParam) : $to->modify('-6 days');
 
-        $sourceFieldOptions = [
-            // Цена за единицу
-            'retail_price',
-            // Сумма реализации (берём из raw)
-            'retail_amount',
-            // Компенсация скидки (кэшбэк)
-            'cashback_amount',
-            // Эквайринг / комиссии за платежи
-            'acquiring_fee',
-            // Цена продажи с учётом скидки
-            'retailPriceWithDiscRub',
-            // Стоимость доставки
-            'deliveryRub',
-            // Плата за хранение
-            'storageFee',
-            // Штрафы
-            'penalty',
-            // Прочие удержания
-            'deduction',
-            // Эквайринг (альтернативное поле)
-            'acquiringFee',
-            // Вознаграждение за ПВЗ
-            'ppvz_reward',
-            // Возмещение логистики/склада
-            'rebill_logistic_cost',
-        ];
+        $sourceFieldOptions = $this->sourceFieldProvider->getOptions();
 
         $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
             $company,

@@ -9,6 +9,7 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Enum\DocumentType;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
+use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvider;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\PLRegisterUpdater;
@@ -21,6 +22,7 @@ final class WildberriesWeeklyPnlGenerator
     public function __construct(
         private readonly WildberriesReportDetailRepository $details,
         private readonly WildberriesReportDetailMappingResolver $mappingResolver,
+        private readonly WildberriesReportDetailSourceFieldProvider $sourceFieldProvider,
         private readonly PLCategoryRepository $plCategories,
         private readonly PLRegisterUpdater $plRegisterUpdater,
         private readonly EntityManagerInterface $em,
@@ -84,26 +86,7 @@ final class WildberriesWeeklyPnlGenerator
                 }
 
                 $sourceField = $mapping->getSourceField();
-
-                $value = match ($sourceField) {
-                    // Цена за единицу
-                    'retail_price' => $row->getRetailPrice(),
-                    // Сумма реализации (берём из raw)
-                    'retail_amount' => $row->getRaw()['retail_amount'] ?? null,
-                    // Эквайринг / комиссии за платежи
-                    'acquiring_fee' => $row->getAcquiringFee(),
-                    // Цена продажи с учётом скидки
-                    'retailPriceWithDiscRub' => $row->getRetailPriceWithDiscRub(),
-                    // Стоимость доставки
-                    'deliveryRub' => $row->getDeliveryRub(),
-                    // Плата за хранение
-                    'storageFee' => $row->getStorageFee(),
-                    // Штрафы
-                    'penalty' => $row->getPenalty(),
-                    // Эквайринг (альтернативное поле)
-                    'acquiringFee' => $row->getAcquiringFee(),
-                    default => null,
-                };
+                $value = $this->sourceFieldProvider->resolveValue($row, $sourceField);
 
                 if (null === $value) {
                     continue;
