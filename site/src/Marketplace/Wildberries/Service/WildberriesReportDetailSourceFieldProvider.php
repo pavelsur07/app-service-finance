@@ -36,6 +36,8 @@ final class WildberriesReportDetailSourceFieldProvider
             'acquiringFee' => static fn (WildberriesReportDetail $row) => $row->getAcquiringFee(),
             // Вознаграждение за ПВЗ
             'ppvz_reward' => static fn (WildberriesReportDetail $row) => $row->getRaw()['ppvz_reward'] ?? null,
+            // Сумма к выплате продавцу
+            'ppvz_for_pay' => static fn (WildberriesReportDetail $row) => $row->getRaw()['ppvz_for_pay'] ?? null,
             // Возмещение логистики/склада
             'rebill_logistic_cost' => static fn (WildberriesReportDetail $row) => $row->getRaw()['rebill_logistic_cost'] ?? null,
         ];
