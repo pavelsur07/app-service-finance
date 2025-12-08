@@ -328,11 +328,12 @@
             const saveButton = document.getElementById('wb-mapping-save');
             const deletedContainer = document.getElementById('wb-mapping-deleted');
             const dropdownToggles = document.querySelectorAll('#wb-mapping-table-body [data-bs-toggle="dropdown"]');
+            const dropdownConfig = { boundary: document.body, popperConfig: { strategy: 'fixed' } };
 
             let currentRow = null;
 
             dropdownToggles.forEach(function (toggle) {
-                bootstrap.Dropdown.getOrCreateInstance(toggle);
+                bootstrap.Dropdown.getOrCreateInstance(toggle, dropdownConfig);
             });
 
             // Общая переиндексация полей для корректной отправки формы
@@ -521,7 +522,7 @@
 
                 const cloneDropdownToggle = clone.querySelector('[data-bs-toggle="dropdown"]');
                 if (cloneDropdownToggle) {
-                    bootstrap.Dropdown.getOrCreateInstance(cloneDropdownToggle);
+                    bootstrap.Dropdown.getOrCreateInstance(cloneDropdownToggle, dropdownConfig);
                 }
 
                 // Сбрасываем выбранную PL-категорию в копии, чтобы её явно выбрать
