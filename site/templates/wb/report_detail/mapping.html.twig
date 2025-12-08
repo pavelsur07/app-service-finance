@@ -282,7 +282,7 @@
         </div>
     </div>
     <script>
-        (function () {
+        document.addEventListener('DOMContentLoaded', function () {
             // Подтверждение очистки маппинга
             document.addEventListener('submit', function (event) {
                 const clearForm = event.target.closest('.js-wb-mapping-clear-form');
@@ -509,6 +509,6 @@
 
             // Сохраняем значения из оффканваса
             saveButton?.addEventListener('click', applyEditorToRow);
-        })();
+        });
     </script>
 {% endblock %}
