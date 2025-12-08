@@ -27,8 +27,19 @@
     <div class="card mb-4">
         <div class="card-body">
             <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                <h2 class="card-title mb-0">Маппинг операций</h2>
-                <div class="text-muted">Всего комбинаций: {{ items|length }}</div>
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <h2 class="card-title mb-0">Маппинг операций</h2>
+                    <div class="text-muted">Всего комбинаций: {{ items|length }}</div>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <label for="wb-mapping-sort" class="form-label mb-0">Сортировка:</label>
+                    <select id="wb-mapping-sort" class="form-select form-select-sm w-auto">
+                        <option value="order" selected>Как получено</option>
+                        <option value="doc">По типу документа</option>
+                        <option value="supplier">По обоснованию</option>
+                        <option value="rows">По количеству строк</option>
+                    </select>
+                </div>
             </div>
 
             <form id="wb-report-mapping-form" method="post" action="{{ path('wb_report_detail_mapping_save', { from: from|date('Y-m-d'), to: to|date('Y-m-d') }) }}">
@@ -48,67 +59,79 @@
                             <th>Знак (+/−)</th>
                             <th>PL категория</th>
                             <th class="text-center">Активен</th>
+                            <th class="text-center">Действия</th>
                         </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="wb-mapping-table-body">
                         {% for item in items %}
                             {% set mapping = item.mapping ?? null %}
-                            <tr>
+                            {% set selectedSourceField = mapping ? mapping.sourceField : '' %}
+                            {% set selectedSign = mapping ? mapping.signMultiplier : 1 %}
+                            {% set selectedCategory = mapping and mapping.plCategory ? mapping.plCategory : null %}
+                            {% set selectedCategoryLabel = selectedCategory ? (selectedCategory.label ?? selectedCategory.name ?? 'Не выбрано') : 'Не выбрано' %}
+                            {% set isActive = mapping is null or mapping.isActive %}
+                            <tr class="js-wb-mapping-row"
+                                data-original-order="{{ loop.index0 }}"
+                                data-doc-type="{{ item.docTypeName ?? '—' }}"
+                                data-supplier="{{ item.supplierOperName ?? '—' }}"
+                                data-rows="{{ item.rowsCount }}">
                                 <td>
-                                    <input type="text"
+                                    <div class="js-wb-note-text">{{ mapping ? mapping.note : '—' }}</div>
+                                    <input type="hidden"
                                            name="mappings[{{ loop.index0 }}][note]"
                                            value="{{ mapping ? mapping.note : '' }}"
-                                           class="form-control"
-                                           maxlength="1024"
-                                           placeholder="Комментарий к правилу">
+                                           class="js-wb-note-input">
                                 </td>
                                 <td>
-                                    <div>{{ item.docTypeName ?? '—' }}</div>
+                                    <div class="js-wb-doc-type">{{ item.docTypeName ?? '—' }}</div>
                                     <input type="hidden" name="mappings[{{ loop.index0 }}][docTypeName]" value="{{ item.docTypeName }}">
                                 </td>
                                 <td>
-                                    <div class="fw-semibold">{{ item.supplierOperName ?? '—' }}</div>
+                                    <div class="fw-semibold js-wb-supplier">{{ item.supplierOperName ?? '—' }}</div>
                                     <input type="hidden" name="mappings[{{ loop.index0 }}][supplierOperName]" value="{{ item.supplierOperName }}">
                                     {% if mapping %}
                                         <input type="hidden" name="mappings[{{ loop.index0 }}][id]" value="{{ mapping.id }}">
                                     {% endif %}
                                 </td>
-                                <td class="text-end">{{ item.rowsCount }}</td>
+                                <td class="text-end js-wb-rows">{{ item.rowsCount }}</td>
                                 <td>
-                                    {% set selectedSourceField = mapping ? mapping.sourceField : '' %}
-
-                                    <select name="mappings[{{ loop.index0 }}][sourceField]" class="form-select">
-                                        <option value="">—</option>
-                                        {% for option in sourceFieldOptions %}
-                                            <option value="{{ option }}" {{ selectedSourceField == option ? 'selected' : '' }}>
-                                                {{ option }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
+                                    <div class="js-wb-source-field-text">{{ selectedSourceField ?: '—' }}</div>
+                                    <input type="hidden"
+                                           name="mappings[{{ loop.index0 }}][sourceField]"
+                                           value="{{ selectedSourceField }}"
+                                           class="js-wb-source-field-input">
                                 </td>
                                 <td>
-                                    {% set selectedSign = mapping ? mapping.signMultiplier : 1 %}
-                                    <select name="mappings[{{ loop.index0 }}][signMultiplier]" class="form-select">
-                                        <option value="1" {% if selectedSign == 1 %}selected{% endif %}>+</option>
-                                        <option value="-1" {% if selectedSign == -1 %}selected{% endif %}>−</option>
-                                    </select>
+                                    <div class="js-wb-sign-text">{{ selectedSign == -1 ? '−' : '+' }}</div>
+                                    <input type="hidden"
+                                           name="mappings[{{ loop.index0 }}][signMultiplier]"
+                                           value="{{ selectedSign }}"
+                                           class="js-wb-sign-input">
                                 </td>
                                 <td>
-                                    <select name="mappings[{{ loop.index0 }}][plCategoryId]" class="form-select">
-                                        <option value="">Не выбрано</option>
-                                        {% for category in categoryOptions %}
-                                            <option value="{{ category.id }}" {{ mapping and mapping.plCategory.id == category.id ? 'selected' : '' }}>{{ category.label }}</option>
-                                        {% endfor %}
-                                    </select>
+                                    <div class="js-wb-category-text">{{ selectedCategoryLabel }}</div>
+                                    <input type="hidden"
+                                           name="mappings[{{ loop.index0 }}][plCategoryId]"
+                                           value="{{ selectedCategory ? selectedCategory.id : '' }}"
+                                           class="js-wb-category-input">
+                                </td>
+                                <td class="text-center">
+                                    <div class="js-wb-active-state badge {{ isActive ? 'bg-success' : 'bg-secondary' }}">
+                                        {{ isActive ? 'Активен' : 'Выключен' }}
+                                    </div>
+                                    <input type="hidden"
+                                           name="mappings[{{ loop.index0 }}][isActive]"
+                                           value="{{ isActive ? 1 : 0 }}"
+                                           class="js-wb-active-input">
                                 </td>
                                 <td class="text-nowrap">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <input type="checkbox"
-                                               name="mappings[{{ loop.index0 }}][isActive]"
-                                               value="1"
-                                               {% if mapping is null or mapping.isActive %}checked{% endif %}
-                                        >
-
+                                    <div class="d-flex align-items-center gap-2 justify-content-center">
+                                        <button type="button"
+                                                class="btn btn-link p-0 text-secondary js-wb-mapping-edit"
+                                                title="Редактировать"
+                                                aria-label="Редактировать">
+                                            <i class="ti ti-pencil"></i>
+                                        </button>
                                         <button type="button"
                                                 class="btn btn-link p-0 text-secondary js-wb-mapping-copy"
                                                 title="Копировать"
@@ -120,7 +143,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="8" class="text-center">Комбинации не найдены</td>
+                                <td colspan="9" class="text-center">Комбинации не найдены</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -138,6 +161,58 @@
                     <button type="submit" class="btn btn-outline-danger">- Очистить</button>
                 </form>
                 <button type="submit" form="wb-report-mapping-form" class="btn btn-primary">Сохранить маппинг</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="wb-mapping-editor" aria-labelledby="wb-mapping-editor-label">
+        <div class="offcanvas-header">
+            <div>
+                <div class="text-muted small">Тип документа</div>
+                <h5 class="offcanvas-title mb-0" id="wb-mapping-editor-label">—</h5>
+                <div class="text-muted" id="wb-mapping-supplier">—</div>
+            </div>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Закрыть"></button>
+        </div>
+        <div class="offcanvas-body">
+            <div class="mb-3">
+                <label for="wb-mapping-note" class="form-label">Примечание</label>
+                <input type="text" id="wb-mapping-note" class="form-control" maxlength="1024" placeholder="Комментарий к правилу">
+            </div>
+            <div class="row g-3 mb-3">
+                <div class="col-md-6">
+                    <label for="wb-mapping-source-field" class="form-label">Поле суммы</label>
+                    <select id="wb-mapping-source-field" class="form-select">
+                        <option value="">—</option>
+                        {% for option in sourceFieldOptions %}
+                            <option value="{{ option }}">{{ option }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <label for="wb-mapping-sign" class="form-label">Знак (+/−)</label>
+                    <select id="wb-mapping-sign" class="form-select">
+                        <option value="1">+</option>
+                        <option value="-1">−</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-3">
+                <label for="wb-mapping-category" class="form-label">PL категория</label>
+                <select id="wb-mapping-category" class="form-select">
+                    <option value="">Не выбрано</option>
+                    {% for category in categoryOptions %}
+                        <option value="{{ category.id }}">{{ category.label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-check mb-4">
+                <input class="form-check-input" type="checkbox" id="wb-mapping-active" checked>
+                <label class="form-check-label" for="wb-mapping-active">Активно</label>
+            </div>
+            <div class="d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="offcanvas">Отмена</button>
+                <button type="button" class="btn btn-primary" id="wb-mapping-save">Сохранить</button>
             </div>
         </div>
     </div>
@@ -207,63 +282,233 @@
         </div>
     </div>
     <script>
-        document.addEventListener('submit', function (event) {
-            const clearForm = event.target.closest('.js-wb-mapping-clear-form');
+        (function () {
+            // Подтверждение очистки маппинга
+            document.addEventListener('submit', function (event) {
+                const clearForm = event.target.closest('.js-wb-mapping-clear-form');
 
-            if (!clearForm) {
-                return;
-            }
+                if (!clearForm) {
+                    return;
+                }
 
-            if (!confirm('Очистить все сохранённые правила маппинга?')) {
-                event.preventDefault();
-            }
-        });
-
-        document.addEventListener('click', function (event) {
-            const copyButton = event.target.closest('.js-wb-mapping-copy');
-            if (!copyButton) {
-                return;
-            }
-
-            event.preventDefault();
-
-            const row = copyButton.closest('tr');
-            if (!row) {
-                return;
-            }
-
-            const tbody = row.closest('tbody');
-            if (!tbody) {
-                return;
-            }
-
-            // Клонируем строку
-            const clone = row.cloneNode(true);
-
-            // Сбросим выбранную PL-категорию в копии,
-            // чтобы её явно выбрать под новую операцию
-            const categorySelect = clone.querySelector('select[name*="[plCategoryId]"]');
-            if (categorySelect) {
-                categorySelect.value = '';
-            }
-
-            // Удаляем id существующего маппинга в копии, чтобы создать новое правило
-            const mappingIdInput = clone.querySelector('input[name*="[id]"]');
-            if (mappingIdInput) {
-                mappingIdInput.value = '';
-            }
-
-            // Вставляем клон сразу под исходной строкой
-            row.insertAdjacentElement('afterend', clone);
-
-            // Переиндексируем все имена полей: mappings[0], mappings[1], ...
-            const rows = tbody.querySelectorAll('tr');
-            rows.forEach(function (tr, index) {
-                const inputs = tr.querySelectorAll('input[name^="mappings["], select[name^="mappings["]');
-                inputs.forEach(function (input) {
-                    input.name = input.name.replace(/mappings\[\d+]/, 'mappings[' + index + ']');
-                });
+                if (!confirm('Очистить все сохранённые правила маппинга?')) {
+                    event.preventDefault();
+                }
             });
-        });
+
+            const mappingTableBody = document.getElementById('wb-mapping-table-body');
+            const sortSelect = document.getElementById('wb-mapping-sort');
+
+            const offcanvasElement = document.getElementById('wb-mapping-editor');
+            const offcanvas = offcanvasElement ? new bootstrap.Offcanvas(offcanvasElement) : null;
+            const docTypeTarget = document.getElementById('wb-mapping-editor-label');
+            const supplierTarget = document.getElementById('wb-mapping-supplier');
+            const noteInput = document.getElementById('wb-mapping-note');
+            const sourceFieldSelect = document.getElementById('wb-mapping-source-field');
+            const signSelect = document.getElementById('wb-mapping-sign');
+            const categorySelect = document.getElementById('wb-mapping-category');
+            const activeCheckbox = document.getElementById('wb-mapping-active');
+            const saveButton = document.getElementById('wb-mapping-save');
+
+            let currentRow = null;
+
+            // Общая переиндексация полей для корректной отправки формы
+            function reindexRows(tbody) {
+                const rows = tbody.querySelectorAll('.js-wb-mapping-row');
+                rows.forEach(function (tr, index) {
+                    if (!tr.dataset.originalOrder) {
+                        tr.dataset.originalOrder = String(index);
+                    }
+
+                    const inputs = tr.querySelectorAll('input[name^="mappings["], select[name^="mappings["]');
+                    inputs.forEach(function (input) {
+                        input.name = input.name.replace(/mappings\[\d+]/, 'mappings[' + index + ']');
+                    });
+                });
+            }
+
+            // Обновляем бейдж статуса активности
+            function updateActiveBadge(row, isActive) {
+                const badge = row.querySelector('.js-wb-active-state');
+                if (!badge) {
+                    return;
+                }
+
+                badge.textContent = isActive ? 'Активен' : 'Выключен';
+                badge.classList.toggle('bg-success', isActive);
+                badge.classList.toggle('bg-secondary', !isActive);
+            }
+
+            // Заполняем оффканвас данными строки
+            function fillEditorFromRow(row) {
+                const noteValue = row.querySelector('.js-wb-note-input')?.value || '';
+                const sourceFieldValue = row.querySelector('.js-wb-source-field-input')?.value || '';
+                const signValue = row.querySelector('.js-wb-sign-input')?.value || '1';
+                const categoryValue = row.querySelector('.js-wb-category-input')?.value || '';
+                const isActiveValue = row.querySelector('.js-wb-active-input')?.value || '1';
+
+                docTypeTarget.textContent = row.dataset.docType || '—';
+                supplierTarget.textContent = row.dataset.supplier || '—';
+                noteInput.value = noteValue;
+                sourceFieldSelect.value = sourceFieldValue;
+                signSelect.value = signValue;
+                categorySelect.value = categoryValue;
+                activeCheckbox.checked = isActiveValue === '1';
+            }
+
+            // Применяем изменения из модального окна к строке таблицы
+            function applyEditorToRow() {
+                if (!currentRow) {
+                    return;
+                }
+
+                const noteValue = noteInput.value.trim();
+                const sourceFieldValue = sourceFieldSelect.value;
+                const signValue = signSelect.value === '-1' ? '-1' : '1';
+                const categoryValue = categorySelect.value;
+                const categoryLabel = categorySelect.options[categorySelect.selectedIndex]?.textContent || 'Не выбрано';
+                const isActiveValue = activeCheckbox.checked ? '1' : '0';
+
+                const noteTarget = currentRow.querySelector('.js-wb-note-text');
+                if (noteTarget) {
+                    noteTarget.textContent = noteValue || '—';
+                }
+                const noteInputField = currentRow.querySelector('.js-wb-note-input');
+                if (noteInputField) {
+                    noteInputField.value = noteValue;
+                }
+
+                const sourceFieldTarget = currentRow.querySelector('.js-wb-source-field-text');
+                if (sourceFieldTarget) {
+                    sourceFieldTarget.textContent = sourceFieldValue || '—';
+                }
+                const sourceFieldInput = currentRow.querySelector('.js-wb-source-field-input');
+                if (sourceFieldInput) {
+                    sourceFieldInput.value = sourceFieldValue;
+                }
+
+                const signTarget = currentRow.querySelector('.js-wb-sign-text');
+                if (signTarget) {
+                    signTarget.textContent = signValue === '-1' ? '−' : '+';
+                }
+                const signInput = currentRow.querySelector('.js-wb-sign-input');
+                if (signInput) {
+                    signInput.value = signValue;
+                }
+
+                const categoryTarget = currentRow.querySelector('.js-wb-category-text');
+                if (categoryTarget) {
+                    categoryTarget.textContent = categoryLabel;
+                }
+                const categoryInputField = currentRow.querySelector('.js-wb-category-input');
+                if (categoryInputField) {
+                    categoryInputField.value = categoryValue;
+                }
+
+                const activeInput = currentRow.querySelector('.js-wb-active-input');
+                if (activeInput) {
+                    activeInput.value = isActiveValue;
+                }
+                updateActiveBadge(currentRow, isActiveValue === '1');
+
+                offcanvas?.hide();
+            }
+
+            // Сортировка строк маппинга
+            function sortRows(sortType) {
+                if (!mappingTableBody) {
+                    return;
+                }
+
+                const rows = Array.from(mappingTableBody.querySelectorAll('.js-wb-mapping-row'));
+                rows.sort(function (a, b) {
+                    switch (sortType) {
+                        case 'doc':
+                            return a.dataset.docType.localeCompare(b.dataset.docType) || a.dataset.supplier.localeCompare(b.dataset.supplier);
+                        case 'supplier':
+                            return a.dataset.supplier.localeCompare(b.dataset.supplier) || a.dataset.docType.localeCompare(b.dataset.docType);
+                        case 'rows':
+                            return Number(b.dataset.rows) - Number(a.dataset.rows);
+                        default:
+                            return Number(a.dataset.originalOrder) - Number(b.dataset.originalOrder);
+                    }
+                });
+
+                rows.forEach(function (row) {
+                    mappingTableBody.appendChild(row);
+                });
+            }
+
+            sortSelect?.addEventListener('change', function () {
+                sortRows(this.value);
+            });
+
+            // Копирование строки маппинга
+            document.addEventListener('click', function (event) {
+                const copyButton = event.target.closest('.js-wb-mapping-copy');
+                if (!copyButton) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const row = copyButton.closest('.js-wb-mapping-row');
+                if (!row) {
+                    return;
+                }
+
+                const tbody = row.closest('tbody');
+                if (!tbody) {
+                    return;
+                }
+
+                // Клонируем строку и переносим только видимые значения
+                const clone = row.cloneNode(true);
+
+                // Сбрасываем выбранную PL-категорию в копии, чтобы её явно выбрать
+                const categoryInput = clone.querySelector('.js-wb-category-input');
+                if (categoryInput) {
+                    categoryInput.value = '';
+                }
+                const categoryText = clone.querySelector('.js-wb-category-text');
+                if (categoryText) {
+                    categoryText.textContent = 'Не выбрано';
+                }
+
+                // Удаляем id существующего маппинга в копии, чтобы создать новое правило
+                const mappingIdInput = clone.querySelector('input[name*="[id]"]');
+                if (mappingIdInput) {
+                    mappingIdInput.value = '';
+                }
+
+                // Обновляем порядковый номер для сортировки "как получено"
+                clone.dataset.originalOrder = tbody.querySelectorAll('.js-wb-mapping-row').length;
+
+                // Вставляем клон сразу под исходной строкой
+                row.insertAdjacentElement('afterend', clone);
+
+                // Переиндексируем имена полей после копирования
+                reindexRows(tbody);
+            });
+
+            // Открываем редактор для выбранной строки
+            document.addEventListener('click', function (event) {
+                const editButton = event.target.closest('.js-wb-mapping-edit');
+                if (!editButton) {
+                    return;
+                }
+
+                currentRow = editButton.closest('.js-wb-mapping-row');
+                if (!currentRow) {
+                    return;
+                }
+
+                fillEditorFromRow(currentRow);
+                offcanvas?.show();
+            });
+
+            // Сохраняем значения из оффканваса
+            saveButton?.addEventListener('click', applyEditorToRow);
+        })();
     </script>
 {% endblock %}
