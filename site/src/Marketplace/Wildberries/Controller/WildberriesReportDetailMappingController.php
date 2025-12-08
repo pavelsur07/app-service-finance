@@ -150,7 +150,22 @@ final class WildberriesReportDetailMappingController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token');
         }
 
+        $deletedMappingIds = array_filter((array) $request->request->all('deletedMappings'));
         $mappings = $request->request->all('mappings');
+
+        foreach ($deletedMappingIds as $mappingId) {
+            $mapping = $this->mappingRepository->find($mappingId);
+
+            if (!$mapping instanceof WildberriesReportDetailMapping) {
+                continue;
+            }
+
+            if ($mapping->getCompany()->getId() !== $company->getId()) {
+                continue;
+            }
+
+            $this->em->remove($mapping);
+        }
 
         foreach ($mappings as $mappingData) {
             $mappingId = $mappingData['id'] ?? null;

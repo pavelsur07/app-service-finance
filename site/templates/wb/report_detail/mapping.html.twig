@@ -49,6 +49,7 @@
                 <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping') }}">
                 <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
                 <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+                <div id="wb-mapping-deleted" class="d-none"></div>
 
                 <div class="table-responsive mb-3">
                     <table class="table table-striped align-middle">
@@ -318,6 +319,7 @@
             const categorySelect = document.getElementById('wb-mapping-category');
             const activeCheckbox = document.getElementById('wb-mapping-active');
             const saveButton = document.getElementById('wb-mapping-save');
+            const deletedContainer = document.getElementById('wb-mapping-deleted');
 
             let currentRow = null;
 
@@ -543,6 +545,16 @@
 
                 if (!row || !tbody) {
                     return;
+                }
+
+                const mappingIdInput = row.querySelector('input[name*="[id]"]');
+
+                if (mappingIdInput && mappingIdInput.value && deletedContainer) {
+                    const deletedInput = document.createElement('input');
+                    deletedInput.type = 'hidden';
+                    deletedInput.name = 'deletedMappings[]';
+                    deletedInput.value = mappingIdInput.value;
+                    deletedContainer.appendChild(deletedInput);
                 }
 
                 // Закрываем оффканвас, если удаляем редактируемую строку
