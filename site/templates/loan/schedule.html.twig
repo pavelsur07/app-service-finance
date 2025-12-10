@@ -47,9 +47,9 @@
                                     <td class="text-end">{{ item.feePart|number_format(2, '.', ' ') }}</td>
                                     <td class="text-center">
                                         {% if item.isPaid %}
-                                            <span class="badge bg-success">Оплачен</span>
+                                            <span class="badge bg-success-lt text-success">Оплачен</span>
                                         {% else %}
-                                            <span class="badge bg-secondary">Не оплачен</span>
+                                            <span class="badge bg-danger-lt text-danger">Не оплачен</span>
                                         {% endif %}
                                     </td>
                                     <td class="text-end">
