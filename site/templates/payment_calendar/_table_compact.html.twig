@@ -16,11 +16,11 @@
         </thead>
         <tbody>
         {% set statusClasses = {
-            'DRAFT': 'bg-gray-lt text-body',
-            'PLANNED': 'bg-secondary text-white',
-            'APPROVED': 'bg-yellow-lt text-yellow',
-            'PAID': 'bg-lime-lt text-lime',
-            'CANCELED': 'bg-gray-lt text-body'
+            'DRAFT': 'bg-secondary text-white',
+            'PLANNED': 'bg-info text-white',
+            'APPROVED': 'bg-warning text-dark',
+            'PAID': 'bg-success text-white',
+            'CANCELED': 'bg-dark text-white'
         } %}
         {% for payment in payments %}
             {% set paymentType = payment.type.value %}
