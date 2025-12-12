@@ -19,6 +19,7 @@ final class Version20251212160000 extends AbstractMigration
     public function up(Schema $schema): void
     {
         $schemaManager = $this->connection->createSchemaManager();
+        $plDailyTotals = $schemaManager->introspectTable('pl_daily_totals');
 
         // ensure required columns exist even if previous migrations were skipped
         $this->connection->executeStatement('ALTER TABLE documents ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
@@ -100,8 +101,15 @@ final class Version20251212160000 extends AbstractMigration
         $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT fk_doc_ops_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT fk_pl_daily_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
 
-        $this->addSql('ALTER TABLE pl_daily_totals DROP CONSTRAINT IF EXISTS uniq_pl_daily_company_cat_date');
-        $this->addSql('DROP INDEX IF EXISTS idx_pl_daily_company_cat_date');
+        if ($plDailyTotals->hasIndex('uniq_pl_daily_company_cat_date')) {
+            $this->addSql('ALTER TABLE pl_daily_totals DROP CONSTRAINT IF EXISTS uniq_pl_daily_company_cat_date');
+            $this->addSql('DROP INDEX IF EXISTS uniq_pl_daily_company_cat_date');
+        }
+
+        if ($plDailyTotals->hasIndex('idx_pl_daily_company_cat_date')) {
+            $this->addSql('DROP INDEX IF EXISTS idx_pl_daily_company_cat_date');
+        }
+
         $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT uniq_pl_daily_company_cat_date UNIQUE (company_id, pl_category_id, date, project_direction_id)');
         $this->addSql('CREATE INDEX idx_pl_daily_company_cat_date ON pl_daily_totals (company_id, pl_category_id, date, project_direction_id)');
     }
