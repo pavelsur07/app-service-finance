@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\Counterparty;
 use App\Entity\Document;
+use App\Entity\ProjectDirection;
 use App\Enum\DocumentType as DocumentTypeEnum;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
@@ -46,6 +47,17 @@ class DocumentType extends AbstractType
                     'data-document-counterparty' => 'true',
                 ],
             ])
+            ->add('projectDirection', EntityType::class, [
+                'class' => ProjectDirection::class,
+                'choices' => $options['project_directions'],
+                'choice_label' => 'name',
+                'placeholder' => '—',
+                'required' => false,
+                'label' => 'Проект',
+                'attr' => [
+                    'data-document-project-direction' => 'true',
+                ],
+            ])
             ->add('description', TextareaType::class, [
                 'required' => false,
                 'label' => 'Описание',
@@ -55,6 +67,7 @@ class DocumentType extends AbstractType
                 'entry_options' => [
                     'categories' => $options['categories'],
                     'counterparties' => $options['counterparties'],
+                    'project_directions' => $options['project_directions'],
                 ],
                 'allow_add' => true,
                 'allow_delete' => true,
@@ -69,6 +82,7 @@ class DocumentType extends AbstractType
             'data_class' => Document::class,
             'categories' => [],
             'counterparties' => [],
+            'project_directions' => [],
         ]);
     }
 }

@@ -11,21 +11,28 @@ final class Version20251120120000 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'Drop deprecated document type column and related database artifacts';
+        return 'Add project direction references to documents and document operations';
     }
 
     public function up(Schema $schema): void
     {
-        $this->addSql('DROP INDEX IF EXISTS idx_documents_company_type_date');
-        $this->addSql('ALTER TABLE documents DROP CONSTRAINT IF EXISTS documents_type_enum_check');
-        $this->addSql('ALTER TABLE documents DROP COLUMN type');
+        $this->addSql('ALTER TABLE documents ADD project_direction_id UUID DEFAULT NULL');
+        $this->addSql('CREATE INDEX idx_documents_project_direction ON documents (project_direction_id)');
+        $this->addSql('ALTER TABLE documents ADD CONSTRAINT fk_documents_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
+
+        $this->addSql('ALTER TABLE document_operations ADD project_direction_id UUID DEFAULT NULL');
+        $this->addSql('CREATE INDEX idx_doc_oper_project_direction ON document_operations (project_direction_id)');
+        $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT fk_doc_oper_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) NOT DEFERRABLE INITIALLY IMMEDIATE');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql("ALTER TABLE documents ADD type VARCHAR(255) DEFAULT 'OTHER'");
-        $this->addSql("UPDATE documents SET type = 'OTHER' WHERE type IS NULL");
-        $this->addSql('ALTER TABLE documents ALTER COLUMN type SET NOT NULL');
-        $this->addSql('CREATE INDEX idx_documents_company_type_date ON documents (company_id, type, date DESC)');
+        $this->addSql('ALTER TABLE document_operations DROP CONSTRAINT fk_doc_oper_project_direction');
+        $this->addSql('DROP INDEX idx_doc_oper_project_direction');
+        $this->addSql('ALTER TABLE document_operations DROP COLUMN project_direction_id');
+
+        $this->addSql('ALTER TABLE documents DROP CONSTRAINT fk_documents_project_direction');
+        $this->addSql('DROP INDEX idx_documents_project_direction');
+        $this->addSql('ALTER TABLE documents DROP COLUMN project_direction_id');
     }
 }

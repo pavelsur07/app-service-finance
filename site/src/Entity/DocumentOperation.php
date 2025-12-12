@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Repository\DocumentOperationRepository;
+use App\Entity\ProjectDirection;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -28,6 +29,10 @@ class DocumentOperation
 
     #[ORM\ManyToOne(targetEntity: Counterparty::class)]
     private ?Counterparty $counterparty = null;
+
+    #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?ProjectDirection $projectDirection = null;
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $comment = null;
@@ -98,6 +103,18 @@ class DocumentOperation
     public function setCounterparty(?Counterparty $counterparty): self
     {
         $this->counterparty = $counterparty;
+
+        return $this;
+    }
+
+    public function getProjectDirection(): ?ProjectDirection
+    {
+        return $this->projectDirection;
+    }
+
+    public function setProjectDirection(?ProjectDirection $projectDirection): self
+    {
+        $this->projectDirection = $projectDirection;
 
         return $this;
     }

@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
+use App\Entity\ProjectDirection;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -38,6 +39,10 @@ class Document
     #[ORM\ManyToOne(targetEntity: Counterparty::class)]
     #[ORM\JoinColumn(nullable: true)]
     private ?Counterparty $counterparty = null;
+
+    #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
+    #[ORM\JoinColumn(nullable: true)]
+    private ?ProjectDirection $projectDirection = null;
 
     #[ORM\Column(enumType: DocumentType::class, options: ['default' => DocumentType::OTHER->value])]
     private DocumentType $type = DocumentType::OTHER;
@@ -130,6 +135,18 @@ class Document
     public function setCounterparty(?Counterparty $counterparty): self
     {
         $this->counterparty = $counterparty;
+
+        return $this;
+    }
+
+    public function getProjectDirection(): ?ProjectDirection
+    {
+        return $this->projectDirection;
+    }
+
+    public function setProjectDirection(?ProjectDirection $projectDirection): self
+    {
+        $this->projectDirection = $projectDirection;
 
         return $this;
     }

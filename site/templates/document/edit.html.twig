@@ -54,6 +54,11 @@
                         {{ form_row(form.counterparty) }}
                     </div>
                 </div>
+                <div class="row">
+                    <div class="col-md-3">
+                        {{ form_row(form.projectDirection) }}
+                    </div>
+                </div>
                 {{ form_row(form.description) }}
                 <div class="mb-3">
                     <label class="form-label">Операции</label>
@@ -81,6 +86,7 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const documentCounterpartyField = document.querySelector('[data-document-counterparty]');
+        const documentProjectField = document.querySelector('[data-document-project-direction]');
         const prefillOperationCounterparty = function(card) {
             if (!documentCounterpartyField) {
                 return;
@@ -95,6 +101,23 @@
             if (operationCounterpartyField && !operationCounterpartyField.value) {
                 operationCounterpartyField.value = selectedCounterparty;
                 operationCounterpartyField.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        };
+
+        const prefillOperationProject = function(card) {
+            if (!documentProjectField) {
+                return;
+            }
+
+            const selectedProject = documentProjectField.value;
+            if (!selectedProject) {
+                return;
+            }
+
+            const operationProjectField = card.querySelector('[data-operation-project-direction]');
+            if (operationProjectField && !operationProjectField.value) {
+                operationProjectField.value = selectedProject;
+                operationProjectField.dispatchEvent(new Event('change', { bubbles: true }));
             }
         };
 
@@ -119,6 +142,7 @@
                 const card = createOperationCard(newForm);
                 collectionHolder.appendChild(card);
                 prefillOperationCounterparty(card);
+                prefillOperationProject(card);
             });
 
             collectionHolder.addEventListener('click', function(e){
