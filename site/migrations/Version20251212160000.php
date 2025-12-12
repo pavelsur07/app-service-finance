@@ -21,9 +21,9 @@ final class Version20251212160000 extends AbstractMigration
         $schemaManager = $this->connection->createSchemaManager();
 
         // ensure required columns exist even if previous migrations were skipped
-        $this->addSql('ALTER TABLE documents ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
-        $this->addSql('ALTER TABLE document_operations ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
-        $this->addSql('ALTER TABLE pl_daily_totals ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
+        $this->connection->executeStatement('ALTER TABLE documents ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
+        $this->connection->executeStatement('ALTER TABLE document_operations ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
+        $this->connection->executeStatement('ALTER TABLE pl_daily_totals ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
 
         $companies = $this->connection->fetchFirstColumn('SELECT id FROM companies');
         $defaultProjects = [];
