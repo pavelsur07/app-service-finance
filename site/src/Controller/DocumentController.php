@@ -13,6 +13,7 @@ use App\Form\DocumentType;
 use App\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
+use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\PlNatureResolver;
 use App\Service\PLRegisterUpdater;
@@ -56,7 +57,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/new', name: 'document_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function new(Request $request, DocumentRepository $repo, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
         $document = new Document(Uuid::uuid4()->toString(), $company);
@@ -64,13 +65,23 @@ class DocumentController extends AbstractController
 
         $categories = $catRepo->findTreeByCompany($company);
         $counterparties = $cpRepo->findBy(['company' => $company]);
+        $projectDirections = $projectDirectionRepo->findByCompany($company);
         $form = $this->createForm(DocumentType::class, $document, [
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'project_directions' => $projectDirections,
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if (null !== $document->getProjectDirection()) {
+                foreach ($document->getOperations() as $operation) {
+                    if (null === $operation->getProjectDirection()) {
+                        $operation->setProjectDirection($document->getProjectDirection());
+                    }
+                }
+            }
+
             $em->persist($document);
             $em->flush();
 
@@ -90,6 +101,7 @@ class DocumentController extends AbstractController
         Document $document,
         PLCategoryRepository $catRepo,
         CounterpartyRepository $cpRepo,
+        ProjectDirectionRepository $projectDirectionRepo,
         EntityManagerInterface $em,
         ActiveCompanyService $companyService,
     ): Response {
@@ -102,13 +114,23 @@ class DocumentController extends AbstractController
 
         $categories = $catRepo->findTreeByCompany($company);
         $counterparties = $cpRepo->findBy(['company' => $company]);
+        $projectDirections = $projectDirectionRepo->findByCompany($company);
         $form = $this->createForm(DocumentType::class, $copy, [
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'project_directions' => $projectDirections,
         ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
+            if (null !== $copy->getProjectDirection()) {
+                foreach ($copy->getOperations() as $operation) {
+                    if (null === $operation->getProjectDirection()) {
+                        $operation->setProjectDirection($copy->getProjectDirection());
+                    }
+                }
+            }
+
             $em->persist($copy);
             $em->flush();
 
@@ -155,7 +177,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'document_edit', methods: ['GET', 'POST'])]
-    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(Request $request, Document $document, PLCategoryRepository $catRepo, CounterpartyRepository $cpRepo, ProjectDirectionRepository $projectDirectionRepo, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
     {
         $company = $companyService->getActiveCompany();
         if ($document->getCompany() !== $company) {
@@ -164,9 +186,11 @@ class DocumentController extends AbstractController
 
         $categories = $catRepo->findTreeByCompany($company);
         $counterparties = $cpRepo->findBy(['company' => $company]);
+        $projectDirections = $projectDirectionRepo->findByCompany($company);
         $form = $this->createForm(DocumentType::class, $document, [
             'categories' => $categories,
             'counterparties' => $counterparties,
+            'project_directions' => $projectDirections,
         ]);
         $form->handleRequest($request);
 
@@ -186,6 +210,14 @@ class DocumentController extends AbstractController
             if ($form->isValid()) {
                 if ($cashTransaction instanceof CashTransaction) {
                     $cashTransaction->recalculateAllocatedAmount();
+                }
+
+                if (null !== $document->getProjectDirection()) {
+                    foreach ($document->getOperations() as $operation) {
+                        if (null === $operation->getProjectDirection()) {
+                            $operation->setProjectDirection($document->getProjectDirection());
+                        }
+                    }
                 }
 
                 $em->flush();
@@ -254,6 +286,7 @@ class DocumentController extends AbstractController
         $copy->setNumber($source->getNumber());
         $copy->setType($source->getType());
         $copy->setCounterparty($source->getCounterparty());
+        $copy->setProjectDirection($source->getProjectDirection());
         $copy->setDescription($source->getDescription());
         $copy->setStatus($source->getStatus());
 
@@ -262,6 +295,7 @@ class DocumentController extends AbstractController
             $operationCopy->setPlCategory($operation->getPlCategory());
             $operationCopy->setAmount($operation->getAmount());
             $operationCopy->setCounterparty($operation->getCounterparty());
+            $operationCopy->setProjectDirection($operation->getProjectDirection());
             $operationCopy->setComment($operation->getComment());
             $copy->addOperation($operationCopy);
         }

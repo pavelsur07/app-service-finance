@@ -5,6 +5,7 @@ namespace App\Form;
 use App\Entity\Counterparty;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
+use App\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -39,6 +40,16 @@ class DocumentOperationType extends AbstractType
                 'attr' => [
                     'data-operation-counterparty' => 'true',
                 ],
+            ])
+            ->add('projectDirection', EntityType::class, [
+                'class' => ProjectDirection::class,
+                'choices' => $options['project_directions'],
+                'choice_label' => 'name',
+                'required' => false,
+                'label' => 'Проект',
+                'attr' => [
+                    'data-operation-project-direction' => 'true',
+                ],
             ]);
     }
 
@@ -48,6 +59,7 @@ class DocumentOperationType extends AbstractType
             'data_class' => DocumentOperation::class,
             'categories' => [],
             'counterparties' => [],
+            'project_directions' => [],
         ]);
     }
 }

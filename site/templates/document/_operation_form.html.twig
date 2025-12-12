@@ -1,12 +1,15 @@
 <div class="row g-3 align-items-end">
-    <div class="col-md-5 col-xl-6">
+    <div class="col-md-4 col-xl-5">
         {{ form_row(operationForm.category) }}
     </div>
-    <div class="col-md-3 col-xl-2">
+    <div class="col-md-2 col-xl-2">
         {{ form_row(operationForm.amount) }}
     </div>
-    <div class="col-md-4 col-xl-3">
+    <div class="col-md-3 col-xl-3">
         {{ form_row(operationForm.counterparty) }}
+    </div>
+    <div class="col-md-3 col-xl-2">
+        {{ form_row(operationForm.projectDirection) }}
     </div>
     <div class="col-auto ms-auto">
         <button type="button"
