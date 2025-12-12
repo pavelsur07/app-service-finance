@@ -205,19 +205,6 @@
         });
     </script>
     <script>
-        const initDropdowns = () => {
-            const Dropdown = window.bootstrap?.Dropdown;
-            if (!Dropdown) return;
-
-            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(toggle => {
-                Dropdown.getOrCreateInstance(toggle, {display: 'static'});
-            });
-        };
-
-        document.addEventListener('turbo:load', initDropdowns);
-        document.addEventListener('DOMContentLoaded', initDropdowns);
-    </script>
-    <script>
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest('.js-auto-rule');
       if (!btn) return;
