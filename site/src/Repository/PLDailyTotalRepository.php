@@ -19,6 +19,7 @@ class PLDailyTotalRepository extends ServiceEntityRepository
         string $companyId,
         ?string $categoryId,
         \DateTimeImmutable $date,
+        string $projectDirectionId,
         string $amountIncome,
         string $amountExpense,
         bool $replace,
@@ -30,9 +31,9 @@ class PLDailyTotalRepository extends ServiceEntityRepository
 
         $sql = sprintf(
             <<<'SQL'
-INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, amount_income, amount_expense, created_at, updated_at)
-VALUES (:id, :company_id, :category_id, :date, :amount_income, :amount_expense, :created_at, :updated_at)
-ON CONFLICT (company_id, pl_category_id, date) DO UPDATE SET
+INSERT INTO pl_daily_totals (id, company_id, pl_category_id, date, project_direction_id, amount_income, amount_expense, created_at, updated_at)
+VALUES (:id, :company_id, :category_id, :date, :project_direction_id, :amount_income, :amount_expense, :created_at, :updated_at)
+ON CONFLICT (company_id, pl_category_id, date, project_direction_id) DO UPDATE SET
     amount_income = %s,
     amount_expense = %s,
     updated_at = EXCLUDED.updated_at
@@ -48,6 +49,7 @@ SQL,
                 'company_id' => $companyId,
                 'category_id' => $categoryId,
                 'date' => $date,
+                'project_direction_id' => $projectDirectionId,
                 'amount_income' => $amountIncome,
                 'amount_expense' => $amountExpense,
                 'created_at' => $timestamp,
@@ -58,6 +60,7 @@ SQL,
                 'company_id' => Types::GUID,
                 'category_id' => Types::GUID,
                 'date' => Types::DATE_IMMUTABLE,
+                'project_direction_id' => Types::GUID,
                 'created_at' => Types::DATETIME_IMMUTABLE,
                 'updated_at' => Types::DATETIME_IMMUTABLE,
             ],
