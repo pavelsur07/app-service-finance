@@ -39,7 +39,7 @@ final class PlRawFactsController extends AbstractController
             $value = null;
 
             if ($code && PLCategoryType::LEAF_INPUT === $c->getType()) {
-                $value = (float) $facts->value($company, $period, $code);
+                $value = (float) $facts->value($company, $period, $code, null);
             }
 
             $rows[] = [

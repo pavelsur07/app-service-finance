@@ -22,6 +22,12 @@
             По месяцам
           </option>
         </select>
+        <select class="form-select" name="projectDirectionId">
+          <option value="">Все проекты</option>
+          {% for p in projectDirections %}
+            <option value="{{ p.id }}" {{ selectedProjectDirectionId == p.id ? 'selected' }}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
         <input class="form-control" type="date" name="from" value="{{ from|date('Y-m-d') }}">
         <input class="form-control" type="date" name="to" value="{{ to|date('Y-m-d') }}">
         <label class="form-check">
@@ -48,6 +54,7 @@
         <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
         <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
         <input type="hidden" name="show_meta" value="{{ showMetaColumns ? 1 : 0 }}">
+        <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
         <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
         <input
           class="form-control"
