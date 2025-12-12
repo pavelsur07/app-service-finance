@@ -205,6 +205,25 @@
         });
     </script>
     <script>
+        const initDropdowns = () => {
+            const Dropdown = window.bootstrap?.Dropdown;
+            if (!Dropdown) return;
+
+            const config = {
+                display: 'static',
+                boundary: document.body,
+                popperConfig: { strategy: 'fixed' },
+            };
+
+            document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(toggle => {
+                Dropdown.getOrCreateInstance(toggle, config);
+            });
+        };
+
+        document.addEventListener('turbo:load', initDropdowns);
+        document.addEventListener('DOMContentLoaded', initDropdowns);
+    </script>
+    <script>
     document.addEventListener('click', async (e) => {
       const btn = e.target.closest('.js-auto-rule');
       if (!btn) return;
