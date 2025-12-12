@@ -2,15 +2,16 @@
 
 namespace App\Entity;
 
+use App\Entity\ProjectDirection;
 use App\Repository\PLDailyTotalRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PLDailyTotalRepository::class)]
 #[ORM\Table(name: 'pl_daily_totals')]
-#[ORM\UniqueConstraint(name: 'uniq_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date'])]
+#[ORM\UniqueConstraint(name: 'uniq_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date', 'project_direction_id'])]
 #[ORM\Index(name: 'idx_pl_daily_company_date', columns: ['company_id', 'date'])]
-#[ORM\Index(name: 'idx_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date'])]
+#[ORM\Index(name: 'idx_pl_daily_company_cat_date', columns: ['company_id', 'pl_category_id', 'date', 'project_direction_id'])]
 class PLDailyTotal
 {
     #[ORM\Id]
@@ -24,6 +25,10 @@ class PLDailyTotal
     #[ORM\ManyToOne(targetEntity: PLCategory::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?PLCategory $plCategory = null;
+
+    #[ORM\ManyToOne(targetEntity: ProjectDirection::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
+    private ProjectDirection $projectDirection;
 
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $date;
@@ -40,11 +45,12 @@ class PLDailyTotal
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    public function __construct(string $id, Company $company, \DateTimeImmutable $date, ?PLCategory $category)
+    public function __construct(string $id, Company $company, ProjectDirection $projectDirection, \DateTimeImmutable $date, ?PLCategory $category)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
+        $this->projectDirection = $projectDirection;
         $this->date = $date;
         $this->plCategory = $category;
         $this->createdAt = new \DateTimeImmutable();
@@ -76,6 +82,18 @@ class PLDailyTotal
     public function setPlCategory(?PLCategory $category): self
     {
         $this->plCategory = $category;
+
+        return $this;
+    }
+
+    public function getProjectDirection(): ProjectDirection
+    {
+        return $this->projectDirection;
+    }
+
+    public function setProjectDirection(ProjectDirection $projectDirection): self
+    {
+        $this->projectDirection = $projectDirection;
 
         return $this;
     }
