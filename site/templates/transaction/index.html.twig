@@ -209,14 +209,8 @@
             const Dropdown = window.bootstrap?.Dropdown;
             if (!Dropdown) return;
 
-            const config = {
-                display: 'static',
-                boundary: document.body,
-                popperConfig: { strategy: 'fixed' },
-            };
-
             document.querySelectorAll('[data-bs-toggle="dropdown"]').forEach(toggle => {
-                Dropdown.getOrCreateInstance(toggle, config);
+                Dropdown.getOrCreateInstance(toggle, {display: 'static'});
             });
         };
 
