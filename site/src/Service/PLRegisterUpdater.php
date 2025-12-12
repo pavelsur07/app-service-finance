@@ -9,6 +9,7 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
+use App\Entity\ProjectDirection;
 use App\Enum\PlNature;
 use App\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
@@ -33,9 +34,11 @@ final class PLRegisterUpdater
         $this->clearTotals($company, $day, $day);
 
         $documents = $this->documentRepository->createQueryBuilder('d')
-            ->addSelect('o', 'c')
+            ->addSelect('o', 'c', 'pd', 'opd')
+            ->leftJoin('d.projectDirection', 'pd')
             ->leftJoin('d.operations', 'o')
             ->leftJoin('o.category', 'c')
+            ->leftJoin('o.projectDirection', 'opd')
             ->where('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
             ->setParameter('company', $company)
@@ -62,9 +65,11 @@ final class PLRegisterUpdater
         $this->clearTotals($company, $fromDay, $toDay);
 
         $documents = $this->documentRepository->createQueryBuilder('d')
-            ->addSelect('o', 'c')
+            ->addSelect('o', 'c', 'pd', 'opd')
+            ->leftJoin('d.projectDirection', 'pd')
             ->leftJoin('d.operations', 'o')
             ->leftJoin('o.category', 'c')
+            ->leftJoin('o.projectDirection', 'opd')
             ->where('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
             ->setParameter('company', $company)
@@ -83,7 +88,13 @@ final class PLRegisterUpdater
     /**
      * @param iterable<Document> $documents
      *
-     * @return array<string, array{date: \DateTimeImmutable, categories: array<string, array{category: PLCategory, income: float, expense: float}>}>
+     * @return array<string, array{
+     *   date: \DateTimeImmutable,
+     *   projects: array<string, array{
+     *     project: ProjectDirection,
+     *     categories: array<string, array{category: PLCategory, income: float, expense: float}>,
+     *   }>,
+     * }>
      */
     private function aggregateDocuments(iterable $documents): array
     {
@@ -100,12 +111,20 @@ final class PLRegisterUpdater
             if (!isset($result[$dateKey])) {
                 $result[$dateKey] = [
                     'date' => $date,
-                    'categories' => [],
+                    'projects' => [],
                 ];
             }
 
             foreach ($document->getOperations() as $operation) {
                 if (!$operation instanceof DocumentOperation) {
+                    continue;
+                }
+
+                $project = method_exists($operation, 'getProjectDirection')
+                    ? $operation->getProjectDirection()
+                    : null;
+
+                if (!$project instanceof ProjectDirection) {
                     continue;
                 }
 
@@ -123,10 +142,18 @@ final class PLRegisterUpdater
                     continue;
                 }
 
+                $projectKey = $project->getId() ?? (string) spl_object_id($project);
                 $categoryKey = $category->getId() ?? (string) spl_object_id($category);
 
-                if (!isset($result[$dateKey]['categories'][$categoryKey])) {
-                    $result[$dateKey]['categories'][$categoryKey] = [
+                if (!isset($result[$dateKey]['projects'][$projectKey])) {
+                    $result[$dateKey]['projects'][$projectKey] = [
+                        'project' => $project,
+                        'categories' => [],
+                    ];
+                }
+
+                if (!isset($result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey])) {
+                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey] = [
                         'category' => $category,
                         'income' => 0.0,
                         'expense' => 0.0,
@@ -136,9 +163,9 @@ final class PLRegisterUpdater
                 $amount = abs((float) $operation->getAmount());
 
                 if (PlNature::INCOME === $nature) {
-                    $result[$dateKey]['categories'][$categoryKey]['income'] += $amount;
+                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['income'] += $amount;
                 } else {
-                    $result[$dateKey]['categories'][$categoryKey]['expense'] += $amount;
+                    $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['expense'] += $amount;
                 }
             }
         }
@@ -151,22 +178,27 @@ final class PLRegisterUpdater
         foreach ($aggregated as $data) {
             $date = $data['date'];
 
-            foreach ($data['categories'] as $categoryData) {
-                $income = $categoryData['income'];
-                $expense = $categoryData['expense'];
+            foreach ($data['projects'] as $projectData) {
+                $project = $projectData['project'];
 
-                if (0.0 === $income && 0.0 === $expense) {
-                    continue;
+                foreach ($projectData['categories'] as $categoryData) {
+                    $income = $categoryData['income'];
+                    $expense = $categoryData['expense'];
+
+                    if (0.0 === $income && 0.0 === $expense) {
+                        continue;
+                    }
+
+                    $this->upsertDailyTotal(
+                        $company,
+                        $date,
+                        $project,
+                        $categoryData['category'],
+                        $income,
+                        $expense,
+                        $replace,
+                    );
                 }
-
-                $this->upsertDailyTotal(
-                    $company,
-                    $date,
-                    $categoryData['category'],
-                    $income,
-                    $expense,
-                    $replace,
-                );
             }
         }
     }
@@ -174,6 +206,7 @@ final class PLRegisterUpdater
     private function upsertDailyTotal(
         Company $company,
         \DateTimeImmutable $date,
+        ProjectDirection $projectDirection,
         PLCategory $category,
         float $income,
         float $expense,
@@ -181,8 +214,9 @@ final class PLRegisterUpdater
     ): void {
         $companyId = $company->getId();
         $categoryId = $category->getId();
+        $projectDirectionId = $projectDirection->getId();
 
-        if (null === $companyId || null === $categoryId) {
+        if (null === $companyId || null === $categoryId || null === $projectDirectionId) {
             throw new \LogicException('Unable to upsert PL daily total without identifiers.');
         }
 
@@ -190,6 +224,7 @@ final class PLRegisterUpdater
             $companyId,
             $categoryId,
             $date,
+            $projectDirectionId,
             $this->formatAmount($income),
             $this->formatAmount($expense),
             $replace,

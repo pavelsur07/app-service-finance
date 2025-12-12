@@ -6,6 +6,7 @@ namespace App\Finance\Controller;
 
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportPeriod;
+use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\PLRegisterUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,6 +22,7 @@ final class PlReportPreviewController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompany,
         PlReportCalculator $calc,
+        ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $activeCompany->getActiveCompany();
 
@@ -30,6 +32,19 @@ final class PlReportPreviewController extends AbstractController
         }
 
         $showMetaColumns = $request->query->getBoolean('show_meta');
+
+        $projectDirectionId = $request->query->get('projectDirectionId');
+        $projectDirections = $projectDirectionRepo->findByCompany($company);
+        $selectedProject = null;
+        if ($projectDirectionId) {
+            foreach ($projectDirections as $projectDirection) {
+                if ((string) $projectDirection->getId() === (string) $projectDirectionId) {
+                    $selectedProject = $projectDirection;
+
+                    break;
+                }
+            }
+        }
 
         $fromInput = $request->query->get('from');
         $toInput = $request->query->get('to');
@@ -49,7 +64,7 @@ final class PlReportPreviewController extends AbstractController
         $results = [];
         $warnings = [];
         foreach ($periods as $period) {
-            $result = $calc->calculate($company, $period);
+            $result = $calc->calculate($company, $period, $selectedProject);
             $results[] = $result;
             $warnings = array_merge($warnings, $result->warnings);
         }
@@ -79,6 +94,8 @@ final class PlReportPreviewController extends AbstractController
             'company' => $company,
             'grouping' => $grouping,
             'showMetaColumns' => $showMetaColumns,
+            'projectDirections' => $projectDirections,
+            'selectedProjectDirectionId' => $selectedProject?->getId(),
             'from' => $from,
             'to' => $to,
             'periods' => array_map(
@@ -170,6 +187,7 @@ final class PlReportPreviewController extends AbstractController
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
+                'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
         }
 
@@ -188,6 +206,7 @@ final class PlReportPreviewController extends AbstractController
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
+                'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
         }
 
@@ -203,6 +222,7 @@ final class PlReportPreviewController extends AbstractController
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
+                'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
         }
 
@@ -226,6 +246,7 @@ final class PlReportPreviewController extends AbstractController
             'from' => $request->request->get('from', $from->format('Y-m-d')),
             'to' => $request->request->get('to', $to->format('Y-m-d')),
             'show_meta' => $request->request->getBoolean('show_meta'),
+            'projectDirectionId' => $request->request->get('projectDirectionId'),
         ]);
     }
 }

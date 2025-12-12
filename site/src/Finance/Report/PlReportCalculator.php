@@ -6,6 +6,7 @@ namespace App\Finance\Report;
 
 use App\Entity\Company;
 use App\Entity\PLCategory;
+use App\Entity\ProjectDirection;
 use App\Enum\PLCategoryType;
 use App\Finance\Engine\DependencyExtractor;
 use App\Finance\Engine\Graph;
@@ -31,7 +32,7 @@ final class PlReportCalculator
     ) {
     }
 
-    public function calculate(Company $company, PlReportPeriod $period): PlReportResult
+    public function calculate(Company $company, PlReportPeriod $period, ?ProjectDirection $projectDirection = null): PlReportResult
     {
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);
         $displayOrder = $this->orderByTree($all);
@@ -78,12 +79,13 @@ final class PlReportCalculator
         $order = $this->topo->sort($g, $byId);
 
         $values = [];
-        $env = new class($values, $all, $company, $period, $this->facts, $warnings) implements \App\Finance\Formula\Env {
+        $env = new class($values, $all, $company, $period, $projectDirection, $this->facts, $warnings) implements \App\Finance\Formula\Env {
             public function __construct(
                 public array &$values,
                 private array $all,
                 private Company $company,
                 private PlReportPeriod $period,
+                private ?ProjectDirection $projectDirection,
                 private FactsProviderInterface $facts,
                 private array &$warnings,
             ) {
@@ -93,7 +95,7 @@ final class PlReportCalculator
             {
                 foreach ($this->all as $c) {
                     if ($c->getCode() && strtoupper($c->getCode()) === strtoupper($code)) {
-                        $v = $this->values[$c->getId()] ?? $this->facts->value($this->company, $this->period, $code);
+                        $v = $this->values[$c->getId()] ?? $this->facts->value($this->company, $this->period, $code, $this->projectDirection);
 
                         return (float) $v;
                     }
@@ -117,7 +119,7 @@ final class PlReportCalculator
 
             if (PLCategoryType::LEAF_INPUT === $t) {
                 $code = (string) $c->getCode();
-                $val = $this->facts->value($company, $period, $code);
+                $val = $this->facts->value($company, $period, $code, $projectDirection);
             } elseif (PLCategoryType::SUBTOTAL === $t) {
                 $formula = trim((string) ($c->getFormula() ?? ''));
                 if ('' === $formula) {

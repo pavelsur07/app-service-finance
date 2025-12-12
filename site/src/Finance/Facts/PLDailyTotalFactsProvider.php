@@ -7,6 +7,7 @@ namespace App\Finance\Facts;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
+use App\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,7 +24,7 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
      * Возвращает сумму за период по коду категории:
      * SUM(amountIncome) - SUM(amountExpense) из PLDailyTotal по company + category + date ∈ [from; to]
      */
-    public function value(Company $company, PlReportPeriod $period, string $code): float
+    public function value(Company $company, PlReportPeriod $period, string $code, ?ProjectDirection $projectDirection = null): float
     {
         $code = trim((string) $code);
         if ('' === $code) {
@@ -53,6 +54,12 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             ->setParameter('cat', $cat)
             ->setParameter('from', $from)
             ->setParameter('to', $to);
+
+        if (null !== $projectDirection) {
+            $qb
+                ->andWhere('dt.projectDirection = :project')
+                ->setParameter('project', $projectDirection);
+        }
 
         $row = $qb->getQuery()->getOneOrNullResult();
         $income = isset($row['sIncome']) ? (float) $row['sIncome'] : 0.0;
