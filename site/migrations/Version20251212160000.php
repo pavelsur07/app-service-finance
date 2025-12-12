@@ -20,17 +20,10 @@ final class Version20251212160000 extends AbstractMigration
     {
         $schemaManager = $this->connection->createSchemaManager();
 
-        if (!$schemaManager->introspectTable('documents')->hasColumn('project_direction_id')) {
-            $this->addSql('ALTER TABLE documents ADD project_direction_id UUID DEFAULT NULL');
-        }
-
-        if (!$schemaManager->introspectTable('document_operations')->hasColumn('project_direction_id')) {
-            $this->addSql('ALTER TABLE document_operations ADD project_direction_id UUID DEFAULT NULL');
-        }
-
-        if (!$schemaManager->introspectTable('pl_daily_totals')->hasColumn('project_direction_id')) {
-            $this->addSql('ALTER TABLE pl_daily_totals ADD project_direction_id UUID DEFAULT NULL');
-        }
+        // ensure required columns exist even if previous migrations were skipped
+        $this->addSql('ALTER TABLE documents ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
+        $this->addSql('ALTER TABLE document_operations ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
+        $this->addSql('ALTER TABLE pl_daily_totals ADD COLUMN IF NOT EXISTS project_direction_id UUID DEFAULT NULL');
 
         $companies = $this->connection->fetchFirstColumn('SELECT id FROM companies');
         $defaultProjects = [];
