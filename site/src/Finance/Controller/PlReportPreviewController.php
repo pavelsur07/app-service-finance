@@ -103,8 +103,25 @@ final class PlReportPreviewController extends AbstractController
                     'compareProjects' => $compare['projects'],
                 ]);
             } catch (LogicException $e) {
-                $this->addFlash('warning', 'Разрез по проектам пока недоступен. Проекты не участвуют в расчёте ОПиУ.');
-                $layout = 'periods';
+                $warningMessage = 'Не удалось построить разрез по проектам. Проверьте наличие регистра pl_daily_totals по проектам.';
+                $warnings = [$e->getMessage() ?: $warningMessage];
+
+                $this->addFlash('warning', $warningMessage);
+
+                return $this->render('finance/report/preview.html.twig', [
+                    'company' => $company,
+                    'grouping' => $grouping,
+                    'showMetaColumns' => $showMetaColumns,
+                    'projectDirections' => $projectDirectionsList,
+                    'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'from' => $from,
+                    'to' => $to,
+                    'layout' => 'projects',
+                    'periods' => [],
+                    'rows' => [],
+                    'warnings' => $warnings,
+                    'compareProjects' => [],
+                ]);
             }
         }
 
