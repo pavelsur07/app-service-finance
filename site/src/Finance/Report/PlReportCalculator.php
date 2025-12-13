@@ -32,6 +32,11 @@ final class PlReportCalculator
     ) {
     }
 
+    public function supportsProjectDimension(): bool
+    {
+        return false;
+    }
+
     public function calculate(Company $company, PlReportPeriod $period, ?ProjectDirection $projectDirection = null): PlReportResult
     {
         $all = $this->categories->findBy(['company' => $company], ['parent' => 'ASC', 'sortOrder' => 'ASC']);

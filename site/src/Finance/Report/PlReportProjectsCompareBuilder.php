@@ -54,6 +54,12 @@ final class PlReportProjectsCompareBuilder
         $rowsById = [];
         $rawValues = [];
 
+        if (!$this->calc->supportsProjectDimension()) {
+            throw new \LogicException(
+                'P&L projects view requires project dimension support in facts'
+            );
+        }
+
         // считаем по каждому проекту
         foreach ($projects as $p) {
             if (!$p->getId()) {
