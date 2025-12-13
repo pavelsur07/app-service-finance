@@ -22,6 +22,28 @@ final class PublicPlReportController extends AbstractController
     ) {
     }
 
+    /**
+     * Публичный отчет о прибылях и убытках.
+     *
+     * Входные параметры (query):
+     *  - token (string, required): публичный ключ компании, иначе 401.
+     *  - grouping (string, optional): day|week|month, по умолчанию month.
+     *  - from, to (string, optional): даты в формате YYYY-MM-DD; если from > to, значения меняются местами;
+     *    по умолчанию текущий месяц.
+     *  - projectDirectionId (string, optional): идентификатор направления проекта.
+     *
+     * Контракт ответа (JsonResponse 200):
+     *  - company (string): идентификатор компании.
+     *  - grouping (string): используемый тип группировки.
+     *  - from, to (string): границы периода в формате YYYY-MM-DD.
+     *  - projectDirectionId (string|null): выбранное направление проекта.
+     *  - periods (array): список периодов с полями id, label, from, to.
+     *  - rows (array): агрегированные строки отчета.
+     *  - rawValues (array): исходные суммы, которые использовались для построения rows.
+     *  - warnings (array): список предупреждений.
+     *
+     * Ошибки: 401 token_required или unauthorized, 429 rate_limited.
+     */
     #[Route('/api/public/reports/pl.json', name: 'api_report_pl_json', methods: ['GET'])]
     public function jsonReport(Request $r): JsonResponse
     {
