@@ -34,7 +34,7 @@ final class PlReportCalculator
 
     public function supportsProjectDimension(): bool
     {
-        return false;
+        return true;
     }
 
     public function calculate(Company $company, PlReportPeriod $period, ?ProjectDirection $projectDirection = null): PlReportResult
