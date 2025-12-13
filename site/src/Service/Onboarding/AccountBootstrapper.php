@@ -50,6 +50,18 @@ final class AccountBootstrapper
         return $company;
     }
 
+    public function ensurePlSeeded(Company $company): bool
+    {
+        if ($this->plCategories->count(['company' => $company]) > 0) {
+            return false;
+        }
+
+        $this->seedPL($company);
+        $this->em->flush();
+
+        return true;
+    }
+
     private function createCompanyFor(User $user, string $name): Company
     {
         $company = new Company(

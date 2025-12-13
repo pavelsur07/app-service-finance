@@ -8,6 +8,7 @@ use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\Onboarding\AccountBootstrapper;
 use App\Service\PLRegisterUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -21,10 +22,19 @@ final class PlReportPreviewController extends AbstractController
     public function preview(
         Request $request,
         ActiveCompanyService $activeCompany,
+        AccountBootstrapper $accountBootstrapper,
         PlReportGridBuilder $gridBuilder,
         ProjectDirectionRepository $projectDirections,
     ): Response {
         $company = $activeCompany->getActiveCompany();
+
+        $seeded = $accountBootstrapper->ensurePlSeeded($company);
+        if ($seeded) {
+            $this->addFlash(
+                'info',
+                'Для компании создана базовая структура ОПиУ. Настроить статьи можно в разделе "Справочники → ОПиУ (структура)".'
+            );
+        }
 
         $grouping = $request->query->get('grouping', 'month');
         if (!\in_array($grouping, ['day', 'week', 'month'], true)) {
