@@ -3,6 +3,7 @@
 namespace App\Controller\Api;
 
 use App\Finance\Report\PlReportGridBuilder;
+use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\RateLimiter\ReportsApiRateLimiter;
@@ -17,6 +18,7 @@ final class PublicPlReportController extends AbstractController
     public function __construct(
         private readonly ReportApiKeyManager $keys,
         private readonly PlReportGridBuilder $gridBuilder,
+        private readonly PlReportProjectsCompareBuilder $projectsCompareBuilder,
         private readonly ProjectDirectionRepository $projectDirections,
         private readonly ReportsApiRateLimiter $rateLimiter,
     ) {
@@ -109,6 +111,62 @@ final class PublicPlReportController extends AbstractController
             'rows' => $grid['rows'],
             'rawValues' => $grid['rawValues'],
             'warnings' => $grid['warnings'],
+        ]);
+    }
+
+    #[Route('/api/public/reports/pl-projects.json', name: 'api_report_pl_projects_json', methods: ['GET'])]
+    public function jsonProjectsReport(Request $r): JsonResponse
+    {
+        $token = (string) $r->query->get('token', '');
+        $identifier = '' !== $token ? $token : ($r->getClientIp() ?? 'anon');
+        if (!$this->rateLimiter->consume($identifier)) {
+            return new JsonResponse(['error' => 'rate_limited'], 429);
+        }
+        if ('' === $token) {
+            return new JsonResponse(['error' => 'token_required'], 401);
+        }
+
+        $company = $this->keys->findCompanyByRawKey($token);
+        if (!$company) {
+            return new JsonResponse(['error' => 'unauthorized'], 401);
+        }
+
+        $defaultFrom = (new \DateTimeImmutable('first day of this month'))->setTime(0, 0, 0);
+        $defaultTo = (new \DateTimeImmutable('last day of this month'))->setTime(0, 0, 0);
+
+        $from = $this->parseDate($r->query->get('from')) ?? $defaultFrom;
+        $to = $this->parseDate($r->query->get('to')) ?? $defaultTo;
+
+        if ($from > $to) {
+            [$from, $to] = [$to, $from];
+        }
+
+        $projectDirections = $this->projectDirections->findByCompany($company);
+        $overhead = null;
+        foreach ($projectDirections as $pd) {
+            $name = mb_strtolower(trim((string) $pd->getName()));
+            if ($name === 'общий' || str_starts_with($name, 'общий')) {
+                $overhead = $pd;
+
+                break;
+            }
+        }
+
+        $payload = $this->projectsCompareBuilder->build($company, $from, $to, $projectDirections, $overhead);
+
+        return $this->json([
+            'company' => [
+                'id' => $company->getId(),
+                'name' => $company->getName(),
+            ],
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+            'layout' => 'projects',
+            'period' => $payload['period'],
+            'projects' => $payload['projects'],
+            'rows' => $payload['rows'],
+            'rawValues' => $payload['rawValues'],
+            'warnings' => $payload['warnings'],
         ]);
     }
 
