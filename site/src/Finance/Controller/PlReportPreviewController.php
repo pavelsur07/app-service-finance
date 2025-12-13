@@ -22,7 +22,7 @@ final class PlReportPreviewController extends AbstractController
         Request $request,
         ActiveCompanyService $activeCompany,
         PlReportGridBuilder $gridBuilder,
-        ProjectDirectionRepository $projectDirectionRepo,
+        ProjectDirectionRepository $projectDirections,
     ): Response {
         $company = $activeCompany->getActiveCompany();
 
@@ -33,12 +33,12 @@ final class PlReportPreviewController extends AbstractController
 
         $showMetaColumns = $request->query->getBoolean('show_meta');
 
-        $projectDirectionId = $request->query->get('projectDirectionId');
-        $projectDirections = $projectDirectionRepo->findByCompany($company);
+        $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
+        $projectDirectionsList = $projectDirections->findByCompany($company);
         $selectedProject = null;
-        if ($projectDirectionId) {
-            foreach ($projectDirections as $projectDirection) {
-                if ((string) $projectDirection->getId() === (string) $projectDirectionId) {
+        if ($projectDirectionId !== '') {
+            foreach ($projectDirectionsList as $projectDirection) {
+                if ((string) $projectDirection->getId() === $projectDirectionId) {
                     $selectedProject = $projectDirection;
 
                     break;
@@ -61,7 +61,7 @@ final class PlReportPreviewController extends AbstractController
             'company' => $company,
             'grouping' => $grouping,
             'showMetaColumns' => $showMetaColumns,
-            'projectDirections' => $projectDirections,
+            'projectDirections' => $projectDirectionsList,
             'selectedProjectDirectionId' => $selectedProject?->getId(),
             'from' => $from,
             'to' => $to,
