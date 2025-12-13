@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Finance\Report\PlReportGridBuilder;
+use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
@@ -24,6 +25,7 @@ final class PlReportPreviewController extends AbstractController
         ActiveCompanyService $activeCompany,
         AccountBootstrapper $accountBootstrapper,
         PlReportGridBuilder $gridBuilder,
+        PlReportProjectsCompareBuilder $projectsCompareBuilder,
         ProjectDirectionRepository $projectDirections,
     ): Response {
         $company = $activeCompany->getActiveCompany();
@@ -41,10 +43,26 @@ final class PlReportPreviewController extends AbstractController
             $grouping = 'month';
         }
 
+        $layout = (string) $request->query->get('layout', 'periods');
+        if (!in_array($layout, ['periods', 'projects'], true)) {
+            $layout = 'periods';
+        }
+
         $showMetaColumns = $request->query->getBoolean('show_meta');
 
         $projectDirectionId = (string) $request->query->get('projectDirectionId', '');
         $projectDirectionsList = $projectDirections->findByCompany($company);
+        $overheadProject = null;
+
+        foreach ($projectDirectionsList as $pd) {
+            $name = mb_strtolower(trim((string) $pd->getName()));
+            if ($name === 'общий' || str_starts_with($name, 'общий')) {
+                $overheadProject = $pd;
+
+                break;
+            }
+        }
+
         $selectedProject = null;
         if ($projectDirectionId !== '') {
             foreach ($projectDirectionsList as $projectDirection) {
@@ -65,6 +83,25 @@ final class PlReportPreviewController extends AbstractController
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
 
+        if ($layout === 'projects') {
+            $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
+
+            return $this->render('finance/report/preview.html.twig', [
+                'company' => $company,
+                'grouping' => $grouping,
+                'showMetaColumns' => $showMetaColumns,
+                'projectDirections' => $projectDirectionsList,
+                'selectedProjectDirectionId' => $selectedProject?->getId(),
+                'from' => $from,
+                'to' => $to,
+                'layout' => $layout,
+                'periods' => [],
+                'rows' => $compare['rows'],
+                'warnings' => $compare['warnings'],
+                'compareProjects' => $compare['projects'],
+            ]);
+        }
+
         $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject);
 
         return $this->render('finance/report/preview.html.twig', [
@@ -75,6 +112,7 @@ final class PlReportPreviewController extends AbstractController
             'selectedProjectDirectionId' => $selectedProject?->getId(),
             'from' => $from,
             'to' => $to,
+            'layout' => $layout,
             'periods' => array_map(
                 static fn (PlReportPeriod $period): array => [
                     'id' => $period->id,
@@ -115,6 +153,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
@@ -134,6 +173,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
@@ -150,6 +190,7 @@ final class PlReportPreviewController extends AbstractController
                 'grouping' => $request->request->get('grouping', 'month'),
                 'from' => $request->request->get('from'),
                 'to' => $request->request->get('to'),
+                'layout' => $request->request->get('layout', 'periods'),
                 'show_meta' => $request->request->getBoolean('show_meta'),
                 'projectDirectionId' => $request->request->get('projectDirectionId'),
             ]);
@@ -174,6 +215,7 @@ final class PlReportPreviewController extends AbstractController
             'grouping' => $request->request->get('grouping', 'month'),
             'from' => $request->request->get('from', $from->format('Y-m-d')),
             'to' => $request->request->get('to', $to->format('Y-m-d')),
+            'layout' => $request->request->get('layout', 'periods'),
             'show_meta' => $request->request->getBoolean('show_meta'),
             'projectDirectionId' => $request->request->get('projectDirectionId'),
         ]);

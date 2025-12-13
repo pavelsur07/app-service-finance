@@ -6,7 +6,13 @@
     {% set groupingLabels = {'day': 'по дням', 'week': 'по неделям', 'month': 'по месяцам'} %}
 
     <div class="d-flex align-items-center mb-3">
-      <h2 class="page-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }} ({{ groupingLabels[grouping] ?? grouping }})</h2>
+      <h2 class="page-title mb-0">P&L Preview — {{ company.name }} — {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}
+        {% if layout == 'projects' %}
+          (по проектам)
+        {% else %}
+          ({{ groupingLabels[grouping] ?? grouping }})
+        {% endif %}
+      </h2>
     </div>
 
     <div class="d-flex align-items-center gap-3 mb-3 flex-nowrap">
@@ -21,6 +27,10 @@
           <option value="month" {{ grouping == 'month' ? 'selected' }}>
             По месяцам
           </option>
+        </select>
+        <select class="form-select" name="layout">
+          <option value="periods" {{ layout == 'periods' ? 'selected' }}>По периодам</option>
+          <option value="projects" {{ layout == 'projects' ? 'selected' }}>По проектам (Direct)</option>
         </select>
         <select class="form-select" name="projectDirectionId">
           <option value="">Все проекты</option>
@@ -53,6 +63,7 @@
         <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
         <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
         <input type="hidden" name="recalc_to" value="{{ to|date('Y-m-d') }}">
+        <input type="hidden" name="layout" value="{{ layout }}">
         <input type="hidden" name="show_meta" value="{{ showMetaColumns ? 1 : 0 }}">
         <input type="hidden" name="projectDirectionId" value="{{ selectedProjectDirectionId ?? '' }}">
         <label class="form-label mb-0" for="recalc_from">Пересчитать с</label>
@@ -79,36 +90,73 @@
     <div class="card">
       <div class="table-responsive">
         <table class="table table-vcenter">
-          <thead>
-            <tr>
-              <th>Строка</th>
-              {% if showMetaColumns %}
-                <th>Код</th>
-                <th>Тип</th>
-              {% endif %}
-              {% for period in periods %}
-                <th class="text-end">{{ period.label }}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-          {% for r in rows %}
-            <tr>
-              <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
-              {% if showMetaColumns %}
-                <td><code>{{ r.code ?? '—' }}</code></td>
-                <td>{{ r.type }}</td>
-              {% endif %}
-              {% for period in periods %}
-                <td class="text-end">{{ r.values[period.id] ?? '—' }}</td>
-              {% endfor %}
-            </tr>
+          {% if layout == 'projects' %}
+            <thead>
+              <tr>
+                <th>Строка</th>
+                {% if showMetaColumns %}
+                  <th>Код</th>
+                  <th>Тип</th>
+                {% endif %}
+                {% for p in compareProjects %}
+                  <th class="text-end">
+                    {{ p.name }}{% if p.isOverhead %} <span class="text-muted">(Shared)</span>{% endif %}
+                  </th>
+                {% endfor %}
+                <th class="text-end">Итого</th>
+              </tr>
+            </thead>
+            <tbody>
+            {% for r in rows %}
+              <tr>
+                <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
+                {% if showMetaColumns %}
+                  <td><code>{{ r.code ?? '—' }}</code></td>
+                  <td>{{ r.type }}</td>
+                {% endif %}
+                {% for p in compareProjects %}
+                  <td class="text-end">{{ r.values[p.id] ?? '—' }}</td>
+                {% endfor %}
+                <td class="text-end fw-bold">{{ r.values['_total'] ?? '—' }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="{{ 1 + (showMetaColumns ? 2 : 0) + compareProjects|length + 1 }}" class="text-muted">Нет строк отчёта</td>
+              </tr>
+            {% endfor %}
+            </tbody>
           {% else %}
-            <tr>
-              <td colspan="{{ 1 + (showMetaColumns ? 2 : 0) + periods|length }}" class="text-muted">Нет строк отчёта</td>
-            </tr>
-          {% endfor %}
-          </tbody>
+            <thead>
+              <tr>
+                <th>Строка</th>
+                {% if showMetaColumns %}
+                  <th>Код</th>
+                  <th>Тип</th>
+                {% endif %}
+                {% for period in periods %}
+                  <th class="text-end">{{ period.label }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+            {% for r in rows %}
+              <tr>
+                <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
+                {% if showMetaColumns %}
+                  <td><code>{{ r.code ?? '—' }}</code></td>
+                  <td>{{ r.type }}</td>
+                {% endif %}
+                {% for period in periods %}
+                  <td class="text-end">{{ r.values[period.id] ?? '—' }}</td>
+                {% endfor %}
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="{{ 1 + (showMetaColumns ? 2 : 0) + periods|length }}" class="text-muted">Нет строк отчёта</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          {% endif %}
         </table>
       </div>
     </div>
