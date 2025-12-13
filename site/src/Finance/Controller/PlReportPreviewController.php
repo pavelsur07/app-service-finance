@@ -16,6 +16,7 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use LogicException;
 
 final class PlReportPreviewController extends AbstractController
 {
@@ -84,22 +85,27 @@ final class PlReportPreviewController extends AbstractController
         $to = $this->parseDate($toInput) ?? $defaultEnd;
 
         if ($layout === 'projects') {
-            $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
+            try {
+                $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
 
-            return $this->render('finance/report/preview.html.twig', [
-                'company' => $company,
-                'grouping' => $grouping,
-                'showMetaColumns' => $showMetaColumns,
-                'projectDirections' => $projectDirectionsList,
-                'selectedProjectDirectionId' => $selectedProject?->getId(),
-                'from' => $from,
-                'to' => $to,
-                'layout' => $layout,
-                'periods' => [],
-                'rows' => $compare['rows'],
-                'warnings' => $compare['warnings'],
-                'compareProjects' => $compare['projects'],
-            ]);
+                return $this->render('finance/report/preview.html.twig', [
+                    'company' => $company,
+                    'grouping' => $grouping,
+                    'showMetaColumns' => $showMetaColumns,
+                    'projectDirections' => $projectDirectionsList,
+                    'selectedProjectDirectionId' => $selectedProject?->getId(),
+                    'from' => $from,
+                    'to' => $to,
+                    'layout' => $layout,
+                    'periods' => [],
+                    'rows' => $compare['rows'],
+                    'warnings' => $compare['warnings'],
+                    'compareProjects' => $compare['projects'],
+                ]);
+            } catch (LogicException $e) {
+                $this->addFlash('warning', 'Разрез по проектам пока недоступен. Проекты не участвуют в расчёте ОПиУ.');
+                $layout = 'periods';
+            }
         }
 
         $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject);
