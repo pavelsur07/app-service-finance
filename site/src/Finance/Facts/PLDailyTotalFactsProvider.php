@@ -55,6 +55,12 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             ->setParameter('from', $from)
             ->setParameter('to', $to);
 
+        if ($projectDirection instanceof ProjectDirection) {
+            $qb
+                ->andWhere('dt.projectDirection = :pd')
+                ->setParameter('pd', $projectDirection);
+        }
+
         $row = $qb->getQuery()->getOneOrNullResult();
         $income = isset($row['sIncome']) ? (float) $row['sIncome'] : 0.0;
         $expense = isset($row['sExpense']) ? (float) $row['sExpense'] : 0.0;
