@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Finance\Report\PlReportCalculator;
+use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
@@ -21,7 +21,7 @@ final class PlReportPreviewController extends AbstractController
     public function preview(
         Request $request,
         ActiveCompanyService $activeCompany,
-        PlReportCalculator $calc,
+        PlReportGridBuilder $gridBuilder,
         ProjectDirectionRepository $projectDirectionRepo,
     ): Response {
         $company = $activeCompany->getActiveCompany();
@@ -55,40 +55,7 @@ final class PlReportPreviewController extends AbstractController
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
 
-        if ($from > $to) {
-            [$from, $to] = [$to, $from];
-        }
-
-        $periods = $this->buildPeriods($from, $to, $grouping);
-
-        $results = [];
-        $warnings = [];
-        foreach ($periods as $period) {
-            $result = $calc->calculate($company, $period, $selectedProject);
-            $results[] = $result;
-            $warnings = array_merge($warnings, $result->warnings);
-        }
-        $warnings = array_values(array_unique($warnings));
-
-        $rows = [];
-        if ([] !== $results) {
-            foreach ($results[0]->rows as $row) {
-                $rows[$row->id] = [
-                    'id' => $row->id,
-                    'code' => $row->code,
-                    'name' => $row->name,
-                    'level' => $row->level,
-                    'type' => $row->type,
-                    'values' => [],
-                ];
-            }
-
-            foreach ($results as $result) {
-                foreach ($result->rows as $row) {
-                    $rows[$row->id]['values'][$result->period->id] = $row->formatted;
-                }
-            }
-        }
+        $grid = $gridBuilder->build($company, $from, $to, $grouping, $selectedProject);
 
         return $this->render('finance/report/preview.html.twig', [
             'company' => $company,
@@ -105,10 +72,10 @@ final class PlReportPreviewController extends AbstractController
                     'from' => $period->from,
                     'to' => $period->to,
                 ],
-                $periods
+                $grid['periods']
             ),
-            'rows' => array_values($rows),
-            'warnings' => $warnings,
+            'rows' => $grid['rows'],
+            'warnings' => $grid['warnings'],
         ]);
     }
 
@@ -123,54 +90,6 @@ final class PlReportPreviewController extends AbstractController
         } catch (\Exception) {
             return null;
         }
-    }
-
-    /** @return PlReportPeriod[] */
-    private function buildPeriods(\DateTimeImmutable $from, \DateTimeImmutable $to, string $grouping): array
-    {
-        $periods = [];
-        $start = $from->setTime(0, 0, 0);
-        $endBound = $to->setTime(23, 59, 59);
-
-        while ($start <= $endBound) {
-            $periodStart = $start;
-            switch ($grouping) {
-                case 'day':
-                    $candidateEnd = $periodStart;
-                    $label = $periodStart->format('d.m.Y');
-                    break;
-                case 'week':
-                    $candidateEnd = $periodStart->modify('sunday this week');
-                    $label = '';
-                    break;
-                case 'month':
-                default:
-                    $candidateEnd = $periodStart->modify('last day of this month');
-                    $label = $periodStart->format('Y-m');
-                    break;
-            }
-
-            $candidateEnd = $candidateEnd->setTime(23, 59, 59);
-            if ($candidateEnd > $endBound) {
-                $periodEnd = $endBound;
-            } else {
-                $periodEnd = $candidateEnd;
-            }
-
-            if ('week' === $grouping) {
-                $label = sprintf(
-                    'Неделя %s (%s — %s)',
-                    $periodStart->format('W'),
-                    $periodStart->format('d.m.Y'),
-                    $periodEnd->format('d.m.Y')
-                );
-            }
-
-            $periods[] = new PlReportPeriod($periodStart, $periodEnd, $label);
-            $start = $periodEnd->modify('+1 day')->setTime(0, 0, 0);
-        }
-
-        return $periods;
     }
 
     #[Route('/finance/report/preview/recalc', name: 'finance_report_preview_recalc', methods: ['POST'])]
