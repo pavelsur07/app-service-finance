@@ -78,6 +78,45 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Возвращает суммы closingBalance по валютам для последней доступной даты не позже указанной.
+     *
+     * @return array<string,string> currency => totalClosing (decimal string)
+     */
+    public function getLatestClosingTotalsUpToDate(Company $company, \DateTimeInterface $date): array
+    {
+        $lastDate = $this->createQueryBuilder('b')
+            ->select('MAX(b.date)')
+            ->where('b.company = :company')
+            ->andWhere('b.date <= :date')
+            ->setParameter('company', $company)
+            ->setParameter('date', \DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (null === $lastDate) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('b')
+            ->select('b.currency as currency')
+            ->addSelect('COALESCE(SUM(b.closingBalance), 0) as totalClosing')
+            ->where('b.company = :company')
+            ->andWhere('b.date = :lastDate')
+            ->setParameter('company', $company)
+            ->setParameter('lastDate', new \DateTimeImmutable($lastDate), Types::DATE_IMMUTABLE)
+            ->groupBy('b.currency')
+            ->getQuery()
+            ->getArrayResult();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['currency']] = (string) $row['totalClosing'];
+        }
+
+        return $result;
+    }
+
+    /**
      * @param iterable<array<string,mixed>> $rows
      */
     public function upsertMany(iterable $rows): void

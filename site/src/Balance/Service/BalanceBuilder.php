@@ -28,7 +28,7 @@ class BalanceBuilder
     public function buildForCompanyAndDate(Company $company, \DateTimeImmutable $date): array
     {
         $roots = $this->balanceCategoryRepository->findRootByCompany($company);
-        $cashTotals = $this->moneyAccountDailyBalanceRepository->getClosingTotalsForDate($company, $date);
+        $cashTotals = $this->moneyAccountDailyBalanceRepository->getLatestClosingTotalsUpToDate($company, $date);
 
         $fundTotalsMinor = $this->fundBalanceService->getTotals($company->getId());
         $fundTotals = [];
