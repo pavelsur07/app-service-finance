@@ -118,7 +118,7 @@
                                     <td class="text-end">{{ row.inflow|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ row.outflow|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ row.closing|number_format(2, '.', ' ') }}</td>
-                                    <td>{{ row.account.type ?? '' }}</td>
+                                    <td>{{ row.account.type.value ?? '' }}</td>
                                     <td></td>
                                     <td></td>
                                 </tr>
