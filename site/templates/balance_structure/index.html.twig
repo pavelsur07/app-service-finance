@@ -6,6 +6,7 @@
         <li class="list-group-item">
             <div class="d-flex align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2" style="padding-left: {{ (item.level - 1) * 12 }}px;">
+                    {% set hasLinks = item.links is defined and item.links|length > 0 %}
                     {% set type_value = item.type.value %}
                     {% set type_label = {
                         'asset': 'Актив',
@@ -18,7 +19,12 @@
                         'equity': 'bg-blue'
                     }[type_value] ?? 'bg-secondary' %}
                     <span class="badge {{ badge_class }} text-uppercase">{{ type_label }}</span>
-                    <span class="fw-semibold">{{ item.name }}</span>
+                    <span class="fw-semibold {{ hasLinks ? '' : 'text-muted' }}">{{ item.name }}</span>
+                    {% if hasLinks %}
+                        <span class="badge bg-success-lt text-success">Считается</span>
+                    {% else %}
+                        <span class="badge bg-secondary-lt text-secondary">Группа</span>
+                    {% endif %}
                 </div>
                 <div class="ms-auto d-flex flex-wrap gap-1">
                     <form method="post" action="{{ path('balance_structure_move') }}" class="d-inline">
@@ -66,6 +72,9 @@
     </div>
 
     <div class="container-xl mt-3">
+        <div class="alert alert-info" role="alert">
+            Баланс считается, когда у строки задан источник суммы. Рекомендуем начать с: «Деньги → все счета» и «Фонды → все фонды».
+        </div>
         <div class="card">
             <div class="card-body">
                 {% if items|length > 0 %}
