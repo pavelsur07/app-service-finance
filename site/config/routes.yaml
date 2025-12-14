@@ -16,6 +16,12 @@ finance_controllers:
         namespace: App\Finance\Controller
     type: attribute
 
+balance_controllers:
+    resource:
+        path: ../src/Balance/Controller/
+        namespace: App\Balance\Controller
+    type: attribute
+
 loan_controllers:
     resource:
         path: ../src/Loan/Controller/
