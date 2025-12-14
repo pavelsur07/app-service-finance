@@ -71,8 +71,18 @@
         </div>
     </form>
 
-    {% if rowsByCurrency is empty %}
-        <div class="alert alert-info">Нет данных для отображения.</div>
+    {% set hasAccountRows = false %}
+    {% for currency, rows in rowsByCurrency %}
+        {% if rows.accounts is defined and rows.accounts|length > 0 %}
+            {% set hasAccountRows = true %}
+        {% endif %}
+    {% endfor %}
+
+    {% if rowsByCurrency is empty or not hasAccountRows %}
+        <div class="alert alert-warning">
+            <div class="mb-1">Нет данных за выбранный период. Проверьте фильтр 'Кассы' и переключатель 'Скрывать нулевые строки'.</div>
+            <div class="mb-0">Для актуальных остатков выполните 'Пересчёт остатков' в <a href="{{ path('report_account_balances_index') }}">основном отчёте</a>.</div>
+        </div>
     {% else %}
         <div class="card">
             <div class="table-responsive">
