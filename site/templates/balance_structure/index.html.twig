@@ -1,0 +1,81 @@
+{% extends 'base.html.twig' %}
+{% block title %}Настройка баланса{% endblock %}
+
+{% macro render_items(items) %}
+    {% for item in items %}
+        <li class="list-group-item">
+            <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2" style="padding-left: {{ (item.level - 1) * 12 }}px;">
+                    {% set type_value = item.type.value %}
+                    {% set type_label = {
+                        'asset': 'Актив',
+                        'liability': 'Обязательство',
+                        'equity': 'Капитал'
+                    }[type_value] ?? type_value %}
+                    {% set badge_class = {
+                        'asset': 'bg-green',
+                        'liability': 'bg-red',
+                        'equity': 'bg-blue'
+                    }[type_value] ?? 'bg-secondary' %}
+                    <span class="badge {{ badge_class }} text-uppercase">{{ type_label }}</span>
+                    <span class="fw-semibold">{{ item.name }}</span>
+                </div>
+                <div class="ms-auto d-flex flex-wrap gap-1">
+                    <form method="post" action="{{ path('balance_structure_move') }}" class="d-inline">
+                        <input type="hidden" name="_token" value="{{ csrf_token('move' ~ item.id) }}">
+                        <input type="hidden" name="category_id" value="{{ item.id }}">
+                        <input type="hidden" name="direction" value="up">
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Вверх">↑</button>
+                    </form>
+                    <form method="post" action="{{ path('balance_structure_move') }}" class="d-inline">
+                        <input type="hidden" name="_token" value="{{ csrf_token('move' ~ item.id) }}">
+                        <input type="hidden" name="category_id" value="{{ item.id }}">
+                        <input type="hidden" name="direction" value="down">
+                        <button class="btn btn-sm btn-outline-secondary" type="submit" title="Вниз">↓</button>
+                    </form>
+                    <a class="btn btn-sm btn-outline-primary" href="{{ path('balance_structure_edit', {'id': item.id}) }}">Редактировать</a>
+                    <form method="post" action="{{ path('balance_structure_delete', {'id': item.id}) }}" class="d-inline" onsubmit="return confirm('Удалить категорию?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ item.id) }}">
+                        <button class="btn btn-sm btn-outline-danger" type="submit">Удалить</button>
+                    </form>
+                </div>
+            </div>
+            {% if item.children|length > 0 %}
+                <ul class="list-group list-group-flush mt-2 ms-3">
+                    {{ _self.render_items(item.children) }}
+                </ul>
+            {% endif %}
+        </li>
+    {% endfor %}
+{% endmacro %}
+
+{% import _self as macros %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Настройка структуры баланса</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('balance_structure_new') }}" class="btn btn-primary">+ Добавить категорию</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {% if items|length > 0 %}
+                    <ul class="list-group list-group-flush">
+                        {{ macros.render_items(items) }}
+                    </ul>
+                {% else %}
+                    <p class="text-muted mb-0">Пока нет категорий баланса.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

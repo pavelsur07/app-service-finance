@@ -1,0 +1,95 @@
+{% extends 'base.html.twig' %}
+{% block title %}Баланс{% endblock %}
+
+{% macro render_rows(items, currencies) %}
+    {% for item in items %}
+        <tr>
+            <td style="padding-left: {{ (item.level - 1) * 16 }}px;">
+                <span class="fw-semibold">{{ item.name }}</span>
+            </td>
+            {% for currency in currencies %}
+                <td class="text-end">{{ (item.amountsByCurrency[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
+            {% endfor %}
+        </tr>
+        {% if item.children|length > 0 %}
+            {{ _self.render_rows(item.children, currencies) }}
+        {% endif %}
+    {% endfor %}
+{% endmacro %}
+
+{% import _self as macros %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Баланс</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <form class="d-flex align-items-center" method="get" action="{{ path('balance_index') }}">
+                        <label class="me-2 mb-0" for="balance-date">Дата:</label>
+                        <input id="balance-date" class="form-control" type="date" name="date" value="{{ date|date('Y-m-d') }}">
+                        <button class="btn btn-primary ms-2" type="submit">Показать</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Итоги</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table card-table">
+                            <thead>
+                            <tr>
+                                <th>Валюта</th>
+                                <th class="text-end">Сумма</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for currency in currencies %}
+                                <tr>
+                                    <td>{{ currency }}</td>
+                                    <td class="text-end">{{ (totals[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="2" class="text-muted">Нет данных</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Структура</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table card-table">
+                            <thead>
+                            <tr>
+                                <th>Категория</th>
+                                {% for currency in currencies %}
+                                    <th class="text-end">{{ currency }}</th>
+                                {% endfor %}
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {{ macros.render_rows(roots, currencies) }}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

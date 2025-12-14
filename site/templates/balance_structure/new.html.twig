@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+{% block title %}Новая категория баланса{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Новая категория баланса</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('balance_structure_index') }}" class="btn btn-link">Назад</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {{ form_start(form) }}
+                {{ form_widget(form) }}
+                <div class="mt-3">
+                    <button class="btn btn-primary" type="submit">Сохранить</button>
+                    <a href="{{ path('balance_structure_index') }}" class="btn btn-link">Отмена</a>
+                </div>
+                {{ form_end(form) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
