@@ -57,6 +57,13 @@
                         <span class="nav-link-title hide-when-collapsed">Остатки и счета</span>
                     </a>
                 </li>
+                {% set report_account_balances_structured_active = current_route == 'report_account_balances_structured_index' %}
+                <li class="nav-item {{ report_account_balances_structured_active ? 'active' : '' }}">
+                    <a class="nav-link {{ report_account_balances_structured_active ? 'active' : '' }}" href="{{ path('report_account_balances_structured_index') }}" title="Остатки и счета (структура)">
+                        <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Остатки и счета (структура)</span>
+                    </a>
+                </li>
                 {% set finance_funds_active = current_route == 'finance_funds_index' %}
                 <li class="nav-item {{ finance_funds_active ? 'active' : '' }}">
                     <a class="nav-link {{ finance_funds_active ? 'active' : '' }}"  href="{{ path('finance_funds_index') }}" title="Фонды (конверты)">
