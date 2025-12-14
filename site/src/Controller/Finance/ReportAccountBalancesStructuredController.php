@@ -6,6 +6,7 @@ use App\Entity\MoneyAccount;
 use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
+use App\Service\AccountBalanceProvider;
 use Doctrine\DBAL\Types\Types;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,6 +20,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
         private ActiveCompanyService $activeCompanyService,
         private MoneyAccountRepository $accountRepository,
         private MoneyAccountDailyBalanceRepository $balanceRepository,
+        private AccountBalanceProvider $accountBalanceProvider,
     ) {
     }
 
@@ -71,37 +73,8 @@ class ReportAccountBalancesStructuredController extends AbstractController
         $flowByAccountId = [];
 
         if (!empty($accountIds)) {
-            $openingRows = $this->balanceRepository->createQueryBuilder('b')
-                ->select('IDENTITY(b.moneyAccount) AS accountId')
-                ->addSelect('b.openingBalance AS openingBalance')
-                ->where('b.company = :company')
-                ->andWhere('b.date = :fromDate')
-                ->andWhere('b.moneyAccount IN (:accountIds)')
-                ->setParameter('company', $company)
-                ->setParameter('fromDate', $from, Types::DATE_IMMUTABLE)
-                ->setParameter('accountIds', $accountIds)
-                ->getQuery()
-                ->getArrayResult();
-
-            foreach ($openingRows as $row) {
-                $openingByAccountId[(int) $row['accountId']] = (string) $row['openingBalance'];
-            }
-
-            $closingRows = $this->balanceRepository->createQueryBuilder('b')
-                ->select('IDENTITY(b.moneyAccount) AS accountId')
-                ->addSelect('b.closingBalance AS closingBalance')
-                ->where('b.company = :company')
-                ->andWhere('b.date = :toDate')
-                ->andWhere('b.moneyAccount IN (:accountIds)')
-                ->setParameter('company', $company)
-                ->setParameter('toDate', $to, Types::DATE_IMMUTABLE)
-                ->setParameter('accountIds', $accountIds)
-                ->getQuery()
-                ->getArrayResult();
-
-            foreach ($closingRows as $row) {
-                $closingByAccountId[(int) $row['accountId']] = (string) $row['closingBalance'];
-            }
+            $openingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $from, $accountIds);
+            $closingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $to, $accountIds);
 
             $flowRows = $this->balanceRepository->createQueryBuilder('b')
                 ->select('IDENTITY(b.moneyAccount) AS accountId')
