@@ -88,11 +88,12 @@
                 </li>
 
 
-                {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
-                {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
-                {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
-                {% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
-                {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active %}
+{% set report_cashflow_active = current_route == 'report_cashflow_index' %}
+{% set finance_report_preview_active = current_route == 'finance_report_preview' %}
+{% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+{% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
+{% set balance_report_active = current_route == 'balance_index' %}
+{% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active or balance_report_active %}
                 <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
                     <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
                         <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
@@ -115,8 +116,8 @@
                                     <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
                                 </a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" title="Счета / касса / кошелек">
+                            <li class="nav-item {{ balance_report_active ? 'active' : '' }}">
+                                <a class="nav-link {{ balance_report_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
                                     <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
                                     <span class="nav-link-title hide-when-collapsed">Баланс</span>
                                 </a>
@@ -142,7 +143,6 @@
                 {% set handbooks_menu_open =
                     current_route == 'cashflow_category_index'
                     or current_route == 'pl_category_index'
-                    or current_route == 'balance_index'
                     or current_route starts with 'balance_structure_'
                     or current_route == 'money_account_index'
                     or current_route == 'counterparty_index'
@@ -162,13 +162,6 @@
                                 <a class="nav-link {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}" title="Категории ДДС">
                                     <span class="nav-link-icon"><i class="ti ti-category"></i></span>
                                     <span class="hide-when-collapsed">Категории ДДС</span>
-                                </a>
-                            </li>
-                            {% set balance_active = current_route == 'balance_index' %}
-                            <li class="nav-item {{ balance_active ? 'active' : '' }}">
-                                <a class="nav-link {{ balance_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
-                                    <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
-                                    <span class="hide-when-collapsed">Баланс</span>
                                 </a>
                             </li>
                             {% set pl_category_active = current_route == 'pl_category_index' %}
