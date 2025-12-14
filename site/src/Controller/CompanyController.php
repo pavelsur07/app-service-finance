@@ -2,6 +2,7 @@
 
 namespace App\Controller;
 
+use App\Balance\Service\BalanceStructureSeeder;
 use App\Entity\Company;
 use App\Form\CompanyType;
 use App\Repository\CompanyRepository;
@@ -43,7 +44,7 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/new', name: 'company_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request, EntityManagerInterface $em, BalanceStructureSeeder $balanceSeeder): Response
     {
         $company = new Company(id: Uuid::uuid4()->toString(), user: $this->getUser());
         $company->setUser($this->getUser()); // Автоматически проставляем владельца
@@ -53,6 +54,7 @@ class CompanyController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($company);
+            $balanceSeeder->seedDefaultIfEmpty($company);
             $em->flush();
 
             return $this->redirectToRoute('company_index');
