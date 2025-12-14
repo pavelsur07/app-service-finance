@@ -14,6 +14,7 @@ use App\Repository\CashflowCategoryRepository;
 use App\Repository\CompanyRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Repository\PLCategoryRepository;
+use App\Balance\Service\BalanceStructureSeeder;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -25,6 +26,7 @@ final class AccountBootstrapper
         private readonly CashflowCategoryRepository $cashflowCategories,
         private readonly PLCategoryRepository $plCategories,
         private readonly MoneyAccountRepository $moneyAccounts,
+        private readonly BalanceStructureSeeder $balanceSeeder,
     ) {
     }
 
@@ -41,6 +43,7 @@ final class AccountBootstrapper
             $this->seedCashflow($company);
             $this->seedPL($company);
             $this->seedAccounts($company);
+            $this->balanceSeeder->seedDefaultIfEmpty($company);
 
             $em->flush();
 

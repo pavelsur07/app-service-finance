@@ -8,6 +8,7 @@ use App\Entity\MoneyAccount;
 use App\Entity\User;
 use App\Enum\CounterpartyType;
 use App\Enum\MoneyAccountType;
+use App\Balance\Service\BalanceStructureSeeder;
 use App\Service\AccountBalanceService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
@@ -25,6 +26,7 @@ class AppFixtures extends Fixture
     public function __construct(
         private UserPasswordHasherInterface $passwordHasher,
         private AccountBalanceService $accountBalanceService,
+        private BalanceStructureSeeder $balanceStructureSeeder,
     ) {
     }
 
@@ -49,6 +51,8 @@ class AppFixtures extends Fixture
         $company->setName('ООО "Ромашка"');
         $manager->persist($company);
         $this->addReference(self::REF_COMPANY_ROMASHKA, $company);
+
+        $this->balanceStructureSeeder->seedDefaultIfEmpty($company);
 
         // --- Контрагенты для ООО "Ромашка" (добавлены Wildberries и Ozon + сервисные контрагенты)
         $counterpartiesData = [
