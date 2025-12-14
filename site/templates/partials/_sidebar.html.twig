@@ -142,6 +142,8 @@
                 {% set handbooks_menu_open =
                     current_route == 'cashflow_category_index'
                     or current_route == 'pl_category_index'
+                    or current_route == 'balance_index'
+                    or current_route starts with 'balance_structure_'
                     or current_route == 'money_account_index'
                     or current_route == 'counterparty_index'
                     or current_route == 'project_direction_index'
@@ -162,11 +164,25 @@
                                     <span class="hide-when-collapsed">Категории ДДС</span>
                                 </a>
                             </li>
+                            {% set balance_active = current_route == 'balance_index' %}
+                            <li class="nav-item {{ balance_active ? 'active' : '' }}">
+                                <a class="nav-link {{ balance_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
+                                    <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
+                                    <span class="hide-when-collapsed">Баланс</span>
+                                </a>
+                            </li>
                             {% set pl_category_active = current_route == 'pl_category_index' %}
                             <li class="nav-item {{ pl_category_active ? 'active' : '' }}">
                                 <a class="nav-link {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}" title="Категории ОПиУ">
                                     <span class="nav-link-icon"><i class="ti ti-hierarchy-2"></i></span>
                                     <span class="hide-when-collapsed">Категории ОПиУ</span>
+                                </a>
+                            </li>
+                            {% set balance_structure_active = current_route starts with 'balance_structure_' %}
+                            <li class="nav-item {{ balance_structure_active ? 'active' : '' }}">
+                                <a class="nav-link {{ balance_structure_active ? 'active' : '' }}" href="{{ path('balance_structure_index') }}" title="Настройка баланса">
+                                    <span class="nav-link-icon"><i class="ti ti-adjustments"></i></span>
+                                    <span class="hide-when-collapsed">Настройка баланса</span>
                                 </a>
                             </li>
                             {% set money_account_active = current_route == 'money_account_index' %}

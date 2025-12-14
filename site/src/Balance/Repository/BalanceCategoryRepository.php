@@ -63,4 +63,33 @@ class BalanceCategoryRepository extends ServiceEntityRepository
 
         return ($maxSortOrder ?? 0) + self::SORT_ORDER_STEP;
     }
+
+    /**
+     * @return BalanceCategory[]
+     */
+    public function findSiblings(Company $company, ?BalanceCategory $parent): array
+    {
+        $qb = $this->createQueryBuilder('c')
+            ->andWhere('c.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('c.sortOrder', 'ASC');
+
+        if (null !== $parent) {
+            $qb->andWhere('c.parent = :parent')
+                ->setParameter('parent', $parent);
+        } else {
+            $qb->andWhere('c.parent IS NULL');
+        }
+
+        return $qb->getQuery()->getResult();
+    }
+
+    public function swapSortOrder(BalanceCategory $a, BalanceCategory $b): void
+    {
+        $aSort = $a->getSortOrder();
+        $bSort = $b->getSortOrder();
+
+        $a->setSortOrder($bSort);
+        $b->setSortOrder($aSort);
+    }
 }

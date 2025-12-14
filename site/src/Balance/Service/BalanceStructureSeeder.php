@@ -121,7 +121,7 @@ class BalanceStructureSeeder
         return $category;
     }
 
-    private function ensureLink(
+    public function ensureLink(
         Company $company,
         BalanceCategory $category,
         BalanceLinkSourceType $sourceType,
