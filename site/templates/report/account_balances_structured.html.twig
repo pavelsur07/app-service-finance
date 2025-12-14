@@ -18,51 +18,51 @@
     <form method="get" class="card mb-4">
         <div class="card-body">
             <div class="row g-3 align-items-stretch">
-                <div class="col-12 col-xl-3">
-                    <div class="d-flex flex-xl-column gap-2 h-100">
+                <div class="col-12 col-md-3 col-lg-2">
+                    <div class="d-flex flex-column gap-2 h-100">
                         <a href="#" class="btn btn-outline-secondary disabled w-100">Сохранить текущий фильтр</a>
-                        <a href="{{ path('report_account_balances_structured_index') }}" class="btn btn-link text-start">Очистить фильтры</a>
+                        <a href="{{ path('report_account_balances_structured_index') }}" class="btn btn-link text-start w-100">Очистить фильтры</a>
                     </div>
                 </div>
-                <div class="col-12 col-xl-9">
-                    <div class="row g-3 align-items-end flex-xl-nowrap">
-                        <div class="col-12 col-sm-6 col-xl-2">
+                <div class="col-12 col-md-9 col-lg-10">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
                             <label class="form-label mb-1">Дата отчёта с</label>
                             <input type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control" />
                         </div>
-                        <div class="col-12 col-sm-6 col-xl-2">
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
                             <label class="form-label mb-1">Дата отчёта по</label>
                             <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
                         </div>
-                        <div class="col-12 col-sm-6 col-xl-2">
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
                             <label class="form-label mb-1">Дата транзакции</label>
                             <select class="form-select" name="transactionDate">
                                 <option value="report">По дате отчёта</option>
                             </select>
                         </div>
-                        <div class="col-12 col-xl-4">
+                        <div class="col-12 col-md-6 col-lg-3">
                             <label class="form-label mb-1">Кассы</label>
-                            <div class="d-flex flex-column flex-xl-row align-items-xl-end gap-2">
-                                <select name="accounts[]" class="form-select" multiple size="6">
+                            <div class="d-flex flex-column gap-2">
+                                <select name="accounts[]" class="form-select" multiple style="max-height: 200px; overflow-y: auto;">
                                     {% for account in accountsForFilter %}
                                         <option value="{{ account.id }}" {% if account.id in selectedAccountIds %}selected{% endif %}>
                                             {{ account.name }} ({{ account.currency }})
                                         </option>
                                     {% endfor %}
                                 </select>
-                                <div class="form-check mb-1 ms-xl-2">
+                                <div class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" value="1" id="excludeCheckbox" name="exclude" {% if excludeSelected %}checked{% endif %} />
                                     <label class="form-check-label" for="excludeCheckbox">Исключить выбранные</label>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-sm-6 col-xl-auto">
-                            <div class="form-check mb-1">
-                                <input class="form-check-input" type="checkbox" value="1" id="hideZeroCheckbox" name="hideZero" {% if hideZero %}checked{% endif %} />
+                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
+                            <div class="form-check mb-0">
+                                <input class="form-check-input" type="checkbox" value="1" id="hideZeroCheckbox" name="hideZero"{% if hideZero %}checked{% endif %} />
                                 <label class="form-check-label" for="hideZeroCheckbox">Скрывать нулевые строки</label>
                             </div>
                         </div>
-                        <div class="col-auto">
+                        <div class="col-auto ms-auto">
                             <button type="submit" class="btn btn-primary">Показать</button>
                         </div>
                     </div>
