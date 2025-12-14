@@ -3,14 +3,16 @@
 
 {% macro render_rows(items, currencies) %}
     {% for item in items %}
-        <tr>
-            <td style="padding-left: {{ (item.level - 1) * 16 }}px;">
-                <span class="fw-semibold">{{ item.name }}</span>
-            </td>
-            {% for currency in currencies %}
-                <td class="text-end">{{ (item.amountsByCurrency[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
-            {% endfor %}
-        </tr>
+        {% if item.isVisible %}
+            <tr>
+                <td style="padding-left: {{ (item.level - 1) * 16 }}px;">
+                    <span class="fw-semibold">{{ item.name }}</span>
+                </td>
+                {% for currency in currencies %}
+                    <td class="text-end">{{ (item.amountsByCurrency[currency] ?? 0)|number_format(2, '.', ' ') }}</td>
+                {% endfor %}
+            </tr>
+        {% endif %}
         {% if item.children|length > 0 %}
             {{ _self.render_rows(item.children, currencies) }}
         {% endif %}
