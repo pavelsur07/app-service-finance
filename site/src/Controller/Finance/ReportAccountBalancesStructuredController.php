@@ -3,11 +3,9 @@
 namespace App\Controller\Finance;
 
 use App\Entity\MoneyAccount;
-use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\AccountBalanceProvider;
-use Doctrine\DBAL\Types\Types;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,7 +17,6 @@ class ReportAccountBalancesStructuredController extends AbstractController
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
         private MoneyAccountRepository $accountRepository,
-        private MoneyAccountDailyBalanceRepository $balanceRepository,
         private AccountBalanceProvider $accountBalanceProvider,
     ) {
     }
@@ -70,33 +67,9 @@ class ReportAccountBalancesStructuredController extends AbstractController
 
         $openingByAccountId = [];
         $closingByAccountId = [];
-        $flowByAccountId = [];
-
         if (!empty($accountIds)) {
             $openingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $from, $accountIds);
             $closingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $to, $accountIds);
-
-            $flowRows = $this->balanceRepository->createQueryBuilder('b')
-                ->select('IDENTITY(b.moneyAccount) AS accountId')
-                ->addSelect('COALESCE(SUM(b.inflow), 0) AS inflowTotal')
-                ->addSelect('COALESCE(SUM(b.outflow), 0) AS outflowTotal')
-                ->where('b.company = :company')
-                ->andWhere('b.date BETWEEN :fromDate AND :toDate')
-                ->andWhere('b.moneyAccount IN (:accountIds)')
-                ->setParameter('company', $company)
-                ->setParameter('fromDate', $from, Types::DATE_IMMUTABLE)
-                ->setParameter('toDate', $to, Types::DATE_IMMUTABLE)
-                ->setParameter('accountIds', $accountIds)
-                ->groupBy('b.moneyAccount')
-                ->getQuery()
-                ->getArrayResult();
-
-            foreach ($flowRows as $row) {
-                $flowByAccountId[(int) $row['accountId']] = [
-                    'inflow' => (string) $row['inflowTotal'],
-                    'outflow' => (string) $row['outflowTotal'],
-                ];
-            }
         }
 
         $rowsByCurrency = [];
@@ -108,8 +81,8 @@ class ReportAccountBalancesStructuredController extends AbstractController
 
             $opening = $openingByAccountId[$accId] ?? '0.00';
             $closing = $closingByAccountId[$accId] ?? '0.00';
-            $inflow = $flowByAccountId[$accId]['inflow'] ?? '0.00';
-            $outflow = $flowByAccountId[$accId]['outflow'] ?? '0.00';
+            $inflow = '0.00';
+            $outflow = '0.00';
 
             $isZeroRow = 0 === bccomp($opening, '0', 2)
                 && 0 === bccomp($inflow, '0', 2)
@@ -133,7 +106,10 @@ class ReportAccountBalancesStructuredController extends AbstractController
             }
 
             $rowsByCurrency[$currency]['accounts'][] = [
-                'account' => $account,
+                'id' => $account->getId(),
+                'name' => $account->getName(),
+                'type' => $account->getType()->value,
+                'currency' => $currency,
                 'opening' => $opening,
                 'inflow' => $inflow,
                 'outflow' => $outflow,

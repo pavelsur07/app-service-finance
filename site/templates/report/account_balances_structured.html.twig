@@ -80,47 +80,44 @@
                     <thead>
                         <tr>
                             <th class="text-center" style="width: 50px;">#</th>
-                            <th>Дата</th>
-                            <th>Дата отчета</th>
+                            <th>Счёт</th>
+                            <th>Валюта</th>
+                            <th>Период</th>
                             <th class="text-end">На начало</th>
                             <th class="text-end">Поступление</th>
                             <th class="text-end">Расход</th>
-                            <th class="text-end">Стало</th>
+                            <th class="text-end">На конец</th>
                             <th>Тип</th>
-                            <th>Комментарий</th>
-                            <th>Автор</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for currency, rows in rowsByCurrency %}
                             <tr class="table-light">
-                                <td colspan="10" class="fw-bold">Валюта: {{ currency }}</td>
+                                <td colspan="9" class="fw-bold">Валюта: {{ currency }}</td>
                             </tr>
                             <tr class="fw-bold">
                                 <td></td>
-                                <td></td>
                                 <td>Всего</td>
+                                <td>{{ currency }}</td>
+                                <td></td>
                                 <td class="text-end">{{ rows.total.opening|number_format(2, '.', ' ') }}</td>
                                 <td class="text-end">{{ rows.total.inflow|number_format(2, '.', ' ') }}</td>
                                 <td class="text-end">{{ rows.total.outflow|number_format(2, '.', ' ') }}</td>
                                 <td class="text-end">{{ rows.total.closing|number_format(2, '.', ' ') }}</td>
-                                <td></td>
-                                <td></td>
                                 <td></td>
                             </tr>
                             {% set rowIndex = 1 %}
                             {% for row in rows.accounts %}
                                 <tr>
                                     <td class="text-center">{{ rowIndex }}</td>
-                                    <td></td>
+                                    <td>{{ row.name }}</td>
+                                    <td>{{ row.currency }}</td>
                                     <td>{{ from|date('d.m.Y') }} – {{ to|date('d.m.Y') }}</td>
                                     <td class="text-end">{{ row.opening|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ row.inflow|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ row.outflow|number_format(2, '.', ' ') }}</td>
                                     <td class="text-end">{{ row.closing|number_format(2, '.', ' ') }}</td>
-                                    <td>{{ row.account.type.value ?? '' }}</td>
-                                    <td></td>
-                                    <td></td>
+                                    <td>{{ row.type ?? '' }}</td>
                                 </tr>
                                 {% set rowIndex = rowIndex + 1 %}
                             {% endfor %}
