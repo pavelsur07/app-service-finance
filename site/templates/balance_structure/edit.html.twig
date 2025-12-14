@@ -33,20 +33,31 @@
                 <h3 class="card-title">Источник суммы (MVP)</h3>
             </div>
             <div class="card-body">
-                {% if links|length > 0 %}
-                    <ul class="list-group list-group-flush mb-3">
-                        {% for link in links %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center">
-                                <span>{{ link.sourceType.value }}</span>
-                                <span class="badge bg-secondary">{{ link.sourceId ?? 'Общий' }}</span>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="text-muted">Пока нет привязок.</p>
+                {% set hasLinks = links|length > 0 %}
+
+                <div class="alert alert-{{ hasLinks ? 'success' : 'warning' }}" role="alert">
+                    {% if hasLinks %}
+                        Источник суммы подключен. Баланс будет рассчитываться автоматически.
+                    {% else %}
+                        Сумма по этой строке сейчас не рассчитывается. Выберите источник ниже.
+                    {% endif %}
+                </div>
+
+                {% if hasLinks %}
+                    <div class="mb-3">
+                        <div class="fw-semibold mb-2">Текущие привязки</div>
+                        <ul class="list-group list-group-flush">
+                            {% for link in links %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>{{ link.sourceType.value }}</span>
+                                    <span class="badge bg-secondary">{{ link.sourceId ?? 'Общий' }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
                 {% endif %}
 
-                <div class="d-flex flex-wrap gap-2">
+                <div class="d-flex flex-wrap gap-2 mb-2">
                     <form method="post" action="{{ path('balance_structure_link_money_accounts_total', {'id': item.id}) }}" class="d-inline">
                         <input type="hidden" name="_token" value="{{ csrf_token('link_money_accounts_total' ~ item.id) }}">
                         <button class="btn btn-outline-primary" type="submit">Привязать: Деньги (все счета)</button>
@@ -56,6 +67,8 @@
                         <button class="btn btn-outline-primary" type="submit">Привязать: Фонды (все фонды)</button>
                     </form>
                 </div>
+
+                <p class="text-muted small mb-0">В MVP доступны только агрегированные источники (все счета / все фонды). Выбор конкретных счетов появится позже.</p>
             </div>
         </div>
     </div>
