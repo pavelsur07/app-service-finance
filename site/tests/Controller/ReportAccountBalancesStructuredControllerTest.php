@@ -1,0 +1,200 @@
+<?php
+namespace App\Tests\Controller;
+
+use App\Entity\Company;
+use App\Entity\MoneyAccount;
+use App\Entity\MoneyAccountDailyBalance;
+use App\Entity\User;
+use App\Enum\MoneyAccountType;
+use Ramsey\Uuid\Uuid;
+use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+
+class ReportAccountBalancesStructuredControllerTest extends WebTestCase
+{
+    public function testStructuredReportShowsBalancesAndTotals(): void
+    {
+        $client = static::createClient();
+        $container = static::getContainer();
+        $em = $container->get('doctrine.orm.entity_manager');
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('test@example.com');
+        $user->setPassword($hasher->hashPassword($user, 'password'));
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('TestCo');
+
+        $accountRub = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main RUB', 'RUB');
+        $accountRub->setOpeningBalance('0');
+        $accountRub->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $accountUsd = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::CASH, 'Cash USD', 'USD');
+        $accountUsd->setOpeningBalance('0');
+        $accountUsd->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $balanceRubFrom = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountRub,
+            new \DateTimeImmutable('2024-01-01'),
+            '0',
+            '100',
+            '0',
+            '100',
+            'RUB'
+        );
+        $balanceRubTo = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountRub,
+            new \DateTimeImmutable('2024-01-05'),
+            '100',
+            '60',
+            '10',
+            '150',
+            'RUB'
+        );
+
+        $balanceUsdFrom = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountUsd,
+            new \DateTimeImmutable('2024-01-02'),
+            '0',
+            '75',
+            '0',
+            '75',
+            'USD'
+        );
+        $balanceUsdTo = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountUsd,
+            new \DateTimeImmutable('2024-01-05'),
+            '75',
+            '20',
+            '5',
+            '90',
+            'USD'
+        );
+
+        $em->persist($user);
+        $em->persist($company);
+        $em->persist($accountRub);
+        $em->persist($accountUsd);
+        $em->persist($balanceRubFrom);
+        $em->persist($balanceRubTo);
+        $em->persist($balanceUsdFrom);
+        $em->persist($balanceUsdTo);
+        $em->flush();
+
+        $client->loginUser($user);
+        $client->request('GET', '/finance/reports/account-balances-structured', [
+            'from' => '2024-01-01',
+            'to' => '2024-01-05',
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $content = $client->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        self::assertStringContainsString('Остатки и счета (структура)', $content);
+        self::assertStringContainsString('Валюта: RUB', $content);
+        self::assertStringContainsString('Валюта: USD', $content);
+
+        self::assertStringContainsString('Main RUB', $content);
+        self::assertStringContainsString('100.00', $content);
+        self::assertStringContainsString('150.00', $content);
+
+        self::assertStringContainsString('Cash USD', $content);
+        self::assertStringContainsString('75.00', $content);
+        self::assertStringContainsString('90.00', $content);
+    }
+
+    public function testStructuredReportAppliesFilters(): void
+    {
+        $client = static::createClient();
+        $container = static::getContainer();
+        $em = $container->get('doctrine.orm.entity_manager');
+        $hasher = $container->get(UserPasswordHasherInterface::class);
+
+        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
+
+        $user = new User(Uuid::uuid4()->toString());
+        $user->setEmail('filter@example.com');
+        $user->setPassword($hasher->hashPassword($user, 'password'));
+        $company = new Company(Uuid::uuid4()->toString(), $user);
+        $company->setName('TestCo');
+
+        $accountRub = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Filtered RUB', 'RUB');
+        $accountRub->setOpeningBalance('0');
+        $accountRub->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $accountUsd = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::CASH, 'Visible USD', 'USD');
+        $accountUsd->setOpeningBalance('0');
+        $accountUsd->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $accountZero = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::CASH, 'Zero RUB', 'RUB');
+        $accountZero->setOpeningBalance('0');
+        $accountZero->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $balanceUsd = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountUsd,
+            new \DateTimeImmutable('2024-01-05'),
+            '50',
+            '10',
+            '0',
+            '60',
+            'USD'
+        );
+        $balanceZero = new MoneyAccountDailyBalance(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountZero,
+            new \DateTimeImmutable('2024-01-05'),
+            '0',
+            '0',
+            '0',
+            '0',
+            'RUB'
+        );
+
+        $em->persist($user);
+        $em->persist($company);
+        $em->persist($accountRub);
+        $em->persist($accountUsd);
+        $em->persist($accountZero);
+        $em->persist($balanceUsd);
+        $em->persist($balanceZero);
+        $em->flush();
+
+        $client->loginUser($user);
+        $client->request('GET', '/finance/reports/account-balances-structured', [
+            'from' => '2024-01-01',
+            'to' => '2024-01-05',
+            'accounts' => [$accountRub->getId()],
+            'exclude' => 1,
+            'hideZero' => 1,
+        ]);
+
+        self::assertResponseIsSuccessful();
+        $content = $client->getResponse()->getContent();
+        self::assertNotFalse($content);
+
+        self::assertStringNotContainsString('Filtered RUB', $content);
+        self::assertStringNotContainsString('Zero RUB', $content);
+        self::assertStringContainsString('Visible USD', $content);
+        self::assertStringContainsString('60.00', $content);
+    }
+}
