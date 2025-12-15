@@ -1,3 +1,7 @@
 admin_controllers:
   resource: ../../src/Admin/Controller/
   type: attribute
+
+telegram_admin_controllers:
+  resource: ../../src/Telegram/Controller/Admin/
+  type: attribute
