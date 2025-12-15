@@ -3,6 +3,7 @@
 namespace App\Controller\Finance;
 
 use App\Entity\MoneyAccount;
+use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\AccountBalanceProvider;
@@ -18,6 +19,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
         private ActiveCompanyService $activeCompanyService,
         private MoneyAccountRepository $accountRepository,
         private AccountBalanceProvider $accountBalanceProvider,
+        private CashTransactionRepository $cashTransactionRepository,
     ) {
     }
 
@@ -67,9 +69,11 @@ class ReportAccountBalancesStructuredController extends AbstractController
 
         $openingByAccountId = [];
         $closingByAccountId = [];
+        $turnoversByAccountId = [];
         if (!empty($accountIds)) {
             $openingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $from, $accountIds);
             $closingByAccountId = $this->accountBalanceProvider->getClosingBalancesUpToDate($company, $to, $accountIds);
+            $turnoversByAccountId = $this->cashTransactionRepository->sumByAccountAndPeriod($company, $accountIds, $from, $to);
         }
 
         $rowsByCurrency = [];
@@ -81,8 +85,8 @@ class ReportAccountBalancesStructuredController extends AbstractController
 
             $opening = $openingByAccountId[$accId] ?? '0.00';
             $closing = $closingByAccountId[$accId] ?? '0.00';
-            $inflow = '0.00';
-            $outflow = '0.00';
+            $inflow = $turnoversByAccountId[$accId]['inflow'] ?? '0.00';
+            $outflow = $turnoversByAccountId[$accId]['outflow'] ?? '0.00';
 
             $isZeroRow = 0 === bccomp($opening, '0', 2)
                 && 0 === bccomp($inflow, '0', 2)
