@@ -32,6 +32,15 @@
             <span class="nav-link-title">Telegram (финансы) → Боты</span>
           </a>
         </li>
+        <li class="nav-item">
+          <a class="nav-link {% if app.request.get('_route') starts with 'admin_telegram_link_' %}active{% endif %}"
+             href="{{ path('admin_telegram_link_index') }}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="ti ti-link"></i>
+            </span>
+            <span class="nav-link-title">Telegram (финансы) → Ссылки привязки</span>
+          </a>
+        </li>
           <li class="nav-item">
               <a class="nav-link {% if app.request.get('admin_demo') starts with 'admin_user_' %}active{% endif %}"
                  href="{{ path('admin_demo') }}">
