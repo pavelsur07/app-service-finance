@@ -7,6 +7,7 @@ use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
 use App\Telegram\Repository\TelegramBotRepository;
+use App\Entity\MoneyAccount;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -40,6 +41,11 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ignored']);
         }
 
+        $callbackQuery = $payload['callback_query'] ?? null;
+        if (is_array($callbackQuery)) {
+            return $this->handleCallbackQuery($bot, $callbackQuery);
+        }
+
         $message = $payload['message'] ?? null;
         $text = $message['text'] ?? null;
 
@@ -50,6 +56,10 @@ class TelegramWebhookController extends AbstractController
 
         if (str_starts_with($text, '/start')) {
             return $this->handleStart($bot, $message, $text);
+        }
+
+        if ($text === '/set_cash') {
+            return $this->handleSetCash($bot, $message);
         }
 
         return new JsonResponse(['status' => 'ok']);
@@ -83,25 +93,10 @@ class TelegramWebhookController extends AbstractController
         }
 
         $from = $message['from'] ?? [];
-        $tgUserId = isset($from['id']) ? (string) $from['id'] : null;
-        if (!$tgUserId) {
+        $telegramUser = $this->syncTelegramUser($from);
+        if (!$telegramUser) {
             return new JsonResponse(['status' => 'ignored']);
         }
-
-        // Находим или создаем TelegramUser
-        $telegramUser = $this->entityManager->getRepository(TelegramUser::class)
-            ->findOneBy(['tgUserId' => $tgUserId]);
-
-        if (!$telegramUser) {
-            $telegramUser = new TelegramUser(Uuid::uuid4()->toString(), $tgUserId);
-            $this->entityManager->persist($telegramUser);
-        }
-
-        // Обновляем пользовательские данные и дату активности
-        $telegramUser->setUsername($from['username'] ?? null);
-        $telegramUser->setFirstName($from['first_name'] ?? null);
-        $telegramUser->setLastName($from['last_name'] ?? null);
-        $telegramUser->touch();
 
         // Создаем привязку клиента, если ее еще нет
         $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
@@ -132,16 +127,150 @@ class TelegramWebhookController extends AbstractController
         );
     }
 
-    private function respondWithMessage(TelegramBot $bot, array $message, string $text): Response
+    private function handleSetCash(TelegramBot $bot, array $message): Response
+    {
+        $from = $message['from'] ?? [];
+        $telegramUser = $this->syncTelegramUser($from);
+        if (!$telegramUser) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
+            'company' => $bot->getCompany(),
+            'bot' => $bot,
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$clientBinding) {
+            return $this->respondWithMessage($bot, $message, 'Не найдена привязка. Отправьте /start.');
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован');
+        }
+
+        $moneyAccounts = $this->entityManager->getRepository(MoneyAccount::class)->findBy(
+            ['company' => $clientBinding->getCompany()],
+            ['sortOrder' => 'ASC', 'name' => 'ASC'],
+        );
+
+        if (!$moneyAccounts) {
+            return $this->respondWithMessage($bot, $message, 'Доступные кассы не найдены.');
+        }
+
+        $lines = ['Выберите кассу:'];
+        $keyboard = [];
+
+        foreach ($moneyAccounts as $account) {
+            if (!$account instanceof MoneyAccount) {
+                continue;
+            }
+
+            $lines[] = sprintf('- %s (%s)', $account->getName(), $account->getCurrency());
+            $keyboard[] = [
+                [
+                    'text' => $account->getName(),
+                    'callback_data' => 'set_cash:'.$account->getId(),
+                ],
+            ];
+        }
+
+        $this->entityManager->flush();
+
+        return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
+            'inline_keyboard' => $keyboard,
+        ]);
+    }
+
+    private function handleCallbackQuery(TelegramBot $bot, array $callbackQuery): Response
+    {
+        $callbackData = $callbackQuery['data'] ?? null;
+        if (!\is_string($callbackData)) {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        if (str_starts_with($callbackData, 'set_cash:')) {
+            return $this->handleSetCashCallback($bot, $callbackQuery, substr($callbackData, strlen('set_cash:')));
+        }
+
+        return new JsonResponse(['status' => 'ok']);
+    }
+
+    private function handleSetCashCallback(TelegramBot $bot, array $callbackQuery, string $moneyAccountId): Response
+    {
+        $from = $callbackQuery['from'] ?? [];
+        $telegramUser = $this->syncTelegramUser($from);
+        if (!$telegramUser) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
+            'company' => $bot->getCompany(),
+            'bot' => $bot,
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$clientBinding) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован');
+        }
+
+        $moneyAccount = $this->entityManager->getRepository(MoneyAccount::class)->find($moneyAccountId);
+        if (!$moneyAccount instanceof MoneyAccount) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Касса не найдена.');
+        }
+
+        if ($moneyAccount->getCompany()->getId() !== $clientBinding->getCompany()->getId()) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Нельзя выбрать кассу другой компании.');
+        }
+
+        $clientBinding->setMoneyAccount($moneyAccount);
+        $this->entityManager->flush();
+
+        return $this->respondWithMessage($bot, $callbackQuery, sprintf('Касса установлена: %s', $moneyAccount->getName()));
+    }
+
+    private function syncTelegramUser(array $from): ?TelegramUser
+    {
+        $tgUserId = isset($from['id']) ? (string) $from['id'] : null;
+        if (!$tgUserId) {
+            return null;
+        }
+
+        $telegramUser = $this->entityManager->getRepository(TelegramUser::class)
+            ->findOneBy(['tgUserId' => $tgUserId]);
+
+        if (!$telegramUser) {
+            $telegramUser = new TelegramUser(Uuid::uuid4()->toString(), $tgUserId);
+            $this->entityManager->persist($telegramUser);
+        }
+
+        // Обновляем пользовательские данные и дату активности
+        $telegramUser->setUsername($from['username'] ?? null);
+        $telegramUser->setFirstName($from['first_name'] ?? null);
+        $telegramUser->setLastName($from['last_name'] ?? null);
+        $telegramUser->touch();
+
+        return $telegramUser;
+    }
+
+    private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
     {
         // Отправляем простой ответ через Telegram API
         if (isset($message['from']['id'])) {
             $chatId = (string) $message['from']['id'];
             $this->httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/sendMessage', $bot->getToken()), [
-                'json' => [
-                    'chat_id' => $chatId,
-                    'text' => $text,
-                ],
+                'json' => array_filter(
+                    [
+                        'chat_id' => $chatId,
+                        'text' => $text,
+                        'reply_markup' => $replyMarkup,
+                    ],
+                    static fn ($value) => $value !== null,
+                ),
             ]);
         }
 
