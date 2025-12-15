@@ -150,6 +150,11 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         self::assertNotFalse($content);
 
         self::assertStringContainsString('Остатки и счета (структура)', $content);
+        self::assertStringNotContainsString('Сохранить текущий фильтр', $content);
+        self::assertStringNotContainsString('Очистить фильтры', $content);
+        self::assertStringNotContainsString('Кассы', $content);
+        self::assertStringNotContainsString('Исключить выбранные', $content);
+        self::assertStringNotContainsString('Скрывать нулевые строки', $content);
         self::assertStringContainsString('Валюта: RUB', $content);
         self::assertStringContainsString('Валюта: USD', $content);
 
@@ -166,7 +171,7 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         self::assertStringContainsString('5.00', $content);
     }
 
-    public function testStructuredReportAppliesFilters(): void
+    public function testStructuredReportShowsAllAccounts(): void
     {
         $client = static::createClient();
         $container = static::getContainer();
@@ -233,18 +238,15 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         $client->request('GET', '/finance/reports/account-balances-structured', [
             'from' => '2024-01-01',
             'to' => '2024-01-05',
-            'accounts' => [$accountRub->getId()],
-            'exclude' => 1,
-            'hideZero' => 1,
         ]);
 
         self::assertResponseIsSuccessful();
         $content = $client->getResponse()->getContent();
         self::assertNotFalse($content);
 
-        self::assertStringNotContainsString('Filtered RUB', $content);
-        self::assertStringNotContainsString('Zero RUB', $content);
+        self::assertStringContainsString('Filtered RUB', $content);
         self::assertStringContainsString('Visible USD', $content);
+        self::assertStringContainsString('Zero RUB', $content);
         self::assertStringContainsString('60.00', $content);
     }
 }

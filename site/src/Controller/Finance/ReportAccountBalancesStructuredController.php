@@ -43,30 +43,12 @@ class ReportAccountBalancesStructuredController extends AbstractController
             $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
         }
 
-        $selectedAccountIdsRaw = $request->query->all('accounts');
-        $selectedAccountIds = array_values(array_filter(array_map('strval', $selectedAccountIdsRaw), static fn($v) => $v !== ''));
-        $excludeSelected = $request->query->getBoolean('exclude');
-        $hideZero = $request->query->getBoolean('hideZero');
-
         $accounts = $this->accountRepository->findBy(
             ['company' => $company, 'isActive' => true],
             ['type' => 'ASC', 'name' => 'ASC']
         );
 
-        $filteredAccounts = array_filter(
-            $accounts,
-            static function (MoneyAccount $account) use ($selectedAccountIds, $excludeSelected): bool {
-                if (empty($selectedAccountIds)) {
-                    return true;
-                }
-
-                $isSelected = in_array($account->getId(), $selectedAccountIds, true);
-
-                return $excludeSelected ? !$isSelected : $isSelected;
-            }
-        );
-
-        $accountIds = array_map(static fn (MoneyAccount $account) => $account->getId(), $filteredAccounts);
+        $accountIds = array_map(static fn (MoneyAccount $account) => $account->getId(), $accounts);
 
         $openingByAccountId = [];
         $closingByAccountId = [];
@@ -79,7 +61,7 @@ class ReportAccountBalancesStructuredController extends AbstractController
 
         $rowsByCurrency = [];
 
-        foreach ($filteredAccounts as $account) {
+        foreach ($accounts as $account) {
             /** @var MoneyAccount $account */
             $accId = $account->getId();
             $currency = $account->getCurrency();
@@ -88,15 +70,6 @@ class ReportAccountBalancesStructuredController extends AbstractController
             $closing = $closingByAccountId[$accId] ?? '0.00';
             $inflow = $turnoversByAccountId[$accId]['inflow'] ?? '0.00';
             $outflow = $turnoversByAccountId[$accId]['outflow'] ?? '0.00';
-
-            $isZeroRow = 0 === bccomp($opening, '0', 2)
-                && 0 === bccomp($inflow, '0', 2)
-                && 0 === bccomp($outflow, '0', 2)
-                && 0 === bccomp($closing, '0', 2);
-
-            if ($hideZero && $isZeroRow) {
-                continue;
-            }
 
             if (!isset($rowsByCurrency[$currency])) {
                 $rowsByCurrency[$currency] = [
@@ -131,10 +104,6 @@ class ReportAccountBalancesStructuredController extends AbstractController
             'company' => $company,
             'from' => $from,
             'to' => $to,
-            'accountsForFilter' => $accounts,
-            'selectedAccountIds' => $selectedAccountIds,
-            'excludeSelected' => $excludeSelected,
-            'hideZero' => $hideZero,
             'rowsByCurrency' => $rowsByCurrency,
         ]);
     }
