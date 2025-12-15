@@ -13,6 +13,7 @@
 {% block content %}
     <div class="d-flex align-items-center justify-content-between mb-3">
         <h2 class="page-title mb-0">Остатки и счета (структура)</h2>
+        <div class="text-muted">Период: {{ from|date('d.m.Y') }} — {{ to|date('d.m.Y') }}</div>
     </div>
 
     <form method="get" class="card mb-4">
@@ -26,13 +27,12 @@
                 </div>
                 <div class="col-12 col-md-9 col-lg-10">
                     <div class="row g-3 align-items-end">
-                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-                            <label class="form-label mb-1">Дата отчёта с</label>
-                            <input type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control" />
-                        </div>
-                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-                            <label class="form-label mb-1">Дата отчёта по</label>
-                            <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
+                        <div class="col-12 col-md-6 col-lg-3 col-xl-3">
+                            <label class="form-label mb-1">Дата отчёта</label>
+                            <div class="d-flex gap-2">
+                                <input type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control" />
+                                <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
+                            </div>
                         </div>
                         <div class="col-12 col-sm-6 col-md-3 col-lg-2">
                             <label class="form-label mb-1">Дата транзакции</label>
@@ -40,29 +40,29 @@
                                 <option value="report">По дате отчёта</option>
                             </select>
                         </div>
-                        <div class="col-12 col-md-6 col-lg-3">
+                        <div class="col-12 col-md-6 col-lg-3 col-xl-3">
                             <label class="form-label mb-1">Кассы</label>
-                            <div class="d-flex flex-column gap-2">
-                                <select name="accounts[]" class="form-select" multiple style="max-height: 200px; overflow-y: auto;">
+                            <div class="d-flex gap-3 align-items-start">
+                                <select name="accounts[]" class="form-select" multiple style="max-height: 140px; overflow:auto;">
                                     {% for account in accountsForFilter %}
                                         <option value="{{ account.id }}" {% if account.id in selectedAccountIds %}selected{% endif %}>
                                             {{ account.name }} ({{ account.currency }})
                                         </option>
                                     {% endfor %}
                                 </select>
-                                <div class="form-check mb-0">
-                                    <input class="form-check-input" type="checkbox" value="1" id="excludeCheckbox" name="exclude" {% if excludeSelected %}checked{% endif %} />
-                                    <label class="form-check-label" for="excludeCheckbox">Исключить выбранные</label>
+                                <div class="d-flex flex-column gap-2">
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" value="1" id="excludeCheckbox" name="exclude" {% if excludeSelected %}checked{% endif %} />
+                                        <label class="form-check-label" for="excludeCheckbox">Исключить выбранные</label>
+                                    </div>
+                                    <div class="form-check mb-0">
+                                        <input class="form-check-input" type="checkbox" value="1" id="hideZeroCheckbox" name="hideZero" {% if hideZero %}checked{% endif %} />
+                                        <label class="form-check-label" for="hideZeroCheckbox">Скрывать нулевые строки</label>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input" type="checkbox" value="1" id="hideZeroCheckbox" name="hideZero"{% if hideZero %}checked{% endif %} />
-                                <label class="form-check-label" for="hideZeroCheckbox">Скрывать нулевые строки</label>
-                            </div>
-                        </div>
-                        <div class="col-auto ms-auto">
+                        <div class="col-auto ms-auto align-self-end">
                             <button type="submit" class="btn btn-primary">Показать</button>
                         </div>
                     </div>
@@ -80,8 +80,7 @@
 
     {% if rowsByCurrency is empty or not hasAccountRows %}
         <div class="alert alert-warning">
-            <div class="mb-1">Нет данных за выбранный период. Проверьте фильтр 'Кассы' и переключатель 'Скрывать нулевые строки'.</div>
-            <div class="mb-0">Для актуальных остатков выполните 'Пересчёт остатков' в <a href="{{ path('report_account_balances_index') }}">основном отчёте</a>.</div>
+            Нет данных за выбранный период. Проверьте выбранные кассы и переключатель 'Скрывать нулевые строки'.
         </div>
     {% else %}
         <div class="card">

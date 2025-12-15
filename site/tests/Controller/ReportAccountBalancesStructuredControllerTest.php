@@ -2,9 +2,11 @@
 namespace App\Tests\Controller;
 
 use App\Entity\Company;
+use App\Entity\CashTransaction;
 use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
+use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -19,6 +21,7 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
+        $em->createQuery('DELETE FROM App\\Entity\\CashTransaction t')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
@@ -92,6 +95,48 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         $em->persist($balanceRubTo);
         $em->persist($balanceUsdFrom);
         $em->persist($balanceUsdTo);
+
+        $rubInflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountRub,
+            CashDirection::INFLOW,
+            '60',
+            'RUB',
+            new \DateTimeImmutable('2024-01-03')
+        );
+        $rubOutflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountRub,
+            CashDirection::OUTFLOW,
+            '10',
+            'RUB',
+            new \DateTimeImmutable('2024-01-04')
+        );
+        $usdInflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountUsd,
+            CashDirection::INFLOW,
+            '20',
+            'USD',
+            new \DateTimeImmutable('2024-01-03')
+        );
+        $usdOutflow = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $company,
+            $accountUsd,
+            CashDirection::OUTFLOW,
+            '5',
+            'USD',
+            new \DateTimeImmutable('2024-01-04')
+        );
+
+        $em->persist($rubInflow);
+        $em->persist($rubOutflow);
+        $em->persist($usdInflow);
+        $em->persist($usdOutflow);
         $em->flush();
 
         $client->loginUser($user);
@@ -111,10 +156,14 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         self::assertStringContainsString('Main RUB', $content);
         self::assertStringContainsString('100.00', $content);
         self::assertStringContainsString('150.00', $content);
+        self::assertStringContainsString('60.00', $content);
+        self::assertStringContainsString('10.00', $content);
 
         self::assertStringContainsString('Cash USD', $content);
         self::assertStringContainsString('75.00', $content);
         self::assertStringContainsString('90.00', $content);
+        self::assertStringContainsString('20.00', $content);
+        self::assertStringContainsString('5.00', $content);
     }
 
     public function testStructuredReportAppliesFilters(): void
@@ -124,6 +173,7 @@ class ReportAccountBalancesStructuredControllerTest extends WebTestCase
         $em = $container->get('doctrine.orm.entity_manager');
         $hasher = $container->get(UserPasswordHasherInterface::class);
 
+        $em->createQuery('DELETE FROM App\\Entity\\CashTransaction t')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();

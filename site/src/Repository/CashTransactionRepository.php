@@ -5,6 +5,7 @@ namespace App\Repository;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
+use App\Enum\CashDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -64,5 +65,51 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('externalId', $externalId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    /**
+     * @param list<int> $accountIds
+     *
+     * @return array<int, array{inflow: string, outflow: string}>
+     */
+    public function sumByAccountAndPeriod(Company $company, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        if ($accountIds === []) {
+            return [];
+        }
+
+        $qb = $this->createQueryBuilder('t')
+            ->select(
+                'IDENTITY(t.moneyAccount) as accountId',
+                'SUM(CASE WHEN t.direction = :inflow THEN t.amount ELSE 0 END) as inflow',
+                'SUM(CASE WHEN t.direction = :outflow THEN t.amount ELSE 0 END) as outflow'
+            )
+            ->join('t.moneyAccount', 'ma')
+            ->where('t.company = :company')
+            ->andWhere('IDENTITY(t.moneyAccount) IN (:accountIds)')
+            ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->groupBy('accountId')
+            ->setParameter('company', $company)
+            ->setParameter('accountIds', $accountIds)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('outflow', CashDirection::OUTFLOW);
+
+        // TODO: exclude transfers (isTransfer = true) if the report should show only operational turnovers.
+
+        $result = $qb->getQuery()->getArrayResult();
+
+        $byAccountId = [];
+        foreach ($result as $row) {
+            $accountId = (int) $row['accountId'];
+            $byAccountId[$accountId] = [
+                'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
+                'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
+            ];
+        }
+
+        return $byAccountId;
     }
 }
