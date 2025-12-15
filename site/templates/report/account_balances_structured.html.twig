@@ -18,48 +18,16 @@
 
     <form method="get" class="card mb-4">
         <div class="card-body">
-            <div class="row g-3 align-items-stretch">
-                <div class="col-12 col-md-3 col-lg-2">
-                    <div class="d-flex flex-column gap-2 h-100">
-                        <a href="#" class="btn btn-outline-secondary disabled w-100">Сохранить текущий фильтр</a>
-                        <a href="{{ path('report_account_balances_structured_index') }}" class="btn btn-link text-start w-100">Очистить фильтры</a>
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-6 col-lg-4">
+                    <label class="form-label mb-1">Дата отчёта</label>
+                    <div class="d-flex gap-2">
+                        <input type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control" />
+                        <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
                     </div>
                 </div>
-                <div class="col-12 col-md-9 col-lg-10">
-                    <div class="row g-3 align-items-end">
-                        <div class="col-12 col-md-6 col-lg-3 col-xl-3">
-                            <label class="form-label mb-1">Дата отчёта</label>
-                            <div class="d-flex gap-2">
-                                <input type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control" />
-                                <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
-                            </div>
-                        </div>
-                        <div class="col-12 col-md-6 col-lg-6 col-xl-7">
-                            <label class="form-label mb-1">Кассы</label>
-                            <div class="d-flex gap-3 align-items-start">
-                                <select name="accounts[]" class="form-select" multiple style="max-height: 140px; overflow:auto;">
-                                    {% for account in accountsForFilter %}
-                                        <option value="{{ account.id }}" {% if account.id in selectedAccountIds %}selected{% endif %}>
-                                            {{ account.name }} ({{ account.currency }})
-                                        </option>
-                                    {% endfor %}
-                                </select>
-                                <div class="d-flex flex-column gap-2">
-                                    <div class="form-check mb-0">
-                                        <input class="form-check-input" type="checkbox" value="1" id="excludeCheckbox" name="exclude" {% if excludeSelected %}checked{% endif %} />
-                                        <label class="form-check-label" for="excludeCheckbox">Исключить выбранные</label>
-                                    </div>
-                                    <div class="form-check mb-0">
-                                        <input class="form-check-input" type="checkbox" value="1" id="hideZeroCheckbox" name="hideZero" {% if hideZero %}checked{% endif %} />
-                                        <label class="form-check-label" for="hideZeroCheckbox">Скрывать нулевые строки</label>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-auto ms-auto align-self-end">
-                            <button type="submit" class="btn btn-primary">Показать</button>
-                        </div>
-                    </div>
+                <div class="col-auto ms-auto align-self-end">
+                    <button type="submit" class="btn btn-primary">Показать</button>
                 </div>
             </div>
         </div>
@@ -74,7 +42,7 @@
 
     {% if rowsByCurrency is empty or not hasAccountRows %}
         <div class="alert alert-warning">
-            Нет данных за выбранный период. Проверьте выбранные кассы и переключатель 'Скрывать нулевые строки'.
+            Нет данных за выбранный период.
         </div>
     {% else %}
         <div class="card">
