@@ -1,0 +1,68 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Telegram-боты{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Telegram-боты</h2>
+        <p class="text-muted mb-0">Управление ботами текущей компании</p>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a href="{{ path('admin_telegram_bot_new') }}" class="btn btn-primary">+ Добавить бота</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      {% if bots is empty %}
+        <div class="alert alert-info mb-0">Пока нет ни одного бота. Нажмите «Добавить бота», чтобы создать.</div>
+      {% else %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th>Username</th>
+                <th>Токен</th>
+                <th>Webhook URL</th>
+                <th class="text-center">Активен</th>
+                <th class="text-end">Действия</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for bot in bots %}
+                <tr>
+                  <td>{{ bot.username ?? '—' }}</td>
+                  <td class="text-muted">{{ bot.token }}</td>
+                  <td>{{ bot.webhookUrl ?? '—' }}</td>
+                  <td class="text-center">
+                    {% if bot.isActive %}
+                      <span class="badge bg-success-lt text-success">Да</span>
+                    {% else %}
+                      <span class="badge bg-secondary">Нет</span>
+                    {% endif %}
+                  </td>
+                  <td class="text-end">
+                    <div class="d-flex gap-2 justify-content-end">
+                      <a class="btn btn-sm btn-outline-primary" href="{{ path('admin_telegram_bot_edit', {id: bot.id}) }}">Редактировать</a>
+                      <form method="post" action="{{ path('admin_telegram_bot_toggle', {id: bot.id}) }}" onsubmit="return confirm('Переключить активность?');">
+                        <input type="hidden" name="_token" value="{{ csrf_token('toggle_bot' ~ bot.id) }}">
+                        {% if bot.isActive %}
+                          <button class="btn btn-sm btn-outline-warning" type="submit">Деактивировать</button>
+                        {% else %}
+                          <button class="btn btn-sm btn-outline-success" type="submit">Активировать</button>
+                        {% endif %}
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
