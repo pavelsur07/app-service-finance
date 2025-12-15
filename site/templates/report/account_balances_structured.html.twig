@@ -34,13 +34,7 @@
                                 <input type="date" name="to" value="{{ to|date('Y-m-d') }}" class="form-control" />
                             </div>
                         </div>
-                        <div class="col-12 col-sm-6 col-md-3 col-lg-2">
-                            <label class="form-label mb-1">Дата транзакции</label>
-                            <select class="form-select" name="transactionDate">
-                                <option value="report">По дате отчёта</option>
-                            </select>
-                        </div>
-                        <div class="col-12 col-md-6 col-lg-3 col-xl-3">
+                        <div class="col-12 col-md-6 col-lg-6 col-xl-7">
                             <label class="form-label mb-1">Кассы</label>
                             <div class="d-flex gap-3 align-items-start">
                                 <select name="accounts[]" class="form-select" multiple style="max-height: 140px; overflow:auto;">
