@@ -6,7 +6,9 @@ use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+use App\Telegram\Repository\TelegramBotRepository;
+
+#[ORM\Entity(repositoryClass: TelegramBotRepository::class)]
 #[ORM\Table(name: '`telegram_bots`')]
 #[ORM\UniqueConstraint(name: 'uniq_telegram_bot_token', columns: ['token'])]
 class TelegramBot
