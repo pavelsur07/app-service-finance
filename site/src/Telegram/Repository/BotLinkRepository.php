@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Telegram\Repository;
 
 use App\Telegram\Entity\BotLink;
+use App\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
@@ -14,6 +15,16 @@ class BotLinkRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, BotLink::class);
+    }
+
+    /**
+     * Возвращает ссылки текущей компании, отсортированные по дате создания (новые сверху).
+     *
+     * @return BotLink[]
+     */
+    public function findByCompany(Company $company): array
+    {
+        return $this->findBy(['company' => $company], ['createdAt' => 'DESC']);
     }
 
     /**

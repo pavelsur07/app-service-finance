@@ -1,0 +1,65 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Создание ссылки привязки{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Создание ссылки привязки</h2>
+        <p class="text-muted mb-0">Ссылка /start привяжет пользователя к текущей компании</p>
+      </div>
+      <div class="col-auto ms-auto d-print-none">
+        <a href="{{ path('admin_telegram_link_index') }}" class="btn btn-secondary">К списку ссылок</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="row mt-3">
+    <div class="col-lg-6">
+      <div class="card">
+        <div class="card-body">
+          {{ form_start(form) }}
+          {{ form_row(form.bot) }}
+          {{ form_row(form.expiresAt) }}
+          <div class="mt-3">
+            {{ form_row(form.save) }}
+          </div>
+          {{ form_end(form) }}
+        </div>
+      </div>
+    </div>
+
+    {% if createdLink %}
+      <div class="col-lg-6">
+        <div class="card">
+          <div class="card-body">
+            <h3 class="card-title">Сформированная ссылка</h3>
+            <p class="text-muted">Передайте её пользователю для запуска бота с токеном.</p>
+
+            {% if deepLink %}
+              <div class="alert alert-success">
+                <div class="fw-bold">Готовая ссылка:</div>
+                <a href="{{ deepLink }}" target="_blank" rel="noopener">{{ deepLink }}</a>
+              </div>
+            {% elseif usernameMissing %}
+              <div class="alert alert-warning mb-2">Заполните username у бота, иначе deep-link не сформировать.</div>
+              <div class="text-muted">Токен: <code>{{ createdLink.token }}</code></div>
+            {% endif %}
+
+            <dl class="row mt-3">
+              <dt class="col-sm-4">Бот</dt>
+              <dd class="col-sm-8">{{ createdLink.bot.username ?? '—' }}</dd>
+
+              <dt class="col-sm-4">Scope</dt>
+              <dd class="col-sm-8">{{ createdLink.scope }}</dd>
+
+              <dt class="col-sm-4">Истекает</dt>
+              <dd class="col-sm-8">{{ createdLink.expiresAt|date('d.m.Y H:i') }}</dd>
+            </dl>
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
