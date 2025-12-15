@@ -43,7 +43,8 @@ class ReportAccountBalancesStructuredController extends AbstractController
             $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
         }
 
-        $selectedAccountIds = array_map('intval', $request->query->all('accounts'));
+        $selectedAccountIdsRaw = $request->query->all('accounts');
+        $selectedAccountIds = array_values(array_filter(array_map('strval', $selectedAccountIdsRaw), static fn($v) => $v !== ''));
         $excludeSelected = $request->query->getBoolean('exclude');
         $hideZero = $request->query->getBoolean('hideZero');
 

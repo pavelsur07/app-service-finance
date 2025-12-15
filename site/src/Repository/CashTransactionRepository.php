@@ -68,9 +68,9 @@ class CashTransactionRepository extends ServiceEntityRepository
     }
 
     /**
-     * @param list<int> $accountIds
+     * @param list<string> $accountIds
      *
-     * @return array<int, array{inflow: string, outflow: string}>
+     * @return array<string, array{inflow: string, outflow: string}>
      */
     public function sumByAccountAndPeriod(Company $company, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
@@ -103,7 +103,7 @@ class CashTransactionRepository extends ServiceEntityRepository
 
         $byAccountId = [];
         foreach ($result as $row) {
-            $accountId = (int) $row['accountId'];
+            $accountId = (string) $row['accountId'];
             $byAccountId[$accountId] = [
                 'inflow' => bcadd((string) ($row['inflow'] ?? '0'), '0', 2),
                 'outflow' => bcadd((string) ($row['outflow'] ?? '0'), '0', 2),
