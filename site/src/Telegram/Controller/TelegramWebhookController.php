@@ -3,6 +3,7 @@
 namespace App\Telegram\Controller;
 
 use App\Telegram\Entity\ClientBinding;
+use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
@@ -60,6 +61,10 @@ class TelegramWebhookController extends AbstractController
 
         if ($text === '/set_cash') {
             return $this->handleSetCash($bot, $message);
+        }
+
+        if (str_starts_with($text, '/reports')) {
+            return $this->handleReports($bot, $message);
         }
 
         return new JsonResponse(['status' => 'ok']);
@@ -193,7 +198,62 @@ class TelegramWebhookController extends AbstractController
             return $this->handleSetCashCallback($bot, $callbackQuery, substr($callbackData, strlen('set_cash:')));
         }
 
+        if (str_starts_with($callbackData, 'rep:')) {
+            return $this->handleReportsCallback($bot, $callbackQuery, $callbackData);
+        }
+
         return new JsonResponse(['status' => 'ok']);
+    }
+
+    private function handleReports(TelegramBot $bot, array $message): Response
+    {
+        $from = $message['from'] ?? [];
+        $telegramUser = $this->syncTelegramUser($from);
+        if (!$telegramUser) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
+            'company' => $bot->getCompany(),
+            'bot' => $bot,
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$clientBinding) {
+            return $this->respondWithMessage($bot, $message, 'Не найдена привязка. Отправьте /start.');
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован');
+        }
+
+        $subscription = $this->entityManager->getRepository(ReportSubscription::class)->findOneBy([
+            'company' => $clientBinding->getCompany(),
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$subscription) {
+            // Создаем подписку с дефолтными настройками
+            $subscription = new ReportSubscription(
+                Uuid::uuid4()->toString(),
+                $clientBinding->getCompany(),
+                $telegramUser,
+                ReportSubscription::PERIOD_DAILY,
+                '09:00'
+            );
+            $subscription->setMetricsMask(0);
+            $subscription->enable();
+            $this->entityManager->persist($subscription);
+        }
+
+        $this->entityManager->flush();
+
+        return $this->respondWithMessage(
+            $bot,
+            $message,
+            $this->buildReportMessage($subscription),
+            $this->buildReportKeyboard($subscription)
+        );
     }
 
     private function handleSetCashCallback(TelegramBot $bot, array $callbackQuery, string $moneyAccountId): Response
@@ -233,6 +293,101 @@ class TelegramWebhookController extends AbstractController
         return $this->respondWithMessage($bot, $callbackQuery, sprintf('Касса установлена: %s', $moneyAccount->getName()));
     }
 
+    private function handleReportsCallback(TelegramBot $bot, array $callbackQuery, string $callbackData): Response
+    {
+        $from = $callbackQuery['from'] ?? [];
+        $telegramUser = $this->syncTelegramUser($from);
+        if (!$telegramUser) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
+            'company' => $bot->getCompany(),
+            'bot' => $bot,
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$clientBinding) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Не найдена привязка. Отправьте /start.');
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован');
+        }
+
+        $subscription = $this->entityManager->getRepository(ReportSubscription::class)->findOneBy([
+            'company' => $clientBinding->getCompany(),
+            'telegramUser' => $telegramUser,
+        ]);
+
+        if (!$subscription) {
+            // Создаем подписку на лету, чтобы не зависеть от предыдущего вызова /reports
+            $subscription = new ReportSubscription(
+                Uuid::uuid4()->toString(),
+                $clientBinding->getCompany(),
+                $telegramUser,
+                ReportSubscription::PERIOD_DAILY,
+                '09:00'
+            );
+            $this->entityManager->persist($subscription);
+        }
+
+        if (str_starts_with($callbackData, 'rep:toggle:')) {
+            $bit = (int) substr($callbackData, strlen('rep:toggle:'));
+            $allowedBits = [1, 2, 4];
+            if (!in_array($bit, $allowedBits, true)) {
+                return $this->respondWithMessage($bot, $callbackQuery, 'Неизвестная метрика.');
+            }
+
+            // Тоглим соответствующий бит
+            $subscription->setMetricsMask($subscription->getMetricsMask() ^ $bit);
+        } elseif (str_starts_with($callbackData, 'rep:period:')) {
+            $periodicity = substr($callbackData, strlen('rep:period:'));
+            $allowedPeriods = [
+                ReportSubscription::PERIOD_DAILY,
+                ReportSubscription::PERIOD_WEEKLY,
+                ReportSubscription::PERIOD_MONTHLY,
+            ];
+
+            if (!in_array($periodicity, $allowedPeriods, true)) {
+                return $this->respondWithMessage($bot, $callbackQuery, 'Некорректная периодичность.');
+            }
+
+            $subscription->setPeriodicity($periodicity);
+        } elseif ($callbackData === 'rep:on') {
+            $subscription->enable();
+        } elseif ($callbackData === 'rep:off') {
+            $subscription->disable();
+        } else {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        $this->entityManager->flush();
+
+        $text = $this->buildReportMessage($subscription);
+        $replyMarkup = $this->buildReportKeyboard($subscription);
+
+        // Обновляем существующее сообщение, если это возможно
+        if (isset($callbackQuery['message']['message_id'], $callbackQuery['message']['chat']['id'])) {
+            $this->httpClient->request(
+                'POST',
+                sprintf('https://api.telegram.org/bot%s/editMessageText', $bot->getToken()),
+                [
+                    'json' => [
+                        'chat_id' => (string) $callbackQuery['message']['chat']['id'],
+                        'message_id' => $callbackQuery['message']['message_id'],
+                        'text' => $text,
+                        'reply_markup' => $replyMarkup,
+                    ],
+                ]
+            );
+
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        return $this->respondWithMessage($bot, $callbackQuery, $text, $replyMarkup);
+    }
+
     private function syncTelegramUser(array $from): ?TelegramUser
     {
         $tgUserId = isset($from['id']) ? (string) $from['id'] : null;
@@ -255,6 +410,78 @@ class TelegramWebhookController extends AbstractController
         $telegramUser->touch();
 
         return $telegramUser;
+    }
+
+    private function buildReportMessage(ReportSubscription $subscription): string
+    {
+        $metricsMask = $subscription->getMetricsMask();
+        $metrics = [
+            1 => 'Баланс',
+            2 => 'ДДС (доход/расход)',
+            4 => 'Топ расходов',
+        ];
+
+        $metricLines = [];
+        foreach ($metrics as $bit => $label) {
+            $metricLines[] = sprintf('- %s: %s', $label, ($metricsMask & $bit) === $bit ? 'включено' : 'выключено');
+        }
+
+        $periodicityTitles = [
+            ReportSubscription::PERIOD_DAILY => 'Каждый день',
+            ReportSubscription::PERIOD_WEEKLY => 'Раз в неделю',
+            ReportSubscription::PERIOD_MONTHLY => 'Раз в месяц',
+        ];
+
+        return implode("\n", array_merge(
+            ['Настройка отчетов:'],
+            $metricLines,
+            [
+                sprintf('Периодичность: %s', $periodicityTitles[$subscription->getPeriodicity()] ?? $subscription->getPeriodicity()),
+                sprintf('Статус: %s', $subscription->isEnabled() ? 'включена' : 'выключена'),
+            ]
+        ));
+    }
+
+    private function buildReportKeyboard(ReportSubscription $subscription): array
+    {
+        $metricsMask = $subscription->getMetricsMask();
+
+        $buildToggle = static fn (string $label, int $bit): array => [
+            'text' => sprintf('%s %s', ($metricsMask & $bit) === $bit ? '✅' : '⚪️', $label),
+            'callback_data' => sprintf('rep:toggle:%d', $bit),
+        ];
+
+        $buildPeriodicity = static function (string $label, string $value) use ($subscription): array {
+            $isActive = $subscription->getPeriodicity() === $value;
+
+            return [
+                'text' => sprintf('%s %s', $isActive ? '✅' : '⚪️', $label),
+                'callback_data' => sprintf('rep:period:%s', $value),
+            ];
+        };
+
+        $statusButton = [
+            'text' => $subscription->isEnabled() ? 'Выключить подписку' : 'Включить подписку',
+            'callback_data' => $subscription->isEnabled() ? 'rep:off' : 'rep:on',
+        ];
+
+        return [
+            'inline_keyboard' => [
+                [
+                    $buildToggle('Баланс', 1),
+                    $buildToggle('ДДС (доход/расход)', 2),
+                ],
+                [
+                    $buildToggle('Топ расходов', 4),
+                ],
+                [
+                    $buildPeriodicity('День', ReportSubscription::PERIOD_DAILY),
+                    $buildPeriodicity('Неделя', ReportSubscription::PERIOD_WEEKLY),
+                    $buildPeriodicity('Месяц', ReportSubscription::PERIOD_MONTHLY),
+                ],
+                [$statusButton],
+            ],
+        ];
     }
 
     private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
