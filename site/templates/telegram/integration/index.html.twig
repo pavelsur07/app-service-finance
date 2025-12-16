@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Интеграция с Telegram{% endblock %}
+
+{% block body %}
+<div class="container-xl">
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Telegram / Финансы</h2>
+        <div class="text-secondary">Создайте ссылку привязки для активной компании: <strong>{{ company.name }}</strong>.</div>
+      </div>
+    </div>
+  </div>
+
+  {% for label, messages in app.flashes %}
+    {% for message in messages %}
+      <div class="alert alert-{{ label }} my-2" role="alert">
+        {{ message }}
+      </div>
+    {% endfor %}
+  {% endfor %}
+
+  <div class="row row-cards">
+    <div class="col-md-8">
+      <div class="card">
+        <div class="card-status-top bg-primary"></div>
+        <div class="card-header">
+          <h3 class="card-title">Привязка Telegram-бота</h3>
+        </div>
+        <div class="card-body">
+          {% if bot %}
+            <p class="text-secondary mb-3">
+              Активный бот: <strong>{{ bot.username ? '@' ~ bot.username|trim('@') : 'без username' }}</strong>.
+            </p>
+          {% else %}
+            <div class="alert alert-warning" role="alert">
+              Администратор сервиса ещё не настроил Telegram-бота
+            </div>
+          {% endif %}
+
+          <form method="post" action="{{ path('telegram_integration_generate_link') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('telegram_generate_link') }}">
+            <button class="btn btn-primary" type="submit" {% if not bot %}disabled{% endif %}>
+              Сгенерировать ссылку привязки
+            </button>
+          </form>
+
+          {% if deepLink %}
+            <div class="alert alert-success mt-4" role="alert">
+              Deep-link для привязки: <a href="{{ deepLink }}" target="_blank" rel="noopener noreferrer">{{ deepLink }}</a>
+            </div>
+          {% endif %}
+
+          {% if usernameMissing %}
+            <div class="alert alert-warning mt-2" role="alert">
+              Заполните username в /admin
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

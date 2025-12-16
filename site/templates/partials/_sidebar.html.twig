@@ -259,14 +259,27 @@
                     </a>
                 </li>
 
-                {% set integrations_active = current_route starts with 'ozon_' or current_route starts with 'wildberries_' %}
+                {% set integrations_active =
+                    current_route starts with 'ozon_'
+                    or current_route starts with 'wildberries_'
+                    or current_route starts with 'telegram_integration_'
+                %}
                 <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                     <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
                         <span class="nav-link-title">Интеграции</span>
                     </a>
-                    {% set integrations_show = (integrations_active or current_route starts with 'ozon_' or current_route starts with 'wildberries_') ? 'show' : '' %}
+                    {% set integrations_show = (
+                        integrations_active
+                        or current_route starts with 'ozon_'
+                        or current_route starts with 'wildberries_'
+                        or current_route starts with 'telegram_integration_'
+                    ) ? 'show' : '' %}
                         <div class="dropdown-menu {{ integrations_show }}">
                             <div class="dropdown-menu-column">
+                                {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
+                                <a class="dropdown-item {{ telegram_finance_active ? 'active' : '' }}" href="{{ path('telegram_integration_index') }}">
+                                    <span>Telegram / Финансы</span>
+                                </a>
                                 {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
                                 <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
                                     <span>Wb / Продажи</span>
