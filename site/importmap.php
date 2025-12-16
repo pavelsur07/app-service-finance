@@ -17,10 +17,10 @@ return [
         'entrypoint' => true,
     ],
     'react' => [
-        'url' => 'https://ga.jspm.io/npm:react@18.3.1/dev.index.js',
+        'version' => '18.3.1',
     ],
     'react-dom/client' => [
-        'url' => 'https://ga.jspm.io/npm:react-dom@18.3.1/client.js',
+        'version' => '18.3.1',
     ],
     '@hotwired/stimulus' => [
         'version' => '3.2.2',
