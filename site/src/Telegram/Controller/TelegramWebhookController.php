@@ -6,6 +6,7 @@ use App\Entity\CashTransaction;
 use App\Enum\CashDirection;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ReportSubscription;
+use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
@@ -51,7 +52,13 @@ class TelegramWebhookController extends AbstractController
         }
 
         $message = $payload['message'] ?? null;
+        $document = is_array($message['document'] ?? null) ? $message['document'] : null;
         $text = $message['text'] ?? null;
+
+        // Сначала принимаем файлы, чтобы не игнорировать документы без текстового тела
+        if ($document) {
+            return $this->handleDocument($bot, $message, $document);
+        }
 
         // Обрабатываем только текстовые сообщения
         if (!\is_string($text)) {
@@ -421,6 +428,117 @@ class TelegramWebhookController extends AbstractController
         }
 
         return $this->respondWithMessage($bot, $callbackQuery, $text, $replyMarkup);
+    }
+
+    private function handleDocument(TelegramBot $bot, array $message, array $document): Response
+    {
+        // Фиксируем пользователя, чтобы знать источник загрузки и иметь доступ к привязкам
+        $telegramUser = $this->syncTelegramUser($message['from'] ?? []);
+        if (!$telegramUser) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        // Ищем активные привязки пользователя
+        $clientBindings = $this->entityManager->getRepository(ClientBinding::class)->findBy([
+            'telegramUser' => $telegramUser,
+            'status' => ClientBinding::STATUS_ACTIVE,
+        ]);
+
+        if (!$clientBindings) {
+            return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета');
+        }
+
+        if (count($clientBindings) > 1) {
+            return $this->respondWithMessage($bot, $message, 'У вас несколько компаний. Для импорта выберите компанию через /set_cash');
+        }
+
+        $clientBinding = $clientBindings[0];
+        if (!$clientBinding instanceof ClientBinding) {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+        }
+
+        $fileId = is_string($document['file_id'] ?? null) ? (string) $document['file_id'] : null;
+        if (!$fileId) {
+            return new JsonResponse(['status' => 'ignored']);
+        }
+
+        $originalFilename = is_string($document['file_name'] ?? null) ? $document['file_name'] : 'import';
+
+        try {
+            // Запрашиваем путь к файлу через Telegram API
+            $fileInfoResponse = $this->httpClient->request(
+                'GET',
+                sprintf('https://api.telegram.org/bot%s/getFile', $bot->getToken()),
+                [
+                    'query' => [
+                        'file_id' => $fileId,
+                    ],
+                ],
+            );
+            $fileInfo = $fileInfoResponse->toArray(false);
+        } catch (\Throwable) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось запросить файл, попробуйте позже.');
+        }
+
+        $filePath = is_array($fileInfo['result'] ?? null) && is_string($fileInfo['result']['file_path'] ?? null)
+            ? $fileInfo['result']['file_path']
+            : null;
+
+        if (!$filePath) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось получить файл, попробуйте позже.');
+        }
+
+        try {
+            // Скачиваем содержимое файла
+            $fileResponse = $this->httpClient->request(
+                'GET',
+                sprintf('https://api.telegram.org/file/bot%s/%s', $bot->getToken(), $filePath),
+            );
+            $fileContent = $fileResponse->getContent();
+        } catch (\Throwable) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось скачать файл, попробуйте позже.');
+        }
+
+        // Вычисляем хэш и готовим имя файла с сохранением расширения для наглядности
+        $fileHash = hash('sha256', $fileContent);
+        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
+        $normalizedExtension = $extension !== '' ? '.' . strtolower($extension) : '';
+
+        $storageDir = sprintf('%s/var/storage/telegram-imports', $this->getParameter('kernel.project_dir'));
+        if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось подготовить директорию для файлов импорта.');
+        }
+
+        $targetPath = sprintf('%s/%s%s', $storageDir, $fileHash, $normalizedExtension);
+        if (false === file_put_contents($targetPath, $fileContent)) {
+            return $this->respondWithMessage($bot, $message, 'Не удалось сохранить файл на диск.');
+        }
+
+        // Создаем задачу импорта, чтобы не смешивать загрузку из Telegram с существующей системой импорта
+        $importJob = new ImportJob(
+            Uuid::uuid4()->toString(),
+            $clientBinding->getCompany(),
+            'telegram',
+            $originalFilename,
+            $fileHash,
+            $telegramUser,
+        );
+
+        $this->entityManager->persist($importJob);
+        $this->entityManager->flush();
+
+        // В проекте пока нет очереди/команды для автоматического импорта выписки, поэтому ограничиваемся постановкой задачи
+        $messageText = sprintf(
+            'Файл получен. Импорт будет добавлен позже. Задача №%s, статус: %s',
+            $importJob->getId(),
+            $importJob->getStatus(),
+        );
+
+        return $this->respondWithMessage($bot, $message, $messageText);
     }
 
     private function handleTextMessage(TelegramBot $bot, array $message, string $text): Response
