@@ -46,5 +46,11 @@ telegram_webhook_controller:
         namespace: App\Telegram\Controller
     type: attribute
 
+telegram_integration_controllers:
+    resource:
+        path: ../src/Telegram/Controller/Integration/
+        namespace: App\Telegram\Controller\Integration
+    type: attribute
+
 admin:
     resource: routes/admin.yaml
