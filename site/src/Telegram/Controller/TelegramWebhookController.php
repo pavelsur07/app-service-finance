@@ -73,6 +73,10 @@ class TelegramWebhookController extends AbstractController
             return $this->handleSetCash($bot, $message);
         }
 
+        if (str_starts_with($text, '/reports')) {
+            return $this->handleReports($bot, $message);
+        }
+
         return $this->handleTextMessage($bot, $message, $text);
     }
 
@@ -219,11 +223,24 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ignored']);
         }
 
-        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $bot->getCompany(),
-            'bot' => $bot,
+        // Ищем активные привязки, как в MVP-логике /set_cash
+        $clientBindings = $this->entityManager->getRepository(ClientBinding::class)->findBy([
             'telegramUser' => $telegramUser,
+            'status' => ClientBinding::STATUS_ACTIVE,
         ]);
+
+        if (!$clientBindings) {
+            return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
+        }
+
+        if (count($clientBindings) > 1) {
+            return $this->respondWithMessage($bot, $message, 'У вас несколько компаний. Для операций сначала выберите компанию командой /set_cash');
+        }
+
+        $clientBinding = $clientBindings[0];
+        if (!$clientBinding instanceof ClientBinding) {
+            return new JsonResponse(['status' => 'ok']);
+        }
 
         if (!$clientBinding) {
             return $this->respondWithMessage($bot, $message, 'Не найдена привязка. Отправьте /start.');
@@ -343,11 +360,24 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ignored']);
         }
 
-        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $bot->getCompany(),
-            'bot' => $bot,
+        // Берем активную привязку, как в /set_cash; если несколько — просим выбрать компанию
+        $clientBindings = $this->entityManager->getRepository(ClientBinding::class)->findBy([
             'telegramUser' => $telegramUser,
+            'status' => ClientBinding::STATUS_ACTIVE,
         ]);
+
+        if (!$clientBindings) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
+        }
+
+        if (count($clientBindings) > 1) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'У вас несколько компаний. Для операций сначала выберите компанию командой /set_cash');
+        }
+
+        $clientBinding = $clientBindings[0];
+        if (!$clientBinding instanceof ClientBinding) {
+            return new JsonResponse(['status' => 'ok']);
+        }
 
         if (!$clientBinding) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Не найдена привязка. Отправьте /start.');
@@ -371,6 +401,7 @@ class TelegramWebhookController extends AbstractController
                 ReportSubscription::PERIOD_DAILY,
                 '09:00'
             );
+            $subscription->setMetricsMask(0);
             $this->entityManager->persist($subscription);
         }
 
@@ -424,7 +455,7 @@ class TelegramWebhookController extends AbstractController
                 ]
             );
 
-            return new JsonResponse(['status' => 'ok']);
+            return $this->respondWithMessage($bot, $callbackQuery, 'Настройки обновлены');
         }
 
         return $this->respondWithMessage($bot, $callbackQuery, $text, $replyMarkup);
