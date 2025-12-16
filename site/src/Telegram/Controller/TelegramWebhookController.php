@@ -28,11 +28,12 @@ class TelegramWebhookController extends AbstractController
     ) {
     }
 
-    #[Route('/telegram/bot/{token}', name: 'telegram_webhook', methods: ['POST'])]
-    public function __invoke(string $token, Request $request): Response
+    // Вебхук стал глобальным: один endpoint обслуживает все запросы, активного бота выбираем внутри
+    #[Route('/telegram/webhook', name: 'telegram_webhook', methods: ['POST'])]
+    public function __invoke(Request $request): Response
     {
-        // Находим бота по токену и проверяем активность
-        $bot = $this->botRepository->findOneBy(['token' => $token]);
+        // Находим активного бота, чтобы принимать сообщения независимо от конкретного токена маршрута
+        $bot = $this->botRepository->findActiveBot();
         if (!$bot || !$bot->isActive()) {
             throw $this->createNotFoundException();
         }
@@ -44,7 +45,7 @@ class TelegramWebhookController extends AbstractController
 
         $callbackQuery = $payload['callback_query'] ?? null;
         if (is_array($callbackQuery)) {
-            return $this->handleCallbackQuery($bot, $callbackQuery);
+            return new JsonResponse(['status' => 'ok']);
         }
 
         $message = $payload['message'] ?? null;
@@ -57,14 +58,6 @@ class TelegramWebhookController extends AbstractController
 
         if (str_starts_with($text, '/start')) {
             return $this->handleStart($bot, $message, $text);
-        }
-
-        if ($text === '/set_cash') {
-            return $this->handleSetCash($bot, $message);
-        }
-
-        if (str_starts_with($text, '/reports')) {
-            return $this->handleReports($bot, $message);
         }
 
         return new JsonResponse(['status' => 'ok']);
@@ -84,11 +77,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $message, 'Ссылка не найдена. Сгенерируйте новую.');
         }
 
-        // Проверяем принадлежность компании и актуальность ссылки
-        if ($botLink->getCompany()->getId() !== $bot->getCompany()->getId()) {
-            return $this->respondWithMessage($bot, $message, 'Ссылка недействительна для этого бота.');
-        }
-
+        // Бот глобальный, компанию для привязки берем из BotLink, а не из бота
         if ($botLink->getExpiresAt() < new \DateTimeImmutable()) {
             return $this->respondWithMessage($bot, $message, 'Ссылка истекла. Сгенерируйте новую.');
         }
@@ -105,7 +94,7 @@ class TelegramWebhookController extends AbstractController
 
         // Создаем привязку клиента, если ее еще нет
         $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $bot->getCompany(),
+            'company' => $botLink->getCompany(),
             'bot' => $bot,
             'telegramUser' => $telegramUser,
         ]);
@@ -113,7 +102,7 @@ class TelegramWebhookController extends AbstractController
         if (!$clientBinding) {
             $clientBinding = new ClientBinding(
                 Uuid::uuid4()->toString(),
-                $bot->getCompany(),
+                $botLink->getCompany(),
                 $bot,
                 $telegramUser,
             );
@@ -128,7 +117,7 @@ class TelegramWebhookController extends AbstractController
         return $this->respondWithMessage(
             $bot,
             $message,
-            'Вы привязаны. Теперь можете отправлять расходы/доходы.'
+            'Привязка выполнена. Настройте кассу командой /set_cash.'
         );
     }
 
