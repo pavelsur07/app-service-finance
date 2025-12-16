@@ -6,6 +6,7 @@ use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Form\TelegramBotType;
 use App\Telegram\Repository\TelegramBotRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -36,12 +37,11 @@ class TelegramBotController extends AbstractController
         // Админка платформы: доступ только для суперадминов, без контекста активной компании
         $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
 
-        // Форма сама создаёт нового бота после выбора компании, поэтому не используем ActiveCompanyService
-        $form = $this->createForm(TelegramBotType::class);
-        $form->handleRequest($request);
+        // Создаём нового бота без привязки к компании
+        $bot = new TelegramBot(Uuid::uuid4()->toString(), '');
 
-        /** @var TelegramBot|null $bot */
-        $bot = $form->getData();
+        $form = $this->createForm(TelegramBotType::class, $bot);
+        $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
             // Сохраняем новую запись и возвращаемся к списку
@@ -73,10 +73,7 @@ class TelegramBotController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $form = $this->createForm(TelegramBotType::class, $bot, [
-            // Компания задаётся при создании, поэтому в режиме редактирования не меняем её
-            'lock_company' => true,
-        ]);
+        $form = $this->createForm(TelegramBotType::class, $bot);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
