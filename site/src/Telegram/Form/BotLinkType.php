@@ -2,7 +2,6 @@
 
 namespace App\Telegram\Form;
 
-use App\Entity\Company;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Repository\TelegramBotRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -17,7 +16,6 @@ class BotLinkType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        // Разрешаем выбирать только ботов текущей компании
         $builder
             ->add('bot', EntityType::class, [
                 'class' => TelegramBot::class,
@@ -27,10 +25,8 @@ class BotLinkType extends AbstractType
                     return sprintf('%s (%s)', $username, $bot->getId());
                 },
                 'label' => 'Бот',
-                'query_builder' => function (TelegramBotRepository $repository) use ($options) {
+                'query_builder' => function (TelegramBotRepository $repository) {
                     return $repository->createQueryBuilder('b')
-                        ->andWhere('b.company = :company')
-                        ->setParameter('company', $options['company'])
                         ->orderBy('b.createdAt', 'DESC');
                 },
                 'constraints' => [
@@ -55,12 +51,8 @@ class BotLinkType extends AbstractType
 
     public function configureOptions(OptionsResolver $resolver): void
     {
-        // Передаём текущую компанию, чтобы ограничить список ботов
         $resolver->setDefaults([
             'data_class' => null,
         ]);
-
-        $resolver->setRequired('company');
-        $resolver->setAllowedTypes('company', [Company::class]);
     }
 }

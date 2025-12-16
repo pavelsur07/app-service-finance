@@ -2,7 +2,6 @@
 
 namespace App\Telegram\Controller\Admin;
 
-use App\Service\ActiveCompanyService;
 use App\Telegram\Entity\BotLink;
 use App\Telegram\Form\BotLinkType;
 use App\Telegram\Repository\BotLinkRepository;
@@ -20,12 +19,12 @@ class BotLinkController extends AbstractController
     private const SCOPE_FINANCE = 'finance';
 
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(ActiveCompanyService $companyService, BotLinkRepository $repository): Response
+    public function index(BotLinkRepository $repository): Response
     {
-        // Ограничиваемся активной компанией
-        $company = $companyService->getActiveCompany();
+        // Админка платформы: доступ только для суперадминов, без привязки к активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
 
-        $links = $repository->findByCompany($company);
+        $links = $repository->findBy([], ['createdAt' => 'DESC']);
 
         return $this->render('telegram/admin/link/index.html.twig', [
             'links' => $links,
@@ -35,18 +34,15 @@ class BotLinkController extends AbstractController
     #[Route('/new', name: 'new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        ActiveCompanyService $companyService,
         TelegramBotRepository $botRepository,
         EntityManagerInterface $entityManager,
     ): Response {
-        // Работаем в контексте текущей компании
-        $company = $companyService->getActiveCompany();
+        // Админка платформы: доступ только для суперадминов, без привязки к активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
 
         $form = $this->createForm(BotLinkType::class, [
             // Значение по умолчанию — 60 минут от текущего времени
             'expiresAt' => new \DateTimeImmutable('+60 minutes'),
-        ], [
-            'company' => $company,
         ]);
 
         $form->handleRequest($request);
@@ -62,7 +58,7 @@ class BotLinkController extends AbstractController
             }
 
             $botId = (string) $botData->getId();
-            $bot = $botRepository->findOneByIdAndCompany($botId, $company);
+            $bot = $botRepository->find($botId);
             if (!$bot) {
                 throw $this->createNotFoundException();
             }
@@ -75,7 +71,7 @@ class BotLinkController extends AbstractController
 
             $botLink = new BotLink(
                 Uuid::uuid4()->toString(),
-                $company,
+                $bot->getCompany(),
                 $bot,
                 $token,
                 self::SCOPE_FINANCE,
