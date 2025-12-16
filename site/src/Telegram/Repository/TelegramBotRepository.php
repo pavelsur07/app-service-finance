@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Telegram\Repository;
 
-use App\Entity\Company;
 use App\Telegram\Entity\TelegramBot;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -16,24 +15,21 @@ class TelegramBotRepository extends ServiceEntityRepository
         parent::__construct($registry, TelegramBot::class);
     }
 
-    /**
-     * Возвращает всех ботов компании, отсортированных по дате создания (новые сверху).
-     *
-     * @return TelegramBot[]
-     */
-    public function findByCompany(Company $company): array
+    // Возвращает активного бота (isActive = true) с сортировкой по дате создания (последний созданный первый)
+    public function findActiveBot(): ?TelegramBot
     {
-        return $this->findBy(['company' => $company], ['createdAt' => 'DESC']);
+        return $this->createQueryBuilder('bot')
+            ->andWhere('bot.isActive = :active')
+            ->setParameter('active', true)
+            ->orderBy('bot.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
-    /**
-     * Находит бота по его идентификатору с проверкой принадлежности компании.
-     */
-    public function findOneByIdAndCompany(string $id, Company $company): ?TelegramBot
+    // Возвращает бота по идентификатору
+    public function findOneById(string $id): ?TelegramBot
     {
-        return $this->findOneBy([
-            'id' => $id,
-            'company' => $company,
-        ]);
+        return $this->find($id);
     }
 }

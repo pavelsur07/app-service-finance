@@ -2,7 +2,6 @@
 
 namespace App\Telegram\Entity;
 
-use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -17,11 +16,6 @@ class TelegramBot
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
-
-    // Компания, к которой привязан бот
-    #[ORM\ManyToOne(targetEntity: Company::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
-    private Company $company;
 
     // Токен, полученный от @BotFather
     #[ORM\Column(type: 'string', length: 255)]
@@ -47,12 +41,11 @@ class TelegramBot
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    public function __construct(string $id, Company $company, string $token)
+    public function __construct(string $id, string $token)
     {
         Assert::uuid($id);
 
         $this->id = $id;
-        $this->company = $company;
         $this->token = $token;
         $now = new \DateTimeImmutable();
         $this->createdAt = $now;
@@ -64,20 +57,6 @@ class TelegramBot
     public function getId(): ?string
     {
         return $this->id;
-    }
-
-    // Возвращает компанию, к которой привязан бот
-    public function getCompany(): Company
-    {
-        return $this->company;
-    }
-
-    // Устанавливает компанию владельца
-    public function setCompany(Company $company): self
-    {
-        $this->company = $company;
-
-        return $this;
     }
 
     // Возвращает токен бота
