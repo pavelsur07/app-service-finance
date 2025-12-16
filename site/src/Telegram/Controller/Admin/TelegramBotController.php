@@ -2,12 +2,10 @@
 
 namespace App\Telegram\Controller\Admin;
 
-use App\Service\ActiveCompanyService;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Form\TelegramBotType;
 use App\Telegram\Repository\TelegramBotRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,13 +15,13 @@ use Symfony\Component\Routing\Attribute\Route;
 class TelegramBotController extends AbstractController
 {
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(ActiveCompanyService $companyService, TelegramBotRepository $repository): Response
+    public function index(TelegramBotRepository $repository): Response
     {
-        // Получаем текущую компанию из сессии пользователя
-        $company = $companyService->getActiveCompany();
+        // Админка платформы: доступ только для суперадминов, без контекста активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
 
-        // Подтягиваем всех ботов компании для отображения в списке
-        $bots = $repository->findByCompany($company);
+        // Загружаем всех ботов сервиса, порядок — новые сверху
+        $bots = $repository->findBy([], ['createdAt' => 'DESC']);
 
         return $this->render('telegram/admin/bot/index.html.twig', [
             'bots' => $bots,
@@ -33,15 +31,17 @@ class TelegramBotController extends AbstractController
     #[Route('/new', name: 'new', methods: ['GET', 'POST'])]
     public function new(
         Request $request,
-        ActiveCompanyService $companyService,
         EntityManagerInterface $entityManager,
     ): Response {
-        // Создаём нового бота, сразу привязанного к активной компании
-        $company = $companyService->getActiveCompany();
-        $bot = new TelegramBot(Uuid::uuid4()->toString(), $company, '');
+        // Админка платформы: доступ только для суперадминов, без контекста активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
 
-        $form = $this->createForm(TelegramBotType::class, $bot);
+        // Форма сама создаёт нового бота после выбора компании, поэтому не используем ActiveCompanyService
+        $form = $this->createForm(TelegramBotType::class);
         $form->handleRequest($request);
+
+        /** @var TelegramBot|null $bot */
+        $bot = $form->getData();
 
         if ($form->isSubmitted() && $form->isValid()) {
             // Сохраняем новую запись и возвращаемся к списку
@@ -62,18 +62,21 @@ class TelegramBotController extends AbstractController
     public function edit(
         string $id,
         Request $request,
-        ActiveCompanyService $companyService,
         TelegramBotRepository $repository,
         EntityManagerInterface $entityManager,
     ): Response {
-        // Проверяем, что бот принадлежит активной компании
-        $company = $companyService->getActiveCompany();
-        $bot = $repository->findOneByIdAndCompany($id, $company);
+        // Админка платформы: доступ только для суперадминов, без контекста активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
+
+        $bot = $repository->find($id);
         if (!$bot) {
             throw $this->createNotFoundException();
         }
 
-        $form = $this->createForm(TelegramBotType::class, $bot);
+        $form = $this->createForm(TelegramBotType::class, $bot, [
+            // Компания задаётся при создании, поэтому в режиме редактирования не меняем её
+            'lock_company' => true,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
@@ -96,13 +99,13 @@ class TelegramBotController extends AbstractController
     public function toggle(
         string $id,
         Request $request,
-        ActiveCompanyService $companyService,
         TelegramBotRepository $repository,
         EntityManagerInterface $entityManager,
     ): Response {
-        // Находим бота в пределах активной компании
-        $company = $companyService->getActiveCompany();
-        $bot = $repository->findOneByIdAndCompany($id, $company);
+        // Админка платформы: доступ только для суперадминов, без контекста активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
+
+        $bot = $repository->find($id);
         if (!$bot) {
             throw $this->createNotFoundException();
         }
