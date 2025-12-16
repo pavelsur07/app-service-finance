@@ -45,7 +45,7 @@ class TelegramWebhookController extends AbstractController
 
         $callbackQuery = $payload['callback_query'] ?? null;
         if (is_array($callbackQuery)) {
-            return new JsonResponse(['status' => 'ok']);
+            return $this->handleCallbackQuery($bot, $callbackQuery);
         }
 
         $message = $payload['message'] ?? null;
@@ -58,6 +58,10 @@ class TelegramWebhookController extends AbstractController
 
         if (str_starts_with($text, '/start')) {
             return $this->handleStart($bot, $message, $text);
+        }
+
+        if (str_starts_with($text, '/set_cash')) {
+            return $this->handleSetCash($bot, $message);
         }
 
         return new JsonResponse(['status' => 'ok']);
@@ -123,55 +127,55 @@ class TelegramWebhookController extends AbstractController
 
     private function handleSetCash(TelegramBot $bot, array $message): Response
     {
-        $from = $message['from'] ?? [];
-        $telegramUser = $this->syncTelegramUser($from);
-        if (!$telegramUser) {
+        $tgUserId = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
+        if (!$tgUserId) {
             return new JsonResponse(['status' => 'ignored']);
         }
 
-        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $bot->getCompany(),
-            'bot' => $bot,
+        $telegramUser = $this->entityManager->getRepository(TelegramUser::class)
+            ->findOneBy(['tgUserId' => $tgUserId]);
+
+        if (!$telegramUser) {
+            return $this->respondWithMessage($bot, $message, 'Сначала выполните привязку через ссылку /start');
+        }
+
+        $clientBindings = $this->entityManager->getRepository(ClientBinding::class)->findBy([
             'telegramUser' => $telegramUser,
+            'status' => ClientBinding::STATUS_ACTIVE,
         ]);
 
-        if (!$clientBinding) {
-            return $this->respondWithMessage($bot, $message, 'Не найдена привязка. Отправьте /start.');
+        if (!$clientBindings) {
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                'У вас нет активных привязок. Откройте ссылку привязки из кабинета компании.'
+            );
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
-            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован');
+        if (count($clientBindings) === 1) {
+            $clientBinding = $clientBindings[0];
+
+            if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+                return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+            }
+
+            return $this->sendMoneyAccountSelection($bot, $message, $clientBinding);
         }
 
-        $moneyAccounts = $this->entityManager->getRepository(MoneyAccount::class)->findBy(
-            ['company' => $clientBinding->getCompany()],
-            ['sortOrder' => 'ASC', 'name' => 'ASC'],
-        );
-
-        if (!$moneyAccounts) {
-            return $this->respondWithMessage($bot, $message, 'Доступные кассы не найдены.');
-        }
-
-        $lines = ['Выберите кассу:'];
+        // При нескольких активных привязках просим выбрать компанию, чтобы не перепутать кассу для разных организаций
         $keyboard = [];
-
-        foreach ($moneyAccounts as $account) {
-            if (!$account instanceof MoneyAccount) {
+        foreach ($clientBindings as $binding) {
+            if (!$binding instanceof ClientBinding) {
                 continue;
             }
 
-            $lines[] = sprintf('- %s (%s)', $account->getName(), $account->getCurrency());
-            $keyboard[] = [
-                [
-                    'text' => $account->getName(),
-                    'callback_data' => 'set_cash:'.$account->getId(),
-                ],
-            ];
+            $keyboard[] = [[
+                'text' => $binding->getCompany()->getName(),
+                'callback_data' => sprintf('bind:%s:set_cash', $binding->getId()),
+            ]];
         }
 
-        $this->entityManager->flush();
-
-        return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
+        return $this->respondWithMessage($bot, $message, 'Выберите компанию', [
             'inline_keyboard' => $keyboard,
         ]);
     }
@@ -183,8 +187,12 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        if (str_starts_with($callbackData, 'set_cash:')) {
-            return $this->handleSetCashCallback($bot, $callbackQuery, substr($callbackData, strlen('set_cash:')));
+        if (str_starts_with($callbackData, 'bind:')) {
+            return $this->handleBindingSelectionCallback($bot, $callbackQuery, $callbackData);
+        }
+
+        if (str_starts_with($callbackData, 'cash:')) {
+            return $this->handleCashSelectionCallback($bot, $callbackQuery, $callbackData);
         }
 
         if (str_starts_with($callbackData, 'rep:')) {
@@ -245,26 +253,61 @@ class TelegramWebhookController extends AbstractController
         );
     }
 
-    private function handleSetCashCallback(TelegramBot $bot, array $callbackQuery, string $moneyAccountId): Response
+    private function handleBindingSelectionCallback(TelegramBot $bot, array $callbackQuery, string $callbackData): Response
     {
         $from = $callbackQuery['from'] ?? [];
-        $telegramUser = $this->syncTelegramUser($from);
+        $telegramUser = $this->findTelegramUserByCallback($from);
         if (!$telegramUser) {
-            return new JsonResponse(['status' => 'ignored']);
+            return $this->respondWithMessage($bot, $callbackQuery, 'Сначала выполните привязку через ссылку /start');
         }
 
-        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $bot->getCompany(),
-            'bot' => $bot,
-            'telegramUser' => $telegramUser,
-        ]);
+        $parts = explode(':', $callbackData);
+        if (count($parts) !== 3 || $parts[2] !== 'set_cash') {
+            return new JsonResponse(['status' => 'ok']);
+        }
 
-        if (!$clientBinding) {
+        [$prefix, $bindingId] = [$parts[0], $parts[1]];
+        if ($prefix !== 'bind') {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->find($bindingId);
+        if (!$clientBinding instanceof ClientBinding || $clientBinding->getTelegramUser()->getId() !== $telegramUser->getId()) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
         }
 
         if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
-            return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован');
+            return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
+        }
+
+        return $this->sendMoneyAccountSelection($bot, $callbackQuery, $clientBinding);
+    }
+
+    private function handleCashSelectionCallback(TelegramBot $bot, array $callbackQuery, string $callbackData): Response
+    {
+        $from = $callbackQuery['from'] ?? [];
+        $telegramUser = $this->findTelegramUserByCallback($from);
+        if (!$telegramUser) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Сначала выполните привязку через ссылку /start');
+        }
+
+        $parts = explode(':', $callbackData);
+        if (count($parts) !== 3) {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        [$prefix, $bindingId, $moneyAccountId] = $parts;
+        if ($prefix !== 'cash') {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
+        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->find($bindingId);
+        if (!$clientBinding instanceof ClientBinding || $clientBinding->getTelegramUser()->getId() !== $telegramUser->getId()) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
+        }
+
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
         }
 
         $moneyAccount = $this->entityManager->getRepository(MoneyAccount::class)->find($moneyAccountId);
@@ -272,6 +315,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Касса не найдена.');
         }
 
+        // Проверяем, что выбранная касса принадлежит той же компании, что и привязка, чтобы не записать чужие данные
         if ($moneyAccount->getCompany()->getId() !== $clientBinding->getCompany()->getId()) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Нельзя выбрать кассу другой компании.');
         }
@@ -491,5 +535,53 @@ class TelegramWebhookController extends AbstractController
         }
 
         return new JsonResponse(['status' => 'ok']);
+    }
+
+    private function sendMoneyAccountSelection(TelegramBot $bot, array $message, ClientBinding $clientBinding): Response
+    {
+        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+        }
+
+        $moneyAccounts = $this->entityManager->getRepository(MoneyAccount::class)->findBy(
+            ['company' => $clientBinding->getCompany()],
+            ['sortOrder' => 'ASC', 'name' => 'ASC'],
+        );
+
+        if (!$moneyAccounts) {
+            return $this->respondWithMessage($bot, $message, 'Доступные кассы не найдены.');
+        }
+
+        $lines = ['Выберите кассу:'];
+        $keyboard = [];
+
+        foreach ($moneyAccounts as $account) {
+            if (!$account instanceof MoneyAccount) {
+                continue;
+            }
+
+            $lines[] = sprintf('- %s (%s)', $account->getName(), $account->getCurrency());
+            $keyboard[] = [
+                [
+                    'text' => $account->getName(),
+                    'callback_data' => sprintf('cash:%s:%s', $clientBinding->getId(), $account->getId()),
+                ],
+            ];
+        }
+
+        return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
+            'inline_keyboard' => $keyboard,
+        ]);
+    }
+
+    private function findTelegramUserByCallback(array $from): ?TelegramUser
+    {
+        $tgUserId = isset($from['id']) ? (string) $from['id'] : null;
+        if (!$tgUserId) {
+            return null;
+        }
+
+        return $this->entityManager->getRepository(TelegramUser::class)
+            ->findOneBy(['tgUserId' => $tgUserId]);
     }
 }
