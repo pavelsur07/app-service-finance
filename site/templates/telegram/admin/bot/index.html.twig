@@ -24,7 +24,7 @@
           <table class="table table-vcenter">
             <thead>
               <tr>
-                <th>Username</th>
+                <th>Имя пользователя</th>
                 <th>Токен</th>
                 <th>Webhook URL</th>
                 <th class="text-center">Активен</th>
@@ -35,7 +35,10 @@
               {% for bot in bots %}
                 <tr>
                   <td>{{ bot.username ?? '—' }}</td>
-                  <td class="text-muted">{{ bot.token }}</td>
+                  <td class="text-muted">
+                    {% set token_preview = bot.token ? bot.token|slice(0, 6) ~ '****' : '—' %}
+                    {{ token_preview }}
+                  </td>
                   <td>{{ bot.webhookUrl ?? '—' }}</td>
                   <td class="text-center">
                     {% if bot.isActive %}
