@@ -97,10 +97,31 @@ class TelegramWebhookController extends AbstractController
     private function handleStart(TelegramBot $bot, array $message, string $text): Response
     {
         // Извлекаем токен после /start
-        $startToken = trim(mb_substr($text, mb_strlen('/start')));
+        $tail = trim(mb_substr($text, mb_strlen('/start')));
+        if ($tail === '') {
+            return $this->respondWithMessage($bot, $message, 'Некорректная ссылка. Попробуйте сгенерировать новую.');
+        }
+
+        if (str_starts_with($tail, '=')) {
+            $tail = mb_substr($tail, 1);
+        }
+
+        if (str_starts_with($tail, '-')) {
+            $tail = mb_substr($tail, 1);
+        }
+
+        if (str_starts_with($tail, 'start=')) {
+            $tail = mb_substr($tail, mb_strlen('start='));
+        }
+
+        $startToken = trim($tail);
+
         if ($startToken === '') {
             return $this->respondWithMessage($bot, $message, 'Некорректная ссылка. Попробуйте сгенерировать новую.');
         }
+
+        // для диагностики проблем привязки
+        error_log(sprintf('[TELEGRAM] handleStart: raw="%s", tail="%s", token="%s"', $text, $tail, $startToken));
 
         // Ищем BotLink с блокировкой для корректной отметки использования
         $botLink = $this->botLinkRepository->findOneByTokenForUpdate($startToken);
