@@ -32,6 +32,22 @@ class TelegramIntegrationController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $bot = $this->telegramBotRepository->findActiveBot();
 
+        $botLinkRepository = $this->entityManager->getRepository(BotLink::class);
+
+        // Проверяем наличие использованных ссылок для компании
+        $usedBotLink = $botLinkRepository
+            ->createQueryBuilder('bl')
+            ->andWhere('bl.company = :company')
+            ->andWhere('bl.usedAt IS NOT NULL')
+            ->setParameter('company', $company)
+            ->orderBy('bl.usedAt', 'DESC')
+            ->addOrderBy('bl.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        $isBound = (bool) $usedBotLink;
+
         return $this->render('telegram/integration/index.html.twig', [
             'company' => $company,
             'bot' => $bot,
@@ -40,6 +56,7 @@ class TelegramIntegrationController extends AbstractController
             'deepLinkApp' => null,
             'startCommand' => null,
             'usernameMissing' => false,
+            'isBound' => $isBound,
         ]);
     }
 
@@ -84,6 +101,22 @@ class TelegramIntegrationController extends AbstractController
         $startCommand = null;
         $usernameMissing = false;
 
+        $botLinkRepository = $this->entityManager->getRepository(BotLink::class);
+
+        // Проверяем наличие использованных ссылок для компании
+        $usedBotLink = $botLinkRepository
+            ->createQueryBuilder('bl')
+            ->andWhere('bl.company = :company')
+            ->andWhere('bl.usedAt IS NOT NULL')
+            ->setParameter('company', $company)
+            ->orderBy('bl.usedAt', 'DESC')
+            ->addOrderBy('bl.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        $isBound = (bool) $usedBotLink;
+
         if ($bot->getUsername()) {
             $username = ltrim($bot->getUsername(), '@');
             $token = $botLink->getToken();
@@ -106,6 +139,7 @@ class TelegramIntegrationController extends AbstractController
             'deepLinkApp' => $deepLinkApp,
             'startCommand' => $startCommand,
             'usernameMissing' => $usernameMissing,
+            'isBound' => $isBound,
         ]);
     }
 }
