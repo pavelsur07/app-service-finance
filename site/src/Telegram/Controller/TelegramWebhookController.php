@@ -112,70 +112,104 @@ class TelegramWebhookController extends AbstractController
 
     private function handleStart(TelegramBot $bot, array $message, string $text): Response
     {
-        // Нормализуем текст и достаем токен различными способами, чтобы поддержать варианты deep-link
-        $normalizedText = trim($text);
-        [$startToken, $parsePath] = $this->extractStartToken($normalizedText);
+        $conn = $this->entityManager->getConnection();
+        // Открываем транзакцию, потому что пессимистическая блокировка требует активной транзакции
+        $conn->beginTransaction();
 
-        if ($startToken === null || $startToken === '') {
-            // Нет токена: подсказываем пользователю выполнить привязку корректно
-            return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
-        }
+        try {
+            // Нормализуем текст и достаем токен различными способами, чтобы поддержать варианты deep-link
+            $normalizedText = trim($text);
+            [$startToken, $parsePath] = $this->extractStartToken($normalizedText);
 
-        // для диагностики проблем привязки
-        $this->logger->info('Парсинг /start', [
-            'raw_text' => $this->shortenText($normalizedText),
-            'token' => $startToken,
-            'parse_path' => $parsePath,
-        ]);
+            if ($startToken === null || $startToken === '') {
+                // Нет токена: подсказываем пользователю выполнить привязку корректно
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
 
-        // Ищем BotLink с блокировкой для корректной отметки использования
-        $botLink = $this->botLinkRepository->findOneByTokenForUpdate($startToken);
-        if (!$botLink || $botLink->getBot()->getId() !== $bot->getId()) {
-            return $this->respondWithMessage($bot, $message, 'Ссылка не найдена. Сгенерируйте новую.');
-        }
+                return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
+            }
 
-        // Бот глобальный, компанию для привязки берем из BotLink, а не из бота
-        if ($botLink->getExpiresAt() < new \DateTimeImmutable()) {
-            return $this->respondWithMessage($bot, $message, 'Ссылка истекла. Сгенерируйте новую.');
-        }
+            // для диагностики проблем привязки
+            $this->logger->info('Парсинг /start', [
+                'raw_text' => $this->shortenText($normalizedText),
+                'token' => $startToken,
+                'parse_path' => $parsePath,
+            ]);
 
-        if ($botLink->getUsedAt() !== null) {
-            return $this->respondWithMessage($bot, $message, 'Ссылка уже использована. Создайте новую.');
-        }
+            // Ищем BotLink с блокировкой для корректной отметки использования
+            $botLink = $this->botLinkRepository->findOneByTokenForUpdate($startToken);
+            if (!$botLink || $botLink->getBot()->getId() !== $bot->getId()) {
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
 
-        $from = $message['from'] ?? [];
-        $telegramUser = $this->syncTelegramUser($from);
-        if (!$telegramUser) {
-            return new JsonResponse(['status' => 'ignored']);
-        }
+                return $this->respondWithMessage($bot, $message, 'Ссылка не найдена. Сгенерируйте новую.');
+            }
 
-        // Создаем привязку клиента, если ее еще нет
-        $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
-            'company' => $botLink->getCompany(),
-            'bot' => $bot,
-            'telegramUser' => $telegramUser,
-        ]);
+            // Бот глобальный, компанию для привязки берем из BotLink, а не из бота
+            if ($botLink->getExpiresAt() < new \DateTimeImmutable()) {
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
 
-        if (!$clientBinding) {
-            $clientBinding = new ClientBinding(
-                Uuid::uuid4()->toString(),
-                $botLink->getCompany(),
+                return $this->respondWithMessage($bot, $message, 'Ссылка истекла. Сгенерируйте новую.');
+            }
+
+            if ($botLink->getUsedAt() !== null) {
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
+
+                return $this->respondWithMessage($bot, $message, 'Ссылка уже использована. Создайте новую.');
+            }
+
+            $from = $message['from'] ?? [];
+            $telegramUser = $this->syncTelegramUser($from);
+            if (!$telegramUser) {
+                if ($conn->isTransactionActive()) {
+                    $conn->rollBack();
+                }
+
+                return new JsonResponse(['status' => 'ignored']);
+            }
+
+            // Создаем привязку клиента, если ее еще нет
+            $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->findOneBy([
+                'company' => $botLink->getCompany(),
+                'bot' => $bot,
+                'telegramUser' => $telegramUser,
+            ]);
+
+            if (!$clientBinding) {
+                $clientBinding = new ClientBinding(
+                    Uuid::uuid4()->toString(),
+                    $botLink->getCompany(),
+                    $bot,
+                    $telegramUser,
+                );
+                $this->entityManager->persist($clientBinding);
+            }
+
+            // Помечаем ссылку использованной
+            $botLink->markUsed();
+
+            $this->entityManager->flush();
+
+            $conn->commit();
+
+            return $this->respondWithMessage(
                 $bot,
-                $telegramUser,
+                $message,
+                'Привязка выполнена. Настройте кассу командой /set_cash.'
             );
-            $this->entityManager->persist($clientBinding);
+        } catch (\Throwable $e) {
+            if ($conn->isTransactionActive()) {
+                $conn->rollBack();
+            }
+
+            throw $e;
         }
-
-        // Помечаем ссылку использованной
-        $botLink->markUsed();
-
-        $this->entityManager->flush();
-
-        return $this->respondWithMessage(
-            $bot,
-            $message,
-            'Привязка выполнена. Настройте кассу командой /set_cash.'
-        );
     }
 
     private function handleSetCash(TelegramBot $bot, array $message): Response
