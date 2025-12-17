@@ -40,16 +40,11 @@ wildberries_controllers:
         namespace: App\Marketplace\Wildberries\Controller
     type: attribute
 
-telegram_webhook_controller:
-    resource:
-        path: ../src/Telegram/Controller/TelegramWebhookController.php
-        namespace: App\Telegram\Controller
-    type: attribute
-
 telegram_integration_controllers:
+    # Импортируем все контроллеры Telegram (вебхук, workspace, admin)
     resource:
-        path: ../src/Telegram/Controller/Integration/
-        namespace: App\Telegram\Controller\Integration
+        path: ../src/Telegram/Controller/
+        namespace: App\Telegram\Controller
     type: attribute
 
 admin:
