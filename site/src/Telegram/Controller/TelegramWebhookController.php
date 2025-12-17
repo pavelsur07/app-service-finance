@@ -448,9 +448,16 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        [$prefix, $bindingId, $moneyAccountId] = $parts;
+        [$prefix, $bindingEnc, $moneyAccountEnc] = $parts;
         if ($prefix !== 'cash') {
             return new JsonResponse(['status' => 'ok']);
+        }
+
+        try {
+            $bindingId = $this->decodeUuid($bindingEnc);
+            $moneyAccountId = $this->decodeUuid($moneyAccountEnc);
+        } catch (\InvalidArgumentException) {
+            return $this->respondWithMessage($bot, $callbackQuery, 'Ошибка выбора кассы. Повторите /set_cash');
         }
 
         $clientBinding = $this->entityManager->getRepository(ClientBinding::class)->find($bindingId);
@@ -1153,7 +1160,11 @@ class TelegramWebhookController extends AbstractController
             $keyboard[] = [
                 [
                     'text' => $account->getName(),
-                    'callback_data' => sprintf('cash:%s:%s', $clientBinding->getId(), $account->getId()),
+                    'callback_data' => sprintf(
+                        'cash:%s:%s',
+                        $this->encodeUuid($clientBinding->getId()),
+                        $this->encodeUuid($account->getId()),
+                    ),
                 ],
             ];
         }
@@ -1170,6 +1181,33 @@ class TelegramWebhookController extends AbstractController
         return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
             'inline_keyboard' => $keyboard,
         ]);
+    }
+
+    private function encodeUuid(string $uuid): string
+    {
+        $bytes = Uuid::fromString($uuid)->getBytes();
+
+        return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');
+    }
+
+    private function decodeUuid(string $encoded): string
+    {
+        $base64 = strtr($encoded, '-_', '+/');
+        $padding = strlen($base64) % 4;
+        if ($padding !== 0) {
+            $base64 .= str_repeat('=', 4 - $padding);
+        }
+
+        $bytes = base64_decode($base64, true);
+        if ($bytes === false) {
+            throw new \InvalidArgumentException('Invalid encoded UUID');
+        }
+
+        try {
+            return Uuid::fromBytes($bytes)->toString();
+        } catch (\Throwable $e) {
+            throw new \InvalidArgumentException('Invalid encoded UUID', 0, $e);
+        }
     }
 
     private function findTelegramUserByCallback(array $from): ?TelegramUser
