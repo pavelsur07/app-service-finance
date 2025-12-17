@@ -13,6 +13,7 @@ use App\Telegram\Repository\BotLinkRepository;
 use App\Telegram\Repository\TelegramBotRepository;
 use App\Entity\MoneyAccount;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -28,6 +29,7 @@ class TelegramWebhookController extends AbstractController
         private readonly BotLinkRepository $botLinkRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly HttpClientInterface $httpClient,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -54,14 +56,28 @@ class TelegramWebhookController extends AbstractController
                 return new JsonResponse(['status' => 'inactive_bot']);
             }
 
-            $callbackQuery = $update['callback_query'] ?? null;
-            if (is_array($callbackQuery)) {
+            // Фиксируем базовую информацию об апдейте для диагностики
+            $message = is_array($update['message'] ?? null) ? $update['message'] : null;
+            $callbackQuery = is_array($update['callback_query'] ?? null) ? $update['callback_query'] : null;
+            $editedMessage = is_array($update['edited_message'] ?? null) ? $update['edited_message'] : null;
+            $rawText = is_string($message['text'] ?? null) ? $message['text'] : null;
+            $chatId = $this->extractChatId($message, $callbackQuery, $editedMessage);
+            $this->logger->info('Telegram update получен', [
+                'update_keys' => array_keys($update),
+                'chat_id' => $chatId,
+                'text' => $this->shortenText($rawText),
+            ]);
+
+            if ($callbackQuery) {
                 return $this->handleCallbackQuery($bot, $callbackQuery);
             }
 
-            $message = $update['message'] ?? null;
+            if (!$message) {
+                return new JsonResponse(['status' => 'ignored']);
+            }
+
             $document = is_array($message['document'] ?? null) ? $message['document'] : null;
-            $text = $message['text'] ?? null;
+            $text = is_string($message['text'] ?? null) ? $message['text'] : null;
 
             // Сначала принимаем файлы, чтобы не игнорировать документы без текстового тела
             if ($document) {
@@ -70,7 +86,7 @@ class TelegramWebhookController extends AbstractController
 
             // Обрабатываем только текстовые сообщения
             if (!\is_string($text)) {
-                return new JsonResponse(['status' => 'ok']);
+                return new JsonResponse(['status' => 'ignored']);
             }
 
             if (str_starts_with($text, '/start')) {
@@ -96,32 +112,21 @@ class TelegramWebhookController extends AbstractController
 
     private function handleStart(TelegramBot $bot, array $message, string $text): Response
     {
-        // Извлекаем токен после /start
-        $tail = trim(mb_substr($text, mb_strlen('/start')));
-        if ($tail === '') {
-            return $this->respondWithMessage($bot, $message, 'Некорректная ссылка. Попробуйте сгенерировать новую.');
-        }
+        // Нормализуем текст и достаем токен различными способами, чтобы поддержать варианты deep-link
+        $normalizedText = trim($text);
+        [$startToken, $parsePath] = $this->extractStartToken($normalizedText);
 
-        if (str_starts_with($tail, '=')) {
-            $tail = mb_substr($tail, 1);
-        }
-
-        if (str_starts_with($tail, '-')) {
-            $tail = mb_substr($tail, 1);
-        }
-
-        if (str_starts_with($tail, 'start=')) {
-            $tail = mb_substr($tail, mb_strlen('start='));
-        }
-
-        $startToken = trim($tail);
-
-        if ($startToken === '') {
-            return $this->respondWithMessage($bot, $message, 'Некорректная ссылка. Попробуйте сгенерировать новую.');
+        if ($startToken === null || $startToken === '') {
+            // Нет токена: подсказываем пользователю выполнить привязку корректно
+            return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
         }
 
         // для диагностики проблем привязки
-        error_log(sprintf('[TELEGRAM] handleStart: raw="%s", tail="%s", token="%s"', $text, $tail, $startToken));
+        $this->logger->info('Парсинг /start', [
+            'raw_text' => $this->shortenText($normalizedText),
+            'token' => $startToken,
+            'parse_path' => $parsePath,
+        ]);
 
         // Ищем BotLink с блокировкой для корректной отметки использования
         $botLink = $this->botLinkRepository->findOneByTokenForUpdate($startToken);
@@ -892,6 +897,75 @@ class TelegramWebhookController extends AbstractController
                 [$statusButton],
             ],
         ];
+    }
+
+    private function extractStartToken(string $text): array
+    {
+        // Возвращаем [token|null, источник], чтобы в логах понимать, какой путь парсинга сработал
+        $token = null;
+        $path = null;
+
+        if (str_starts_with($text, '/start')) {
+            // Поддерживаем варианты: "/start <token>", "/start<token>", "/start start=<token>"
+            $afterStart = trim(mb_substr($text, mb_strlen('/start')));
+
+            if ($afterStart !== '') {
+                if (str_starts_with($afterStart, 'start=')) {
+                    $token = trim(mb_substr($afterStart, mb_strlen('start=')));
+                    $path = '/start start=';
+                } elseif (str_starts_with($afterStart, 'start-')) {
+                    $token = trim(mb_substr($afterStart, mb_strlen('start-')));
+                    $path = '/start start-';
+                } else {
+                    // Подчищаем возможные разделители вида "=token" или "-token"
+                    $token = trim(ltrim($afterStart, "= -\t"));
+                    $path = '/start';
+                }
+            }
+        }
+
+        if ($token === null && preg_match('/^start[-=]([A-Za-z0-9_-]{20,})$/', $text, $matches)) {
+            $token = $matches[1];
+            $path = 'start-prefix';
+        }
+
+        if ($token === null && !str_starts_with($text, '/start') && preg_match('/^[A-Za-z0-9_-]{20,}$/', $text)) {
+            // Пользователь отправил один токен без команды
+            $token = $text;
+            $path = 'token-only';
+        }
+
+        return [$token, $path];
+    }
+
+    private function shortenText(?string $text): ?string
+    {
+        // Безопасно обрезаем текст для логов, чтобы не заливать длинные payload в stderr
+        if ($text === null) {
+            return null;
+        }
+
+        $trimmed = trim($text);
+
+        return mb_strlen($trimmed) > 200 ? mb_substr($trimmed, 0, 200) . '…' : $trimmed;
+    }
+
+    private function extractChatId(?array $message, ?array $callbackQuery, ?array $editedMessage): ?int
+    {
+        // Пробуем достать chat_id из разных типов апдейтов
+        if (isset($message['chat']['id'])) {
+            return (int) $message['chat']['id'];
+        }
+
+        if (isset($callbackQuery['message']['chat']['id'])) {
+            return (int) $callbackQuery['message']['chat']['id'];
+        }
+
+        if (isset($editedMessage['chat']['id'])) {
+            return (int) $editedMessage['chat']['id'];
+        }
+
+        return null;
     }
 
     private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
