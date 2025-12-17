@@ -33,7 +33,8 @@ class TelegramWebhookController extends AbstractController
 
     // Вебхук стал глобальным: один endpoint обслуживает все запросы, активного бота выбираем внутри
     #[Route('/telegram/webhook', name: 'telegram_webhook', methods: ['POST', 'GET'])]
-    public function __invoke(Request $request): Response
+    // Обработчик объявлен явным методом, чтобы следовать стилю контроллеров проекта
+    public function webhook(Request $request): Response
     {
         if ($request->isMethod(Request::METHOD_GET)) {
             return new JsonResponse(['status' => 'ok']);
