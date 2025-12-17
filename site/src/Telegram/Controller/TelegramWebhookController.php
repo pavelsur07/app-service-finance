@@ -94,7 +94,7 @@ class TelegramWebhookController extends AbstractController
             }
 
             if (str_starts_with($text, '/set_cash')) {
-                return $this->handleSetCash($bot, $message);
+                return $this->handleSetCash($bot, $message, $text);
             }
 
             if (str_starts_with($text, '/reports')) {
@@ -212,16 +212,23 @@ class TelegramWebhookController extends AbstractController
         }
     }
 
-    private function handleSetCash(TelegramBot $bot, array $message): Response
+    private function handleSetCash(TelegramBot $bot, array $message, string $text): Response
     {
-        $tgUserId = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
-        if (!$tgUserId) {
-            return new JsonResponse(['status' => 'ignored']);
-        }
+        // Фиксируем входящее сообщение для диагностики в docker-логах
+        $chatId = $this->extractChatId($message, null, null);
+        $normalizedText = trim($text);
+        $parts = preg_split('/\s+/', $normalizedText);
+        $requestedMoneyAccountId = isset($parts[1]) ? trim($parts[1]) : null;
+        $requestedMoneyAccountId = $requestedMoneyAccountId === '' ? null : $requestedMoneyAccountId;
 
-        $telegramUser = $this->entityManager->getRepository(TelegramUser::class)
-            ->findOneBy(['tgUserId' => $tgUserId]);
+        $this->logger->info('Обработка /set_cash', [
+            'chat_id' => $chatId,
+            'raw_text' => $this->shortenText($normalizedText),
+            'money_account_id' => $requestedMoneyAccountId,
+        ]);
 
+        // Синхронизируем пользователя, чтобы команда работала даже после переустановки бота
+        $telegramUser = $this->syncTelegramUser($message['from'] ?? []);
         if (!$telegramUser) {
             return $this->respondWithMessage($bot, $message, 'Сначала выполните привязку через ссылку /start');
         }
@@ -236,6 +243,51 @@ class TelegramWebhookController extends AbstractController
                 $bot,
                 $message,
                 'У вас нет активных привязок. Откройте ссылку привязки из кабинета компании.'
+            );
+        }
+
+        // Если пришел аргумент, пробуем сразу привязать указанную кассу
+        if ($requestedMoneyAccountId) {
+            $moneyAccount = $this->entityManager->getRepository(MoneyAccount::class)->find($requestedMoneyAccountId);
+            if (!$moneyAccount instanceof MoneyAccount) {
+                return $this->respondWithMessage($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
+            }
+
+            // Ищем привязку с той же компанией, чтобы не дать выбрать чужую кассу
+            $clientBinding = null;
+            foreach ($clientBindings as $binding) {
+                if (!$binding instanceof ClientBinding) {
+                    continue;
+                }
+
+                if ($binding->getCompany()->getId() === $moneyAccount->getCompany()->getId()) {
+                    $clientBinding = $binding;
+                    break;
+                }
+            }
+
+            if (!$clientBinding) {
+                return $this->respondWithMessage($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
+            }
+
+            if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+                return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+            }
+
+            $clientBinding->setMoneyAccount($moneyAccount);
+            $this->entityManager->flush();
+
+            // Логируем удачную установку кассы для быстрой диагностики
+            $this->logger->info('Касса установлена через /set_cash', [
+                'chat_id' => $chatId,
+                'company_id' => $clientBinding->getCompany()->getId(),
+                'money_account_id' => $moneyAccount->getId(),
+            ]);
+
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                sprintf('Касса установлена: %s', $moneyAccount->getName()),
             );
         }
 
@@ -422,6 +474,13 @@ class TelegramWebhookController extends AbstractController
 
         $clientBinding->setMoneyAccount($moneyAccount);
         $this->entityManager->flush();
+
+        // Логируем выбор кассы через inline-кнопку для быстрой диагностики
+        $this->logger->info('Касса установлена через callback set_cash', [
+            'chat_id' => $this->extractChatId(null, $callbackQuery, null),
+            'company_id' => $clientBinding->getCompany()->getId(),
+            'money_account_id' => $moneyAccount->getId(),
+        ]);
 
         return $this->respondWithMessage($bot, $callbackQuery, sprintf('Касса установлена: %s', $moneyAccount->getName()));
     }
@@ -1072,18 +1131,25 @@ class TelegramWebhookController extends AbstractController
         );
 
         if (!$moneyAccounts) {
-            return $this->respondWithMessage($bot, $message, 'Доступные кассы не найдены.');
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                'У компании нет касс. Создайте кассу в кабинете и повторите /set_cash.'
+            );
         }
 
-        $lines = ['Выберите кассу:'];
+        $lines = ['Доступные кассы:'];
         $keyboard = [];
+        $selectedMoneyAccountId = $clientBinding->getMoneyAccount()?->getId();
 
         foreach ($moneyAccounts as $account) {
             if (!$account instanceof MoneyAccount) {
                 continue;
             }
 
-            $lines[] = sprintf('- %s (%s)', $account->getName(), $account->getCurrency());
+            $shortId = mb_substr((string) $account->getId(), -6);
+            $isSelected = $selectedMoneyAccountId !== null && $selectedMoneyAccountId === $account->getId();
+            $lines[] = sprintf('- %s (%s)%s', $account->getName(), $shortId, $isSelected ? ' — выбрана' : '');
             $keyboard[] = [
                 [
                     'text' => $account->getName(),
@@ -1091,6 +1157,15 @@ class TelegramWebhookController extends AbstractController
                 ],
             ];
         }
+
+        $lines[] = '';
+        $lines[] = 'Выберите кассу командой: /set_cash <ID>';
+
+        // Логируем текущий список касс, чтобы понимать, что увидит пользователь
+        $this->logger->info('Показываем список касс для /set_cash', [
+            'chat_id' => $this->extractChatId($message, null, null),
+            'company_id' => $clientBinding->getCompany()->getId(),
+        ]);
 
         return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
             'inline_keyboard' => $keyboard,
