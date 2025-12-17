@@ -36,53 +36,62 @@ class TelegramWebhookController extends AbstractController
     // Обработчик объявлен явным методом, чтобы следовать стилю контроллеров проекта
     public function webhook(Request $request): Response
     {
-        if ($request->isMethod(Request::METHOD_GET)) {
+        $payload = $request->getContent();
+        $update = json_decode($payload, true);
+
+        if (!\is_array($update)) {
             return new JsonResponse(['status' => 'ok']);
         }
 
-        // Находим активного бота, чтобы принимать сообщения независимо от конкретного токена маршрута
-        $bot = $this->botRepository->findActiveBot();
-        if (!$bot || !$bot->isActive()) {
-            return new JsonResponse(['status' => 'inactive_bot']);
-        }
+        try {
+            if ($request->isMethod(Request::METHOD_GET)) {
+                return new JsonResponse(['status' => 'ok']);
+            }
 
-        $payload = json_decode($request->getContent(), true);
-        if (!\is_array($payload)) {
-            return new JsonResponse(['status' => 'ignored']);
-        }
+            // Находим активного бота, чтобы принимать сообщения независимо от конкретного токена маршрута
+            $bot = $this->botRepository->findActiveBot();
+            if (!$bot || !$bot->isActive()) {
+                return new JsonResponse(['status' => 'inactive_bot']);
+            }
 
-        $callbackQuery = $payload['callback_query'] ?? null;
-        if (is_array($callbackQuery)) {
-            return $this->handleCallbackQuery($bot, $callbackQuery);
-        }
+            $callbackQuery = $update['callback_query'] ?? null;
+            if (is_array($callbackQuery)) {
+                return $this->handleCallbackQuery($bot, $callbackQuery);
+            }
 
-        $message = $payload['message'] ?? null;
-        $document = is_array($message['document'] ?? null) ? $message['document'] : null;
-        $text = $message['text'] ?? null;
+            $message = $update['message'] ?? null;
+            $document = is_array($message['document'] ?? null) ? $message['document'] : null;
+            $text = $message['text'] ?? null;
 
-        // Сначала принимаем файлы, чтобы не игнорировать документы без текстового тела
-        if ($document) {
-            return $this->handleDocument($bot, $message, $document);
-        }
+            // Сначала принимаем файлы, чтобы не игнорировать документы без текстового тела
+            if ($document) {
+                return $this->handleDocument($bot, $message, $document);
+            }
 
-        // Обрабатываем только текстовые сообщения
-        if (!\is_string($text)) {
+            // Обрабатываем только текстовые сообщения
+            if (!\is_string($text)) {
+                return new JsonResponse(['status' => 'ok']);
+            }
+
+            if (str_starts_with($text, '/start')) {
+                return $this->handleStart($bot, $message, $text);
+            }
+
+            if (str_starts_with($text, '/set_cash')) {
+                return $this->handleSetCash($bot, $message);
+            }
+
+            if (str_starts_with($text, '/reports')) {
+                return $this->handleReports($bot, $message);
+            }
+
+            return $this->handleTextMessage($bot, $message, $text);
+        } catch (\Throwable $e) {
+            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] ' . $e->getMessage());
+            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] file=' . $e->getFile() . ':' . $e->getLine());
+
             return new JsonResponse(['status' => 'ok']);
         }
-
-        if (str_starts_with($text, '/start')) {
-            return $this->handleStart($bot, $message, $text);
-        }
-
-        if (str_starts_with($text, '/set_cash')) {
-            return $this->handleSetCash($bot, $message);
-        }
-
-        if (str_starts_with($text, '/reports')) {
-            return $this->handleReports($bot, $message);
-        }
-
-        return $this->handleTextMessage($bot, $message, $text);
     }
 
     private function handleStart(TelegramBot $bot, array $message, string $text): Response
