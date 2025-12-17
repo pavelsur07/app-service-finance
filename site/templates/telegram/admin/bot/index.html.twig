@@ -10,7 +10,10 @@
         <p class="text-muted mb-0">Управление ботами сервиса</p>
       </div>
       <div class="col-auto ms-auto d-print-none">
-        <a href="{{ path('admin_telegram_bot_new') }}" class="btn btn-primary">+ Добавить бота</a>
+        <div class="btn-list">
+          <a href="{{ path('admin_telegram_bot_webhook_health') }}" class="btn btn-outline-primary">Проверить webhook</a>
+          <a href="{{ path('admin_telegram_bot_new') }}" class="btn btn-primary">+ Добавить бота</a>
+        </div>
       </div>
     </div>
   </div>
