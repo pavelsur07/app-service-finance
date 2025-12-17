@@ -201,7 +201,8 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage(
                 $bot,
                 $message,
-                'Привязка выполнена. Настройте кассу командой /set_cash.'
+                'Привязка выполнена',
+                $this->buildMainMenuReplyMarkup()
             );
         } catch (\Throwable $e) {
             if ($conn->isTransactionActive()) {
@@ -230,7 +231,7 @@ class TelegramWebhookController extends AbstractController
         // Синхронизируем пользователя, чтобы команда работала даже после переустановки бота
         $telegramUser = $this->syncTelegramUser($message['from'] ?? []);
         if (!$telegramUser) {
-            return $this->respondWithMessage($bot, $message, 'Сначала выполните привязку через ссылку /start');
+            return $this->respondWithMessageAndMenu($bot, $message, 'Сначала выполните привязку через ссылку /start');
         }
 
         $clientBindings = $this->entityManager->getRepository(ClientBinding::class)->findBy([
@@ -239,7 +240,7 @@ class TelegramWebhookController extends AbstractController
         ]);
 
         if (!$clientBindings) {
-            return $this->respondWithMessage(
+            return $this->respondWithMessageAndMenu(
                 $bot,
                 $message,
                 'У вас нет активных привязок. Откройте ссылку привязки из кабинета компании.'
@@ -250,7 +251,7 @@ class TelegramWebhookController extends AbstractController
         if ($requestedMoneyAccountId) {
             $moneyAccount = $this->entityManager->getRepository(MoneyAccount::class)->find($requestedMoneyAccountId);
             if (!$moneyAccount instanceof MoneyAccount) {
-                return $this->respondWithMessage($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
+                return $this->respondWithMessageAndMenu($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
             }
 
             // Ищем привязку с той же компанией, чтобы не дать выбрать чужую кассу
@@ -267,11 +268,11 @@ class TelegramWebhookController extends AbstractController
             }
 
             if (!$clientBinding) {
-                return $this->respondWithMessage($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
+                return $this->respondWithMessageAndMenu($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
             }
 
             if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
-                return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+                return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
             $clientBinding->setMoneyAccount($moneyAccount);
@@ -284,7 +285,7 @@ class TelegramWebhookController extends AbstractController
                 'money_account_id' => $moneyAccount->getId(),
             ]);
 
-            return $this->respondWithMessage(
+            return $this->respondWithMessageAndMenu(
                 $bot,
                 $message,
                 sprintf('Касса установлена: %s', $moneyAccount->getName()),
@@ -295,10 +296,13 @@ class TelegramWebhookController extends AbstractController
             $clientBinding = $clientBindings[0];
 
             if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
-                return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
+                return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
-            return $this->sendMoneyAccountSelection($bot, $message, $clientBinding);
+            $response = $this->sendMoneyAccountSelection($bot, $message, $clientBinding);
+            $this->sendMainMenu($bot, $message);
+
+            return $response;
         }
 
         // При нескольких активных привязках просим выбрать компанию, чтобы не перепутать кассу для разных организаций
@@ -314,9 +318,13 @@ class TelegramWebhookController extends AbstractController
             ]];
         }
 
-        return $this->respondWithMessage($bot, $message, 'Выберите компанию', [
+        $response = $this->respondWithMessage($bot, $message, 'Выберите компанию', [
             'inline_keyboard' => $keyboard,
         ]);
+
+        $this->sendMainMenu($bot, $message);
+
+        return $response;
     }
 
     private function handleCallbackQuery(TelegramBot $bot, array $callbackQuery): Response
@@ -356,11 +364,11 @@ class TelegramWebhookController extends AbstractController
         ]);
 
         if (!$clientBindings) {
-            return $this->respondWithMessage($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
+            return $this->respondWithMessageAndMenu($bot, $message, 'Сначала привяжите аккаунт через ссылку из кабинета компании');
         }
 
         if (count($clientBindings) > 1) {
-            return $this->respondWithMessage($bot, $message, 'У вас несколько компаний. Для операций сначала выберите компанию командой /set_cash');
+            return $this->respondWithMessageAndMenu($bot, $message, 'У вас несколько компаний. Для операций сначала выберите компанию командой /set_cash');
         }
 
         $clientBinding = $clientBindings[0];
@@ -369,11 +377,11 @@ class TelegramWebhookController extends AbstractController
         }
 
         if (!$clientBinding) {
-            return $this->respondWithMessage($bot, $message, 'Не найдена привязка. Отправьте /start.');
+            return $this->respondWithMessageAndMenu($bot, $message, 'Не найдена привязка. Отправьте /start.');
         }
 
         if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
-            return $this->respondWithMessage($bot, $message, 'Доступ заблокирован');
+            return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован');
         }
 
         $subscription = $this->entityManager->getRepository(ReportSubscription::class)->findOneBy([
@@ -397,12 +405,16 @@ class TelegramWebhookController extends AbstractController
 
         $this->entityManager->flush();
 
-        return $this->respondWithMessage(
+        $response = $this->respondWithMessage(
             $bot,
             $message,
             $this->buildReportMessage($subscription),
             $this->buildReportKeyboard($subscription)
         );
+
+        $this->sendMainMenu($bot, $message);
+
+        return $response;
     }
 
     private function handleBindingSelectionCallback(TelegramBot $bot, array $callbackQuery, string $callbackData): Response
@@ -735,6 +747,43 @@ class TelegramWebhookController extends AbstractController
 
     private function handleTextMessage(TelegramBot $bot, array $message, string $text): Response
     {
+        $normalizedText = trim($text);
+
+        if ($normalizedText === '📊 Отчёты') {
+            return $this->handleReports($bot, $message);
+        }
+
+        if ($normalizedText === '💼 Выбрать кассу') {
+            return $this->handleSetCash($bot, $message, '/set_cash');
+        }
+
+        if ($normalizedText === '➕ Добавить операцию') {
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                "Введите операцию сообщением:\n\n+120000 оплата от клиента\n-3500 реклама\n\n(Сначала выберите кассу через /set_cash)",
+                $this->buildMainMenuReplyMarkup()
+            );
+        }
+
+        if ($normalizedText === '📥 Загрузить выписку') {
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                'Отправьте файл выписки (PDF/XLS). Мы сохраним его для импорта.',
+                $this->buildMainMenuReplyMarkup()
+            );
+        }
+
+        if ($normalizedText === '⚙️ Помощь') {
+            return $this->respondWithMessage(
+                $bot,
+                $message,
+                "Команды:\n/set_cash — выбрать кассу\n/reports — отчёты\n\nОперации можно вводить текстом:\n+10000 доход\n-500 расход",
+                $this->buildMainMenuReplyMarkup()
+            );
+        }
+
         $tgUserId = isset($message['from']['id']) ? (string) $message['from']['id'] : null;
         if (!$tgUserId) {
             return new JsonResponse(['status' => 'ok']);
@@ -1099,7 +1148,9 @@ class TelegramWebhookController extends AbstractController
                         [
                             'chat_id' => $chatId,
                             'text' => $text,
-                            'reply_markup' => $replyMarkup,
+                            'reply_markup' => $replyMarkup !== null
+                                ? json_encode($replyMarkup, JSON_UNESCAPED_UNICODE)
+                                : null,
                         ],
                         static fn ($value) => $value !== null,
                     ),
@@ -1181,6 +1232,38 @@ class TelegramWebhookController extends AbstractController
         return $this->respondWithMessage($bot, $message, implode("\n", $lines), [
             'inline_keyboard' => $keyboard,
         ]);
+    }
+
+    private function buildMainMenuReplyMarkup(): array
+    {
+        return [
+            'keyboard' => [
+                ['📊 Отчёты', '💼 Выбрать кассу'],
+                ['➕ Добавить операцию', '📥 Загрузить выписку'],
+                ['⚙️ Помощь'],
+            ],
+            'resize_keyboard' => true,
+            'one_time_keyboard' => false,
+            'selective' => false,
+        ];
+    }
+
+    private function sendMainMenu(TelegramBot $bot, array $message): void
+    {
+        $this->respondWithMessage($bot, $message, 'Главное меню', $this->buildMainMenuReplyMarkup());
+    }
+
+    private function respondWithMessageAndMenu(
+        TelegramBot $bot,
+        array $message,
+        string $text,
+        ?array $replyMarkup = null
+    ): Response {
+        $response = $this->respondWithMessage($bot, $message, $text, $replyMarkup);
+
+        $this->sendMainMenu($bot, $message);
+
+        return $response;
     }
 
     private function encodeUuid(string $uuid): string
