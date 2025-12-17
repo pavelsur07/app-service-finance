@@ -32,13 +32,17 @@ class TelegramWebhookController extends AbstractController
     }
 
     // Вебхук стал глобальным: один endpoint обслуживает все запросы, активного бота выбираем внутри
-    #[Route('/telegram/webhook', name: 'telegram_webhook', methods: ['POST'])]
+    #[Route('/telegram/webhook', name: 'telegram_webhook', methods: ['POST', 'GET'])]
     public function __invoke(Request $request): Response
     {
+        if ($request->isMethod(Request::METHOD_GET)) {
+            return new JsonResponse(['status' => 'ok']);
+        }
+
         // Находим активного бота, чтобы принимать сообщения независимо от конкретного токена маршрута
         $bot = $this->botRepository->findActiveBot();
         if (!$bot || !$bot->isActive()) {
-            throw $this->createNotFoundException();
+            return new JsonResponse(['status' => 'inactive_bot']);
         }
 
         $payload = json_decode($request->getContent(), true);
