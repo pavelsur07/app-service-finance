@@ -16,6 +16,9 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/admin/telegram/bots', name: 'admin_telegram_bot_')]
 class TelegramBotController extends AbstractController
 {
+    // Для MVP вебхук всегда должен указывать на продакшн-домен, поэтому URL захардкожен
+    private const TARGET_WEBHOOK_URL = 'https://app.vashfindir.ru/telegram/webhook';
+
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(TelegramBotRepository $repository): Response
     {
@@ -120,6 +123,73 @@ class TelegramBotController extends AbstractController
         return $this->redirectToRoute('admin_telegram_bot_index');
     }
 
+    #[Route('/webhook-set', name: 'webhook_set', methods: ['GET', 'POST'])]
+    public function webhookSet(
+        TelegramBotRepository $repository,
+        HttpClientInterface $httpClient,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        // Админка платформы: доступ только для суперадминов, без контекста активной компании
+        $this->denyAccessUnlessGranted('ROLE_SUPER_ADMIN');
+
+        // Используем только активного бота: именно его токен нужен для вызова setWebhook
+        $bot = $repository->findActiveBot();
+        if (!$bot) {
+            $this->addFlash('danger', 'Нет активного бота');
+
+            return $this->redirectToRoute('admin_telegram_bot_index');
+        }
+
+        if (!$bot->getToken()) {
+            $this->addFlash('danger', 'У активного бота не задан token');
+
+            return $this->redirectToRoute('admin_telegram_bot_index');
+        }
+
+        try {
+            // Запрашиваем Telegram API setWebhook, чтобы привязать бота к фиксированному URL
+            $response = $httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/setWebhook', $bot->getToken()), [
+                'body' => [
+                    // Для MVP жёстко задаём адрес вебхука на продакшн-домен
+                    'url' => self::TARGET_WEBHOOK_URL,
+                ],
+            ]);
+
+            if ($response->getStatusCode() !== 200) {
+                $this->addFlash('danger', sprintf('Telegram API вернул статус %d', $response->getStatusCode()));
+
+                return $this->redirectToRoute('admin_telegram_bot_index');
+            }
+
+            $payload = $response->toArray(false);
+        } catch (\Throwable $exception) {
+            // При сетевых ошибках показываем сообщение и не даём экшену упасть
+            $this->addFlash('danger', sprintf('Не удалось установить webhook: %s', $exception->getMessage()));
+
+            return $this->redirectToRoute('admin_telegram_bot_index');
+        }
+
+        if (($payload['ok'] ?? false) === true) {
+            $this->addFlash('success', 'Webhook установлен');
+
+            // Сохраняем ожидаемый URL вебхука в базе, чтобы админ видел последнюю попытку установки
+            $bot->setWebhookUrl(self::TARGET_WEBHOOK_URL);
+            $bot->setUpdatedAt(new \DateTimeImmutable());
+            $entityManager->flush();
+        } else {
+            $description = $payload['description'] ?? 'неизвестная ошибка';
+            $this->addFlash('danger', sprintf('Не удалось установить webhook: %s', $description));
+        }
+
+        // После вызова setWebhook сразу проверяем фактический статус через getWebhookInfo
+        $infoPayload = $this->fetchWebhookInfo($bot, $httpClient);
+        if ($infoPayload !== null) {
+            $this->addFlash('webhook_status', $this->buildWebhookStatus($infoPayload));
+        }
+
+        return $this->redirectToRoute('admin_telegram_bot_index');
+    }
+
     #[Route('/webhook-health', name: 'webhook_health', methods: ['GET'])]
     public function webhookHealth(
         TelegramBotRepository $repository,
@@ -136,24 +206,41 @@ class TelegramBotController extends AbstractController
             return $this->redirectToRoute('admin_telegram_bot_index');
         }
 
+        $payload = $this->fetchWebhookInfo($bot, $httpClient);
+        if ($payload === null) {
+            return $this->redirectToRoute('admin_telegram_bot_index');
+        }
+
+        // Сохраняем статус в flash, чтобы показать админу после редиректа
+        $this->addFlash('webhook_status', $this->buildWebhookStatus($payload));
+        $this->addFlash('success', 'Статус webhook обновлён');
+
+        return $this->redirectToRoute('admin_telegram_bot_index');
+    }
+
+    private function fetchWebhookInfo(TelegramBot $bot, HttpClientInterface $httpClient): ?array
+    {
         try {
-            // Запрашиваем информацию о текущем webhook через Telegram API: метод getWebhookInfo
+            // Вызываем Telegram API getWebhookInfo, чтобы узнать актуальный адрес и ошибки доставки
             $response = $httpClient->request('GET', sprintf('https://api.telegram.org/bot%s/getWebhookInfo', $bot->getToken()));
 
             if ($response->getStatusCode() !== 200) {
                 $this->addFlash('danger', sprintf('Telegram API вернул статус %d', $response->getStatusCode()));
 
-                return $this->redirectToRoute('admin_telegram_bot_index');
+                return null;
             }
 
-            $payload = $response->toArray(false);
+            return $response->toArray(false);
         } catch (\Throwable $exception) {
             // В случае сетевой ошибки или недоступности API показываем администратору причину
             $this->addFlash('danger', sprintf('Не удалось проверить webhook: %s', $exception->getMessage()));
 
-            return $this->redirectToRoute('admin_telegram_bot_index');
+            return null;
         }
+    }
 
+    private function buildWebhookStatus(array $payload): array
+    {
         // Полезные поля ответа getWebhookInfo: url — текущий webhook, pending_update_count — сколько апдейтов ждут,
         // last_error_date / last_error_message — последняя ошибка доставки апдейтов, помогает диагностировать проблемы
         $result = is_array($payload['result'] ?? null) ? $payload['result'] : [];
@@ -162,19 +249,19 @@ class TelegramBotController extends AbstractController
         $lastErrorDate = isset($result['last_error_date']) ? (int) $result['last_error_date'] : null;
         $lastErrorMessage = $result['last_error_message'] ?? null;
 
-        $details = [];
-        $details[] = sprintf('Webhook URL: %s', $url ?: 'не установлен');
-        $details[] = sprintf('Ожидающих обновлений: %s', $pending ?? 'нет данных');
+        // Вебхук считаем установленным, когда Telegram возвращает ожидаемый адрес
+        $webhookInstalled = $url === self::TARGET_WEBHOOK_URL;
+        // Эвристика для MVP: webhook считаем живым, если он установлен и Telegram не сообщает об ошибках доставки
+        $webhookAlive = $webhookInstalled && empty($lastErrorMessage);
 
-        if ($lastErrorDate || $lastErrorMessage) {
-            $formattedDate = $lastErrorDate ? date('d.m.Y H:i:s', $lastErrorDate) : '—';
-            $details[] = sprintf('Последняя ошибка: %s (%s)', $lastErrorMessage ?: 'сообщение отсутствует', $formattedDate);
-        } else {
-            $details[] = 'Ошибок не зафиксировано';
-        }
-
-        $this->addFlash('success', implode(' | ', $details));
-
-        return $this->redirectToRoute('admin_telegram_bot_index');
+        return [
+            'expectedUrl' => self::TARGET_WEBHOOK_URL,
+            'actualUrl' => $url,
+            'pendingUpdateCount' => $pending,
+            'lastErrorDate' => $lastErrorDate,
+            'lastErrorMessage' => $lastErrorMessage,
+            'webhookInstalled' => $webhookInstalled,
+            'webhookAlive' => $webhookAlive,
+        ];
     }
 }

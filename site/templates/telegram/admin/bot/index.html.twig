@@ -11,12 +11,64 @@
       </div>
       <div class="col-auto ms-auto d-print-none">
         <div class="btn-list">
+          <a href="{{ path('admin_telegram_bot_webhook_set') }}" class="btn btn-outline-success">Установить webhook</a>
           <a href="{{ path('admin_telegram_bot_webhook_health') }}" class="btn btn-outline-primary">Проверить webhook</a>
           <a href="{{ path('admin_telegram_bot_new') }}" class="btn btn-primary">+ Добавить бота</a>
         </div>
       </div>
     </div>
   </div>
+
+  {% for status in app.flashes('webhook_status') %}
+    <div class="card mt-3">
+      <div class="card-body">
+        <h3 class="card-title mb-3">Статус webhook</h3>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <div class="text-muted">Webhook URL (ожидается)</div>
+            <div class="fw-semibold">{{ status.expectedUrl }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted">Webhook установлен</div>
+            {% if status.webhookInstalled %}
+              <span class="badge bg-success-lt text-success">Да</span>
+            {% else %}
+              <span class="badge bg-danger-lt text-danger">Нет</span>
+            {% endif %}
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted">Webhook живой</div>
+            {% if status.webhookAlive %}
+              <span class="badge bg-success-lt text-success">Да</span>
+            {% else %}
+              <span class="badge bg-danger-lt text-danger">Нет</span>
+            {% endif %}
+          </div>
+        </div>
+        <div class="row g-3 mt-2">
+          <div class="col-md-4">
+            <div class="text-muted">Текущий URL</div>
+            <div class="fw-semibold">{{ status.actualUrl ?? '—' }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted">Ожидающих обновлений</div>
+            <div class="fw-semibold">{{ status.pendingUpdateCount is not null ? status.pendingUpdateCount : 'нет данных' }}</div>
+          </div>
+          <div class="col-md-4">
+            <div class="text-muted">Последняя ошибка</div>
+            {% if status.lastErrorDate or status.lastErrorMessage %}
+              <div class="fw-semibold">{{ status.lastErrorMessage ?: 'сообщение отсутствует' }}</div>
+              {% if status.lastErrorDate %}
+                <div class="text-muted">{{ status.lastErrorDate|date('d.m.Y H:i:s') }}</div>
+              {% endif %}
+            {% else %}
+              <div class="fw-semibold">Ошибок не зафиксировано</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endfor %}
 
   <div class="card mt-3">
     <div class="card-body">
