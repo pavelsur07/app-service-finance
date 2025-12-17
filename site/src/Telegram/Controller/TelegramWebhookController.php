@@ -442,18 +442,38 @@ class TelegramWebhookController extends AbstractController
 
         // Обновляем существующее сообщение, если это возможно
         if (isset($callbackQuery['message']['message_id'], $callbackQuery['message']['chat']['id'])) {
-            $this->httpClient->request(
-                'POST',
-                sprintf('https://api.telegram.org/bot%s/editMessageText', $bot->getToken()),
-                [
-                    'json' => [
-                        'chat_id' => (string) $callbackQuery['message']['chat']['id'],
-                        'message_id' => $callbackQuery['message']['message_id'],
-                        'text' => $text,
-                        'reply_markup' => $replyMarkup,
-                    ],
-                ]
-            );
+            $chatId = (string) $callbackQuery['message']['chat']['id'];
+
+            try {
+                $response = $this->httpClient->request(
+                    'POST',
+                    sprintf('https://api.telegram.org/bot%s/editMessageText', $bot->getToken()),
+                    [
+                        'json' => [
+                            'chat_id' => $chatId,
+                            'message_id' => $callbackQuery['message']['message_id'],
+                            'text' => $text,
+                            'reply_markup' => $replyMarkup,
+                        ],
+                    ]
+                );
+
+                // Принудительно читаем ответ, чтобы ленивый HttpClient реально отправил запрос
+                $statusCode = $response->getStatusCode();
+                $content = $response->getContent(false);
+
+                if ($statusCode !== 200) {
+                    error_log(sprintf('Telegram editMessageText HTTP error: %d, chat=%s', $statusCode, $chatId));
+                } else {
+                    $decoded = json_decode($content, true);
+                    if (is_array($decoded) && isset($decoded['ok']) && $decoded['ok'] === false) {
+                        $description = $decoded['description'] ?? 'unknown error';
+                        error_log(sprintf('Telegram editMessageText API error: %s, chat=%s', $description, $chatId));
+                    }
+                }
+            } catch (\Throwable $exception) {
+                error_log(sprintf('Telegram editMessageText exception: %s', $exception->getMessage()));
+            }
 
             return $this->respondWithMessage($bot, $callbackQuery, 'Настройки обновлены');
         }
@@ -841,18 +861,42 @@ class TelegramWebhookController extends AbstractController
     private function respondWithMessage(TelegramBot $bot, array $message, string $text, ?array $replyMarkup = null): Response
     {
         // Отправляем простой ответ через Telegram API
-        if (isset($message['from']['id'])) {
-            $chatId = (string) $message['from']['id'];
-            $this->httpClient->request('POST', sprintf('https://api.telegram.org/bot%s/sendMessage', $bot->getToken()), [
-                'json' => array_filter(
+        // chat.id лучше from.id: ответы должны приходить в чат (в том числе групповой), а не личные сообщения отправителя
+        if (isset($message['chat']['id'])) {
+            $chatId = (string) $message['chat']['id'];
+
+            try {
+                $response = $this->httpClient->request(
+                    'POST',
+                    sprintf('https://api.telegram.org/bot%s/sendMessage', $bot->getToken()),
                     [
-                        'chat_id' => $chatId,
-                        'text' => $text,
-                        'reply_markup' => $replyMarkup,
+                        'json' => array_filter(
+                            [
+                                'chat_id' => $chatId,
+                                'text' => $text,
+                                'reply_markup' => $replyMarkup,
+                            ],
+                            static fn ($value) => $value !== null,
+                        ),
                     ],
-                    static fn ($value) => $value !== null,
-                ),
-            ]);
+                );
+
+                // HttpClient ленивый: дергаем статус/тело, чтобы запрос точно ушел
+                $statusCode = $response->getStatusCode();
+                $content = $response->getContent(false);
+
+                if ($statusCode !== 200) {
+                    error_log(sprintf('Telegram sendMessage HTTP error: %d, chat=%s, text="%s"', $statusCode, $chatId, $text));
+                } else {
+                    $decoded = json_decode($content, true);
+                    if (is_array($decoded) && isset($decoded['ok']) && $decoded['ok'] === false) {
+                        $description = $decoded['description'] ?? 'unknown error';
+                        error_log(sprintf('Telegram sendMessage API error: %s, chat=%s, text="%s"', $description, $chatId, $text));
+                    }
+                }
+            } catch (\Throwable $exception) {
+                error_log(sprintf('Telegram sendMessage exception: %s', $exception->getMessage()));
+            }
         }
 
         return new JsonResponse(['status' => 'ok']);
