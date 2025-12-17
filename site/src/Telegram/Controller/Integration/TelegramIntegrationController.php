@@ -36,6 +36,9 @@ class TelegramIntegrationController extends AbstractController
             'company' => $company,
             'bot' => $bot,
             'deepLink' => null,
+            'deepLinkWeb' => null,
+            'deepLinkApp' => null,
+            'startCommand' => null,
             'usernameMissing' => false,
         ]);
     }
@@ -76,11 +79,19 @@ class TelegramIntegrationController extends AbstractController
         $this->entityManager->flush();
 
         $deepLink = null;
+        $deepLinkWeb = null;
+        $deepLinkApp = null;
+        $startCommand = null;
         $usernameMissing = false;
 
         if ($bot->getUsername()) {
             $username = ltrim($bot->getUsername(), '@');
-            $deepLink = sprintf('https://t.me/%s?start=%s', $username, $botLink->getToken());
+            $token = $botLink->getToken();
+
+            $deepLink = sprintf('https://t.me/%s?start=%s', $username, $token);
+            $deepLinkWeb = sprintf('https://t.me/%s?start=%s', $username, $token);
+            $deepLinkApp = sprintf('tg://resolve?domain=%s&start=%s', $username, $token);
+            $startCommand = sprintf('/start %s', $token);
         } else {
             $usernameMissing = true;
         }
@@ -91,6 +102,9 @@ class TelegramIntegrationController extends AbstractController
             'company' => $company,
             'bot' => $bot,
             'deepLink' => $deepLink,
+            'deepLinkWeb' => $deepLinkWeb,
+            'deepLinkApp' => $deepLinkApp,
+            'startCommand' => $startCommand,
             'usernameMissing' => $usernameMissing,
         ]);
     }
