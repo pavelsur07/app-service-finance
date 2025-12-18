@@ -13,9 +13,13 @@
     <testsuites>
         <testsuite name="unit">
             <directory>tests/Unit</directory>
+            <directory>tests/Service</directory>
+            <directory>tests/Entity</directory>
+            <directory>tests/Fund</directory>
         </testsuite>
         <testsuite name="integration">
             <directory>tests/Integration</directory>
+            <directory>tests/Controller</directory>
         </testsuite>
         <!-- По модулю, если хочется запускать точечно -->
         <testsuite name="telegram">
