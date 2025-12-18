@@ -51,7 +51,6 @@ class TelegramIntegrationController extends AbstractController
         return $this->render('telegram/integration/index.html.twig', [
             'company' => $company,
             'bot' => $bot,
-            'deepLink' => null,
             'deepLinkWeb' => null,
             'deepLinkApp' => null,
             'startCommand' => null,
@@ -95,7 +94,6 @@ class TelegramIntegrationController extends AbstractController
         $this->entityManager->persist($botLink);
         $this->entityManager->flush();
 
-        $deepLink = null;
         $deepLinkWeb = null;
         $deepLinkApp = null;
         $startCommand = null;
@@ -121,7 +119,6 @@ class TelegramIntegrationController extends AbstractController
             $username = ltrim($bot->getUsername(), '@');
             $token = $botLink->getToken();
 
-            $deepLink = sprintf('https://t.me/%s?start=%s', $username, $token);
             $deepLinkWeb = sprintf('https://t.me/%s?start=%s', $username, $token);
             $deepLinkApp = sprintf('tg://resolve?domain=%s&start=%s', $username, $token);
             $startCommand = sprintf('/start %s', $token);
@@ -134,7 +131,6 @@ class TelegramIntegrationController extends AbstractController
         return $this->render('telegram/integration/index.html.twig', [
             'company' => $company,
             'bot' => $bot,
-            'deepLink' => $deepLink,
             'deepLinkWeb' => $deepLinkWeb,
             'deepLinkApp' => $deepLinkApp,
             'startCommand' => $startCommand,
