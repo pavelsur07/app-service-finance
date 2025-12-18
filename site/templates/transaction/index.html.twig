@@ -145,23 +145,6 @@
 
 {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
 
-<div class="card mt-3">
-    <div class="card-body">
-        <div class="row mb-2">
-            <div class="col">Приток</div>
-            <div class="col text-end text-success">{{ summary.inflow|number_format(2, ',', ' ') }}</div>
-        </div>
-        <div class="row mb-2">
-            <div class="col">Отток</div>
-            <div class="col text-end text-danger">{{ summary.outflow|number_format(2, ',', ' ') }}</div>
-        </div>
-        <div class="row fw-bold">
-            <div class="col">Баланс движения</div>
-            <div class="col text-end">{{ summary.net|number_format(2, ',', ' ') }}</div>
-        </div>
-    </div>
-</div>
-
 {{ include('transaction/_filters.html.twig') }}
 
 <div class="modal fade" id="autoRuleModal" tabindex="-1" aria-hidden="true">
