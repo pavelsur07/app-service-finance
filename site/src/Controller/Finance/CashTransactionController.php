@@ -92,24 +92,12 @@ class CashTransactionController extends AbstractController
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
 
-        $sumQb = clone $qb;
-        $sumQb->resetDQLPart('orderBy');
-
         $pager = new Pagerfanta(new QueryAdapter($qb));
         $pager->setMaxPerPage($limit);
         $pager->setAllowOutOfRangePages(true);
         $pager->setCurrentPage($page);
 
         $transactions = iterator_to_array($pager->getCurrentPageResults());
-        $sum = $sumQb->select(
-            "SUM(CASE WHEN t.direction = 'INFLOW' THEN t.amount ELSE 0 END) as inflow",
-            "SUM(CASE WHEN t.direction = 'OUTFLOW' THEN t.amount ELSE 0 END) as outflow"
-        )->getQuery()->getSingleResult();
-        $summary = [
-            'inflow' => $sum['inflow'] ?? 0,
-            'outflow' => $sum['outflow'] ?? 0,
-            'net' => ($sum['inflow'] ?? 0) - ($sum['outflow'] ?? 0),
-        ];
 
         $accounts = $accountRepo->findBy(['company' => $company]);
         $categories = $categoryRepo->findTreeByCompany($company);
@@ -121,7 +109,6 @@ class CashTransactionController extends AbstractController
             'accounts' => $accounts,
             'categories' => $categories,
             'counterparties' => $counterparties,
-            'summary' => $summary,
             'pager' => $pager,
         ]);
     }
