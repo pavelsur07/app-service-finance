@@ -11,6 +11,7 @@
 - Правила ведения документации: `docs/documentation-rules.md`
 - Правила разработки и развития: `docs/development-rules.md`
 - Шаблон промта для создания модуля (Codex): `docs/codex/module_template.md`
+- План систематизации кода: `docs/refactoring-plan.md`
 
 ## Архитектура
 - Multi-tenant: `docs/multi-tenant.md`
