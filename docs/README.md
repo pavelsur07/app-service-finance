@@ -1,0 +1,27 @@
+# Документация проекта
+
+Единая точка входа в документацию. Все новые документы обязаны добавляться ссылкой сюда.
+
+## Быстрый старт
+- Основной README проекта: `README.md`
+- Cron / scheduler: `docker/cron/README.md`
+
+## Правила и процессы
+- Правила проекта: `docs/rules.md`
+- Шаблон промта для создания модуля (Codex): `docs/codex/module_template.md`
+
+## Архитектура
+- Multi-tenant: `docs/multi-tenant.md`
+
+## Интеграции
+- Wildberries mapping refactor: `docs/wildberries-mapping-refactor.md`
+
+## Финансовые отчёты и методология
+- Intermediate totals: `docs/finplan/intermediate-totals.md`
+- PL Report Projects Compare Builder (analysis): `docs/PlReportProjectsCompareBuilderAnalysis.md`
+
+## Открытые вопросы
+- Открытые вопросы по транзакциям: `open-questions-transactions.md`
+
+## Runbooks (операционка)
+- Docker cleanup: `CLEAR.MD`
