@@ -18,18 +18,18 @@
 </head>
 <body class="layout-fluid layout-fluid-vertical">
 <div class="page">
-    {% include 'partials/_sidebar.html.twig' %}
+    {% include '@Partials/_sidebar.html.twig' %}
     <div class="page-wrapper">
         <header class="navbar navbar-expand-md d-print-none">
             <div class="container-fluid d-flex justify-content-between align-items-center">
                 <h1 class="navbar-brand">Сервис</h1>
-                {% include 'partials/_active_company_widget.html.twig' %}
+                {% include '@Partials/_active_company_widget.html.twig' %}
             </div>
         </header>
         <div class="page-body">
             <div class="container-fluid">
                 {% block breadcrumbs %}{% endblock %}
-                {{ include('partials/_flash.html.twig') }}
+                {{ include('@Partials/_flash.html.twig') }}
                 {% block content %}{% block body %}{% endblock %}{% endblock %}
             </div>
         </div>
