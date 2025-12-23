@@ -8,6 +8,7 @@
 
 ## Правила и процессы
 - Правила проекта: `docs/rules.md`
+- Правила ведения документации: `docs/documentation-rules.md`
 - Шаблон промта для создания модуля (Codex): `docs/codex/module_template.md`
 
 ## Архитектура
