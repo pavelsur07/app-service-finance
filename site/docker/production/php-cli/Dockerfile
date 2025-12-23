@@ -14,6 +14,11 @@ RUN apk add --no-cache $PHPIZE_DEPS \
 RUN apk add --no-cache unzip
 
 ENV COMPOSER_ALLOW_SUPERUSER 1
+ENV COMPOSER_PROCESS_TIMEOUT=1200 \
+    COMPOSER_RETRY=5 \
+    COMPOSER_DISABLE_NETWORK=0
+
+RUN apk add --no-cache git openssh-client
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/bin --filename=composer --quiet
 
