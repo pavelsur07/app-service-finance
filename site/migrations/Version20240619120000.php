@@ -16,6 +16,10 @@ final class Version20240619120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        if (!$schema->hasTable('telegram_bots')) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE telegram_bots DROP CONSTRAINT IF EXISTS FK_DACD6ED979B1AD6');
         $this->addSql('DROP INDEX IF EXISTS IDX_DACD6ED979B1AD6');
         $this->addSql('ALTER TABLE telegram_bots DROP COLUMN IF EXISTS company_id');
@@ -28,6 +32,10 @@ final class Version20240619120000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        if (!$schema->hasTable('telegram_bots')) {
+            return;
+        }
+
         $this->addSql('ALTER TABLE telegram_bots DROP COLUMN IF EXISTS updated_at');
         $this->addSql('ALTER TABLE telegram_bots ADD company_id UUID DEFAULT NULL');
         $this->addSql('CREATE INDEX IDX_DACD6ED979B1AD6 ON telegram_bots (company_id)');
