@@ -1,0 +1,753 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Demo Base Page — Ваш ФинДиректор (Tabler)</title>
+
+    <!-- Inter (project font) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Tabler CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/tabler-icons.min.css">
+  <!-- Tabler Icons (webfont) -->
+  <style>
+    /* ===== Project tokens (as in your project sidebar styles) ===== */
+    :root{
+      --brand:#0A1548;
+      --brand-05: rgba(10,21,72,.05);
+    
+      /* Typography / text (match project Tabler tokens) */
+      --tblr-font-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --tblr-body-color: #232e3c;
+      --tblr-muted: #66738f;
+    }
+
+    /* ===== Full-width layout (100% width) ===== */
+    body.layout-fluid { min-height: 100vh; font-family: var(--tblr-font-sans-serif); color: var(--tblr-body-color); }
+    .page { min-height: 100vh; }
+
+    /* ===== Sidebar active/hover (mirrors project rule) ===== */
+    .navbar-vertical .nav-item.active > .nav-link{
+      background-color: var(--brand-05) !important;
+      color: var(--brand) !important;
+      font-weight: 600;
+      border-left: 2px solid var(--brand);
+      padding-left: calc(1rem - 2px);
+    }
+    .navbar-vertical .nav-link:hover{
+      background-color: var(--brand-05);
+      color: var(--brand) !important;
+    }
+
+    /* ===== Sidebar: first-level items in brand color ===== */
+    .navbar-vertical .navbar-nav > .nav-item > .nav-link{
+      color: var(--brand) !important;
+    }
+    .navbar-vertical .navbar-nav > .nav-item > .nav-link .nav-link-icon,
+    .navbar-vertical .navbar-nav > .nav-item > .nav-link .nav-link-icon i{
+      color: var(--brand) !important;
+    }
+
+
+    /* ===== Project UI utilities (based on your app.css patterns) ===== */
+    .table-compact td, .table-compact th { padding: .4rem .6rem; }
+    .table-compact .badge { font-size: .75rem; padding: .2rem .4rem; }
+    .nowrap{ white-space: nowrap; }
+    .text-truncate-320{ max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .text-truncate-200{ max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .modal.modal-blur .modal-content{ backdrop-filter: none !important; }
+
+    /* ===== Table row gradient (Operations DДС) ===== */
+    . tbody tr{
+      background: linear-gradient(90deg, rgba(10,21,72,.035) 0%, rgba(10,21,72,0) 72%);
+    }
+    . tbody tr:hover{
+      background: linear-gradient(90deg, rgba(10,21,72,.06) 0%, rgba(10,21,72,.015) 72%);
+    }
+
+
+    /* ===== Subtle page header helper ===== */
+    .page-title-muted{ color: var(--tblr-muted); font-size: .95rem; }
+
+    /* ===== Keep content readable at full width: use max widths inside sections when needed ===== */
+    .content-max { max-width: 1440px; } /* inside full-width container-fluid */
+  
+    /* ===== Cashflow operations: row hover highlight ===== */
+    .cashflow-ops .table tbody tr:hover{
+      background-color: var(--brand-05);
+    }
+
+  </style>
+</head>
+
+<body class="layout-fluid layout-fluid-vertical">
+  <div class="page">
+
+    <!-- ===== Sidebar (full-height) ===== -->
+    <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
+      <div class="container-fluid">
+        <h1 class="navbar-brand navbar-brand-autodark">
+          <a href="javascript:void(0)" class="text-decoration-none">
+            <span class="fw-bold" style="color: var(--brand);">Ваш</span> ФинДиректор
+          </a>
+        </h1>
+
+        <div class="navbar-nav flex-row d-lg-none">
+          <div class="nav-item">
+            <a class="nav-link" data-bs-toggle="offcanvas" href="#offcanvasSidebar" role="button" aria-controls="offcanvasSidebar">
+              <i class="ti ti-menu-2"></i>
+            </a>
+          </div>
+        </div>
+
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+          <ul class="navbar-nav pt-lg-3">
+            <li class="nav-item active">
+              <a class="nav-link" href="javascript:void(0)">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-home"></i></span>
+                <span class="nav-link-title">Дашборд</span>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="javascript:void(0)">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-wallet"></i></span>
+                <span class="nav-link-title">ДДС</span>
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="javascript:void(0)">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-chart-bar"></i></span>
+                <span class="nav-link-title">ОПиУ</span>
+              </a>
+            </li>
+
+            <!-- Dropdown (collapse) menu item -->
+            <li class="nav-item">
+              <a class="nav-link" href="#nav-reports" data-bs-toggle="collapse" role="button" aria-expanded="false" aria-controls="nav-reports">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-report-analytics"></i></span>
+                <span class="nav-link-title">Отчёты</span>
+                <span class="nav-link-arrow ms-auto"><i class="ti ti-chevron-down"></i></span>
+              </a>
+              <div class="collapse" id="nav-reports">
+                <ul class="nav nav-pills nav-sub flex-column">
+                  <li class="nav-item">
+                    <a class="nav-link" href="javascript:void(0)">
+                      <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-calendar-stats"></i></span>
+                      <span class="nav-link-title">Платёжный календарь</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="javascript:void(0)">
+                      <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-scale"></i></span>
+                      <span class="nav-link-title">Баланс</span>
+                    </a>
+                  </li>
+                  <li class="nav-item">
+                    <a class="nav-link" href="javascript:void(0)">
+                      <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-robot"></i></span>
+                      <span class="nav-link-title">AI-отчёт</span>
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="javascript:void(0)">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-building"></i></span>
+                <span class="nav-link-title">Компания</span>
+              </a>
+            </li>
+
+            <li class="nav-item mt-2">
+              <div class="hr-text">Инструменты</div>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link" href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#modal-help">
+                <span class="nav-link-icon d-md-none d-lg-inline-block"><i class="ti ti-help-circle"></i></span>
+                <span class="nav-link-title">Справка</span>
+              </a>
+            </li>
+
+          </ul>
+
+          <div class="mt-auto pt-4 pb-3">
+            <div class="card mx-2">
+              <div class="card-body">
+                <div class="d-flex align-items-center">
+                  <span class="avatar me-2">PN</span>
+                  <div class="flex-fill">
+                    <div class="fw-semibold">Pavel</div>
+                    <div class="text-muted">ROLE_ADMIN</div>
+                  </div>
+                  <a class="btn btn-outline-secondary btn-icon" href="javascript:void(0)" aria-label="Profile">
+                    <i class="ti ti-user-circle"></i>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div><!-- /collapse -->
+      </div>
+    </aside>
+
+    <!-- ===== Page Wrapper ===== -->
+    <div class="page-wrapper">
+
+      <!-- ===== Topbar ===== -->
+      <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
+        <div class="container-fluid">
+          <div class="d-flex align-items-center gap-3 w-100">
+            <div class="d-none d-md-flex flex-column">
+              <div class="fw-bold">Дашборд</div>
+              <div class="page-title-muted">Сводка денег • прогноз • риски</div>
+            </div>
+
+            <div class="ms-auto d-flex align-items-center gap-2">
+              <div class="dropdown">
+                <button class="btn btn-outline-secondary dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="ti ti-building me-2"></i>Активная компания
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                  <a class="dropdown-item" href="javascript:void(0)">ООО Ромашка</a>
+                  <a class="dropdown-item" href="javascript:void(0)">ИП Иванов</a>
+                  <div class="dropdown-divider"></div>
+                  <a class="dropdown-item" href="javascript:void(0)"><i class="ti ti-plus me-2"></i>Добавить компанию</a>
+                </div>
+              </div>
+
+              <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="offcanvas" data-bs-target="#offcanvasFilters" aria-label="Filters">
+                <i class="ti ti-filter"></i>
+              </button>
+
+              <button class="btn btn-primary">
+                <i class="ti ti-plus me-2"></i>Добавить операцию
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- ===== Page body ===== -->
+      <div class="page-body">
+        <!-- Full width container -->
+        <div class="container-fluid">
+          <!-- optional max width for readability while still being full-width -->
+          <div class="content-max mx-auto">
+
+            <!-- Breadcrumbs -->
+            <nav aria-label="breadcrumb" class="mb-3">
+              <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="javascript:void(0)">Главная</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Дашборд</li>
+              </ol>
+            </nav>
+
+            <!-- KPI row -->
+            <div class="row row-deck row-cards mb-4">
+              <div class="col-md-6 col-xl-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div class="text-muted">Кэш сейчас</div>
+                        <div class="h2 mb-0">1 240 000 ₽</div>
+                      </div>
+                      <span class="badge bg-azure-lt"><i class="ti ti-wallet me-1"></i>ДДС</span>
+                    </div>
+                    <div class="mt-3 text-muted">Обновлено: <span class="nowrap">2025-12-23 19:10</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6 col-xl-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div class="text-muted">Прогноз 30 дней</div>
+                        <div class="h2 mb-0 text-green">+320 000 ₽</div>
+                      </div>
+                      <span class="badge bg-green-lt"><i class="ti ti-trending-up me-1"></i>Forecast</span>
+                    </div>
+                    <div class="mt-3 text-muted">Поступления: +540k • Платежи: -220k</div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6 col-xl-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div class="text-muted">Риск кассового разрыва</div>
+                        <div class="h2 mb-0 text-red">Высокий</div>
+                      </div>
+                      <span class="badge bg-red-lt"><i class="ti ti-alert-circle me-1"></i>Risk</span>
+                    </div>
+                    <div class="mt-3 text-muted">Критическая дата: <span class="nowrap">2026-01-05</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-md-6 col-xl-3">
+                <div class="card">
+                  <div class="card-body">
+                    <div class="d-flex align-items-start justify-content-between">
+                      <div>
+                        <div class="text-muted">Алерты</div>
+                        <div class="h2 mb-0">3</div>
+                      </div>
+                      <span class="badge bg-yellow-lt"><i class="ti ti-bell me-1"></i>Alerts</span>
+                    </div>
+                    <div class="mt-3 text-muted">1 критичный • 2 предупреждения</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Alerts row -->
+            <div class="row g-3 mb-4">
+              <div class="col-lg-6">
+                <div class="alert alert-danger">
+                  <div class="d-flex">
+                    <div class="me-2"><i class="ti ti-alert-circle"></i></div>
+                    <div>
+                      <div class="fw-bold">Критичный риск</div>
+                      <div class="text-muted">По прогнозу на 2026-01-05 касса уйдёт в минус. Проверьте платежи и поступления.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-6">
+                <div class="alert alert-warning mb-0">
+                  <div class="d-flex">
+                    <div class="me-2"><i class="ti ti-alert-triangle"></i></div>
+                    <div>
+                      <div class="fw-bold">Предупреждение</div>
+                      <div class="text-muted">Выписка не обновлялась 3 дня. Загрузите свежие операции или проверьте интеграцию банка.</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Main content row -->
+            <div class="row g-3">
+              <!-- Left: table -->
+              <div class="col-12 col-xxl-8">
+                <div class="card">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title mb-0">Платёжный календарь (демо)</h3>
+                      <div class="card-subtitle">Таблица внутри карточки • компактная плотность</div>
+                    </div>
+                    <div class="card-actions">
+                      <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input class="form-control" placeholder="Поиск по операциям…" style="width: 280px">
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table table-compact card-table table-vcenter">
+                      <thead>
+                        <tr>
+                          <th class="nowrap">Дата</th>
+                          <th>Операция</th>
+                          <th class="text-end nowrap">Сумма</th>
+                          <th class="text-end">Статус</th>
+                          <th class="text-end">Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="nowrap">2025-12-23</td>
+                          <td class="text-truncate-320">Оплата поставщику по договору №12345 (пример длинного текста)</td>
+                          <td class="text-end nowrap">-120 000 ₽</td>
+                          <td class="text-end"><span class="badge bg-yellow-lt">ожидает</span></td>
+                          <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Edit"><i class="ti ti-pencil"></i></button>
+                            <button class="btn btn-sm btn-outline-danger btn-icon" data-bs-toggle="modal" data-bs-target="#modalDelete" aria-label="Delete"><i class="ti ti-trash"></i></button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="nowrap">2025-12-25</td>
+                          <td>Поступление от маркетплейса</td>
+                          <td class="text-end nowrap">+240 000 ₽</td>
+                          <td class="text-end"><span class="badge bg-green-lt">ок</span></td>
+                          <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Open"><i class="ti ti-external-link"></i></button>
+                          </td>
+                        </tr>
+                        <tr>
+                          <td class="nowrap">2026-01-05</td>
+                          <td>Аренда склада</td>
+                          <td class="text-end nowrap">-180 000 ₽</td>
+                          <td class="text-end"><span class="badge bg-red-lt">риск</span></td>
+                          <td class="text-end">
+                            <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Open"><i class="ti ti-external-link"></i></button>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="card-footer d-flex align-items-center">
+                    <div class="text-muted">Показано 3 из 28</div>
+                    <ul class="pagination ms-auto mb-0">
+                      <li class="page-item disabled"><a class="page-link" href="#" tabindex="-1">‹</a></li>
+                      <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                      <li class="page-item"><a class="page-link" href="#">2</a></li>
+                      <li class="page-item"><a class="page-link" href="#">3</a></li>
+                      <li class="page-item"><a class="page-link" href="#">›</a></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Right: actions + form -->
+              <div class="col-12 col-xxl-4">
+                <div class="card mb-3">
+                  <div class="card-header">
+                    <h3 class="card-title mb-0">Быстрые действия</h3>
+                    <div class="card-subtitle">1 primary CTA на блок</div>
+                  </div>
+                  <div class="card-body">
+                    <div class="d-grid gap-2">
+                      <button class="btn btn-primary"><i class="ti ti-plus me-2"></i>Создать платеж</button>
+                      <button class="btn btn-outline-primary"><i class="ti ti-upload me-2"></i>Загрузить выписку</button>
+                      <button class="btn btn-outline-secondary"><i class="ti ti-settings me-2"></i>Настроить правила</button>
+                    </div>
+                    <div class="text-muted mt-3">
+                      Правило: один основной CTA, остальные — outline.
+                    </div>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div class="card-header">
+                    <h3 class="card-title mb-0">Форма (демо)</h3>
+                    <div class="card-subtitle">row g-3 + form-hint</div>
+                  </div>
+                  <div class="card-body">
+                    <form>
+                      <div class="row g-3">
+                        <div class="col-12">
+                          <label class="form-label">Комментарий</label>
+                          <textarea class="form-control" rows="3" placeholder="Короткая заметка по ситуации"></textarea>
+                          <small class="form-hint">Подсказки — через form-hint.</small>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label">Статус</label>
+                          <select class="form-select">
+                            <option>ОК</option>
+                            <option>Ожидает</option>
+                            <option>Риск</option>
+                          </select>
+                        </div>
+                        <div class="col-md-6">
+                          <label class="form-label">Ответственный</label>
+                          <input class="form-control" placeholder="Финменеджер">
+                        </div>
+                        <div class="col-12">
+                          <label class="form-check">
+                            <input class="form-check-input" type="checkbox">
+                            <span class="form-check-label">Показывать на дашборде</span>
+                          </label>
+                        </div>
+                      </div>
+                    </form>
+                  </div>
+                  <div class="card-footer text-end">
+                    <button class="btn btn-outline-secondary">Отмена</button>
+                    <button class="btn btn-primary">Сохранить</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+
+            <!-- Operations (Cash-flow) -->
+            <div class="row g-3 mt-2 mb-4">
+              <div class="col-12">
+                <div class="card cashflow-ops">
+                  <div class="card-header">
+                    <div>
+                      <h3 class="card-title mb-0">Операции ДДС</h3>
+                      <div class="card-subtitle">Список операций • фильтры слева • действия справа • одна primary CTA</div>
+                    </div>
+                    <div class="card-actions d-flex align-items-center gap-2">
+                      <div class="input-icon d-none d-md-block">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        <input class="form-control" placeholder="Поиск по операциям…" style="width: 280px">
+                      </div>
+                      <button class="btn btn-outline-secondary btn-icon" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCashFilters" aria-label="Фильтры">
+                        <i class="ti ti-filter"></i>
+                      </button>
+                      <button class="btn btn-primary">
+                        <i class="ti ti-plus me-2"></i>Добавить
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="table-responsive">
+                    <table class="table  card-table table-vcenter">
+                      <thead>
+                        <tr>
+                          <th class="nowrap">Дата</th>
+                          <th>Статья</th>
+                          <th>Контрагент</th>
+                          <th class="text-end nowrap">Сумма</th>
+                          <th class="text-end">Счёт</th>
+                          <th class="text-end">Статус</th>
+                          <th class="text-end">Действия</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td class="nowrap">2025-12-23</td>
+                          <td class="text-truncate-320">
+                            <div class="fw-semibold">Закупка сырья</div>
+                            <div class="text-muted">Производство • партия #A-102</div>
+                          </td>
+                          <td class="text-truncate-200">ООО «Поставщик»</td>
+                          <td class="text-end nowrap text-red">-120 000 ₽</td>
+                          <td class="text-end nowrap">Р/с Альфа</td>
+                          <td class="text-end"><span class="badge bg-yellow-lt">ожидает</span></td>
+                          <td class="text-end">
+                            <div class="btn-list justify-content-end flex-nowrap">
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Открыть">
+                                <i class="ti ti-external-link"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Редактировать">
+                                <i class="ti ti-pencil"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger btn-icon" data-bs-toggle="modal" data-bs-target="#modalDelete" aria-label="Удалить">
+                                <i class="ti ti-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td class="nowrap">2025-12-25</td>
+                          <td>
+                            <div class="fw-semibold">Поступление от маркетплейса</div>
+                            <div class="text-muted">Wildberries • выплаты</div>
+                          </td>
+                          <td class="text-truncate-200">Wildberries</td>
+                          <td class="text-end nowrap text-green">+240 000 ₽</td>
+                          <td class="text-end nowrap">Р/с Точка</td>
+                          <td class="text-end"><span class="badge bg-green-lt">проведено</span></td>
+                          <td class="text-end">
+                            <div class="btn-list justify-content-end flex-nowrap">
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Открыть">
+                                <i class="ti ti-external-link"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Редактировать">
+                                <i class="ti ti-pencil"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td class="nowrap">2026-01-05</td>
+                          <td>
+                            <div class="fw-semibold">Аренда склада</div>
+                            <div class="text-muted">Постоянные расходы</div>
+                          </td>
+                          <td class="text-truncate-200">ООО «Склад-Сервис»</td>
+                          <td class="text-end nowrap text-red">-180 000 ₽</td>
+                          <td class="text-end nowrap">Касса</td>
+                          <td class="text-end"><span class="badge bg-red-lt">риск</span></td>
+                          <td class="text-end">
+                            <div class="btn-list justify-content-end flex-nowrap">
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Открыть">
+                                <i class="ti ti-external-link"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-secondary btn-icon" aria-label="Редактировать">
+                                <i class="ti ti-pencil"></i>
+                              </button>
+                              <button class="btn btn-sm btn-outline-danger btn-icon" data-bs-toggle="modal" data-bs-target="#modalDelete" aria-label="Удалить">
+                                <i class="ti ti-trash"></i>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <div class="card-footer d-flex align-items-center">
+                    <div class="text-muted">Показано 3 из 152</div>
+                    
+                    <ul class="pagination ms-auto mb-0">
+                      <li class="page-item disabled"><a class="page-link" href="#" tabindex="-1">‹</a></li>
+                      <li class="page-item active"><a class="page-link" href="#">1</a></li>
+                      <li class="page-item"><a class="page-link" href="#">2</a></li>
+                      <li class="page-item"><a class="page-link" href="#">3</a></li>
+                      <li class="page-item"><a class="page-link" href="#">›</a></li>
+                    </ul>
+                  </div>
+                </div>
+
+                <div class="text-muted mt-2">
+                  Стиль: таблица в карточке (<span class="nowrap">table card-table</span>), суммы/даты — <span class="nowrap">nowrap</span>, длинный текст — <span class="nowrap">text-truncate-*</span>.
+                </div>
+              </div>
+            </div>
+
+            <!-- Offcanvas: Cash filters -->
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasCashFilters" aria-labelledby="offcanvasCashFiltersLabel">
+              <div class="offcanvas-header">
+                <h5 class="offcanvas-title" id="offcanvasCashFiltersLabel"><i class="ti ti-filter me-2"></i>Фильтры операций ДДС</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+              </div>
+              <div class="offcanvas-body">
+                <div class="mb-3">
+                  <label class="form-label">Период</label>
+                  <div class="row g-2">
+                    <div class="col-6"><input class="form-control" placeholder="с"></div>
+                    <div class="col-6"><input class="form-control" placeholder="по"></div>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Счёт</label>
+                  <select class="form-select">
+                    <option>Все</option>
+                    <option>Р/с Альфа</option>
+                    <option>Р/с Точка</option>
+                    <option>Касса</option>
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Статус</label>
+                  <select class="form-select">
+                    <option>Все</option>
+                    <option>Проведено</option>
+                    <option>Ожидает</option>
+                    <option>Риск</option>
+                  </select>
+                </div>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-primary w-100">Применить</button>
+                  <button class="btn btn-outline-secondary w-100" data-bs-dismiss="offcanvas">Закрыть</button>
+                </div>
+                <div class="text-muted mt-3">Паттерн: фильтры — в offcanvas, чтобы разгрузить страницу.</div>
+              </div>
+            </div>
+
+            <!-- Footer note -->
+            <div class="mt-4 text-muted">
+              Demo page: full-width <span class="nowrap">container-fluid</span> + внутренний ограничитель <span class="nowrap">content-max</span> для читаемости на широких экранах.
+            </div>
+
+          </div><!-- /content-max -->
+        </div><!-- /container-fluid -->
+      </div><!-- /page-body -->
+
+      <!-- Footer -->
+      <footer class="footer footer-transparent d-print-none">
+        <div class="container-fluid">
+          <div class="text-muted text-center py-3">
+            © 2025 Ваш ФинДиректор • Demo base page (Tabler)
+          </div>
+        </div>
+      </footer>
+
+    </div><!-- /page-wrapper -->
+  </div><!-- /page -->
+
+  <!-- Offcanvas Filters -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasFilters" aria-labelledby="offcanvasFiltersLabel">
+    <div class="offcanvas-header">
+      <h5 class="offcanvas-title" id="offcanvasFiltersLabel"><i class="ti ti-filter me-2"></i>Фильтры</h5>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+    <div class="offcanvas-body">
+      <div class="mb-3">
+        <label class="form-label">Статус</label>
+        <select class="form-select">
+          <option>Все</option>
+          <option>ОК</option>
+          <option>Ожидает</option>
+          <option>Риск</option>
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Период</label>
+        <div class="row g-2">
+          <div class="col-6"><input class="form-control" placeholder="с"></div>
+          <div class="col-6"><input class="form-control" placeholder="по"></div>
+        </div>
+      </div>
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary w-100">Применить</button>
+        <button class="btn btn-outline-secondary w-100" data-bs-dismiss="offcanvas">Закрыть</button>
+      </div>
+      <div class="text-muted mt-3">Паттерн: фильтры/настройки — в offcanvas, чтобы не утяжелять страницу.</div>
+    </div>
+  </div>
+
+  <!-- Modal Delete confirm -->
+  <div class="modal modal-blur fade" id="modalDelete" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Удалить операцию?</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          Это действие необратимо. Рекомендуется подтверждение для всех danger-операций.
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-danger" data-bs-dismiss="modal">Удалить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Help -->
+  <div class="modal modal-blur fade" id="modal-help" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="ti ti-help-circle me-2"></i>Справка (демо)</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-info">
+            <i class="ti ti-info-circle me-2"></i>
+            Здесь обычно размещается краткая инструкция по экрану и ссылки на документацию.
+          </div>
+          <ul class="mb-0">
+            <li>CTA: один primary на экран</li>
+            <li>Таблицы: внутри карточек</li>
+            <li>Danger: только через confirm modal</li>
+            <li>Иконки: Tabler Icons</li>
+          </ul>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Понял</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabler JS bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/js/tabler.min.js"></script>
+</body>
+</html>
