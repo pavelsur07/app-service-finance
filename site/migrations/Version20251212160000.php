@@ -97,9 +97,63 @@ final class Version20251212160000 extends AbstractMigration
         $this->addSql('ALTER TABLE document_operations ALTER COLUMN project_direction_id SET NOT NULL');
         $this->addSql('ALTER TABLE pl_daily_totals ALTER COLUMN project_direction_id SET NOT NULL');
 
-        $this->addSql('ALTER TABLE documents ADD CONSTRAINT fk_documents_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE document_operations ADD CONSTRAINT fk_doc_ops_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE pl_daily_totals ADD CONSTRAINT fk_pl_daily_project_direction FOREIGN KEY (project_direction_id) REFERENCES project_directions (id) ON DELETE RESTRICT NOT DEFERRABLE INITIALLY IMMEDIATE');
+        $this->addSql(<<<'SQL'
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            WHERE c.conname = 'fk_documents_project_direction'
+              AND t.relname = 'documents'
+          ) THEN
+            ALTER TABLE documents
+              ADD CONSTRAINT fk_documents_project_direction
+              FOREIGN KEY (project_direction_id)
+              REFERENCES project_directions (id)
+              ON DELETE RESTRICT
+              NOT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+        END $$;
+        SQL);
+        $this->addSql(<<<'SQL'
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            WHERE c.conname = 'fk_doc_ops_project_direction'
+              AND t.relname = 'document_operations'
+          ) THEN
+            ALTER TABLE document_operations
+              ADD CONSTRAINT fk_doc_ops_project_direction
+              FOREIGN KEY (project_direction_id)
+              REFERENCES project_directions (id)
+              ON DELETE RESTRICT
+              NOT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+        END $$;
+        SQL);
+        $this->addSql(<<<'SQL'
+        DO $$
+        BEGIN
+          IF NOT EXISTS (
+            SELECT 1
+            FROM pg_constraint c
+            JOIN pg_class t ON t.oid = c.conrelid
+            WHERE c.conname = 'fk_pl_daily_project_direction'
+              AND t.relname = 'pl_daily_totals'
+          ) THEN
+            ALTER TABLE pl_daily_totals
+              ADD CONSTRAINT fk_pl_daily_project_direction
+              FOREIGN KEY (project_direction_id)
+              REFERENCES project_directions (id)
+              ON DELETE RESTRICT
+              NOT DEFERRABLE INITIALLY IMMEDIATE;
+          END IF;
+        END $$;
+        SQL);
 
         if ($plDailyTotals->hasIndex('uniq_pl_daily_company_cat_date')) {
             $this->addSql('ALTER TABLE pl_daily_totals DROP CONSTRAINT IF EXISTS uniq_pl_daily_company_cat_date');
