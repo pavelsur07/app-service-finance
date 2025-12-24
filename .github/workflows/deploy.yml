@@ -3,6 +3,7 @@ name: 🚀 Deploy to Production
 on:
     push:
         branches: [ master ]
+    pull_request:
 
 jobs:
     deploy:
@@ -85,3 +86,59 @@ jobs:
                     echo "✅ Миграции применены"
                   EOF
 
+    migrations-empty-db:
+        runs-on: ubuntu-latest
+
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_DB: app
+                    POSTGRES_USER: app
+                    POSTGRES_PASSWORD: app
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd="pg_isready -U app -d app"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐘 Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.2
+                  tools: composer
+
+            - name: 📦 Install dependencies
+              working-directory: site
+              run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: Install psql client
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y postgresql-client
+
+            - name: Create test database (app_test)
+              env:
+                  PGPASSWORD: app
+              run: |
+                  set -e
+                  if psql -h 127.0.0.1 -p 5432 -U app -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='app_test'" | grep -q 1; then
+                    echo "Database app_test already exists"
+                  else
+                    echo "Creating database app_test"
+                    psql -h 127.0.0.1 -p 5432 -U app -d postgres -c "CREATE DATABASE app_test"
+                  fi
+
+            - name: 🧬 Run Doctrine migrations
+              working-directory: site
+              env:
+                  APP_ENV: test
+                  APP_DEBUG: 0
+                  DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8"
+              run: php bin/console doctrine:migrations:migrate --no-interaction
