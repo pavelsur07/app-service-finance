@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  migrations-empty-db:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: app
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: app
+        ports:
+          - "5432:5432"
+        options: >-
+          --health-cmd="pg_isready -U app -d app"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer
+      - name: Composer install
+        working-directory: site
+        run: composer install --no-interaction --prefer-dist --no-progress --no-dev
+      - name: Run migrations on empty DB
+        working-directory: site
+        env:
+          DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8"
+          APP_ENV: test
+        run: php bin/console doctrine:migrations:migrate --no-interaction
