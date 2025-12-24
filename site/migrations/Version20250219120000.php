@@ -16,6 +16,10 @@ final class Version20250219120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        if (!$schema->hasTable('bot_links')) {
+            return;
+        }
+
         // Добавляем колонку updated_at, приводим существующие записи к created_at и запрещаем NULL
         $this->addSql('ALTER TABLE bot_links ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE');
         $this->addSql('UPDATE bot_links SET updated_at = created_at WHERE updated_at IS NULL');
@@ -25,6 +29,10 @@ final class Version20250219120000 extends AbstractMigration
 
     public function down(Schema $schema): void
     {
+        if (!$schema->hasTable('bot_links')) {
+            return;
+        }
+
         // Откатываем добавление колонки updated_at, возвращая схему в исходное состояние
         $this->addSql('ALTER TABLE bot_links DROP COLUMN updated_at');
     }
