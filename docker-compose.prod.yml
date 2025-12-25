@@ -109,8 +109,8 @@ services:
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
             MAILER_DSN: ${SITE_MAILER_DSN}
-            APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
-            APP_MAIL_REPLY_TO: "support@yourdomain.com"
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
             LLM_API_URL: "https://example.com/v1/chat/completions"
             LLM_API_KEY: "change-me"
@@ -131,8 +131,8 @@ services:
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
             MAILER_DSN: ${SITE_MAILER_DSN}
-            APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
-            APP_MAIL_REPLY_TO: "support@yourdomain.com"
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
             LLM_API_URL: "https://example.com/v1/chat/completions"
             LLM_API_KEY: "change-me"
@@ -155,8 +155,8 @@ services:
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
             MAILER_DSN: ${SITE_MAILER_DSN}
-            APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
-            APP_MAIL_REPLY_TO: "support@yourdomain.com"
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
             LLM_API_URL: "https://example.com/v1/chat/completions"
             LLM_API_KEY: "change-me"
@@ -207,8 +207,8 @@ services:
             REDIS_DSN: redis://site-redis:6379
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
             MAILER_DSN: ${SITE_MAILER_DSN}
-            APP_MAIL_FROM: "FinPlan <no-reply@yourdomain.com>"
-            APP_MAIL_REPLY_TO: "support@yourdomain.com"
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
