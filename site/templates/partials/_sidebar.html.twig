@@ -20,362 +20,358 @@
 
 <!-- Sidebar -->
 
-<aside class="navbar navbar-vertical navbar-expand-lg">
-    <div class="container-fluid">
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Переключить навигацию">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+    <h1 class="navbar-brand navbar-brand-autodark mb-0">
+        <a href="{{ path('app_home_index') }}">
+            <img src="{{ asset('logo-vf-001.png') }}" alt="Ваш ФинДир" />
+        </a>
+    </h1>
+    <div class="collapse navbar-collapse" id="sidebar-menu">
 
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false" aria-label="Переключить навигацию">
-            <span class="navbar-toggler-icon"></span>
-        </button>
-        <h1 class="navbar-brand navbar-brand-autodark mb-0">
-            <a href="{{ path('app_home_index') }}">
-                <img src="{{ asset('logo.png') }}" alt="Ваш ФинДир" />
-            </a>
-        </h1>
-        <div class="collapse navbar-collapse" id="sidebar-menu">
+        <ul class="navbar-nav">
+            <!-- Dashboard -->
+            {% set dashboard_active = current_route == 'app_home_index' %}
+            <li class="nav-item {{ dashboard_active ? 'active' : '' }}">
+                <a class="nav-link {{ dashboard_active ? 'active' : '' }}" href="{{ path('app_home_index') }}" title="Главная">
+                    <span class="nav-link-icon"><i class="ti ti-home"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Главная</span>
+                </a>
+            </li>
+            <!-- Деньги -->
+            {% set cash_transactions_active = current_route == 'cash_transaction_index' %}
+            <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
+                <a class="nav-link {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}" title="Операции ДДС">
+                    <span class="nav-link-icon"><i class="ti ti-arrows-exchange"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Операции</span>
+                </a>
+            </li>
+            {% set report_account_balances_structured_active = current_route == 'report_account_balances_structured_index' %}
+            <li class="nav-item {{ report_account_balances_structured_active ? 'active' : '' }}">
+                <a class="nav-link {{ report_account_balances_structured_active ? 'active' : '' }}" href="{{ path('report_account_balances_structured_index') }}" title="Остатки и счета (структура)">
+                    <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Остатки и счета (структура)</span>
+                </a>
+            </li>
+            {% set finance_funds_active = current_route == 'finance_funds_index' %}
+            <li class="nav-item {{ finance_funds_active ? 'active' : '' }}">
+                <a class="nav-link {{ finance_funds_active ? 'active' : '' }}"  href="{{ path('finance_funds_index') }}" title="Фонды (конверты)">
+                    <span class="nav-link-icon"><i class="ti ti-pig-money"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Фонды (конверты)</span>
+                </a>
+            </li>
+            {% set payment_calendar_active = current_route == 'payment_calendar_index' %}
+            <li class="nav-item {{ payment_calendar_active ? 'active' : '' }}">
+                <a class="nav-link {{ payment_calendar_active ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}" title="Планирование">
+                    <span class="nav-link-icon"><i class="ti ti-calendar-due"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Платежный календарь</span>
+                </a>
+            </li>
 
-            <ul class="navbar-nav">
-                <!-- Dashboard -->
-                {% set dashboard_active = current_route == 'app_home_index' %}
-                <li class="nav-item {{ dashboard_active ? 'active' : '' }}">
-                    <a class="nav-link {{ dashboard_active ? 'active' : '' }}" href="{{ path('app_home_index') }}" title="Главная">
-                        <span class="nav-link-icon"><i class="ti ti-home"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Главная</span>
-                    </a>
-                </li>
-                <!-- Деньги -->
-                {% set cash_transactions_active = current_route == 'cash_transaction_index' %}
-                <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
-                    <a class="nav-link {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}" title="Операции ДДС">
-                        <span class="nav-link-icon"><i class="ti ti-arrows-exchange"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Операции</span>
-                    </a>
-                </li>
-                {% set report_account_balances_structured_active = current_route == 'report_account_balances_structured_index' %}
-                <li class="nav-item {{ report_account_balances_structured_active ? 'active' : '' }}">
-                    <a class="nav-link {{ report_account_balances_structured_active ? 'active' : '' }}" href="{{ path('report_account_balances_structured_index') }}" title="Остатки и счета (структура)">
-                        <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Остатки и счета (структура)</span>
-                    </a>
-                </li>
-                {% set finance_funds_active = current_route == 'finance_funds_index' %}
-                <li class="nav-item {{ finance_funds_active ? 'active' : '' }}">
-                    <a class="nav-link {{ finance_funds_active ? 'active' : '' }}"  href="{{ path('finance_funds_index') }}" title="Фонды (конверты)">
-                        <span class="nav-link-icon"><i class="ti ti-pig-money"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Фонды (конверты)</span>
-                    </a>
-                </li>
-                {% set payment_calendar_active = current_route == 'payment_calendar_index' %}
-                <li class="nav-item {{ payment_calendar_active ? 'active' : '' }}">
-                    <a class="nav-link {{ payment_calendar_active ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}" title="Планирование">
-                        <span class="nav-link-icon"><i class="ti ti-calendar-due"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Платежный календарь</span>
-                    </a>
-                </li>
-
-                {% set loans_active = current_route starts with 'loan_' %}
-                <li class="nav-item {{ loans_active ? 'active' : '' }}">
-                    <a class="nav-link {{ loans_active ? 'active' : '' }}" href="{{ path('loan_index') }}" title="Кредиты">
-                        <span class="nav-link-icon"><i class="ti ti-building-bank"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Кредиты</span>
-                    </a>
-                </li>
-                {% set documents_active = current_route == 'document_index' %}
-                <li class="nav-item {{ documents_active ? 'active' : '' }}">
-                    <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
-                        <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
-                    </a>
-                </li>
+            {% set loans_active = current_route starts with 'loan_' %}
+            <li class="nav-item {{ loans_active ? 'active' : '' }}">
+                <a class="nav-link {{ loans_active ? 'active' : '' }}" href="{{ path('loan_index') }}" title="Кредиты">
+                    <span class="nav-link-icon"><i class="ti ti-building-bank"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Кредиты</span>
+                </a>
+            </li>
+            {% set documents_active = current_route == 'document_index' %}
+            <li class="nav-item {{ documents_active ? 'active' : '' }}">
+                <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
+                    <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
+                </a>
+            </li>
 
 
-{% set report_account_balances_active = current_route == 'report_account_balances_index' %}
-{% set report_cashflow_active = current_route == 'report_cashflow_index' %}
-{% set finance_report_preview_active = current_route == 'finance_report_preview' %}
-{% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
-{% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
-{% set balance_report_active = current_route == 'balance_index' %}
-{% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active or balance_report_active or report_account_balances_active %}
-                <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
-                    <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
-                        <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Отчёты</span>
-                        <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
-                    </a>
-                    <div class="collapse {{ reports_menu_open ? 'show' : '' }}" id="menu-report" data-bs-parent="#sidebar-menu">
-                        <ul class="nav nav-pills nav-sub">
-                            {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
-                            <li class="nav-item {{ report_cashflow_active ? 'active' : '' }}">
-                                <a class="nav-link {{ report_cashflow_active ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}" title="Категории ДДС">
-                                    <span class="nav-link-icon"><i class="ti ti-arrows-left-right"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Движение денег</span>
-                                </a>
-                            </li>
-                            {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
-                            <li class="nav-item {{ finance_report_preview_active ? 'active' : '' }}">
-                                <a class="nav-link {{ finance_report_preview_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}" title="Категории ОПиУ">
-                                    <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
-                                </a>
-                            </li>
-                            <li class="nav-item {{ balance_report_active ? 'active' : '' }}">
-                                <a class="nav-link {{ balance_report_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
-                                    <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Баланс</span>
-                                </a>
-                            </li>
-                            <li class="nav-item {{ wb_rnp_active ? 'active' : '' }}">
-                                <a class="nav-link {{ wb_rnp_active ? 'active' : '' }}"
-                                   href="{{ path('wb_reports_rnp', {'period':'month'}) }}"
-                                   title="РНП — Рука на пульсе (Wildberries)">
-                                    <span class="nav-link-icon"><i class="ti ti-activity"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">РНП (Wildberries)</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="{{ path('report_cashflow_ops_check_index') }}" class="nav-link">
-                                    <span class="nav-link-icon"><i class="ti ti-report-search"></i></span>
-                                    <span class="nav-link-title">Проверка операций ДДС</span>
-                                </a>
-                            </li>
-                            <li class="nav-item {{ report_account_balances_active ? 'active' : '' }}">
-                                <a class="nav-link {{ report_account_balances_active ? 'active' : '' }}" href="{{ path('report_account_balances_index') }}" title="Остатки и счета">
-                                    <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
-                                    <span class="nav-link-title hide-when-collapsed">Остатки и счета</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
+    {% set report_account_balances_active = current_route == 'report_account_balances_index' %}
+    {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
+    {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
+    {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+    {% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
+    {% set balance_report_active = current_route == 'balance_index' %}
+    {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active or balance_report_active or report_account_balances_active %}
+            <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
+                <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
+                    <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Отчёты</span>
+                    <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
+                </a>
+                <div class="collapse {{ reports_menu_open ? 'show' : '' }}" id="menu-report" data-bs-parent="#sidebar-menu">
+                    <ul class="nav nav-pills nav-sub">
+                        {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
+                        <li class="nav-item {{ report_cashflow_active ? 'active' : '' }}">
+                            <a class="nav-link {{ report_cashflow_active ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}" title="Категории ДДС">
+                                <span class="nav-link-icon"><i class="ti ti-arrows-left-right"></i></span>
+                                <span class="nav-link-title hide-when-collapsed">Движение денег</span>
+                            </a>
+                        </li>
+                        {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
+                        <li class="nav-item {{ finance_report_preview_active ? 'active' : '' }}">
+                            <a class="nav-link {{ finance_report_preview_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}" title="Категории ОПиУ">
+                                <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
+                                <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {{ balance_report_active ? 'active' : '' }}">
+                            <a class="nav-link {{ balance_report_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
+                                <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
+                                <span class="nav-link-title hide-when-collapsed">Баланс</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {{ wb_rnp_active ? 'active' : '' }}">
+                            <a class="nav-link {{ wb_rnp_active ? 'active' : '' }}"
+                               href="{{ path('wb_reports_rnp', {'period':'month'}) }}"
+                               title="РНП — Рука на пульсе (Wildberries)">
+                                <span class="nav-link-icon"><i class="ti ti-activity"></i></span>
+                                <span class="nav-link-title hide-when-collapsed">РНП (Wildberries)</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('report_cashflow_ops_check_index') }}" class="nav-link">
+                                <span class="nav-link-icon"><i class="ti ti-report-search"></i></span>
+                                <span class="nav-link-title">Проверка операций ДДС</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {{ report_account_balances_active ? 'active' : '' }}">
+                            <a class="nav-link {{ report_account_balances_active ? 'active' : '' }}" href="{{ path('report_account_balances_index') }}" title="Остатки и счета">
+                                <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                                <span class="nav-link-title hide-when-collapsed">Остатки и счета</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
 
-                {% set handbooks_menu_open =
-                    current_route == 'cashflow_category_index'
-                    or current_route == 'pl_category_index'
-                    or current_route starts with 'balance_structure_'
-                    or current_route == 'money_account_index'
-                    or current_route == 'counterparty_index'
-                    or current_route == 'project_direction_index'
-                    or current_route == 'cash_transaction_auto_rule_index'
-                %}
-                <li class="nav-item {{ handbooks_menu_open ? 'active' : '' }}">
-                    <a class="nav-link {{ handbooks_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-handbooks" href="#" role="button" aria-expanded="{{ handbooks_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
-                        <span class="nav-link-icon"><i class="ti ti-books"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Справочники</span>
-                        <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
-                    </a>
-                    <div class="collapse {{ handbooks_menu_open ? 'show' : '' }}" id="menu-handbooks" data-bs-parent="#sidebar-menu">
-                        <ul class="nav nav-pills nav-sub">
-                            {% set cashflow_category_active = current_route == 'cashflow_category_index' %}
-                            <li class="nav-item {{ cashflow_category_active ? 'active' : '' }}">
-                                <a class="nav-link {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}" title="Категории ДДС">
-                                    <span class="nav-link-icon"><i class="ti ti-category"></i></span>
-                                    <span class="hide-when-collapsed">Категории ДДС</span>
-                                </a>
-                            </li>
-                            {% set pl_category_active = current_route == 'pl_category_index' %}
-                            <li class="nav-item {{ pl_category_active ? 'active' : '' }}">
-                                <a class="nav-link {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}" title="Категории ОПиУ">
-                                    <span class="nav-link-icon"><i class="ti ti-hierarchy-2"></i></span>
-                                    <span class="hide-when-collapsed">Категории ОПиУ</span>
-                                </a>
-                            </li>
-                            {% set balance_structure_active = current_route starts with 'balance_structure_' %}
-                            <li class="nav-item {{ balance_structure_active ? 'active' : '' }}">
-                                <a class="nav-link {{ balance_structure_active ? 'active' : '' }}" href="{{ path('balance_structure_index') }}" title="Настройка баланса">
-                                    <span class="nav-link-icon"><i class="ti ti-adjustments"></i></span>
-                                    <span class="hide-when-collapsed">Настройка баланса</span>
-                                </a>
-                            </li>
-                            {% set money_account_active = current_route == 'money_account_index' %}
-                            <li class="nav-item {{ money_account_active ? 'active' : '' }}">
-                                <a class="nav-link {{ money_account_active ? 'active' : '' }}" href="{{ path('money_account_index') }}" title="Счета / касса / кошелек">
-                                    <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
-                                    <span class="hide-when-collapsed">Счета / касса / кошелёк</span>
-                                </a>
-                            </li>
+            {% set handbooks_menu_open =
+                current_route == 'cashflow_category_index'
+                or current_route == 'pl_category_index'
+                or current_route starts with 'balance_structure_'
+                or current_route == 'money_account_index'
+                or current_route == 'counterparty_index'
+                or current_route == 'project_direction_index'
+                or current_route == 'cash_transaction_auto_rule_index'
+            %}
+            <li class="nav-item {{ handbooks_menu_open ? 'active' : '' }}">
+                <a class="nav-link {{ handbooks_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-handbooks" href="#" role="button" aria-expanded="{{ handbooks_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
+                    <span class="nav-link-icon"><i class="ti ti-books"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Справочники</span>
+                    <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
+                </a>
+                <div class="collapse {{ handbooks_menu_open ? 'show' : '' }}" id="menu-handbooks" data-bs-parent="#sidebar-menu">
+                    <ul class="nav nav-pills nav-sub">
+                        {% set cashflow_category_active = current_route == 'cashflow_category_index' %}
+                        <li class="nav-item {{ cashflow_category_active ? 'active' : '' }}">
+                            <a class="nav-link {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}" title="Категории ДДС">
+                                <span class="nav-link-icon"><i class="ti ti-category"></i></span>
+                                <span class="hide-when-collapsed">Категории ДДС</span>
+                            </a>
+                        </li>
+                        {% set pl_category_active = current_route == 'pl_category_index' %}
+                        <li class="nav-item {{ pl_category_active ? 'active' : '' }}">
+                            <a class="nav-link {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}" title="Категории ОПиУ">
+                                <span class="nav-link-icon"><i class="ti ti-hierarchy-2"></i></span>
+                                <span class="hide-when-collapsed">Категории ОПиУ</span>
+                            </a>
+                        </li>
+                        {% set balance_structure_active = current_route starts with 'balance_structure_' %}
+                        <li class="nav-item {{ balance_structure_active ? 'active' : '' }}">
+                            <a class="nav-link {{ balance_structure_active ? 'active' : '' }}" href="{{ path('balance_structure_index') }}" title="Настройка баланса">
+                                <span class="nav-link-icon"><i class="ti ti-adjustments"></i></span>
+                                <span class="hide-when-collapsed">Настройка баланса</span>
+                            </a>
+                        </li>
+                        {% set money_account_active = current_route == 'money_account_index' %}
+                        <li class="nav-item {{ money_account_active ? 'active' : '' }}">
+                            <a class="nav-link {{ money_account_active ? 'active' : '' }}" href="{{ path('money_account_index') }}" title="Счета / касса / кошелек">
+                                <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                                <span class="hide-when-collapsed">Счета / касса / кошелёк</span>
+                            </a>
+                        </li>
 
-                            {% set counterparty_active = current_route == 'counterparty_index' %}
-                            <li class="nav-item {{ counterparty_active ? 'active' : '' }}">
-                                <a class="nav-link {{ counterparty_active ? 'active' : '' }}" href="{{ path('counterparty_index') }}" title="Контрагенты">
-                                    <span class="nav-link-icon"><i class="ti ti-address-book"></i></span>
-                                    <span class="hide-when-collapsed">Контрагенты</span>
-                                </a>
-                            </li>
-                            {% set project_direction_active = current_route == 'project_direction_index' %}
-                            <li class="nav-item {{ project_direction_active ? 'active' : '' }}">
-                                <a class="nav-link {{ project_direction_active ? 'active' : '' }}" href="{{ path('project_direction_index') }}" title="Проекты">
-                                    <span class="nav-link-icon"><i class="ti ti-folder"></i></span>
-                                    <span class="hide-when-collapsed">Проекты</span>
-                                </a>
-                            </li>
+                        {% set counterparty_active = current_route == 'counterparty_index' %}
+                        <li class="nav-item {{ counterparty_active ? 'active' : '' }}">
+                            <a class="nav-link {{ counterparty_active ? 'active' : '' }}" href="{{ path('counterparty_index') }}" title="Контрагенты">
+                                <span class="nav-link-icon"><i class="ti ti-address-book"></i></span>
+                                <span class="hide-when-collapsed">Контрагенты</span>
+                            </a>
+                        </li>
+                        {% set project_direction_active = current_route == 'project_direction_index' %}
+                        <li class="nav-item {{ project_direction_active ? 'active' : '' }}">
+                            <a class="nav-link {{ project_direction_active ? 'active' : '' }}" href="{{ path('project_direction_index') }}" title="Проекты">
+                                <span class="nav-link-icon"><i class="ti ti-folder"></i></span>
+                                <span class="hide-when-collapsed">Проекты</span>
+                            </a>
+                        </li>
 
-                            {% set cash_transaction_auto_rule_active = current_route == 'cash_transaction_auto_rule_index' %}
-                            <li class="nav-item {{ cash_transaction_auto_rule_active ? 'active' : '' }}">
-                                <a class="nav-link {{ cash_transaction_auto_rule_active ? 'active' : '' }}"  href="{{ path('cash_transaction_auto_rule_index') }}" title="Журнал импорта">
-                                    <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
-                                    <span class="hide-when-collapsed">Автоправила ДДС</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
+                        {% set cash_transaction_auto_rule_active = current_route == 'cash_transaction_auto_rule_index' %}
+                        <li class="nav-item {{ cash_transaction_auto_rule_active ? 'active' : '' }}">
+                            <a class="nav-link {{ cash_transaction_auto_rule_active ? 'active' : '' }}"  href="{{ path('cash_transaction_auto_rule_index') }}" title="Журнал импорта">
+                                <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
+                                <span class="hide-when-collapsed">Автоправила ДДС</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
 
-                {% set cash_bank1c_import_upload_active = current_route == 'cash_bank1c_import_upload' %}
-                {% set import_logs_active = current_route == 'import_logs_index' %}
-                {% set import_menu_open = cash_bank1c_import_upload_active or import_logs_active %}
-                <li class="nav-item {{ import_menu_open ? 'active' : '' }}">
-                    <a class="nav-link {{ import_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-import" href="#" role="button" aria-expanded="{{ import_menu_open ? 'true' : 'false' }}" aria-controls="menu-import" title="Импорт">
-                        <span class="nav-link-icon"><i class="ti ti-download"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">Импорт</span>
-                        <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
-                    </a>
-                    <div class="collapse {{ import_menu_open ? 'show' : '' }}" id="menu-import" data-bs-parent="#sidebar-menu">
-                        <ul class="nav nav-pills nav-sub">
-                            <li class="nav-item {{ cash_bank1c_import_upload_active ? 'active' : '' }}">
-                                <a class="nav-link {{ cash_bank1c_import_upload_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}" title="Импорт выписок">
-                                    <span class="nav-link-icon"><i class="ti ti-upload"></i></span>
-                                    <span class="hide-when-collapsed">Импорт выписок 1С</span>
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="#" title="Импорт документов">
-                                    <span class="nav-link-icon"><i class="ti ti-file-import"></i></span>
-                                    <span class="hide-when-collapsed">Импорт документов</span>
-                                </a>
-                            </li>
-                            <li class="nav-item {{ import_logs_active ? 'active' : '' }}">
-                                <a class="nav-link {{ import_logs_active ? 'active' : '' }}" href="{{ path('import_logs_index') }}" title="Журнал импорта">
-                                    <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
-                                    <span class="hide-when-collapsed">Журнал импорта</span>
-                                </a>
-                            </li>
-                        </ul>
-                    </div>
-                </li>
-                {% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
-                <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
-                    <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
-                        <span class="nav-link-icon"><i class="ti ti-sparkles"></i></span>
-                        <span class="nav-link-title hide-when-collapsed">AI-рекомендации</span>
-                    </a>
-                </li>
+            {% set cash_bank1c_import_upload_active = current_route == 'cash_bank1c_import_upload' %}
+            {% set import_logs_active = current_route == 'import_logs_index' %}
+            {% set import_menu_open = cash_bank1c_import_upload_active or import_logs_active %}
+            <li class="nav-item {{ import_menu_open ? 'active' : '' }}">
+                <a class="nav-link {{ import_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-import" href="#" role="button" aria-expanded="{{ import_menu_open ? 'true' : 'false' }}" aria-controls="menu-import" title="Импорт">
+                    <span class="nav-link-icon"><i class="ti ti-download"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Импорт</span>
+                    <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
+                </a>
+                <div class="collapse {{ import_menu_open ? 'show' : '' }}" id="menu-import" data-bs-parent="#sidebar-menu">
+                    <ul class="nav nav-pills nav-sub">
+                        <li class="nav-item {{ cash_bank1c_import_upload_active ? 'active' : '' }}">
+                            <a class="nav-link {{ cash_bank1c_import_upload_active ? 'active' : '' }}" href="{{ path('cash_bank1c_import_upload') }}" title="Импорт выписок">
+                                <span class="nav-link-icon"><i class="ti ti-upload"></i></span>
+                                <span class="hide-when-collapsed">Импорт выписок 1С</span>
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#" title="Импорт документов">
+                                <span class="nav-link-icon"><i class="ti ti-file-import"></i></span>
+                                <span class="hide-when-collapsed">Импорт документов</span>
+                            </a>
+                        </li>
+                        <li class="nav-item {{ import_logs_active ? 'active' : '' }}">
+                            <a class="nav-link {{ import_logs_active ? 'active' : '' }}" href="{{ path('import_logs_index') }}" title="Журнал импорта">
+                                <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
+                                <span class="hide-when-collapsed">Журнал импорта</span>
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </li>
+            {% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
+            <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
+                <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
+                    <span class="nav-link-icon"><i class="ti ti-sparkles"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">AI-рекомендации</span>
+                </a>
+            </li>
 
-                {% set integrations_active =
-                    current_route starts with 'ozon_'
+            {% set integrations_active =
+                current_route starts with 'ozon_'
+                or current_route starts with 'wildberries_'
+                or current_route starts with 'telegram_integration_'
+            %}
+            <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
+                    <span class="nav-link-title">Интеграции</span>
+                </a>
+                {% set integrations_show = (
+                    integrations_active
+                    or current_route starts with 'ozon_'
                     or current_route starts with 'wildberries_'
                     or current_route starts with 'telegram_integration_'
-                %}
-                <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
-                    <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
-                        <span class="nav-link-title">Интеграции</span>
-                    </a>
-                    {% set integrations_show = (
-                        integrations_active
-                        or current_route starts with 'ozon_'
-                        or current_route starts with 'wildberries_'
-                        or current_route starts with 'telegram_integration_'
-                    ) ? 'show' : '' %}
-                        <div class="dropdown-menu {{ integrations_show }}">
-                            <div class="dropdown-menu-column">
-                                {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
-                                <a class="dropdown-item {{ telegram_finance_active ? 'active' : '' }}" href="{{ path('telegram_integration_index') }}">
-                                    <span>Telegram / Финансы</span>
-                                </a>
-                                {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
-                                <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                    <span>Wb / Продажи</span>
-                                </a>
-
-                                {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
-                                <a class="dropdown-item {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
-                                    <span>Wb / Операции (фин. отчёт)</span>
-                                </a>
-                                {% set wildberries_import_logs_active = current_route starts with 'wildberries_import_logs_' %}
-                                <a class="dropdown-item {{ wildberries_import_logs_active ? 'active' : '' }}" href="{{ path('wildberries_import_logs_index') }}">
-                                    <span>Wb / Журнал импорта отчётов</span>
-                                </a>
-                                {% set ozon_orders_active = current_route starts with 'ozon_order' %}
-                                <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                    <span>Ozon / Заказы</span>
-                                </a>
-                            {% set ozon_products_active = current_route starts with 'ozon_products' %}
-                            <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                                <span>Ozon / Товары</span>
-                            </a>
-                        </div>
-                    </div>
-                </li>
-
-                {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' %}
-                <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
-                    <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
-                        <span class="nav-link-title">Компания и доступ</span>
-                    </a>
-                    {% set company_show = (company_active or current_route starts with 'company_' or current_route starts with 'settings_report_api_key_') ? 'show' : '' %}
-                    <div class="dropdown-menu {{ company_show }}">
+                ) ? 'show' : '' %}
+                    <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
-                            {% set company_profile_active = current_route == 'company_index' or current_route starts with 'company_' %}
-                            <a class="dropdown-item {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
-                                <span>Профиль компании</span>
+                            {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
+                            <a class="dropdown-item {{ telegram_finance_active ? 'active' : '' }}" href="{{ path('telegram_integration_index') }}">
+                                <span>Telegram / Финансы</span>
+                            </a>
+                            {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
+                            <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
+                                <span>Wb / Продажи</span>
                             </a>
 
-                            {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
-                            <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
-                                <span>Настройки отчётов (API-ключ)</span>
+                            {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+                            <a class="dropdown-item {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
+                                <span>Wb / Операции (фин. отчёт)</span>
                             </a>
-                            {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
-                            <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
-                                <span>WB: Тех. операции</span>
+                            {% set wildberries_import_logs_active = current_route starts with 'wildberries_import_logs_' %}
+                            <a class="dropdown-item {{ wildberries_import_logs_active ? 'active' : '' }}" href="{{ path('wildberries_import_logs_index') }}">
+                                <span>Wb / Журнал импорта отчётов</span>
                             </a>
+                            {% set ozon_orders_active = current_route starts with 'ozon_order' %}
+                            <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
+                                <span>Ozon / Заказы</span>
+                            </a>
+                        {% set ozon_products_active = current_route starts with 'ozon_products' %}
+                        <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
+                            <span>Ozon / Товары</span>
+                        </a>
+                    </div>
+                </div>
+            </li>
 
-                            {% set reports_debug_active =
-                                current_route starts with 'report_transactions_statement_'
-                                or current_route starts with 'report_transactions_debug_'
+            {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' %}
+            <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
+                    <span class="nav-link-title">Компания и доступ</span>
+                </a>
+                {% set company_show = (company_active or current_route starts with 'company_' or current_route starts with 'settings_report_api_key_') ? 'show' : '' %}
+                <div class="dropdown-menu {{ company_show }}">
+                    <div class="dropdown-menu-column">
+                        {% set company_profile_active = current_route == 'company_index' or current_route starts with 'company_' %}
+                        <a class="dropdown-item {{ company_profile_active ? 'active' : '' }}" href="{{ path('company_index') }}">
+                            <span>Профиль компании</span>
+                        </a>
+
+                        {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
+                        <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
+                            <span>Настройки отчётов (API-ключ)</span>
+                        </a>
+                        {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
+                        <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
+                            <span>WB: Тех. операции</span>
+                        </a>
+
+                        {% set reports_debug_active =
+                            current_route starts with 'report_transactions_statement_'
+                            or current_route starts with 'report_transactions_debug_'
+                            or current_route starts with 'report_debug_'
+                            or current_route starts with 'finance_report_raw'
+                            or current_route starts with 'finance_report_pl_raw'
+                        %}
+                        <div class="dropend {{ reports_debug_active ? 'show' : '' }}">
+                            <a class="dropdown-item dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
+                                <span>Отладка</span>
+                            </a>
+                            {% set reports_debug_show = (
+                                reports_debug_active
+                                or current_route starts with 'report_transactions_statement_'
                                 or current_route starts with 'report_debug_'
                                 or current_route starts with 'finance_report_raw'
                                 or current_route starts with 'finance_report_pl_raw'
-                            %}
-                            <div class="dropend {{ reports_debug_active ? 'show' : '' }}">
-                                <a class="dropdown-item dropdown-toggle {{ reports_debug_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ reports_debug_active ? 'true' : 'false' }}">
-                                    <span>Отладка</span>
+                            ) ? 'show' : '' %}
+                            <div class="dropdown-menu {{ reports_debug_show }}">
+                                {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
+                                <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
+                                    <span>Выписка/Стейтмент</span>
                                 </a>
-                                {% set reports_debug_show = (
-                                    reports_debug_active
-                                    or current_route starts with 'report_transactions_statement_'
-                                    or current_route starts with 'report_debug_'
-                                    or current_route starts with 'finance_report_raw'
-                                    or current_route starts with 'finance_report_pl_raw'
-                                ) ? 'show' : '' %}
-                                <div class="dropdown-menu {{ reports_debug_show }}">
-                                    {% set report_statement_active = current_route starts with 'report_transactions_statement_' %}
-                                    <a class="dropdown-item {{ report_statement_active ? 'active' : '' }}" href="{{ path('report_transactions_statement_index') }}">
-                                        <span>Выписка/Стейтмент</span>
-                                    </a>
-                                    {% set report_debug_active = current_route starts with 'report_transactions_debug_' %}
-                                    <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
-                                        <span>Отчёт отладка</span>
-                                    </a>
-                                    {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
-                                    <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
-                                        <span>Отчёт «Сырые транзакции»</span>
-                                    </a>
-                                    {% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
-                                    <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
-                                        <span>Отчёт «Фактические дневные остатки»</span>
-                                    </a>
-                                    {% set finance_report_raw_active = current_route starts with 'finance_report_raw' %}
-                                    <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
-                                        <span>Сырые транзакции ОПиУ</span>
-                                    </a>
-                                    {% set finance_report_pl_raw_active = current_route starts with 'finance_report_pl_raw' %}
-                                    <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
-                                        <span>Сырые данные ОПиУ</span>
-                                    </a>
-                                </div>
+                                {% set report_debug_active = current_route starts with 'report_transactions_debug_' %}
+                                <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
+                                    <span>Отчёт отладка</span>
+                                </a>
+                                {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
+                                <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
+                                    <span>Отчёт «Сырые транзакции»</span>
+                                </a>
+                                {% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
+                                <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
+                                    <span>Отчёт «Фактические дневные остатки»</span>
+                                </a>
+                                {% set finance_report_raw_active = current_route starts with 'finance_report_raw' %}
+                                <a class="dropdown-item {{ finance_report_raw_active ? 'active' : '' }}" href="{{ path('finance_report_raw') }}">
+                                    <span>Сырые транзакции ОПиУ</span>
+                                </a>
+                                {% set finance_report_pl_raw_active = current_route starts with 'finance_report_pl_raw' %}
+                                <a class="dropdown-item {{ finance_report_pl_raw_active ? 'active' : '' }}" href="{{ path('finance_report_pl_raw') }}">
+                                    <span>Сырые данные ОПиУ</span>
+                                </a>
                             </div>
                         </div>
                     </div>
-                </li>
-            </ul>
-        </div>
+                </div>
+            </li>
+        </ul>
     </div>
-</aside>
+
