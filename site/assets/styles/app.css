@@ -20,6 +20,11 @@ body {
     gap: 0;
 }
 
+.page-wrapper {
+    margin-left: 0;
+    padding-left: 0;
+}
+
 .page-body .container {
     padding: 1rem;
 }
