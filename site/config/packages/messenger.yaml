@@ -23,6 +23,7 @@ framework:
         routing:
             App\Message\ApplyAutoRulesForTransaction: async
             App\Message\EnqueueAutoRulesForRange: async
+            App\Message\SendRegistrationEmailMessage: async
             App\Message\Ozon\SyncOzonOrders: async
             App\Marketplace\Wildberries\Message\WbFinanceReportImportMessage: async
             Symfony\Component\Mailer\Messenger\SendEmailMessage: async
