@@ -1,0 +1,7 @@
+Здравствуйте!
+{% if company is defined and company.name is defined and company.name %}
+Компания {{ company.name }} успешно зарегистрирована.
+{% else %}
+Регистрация прошла успешно.
+{% endif %}
+Вы можете войти в систему, используя ваш email: {{ user.email }}.
