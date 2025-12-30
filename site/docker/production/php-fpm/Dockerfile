@@ -3,10 +3,10 @@ FROM php:8.2-cli-alpine AS builder
 # После ("щадящий" вариант):
 ENV MAKEFLAGS="-j1"
 
-RUN apk add --no-cache libpq-dev \
+RUN apk add --no-cache libpq-dev libzip-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip
 
 # Install ext-redis for the build stage so that Composer sees the extension
 RUN apk add --no-cache $PHPIZE_DEPS \
@@ -35,10 +35,10 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 ### FPM ###
 FROM php:8.2-fpm-alpine
 
-RUN apk add --no-cache libpq-dev fcgi \
+RUN apk add --no-cache libpq-dev libzip-dev fcgi \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip
 
 # ⬇️ Добавляем ext-redis для рантайма PHP-FPM
 RUN apk add --no-cache $PHPIZE_DEPS \

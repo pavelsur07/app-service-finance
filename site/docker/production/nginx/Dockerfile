@@ -1,8 +1,8 @@
 FROM php:8.2-cli-alpine AS builder
 
-RUN apk add --no-cache libpq-dev $PHPIZE_DEPS \
+RUN apk add --no-cache libpq-dev libzip-dev $PHPIZE_DEPS \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
-    && docker-php-ext-install pdo_pgsql opcache bcmath \
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip \
     && pecl install redis \
     && docker-php-ext-enable redis \
     && apk del --no-cache $PHPIZE_DEPS
