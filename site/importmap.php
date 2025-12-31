@@ -22,6 +22,9 @@ return [
     'react-dom/client' => [
         'version' => '18.3.1',
     ],
+    'react-dom' => [
+        'version' => '18.3.1',
+    ],
     '@hotwired/stimulus' => [
         'version' => '3.2.2',
     ],
