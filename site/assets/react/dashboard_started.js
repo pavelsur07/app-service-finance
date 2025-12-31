@@ -6,6 +6,14 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
+function DashboardStarted() {
+  return React.createElement(
+    'div',
+    { className: 'm-0' },
+    'Ваш Финдир'
+  );
+}
+
 function mountReactStarted() {
   const el = document.getElementById('react-dashboard-started');
   if (!el) return;
@@ -16,9 +24,7 @@ function mountReactStarted() {
   const root = createRoot(el);
   el.__reactRoot = root;
 
-  root.render(
-    React.createElement('h2', { className: 'm-0' }, 'React Started')
-  );
+  root.render(React.createElement(DashboardStarted));
 }
 
 // Важно: importmap-скрипт грузится в <head>, поэтому ждём DOM.
