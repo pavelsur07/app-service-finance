@@ -43,7 +43,8 @@ class RegistrationController extends AbstractController
             $entityManager->persist($user);
 
             $company = new Company(Uuid::uuid4()->toString(), $user);
-            $company->setName('Новая компания');
+            $companyName = trim((string) $form->get('companyName')->getData());
+            $company->setName($companyName);
             $user->addCompany($company);
             $entityManager->persist($company);
 

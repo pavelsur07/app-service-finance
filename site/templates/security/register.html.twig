@@ -62,6 +62,15 @@
                     }) }}
                     <div class="row g-3">
                         <div class="col-12">
+                            {{ form_label(registrationForm.companyName, 'Имя компании', { label_attr: { class: 'form-label small' } }) }}
+                            {{ form_widget(registrationForm.companyName, {
+                                attr: { class: 'form-control', placeholder: 'ООО Ромашка', required: true }
+                            }) }}
+                            <div class="invalid-feedback">Введите имя компании</div>
+                            {{ form_errors(registrationForm.companyName) }}
+                        </div>
+
+                        <div class="col-12">
                             {{ form_label(registrationForm.email, 'Email', { label_attr: { class: 'form-label small' } }) }}
                             {{ form_widget(registrationForm.email, {
                                 attr: { class: 'form-control', placeholder: 'ivan@company.ru' }
