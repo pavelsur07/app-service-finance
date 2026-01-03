@@ -18,6 +18,7 @@
   .payments-card .table-responsive { overflow: visible; }
   .table-compact tbody tr > * { padding-top:.35rem; padding-bottom:.35rem; }
 </style>
+
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
     <h2 class="page-title mb-0">Операции ДДС</h2>
     <div class="ms-auto d-print-none">
@@ -40,7 +41,6 @@
         </div>
     </div>
 </div>
-
 {% if transactions is defined and transactions|length == 0 %}
   <div class="card my-3">
     <div class="card-body text-center">
@@ -51,53 +51,153 @@
     </div>
   </div>
 {% endif %}
+<div class="row g-3 mt-2 mb-4">
 
-<div class="card mt-3 payments-card">
-    <div class="table-responsive">
-        <table class="table table-striped table-hover table-vcenter table-compact align-middle">
-            <thead class="sticky-top">
-            <tr>
-                <th>Дата</th>
-                <th>Счет</th>
-                <th class="text-center text-nowrap">ОПиУ</th>
-                <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
-                <th>Статья / Проект</th>
-                <th>Контрагент</th>
-                <th>Описание</th>
-                <th></th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for tx in transactions %}
-                <tr>
-                    <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
-                    <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
-                    <td class="text-center text-nowrap">
-                        {% if tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
-                            <i class="ti ti-file-plus" title="Создать документ ОПиУ на основании этой транзакции"></i>
-                        {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount == 0 and tx.documents is not empty %}
-                            <i class="ti ti-file-check text-success" title="Документы ОПиУ уже созданы на всю сумму"></i>
+    <div class="row g-3 mt-2 mb-4">
+        <div class="col-12">
+            <div class="card cashflow-ops">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead class="sticky-top">
+                            <tr>
+                                <th>Дата</th>
+                                <th>Счет</th>
+                                <th class="text-center text-nowrap">ОПиУ</th>
+                                <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
+                                <th>Статья / Проект</th>
+                                <th>Контрагент</th>
+                                <th>Описание</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                        {% for tx in transactions %}
+                            <tr>
+                                <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
+                                <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
+                                <td class="text-center text-nowrap">
+                                    {% if tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                                        <i class="ti ti-file-plus" title="Создать документ ОПиУ на основании этой транзакции"></i>
+                                    {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount == 0 and tx.documents is not empty %}
+                                        <i class="ti ti-file-check text-success" title="Документы ОПиУ уже созданы на всю сумму"></i>
+                                    {% else %}
+                                        &nbsp;
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
+                                <td>
+                                    {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
+                                    {% if tx.projectDirection %}
+                                        <div class="text-muted small">{{ tx.projectDirection.name }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
+                                <td>
+                                    {% set description = tx.description|default('') %}
+                                    {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
+                                </td>
+                                <td class="text-end">
+                                    <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
+                                        <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                                <path stroke="none" d="M0 0h24v24H0z"/>
+                                                <circle cx="5" cy="12" r="1"/>
+                                                <circle cx="12" cy="12" r="1"/>
+                                                <circle cx="19" cy="12" r="1"/>
+                                            </svg>
+                                        </button>
+
+                                        <div class="dropdown-menu dropdown-menu-end shadow-sm">
+                                            <a class="dropdown-item"
+                                             href="{{ path('cash_transaction_edit', app.request.query.all|merge({'id': tx.id})) }}">
+                                            <i class="ti ti-pencil me-2"></i> Редактировать
+                                            </a>
+
+                                            <button type="button"
+                                                  class="dropdown-item js-auto-rule"
+                                                  data-transaction-id="{{ tx.id }}"
+                                                  data-url="{{ path('cash_transaction_auto_rule_match_one', {transactionId: tx.id}) }}"
+                                                  data-bs-toggle="modal"
+                                                  data-bs-target="#autoRuleModal">
+                                            <i class="ti ti-settings-automation me-2"></i> Автоправило
+                                            </button>
+
+                                            <div class="dropdown-divider"></div>
+
+                                            <button type="button"
+                                                  class="dropdown-item text-danger"
+                                                  data-bs-toggle="modal"
+                                                  data-bs-target="#delete-modal-{{ tx.id }}">
+                                            <i class="ti ti-trash me-2"></i> Удалить
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                  {{ include('transaction/_delete_modal.html.twig', {tx: tx}) }}
+                                </td>
+                            </tr>
                         {% else %}
-                            &nbsp;
-                        {% endif %}
-                    </td>
-                    <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
-                    <td>
-                        {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
-                        {% if tx.projectDirection %}
-                            <div class="text-muted small">{{ tx.projectDirection.name }}</div>
-                        {% endif %}
-                    </td>
-                    <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
-                    <td>
-                        {% set description = tx.description|default('') %}
-                        {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
-                    </td>
-                    <td class="text-end">
-                        <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
-                            <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
-                                    {#<path stroke="none" d="M0 0h24v24H0z"/>#}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">Нет транзакций</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer d-flex align-items-center">
+                    {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
+                </div>
+            </div>
+        </div>
+    </div>
+        {#
+        <div class="card mt-3 payments-card">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-vcenter table-compact align-middle">
+                    <thead class="sticky-top">
+                    <tr>
+                        <th>Дата</th>
+                        <th>Счет</th>
+                        <th class="text-center text-nowrap">ОПиУ</th>
+                        <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
+                        <th>Статья / Проект</th>
+                        <th>Контрагент</th>
+                        <th>Описание</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for tx in transactions %}
+                        <tr>
+                            <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
+                            <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
+                            <td class="text-center text-nowrap">
+                                {% if tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                                    <i class="ti ti-file-plus" title="Создать документ ОПиУ на основании этой транзакции"></i>
+                                {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount == 0 and tx.documents is not empty %}
+                                    <i class="ti ti-file-check text-success" title="Документы ОПиУ уже созданы на всю сумму"></i>
+                                {% else %}
+                                    &nbsp;
+                                {% endif %}
+                            </td>
+                            <td class="text-end text-nowrap" style="min-width: 12rem;"><span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">{{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}</span></td>
+                            <td>
+                                {{ tx.cashflowCategory ? tx.cashflowCategory.name : '' }}
+                                {% if tx.projectDirection %}
+                                    <div class="text-muted small">{{ tx.projectDirection.name }}</div>
+                                {% endif %}
+                            </td>
+                            <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
+                            <td>
+                                {% set description = tx.description|default('') %}
+                                {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
+                            </td>
+                            <td class="text-end">
+                                <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
+                                    <button class="btn btn-link p-0 text-muted" data-bs-toggle="dropdown" aria-label="Действия">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2">
+                                    #}
+                                    {#<path stroke="none" d="M0 0h24v24H0z"/>#} {#
                                     <circle cx="5" cy="12" r="1"/>
                                     <circle cx="12" cy="12" r="1"/>
                                     <circle cx="19" cy="12" r="1"/>
@@ -142,8 +242,8 @@
         </table>
     </div>
 </div>
+#}
 
-{% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
 
 {{ include('transaction/_filters.html.twig') }}
 
@@ -160,6 +260,7 @@
     </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -238,4 +339,3 @@
     });
     </script>
 {% endblock %}
-
