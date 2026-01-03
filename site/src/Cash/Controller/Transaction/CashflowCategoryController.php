@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller;
+namespace App\Cash\Controller\Transaction;
 
 use App\Entity\CashflowCategory;
 use App\Form\CashflowCategoryType;
