@@ -1,0 +1,6 @@
+doctrine:
+    dbal:
+        url: '%env(resolve:DATABASE_URL)%'
+        # Используйте отдельную тестовую БД, заданную в DATABASE_URL.
+        # Отключаем авто-суффикс, чтобы имя БД контролировалось только через DATABASE_URL.
+        dbname_suffix: ''
