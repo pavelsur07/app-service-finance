@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Controller\Finance;
+namespace App\Cash\Controller\Transaction;
 
 use App\DTO\CashTransactionDTO;
-use App\Entity\CashTransaction;
 use App\Entity\CashflowCategory;
+use App\Entity\CashTransaction;
 use App\Entity\Document;
 use App\Enum\DocumentType;
 use App\Form\CashTransactionType;
@@ -16,16 +16,16 @@ use App\Service\ActiveCompanyService;
 use App\Service\CashTransactionService;
 use App\Service\CashTransactionToDocumentService;
 use App\Service\PLRegisterUpdater;
+use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\Exception\ORMException;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
-use Doctrine\ORM\Exception\ORMException;
-use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
-use Ramsey\Uuid\Uuid;
 
 #[Route('/finance/cash-transactions')]
 class CashTransactionController extends AbstractController
