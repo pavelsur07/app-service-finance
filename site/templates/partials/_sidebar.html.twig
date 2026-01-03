@@ -351,10 +351,10 @@
                                 <a class="dropdown-item {{ report_debug_active ? 'active' : '' }}" href="{{ path('report_transactions_debug_index') }}">
                                     <span>Отчёт отладка</span>
                                 </a>#}
-                                {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
+                               {# {% set report_raw_transactions_active = current_route starts with 'report_debug_transactions_raw' %}
                                 <a class="dropdown-item {{ report_raw_transactions_active ? 'active' : '' }}" href="{{ path('report_debug_transactions_raw') }}">
                                     <span>Отчёт «Сырые транзакции»</span>
-                                </a>
+                                </a>#}
                                 {% set report_daily_facts_active = current_route starts with 'report_debug_daily_facts' %}
                                 <a class="dropdown-item {{ report_daily_facts_active ? 'active' : '' }}" href="{{ path('report_debug_daily_facts') }}">
                                     <span>Отчёт «Фактические дневные остатки»</span>
