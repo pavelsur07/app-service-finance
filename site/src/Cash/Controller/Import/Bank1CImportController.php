@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Cash;
+namespace App\Cash\Controller\Import;
 
 use App\Entity\User;
 use App\Repository\MoneyAccountRepository;

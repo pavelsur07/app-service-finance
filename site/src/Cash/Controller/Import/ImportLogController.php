@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller;
+namespace App\Cash\Controller\Import;
 
 use App\Repository\ImportLogRepository;
 use App\Service\ActiveCompanyService;
