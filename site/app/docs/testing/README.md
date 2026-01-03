@@ -19,3 +19,14 @@
   ```bash
   php bin/phpunit --testsuite functional
   ```
+
+## Composer scripts
+
+Примеры запуска через composer:
+
+```bash
+composer test
+composer test:unit
+composer test:integration
+composer test:functional
+```
