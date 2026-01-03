@@ -14,8 +14,24 @@
 {% block content %}
 <style>
   .payments-card,
-  .payments-card .card-body,
-  .payments-card .table-responsive { overflow: visible; }
+  .payments-card .card-body {
+    overflow: visible;
+  }
+
+  .payments-card .table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
+
+  .cashflow-ops,
+  .cashflow-ops .card-body {
+    overflow: visible;
+  }
+
+  .cashflow-ops .table-responsive {
+    overflow-x: auto;
+    overflow-y: visible;
+  }
   .table-compact tbody tr > * { padding-top:.35rem; padding-bottom:.35rem; }
 </style>
 
