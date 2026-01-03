@@ -80,3 +80,44 @@
 - Нельзя выполнять рефакторинг вне этого плана.
 - Нельзя перескакивать этапы.
 - Нельзя объединять несколько этапов в одном PR.
+
+--- BEGIN FULL PROJECT REFACTORING PLAN ---
+
+# Финальный план систематизации проекта
+
+## Зафиксированные решения
+- Cash — единый модуль ДДС.
+- Accounts (MoneyAccount, MoneyFund) являются частью Cash.
+- PaymentPlan и ImportLog относятся к Cash.
+- PnL является частью Finance.
+- Document и DocumentOperation — PnL-операции внутри Finance.
+- Отдельные модули Accounts и PaymentPlan не создаются.
+- Для MVP используется внутримодульная группировка папками.
+
+## Целевая карта модулей
+Существующие модули: Ai, Balance, Banking, Finance, Loan, Marketplace, Telegram, Notification, Admin, Report.
+Формализованные модули: Company, Cash, Finance, Report.
+
+## Структура модуля Cash
+Внутри Cash допускается группировка по папкам:
+Accounts, Transaction, PaymentPlan, Import.
+Подмодули не создаются.
+
+## Очередность рефакторинга
+Этап 1 — UI / Twig.
+Этап 2 — Контроллеры.
+Этап 3 — Сервисы.
+Этап 4 — Forms → Repositories → Entities.
+
+## Definition of Done
+- composer test:smoke проходит
+- legacy-папки не растут
+- изменения атомарны
+- документация обновлена
+
+## Запреты
+- массовые переносы
+- объединение этапов
+- архитектурные эксперименты
+
+--- END FULL PROJECT REFACTORING PLAN ---
