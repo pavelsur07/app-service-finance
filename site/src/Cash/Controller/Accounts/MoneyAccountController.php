@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Profile;
+namespace App\Cash\Controller\Accounts;
 
 use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
