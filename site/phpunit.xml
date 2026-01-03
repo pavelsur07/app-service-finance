@@ -12,14 +12,19 @@
     </php>
     <testsuites>
         <testsuite name="unit">
+            <directory>../app/tests/Unit</directory>
             <directory>tests/Unit</directory>
             <directory>tests/Service</directory>
             <directory>tests/Entity</directory>
             <directory>tests/Fund</directory>
         </testsuite>
         <testsuite name="integration">
+            <directory>../app/tests/Integration</directory>
             <directory>tests/Integration</directory>
             <directory>tests/Controller</directory>
+        </testsuite>
+        <testsuite name="functional">
+            <directory>../app/tests/Functional</directory>
         </testsuite>
         <!-- По модулю, если хочется запускать точечно -->
         <testsuite name="telegram">
