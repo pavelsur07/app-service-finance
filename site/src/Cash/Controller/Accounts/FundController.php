@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Finance;
+namespace App\Cash\Controller\Accounts;
 
 use App\Entity\MoneyFund;
 use App\Entity\MoneyFundMovement;
