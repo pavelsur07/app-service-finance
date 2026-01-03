@@ -22,6 +22,12 @@ balance_controllers:
         namespace: App\Balance\Controller
     type: attribute
 
+cash_controllers:
+    resource:
+        path: ../src/Cash/Controller/
+        namespace: App\Cash\Controller
+    type: attribute
+
 loan_controllers:
     resource:
         path: ../src/Loan/Controller/
