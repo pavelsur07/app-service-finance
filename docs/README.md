@@ -10,6 +10,7 @@
 - Правила проекта: `docs/rules.md`
 - Правила ведения документации: `docs/documentation-rules.md`
 - Правила разработки и развития: `docs/development-rules.md`
+- Стратегия тестирования и Builders (MVP) — Accepted: `app/docs/testing/TESTING_MVP_ACCEPTED.md`
 - Шаблон промта для создания модуля (Codex): `docs/codex/module_template.md`
 - План систематизации кода: `docs/refactoring-plan.md`
 
