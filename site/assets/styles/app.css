@@ -8,6 +8,7 @@
     --tblr-primary: #206bc4;
     --tblr-secondary: #656d77;
     --tblr-muted: #66738f;
+    --tblr-page-gap: 0;
 }
 
 body {
@@ -18,6 +19,7 @@ body {
 }
 
 .page {
+    --tblr-page-gap: 0;
     gap: 0;
     width: 100%;
 }
@@ -25,6 +27,10 @@ body {
 .page-wrapper {
     margin-left: 0;
     padding-left: 0;
+}
+
+.navbar-vertical {
+    margin: 0;
 }
 
 .page-body .container {
