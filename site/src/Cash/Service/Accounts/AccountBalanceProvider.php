@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Cash\Service\Accounts;
 
 use App\Entity\Company;
 use App\Repository\MoneyAccountDailyBalanceRepository;
