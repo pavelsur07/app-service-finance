@@ -10,7 +10,7 @@ use App\Form\MoneyFundType;
 use App\Repository\MoneyFundRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
-use App\Service\FundBalanceService;
+use App\Cash\Service\Accounts\FundBalanceService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
