@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Cash\Service\Accounts;
 
 use App\DTO\DailyBalancesDTO;
 use App\DTO\MoneyBalanceDTO;

@@ -11,7 +11,7 @@ use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
-use App\Service\AccountBalanceService;
+use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Service\ActiveCompanyService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
