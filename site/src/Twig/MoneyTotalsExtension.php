@@ -4,7 +4,7 @@ namespace App\Twig;
 
 use App\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
-use App\Service\MoneyTotalsWidgetProvider;
+use App\Cash\Service\Accounts\MoneyTotalsWidgetProvider;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
