@@ -5,7 +5,7 @@ namespace App\MessageHandler;
 use App\Entity\CashTransaction;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
-use App\Service\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;

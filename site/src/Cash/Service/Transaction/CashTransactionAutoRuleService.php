@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Cash\Service\Transaction;
 
 use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
