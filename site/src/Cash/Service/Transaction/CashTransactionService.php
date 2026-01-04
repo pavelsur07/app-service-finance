@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Cash\Service\Transaction;
 
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
@@ -12,6 +12,7 @@ use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
+use App\Service\DailyBalanceRecalculator;
 use App\Service\PaymentPlan\PaymentPlanMatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
