@@ -14,7 +14,7 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use App\Cash\Service\Transaction\CashTransactionService;
-use App\Service\CashTransactionToDocumentService;
+use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
