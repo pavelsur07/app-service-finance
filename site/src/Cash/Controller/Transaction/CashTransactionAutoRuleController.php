@@ -17,7 +17,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
-use App\Service\CashTransactionAutoRuleService;
+use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
