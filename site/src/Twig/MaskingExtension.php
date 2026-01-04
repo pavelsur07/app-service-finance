@@ -2,7 +2,7 @@
 
 namespace App\Twig;
 
-use App\Service\AccountMasker;
+use App\Cash\Service\Accounts\AccountMasker;
 use Twig\Extension\AbstractExtension;
 use Twig\TwigFilter;
 use Twig\TwigFunction;
