@@ -81,7 +81,6 @@
                             <th class="text-end text-nowrap" style="min-width: 12rem;">Сумма</th>
                             <th>Статья / Проект</th>
                             <th>Контрагент</th>
-                            <th>Описание</th>
                             <th></th>
                         </tr>
                     </thead>
@@ -106,12 +105,14 @@
                                     <div class="text-muted small">{{ tx.projectDirection.name }}</div>
                                 {% endif %}
                             </td>
-                            <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
                             <td>
+                                {{ tx.counterparty ? tx.counterparty.name : '' }}
                                 {% set description = tx.description|default('') %}
-                                <div class="text-muted small">
-                                    {{ description|length > 30 ? description|slice(0, 30) ~ '...' : description }}
-                                </div>
+                                {% if description %}
+                                    <div class="text-muted small">
+                                        {{ description|length > 30 ? description|slice(0, 30) ~ '...' : description }}
+                                    </div>
+                                {% endif %}
                             </td>
                             <td class="text-end">
                                 <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
@@ -155,7 +156,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted">Нет транзакций</td>
+                            <td colspan="7" class="text-center text-muted">Нет транзакций</td>
                         </tr>
                     {% endfor %}
                     </tbody>
