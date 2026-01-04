@@ -1,0 +1,19 @@
+{% extends 'base_v2.html.twig' %}
+
+    {% block breadcrumbs %}
+        <!-- Breadcrumbs -->
+       {% include '_breadcrumbs_v2.html.twig' %}
+    {% endblock %}
+
+    {% block body %}
+        {% include '_body_v2.html.twig' %}
+    {% endblock %}
+
+    {% block offcanvas_filters %}
+        <!-- Offcanvas Filters -->
+        {% include '_offcanvas_filters_v2.html.twig' %}
+    {% endblock %}
+
+    {% block modals %}
+        {% include '_modals_v2.html.twig'%}
+    {% endblock %}

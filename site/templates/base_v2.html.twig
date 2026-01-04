@@ -1,0 +1,146 @@
+{# templates/demo/base_page.html.twig #}
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}Demo Base Page — Ваш ФинДиректор (Tabler){% endblock %}</title>
+
+    {# Inter (project font) #}
+    {% block fonts %}
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    {% endblock %}
+
+    {# Tabler CSS #}
+    {% block stylesheets %}
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/tabler-icons.min.css">
+
+        <style>
+            /* ===== Project tokens (as in your project sidebar styles) ===== */
+            :root{
+                --brand:#0A1548;
+                --brand-05: rgba(10,21,72,.05);
+
+                /* Typography / text (match project Tabler tokens) */
+                --tblr-font-sans-serif: "Inter", -apple-system, BlinkMacSystemFont, "San Francisco", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+                --tblr-body-color: #232e3c;
+                --tblr-muted: #66738f;
+            }
+
+            /* ===== Full-width layout (100% width) ===== */
+            body.layout-fluid { min-height: 100vh; font-family: var(--tblr-font-sans-serif); color: var(--tblr-body-color); }
+            .page { min-height: 100vh; }
+
+            /* ===== Sidebar active/hover (mirrors project rule) ===== */
+            .navbar-vertical .nav-item.active > .nav-link{
+                background-color: var(--brand-05) !important;
+                color: var(--brand) !important;
+                font-weight: 600;
+                border-left: 2px solid var(--brand);
+                padding-left: calc(1rem - 2px);
+            }
+            .navbar-vertical .nav-link:hover{
+                background-color: var(--brand-05);
+                color: var(--brand) !important;
+            }
+
+            /* ===== Sidebar: first-level items in brand color ===== */
+            .navbar-vertical .navbar-nav > .nav-item > .nav-link{
+                color: var(--brand) !important;
+            }
+            .navbar-vertical .navbar-nav > .nav-item > .nav-link .nav-link-icon,
+            .navbar-vertical .navbar-nav > .nav-item > .nav-link .nav-link-icon i{
+                color: var(--brand) !important;
+            }
+
+            /* ===== Project UI utilities (based on your app.css patterns) ===== */
+            .table-compact td, .table-compact th { padding: .4rem .6rem; }
+            .table-compact .badge { font-size: .75rem; padding: .2rem .4rem; }
+            .nowrap{ white-space: nowrap; }
+            .text-truncate-320{ max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .text-truncate-200{ max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+            .modal.modal-blur .modal-content{ backdrop-filter: none !important; }
+
+            /* ===== Table row gradient (Operations DДС) ===== */
+            . tbody tr{
+                background: linear-gradient(90deg, rgba(10,21,72,.035) 0%, rgba(10,21,72,0) 72%);
+            }
+            . tbody tr:hover{
+                background: linear-gradient(90deg, rgba(10,21,72,.06) 0%, rgba(10,21,72,.015) 72%);
+            }
+
+            /* ===== Subtle page header helper ===== */
+            .page-title-muted{ color: var(--tblr-muted); font-size: .95rem; }
+
+            /* ===== Keep content readable at full width: use max widths inside sections when needed ===== */
+            .content-max { max-width: 1440px; } /* inside full-width container-fluid */
+
+            /* ===== Cashflow operations: row hover highlight ===== */
+            .cashflow-ops .table tbody tr:hover{
+                background-color: var(--brand-05);
+            }
+        </style>
+    {% endblock %}
+</head>
+
+<body class="layout-fluid layout-fluid-vertical">
+<div class="page">
+
+    {% block sidebar %}
+        <!-- ===== Sidebar (full-height) ===== -->
+        {% include '_sidebar_v2.html.twig' %}
+    {% endblock %}
+
+    <!-- ===== Page Wrapper ===== -->
+    <div class="page-wrapper">
+
+        {% block topbar %}
+            <!-- ===== Topbar ===== -->
+            {% include '_topbar_v2.html.twig' %}
+        {% endblock %}
+
+        <!-- ===== Page body ===== -->
+        <div class="page-body">
+            <!-- Full width container -->
+            <div class="container-fluid">
+                <!-- optional max width for readability while still being full-width -->
+                <div class="content-max mx-auto">
+
+                    {% block breadcrumbs %}
+                        <!-- Breadcrumbs -->
+                        {% include '_breadcrumbs_v2.html.twig' %}
+                    {% endblock %}
+
+                    {% block body %}
+                        {% include '_body_v2.html.twig' %}
+                    {% endblock %}
+                </div><!-- /content-max -->
+            </div><!-- /container-fluid -->
+        </div><!-- /page-body -->
+
+        {% block footer %}
+            <!-- Footer -->
+            {% include '_footer_v2.html.twig' %}
+        {% endblock %}
+
+    </div><!-- /page-wrapper -->
+</div><!-- /page -->
+
+{% block offcanvas_filters %}
+    <!-- Offcanvas Filters -->
+    {% include '_offcanvas_filters_v2.html.twig' %}
+{% endblock %}
+
+{% block modals %}
+    {% include '_modals_v2.html.twig'%}
+{% endblock %}
+
+{% block javascripts %}
+    <!-- Tabler JS bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/js/tabler.min.js"></script>
+{% endblock %}
+</body>
+</html>
