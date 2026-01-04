@@ -109,7 +109,9 @@
                             <td>{{ tx.counterparty ? tx.counterparty.name : '' }}</td>
                             <td>
                                 {% set description = tx.description|default('') %}
-                                {{ description|length > 100 ? description|slice(0, 100) ~ '...' : description }}
+                                <div class="text-muted small">
+                                    {{ description|length > 80 ? description|slice(0, 80) ~ '...' : description }}
+                                </div>
                             </td>
                             <td class="text-end">
                                 <div class="dropdown position-static {{ loop.last ? 'dropup' : '' }}">
