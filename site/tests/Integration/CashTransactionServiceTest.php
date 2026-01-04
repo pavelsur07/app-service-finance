@@ -18,7 +18,7 @@ use App\Enum\MoneyAccountType;
 use App\Repository\PaymentPlanMatchRepository;
 use App\Repository\PaymentPlanRepository;
 use App\Service\AccountBalanceService;
-use App\Service\CashTransactionService;
+use App\Cash\Service\Transaction\CashTransactionService;
 use App\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\ORM\EntityManager;

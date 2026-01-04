@@ -13,7 +13,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
-use App\Service\CashTransactionService;
+use App\Cash\Service\Transaction\CashTransactionService;
 use App\Service\CashTransactionToDocumentService;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
