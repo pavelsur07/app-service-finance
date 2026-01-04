@@ -8,6 +8,7 @@
     --tblr-primary: #206bc4;
     --tblr-secondary: #656d77;
     --tblr-muted: #66738f;
+    --tblr-page-gap: 0;
 }
 
 body {
