@@ -10,7 +10,7 @@ use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
 use App\Entity\Company;
 use App\Repository\MoneyAccountDailyBalanceRepository;
-use App\Service\FundBalanceService;
+use App\Cash\Service\Accounts\FundBalanceService;
 
 class BalanceBuilder
 {

@@ -2,6 +2,7 @@
 
 namespace App\Service;
 
+use App\Cash\Service\Accounts\FundBalanceService;
 use App\Entity\Company;
 use App\Repository\MoneyAccountRepository;
 use Symfony\Component\Intl\Currencies;
