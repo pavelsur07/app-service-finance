@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Cash\Service\Accounts;
 
 class AccountMasker
 {

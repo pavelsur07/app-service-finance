@@ -4,7 +4,7 @@ namespace App\Cash\Controller\Import;
 
 use App\Entity\User;
 use App\Repository\MoneyAccountRepository;
-use App\Service\AccountMasker;
+use App\Cash\Service\Accounts\AccountMasker;
 use App\Service\ActiveCompanyService;
 use App\Service\Import\ClientBank1CImportService;
 use App\Service\Import\ImportLogger;
