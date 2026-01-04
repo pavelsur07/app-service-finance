@@ -110,7 +110,7 @@
                             <td>
                                 {% set description = tx.description|default('') %}
                                 <div class="text-muted small">
-                                    {{ description|length > 80 ? description|slice(0, 80) ~ '...' : description }}
+                                    {{ description|length > 30 ? description|slice(0, 30) ~ '...' : description }}
                                 </div>
                             </td>
                             <td class="text-end">
