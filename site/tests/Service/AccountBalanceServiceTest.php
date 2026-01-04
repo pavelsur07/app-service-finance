@@ -11,7 +11,7 @@ use App\Entity\User;
 use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;
 use App\Repository\MoneyAccountDailyBalanceRepository;
-use App\Service\AccountBalanceService;
+use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
