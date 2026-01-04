@@ -31,16 +31,19 @@ class ReportAccountBalancesStructuredController extends AbstractController
         $fromParam = $request->query->get('from');
         $toParam = $request->query->get('to');
 
+        $today = (new \DateTimeImmutable('today'))->setTime(0, 0);
+        $defaultFrom = $today->modify('first day of this month')->setTime(0, 0);
+
         try {
-            $from = $fromParam ? (new \DateTimeImmutable($fromParam))->setTime(0, 0) : (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $from = $fromParam ? (new \DateTimeImmutable($fromParam))->setTime(0, 0) : $defaultFrom;
         } catch (\Throwable) {
-            $from = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $from = $defaultFrom;
         }
 
         try {
-            $to = $toParam ? (new \DateTimeImmutable($toParam))->setTime(0, 0) : (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $to = $toParam ? (new \DateTimeImmutable($toParam))->setTime(0, 0) : $today;
         } catch (\Throwable) {
-            $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
+            $to = $today;
         }
 
         $accounts = $this->accountRepository->findBy(
