@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service\Import;
+namespace App\Cash\Service\Import;
 
 use App\Entity\Company;
 use App\Entity\ImportLog;

@@ -11,7 +11,7 @@ use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
-use App\Service\Import\ImportLogger;
+use App\Cash\Service\Import\ImportLogger;
 use App\Service\ActiveCompanyService;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;

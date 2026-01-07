@@ -12,7 +12,7 @@ use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;
 use App\Cash\Service\Transaction\CashTransactionService;
-use App\Service\Import\ImportLogger;
+use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 
