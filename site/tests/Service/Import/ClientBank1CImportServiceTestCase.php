@@ -12,7 +12,7 @@ use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Service\ActiveCompanyService;
-use App\Service\Import\ClientBank1CImportService;
+use App\Cash\Service\Import\ClientBank1CImportService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;
