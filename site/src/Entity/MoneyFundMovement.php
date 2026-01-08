@@ -5,7 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity(repositoryClass: \App\Repository\MoneyFundMovementRepository::class)]
+#[ORM\Entity(repositoryClass: \App\Cash\Repository\Accounts\MoneyFundMovementRepository::class)]
 #[ORM\Table(name: '`money_fund_movement`')]
 #[ORM\Index(columns: ['company_id', 'fund_id'], name: 'idx_money_fund_movement_company_fund')]
 #[ORM\Index(columns: ['company_id', 'occurred_at'], name: 'idx_money_fund_movement_company_occurred_at')]
