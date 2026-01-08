@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Cash\Form\Accounts;
 
 use App\Entity\MoneyFundMovement;
 use Symfony\Component\Form\AbstractType;
