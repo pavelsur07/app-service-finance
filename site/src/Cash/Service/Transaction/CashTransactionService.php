@@ -2,6 +2,7 @@
 
 namespace App\Cash\Service\Transaction;
 
+use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
@@ -13,7 +14,6 @@ use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Repository\CashTransactionRepository;
 use App\Service\DailyBalanceRecalculator;
-use App\Service\PaymentPlan\PaymentPlanMatcher;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Ramsey\Uuid\Uuid;
