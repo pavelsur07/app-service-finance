@@ -6,6 +6,7 @@ namespace App\Finance\Controller;
 
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
+use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
@@ -18,7 +19,6 @@ use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Form\PaymentPlanType;
 use App\Repository\PaymentPlanRepository;
 use App\Service\ActiveCompanyService;
-use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

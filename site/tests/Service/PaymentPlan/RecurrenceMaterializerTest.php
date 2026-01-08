@@ -4,6 +4,7 @@ namespace App\Tests\Service\PaymentPlan;
 
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
+use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
@@ -17,7 +18,6 @@ use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Repository\PaymentPlanRepository;
 use App\Repository\PaymentRecurrenceRuleRepository;
-use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;

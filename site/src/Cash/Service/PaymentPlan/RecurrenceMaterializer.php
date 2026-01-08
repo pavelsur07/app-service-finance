@@ -1,9 +1,7 @@
 <?php
 
-namespace App\Service\PaymentPlan;
+namespace App\Cash\Service\PaymentPlan;
 
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
-use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
