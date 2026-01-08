@@ -3,6 +3,7 @@
 namespace App\Service\PaymentPlan;
 
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
+use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
