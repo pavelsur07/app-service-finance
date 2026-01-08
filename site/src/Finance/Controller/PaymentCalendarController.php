@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
@@ -16,7 +17,6 @@ use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Form\PaymentPlanType;
 use App\Repository\PaymentPlanRepository;
 use App\Service\ActiveCompanyService;
-use App\Service\PaymentPlan\ForecastBalanceService;
 use App\Service\PaymentPlan\PaymentPlanService;
 use App\Service\PaymentPlan\RecurrenceMaterializer;
 use Doctrine\DBAL\Types\Types;

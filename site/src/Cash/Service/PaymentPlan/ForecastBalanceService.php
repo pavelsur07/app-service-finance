@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service\PaymentPlan;
+namespace App\Cash\Service\PaymentPlan;
 
 use App\DTO\ForecastDTO;
 use App\Entity\Company;
