@@ -8,7 +8,6 @@ use App\Entity\PaymentPlanMatch;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Repository\PaymentPlanMatchRepository;
 use App\Repository\PaymentPlanRepository;
-use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;

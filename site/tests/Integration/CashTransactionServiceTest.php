@@ -4,6 +4,7 @@ namespace App\Tests\Integration;
 
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
@@ -20,7 +21,6 @@ use App\Enum\CounterpartyType;
 use App\Enum\MoneyAccountType;
 use App\Repository\PaymentPlanMatchRepository;
 use App\Repository\PaymentPlanRepository;
-use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;

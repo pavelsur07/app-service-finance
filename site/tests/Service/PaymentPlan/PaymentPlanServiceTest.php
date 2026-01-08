@@ -2,13 +2,13 @@
 
 namespace App\Tests\Service\PaymentPlan;
 
+use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Entity\User;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
-use App\Service\PaymentPlan\PaymentPlanService;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

@@ -3,6 +3,7 @@
 namespace App\Tests\Integration\PaymentPlan;
 
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
@@ -17,7 +18,6 @@ use App\Enum\MoneyAccountType;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Repository\PaymentPlanMatchRepository;
 use App\Repository\PaymentPlanRepository;
-use App\Service\PaymentPlan\PaymentPlanService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;
