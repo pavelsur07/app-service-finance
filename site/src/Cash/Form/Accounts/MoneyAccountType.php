@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Cash\Form\Accounts;
 
 use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType as MoneyAccountTypeEnum;

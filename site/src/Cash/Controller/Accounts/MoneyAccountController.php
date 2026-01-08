@@ -2,11 +2,11 @@
 
 namespace App\Cash\Controller\Accounts;
 
+use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
+use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
-use App\Form\MoneyAccountType as MoneyAccountFormType;
 use App\Repository\MoneyAccountRepository;
-use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
