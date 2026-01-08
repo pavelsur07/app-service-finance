@@ -5,7 +5,7 @@ namespace App\Entity;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity(repositoryClass: \App\Repository\MoneyAccountDailyBalanceRepository::class)]
+#[ORM\Entity(repositoryClass: \App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository::class)]
 #[ORM\Table(name: 'money_account_daily_balance')]
 #[ORM\UniqueConstraint(name: 'uniq_company_account_date', columns: ['company_id', 'money_account_id', 'date'])]
 #[ORM\Index(name: 'idx_company_date', columns: ['company_id', 'date'])]

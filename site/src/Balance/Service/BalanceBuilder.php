@@ -8,9 +8,9 @@ use App\Balance\Entity\BalanceCategoryLink;
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
-use App\Entity\Company;
-use App\Repository\MoneyAccountDailyBalanceRepository;
+use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
+use App\Entity\Company;
 
 class BalanceBuilder
 {

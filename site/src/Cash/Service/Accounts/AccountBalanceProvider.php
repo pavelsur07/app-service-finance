@@ -2,8 +2,8 @@
 
 namespace App\Cash\Service\Accounts;
 
+use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Entity\Company;
-use App\Repository\MoneyAccountDailyBalanceRepository;
 
 class AccountBalanceProvider
 {

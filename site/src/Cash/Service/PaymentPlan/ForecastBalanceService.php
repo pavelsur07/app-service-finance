@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Cash\Service\PaymentPlan;
 
+use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\DTO\ForecastDTO;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
-use App\Repository\MoneyAccountDailyBalanceRepository;
 use App\Repository\PaymentPlanRepository;
 
 final class ForecastBalanceService
