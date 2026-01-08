@@ -2,15 +2,15 @@
 
 namespace App\Cash\Controller\Accounts;
 
+use App\Cash\Form\Accounts\MoneyFundType;
+use App\Cash\Service\Accounts\FundBalanceService;
 use App\Entity\MoneyFund;
 use App\Entity\MoneyFundMovement;
 use App\Entity\User;
 use App\Form\MoneyFundMovementType;
-use App\Form\MoneyFundType;
 use App\Repository\MoneyFundRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
-use App\Cash\Service\Accounts\FundBalanceService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
