@@ -2,11 +2,11 @@
 
 namespace App\Controller\Finance;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Entity\MoneyAccount;
 use App\Repository\CashTransactionRepository;
-use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

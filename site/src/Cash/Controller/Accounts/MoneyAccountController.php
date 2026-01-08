@@ -3,10 +3,10 @@
 namespace App\Cash\Controller\Accounts;
 
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
-use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

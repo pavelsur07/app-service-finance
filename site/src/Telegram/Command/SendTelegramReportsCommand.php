@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Telegram\Command;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\Company;
 use App\Repository\CashTransactionRepository;
-use App\Repository\MoneyAccountRepository;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Repository\TelegramBotRepository;
 use DateInterval;

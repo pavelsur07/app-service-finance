@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service\Onboarding;
 
+use App\Balance\Service\BalanceStructureSeeder;
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
@@ -12,9 +14,7 @@ use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CompanyRepository;
-use App\Repository\MoneyAccountRepository;
 use App\Repository\PLCategoryRepository;
-use App\Balance\Service\BalanceStructureSeeder;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

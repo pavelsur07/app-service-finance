@@ -2,13 +2,13 @@
 
 namespace App\Service;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Enum\CashDirection;
 use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
-use App\Repository\MoneyAccountRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

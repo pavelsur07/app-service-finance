@@ -2,6 +2,9 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Service\Transaction\CashTransactionService;
+use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
@@ -11,10 +14,7 @@ use App\Form\CashTransactionType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
-use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
-use App\Cash\Service\Transaction\CashTransactionService;
-use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;

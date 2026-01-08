@@ -2,11 +2,11 @@
 
 namespace App\Report\Cashflow;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Enum\CashDirection;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\MoneyAccountDailyBalanceRepository;
-use App\Repository\MoneyAccountRepository;
 
 final class CashflowReportBuilder
 {

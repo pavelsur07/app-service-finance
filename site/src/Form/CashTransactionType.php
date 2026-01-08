@@ -2,6 +2,7 @@
 
 namespace App\Form;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
@@ -10,7 +11,6 @@ use App\Entity\ProjectDirection;
 use App\Enum\CashDirection;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CounterpartyRepository;
-use App\Repository\MoneyAccountRepository;
 use App\Repository\ProjectDirectionRepository;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller\Finance;
 
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\Company;
-use App\Repository\MoneyAccountRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
