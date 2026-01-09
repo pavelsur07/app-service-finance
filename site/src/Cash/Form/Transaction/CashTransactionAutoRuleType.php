@@ -8,7 +8,6 @@ use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
-use App\Form\CashTransactionAutoRuleConditionType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;

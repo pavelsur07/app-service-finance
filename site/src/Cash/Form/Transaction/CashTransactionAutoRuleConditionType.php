@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Cash\Form\Transaction;
 
 use App\Entity\CashTransactionAutoRuleCondition;
 use App\Entity\Counterparty;
