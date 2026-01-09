@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Fund\Factory;
 
+use App\Cash\Entity\Accounts\MoneyFund;
 use App\Entity\Company;
-use App\Entity\MoneyFund;
 use App\Entity\MoneyFundMovement;
 use Ramsey\Uuid\Uuid;
 

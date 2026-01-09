@@ -2,7 +2,7 @@
 
 namespace App\Cash\Form\Accounts;
 
-use App\Entity\MoneyFund;
+use App\Cash\Entity\Accounts\MoneyFund;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;

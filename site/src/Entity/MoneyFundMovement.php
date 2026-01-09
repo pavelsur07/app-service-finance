@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Cash\Entity\Accounts\MoneyFund;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

@@ -6,8 +6,8 @@ namespace App\Tests\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
+use App\Cash\Entity\Accounts\MoneyFund;
 use App\Entity\Company;
-use App\Entity\MoneyFund;
 use App\Entity\MoneyFundMovement;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
