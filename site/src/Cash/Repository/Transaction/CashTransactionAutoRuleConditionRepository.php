@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repository;
+namespace App\Cash\Repository\Transaction;
 
 use App\Entity\CashTransactionAutoRuleCondition;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
