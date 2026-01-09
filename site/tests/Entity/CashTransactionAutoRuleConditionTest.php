@@ -3,8 +3,8 @@
 namespace App\Tests\Entity;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\CashTransactionAutoRule;
-use App\Entity\CashTransactionAutoRuleCondition;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Entity\Company;
 use App\Entity\User;
 use App\Enum\CashTransactionAutoRuleAction;

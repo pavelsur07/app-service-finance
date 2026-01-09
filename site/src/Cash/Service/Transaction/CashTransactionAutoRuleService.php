@@ -3,8 +3,8 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
-use App\Entity\CashTransactionAutoRule;
 use App\Enum\CashDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;

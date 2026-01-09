@@ -2,7 +2,7 @@
 
 namespace App\Cash\Form\Transaction;
 
-use App\Entity\CashTransactionAutoRuleCondition;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Entity\Counterparty;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;

@@ -3,7 +3,7 @@
 namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Enum\CashTransactionAutoRuleAction;

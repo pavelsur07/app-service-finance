@@ -2,7 +2,7 @@
 
 namespace App\Cash\Repository\Transaction;
 
-use App\Entity\CashTransactionAutoRuleCondition;
+use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

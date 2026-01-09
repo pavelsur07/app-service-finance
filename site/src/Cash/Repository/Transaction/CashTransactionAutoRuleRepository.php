@@ -3,7 +3,7 @@
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\CashTransactionAutoRule;
+use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Entity\Company;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
