@@ -2,6 +2,8 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
+use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
@@ -10,14 +12,12 @@ use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Enum\CashTransactionAutoRuleOperationType;
-use App\Form\CashTransactionAutoRuleType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionAutoRuleRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
