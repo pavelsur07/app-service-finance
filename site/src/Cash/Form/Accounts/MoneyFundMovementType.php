@@ -2,7 +2,7 @@
 
 namespace App\Cash\Form\Accounts;
 
-use App\Entity\MoneyFundMovement;
+use App\Cash\Entity\Accounts\MoneyFundMovement;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\DateTimeType;
 use Symfony\Component\Form\Extension\Core\Type\MoneyType;

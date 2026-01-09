@@ -3,8 +3,8 @@
 namespace App\Cash\Repository\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyFund;
+use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Entity\Company;
-use App\Entity\MoneyFundMovement;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

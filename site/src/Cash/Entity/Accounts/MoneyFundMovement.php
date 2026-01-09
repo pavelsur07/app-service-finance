@@ -1,8 +1,8 @@
 <?php
 
-namespace App\Entity;
+namespace App\Cash\Entity\Accounts;
 
-use App\Cash\Entity\Accounts\MoneyFund;
+use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

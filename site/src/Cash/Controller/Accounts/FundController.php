@@ -3,11 +3,11 @@
 namespace App\Cash\Controller\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyFund;
+use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Cash\Form\Accounts\MoneyFundMovementType;
 use App\Cash\Form\Accounts\MoneyFundType;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
-use App\Entity\MoneyFundMovement;
 use App\Entity\User;
 use App\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
