@@ -2,9 +2,9 @@
 
 namespace App\Entity;
 
+use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
-use App\Repository\CashTransactionAutoRuleRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

@@ -4,6 +4,7 @@ namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
+use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Entity\CashflowCategory;
@@ -14,7 +15,6 @@ use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Enum\CashTransactionAutoRuleOperationType;
-use App\Repository\CashTransactionAutoRuleRepository;
 use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;

@@ -2,13 +2,13 @@
 
 namespace App\Cash\Service\Transaction;
 
+use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
 use App\Enum\CashDirection;
 use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
-use App\Repository\CashTransactionAutoRuleRepository;
 use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 
