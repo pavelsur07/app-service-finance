@@ -2,13 +2,13 @@
 
 namespace App\Cash\Service\Transaction;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;

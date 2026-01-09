@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
@@ -12,7 +13,6 @@ use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;

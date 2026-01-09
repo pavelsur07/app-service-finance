@@ -2,8 +2,8 @@
 
 namespace App\Telegram\Entity;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

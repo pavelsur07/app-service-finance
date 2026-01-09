@@ -2,10 +2,10 @@
 
 namespace App\Service;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Enum\CashDirection;
 use App\Repository\CashTransactionRepository;

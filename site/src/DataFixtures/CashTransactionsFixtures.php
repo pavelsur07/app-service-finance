@@ -2,11 +2,11 @@
 
 namespace App\DataFixtures;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\ProjectDirection;
 use App\Enum\CashDirection;
 use Doctrine\Bundle\FixturesBundle\Fixture;

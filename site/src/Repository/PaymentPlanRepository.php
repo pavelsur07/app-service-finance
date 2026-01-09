@@ -2,9 +2,9 @@
 
 namespace App\Repository;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\PaymentPlan;
 use App\Entity\PaymentRecurrenceRule;
 use App\Enum\PaymentPlanStatus;

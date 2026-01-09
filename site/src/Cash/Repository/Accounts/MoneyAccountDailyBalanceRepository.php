@@ -2,8 +2,8 @@
 
 namespace App\Cash\Repository\Accounts;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;

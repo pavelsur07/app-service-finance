@@ -2,11 +2,11 @@
 
 namespace App\Cash\Service\Accounts;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\DTO\DailyBalancesDTO;
 use App\DTO\MoneyBalanceDTO;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Repository\CashTransactionRepository;
 
 class AccountBalanceService

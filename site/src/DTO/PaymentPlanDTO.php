@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\DTO;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\CashflowCategory;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class PaymentPlanDTO

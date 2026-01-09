@@ -2,9 +2,9 @@
 
 namespace App\Controller\Finance;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
 use App\Service\ActiveCompanyService;
 use App\Service\DailyBalanceRecalculator;

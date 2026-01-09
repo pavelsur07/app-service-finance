@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Builders\Shared;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Enum\MoneyAccountType;
 
 final class MoneyAccountBuilder

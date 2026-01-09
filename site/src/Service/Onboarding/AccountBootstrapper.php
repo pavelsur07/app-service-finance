@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Service\Onboarding;
 
 use App\Balance\Service\BalanceStructureSeeder;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\PLCategory;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;

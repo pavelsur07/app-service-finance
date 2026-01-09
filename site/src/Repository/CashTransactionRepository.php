@@ -2,9 +2,9 @@
 
 namespace App\Repository;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;

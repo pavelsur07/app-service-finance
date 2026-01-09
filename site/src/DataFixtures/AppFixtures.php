@@ -2,14 +2,14 @@
 
 namespace App\DataFixtures;
 
+use App\Balance\Service\BalanceStructureSeeder;
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\User;
 use App\Enum\CounterpartyType;
 use App\Enum\MoneyAccountType;
-use App\Balance\Service\BalanceStructureSeeder;
-use App\Cash\Service\Accounts\AccountBalanceService;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Ramsey\Uuid\Nonstandard\Uuid;

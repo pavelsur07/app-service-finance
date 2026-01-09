@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Form;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Enum\PaymentPlanStatus;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;

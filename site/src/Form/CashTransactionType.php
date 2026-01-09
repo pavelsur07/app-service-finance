@@ -2,11 +2,11 @@
 
 namespace App\Form;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\ProjectDirection;
 use App\Enum\CashDirection;
 use App\Repository\CashflowCategoryRepository;

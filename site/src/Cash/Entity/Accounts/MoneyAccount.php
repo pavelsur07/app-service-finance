@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Entity;
+namespace App\Cash\Entity\Accounts;
 
+use App\Entity\Company;
 use App\Enum\MoneyAccountType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;

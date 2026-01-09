@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;
 use App\Repository\PaymentPlanRepository;

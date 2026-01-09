@@ -6,13 +6,13 @@ namespace App\Banking\Service;
 
 use App\Banking\Dto\Cursor;
 use App\Banking\Provider\ProviderRegistry;
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Service\Import\ImportLogger;
+use App\Cash\Service\Transaction\CashTransactionService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;
-use App\Cash\Service\Transaction\CashTransactionService;
-use App\Cash\Service\Import\ImportLogger;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 

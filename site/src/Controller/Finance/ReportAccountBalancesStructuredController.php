@@ -2,9 +2,9 @@
 
 namespace App\Controller\Finance;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
-use App\Entity\MoneyAccount;
 use App\Repository\CashTransactionRepository;
 use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
