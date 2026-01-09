@@ -2,10 +2,10 @@
 
 namespace App\MessageHandler;
 
+use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Entity\CashTransaction;
 use App\Message\ApplyAutoRulesForTransaction;
-use App\Repository\CashTransactionRepository;
-use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;

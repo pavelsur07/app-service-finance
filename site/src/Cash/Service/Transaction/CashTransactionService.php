@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashflowCategory;
@@ -12,7 +13,6 @@ use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
-use App\Repository\CashTransactionRepository;
 use App\Service\DailyBalanceRecalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;

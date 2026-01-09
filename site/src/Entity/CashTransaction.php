@@ -3,8 +3,8 @@
 namespace App\Entity;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Enum\CashDirection;
-use App\Repository\CashTransactionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

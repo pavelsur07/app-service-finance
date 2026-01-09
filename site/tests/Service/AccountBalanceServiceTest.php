@@ -119,7 +119,7 @@ class AccountBalanceServiceTest extends TestCase
         ];
         $schemaTool->createSchema($classes);
         $registry = new SimpleManagerRegistry($this->em);
-        $txRepo = new \App\Repository\CashTransactionRepository($registry);
+        $txRepo = new \App\Cash\Repository\Transaction\CashTransactionRepository($registry);
         $this->balanceRepo = new MoneyAccountDailyBalanceRepository($registry);
         $this->balanceService = new AccountBalanceService($txRepo, $this->balanceRepo);
         $this->txService = new CashTransactionService($this->em, $this->balanceService, $txRepo, new NullMessageBus());
