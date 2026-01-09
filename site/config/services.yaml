@@ -84,24 +84,6 @@ services:
             $senders:
                 - '@App\Notification\Channel\EmailSender'
 
-    # ---------- Banking  ------------ #
-    # Провайдеры
-    App\Banking\Provider\DemoProvider:
-        tags: ['app.banking.provider']
-
-    App\Banking\Provider\AlfaProvider:
-        tags: ['app.banking.provider']
-
-    # Реестр провайдеров
-    App\Banking\Provider\ProviderRegistry:
-        arguments:
-            $providers: !tagged_iterator 'app.banking.provider'
-
-    # Оркестратор + команда
-    App\Banking\Service\BankImportService: ~
-    App\Banking\Console\BankImportRunCommand:
-        tags: ['console.command']
-
     # Telegram
     App\Telegram\Service\BotLinkService:
         arguments:
