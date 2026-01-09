@@ -2,17 +2,17 @@
 
 namespace App\Tests\Service\Import;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Service\Accounts\AccountBalanceService;
+use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
-use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Service\ActiveCompanyService;
-use App\Cash\Service\Import\ClientBank1CImportService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;

@@ -1,9 +1,9 @@
 <?php
 namespace App\Tests\Controller;
 
-use App\Entity\Company;
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\CashTransaction;
-use App\Entity\MoneyAccount;
+use App\Entity\Company;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\CashDirection;

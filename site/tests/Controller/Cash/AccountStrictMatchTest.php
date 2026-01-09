@@ -2,8 +2,8 @@
 
 namespace App\Tests\Controller\Cash;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Ramsey\Uuid\Uuid;

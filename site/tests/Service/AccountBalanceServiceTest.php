@@ -2,13 +2,13 @@
 
 namespace App\Tests\Service;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\CashDirection;

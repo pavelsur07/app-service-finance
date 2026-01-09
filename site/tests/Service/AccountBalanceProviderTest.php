@@ -2,12 +2,12 @@
 
 namespace App\Tests\Service;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Entity\Company;
-use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
-use App\Cash\Service\Accounts\AccountBalanceProvider;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;

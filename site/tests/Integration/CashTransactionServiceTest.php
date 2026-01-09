@@ -2,6 +2,7 @@
 
 namespace App\Tests\Integration;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
@@ -11,7 +12,6 @@ use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\MoneyAccount;
 use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\PaymentPlan;
 use App\Entity\PaymentPlanMatch;
