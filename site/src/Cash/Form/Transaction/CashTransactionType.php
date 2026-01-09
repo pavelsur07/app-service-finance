@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
