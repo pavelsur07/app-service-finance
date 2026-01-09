@@ -2,8 +2,8 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Entity\CashflowCategory;
-use App\Form\CashflowCategoryType;
 use App\Repository\CashflowCategoryRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
