@@ -71,7 +71,7 @@ class ReportAccountBalancesController extends AbstractController
 
             $rows = $qb->getQuery()->getResult();
             foreach ($rows as $row) {
-                /** @var \App\Entity\MoneyAccountDailyBalance $row */
+                /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
                 $accId = $row->getMoneyAccount()->getId();
                 if (!isset($balancesByAccountId[$accId])) {
                     $balancesByAccountId[$accId] = $row->getClosingBalance();

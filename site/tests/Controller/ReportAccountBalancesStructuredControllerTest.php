@@ -2,9 +2,9 @@
 namespace App\Tests\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
-use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\CashDirection;
 use App\Enum\MoneyAccountType;

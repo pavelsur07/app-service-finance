@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Entity\Company;
-use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\MoneyFund;
 use App\Entity\MoneyFundMovement;
 use App\Entity\User;

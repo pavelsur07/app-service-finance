@@ -3,8 +3,8 @@
 namespace App\Cash\Repository\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Entity\Company;
-use App\Entity\MoneyAccountDailyBalance;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;

@@ -38,7 +38,7 @@ class AccountBalanceProvider
 
         $balances = [];
         foreach ($rows as $row) {
-            /** @var \App\Entity\MoneyAccountDailyBalance $row */
+            /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
             $accountId = $row->getMoneyAccount()->getId();
             if (!isset($balances[$accountId])) {
                 $balances[$accountId] = $row->getClosingBalance();

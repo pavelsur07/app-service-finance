@@ -3,9 +3,9 @@
 namespace App\Tests\Service;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Entity\Company;
-use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Ramsey\Uuid\Uuid;

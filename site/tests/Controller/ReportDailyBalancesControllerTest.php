@@ -3,8 +3,8 @@
 namespace App\Tests\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Entity\Company;
-use App\Entity\MoneyAccountDailyBalance;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Ramsey\Uuid\Uuid;

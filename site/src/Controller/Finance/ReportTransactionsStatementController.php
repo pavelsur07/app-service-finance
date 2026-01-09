@@ -284,7 +284,7 @@ class ReportTransactionsStatementController extends AbstractController
 
         $result = [];
         foreach ($rows as $row) {
-            /** @var \App\Entity\MoneyAccountDailyBalance $row */
+            /** @var \App\Cash\Entity\Accounts\MoneyAccountDailyBalance $row */
             $dateKey = $row->getDate()->format('Y-m-d');
             $accountId = $row->getMoneyAccount()->getId();
             $result[$dateKey][$accountId] = [
