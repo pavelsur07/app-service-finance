@@ -342,7 +342,7 @@ class ReportTransactionsStatementController extends AbstractController
                 $transaction = $row;
             }
 
-            if (!$transaction instanceof \App\Entity\CashTransaction) {
+            if (!$transaction instanceof \App\Cash\Entity\Transaction\CashTransaction) {
                 continue;
             }
 

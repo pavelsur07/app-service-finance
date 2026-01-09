@@ -3,7 +3,7 @@
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Entity\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\Company;
 use App\Enum\CashDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;

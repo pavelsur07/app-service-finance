@@ -2,8 +2,8 @@
 
 namespace App\MessageHandler;
 
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Message\EnqueueAutoRulesForRange;

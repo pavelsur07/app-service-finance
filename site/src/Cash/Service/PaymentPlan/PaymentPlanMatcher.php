@@ -2,7 +2,7 @@
 
 namespace App\Cash\Service\PaymentPlan;
 
-use App\Entity\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\PaymentPlan;
 use App\Entity\PaymentPlanMatch;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;

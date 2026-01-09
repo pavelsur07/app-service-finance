@@ -4,9 +4,9 @@ namespace App\Tests\Integration\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
-use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\PaymentPlan;

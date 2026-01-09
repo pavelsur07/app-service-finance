@@ -3,9 +3,9 @@
 namespace App\Cash\Service\Import;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ImportLog;

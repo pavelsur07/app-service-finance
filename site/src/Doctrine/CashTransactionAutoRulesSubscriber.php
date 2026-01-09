@@ -2,7 +2,7 @@
 
 namespace App\Doctrine;
 
-use App\Entity\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Message\EnqueueAutoRulesForRange;
 use App\Service\DebouncedRangeEnqueuer;
 use Doctrine\Bundle\DoctrineBundle\Attribute\AsDoctrineListener;

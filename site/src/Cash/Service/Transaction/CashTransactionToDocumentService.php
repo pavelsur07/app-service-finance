@@ -3,7 +3,7 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;

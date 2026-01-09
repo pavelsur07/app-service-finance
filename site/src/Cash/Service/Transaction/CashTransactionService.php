@@ -4,10 +4,10 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\DTO\CashTransactionDTO;
-use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;

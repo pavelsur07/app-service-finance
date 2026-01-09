@@ -4,7 +4,7 @@ namespace App\DataFixtures;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\CashTransaction;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;

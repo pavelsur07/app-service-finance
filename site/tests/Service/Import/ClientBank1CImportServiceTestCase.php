@@ -3,10 +3,10 @@
 namespace App\Tests\Service\Import;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
-use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\User;
