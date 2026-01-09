@@ -6,9 +6,9 @@ namespace App\Service\Onboarding;
 
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\User;

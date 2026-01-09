@@ -3,10 +3,10 @@
 namespace App\Tests\Service\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\PaymentPlan;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\DTO;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Entity\Counterparty;
 use Symfony\Component\Validator\Constraints as Assert;
 

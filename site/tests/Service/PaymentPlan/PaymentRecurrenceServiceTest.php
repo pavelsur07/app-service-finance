@@ -2,8 +2,8 @@
 
 namespace App\Tests\Service\PaymentPlan;
 
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Entity\PaymentRecurrenceRule;

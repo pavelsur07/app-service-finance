@@ -3,10 +3,10 @@
 namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\DTO\CashTransactionDTO;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\ProjectDirection;
 use App\Enum\CashDirection;

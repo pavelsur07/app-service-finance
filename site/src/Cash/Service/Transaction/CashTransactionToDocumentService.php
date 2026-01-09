@@ -2,11 +2,11 @@
 
 namespace App\Cash\Service\Transaction;
 
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Entity\CashTransaction;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\CashTransaction;
 use App\Enum\DocumentType;
 use Ramsey\Uuid\Uuid;
 

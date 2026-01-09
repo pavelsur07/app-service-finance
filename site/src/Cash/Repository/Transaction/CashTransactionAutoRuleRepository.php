@@ -2,7 +2,7 @@
 
 namespace App\Cash\Repository\Transaction;
 
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
 use App\Entity\Company;
 use App\Enum\CashTransactionAutoRuleAction;

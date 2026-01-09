@@ -2,7 +2,7 @@
 
 namespace App\Tests\Entity;
 
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
 use App\Entity\CashTransactionAutoRuleCondition;
 use App\Entity\Company;

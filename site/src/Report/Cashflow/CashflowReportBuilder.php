@@ -159,7 +159,7 @@ final class CashflowReportBuilder
     }
 
     /**
-     * @param \App\Entity\CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
+     * @param \App\Cash\Entity\Transaction\CashflowCategory[] $categories // полный список, как вернул findTreeByCompany()
      *
      * @return array<int, array{id:string,name:string,parentId:?string,level:int,order:int}>
      */
@@ -207,8 +207,8 @@ final class CashflowReportBuilder
      *   'children'=> array<node>
      * ].
      *
-     * @param \App\Entity\CashflowCategory[] $allCategories // полный список (findTreeByCompany)
-     * @param array<string,array{entity:\App\Entity\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
+     * @param \App\Cash\Entity\Transaction\CashflowCategory[] $allCategories // полный список (findTreeByCompany)
+     * @param array<string,array{entity:\App\Cash\Entity\Transaction\CashflowCategory, totals:array<string,array<int,float>>}> $categoryMap
      *
      * @return array<int,array>
      */

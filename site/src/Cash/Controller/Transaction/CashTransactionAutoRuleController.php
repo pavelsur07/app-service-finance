@@ -2,12 +2,12 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\CashTransactionAutoRule;
 use App\Enum\CashDirection;

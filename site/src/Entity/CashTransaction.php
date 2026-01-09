@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Enum\CashDirection;
 use Doctrine\Common\Collections\ArrayCollection;

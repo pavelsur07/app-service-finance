@@ -3,7 +3,7 @@
 namespace App\DataFixtures;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Company;
 use App\Entity\Counterparty;

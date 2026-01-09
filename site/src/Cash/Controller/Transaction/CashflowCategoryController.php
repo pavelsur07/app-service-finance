@@ -2,9 +2,9 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Entity\CashflowCategory;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;

@@ -2,7 +2,7 @@
 
 namespace App\Cash\Form\Transaction;
 
-use App\Entity\CashflowCategory;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Entity\CashTransactionAutoRule;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;

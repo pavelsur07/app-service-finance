@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
-use App\Entity\CashflowCategory;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\PaymentPlan;
