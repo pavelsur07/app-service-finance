@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Form\Transaction\CashTransactionAutoRuleType;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
@@ -12,7 +13,6 @@ use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Enum\CashTransactionAutoRuleOperationType;
-use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionAutoRuleRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;

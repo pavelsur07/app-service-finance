@@ -4,6 +4,7 @@ namespace App\Cash\Controller\Transaction;
 
 use App\Cash\Form\Transaction\CashTransactionType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\DTO\CashTransactionDTO;
@@ -11,7 +12,6 @@ use App\Entity\CashflowCategory;
 use App\Entity\CashTransaction;
 use App\Entity\Document;
 use App\Enum\DocumentType;
-use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 use App\Repository\CounterpartyRepository;
 use App\Service\ActiveCompanyService;

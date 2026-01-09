@@ -4,8 +4,8 @@ namespace App\Report\Cashflow;
 
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Enum\CashDirection;
-use App\Repository\CashflowCategoryRepository;
 use App\Repository\CashTransactionRepository;
 
 final class CashflowReportBuilder

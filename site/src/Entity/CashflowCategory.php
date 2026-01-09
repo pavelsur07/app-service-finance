@@ -2,10 +2,9 @@
 
 namespace App\Entity;
 
-use App\Entity\PLCategory;
+use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Enum\CashflowCategoryStatus;
 use App\Enum\PaymentPlanType;
-use App\Repository\CashflowCategoryRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
