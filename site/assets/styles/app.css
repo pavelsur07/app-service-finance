@@ -19,8 +19,8 @@ body {
 }
 
 .page {
-    --tblr-page-gap: 0;
-    gap: 0;
+    --tblr-page-gap: 0 !important;
+    gap: 0 !important;
     width: 100%;
 }
 
@@ -29,8 +29,14 @@ body {
     padding-left: 0;
 }
 
-.navbar-vertical {
-    margin: 0;
+.navbar-vertical.navbar-expand-lg {
+    margin-right: 0 !important;
+}
+
+@media (min-width: 992px) {
+    .layout-fluid-vertical .page > .navbar-vertical.navbar-expand-lg ~ .page-wrapper {
+        margin-left: 0 !important;
+    }
 }
 
 .page-body .container {
