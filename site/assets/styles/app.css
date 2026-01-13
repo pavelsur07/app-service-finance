@@ -19,38 +19,18 @@ body {
 }
 
 .page {
-    --tblr-page-gap: 0 !important;
-    gap: 0 !important;
-    display: flex;
-    flex-direction: row;
+    --tblr-page-gap: 0;
+    gap: 0;
     width: 100%;
 }
 
-.page > .navbar-vertical {
-    flex: 0 0 auto;
+.page-wrapper {
+    margin-left: 0;
+    padding-left: 0;
 }
 
-.page > .page-wrapper {
-    flex: 1 1 auto;
-    min-width: 0;
-    margin-left: 0 !important;
-    padding-left: 0 !important;
-}
-
-.navbar-vertical.navbar-expand-lg {
-    margin-right: 0 !important;
-}
-
-@media (min-width: 992px) {
-    .layout-fluid-vertical .page > .navbar-vertical.navbar-expand-lg ~ .page-wrapper {
-        margin-left: 0 !important;
-    }
-}
-
-@media (max-width: 991.98px) {
-    .page {
-        flex-direction: column;
-    }
+.navbar-vertical {
+    margin: 0;
 }
 
 .page-body .container {
