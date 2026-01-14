@@ -19,8 +19,8 @@ COPY ./ ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
-#RUN php /app/bin/console importmap:install
-#RUN php /app/bin/console asset-map:compile
+RUN php /app/bin/console importmap:install
+RUN php /app/bin/console asset-map:compile
 
 RUN chown www-data:www-data ./var -R
 
@@ -33,6 +33,6 @@ COPY ./docker/common/nginx/conf.d /etc/nginx/conf.d
 WORKDIR /app
 
 COPY ./public ./public
-#COPY --from=builder /app/public/assets ./public/assets
+COPY --from=builder /app/public/assets ./public/assets
 
 HEALTHCHECK --interval=5s --timeout=3s --start-period=1s CMD curl --fail http://127.0.0.1/health || exit 1
