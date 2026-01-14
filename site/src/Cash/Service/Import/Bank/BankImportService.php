@@ -129,6 +129,10 @@ class BankImportService
                         $this->entityManager->persist($cashTransaction);
                     }
 
+                    if (!$this->hasNextPage($response)) {
+                        break;
+                    }
+
                     ++$page;
                 }
 
@@ -180,12 +184,32 @@ class BankImportService
      */
     private function extractTransactions(array $response): array
     {
-        $transactions = $response['transactions'] ?? [];
-        if (!is_array($transactions)) {
+        if (!isset($response['transactions']) || !is_array($response['transactions'])) {
             return [];
         }
 
-        return array_values(array_filter($transactions, 'is_array'));
+        return array_values(array_filter($response['transactions'], 'is_array'));
+    }
+
+    private function hasNextPage(array $response): bool
+    {
+        $links = $response['_links'] ?? null;
+        if (!is_array($links)) {
+            return false;
+        }
+
+        foreach ($links as $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+
+            $rel = $link['rel'] ?? null;
+            if ('next' === $rel) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function resolveOccurredAt(array $transaction): ?DateTimeImmutable
