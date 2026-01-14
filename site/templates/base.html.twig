@@ -40,17 +40,18 @@
                 {% include '@Partials/_sidebar.html.twig' %}
             </div>
         </aside>
+        <!-- ===== Topbar ===== -->
+        <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
+            <div class="container-fluid">
+                <h1 class="navbar-brand">Сервис</h1>
+                {% include '@Partials/_active_company_widget.html.twig' %}
+            </div>
+        </header>
 
         <!-- ===== Page Wrapper ===== -->
         <div class="page-wrapper">
 
-            <!-- ===== Topbar ===== -->
-            <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none">
-                <div class="container-fluid">
-                    <h1 class="navbar-brand">Сервис</h1>
-                    {% include '@Partials/_active_company_widget.html.twig' %}
-                </div>
-            </header>
+
 
             <!-- ===== Page body ===== -->
             <div class="page-body">
