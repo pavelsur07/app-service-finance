@@ -19,8 +19,8 @@ COPY ./ ./
 RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimize-autoloader \
     && rm -rf /root/.composer/cache
 
-RUN php /app/bin/console importmap:install
-RUN php /app/bin/console asset-map:compile
+#RUN php /app/bin/console importmap:install
+#RUN php /app/bin/console asset-map:compile
 
 RUN chown www-data:www-data ./var -R
 
