@@ -94,4 +94,14 @@ class MoneyAccountRepository extends ServiceEntityRepository
 
         return null;
     }
+
+    public function findOneByCompanyAndAccountNumber(Company $company, string $accountNumber): ?MoneyAccount
+    {
+        $normalized = preg_replace('/\D+/', '', $accountNumber);
+        if ('' === $normalized) {
+            return null;
+        }
+
+        return $this->findOneByNormalizedAccountNumber($company, $normalized);
+    }
 }
