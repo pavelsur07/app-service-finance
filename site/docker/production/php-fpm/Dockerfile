@@ -60,7 +60,7 @@ COPY ./ ./
 ENV APP_ENV prod
 
 #RUN php /app/bin/console importmap:install
-RUN php /app/bin/console asset-map:compile
+#RUN php /app/bin/console asset-map:compile
 
 RUN chown www-data:www-data ./var -R
 
