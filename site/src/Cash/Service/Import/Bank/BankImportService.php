@@ -107,6 +107,9 @@ class BankImportService
 
                         $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
                         $direction = $this->resolveDirection($transaction);
+                        if (!$direction instanceof CashDirection) {
+                            continue;
+                        }
                         $description = $this->resolveDescription($transaction);
 
                         $cashTransaction = new CashTransaction(
@@ -121,10 +124,7 @@ class BankImportService
                         $cashTransaction
                             ->setExternalId($externalId)
                             ->setImportSource($bankCode)
-                            ->setDescription($description)
-                            ->setBookedAt($occurredAt)
-                            ->setUpdatedAt(new DateTimeImmutable())
-                            ->setRawData($transaction);
+                            ->setDescription($description);
 
                         $this->entityManager->persist($cashTransaction);
                     }
@@ -180,35 +180,32 @@ class BankImportService
      */
     private function extractTransactions(array $response): array
     {
-        $candidates = [
-            $response['Data']['Transaction'] ?? null,
-            $response['Data']['Transactions'] ?? null,
-            $response['transactions'] ?? null,
-            $response['data']['transactions'] ?? null,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_array($candidate)) {
-                return array_values(array_filter($candidate, 'is_array'));
-            }
+        $transactions = $response['transactions'] ?? [];
+        if (!is_array($transactions)) {
+            return [];
         }
 
-        if ($this->isListOfArrays($response)) {
-            return array_values(array_filter($response, 'is_array'));
-        }
-
-        return [];
+        return array_values(array_filter($transactions, 'is_array'));
     }
 
     private function resolveOccurredAt(array $transaction): ?DateTimeImmutable
     {
-        $dateValue = $transaction['operationDate'] ?? $transaction['documentDate'] ?? null;
-        if (!is_string($dateValue) || '' === $dateValue) {
+        $operationDate = $transaction['operationDate'] ?? null;
+        if (is_string($operationDate) && '' !== $operationDate) {
+            try {
+                return new DateTimeImmutable($operationDate);
+            } catch (\Throwable) {
+                return null;
+            }
+        }
+
+        $documentDate = $transaction['documentDate'] ?? null;
+        if (!is_string($documentDate) || '' === $documentDate) {
             return null;
         }
 
         try {
-            return new DateTimeImmutable($dateValue);
+            return new DateTimeImmutable($documentDate . ' 00:00:00');
         } catch (\Throwable) {
             return null;
         }
@@ -217,37 +214,23 @@ class BankImportService
     private function resolveAmount(array $transaction): ?string
     {
         $amountValue = $transaction['amount'] ?? null;
-        if (is_array($amountValue)) {
-            $amountValue = $amountValue['amount'] ?? $amountValue['value'] ?? null;
-        }
-
-        if (null === $amountValue) {
+        if (!is_array($amountValue)) {
             return null;
         }
 
-        if (is_numeric($amountValue)) {
-            $amount = (string) $amountValue;
-        } elseif (is_string($amountValue)) {
-            $amount = trim($amountValue);
-        } else {
+        $rawAmount = $amountValue['amount'] ?? null;
+        if (!is_numeric($rawAmount)) {
             return null;
         }
 
-        $amount = str_replace(',', '.', $amount);
-        $amount = ltrim($amount, '+');
-
-        if (str_starts_with($amount, '-')) {
-            $amount = ltrim($amount, '-');
-        }
-
-        return '' !== $amount ? $amount : null;
+        return number_format((float) $rawAmount, 2, '.', '');
     }
 
     private function resolveCurrency(array $transaction, string $fallback): string
     {
-        $currency = $transaction['currency'] ?? null;
+        $currency = null;
         if (is_array($transaction['amount'] ?? null)) {
-            $currency = $transaction['amount']['currency'] ?? $currency;
+            $currency = $transaction['amount']['currencyName'] ?? null;
         }
 
         if (is_string($currency) && '' !== $currency) {
@@ -257,53 +240,32 @@ class BankImportService
         return strtoupper($fallback);
     }
 
-    private function resolveDirection(array $transaction): CashDirection
+    private function resolveDirection(array $transaction): ?CashDirection
     {
-        $directionValue = $transaction['direction'] ?? $transaction['creditDebitIndicator'] ?? null;
-        if (is_string($directionValue)) {
-            $normalized = strtolower($directionValue);
-            if (in_array($normalized, ['credit', 'inflow', 'incoming'], true)) {
-                return CashDirection::INFLOW;
-            }
-            if (in_array($normalized, ['debit', 'outflow', 'outgoing'], true)) {
-                return CashDirection::OUTFLOW;
-            }
+        $directionValue = $transaction['direction'] ?? null;
+        if (!is_string($directionValue)) {
+            return null;
         }
 
-        if (is_string($transaction['amount'] ?? null) && str_starts_with(trim($transaction['amount']), '-')) {
+        if ('DEBIT' === $directionValue) {
             return CashDirection::OUTFLOW;
         }
 
-        if (is_numeric($transaction['amount'] ?? null) && (float) $transaction['amount'] < 0) {
-            return CashDirection::OUTFLOW;
+        if ('CREDIT' === $directionValue) {
+            return CashDirection::INFLOW;
         }
 
-        return CashDirection::INFLOW;
+        return null;
     }
 
     private function resolveDescription(array $transaction): ?string
     {
-        $description = $transaction['description'] ?? $transaction['paymentPurpose'] ?? null;
+        $description = $transaction['paymentPurpose'] ?? null;
         if (!is_string($description)) {
             return null;
         }
 
         $description = trim($description);
         return '' !== $description ? $description : null;
-    }
-
-    private function isListOfArrays(array $value): bool
-    {
-        if ($value === []) {
-            return false;
-        }
-
-        foreach ($value as $item) {
-            if (!is_array($item)) {
-                return false;
-            }
-        }
-
-        return array_is_list($value);
     }
 }
