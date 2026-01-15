@@ -41,8 +41,13 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('DROP INDEX uniq_balance_link');
         $this->addSql('ALTER TABLE balance_category_links ALTER source_type TYPE VARCHAR(255)');
         $this->addSql('ALTER INDEX idx_balance_link_company RENAME TO IDX_D79DC3BA979B1AD6');
-        $this->addSql('ALTER TABLE bot_links ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
-        $this->addSql('COMMENT ON COLUMN bot_links.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        if ($schema->hasTable('bot_links') && !$schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('ALTER TABLE bot_links ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
+        }
+
+        if ($schema->hasTable('bot_links') && $schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('COMMENT ON COLUMN bot_links.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        }
         $this->addSql('ALTER TABLE cash_transaction ALTER allocated_amount DROP DEFAULT');
         $this->addSql('ALTER INDEX idx_cashflow_categories_pl_category RENAME TO IDX_EAB5C38D98B34054');
         $this->addSql('ALTER TABLE document_operations DROP CONSTRAINT fk_doc_ops_project_direction');
@@ -114,7 +119,9 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('ALTER TABLE "telegram_bots" DROP updated_at');
         $this->addSql('ALTER TABLE "telegram_bots" ADD CONSTRAINT fk_dacd6ed979b1ad6 FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('CREATE INDEX idx_dacd6ed979b1ad6 ON "telegram_bots" (company_id)');
-        $this->addSql('ALTER TABLE "bot_links" DROP updated_at');
+        if ($schema->hasTable('bot_links') && $schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('ALTER TABLE "bot_links" DROP updated_at');
+        }
         $this->addSql('ALTER INDEX idx_eab5c38d98b34054 RENAME TO idx_cashflow_categories_pl_category');
         $this->addSql('ALTER TABLE finance_loan ALTER start_date TYPE DATE');
         $this->addSql('ALTER TABLE finance_loan ALTER end_date TYPE DATE');
