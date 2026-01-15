@@ -58,6 +58,16 @@ class RegistrationFormType extends AbstractType
                     ]),
                 ],
             ])
+            ->add('website', TextType::class, [
+                'label' => false,
+                'mapped' => false,
+                'required' => false,
+                'attr' => [
+                    'style' => 'display:none',
+                    'tabindex' => '-1',
+                    'autocomplete' => 'off',
+                ],
+            ])
         ;
     }
 
