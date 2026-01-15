@@ -260,6 +260,7 @@
                 current_route starts with 'ozon_'
                 or current_route starts with 'wildberries_'
                 or current_route starts with 'telegram_integration_'
+                or current_route starts with 'cash_bank_connection_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
@@ -270,12 +271,17 @@
                     or current_route starts with 'ozon_'
                     or current_route starts with 'wildberries_'
                     or current_route starts with 'telegram_integration_'
+                    or current_route starts with 'cash_bank_connection_'
                 ) ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
                             {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
                             <a class="dropdown-item {{ telegram_finance_active ? 'active' : '' }}" href="{{ path('telegram_integration_index') }}">
                                 <span>Telegram / Финансы</span>
+                            </a>
+                            {% set bank_connections_active = current_route starts with 'cash_bank_connection_' %}
+                            <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
+                                <span>Банки / Подключения</span>
                             </a>
                             {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
                             <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
@@ -374,4 +380,3 @@
             </li>
         </ul>
     </div>
-
