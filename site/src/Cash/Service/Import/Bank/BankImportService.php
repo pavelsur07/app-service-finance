@@ -8,8 +8,10 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\Bank\Provider\BankStatementsProviderInterface;
 use App\Entity\Company;
+use App\Entity\ImportLog;
 use App\Enum\CashDirection;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,6 +26,7 @@ class BankImportService
         private readonly CashTransactionRepository $cashTransactionRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly ImportLogger $importLogger,
     ) {
     }
 
@@ -33,113 +36,141 @@ class BankImportService
         BankConnection $connection,
         BankStatementsProviderInterface $provider
     ): void {
-        $accountsResponse = $provider->getAccounts($connection);
-        $accountNumbers = $this->extractAccountNumbers($accountsResponse);
+        $totalAccountsFound = 0;
+        $matchedAccounts = 0;
+        $transactionsCreated = 0;
+        $transactionsSkipped = 0;
 
-        foreach ($accountNumbers as $accountNumber) {
-            $moneyAccount = $this->moneyAccountRepository->findOneByCompanyAndAccountNumber($company, $accountNumber);
-            if (!$moneyAccount instanceof MoneyAccount) {
-                $this->logger->warning('Bank import skipped: account not found', [
-                    'company' => $company->getId(),
-                    'bank_code' => $bankCode,
-                    'account_number' => $accountNumber,
-                ]);
-                continue;
-            }
+        $importLog = $this->importLogger->start($company, 'bank:' . $bankCode, false, null, null);
 
-            $cursor = $this->cursorRepository->getOrCreate($company, $bankCode, $accountNumber);
-            $today = new DateTimeImmutable('today');
-            $start = $cursor->getLastImportedDate()
-                ? $cursor->getLastImportedDate()->modify('-1 day')
-                : $today->modify('-7 days');
-            $end = $today;
+        try {
+            $accountsResponse = $provider->getAccounts($connection);
+            $accountNumbers = $this->extractAccountNumbers($accountsResponse);
+            $totalAccountsFound += count($accountNumbers);
 
-            for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
-                $page = 1;
-                while (true) {
-                    $response = $provider->getTransactions($connection, $accountNumber, $date, $page);
-                    $transactions = $this->extractTransactions($response);
-                    if ($transactions === []) {
-                        break;
-                    }
-
-                    foreach ($transactions as $transaction) {
-                        if (!is_array($transaction)) {
-                            continue;
-                        }
-
-                        $externalId = $transaction['uuid'] ?? null;
-                        if (!is_string($externalId) || '' === $externalId) {
-                            $this->logger->warning('Bank import skipped transaction without uuid', [
-                                'company' => $company->getId(),
-                                'bank_code' => $bankCode,
-                                'account_number' => $accountNumber,
-                                'transaction' => $transaction,
-                            ]);
-                            continue;
-                        }
-
-                        if ($this->cashTransactionRepository->findOneByImport($company->getId(), $bankCode, $externalId)) {
-                            continue;
-                        }
-
-                        $occurredAt = $this->resolveOccurredAt($transaction);
-                        if (!$occurredAt instanceof DateTimeImmutable) {
-                            $this->logger->warning('Bank import skipped transaction without date', [
-                                'company' => $company->getId(),
-                                'bank_code' => $bankCode,
-                                'account_number' => $accountNumber,
-                                'external_id' => $externalId,
-                            ]);
-                            continue;
-                        }
-
-                        $amount = $this->resolveAmount($transaction);
-                        if (null === $amount) {
-                            $this->logger->warning('Bank import skipped transaction without amount', [
-                                'company' => $company->getId(),
-                                'bank_code' => $bankCode,
-                                'account_number' => $accountNumber,
-                                'external_id' => $externalId,
-                            ]);
-                            continue;
-                        }
-
-                        $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
-                        $direction = $this->resolveDirection($transaction);
-                        if (!$direction instanceof CashDirection) {
-                            continue;
-                        }
-                        $description = $this->resolveDescription($transaction);
-
-                        $cashTransaction = new CashTransaction(
-                            Uuid::uuid4()->toString(),
-                            $company,
-                            $moneyAccount,
-                            $direction,
-                            $amount,
-                            $currency,
-                            $occurredAt,
-                        );
-                        $cashTransaction
-                            ->setExternalId($externalId)
-                            ->setImportSource($bankCode)
-                            ->setDescription($description);
-
-                        $this->entityManager->persist($cashTransaction);
-                    }
-
-                    if (!$this->hasNextPage($response)) {
-                        break;
-                    }
-
-                    ++$page;
+            foreach ($accountNumbers as $accountNumber) {
+                $moneyAccount = $this->moneyAccountRepository->findOneByCompanyAndAccountNumber($company, $accountNumber);
+                if (!$moneyAccount instanceof MoneyAccount) {
+                    $this->logger->warning('Bank import skipped: account not found', [
+                        'company' => $company->getId(),
+                        'bank_code' => $bankCode,
+                        'account_number' => $accountNumber,
+                    ]);
+                    continue;
                 }
 
-                $this->entityManager->flush();
-                $cursor->setLastImportedDate(new DateTimeImmutable($date->format('Y-m-d')));
-                $this->cursorRepository->save($cursor);
+                ++$matchedAccounts;
+
+                $cursor = $this->cursorRepository->getOrCreate($company, $bankCode, $accountNumber);
+                $today = new DateTimeImmutable('today');
+                $start = $cursor->getLastImportedDate()
+                    ? $cursor->getLastImportedDate()->modify('-1 day')
+                    : $today->modify('-7 days');
+                $end = $today;
+
+                for ($date = $start; $date <= $end; $date = $date->modify('+1 day')) {
+                    $page = 1;
+                    while (true) {
+                        $response = $provider->getTransactions($connection, $accountNumber, $date, $page);
+                        $transactions = $this->extractTransactions($response);
+                        if ($transactions === []) {
+                            break;
+                        }
+
+                        foreach ($transactions as $transaction) {
+                            if (!is_array($transaction)) {
+                                continue;
+                            }
+
+                            $externalId = $transaction['uuid'] ?? null;
+                            if (!is_string($externalId) || '' === $externalId) {
+                                $this->logger->warning('Bank import skipped transaction without uuid', [
+                                    'company' => $company->getId(),
+                                    'bank_code' => $bankCode,
+                                    'account_number' => $accountNumber,
+                                    'transaction' => $transaction,
+                                ]);
+                                continue;
+                            }
+
+                            if ($this->cashTransactionRepository->findOneByImport($company->getId(), $bankCode, $externalId)) {
+                                ++$transactionsSkipped;
+                                continue;
+                            }
+
+                            $occurredAt = $this->resolveOccurredAt($transaction);
+                            if (!$occurredAt instanceof DateTimeImmutable) {
+                                $this->logger->warning('Bank import skipped transaction without date', [
+                                    'company' => $company->getId(),
+                                    'bank_code' => $bankCode,
+                                    'account_number' => $accountNumber,
+                                    'external_id' => $externalId,
+                                ]);
+                                continue;
+                            }
+
+                            $amount = $this->resolveAmount($transaction);
+                            if (null === $amount) {
+                                $this->logger->warning('Bank import skipped transaction without amount', [
+                                    'company' => $company->getId(),
+                                    'bank_code' => $bankCode,
+                                    'account_number' => $accountNumber,
+                                    'external_id' => $externalId,
+                                ]);
+                                continue;
+                            }
+
+                            $currency = $this->resolveCurrency($transaction, $moneyAccount->getCurrency());
+                            $direction = $this->resolveDirection($transaction);
+                            if (!$direction instanceof CashDirection) {
+                                continue;
+                            }
+                            $description = $this->resolveDescription($transaction);
+
+                            $cashTransaction = new CashTransaction(
+                                Uuid::uuid4()->toString(),
+                                $company,
+                                $moneyAccount,
+                                $direction,
+                                $amount,
+                                $currency,
+                                $occurredAt,
+                            );
+                            $cashTransaction
+                                ->setExternalId($externalId)
+                                ->setImportSource($bankCode)
+                                ->setDescription($description);
+
+                            $this->entityManager->persist($cashTransaction);
+                            ++$transactionsCreated;
+                        }
+
+                        if (!$this->hasNextPage($response)) {
+                            break;
+                        }
+
+                        ++$page;
+                    }
+
+                    $this->entityManager->flush();
+                    $cursor->setLastImportedDate(new DateTimeImmutable($date->format('Y-m-d')));
+                    $this->cursorRepository->save($cursor);
+                }
             }
+
+            $this->finishImportLog($importLog, [
+                'bank' => $bankCode,
+                'accounts_found' => $totalAccountsFound,
+                'accounts_matched' => $matchedAccounts,
+                'transactions_created' => $transactionsCreated,
+                'transactions_skipped_duplicates' => $transactionsSkipped,
+            ], $transactionsCreated, $transactionsSkipped, 0);
+        } catch (\Throwable $exception) {
+            $this->finishImportLog($importLog, [
+                'error' => $exception->getMessage(),
+            ], $transactionsCreated, $transactionsSkipped, 1);
+
+            throw $exception;
         }
     }
 
@@ -291,5 +322,24 @@ class BankImportService
 
         $description = trim($description);
         return '' !== $description ? $description : null;
+    }
+
+    private function finishImportLog(
+        ImportLog $importLog,
+        array $payload,
+        int $createdCount,
+        int $skippedDuplicates,
+        int $errorsCount
+    ): void {
+        $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (false === $encodedPayload) {
+            $encodedPayload = '{"error":"Failed to encode import payload"}';
+        }
+
+        $importLog->setCreatedCount($createdCount);
+        $importLog->setSkippedDuplicates($skippedDuplicates);
+        $importLog->setErrorsCount($errorsCount);
+        $importLog->setFileName($encodedPayload);
+        $this->importLogger->finish($importLog);
     }
 }
