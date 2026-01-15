@@ -41,17 +41,22 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('DROP INDEX uniq_balance_link');
         $this->addSql('ALTER TABLE balance_category_links ALTER source_type TYPE VARCHAR(255)');
         $this->addSql('ALTER INDEX idx_balance_link_company RENAME TO IDX_D79DC3BA979B1AD6');
-        $this->addSql('ALTER TABLE bot_links ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
-        $this->addSql('COMMENT ON COLUMN bot_links.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        if ($schema->hasTable('bot_links') && !$schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('ALTER TABLE bot_links ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
+        }
+
+        if ($schema->hasTable('bot_links') && $schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('COMMENT ON COLUMN bot_links.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        }
         $this->addSql('ALTER TABLE cash_transaction ALTER allocated_amount DROP DEFAULT');
         $this->addSql('ALTER INDEX idx_cashflow_categories_pl_category RENAME TO IDX_EAB5C38D98B34054');
         $this->addSql('ALTER TABLE document_operations DROP CONSTRAINT fk_doc_ops_project_direction');
         $this->addSql('ALTER TABLE document_operations ALTER project_direction_id DROP NOT NULL');
-        $this->addSql('ALTER INDEX idx_doc_oper_project_direction RENAME TO IDX_89D7F81E85D43DF4');
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'idx_doc_oper_project_direction') THEN ALTER INDEX idx_doc_oper_project_direction RENAME TO IDX_89D7F81E85D43DF4; END IF; END $$;");
         $this->addSql('ALTER TABLE documents ALTER project_direction_id DROP NOT NULL');
         $this->addSql('ALTER TABLE documents ALTER status TYPE VARCHAR(255)');
         $this->addSql('ALTER INDEX idx_documents_cash_transaction RENAME TO IDX_A2B07288435DB913');
-        $this->addSql('ALTER INDEX idx_documents_project_direction RENAME TO IDX_A2B0728885D43DF4');
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'idx_documents_project_direction') THEN ALTER INDEX idx_documents_project_direction RENAME TO IDX_A2B0728885D43DF4; END IF; END $$;");
         $this->addSql('ALTER TABLE finance_loan ALTER start_date TYPE DATE');
         $this->addSql('ALTER TABLE finance_loan ALTER end_date TYPE DATE');
         $this->addSql('COMMENT ON COLUMN finance_loan.start_date IS \'(DC2Type:date_immutable)\'');
@@ -59,11 +64,17 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('ALTER TABLE finance_loan_payment_schedule ALTER due_date TYPE DATE');
         $this->addSql('COMMENT ON COLUMN finance_loan_payment_schedule.due_date IS \'(DC2Type:date_immutable)\'');
         $this->addSql('DROP INDEX idx_pl_daily_company_cat_date');
-        $this->addSql('ALTER TABLE telegram_bots DROP CONSTRAINT fk_dacd6ed979b1ad6');
-        $this->addSql('DROP INDEX idx_dacd6ed979b1ad6');
-        $this->addSql('ALTER TABLE telegram_bots ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
-        $this->addSql('ALTER TABLE telegram_bots DROP company_id');
-        $this->addSql('COMMENT ON COLUMN telegram_bots.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_constraint WHERE lower(conname) = lower('fk_dacd6ed979b1ad6')) THEN ALTER TABLE telegram_bots DROP CONSTRAINT fk_dacd6ed979b1ad6; END IF; END $$;");
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'idx_dacd6ed979b1ad6') THEN DROP INDEX idx_dacd6ed979b1ad6; END IF; END $$;");
+        if ($schema->hasTable('telegram_bots') && !$schema->getTable('telegram_bots')->hasColumn('updated_at')) {
+            $this->addSql('ALTER TABLE telegram_bots ADD updated_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL');
+        }
+        if ($schema->hasTable('telegram_bots') && $schema->getTable('telegram_bots')->hasColumn('company_id')) {
+            $this->addSql('ALTER TABLE telegram_bots DROP company_id');
+        }
+        if ($schema->hasTable('telegram_bots') && $schema->getTable('telegram_bots')->hasColumn('updated_at')) {
+            $this->addSql('COMMENT ON COLUMN telegram_bots.updated_at IS \'(DC2Type:datetime_immutable)\'');
+        }
         $this->addSql('ALTER INDEX idx_wb_report_detail_mappings_company RENAME TO IDX_C7426B75979B1AD6');
         $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp DROP DEFAULT');
         $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor DROP DEFAULT');
@@ -85,9 +96,9 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('ALTER TABLE documents ALTER project_direction_id SET NOT NULL');
         $this->addSql('ALTER TABLE documents ALTER status TYPE VARCHAR(32)');
         $this->addSql('ALTER INDEX idx_a2b07288435db913 RENAME TO idx_documents_cash_transaction');
-        $this->addSql('ALTER INDEX idx_a2b0728885d43df4 RENAME TO idx_documents_project_direction');
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'idx_a2b0728885d43df4') THEN ALTER INDEX idx_a2b0728885d43df4 RENAME TO idx_documents_project_direction; END IF; END $$;");
         $this->addSql('ALTER TABLE document_operations ALTER project_direction_id SET NOT NULL');
-        $this->addSql('ALTER INDEX idx_89d7f81e85d43df4 RENAME TO idx_doc_oper_project_direction');
+        $this->addSql("DO $$ BEGIN IF EXISTS (SELECT 1 FROM pg_class WHERE relname = 'idx_89d7f81e85d43df4') THEN ALTER INDEX idx_89d7f81e85d43df4 RENAME TO idx_doc_oper_project_direction; END IF; END $$;");
         $this->addSql('CREATE INDEX idx_pl_daily_company_cat_date ON pl_daily_totals (company_id, pl_category_id, date, project_direction_id)');
         $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_count_spp SET DEFAULT 0');
         $this->addSql('ALTER TABLE wildberries_rnp_daily ALTER orders_sum_spp_minor SET DEFAULT 0');
@@ -114,7 +125,9 @@ final class Version20260115105426 extends AbstractMigration
         $this->addSql('ALTER TABLE "telegram_bots" DROP updated_at');
         $this->addSql('ALTER TABLE "telegram_bots" ADD CONSTRAINT fk_dacd6ed979b1ad6 FOREIGN KEY (company_id) REFERENCES companies (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
         $this->addSql('CREATE INDEX idx_dacd6ed979b1ad6 ON "telegram_bots" (company_id)');
-        $this->addSql('ALTER TABLE "bot_links" DROP updated_at');
+        if ($schema->hasTable('bot_links') && $schema->getTable('bot_links')->hasColumn('updated_at')) {
+            $this->addSql('ALTER TABLE "bot_links" DROP updated_at');
+        }
         $this->addSql('ALTER INDEX idx_eab5c38d98b34054 RENAME TO idx_cashflow_categories_pl_category');
         $this->addSql('ALTER TABLE finance_loan ALTER start_date TYPE DATE');
         $this->addSql('ALTER TABLE finance_loan ALTER end_date TYPE DATE');
