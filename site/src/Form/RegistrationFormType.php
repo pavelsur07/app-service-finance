@@ -59,6 +59,7 @@ class RegistrationFormType extends AbstractType
                 ],
             ])
             ->add('website', TextType::class, [
+                'label' => false,
                 'mapped' => false,
                 'required' => false,
                 'attr' => [
