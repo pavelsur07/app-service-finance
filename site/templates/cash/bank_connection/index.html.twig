@@ -45,6 +45,12 @@
                                 <a href="{{ path('cash_bank_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
                                     <i class="ti ti-pencil"></i>
                                 </a>
+                                <form method="post" action="{{ path('cash_bank_connection_enqueue_import', {'id': connection.id}) }}" class="d-inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('enqueue_import_' ~ connection.id) }}">
+                                    <button class="btn btn-sm btn-outline-primary" title="Запустить импорт сейчас">
+                                        Запустить импорт сейчас
+                                    </button>
+                                </form>
                                 <form method="post" action="{{ path('cash_bank_connection_delete', {'id': connection.id}) }}" class="d-inline" onsubmit="return confirm('Удалить подключение?');">
                                     <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
                                     <button class="btn btn-icon btn-danger" title="Удалить">
