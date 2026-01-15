@@ -4,6 +4,7 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Form\Bank\BankConnectionType;
+use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -11,13 +12,16 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/bank-connections')]
 class BankConnectionController extends AbstractController
 {
-    public function __construct(private ActiveCompanyService $activeCompanyService)
-    {
+    public function __construct(
+        private ActiveCompanyService $activeCompanyService,
+        private MessageBusInterface $bus,
+    ) {
     }
 
     #[Route('/', name: 'cash_bank_connection_index', methods: ['GET'])]
@@ -117,6 +121,33 @@ class BankConnectionController extends AbstractController
             $em->remove($connection);
             $em->flush();
         }
+
+        return $this->redirectToRoute('cash_bank_connection_index');
+    }
+
+    #[Route('/{id}/enqueue-import', name: 'cash_bank_connection_enqueue_import', methods: ['POST'])]
+    public function enqueueImport(
+        Request $request,
+        string $id,
+        BankConnectionRepository $repository,
+    ): Response {
+        $company = $this->activeCompanyService->getActiveCompany();
+        $connection = $repository->find($id);
+
+        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('enqueue_import_'.$connection->getId(), (string) $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException();
+        }
+
+        $this->bus->dispatch(new BankImportMessage(
+            (string) $company->getId(),
+            $connection->getBankCode(),
+        ));
+
+        $this->addFlash('success', 'Импорт поставлен в очередь');
 
         return $this->redirectToRoute('cash_bank_connection_index');
     }
