@@ -1,0 +1,18 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Новое подключение{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Новое подключение</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        {% include 'cash/bank_connection/_form.html.twig' with {form: form, button_label: 'Создать'} %}
+    </div>
+{% endblock %}

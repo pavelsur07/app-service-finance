@@ -1,0 +1,66 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Подключения банков{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Подключения банков</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('cash_bank_connection_new') }}" class="btn btn-primary">Добавить</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Банк</th>
+                            <th>Base URL</th>
+                            <th>Активно</th>
+                            <th>Обновлено</th>
+                            <th class="w-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for connection in connections %}
+                        <tr>
+                            <td>{{ connection.bankCode }}</td>
+                            <td>{{ connection.baseUrl }}</td>
+                            <td>
+                                {% if connection.isActive %}
+                                    <span class="badge bg-green">Да</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Нет</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('cash_bank_connection_edit', {'id': connection.id}) }}" class="btn btn-icon" title="Редактировать">
+                                    <i class="ti ti-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('cash_bank_connection_delete', {'id': connection.id}) }}" class="d-inline" onsubmit="return confirm('Удалить подключение?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
+                                    <button class="btn btn-icon btn-danger" title="Удалить">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-secondary">Подключений ещё нет.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
