@@ -4,3 +4,7 @@ framework:
             policy: fixed_window
             limit: 60
             interval: '1 minute'
+        registration:
+            policy: fixed_window
+            limit: 5
+            interval: '10 minutes'

@@ -6,6 +6,7 @@ use App\Entity\Company;
 use App\Entity\User;
 use App\Form\RegistrationFormType;
 use App\Message\SendRegistrationEmailMessage;
+use App\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -28,6 +29,7 @@ class RegistrationController extends AbstractController
         Security $security,
         EntityManagerInterface $entityManager,
         MessageBusInterface $bus,
+        RegistrationRateLimiter $registrationRateLimiter,
     ): Response {
         $user = new User(id: Uuid::uuid4()->toString());
         $form = $this->createForm(RegistrationFormType::class, $user, [
@@ -35,6 +37,17 @@ class RegistrationController extends AbstractController
             // 'attr' => ['class' => 'needs-validation', 'novalidate' => 'novalidate'],
         ]);
         $form->handleRequest($request);
+
+        if ($form->isSubmitted()) {
+            $ip = $request->getClientIp() ?? 'unknown';
+            if (!$registrationRateLimiter->consume($ip)) {
+                $form->addError(new FormError(self::GENERIC_REG_ERROR));
+
+                return $this->render('security/register.html.twig', [
+                    'registrationForm' => $form,
+                ]);
+            }
+        }
 
         if ($form->isSubmitted() && $form->get('website')->getData()) {
             $form->addError(new FormError(self::GENERIC_REG_ERROR));

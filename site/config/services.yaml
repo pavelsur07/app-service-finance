@@ -43,6 +43,10 @@ services:
         arguments:
             $factory: '@?limiter.reports_api'
 
+    App\Service\RateLimiter\RegistrationRateLimiter:
+        arguments:
+            $factory: '@?limiter.registration'
+
     App\Service\FeatureFlagService:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
