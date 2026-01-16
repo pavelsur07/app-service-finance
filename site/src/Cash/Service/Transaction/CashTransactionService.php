@@ -7,10 +7,13 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
+use App\Cash\Service\Vat\VatCalculator;
+use App\Cash\Service\Vat\VatPolicy;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
+use App\Enum\CashDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Service\DailyBalanceRecalculator;
@@ -27,6 +30,8 @@ class CashTransactionService
         private CashTransactionRepository $txRepo,
         private MessageBusInterface $messageBus,
         private PaymentPlanMatcher $paymentPlanMatcher,
+        private VatPolicy $vatPolicy,
+        private VatCalculator $vatCalculator,
     ) {
     }
 
@@ -121,6 +126,8 @@ class CashTransactionService
         $tx->setImportSource($dto->importSource);
         $tx->setExternalId($dto->externalId);
 
+        $this->applyVat($tx, $company, $dto->direction, $dto->amount);
+
         // Сохраняем
         $this->em->persist($tx);
         $this->em->flush(); // ← flush перед пересчётом обязателен
@@ -185,6 +192,8 @@ class CashTransactionService
             ->setCashflowCategory($category)
             ->setProjectDirection($projectDirection);
 
+        $this->applyVat($tx, $company, $dto->direction, $dto->amount);
+
         // Сохраняем изменения
         $this->em->flush(); // ← flush перед пересчётом обязателен
 
@@ -207,6 +216,22 @@ class CashTransactionService
         }
 
         return $tx;
+    }
+
+    private function applyVat(CashTransaction $tx, Company $company, CashDirection $direction, string $amount): void
+    {
+        $rate = $this->vatPolicy->decideForCash($company, $direction);
+
+        if (null === $rate) {
+            $tx->setVatRatePercent(null);
+            $tx->setVatAmount(null);
+
+            return;
+        }
+
+        $split = $this->vatCalculator->splitGross((float) $amount, $rate);
+        $tx->setVatRatePercent($rate);
+        $tx->setVatAmount($split['vat']);
     }
 
     /**

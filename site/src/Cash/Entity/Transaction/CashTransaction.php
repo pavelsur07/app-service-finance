@@ -52,6 +52,12 @@ class CashTransaction
     #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $amount;
 
+    #[ORM\Column(type: 'smallint', nullable: true)]
+    private ?int $vatRatePercent = null;
+
+    #[ORM\Column(type: 'decimal', precision: 18, scale: 2, nullable: true)]
+    private ?string $vatAmount = null;
+
     #[ORM\Column(length: 3)]
     private string $currency;
 
@@ -195,6 +201,30 @@ class CashTransaction
     public function setAmount(string $a): self
     {
         $this->amount = $a;
+
+        return $this;
+    }
+
+    public function getVatRatePercent(): ?int
+    {
+        return $this->vatRatePercent;
+    }
+
+    public function setVatRatePercent(?int $vatRatePercent): self
+    {
+        $this->vatRatePercent = $vatRatePercent;
+
+        return $this;
+    }
+
+    public function getVatAmount(): ?string
+    {
+        return $this->vatAmount;
+    }
+
+    public function setVatAmount(?string $vatAmount): self
+    {
+        $this->vatAmount = $vatAmount;
 
         return $this;
     }
