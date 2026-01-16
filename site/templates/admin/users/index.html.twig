@@ -11,6 +11,25 @@
     </div>
   </div>
 
+  <div class="row row-cards mt-3">
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">Всего пользователей</div>
+          <div class="h1 mb-0">{{ totalUsers }}</div>
+        </div>
+      </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+      <div class="card">
+        <div class="card-body">
+          <div class="subheader">За последние 7 дн.</div>
+          <div class="h1 mb-0">{{ recentUsers }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="card mt-3">
     <div class="card-body">
       {% if users is not empty %}
