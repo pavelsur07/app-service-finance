@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Enum\CompanyTaxSystem;
 use App\Marketplace\Ozon\Entity\OzonProduct;
 use App\Marketplace\Wildberries\Entity\WildberriesSale;
 use Doctrine\Common\Collections\ArrayCollection;
@@ -39,6 +40,9 @@ class Company
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $financeLockBefore = null;
+
+    #[ORM\Column(enumType: CompanyTaxSystem::class, nullable: true)]
+    private ?CompanyTaxSystem $taxSystem = null;
 
     #[ORM\OneToMany(targetEntity: OzonProduct::class, mappedBy: 'company', orphanRemoval: true)]
     private Collection $ozonProducts;
@@ -150,6 +154,18 @@ class Company
     public function setFinanceLockBefore(?\DateTimeImmutable $date): self
     {
         $this->financeLockBefore = $date ? $date->setTime(0, 0) : null;
+
+        return $this;
+    }
+
+    public function getTaxSystem(): ?CompanyTaxSystem
+    {
+        return $this->taxSystem;
+    }
+
+    public function setTaxSystem(?CompanyTaxSystem $taxSystem): self
+    {
+        $this->taxSystem = $taxSystem;
 
         return $this;
     }

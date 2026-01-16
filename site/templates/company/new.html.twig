@@ -32,6 +32,9 @@
                     {{ form_errors(form.ozonApiKey) }}
                 </div>
                 <div class="mb-3">
+                    {{ form_row(form.taxSystem) }}
+                </div>
+                <div class="mb-3">
                     {{ form_row(form.financeLockBefore) }}
                 </div>
                 <button class="btn btn-primary">{{ company is defined ? 'Сохранить' : 'Создать' }}</button>

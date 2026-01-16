@@ -3,7 +3,9 @@
 namespace App\Form;
 
 use App\Entity\Company;
+use App\Enum\CompanyTaxSystem;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\FormBuilderInterface;
@@ -33,6 +35,14 @@ class CompanyType extends AbstractType
             ->add('ozonApiKey', TextType::class, [
                 'label' => 'Ozon API ключ',
                 'required' => false,
+            ])
+            ->add('taxSystem', ChoiceType::class, [
+                'label' => 'Налоговый режим (НДС)',
+                'choices' => CompanyTaxSystem::cases(),
+                'choice_label' => static fn (CompanyTaxSystem $choice) => $choice->label(),
+                'placeholder' => 'Не выбран',
+                'required' => false,
+                'attr' => ['class' => 'form-control'],
             ])
             ->add('financeLockBefore', DateType::class, [
                 'widget' => 'single_text',
