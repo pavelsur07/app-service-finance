@@ -26,9 +26,13 @@ final class UserController extends AbstractController
     #[Route('', name: 'index', methods: ['GET'])]
     public function index(UserRepository $userRepository): Response
     {
+        $lastWeek = new \DateTimeImmutable('-7 days');
+
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
             'users' => $userRepository->getRegisteredUsers(),
+            'totalUsers' => $userRepository->countRegisteredUsers(),
+            'recentUsers' => $userRepository->countRegisteredUsersSince($lastWeek),
         ]);
     }
 
