@@ -60,6 +60,11 @@
                     {{ form_start(registrationForm, {
                         attr: { id: 'signupForm', class: 'needs-validation', novalidate: 'novalidate' }
                     }) }}
+                    {% if registrationForm.vars.errors|length > 0 %}
+                        <div class="alert alert-danger" role="alert">
+                            {{ form_errors(registrationForm) }}
+                        </div>
+                    {% endif %}
                     <div class="row g-3">
                         <div class="col-12">
                             {{ form_label(registrationForm.companyName, 'Имя компании', { label_attr: { class: 'form-label small' } }) }}
