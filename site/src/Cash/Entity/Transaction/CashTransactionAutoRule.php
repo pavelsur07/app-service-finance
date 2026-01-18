@@ -3,11 +3,11 @@
 namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
-use App\Enum\CashTransactionAutoRuleOperationType;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

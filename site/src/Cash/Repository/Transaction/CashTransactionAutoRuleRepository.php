@@ -5,8 +5,8 @@ namespace App\Cash\Repository\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Entity\Company;
-use App\Enum\CashTransactionAutoRuleOperationType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
