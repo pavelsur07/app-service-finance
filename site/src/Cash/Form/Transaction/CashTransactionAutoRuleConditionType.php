@@ -3,8 +3,8 @@
 namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Entity\Counterparty;
-use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

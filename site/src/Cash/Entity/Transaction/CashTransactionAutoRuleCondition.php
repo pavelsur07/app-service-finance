@@ -2,9 +2,9 @@
 
 namespace App\Cash\Entity\Transaction;
 
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleConditionRepository;
 use App\Entity\Counterparty;
-use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
