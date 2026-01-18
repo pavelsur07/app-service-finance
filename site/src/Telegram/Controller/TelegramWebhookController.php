@@ -4,7 +4,7 @@ namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Enum\CashDirection;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;

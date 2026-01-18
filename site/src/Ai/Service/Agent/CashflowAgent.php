@@ -15,11 +15,11 @@ use App\Ai\Repository\AiSuggestionRepository;
 use App\Ai\Service\Llm\LlmClient;
 use App\Ai\Service\Llm\LlmOptions;
 use App\Ai\Service\Prompt\CashflowPromptBuilder;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Entity\Company;
-use App\Enum\CashDirection;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('app.ai.agent')]

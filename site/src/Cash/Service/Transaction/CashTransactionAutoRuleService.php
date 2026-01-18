@@ -4,9 +4,9 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
-use App\Enum\CashDirection;
 use App\Enum\CashTransactionAutoRuleConditionField;
 use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Util\StringNormalizer;

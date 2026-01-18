@@ -3,12 +3,12 @@
 namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\ProjectDirection;
-use App\Enum\CashDirection;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
