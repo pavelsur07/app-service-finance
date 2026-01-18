@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use Doctrine\ORM\Mapping as ORM;

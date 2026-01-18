@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
@@ -15,7 +16,6 @@ use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Service\ActiveCompanyService;

@@ -2,7 +2,7 @@
 
 namespace App\Cash\Service\PaymentPlan;
 
-use App\Entity\PaymentPlan;
+use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Entity\PaymentRecurrenceRule;
 
 final class PaymentRecurrenceService

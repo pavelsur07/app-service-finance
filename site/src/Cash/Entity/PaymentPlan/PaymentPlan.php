@@ -1,10 +1,13 @@
 <?php
 
-namespace App\Entity;
+namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
+use App\Entity\Company;
+use App\Entity\Counterparty;
+use App\Entity\PaymentRecurrenceRule;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;
 use Doctrine\ORM\Mapping as ORM;
