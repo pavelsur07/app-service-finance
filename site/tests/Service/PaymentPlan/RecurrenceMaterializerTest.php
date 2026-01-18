@@ -4,6 +4,7 @@ namespace App\Tests\Service\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
+use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
@@ -12,7 +13,6 @@ use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\PaymentRecurrenceRule;
 use App\Entity\User;
 use App\Enum\CounterpartyType;
 use App\Enum\MoneyAccountType;

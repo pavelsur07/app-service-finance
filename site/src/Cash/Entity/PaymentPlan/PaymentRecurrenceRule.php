@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Entity;
+namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
+use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

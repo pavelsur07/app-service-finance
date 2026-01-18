@@ -2,8 +2,8 @@
 
 namespace App\Cash\Repository\PaymentPlan;
 
+use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Entity\Company;
-use App\Entity\PaymentRecurrenceRule;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

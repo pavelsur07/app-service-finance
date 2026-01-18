@@ -3,10 +3,10 @@
 namespace App\Tests\Service\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
+use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Entity\Company;
-use App\Entity\PaymentRecurrenceRule;
 use App\Entity\User;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
