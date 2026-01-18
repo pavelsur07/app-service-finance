@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller;
+namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Entity\Company;
