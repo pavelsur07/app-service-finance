@@ -4,9 +4,9 @@ namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransactionAutoRule;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
-use App\Enum\CashTransactionAutoRuleAction;
 use App\Enum\CashTransactionAutoRuleOperationType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
