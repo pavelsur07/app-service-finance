@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\_support\Kernel;
+namespace App\Tests\Support\Kernel;
 
-use App\Tests\_support\Db\DbReset;
+use App\Tests\Support\Db\DbReset;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 

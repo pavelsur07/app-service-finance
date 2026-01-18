@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Shared;
 
-use App\Tests\_support\Kernel\WebTestCaseBase;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class MoneyAccountCreateAccessTest extends WebTestCaseBase
 {

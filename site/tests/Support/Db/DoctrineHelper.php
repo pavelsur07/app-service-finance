@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\_support\Db;
+namespace App\Tests\Support\Db;
 
 use Doctrine\ORM\EntityManagerInterface;
 

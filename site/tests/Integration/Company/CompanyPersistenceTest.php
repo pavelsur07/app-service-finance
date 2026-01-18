@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Integration\Shared;
+namespace App\Tests\Integration\Company;
 
 use App\Entity\Company;
-use App\Tests\_support\Kernel\KernelTestCaseBase;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\KernelTestCaseBase;
 
 final class CompanyPersistenceTest extends KernelTestCaseBase
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Tests\Integration\Finance\Fixtures;
+namespace App\Tests\Integration\Finance\Fixtures;
 
 use App\Entity\Company;
 use App\Entity\PLCategory;

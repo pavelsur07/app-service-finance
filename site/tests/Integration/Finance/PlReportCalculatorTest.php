@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Tests\Integration\Finance;
+namespace App\Tests\Integration\Finance;
 
 use App\Entity\Company;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
+use App\Tests\Integration\Finance\Fixtures\MiniTreeFactory;
 use PHPUnit\Framework\TestCase;
-use Tests\Integration\Finance\Fixtures\MiniTreeFactory;
 
 final class PlReportCalculatorTest extends TestCase
 {
