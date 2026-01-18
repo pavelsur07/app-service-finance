@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Controller\Settings;
+namespace App\Company\Controller;
 
 use App\Service\ActiveCompanyService;
 use App\Service\ReportApiKeyManager;
