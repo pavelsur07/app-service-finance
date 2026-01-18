@@ -2,7 +2,7 @@
 
 namespace App\Cash\Repository\Import;
 
-use App\Entity\ImportLog;
+use App\Cash\Entity\Import\ImportLog;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

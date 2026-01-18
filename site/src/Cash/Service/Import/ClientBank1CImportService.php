@@ -3,12 +3,12 @@
 namespace App\Cash\Service\Import;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
+use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\ImportLog;
 use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
 use App\Repository\CounterpartyRepository;

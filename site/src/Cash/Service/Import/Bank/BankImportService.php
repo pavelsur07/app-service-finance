@@ -4,14 +4,14 @@ namespace App\Cash\Service\Import\Bank;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Bank\BankConnection;
+use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\Bank\Provider\BankStatementsProviderInterface;
+use App\Cash\Service\Import\ImportLogger;
 use App\Entity\Company;
-use App\Entity\ImportLog;
 use App\Enum\CashDirection;
 use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;

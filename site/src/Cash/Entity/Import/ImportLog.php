@@ -1,8 +1,9 @@
 <?php
 
-namespace App\Entity;
+namespace App\Cash\Entity\Import;
 
 use App\Cash\Repository\Import\ImportLogRepository;
+use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ImportLogRepository::class)]

@@ -2,8 +2,8 @@
 
 namespace App\Cash\Service\Import;
 
+use App\Cash\Entity\Import\ImportLog;
 use App\Entity\Company;
-use App\Entity\ImportLog;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
