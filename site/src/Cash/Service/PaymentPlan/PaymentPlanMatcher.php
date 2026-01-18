@@ -3,10 +3,10 @@
 namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
+use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Entity\PaymentPlanMatch;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;

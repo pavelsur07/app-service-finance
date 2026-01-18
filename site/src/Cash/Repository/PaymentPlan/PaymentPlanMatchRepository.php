@@ -2,8 +2,8 @@
 
 namespace App\Cash\Repository\PaymentPlan;
 
+use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Entity\PaymentPlanMatch;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

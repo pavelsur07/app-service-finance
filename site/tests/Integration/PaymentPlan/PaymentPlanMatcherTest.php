@@ -4,6 +4,7 @@ namespace App\Tests\Integration\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
+use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
@@ -12,7 +13,6 @@ use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\PaymentPlanMatch;
 use App\Entity\User;
 use App\Enum\CashDirection;
 use App\Enum\CounterpartyType;
