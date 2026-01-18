@@ -6,9 +6,9 @@ namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
+use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\DTO\ForecastDTO;
 use App\Entity\Company;
-use App\Repository\PaymentPlanRepository;
 
 final class ForecastBalanceService
 {
