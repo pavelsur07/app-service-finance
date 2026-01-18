@@ -3,8 +3,8 @@
 namespace App\Cash\Form\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Entity\PLCategory;
-use App\Enum\CashflowCategoryStatus;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
