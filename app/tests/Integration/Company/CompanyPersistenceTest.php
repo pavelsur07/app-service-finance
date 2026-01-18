@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Shared;
 
 use App\Entity\Company;
-use App\Tests\Builders\Shared\CompanyBuilder;
-use App\Tests\Builders\Shared\UserBuilder;
 use App\Tests\_support\Kernel\KernelTestCaseBase;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 
 final class CompanyPersistenceTest extends KernelTestCaseBase
 {

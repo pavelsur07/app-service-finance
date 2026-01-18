@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Builders\Shared;
+namespace App\Tests\Builders\Company;
 
 use App\Entity\User;
 use InvalidArgumentException;

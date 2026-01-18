@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Company;
 
-use App\Tests\Builders\Shared\UserBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\TestCase;
 
 final class UserOwnerRolesTest extends TestCase
