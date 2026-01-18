@@ -3,11 +3,11 @@
 namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
+use App\Cash\Repository\PaymentPlan\PaymentRecurrenceRuleRepository;
 use App\Entity\Company;
 use App\Entity\PaymentPlan;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
-use App\Repository\PaymentRecurrenceRuleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repository;
+namespace App\Cash\Repository\PaymentPlan;
 
 use App\Entity\Company;
 use App\Entity\PaymentRecurrenceRule;
