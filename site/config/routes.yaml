@@ -4,6 +4,12 @@ controllers:
         namespace: App\Controller
     type: attribute
 
+company_controllers:
+    resource:
+        path: ../src/Company/Controller/
+        namespace: App\Company\Controller
+    type: attribute
+
 ai_controllers:
     resource:
         path: ../src/Ai/Controller/
