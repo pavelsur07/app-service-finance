@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Repository\ImportLogRepository;
+use App\Cash\Repository\Import\ImportLogRepository;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: ImportLogRepository::class)]

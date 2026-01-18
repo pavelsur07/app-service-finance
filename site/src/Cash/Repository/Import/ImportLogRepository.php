@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repository;
+namespace App\Cash\Repository\Import;
 
 use App\Entity\ImportLog;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;

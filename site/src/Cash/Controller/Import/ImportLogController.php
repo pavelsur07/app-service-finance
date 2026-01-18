@@ -2,7 +2,7 @@
 
 namespace App\Cash\Controller\Import;
 
-use App\Repository\ImportLogRepository;
+use App\Cash\Repository\Import\ImportLogRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
