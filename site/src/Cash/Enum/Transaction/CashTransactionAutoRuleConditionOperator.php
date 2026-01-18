@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Enum;
+namespace App\Cash\Enum\Transaction;
 
 enum CashTransactionAutoRuleConditionOperator: string
 {

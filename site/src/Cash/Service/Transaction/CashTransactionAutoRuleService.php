@@ -7,8 +7,8 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
+use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
-use App\Enum\CashTransactionAutoRuleConditionOperator;
 use App\Util\StringNormalizer;
 use Doctrine\ORM\EntityManagerInterface;
 
