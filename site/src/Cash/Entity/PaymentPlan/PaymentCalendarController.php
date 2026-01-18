@@ -2,10 +2,9 @@
 
 declare(strict_types=1);
 
-namespace App\Finance\Controller;
+namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
