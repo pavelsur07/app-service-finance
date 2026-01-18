@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Repository;
+namespace App\Cash\Repository\PaymentPlan;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\PaymentPlanMatch;

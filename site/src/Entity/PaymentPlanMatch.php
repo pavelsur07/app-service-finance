@@ -3,7 +3,7 @@
 namespace App\Entity;
 
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Repository\PaymentPlanMatchRepository;
+use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
