@@ -3,8 +3,8 @@
 namespace App\Controller\Api;
 
 use App\Finance\Report\PlReportGridBuilder;
-use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Finance\Report\PlReportPeriod;
+use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\RateLimiter\ReportsApiRateLimiter;
 use App\Service\ReportApiKeyManager;
@@ -145,7 +145,7 @@ final class PublicPlReportController extends AbstractController
         $overhead = null;
         foreach ($projectDirections as $pd) {
             $name = mb_strtolower(trim((string) $pd->getName()));
-            if ($name === 'общий' || str_starts_with($name, 'общий')) {
+            if ('общий' === $name || str_starts_with($name, 'общий')) {
                 $overhead = $pd;
 
                 break;

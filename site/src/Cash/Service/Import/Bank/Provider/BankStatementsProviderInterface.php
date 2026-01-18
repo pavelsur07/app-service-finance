@@ -12,6 +12,6 @@ interface BankStatementsProviderInterface
         BankConnection $connection,
         string $accountNumber,
         \DateTimeInterface $date,
-        int $page
+        int $page,
     ): array;
 }

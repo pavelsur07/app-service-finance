@@ -3,8 +3,8 @@
 namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceLinkSourceType;
-use App\Entity\Company;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
+use App\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

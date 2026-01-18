@@ -103,8 +103,8 @@ class TelegramWebhookController extends AbstractController
 
             return $this->handleTextMessage($bot, $message, $text);
         } catch (\Throwable $e) {
-            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] ' . $e->getMessage());
-            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] file=' . $e->getFile() . ':' . $e->getLine());
+            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] '.$e->getMessage());
+            error_log('[TELEGRAM_WEBHOOK_EXCEPTION] file='.$e->getFile().':'.$e->getLine());
 
             return new JsonResponse(['status' => 'ok']);
         }
@@ -121,7 +121,7 @@ class TelegramWebhookController extends AbstractController
             $normalizedText = trim($text);
             [$startToken, $parsePath] = $this->extractStartToken($normalizedText);
 
-            if ($startToken === null || $startToken === '') {
+            if (null === $startToken || '' === $startToken) {
                 // Нет токена: подсказываем пользователю выполнить привязку корректно
                 if ($conn->isTransactionActive()) {
                     $conn->rollBack();
@@ -156,7 +156,7 @@ class TelegramWebhookController extends AbstractController
                 return $this->respondWithMessage($bot, $message, 'Ссылка истекла. Сгенерируйте новую.');
             }
 
-            if ($botLink->getUsedAt() !== null) {
+            if (null !== $botLink->getUsedAt()) {
                 if ($conn->isTransactionActive()) {
                     $conn->rollBack();
                 }
@@ -220,7 +220,7 @@ class TelegramWebhookController extends AbstractController
         $normalizedText = trim($text);
         $parts = preg_split('/\s+/', $normalizedText);
         $requestedMoneyAccountId = isset($parts[1]) ? trim($parts[1]) : null;
-        $requestedMoneyAccountId = $requestedMoneyAccountId === '' ? null : $requestedMoneyAccountId;
+        $requestedMoneyAccountId = '' === $requestedMoneyAccountId ? null : $requestedMoneyAccountId;
 
         $this->logger->info('Обработка /set_cash', [
             'chat_id' => $chatId,
@@ -271,7 +271,7 @@ class TelegramWebhookController extends AbstractController
                 return $this->respondWithMessageAndMenu($bot, $message, 'Касса не найдена или не принадлежит вашей компании.');
             }
 
-            if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
                 return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
@@ -292,10 +292,10 @@ class TelegramWebhookController extends AbstractController
             );
         }
 
-        if (count($clientBindings) === 1) {
+        if (1 === count($clientBindings)) {
             $clientBinding = $clientBindings[0];
 
-            if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+            if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
                 return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован администратором');
             }
 
@@ -380,7 +380,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessageAndMenu($bot, $message, 'Не найдена привязка. Отправьте /start.');
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessageAndMenu($bot, $message, 'Доступ заблокирован');
         }
 
@@ -426,12 +426,12 @@ class TelegramWebhookController extends AbstractController
         }
 
         $parts = explode(':', $callbackData);
-        if (count($parts) !== 3 || $parts[2] !== 'set_cash') {
+        if (3 !== count($parts) || 'set_cash' !== $parts[2]) {
             return new JsonResponse(['status' => 'ok']);
         }
 
         [$prefix, $bindingId] = [$parts[0], $parts[1]];
-        if ($prefix !== 'bind') {
+        if ('bind' !== $prefix) {
             return new JsonResponse(['status' => 'ok']);
         }
 
@@ -440,7 +440,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
         }
 
@@ -456,12 +456,12 @@ class TelegramWebhookController extends AbstractController
         }
 
         $parts = explode(':', $callbackData);
-        if (count($parts) !== 3) {
+        if (3 !== count($parts)) {
             return new JsonResponse(['status' => 'ok']);
         }
 
         [$prefix, $bindingEnc, $moneyAccountEnc] = $parts;
-        if ($prefix !== 'cash') {
+        if ('cash' !== $prefix) {
             return new JsonResponse(['status' => 'ok']);
         }
 
@@ -477,7 +477,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Привязка не найдена.');
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован администратором');
         }
 
@@ -535,7 +535,7 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $callbackQuery, 'Не найдена привязка. Отправьте /start.');
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $callbackQuery, 'Доступ заблокирован');
         }
 
@@ -579,9 +579,9 @@ class TelegramWebhookController extends AbstractController
             }
 
             $subscription->setPeriodicity($periodicity);
-        } elseif ($callbackData === 'rep:on') {
+        } elseif ('rep:on' === $callbackData) {
             $subscription->enable();
-        } elseif ($callbackData === 'rep:off') {
+        } elseif ('rep:off' === $callbackData) {
             $subscription->disable();
         } else {
             return new JsonResponse(['status' => 'ok']);
@@ -615,11 +615,11 @@ class TelegramWebhookController extends AbstractController
                 $statusCode = $response->getStatusCode();
                 $content = $response->getContent(false);
 
-                if ($statusCode !== 200) {
+                if (200 !== $statusCode) {
                     error_log(sprintf('Telegram editMessageText HTTP error: %d, chat=%s', $statusCode, $chatId));
                 } else {
                     $decoded = json_decode($content, true);
-                    if (is_array($decoded) && isset($decoded['ok']) && $decoded['ok'] === false) {
+                    if (is_array($decoded) && isset($decoded['ok']) && false === $decoded['ok']) {
                         $description = $decoded['description'] ?? 'unknown error';
                         error_log(sprintf('Telegram editMessageText API error: %s, chat=%s', $description, $chatId));
                     }
@@ -661,7 +661,7 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -709,8 +709,8 @@ class TelegramWebhookController extends AbstractController
 
         // Вычисляем хэш и готовим имя файла с сохранением расширения для наглядности
         $fileHash = hash('sha256', $fileContent);
-        $extension = pathinfo($originalFilename, PATHINFO_EXTENSION);
-        $normalizedExtension = $extension !== '' ? '.' . strtolower($extension) : '';
+        $extension = pathinfo($originalFilename, \PATHINFO_EXTENSION);
+        $normalizedExtension = '' !== $extension ? '.'.strtolower($extension) : '';
 
         $storageDir = sprintf('%s/var/storage/telegram-imports', $this->getParameter('kernel.project_dir'));
         if (!is_dir($storageDir) && !mkdir($storageDir, 0775, true) && !is_dir($storageDir)) {
@@ -749,15 +749,15 @@ class TelegramWebhookController extends AbstractController
     {
         $normalizedText = trim($text);
 
-        if ($normalizedText === '📊 Отчёты') {
+        if ('📊 Отчёты' === $normalizedText) {
             return $this->handleReports($bot, $message);
         }
 
-        if ($normalizedText === '💼 Выбрать кассу') {
+        if ('💼 Выбрать кассу' === $normalizedText) {
             return $this->handleSetCash($bot, $message, '/set_cash');
         }
 
-        if ($normalizedText === '➕ Добавить операцию') {
+        if ('➕ Добавить операцию' === $normalizedText) {
             return $this->respondWithMessage(
                 $bot,
                 $message,
@@ -766,7 +766,7 @@ class TelegramWebhookController extends AbstractController
             );
         }
 
-        if ($normalizedText === '📥 Загрузить выписку') {
+        if ('📥 Загрузить выписку' === $normalizedText) {
             return $this->respondWithMessage(
                 $bot,
                 $message,
@@ -775,7 +775,7 @@ class TelegramWebhookController extends AbstractController
             );
         }
 
-        if ($normalizedText === '⚙️ Помощь') {
+        if ('⚙️ Помощь' === $normalizedText) {
             return $this->respondWithMessage(
                 $bot,
                 $message,
@@ -814,7 +814,7 @@ class TelegramWebhookController extends AbstractController
             return new JsonResponse(['status' => 'ok']);
         }
 
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -824,7 +824,7 @@ class TelegramWebhookController extends AbstractController
         }
 
         $amount = $this->parseAmountFromText($text);
-        if ($amount === null) {
+        if (null === $amount) {
             return $this->respondWithMessage($bot, $message, 'Формат: потратил 2500 на рекламу');
         }
 
@@ -853,7 +853,7 @@ class TelegramWebhookController extends AbstractController
         $this->entityManager->persist($transaction);
         $this->entityManager->flush();
 
-        $directionLabel = $direction === CashDirection::INFLOW ? 'доход' : 'расход';
+        $directionLabel = CashDirection::INFLOW === $direction ? 'доход' : 'расход';
         $formattedAmount = $this->formatAmountForMessage($amount, $moneyAccount->getCurrency());
 
         return $this->respondWithMessage(
@@ -870,7 +870,7 @@ class TelegramWebhookController extends AbstractController
         }
 
         $raw = preg_replace('/\s+/u', '', $matches[0]);
-        if ($raw === null || $raw === '') {
+        if (null === $raw || '' === $raw) {
             return null;
         }
 
@@ -878,15 +878,15 @@ class TelegramWebhookController extends AbstractController
         $lastComma = strrpos($raw, ',');
         $decimalSeparator = null;
 
-        if ($lastDot !== false && $lastComma !== false) {
+        if (false !== $lastDot && false !== $lastComma) {
             $decimalSeparator = $lastDot > $lastComma ? '.' : ',';
-        } elseif ($lastDot !== false) {
+        } elseif (false !== $lastDot) {
             $decimalSeparator = '.';
-        } elseif ($lastComma !== false) {
+        } elseif (false !== $lastComma) {
             $decimalSeparator = ',';
         }
 
-        if ($decimalSeparator === ',') {
+        if (',' === $decimalSeparator) {
             $raw = str_replace('.', '', $raw);
             $raw = str_replace(',', '.', $raw);
         } else {
@@ -895,7 +895,7 @@ class TelegramWebhookController extends AbstractController
 
         [$integerPart, $fractionalPart] = array_pad(explode('.', $raw, 2), 2, '');
         $integerPart = ltrim($integerPart, '0');
-        $integerPart = $integerPart === '' ? '0' : $integerPart;
+        $integerPart = '' === $integerPart ? '0' : $integerPart;
 
         $fractionalPart = substr($fractionalPart, 0, 2);
         $fractionalPart = str_pad($fractionalPart, 2, '0');
@@ -943,11 +943,11 @@ class TelegramWebhookController extends AbstractController
     {
         [$integerPart, $fractionalPart] = array_pad(explode('.', $amount, 2), 2, '00');
         $fractionalPart = rtrim($fractionalPart, '0');
-        $fractionalPart = $fractionalPart === '' ? '' : ',' . str_pad($fractionalPart, 2, '0');
+        $fractionalPart = '' === $fractionalPart ? '' : ','.str_pad($fractionalPart, 2, '0');
 
         $formattedInteger = number_format((int) $integerPart, 0, '', ' ');
 
-        $symbol = $currency === 'RUB' ? '₽' : $currency;
+        $symbol = 'RUB' === $currency ? '₽' : $currency;
 
         return sprintf('%s%s %s', $formattedInteger, $fractionalPart, $symbol);
     }
@@ -1058,7 +1058,7 @@ class TelegramWebhookController extends AbstractController
             // Поддерживаем варианты: "/start <token>", "/start<token>", "/start start=<token>"
             $afterStart = trim(mb_substr($text, mb_strlen('/start')));
 
-            if ($afterStart !== '') {
+            if ('' !== $afterStart) {
                 if (str_starts_with($afterStart, 'start=')) {
                     $token = trim(mb_substr($afterStart, mb_strlen('start=')));
                     $path = '/start start=';
@@ -1073,12 +1073,12 @@ class TelegramWebhookController extends AbstractController
             }
         }
 
-        if ($token === null && preg_match('/^start[-=]([A-Za-z0-9_-]{20,})$/', $text, $matches)) {
+        if (null === $token && preg_match('/^start[-=]([A-Za-z0-9_-]{20,})$/', $text, $matches)) {
             $token = $matches[1];
             $path = 'start-prefix';
         }
 
-        if ($token === null && !str_starts_with($text, '/start') && preg_match('/^[A-Za-z0-9_-]{20,}$/', $text)) {
+        if (null === $token && !str_starts_with($text, '/start') && preg_match('/^[A-Za-z0-9_-]{20,}$/', $text)) {
             // Пользователь отправил один токен без команды
             $token = $text;
             $path = 'token-only';
@@ -1090,13 +1090,13 @@ class TelegramWebhookController extends AbstractController
     private function shortenText(?string $text): ?string
     {
         // Безопасно обрезаем текст для логов, чтобы не заливать длинные payload в stderr
-        if ($text === null) {
+        if (null === $text) {
             return null;
         }
 
         $trimmed = trim($text);
 
-        return mb_strlen($trimmed) > 200 ? mb_substr($trimmed, 0, 200) . '…' : $trimmed;
+        return mb_strlen($trimmed) > 200 ? mb_substr($trimmed, 0, 200).'…' : $trimmed;
     }
 
     private function extractChatId(?array $message, ?array $callbackQuery, ?array $editedMessage): ?int
@@ -1129,11 +1129,11 @@ class TelegramWebhookController extends AbstractController
         }
 
         // callback_query
-        if ($chatId === null && isset($message['message']['chat']['id'])) {
+        if (null === $chatId && isset($message['message']['chat']['id'])) {
             $chatId = (int) $message['message']['chat']['id'];
         }
 
-        if ($chatId === null) {
+        if (null === $chatId) {
             error_log('[TELEGRAM] chat_id not found, skip sendMessage');
 
             return new JsonResponse(['status' => 'ok']);
@@ -1148,11 +1148,11 @@ class TelegramWebhookController extends AbstractController
                         [
                             'chat_id' => $chatId,
                             'text' => $text,
-                            'reply_markup' => $replyMarkup !== null
-                                ? json_encode($replyMarkup, JSON_UNESCAPED_UNICODE)
+                            'reply_markup' => null !== $replyMarkup
+                                ? json_encode($replyMarkup, \JSON_UNESCAPED_UNICODE)
                                 : null,
                         ],
-                        static fn ($value) => $value !== null,
+                        static fn ($value) => null !== $value,
                     ),
                 ],
             );
@@ -1161,11 +1161,11 @@ class TelegramWebhookController extends AbstractController
             $statusCode = $response->getStatusCode();
             $content = $response->getContent(false);
 
-            if ($statusCode !== 200) {
+            if (200 !== $statusCode) {
                 error_log(sprintf('Telegram sendMessage HTTP error: %d, chat=%s, text="%s"', $statusCode, $chatId, $text));
             } else {
                 $decoded = json_decode($content, true);
-                if (is_array($decoded) && isset($decoded['ok']) && $decoded['ok'] === false) {
+                if (is_array($decoded) && isset($decoded['ok']) && false === $decoded['ok']) {
                     $description = $decoded['description'] ?? 'unknown error';
                     error_log(sprintf('Telegram sendMessage API error: %s, chat=%s, text="%s"', $description, $chatId, $text));
                 }
@@ -1179,7 +1179,7 @@ class TelegramWebhookController extends AbstractController
 
     private function sendMoneyAccountSelection(TelegramBot $bot, array $message, ClientBinding $clientBinding): Response
     {
-        if ($clientBinding->getStatus() === ClientBinding::STATUS_BLOCKED) {
+        if (ClientBinding::STATUS_BLOCKED === $clientBinding->getStatus()) {
             return $this->respondWithMessage($bot, $message, 'Доступ заблокирован администратором');
         }
 
@@ -1206,7 +1206,7 @@ class TelegramWebhookController extends AbstractController
             }
 
             $shortId = mb_substr((string) $account->getId(), -6);
-            $isSelected = $selectedMoneyAccountId !== null && $selectedMoneyAccountId === $account->getId();
+            $isSelected = null !== $selectedMoneyAccountId && $selectedMoneyAccountId === $account->getId();
             $lines[] = sprintf('- %s (%s)%s', $account->getName(), $shortId, $isSelected ? ' — выбрана' : '');
             $keyboard[] = [
                 [
@@ -1257,7 +1257,7 @@ class TelegramWebhookController extends AbstractController
         TelegramBot $bot,
         array $message,
         string $text,
-        ?array $replyMarkup = null
+        ?array $replyMarkup = null,
     ): Response {
         $response = $this->respondWithMessage($bot, $message, $text, $replyMarkup);
 
@@ -1277,12 +1277,12 @@ class TelegramWebhookController extends AbstractController
     {
         $base64 = strtr($encoded, '-_', '+/');
         $padding = strlen($base64) % 4;
-        if ($padding !== 0) {
+        if (0 !== $padding) {
             $base64 .= str_repeat('=', 4 - $padding);
         }
 
         $bytes = base64_decode($base64, true);
-        if ($bytes === false) {
+        if (false === $bytes) {
             throw new \InvalidArgumentException('Invalid encoded UUID');
         }
 

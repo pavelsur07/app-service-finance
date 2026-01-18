@@ -74,7 +74,7 @@ class CashTransactionRepository extends ServiceEntityRepository
      */
     public function sumByAccountAndPeriod(Company $company, array $accountIds, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
-        if ($accountIds === []) {
+        if ([] === $accountIds) {
             return [];
         }
 

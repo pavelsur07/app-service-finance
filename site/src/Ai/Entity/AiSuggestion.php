@@ -7,7 +7,6 @@ namespace App\Ai\Entity;
 use App\Ai\Enum\AiSuggestionSeverity;
 use App\Ai\Repository\AiSuggestionRepository;
 use App\Entity\Company;
-use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -54,7 +53,7 @@ class AiSuggestion
     private ?string $relatedEntityId = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $createdAt;
+    private \DateTimeImmutable $createdAt;
 
     public function __construct(
         Company $company,
@@ -62,7 +61,7 @@ class AiSuggestion
         AiRun $run,
         string $title,
         string $description,
-        AiSuggestionSeverity $severity
+        AiSuggestionSeverity $severity,
     ) {
         $this->id = Uuid::uuid4()->toString();
         $this->company = $company;
@@ -71,7 +70,7 @@ class AiSuggestion
         $this->title = $title;
         $this->description = $description;
         $this->severity = $severity;
-        $this->createdAt = new DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     public function getId(): string
@@ -145,7 +144,7 @@ class AiSuggestion
         $this->relatedEntityId = $entityId;
     }
 
-    public function getCreatedAt(): DateTimeImmutable
+    public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
     }

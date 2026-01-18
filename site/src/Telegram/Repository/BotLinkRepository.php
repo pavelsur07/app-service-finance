@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Telegram\Repository;
 
-use App\Telegram\Entity\BotLink;
 use App\Entity\Company;
+use App\Telegram\Entity\BotLink;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;

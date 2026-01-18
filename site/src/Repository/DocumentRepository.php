@@ -36,5 +36,4 @@ class DocumentRepository extends ServiceEntityRepository
 
         return $pager;
     }
-
 }

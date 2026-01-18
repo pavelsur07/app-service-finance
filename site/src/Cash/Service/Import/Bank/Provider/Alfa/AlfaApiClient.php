@@ -5,7 +5,6 @@ namespace App\Cash\Service\Import\Bank\Provider\Alfa;
 use App\Cash\Entity\Bank\BankConnection;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
-use RuntimeException;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -26,7 +25,7 @@ class AlfaApiClient
         BankConnection $connection,
         string $accountNumber,
         \DateTimeInterface $date,
-        int $page
+        int $page,
     ): array {
         return $this->request($connection, 'GET', '/jp/v1/statement/transactions', [
             'query' => [
@@ -52,13 +51,13 @@ class AlfaApiClient
                 'bank_connection_id' => $connection->getId(),
             ]);
 
-            throw new RuntimeException(sprintf('Alfa API request failed with status %d', $statusCode));
+            throw new \RuntimeException(sprintf('Alfa API request failed with status %d', $statusCode));
         }
 
         try {
             return $response->toArray(false);
         } catch (DecodingExceptionInterface $exception) {
-            throw new RuntimeException('Failed to decode Alfa API response', 0, $exception);
+            throw new \RuntimeException('Failed to decode Alfa API response', 0, $exception);
         }
     }
 

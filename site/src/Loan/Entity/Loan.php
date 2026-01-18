@@ -7,7 +7,6 @@ namespace App\Loan\Entity;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Loan\Repository\LoanRepository;
-use DateTimeImmutable;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
@@ -43,10 +42,10 @@ class Loan
     private ?string $interestRate = null;
 
     #[ORM\Column(type: 'date_immutable')]
-    private DateTimeImmutable $startDate;
+    private \DateTimeImmutable $startDate;
 
     #[ORM\Column(type: 'date_immutable', nullable: true)]
-    private ?DateTimeImmutable $endDate = null;
+    private ?\DateTimeImmutable $endDate = null;
 
     #[ORM\Column(type: Types::SMALLINT, nullable: true)]
     private ?int $paymentDayOfMonth = null;
@@ -64,10 +63,10 @@ class Loan
     private string $status;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $createdAt;
+    private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $updatedAt;
+    private \DateTimeImmutable $updatedAt;
 
     /**
      * @var Collection<int, LoanPaymentSchedule>
@@ -75,7 +74,7 @@ class Loan
     #[ORM\OneToMany(mappedBy: 'loan', targetEntity: LoanPaymentSchedule::class, orphanRemoval: true, cascade: ['persist'])]
     private Collection $paymentScheduleItems;
 
-    public function __construct(Company $company, string $name, string $principalAmount, DateTimeImmutable $startDate)
+    public function __construct(Company $company, string $name, string $principalAmount, \DateTimeImmutable $startDate)
     {
         $this->id = Uuid::uuid4()->toString();
         $this->company = $company;
@@ -84,8 +83,8 @@ class Loan
         $this->remainingPrincipal = $principalAmount;
         $this->startDate = $startDate;
         $this->status = 'active';
-        $this->createdAt = new DateTimeImmutable();
-        $this->updatedAt = new DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
         $this->paymentScheduleItems = new ArrayCollection();
     }
 
@@ -166,24 +165,24 @@ class Loan
         return $this;
     }
 
-    public function getStartDate(): DateTimeImmutable
+    public function getStartDate(): \DateTimeImmutable
     {
         return $this->startDate;
     }
 
-    public function setStartDate(DateTimeImmutable $startDate): self
+    public function setStartDate(\DateTimeImmutable $startDate): self
     {
         $this->startDate = $startDate;
 
         return $this;
     }
 
-    public function getEndDate(): ?DateTimeImmutable
+    public function getEndDate(): ?\DateTimeImmutable
     {
         return $this->endDate;
     }
 
-    public function setEndDate(?DateTimeImmutable $endDate): self
+    public function setEndDate(?\DateTimeImmutable $endDate): self
     {
         $this->endDate = $endDate;
 
@@ -214,24 +213,24 @@ class Loan
         return $this;
     }
 
-    public function getCreatedAt(): DateTimeImmutable
+    public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(DateTimeImmutable $createdAt): self
+    public function setCreatedAt(\DateTimeImmutable $createdAt): self
     {
         $this->createdAt = $createdAt;
 
         return $this;
     }
 
-    public function getUpdatedAt(): DateTimeImmutable
+    public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
     }
 
-    public function setUpdatedAt(DateTimeImmutable $updatedAt): self
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
 

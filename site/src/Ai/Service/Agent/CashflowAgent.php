@@ -20,10 +20,7 @@ use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Entity\Company;
 use App\Enum\CashDirection;
-use DateInterval;
-use DateTimeImmutable;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
-use Throwable;
 
 #[AutoconfigureTag('app.ai.agent')]
 final class CashflowAgent implements AiAgentInterface
@@ -63,7 +60,7 @@ final class CashflowAgent implements AiAgentInterface
             $this->persistSuggestions($agent, $run, $response->getJson(), $response->getRaw());
 
             $run->markAsSucceeded($response->getRaw());
-        } catch (Throwable $exception) {
+        } catch (\Throwable $exception) {
             throw $exception;
         } finally {
             $this->runRepository->save($run, true);
@@ -72,8 +69,8 @@ final class CashflowAgent implements AiAgentInterface
 
     private function buildInput(Company $company): CashflowAgentInput
     {
-        $periodEnd = new DateTimeImmutable('today');
-        $periodStart = $periodEnd->sub(new DateInterval('P30D'));
+        $periodEnd = new \DateTimeImmutable('today');
+        $periodStart = $periodEnd->sub(new \DateInterval('P30D'));
 
         $totalsByCategory = $this->aggregateTotalsByCategory($company, $periodStart, $periodEnd);
         $dailyBalances = $this->aggregateDailyBalances($company, $periodStart, $periodEnd);
@@ -92,7 +89,7 @@ final class CashflowAgent implements AiAgentInterface
     /**
      * @return array<string, array{inflow: float, outflow: float}>
      */
-    private function aggregateTotalsByCategory(Company $company, DateTimeImmutable $from, DateTimeImmutable $to): array
+    private function aggregateTotalsByCategory(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
             ->select("COALESCE(category.name, 'Без категории') AS category")
@@ -129,7 +126,7 @@ final class CashflowAgent implements AiAgentInterface
     /**
      * @return array<string, float>
      */
-    private function aggregateDailyBalances(Company $company, DateTimeImmutable $from, DateTimeImmutable $to): array
+    private function aggregateDailyBalances(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
         // TODO: заменить на реальный сервис cash balance, когда он появится в проекте.
         $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
@@ -153,7 +150,7 @@ final class CashflowAgent implements AiAgentInterface
         $running = 0.0;
         foreach ($rows as $row) {
             $day = $row['day'];
-            $key = $day instanceof DateTimeImmutable ? $day->format('Y-m-d') : (string) $day;
+            $key = $day instanceof \DateTimeImmutable ? $day->format('Y-m-d') : (string) $day;
             $running += (float) $row['net'];
             $balances[$key] = round($running, 2);
         }
@@ -164,9 +161,9 @@ final class CashflowAgent implements AiAgentInterface
     /**
      * @return list<array{dueDate: string, amount: float, description: string, counterparty?: string}>
      */
-    private function collectUpcomingPayments(Company $company, DateTimeImmutable $periodEnd): array
+    private function collectUpcomingPayments(Company $company, \DateTimeImmutable $periodEnd): array
     {
-        $horizon = $periodEnd->add(new DateInterval('P21D'));
+        $horizon = $periodEnd->add(new \DateInterval('P21D'));
         $plans = $this->paymentPlanRepository->findPlannedByCompanyAndPeriod($company, $periodEnd, $horizon);
 
         $payments = [];
@@ -187,8 +184,8 @@ final class CashflowAgent implements AiAgentInterface
      */
     private function calculateMonthlyAverages(Company $company): array
     {
-        $periodEnd = new DateTimeImmutable('today');
-        $periodStart = $periodEnd->sub(new DateInterval('P90D'));
+        $periodEnd = new \DateTimeImmutable('today');
+        $periodStart = $periodEnd->sub(new \DateInterval('P90D'));
 
         $qb = $this->cashTransactionRepository->createQueryBuilder('transaction')
             ->select(sprintf(
@@ -222,7 +219,7 @@ final class CashflowAgent implements AiAgentInterface
             'upcoming_payments' => $input->upcomingPayments,
         ];
 
-        return json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) ?: '[]';
+        return json_encode($summary, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE) ?: '[]';
     }
 
     private function sumCurrentBalances(Company $company): float
@@ -240,7 +237,7 @@ final class CashflowAgent implements AiAgentInterface
         AiAgentEntity $agent,
         AiRun $run,
         ?array $llmPayload,
-        string $raw
+        string $raw,
     ): void {
         $company = $agent->getCompany();
 

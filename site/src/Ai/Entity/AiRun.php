@@ -7,7 +7,6 @@ namespace App\Ai\Entity;
 use App\Ai\Enum\AiRunStatus;
 use App\Ai\Repository\AiRunRepository;
 use App\Entity\Company;
-use DateTimeImmutable;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
@@ -29,10 +28,10 @@ class AiRun
     private AiAgent $agent;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $startedAt;
+    private \DateTimeImmutable $startedAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
-    private ?DateTimeImmutable $finishedAt = null;
+    private ?\DateTimeImmutable $finishedAt = null;
 
     #[ORM\Column(enumType: AiRunStatus::class)]
     private AiRunStatus $status;
@@ -51,7 +50,7 @@ class AiRun
         $this->id = Uuid::uuid4()->toString();
         $this->agent = $agent;
         $this->company = $agent->getCompany();
-        $this->startedAt = new DateTimeImmutable();
+        $this->startedAt = new \DateTimeImmutable();
         $this->status = AiRunStatus::PENDING;
     }
 
@@ -70,12 +69,12 @@ class AiRun
         return $this->agent;
     }
 
-    public function getStartedAt(): DateTimeImmutable
+    public function getStartedAt(): \DateTimeImmutable
     {
         return $this->startedAt;
     }
 
-    public function getFinishedAt(): ?DateTimeImmutable
+    public function getFinishedAt(): ?\DateTimeImmutable
     {
         return $this->finishedAt;
     }
@@ -113,7 +112,7 @@ class AiRun
     public function markAsSucceeded(?string $output = null): void
     {
         $this->status = AiRunStatus::SUCCESS;
-        $this->finishedAt = new DateTimeImmutable();
+        $this->finishedAt = new \DateTimeImmutable();
         $this->output = $output;
         $this->errorMessage = null;
     }
@@ -121,7 +120,7 @@ class AiRun
     public function markAsFailed(string $error): void
     {
         $this->status = AiRunStatus::FAILED;
-        $this->finishedAt = new DateTimeImmutable();
+        $this->finishedAt = new \DateTimeImmutable();
         $this->errorMessage = $error;
     }
 }

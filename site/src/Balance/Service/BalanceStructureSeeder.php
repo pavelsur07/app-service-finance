@@ -97,7 +97,7 @@ class BalanceStructureSeeder
         BalanceCategoryType $type,
         ?BalanceCategory $parent,
         int $sortOrder,
-        ?string $code
+        ?string $code,
     ): BalanceCategory {
         $existing = $this->balanceCategories->findOneBy([
             'company' => $company,

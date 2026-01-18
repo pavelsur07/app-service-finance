@@ -38,7 +38,7 @@ TEXT;
 
         return [
             ['role' => 'system', 'content' => $systemMessage],
-            ['role' => 'user', 'content' => sprintf($userContent, json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE))],
+            ['role' => 'user', 'content' => sprintf($userContent, json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE))],
         ];
     }
 }

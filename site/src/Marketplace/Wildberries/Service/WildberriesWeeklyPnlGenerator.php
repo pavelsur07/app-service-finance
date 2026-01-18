@@ -8,14 +8,11 @@ use App\Entity\Company;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Enum\DocumentType;
-use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
-use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvider;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use function sprintf;
 
 final class WildberriesWeeklyPnlGenerator
 {
@@ -42,7 +39,7 @@ final class WildberriesWeeklyPnlGenerator
     public function aggregateForPeriod(
         Company $company,
         \DateTimeImmutable $from,
-        \DateTimeImmutable $to
+        \DateTimeImmutable $to,
     ): array {
         $rows = $this->details->createQueryBuilder('wrd')
             ->andWhere('wrd.company = :company')
@@ -60,8 +57,8 @@ final class WildberriesWeeklyPnlGenerator
         foreach ($rows as $row) {
             $mappings = $this->mappingResolver->resolveManyForRow($company, $row);
 
-            if ($mappings === []) {
-                $key = sprintf(
+            if ([] === $mappings) {
+                $key = \sprintf(
                     '%s|%s',
                     (string) $row->getSupplierOperName(),
                     (string) $row->getDocTypeName(),
@@ -109,7 +106,7 @@ final class WildberriesWeeklyPnlGenerator
         Company $company,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
-        array $totals
+        array $totals,
     ): Document {
         if ([] === $totals) {
             throw new \DomainException('Cannot create WB weekly PnL document: totals are empty');
@@ -119,7 +116,7 @@ final class WildberriesWeeklyPnlGenerator
         $document
             ->setDate($to)
             ->setType(DocumentType::OTHER)
-            ->setDescription(sprintf('WB: ОПиУ за период %s–%s', $from->format('d.m.Y'), $to->format('d.m.Y')));
+            ->setDescription(\sprintf('WB: ОПиУ за период %s–%s', $from->format('d.m.Y'), $to->format('d.m.Y')));
 
         foreach ($totals as $plCategoryId => $amount) {
             $plCategory = $this->plCategories->find($plCategoryId);

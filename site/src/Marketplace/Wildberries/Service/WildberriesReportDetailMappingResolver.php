@@ -18,7 +18,7 @@ final class WildberriesReportDetailMappingResolver
 
     public function resolveForRow(
         Company $company,
-        WildberriesReportDetail $row
+        WildberriesReportDetail $row,
     ): ?WildberriesReportDetailMapping {
         $mappings = $this->resolveManyForRow($company, $row);
 
@@ -30,11 +30,11 @@ final class WildberriesReportDetailMappingResolver
      */
     public function resolveManyForRow(
         Company $company,
-        WildberriesReportDetail $row
+        WildberriesReportDetail $row,
     ): array {
         $supplierOperName = $row->getSupplierOperName();
         $docTypeName = $row->getDocTypeName();
-        
+
         // 1. Полное совпадение: oper + doc_type (страна площадки не учитывается)
         $result = $this->repository->findBy([
             'company' => $company,
@@ -42,7 +42,7 @@ final class WildberriesReportDetailMappingResolver
             'docTypeName' => $docTypeName,
         ]);
 
-        if ($result !== []) {
+        if ([] !== $result) {
             return $result;
         }
 
@@ -65,7 +65,7 @@ final class WildberriesReportDetailMappingResolver
         Company $company,
         ?\DateTimeImmutable $from,
         ?\DateTimeImmutable $to,
-        WildberriesReportDetailRepository $detailRepository
+        WildberriesReportDetailRepository $detailRepository,
     ): array {
         $qb = $detailRepository->createQueryBuilder('wrd')
             ->select('wrd.supplierOperName', 'wrd.docTypeName', 'COUNT(wrd.id) AS rowsCount')

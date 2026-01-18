@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Finance\Controller;
 
 use App\Finance\Report\PlReportGridBuilder;
-use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Finance\Report\PlReportPeriod;
+use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\Onboarding\AccountBootstrapper;
@@ -16,7 +16,6 @@ use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
-use LogicException;
 
 final class PlReportPreviewController extends AbstractController
 {
@@ -57,7 +56,7 @@ final class PlReportPreviewController extends AbstractController
 
         foreach ($projectDirectionsList as $pd) {
             $name = mb_strtolower(trim((string) $pd->getName()));
-            if ($name === 'общий' || str_starts_with($name, 'общий')) {
+            if ('общий' === $name || str_starts_with($name, 'общий')) {
                 $overheadProject = $pd;
 
                 break;
@@ -65,7 +64,7 @@ final class PlReportPreviewController extends AbstractController
         }
 
         $selectedProject = null;
-        if ($projectDirectionId !== '') {
+        if ('' !== $projectDirectionId) {
             foreach ($projectDirectionsList as $projectDirection) {
                 if ((string) $projectDirection->getId() === $projectDirectionId) {
                     $selectedProject = $projectDirection;
@@ -84,7 +83,7 @@ final class PlReportPreviewController extends AbstractController
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
 
-        if ($layout === 'projects') {
+        if ('projects' === $layout) {
             try {
                 $compare = $projectsCompareBuilder->build($company, $from, $to, $projectDirectionsList, $overheadProject);
 
@@ -102,7 +101,7 @@ final class PlReportPreviewController extends AbstractController
                     'warnings' => $compare['warnings'],
                     'compareProjects' => $compare['projects'],
                 ]);
-            } catch (LogicException $e) {
+            } catch (\LogicException $e) {
                 $warningMessage = 'Не удалось построить разрез по проектам. Проверьте наличие регистра pl_daily_totals по проектам.';
                 $warnings = [$e->getMessage() ?: $warningMessage];
 

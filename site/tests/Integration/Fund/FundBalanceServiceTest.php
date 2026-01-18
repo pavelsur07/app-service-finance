@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Fund;
 
+use App\Cash\Service\Accounts\FundBalanceService;
 use App\Entity\Company;
 use App\Entity\User;
-use App\Cash\Service\Accounts\FundBalanceService;
 use App\Tests\Fund\Factory\MoneyFundFactory;
 use App\Tests\Fund\Factory\MoneyFundMovementFactory;
 use Doctrine\ORM\EntityManagerInterface;

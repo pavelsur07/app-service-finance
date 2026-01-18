@@ -27,7 +27,7 @@ final class PlReportGridBuilder
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         string $grouping,
-        ?ProjectDirection $projectDirection = null
+        ?ProjectDirection $projectDirection = null,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];

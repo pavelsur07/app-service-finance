@@ -9,15 +9,12 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Entity\Company;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Repository\TelegramBotRepository;
-use DateInterval;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Throwable;
 
 #[AsCommand(
     name: 'app:telegram:send-reports',
@@ -75,7 +72,7 @@ final class SendTelegramReportsCommand extends Command
                 } else {
                     $output->writeln(sprintf('<error>Не удалось отправить отчет для %s (chat %s). Код %d</error>', $subscription->getCompany()->getName(), $chatId, $statusCode));
                 }
-            } catch (Throwable $exception) {
+            } catch (\Throwable $exception) {
                 $output->writeln(sprintf('<error>Ошибка при отправке отчета для %s: %s</error>', $subscription->getCompany()->getName(), $exception->getMessage()));
             }
         }
@@ -132,8 +129,8 @@ final class SendTelegramReportsCommand extends Command
 
     private function buildCashflowLine(Company $company): string
     {
-        $periodEnd = new DateTimeImmutable('today');
-        $periodStart = $periodEnd->sub(new DateInterval('P7D'));
+        $periodEnd = new \DateTimeImmutable('today');
+        $periodStart = $periodEnd->sub(new \DateInterval('P7D'));
 
         $accounts = $this->moneyAccountRepository->findBy(['company' => $company, 'isActive' => true]);
         if ([] === $accounts) {

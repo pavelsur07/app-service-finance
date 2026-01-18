@@ -4,7 +4,6 @@ namespace App\Balance\Controller;
 
 use App\Balance\Service\BalanceBuilder;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -18,7 +17,7 @@ class BalanceController extends AbstractController
     {
         $company = $companyService->getActiveCompany();
         $dateParam = $request->query->get('date');
-        $date = $dateParam ? new DateTimeImmutable($dateParam) : new DateTimeImmutable('today');
+        $date = $dateParam ? new \DateTimeImmutable($dateParam) : new \DateTimeImmutable('today');
 
         $result = $builder->buildForCompanyAndDate($company, $date);
 

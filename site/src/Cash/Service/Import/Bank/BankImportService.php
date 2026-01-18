@@ -13,7 +13,6 @@ use App\Cash\Service\Import\Bank\Provider\BankStatementsProviderInterface;
 use App\Cash\Service\Import\ImportLogger;
 use App\Entity\Company;
 use App\Enum\CashDirection;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -34,14 +33,14 @@ class BankImportService
         string $bankCode,
         Company $company,
         BankConnection $connection,
-        BankStatementsProviderInterface $provider
+        BankStatementsProviderInterface $provider,
     ): void {
         $totalAccountsFound = 0;
         $matchedAccounts = 0;
         $transactionsCreated = 0;
         $transactionsSkipped = 0;
 
-        $importLog = $this->importLogger->start($company, 'bank:' . $bankCode, false, null, null);
+        $importLog = $this->importLogger->start($company, 'bank:'.$bankCode, false, null, null);
 
         try {
             $accountsResponse = $provider->getAccounts($connection);
@@ -62,7 +61,7 @@ class BankImportService
                 ++$matchedAccounts;
 
                 $cursor = $this->cursorRepository->getOrCreate($company, $bankCode, $accountNumber);
-                $today = new DateTimeImmutable('today');
+                $today = new \DateTimeImmutable('today');
                 $start = $cursor->getLastImportedDate()
                     ? $cursor->getLastImportedDate()->modify('-1 day')
                     : $today->modify('-7 days');
@@ -73,7 +72,7 @@ class BankImportService
                     while (true) {
                         $response = $provider->getTransactions($connection, $accountNumber, $date, $page);
                         $transactions = $this->extractTransactions($response);
-                        if ($transactions === []) {
+                        if ([] === $transactions) {
                             break;
                         }
 
@@ -99,7 +98,7 @@ class BankImportService
                             }
 
                             $occurredAt = $this->resolveOccurredAt($transaction);
-                            if (!$occurredAt instanceof DateTimeImmutable) {
+                            if (!$occurredAt instanceof \DateTimeImmutable) {
                                 $this->logger->warning('Bank import skipped transaction without date', [
                                     'company' => $company->getId(),
                                     'bank_code' => $bankCode,
@@ -153,7 +152,7 @@ class BankImportService
                     }
 
                     $this->entityManager->flush();
-                    $cursor->setLastImportedDate(new DateTimeImmutable($date->format('Y-m-d')));
+                    $cursor->setLastImportedDate(new \DateTimeImmutable($date->format('Y-m-d')));
                     $this->cursorRepository->save($cursor);
                 }
             }
@@ -243,12 +242,12 @@ class BankImportService
         return false;
     }
 
-    private function resolveOccurredAt(array $transaction): ?DateTimeImmutable
+    private function resolveOccurredAt(array $transaction): ?\DateTimeImmutable
     {
         $operationDate = $transaction['operationDate'] ?? null;
         if (is_string($operationDate) && '' !== $operationDate) {
             try {
-                return new DateTimeImmutable($operationDate);
+                return new \DateTimeImmutable($operationDate);
             } catch (\Throwable) {
                 return null;
             }
@@ -260,7 +259,7 @@ class BankImportService
         }
 
         try {
-            return new DateTimeImmutable($documentDate . ' 00:00:00');
+            return new \DateTimeImmutable($documentDate.' 00:00:00');
         } catch (\Throwable) {
             return null;
         }
@@ -321,6 +320,7 @@ class BankImportService
         }
 
         $description = trim($description);
+
         return '' !== $description ? $description : null;
     }
 
@@ -329,9 +329,9 @@ class BankImportService
         array $payload,
         int $createdCount,
         int $skippedDuplicates,
-        int $errorsCount
+        int $errorsCount,
     ): void {
-        $encodedPayload = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $encodedPayload = json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
         if (false === $encodedPayload) {
             $encodedPayload = '{"error":"Failed to encode import payload"}';
         }

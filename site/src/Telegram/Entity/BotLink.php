@@ -56,7 +56,7 @@ class BotLink
         TelegramBot $bot,
         string $token,
         string $scope,
-        \DateTimeImmutable $expiresAt
+        \DateTimeImmutable $expiresAt,
     ) {
         Assert::uuid($id);
 

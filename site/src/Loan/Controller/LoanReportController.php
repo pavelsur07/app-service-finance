@@ -7,7 +7,6 @@ namespace App\Loan\Controller;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -18,12 +17,12 @@ class LoanReportController extends AbstractController
     public function report(
         LoanRepository $loanRepository,
         LoanPaymentScheduleRepository $paymentScheduleRepository,
-        ActiveCompanyService $activeCompanyService
+        ActiveCompanyService $activeCompanyService,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loans = $loanRepository->findActiveByCompany($company);
 
-        $now = new DateTimeImmutable('today');
+        $now = new \DateTimeImmutable('today');
         $yearStart = $now->setDate((int) $now->format('Y'), 1, 1)->setTime(0, 0, 0);
         $yearEnd = $now->setDate((int) $now->format('Y'), 12, 31)->setTime(23, 59, 59);
 

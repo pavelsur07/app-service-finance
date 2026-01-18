@@ -14,11 +14,7 @@ class CashTransactionToDocumentService
 {
     /**
      * Создаёт документ ОПиУ на полный доступный остаток транзакции ДДС.
-     *
-     * @param CashTransaction $transaction
-     *
-     * @return Document
-    */
+     */
     public function createFromCashTransaction(CashTransaction $transaction): Document
     {
         $remaining = $transaction->getRemainingAmount();
@@ -29,11 +25,6 @@ class CashTransactionToDocumentService
 
     /**
      * Создаёт документ ОПиУ на заданную сумму в пределах остатка транзакции ДДС.
-     *
-     * @param CashTransaction $transaction
-     * @param float           $amount
-     *
-     * @return Document
      */
     public function createWithCustomAmount(CashTransaction $transaction, float $amount): Document
     {
@@ -44,10 +35,6 @@ class CashTransactionToDocumentService
 
     /**
      * Создаёт операцию документа из транзакции ДДС.
-     *
-     * @param CashTransaction $transaction
-     *
-     * @return DocumentOperation
      */
     public function createOperationFromTransaction(CashTransaction $transaction): DocumentOperation
     {

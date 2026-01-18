@@ -108,7 +108,7 @@ class CompanyController extends AbstractController
     public function checkWildberriesKey(
         Request $request,
         Company $company,
-        HttpClientInterface $httpClient
+        HttpClientInterface $httpClient,
     ): Response {
         // CSRF-проверка для защиты действия
         if (!$this->isCsrfTokenValid('company_check_wb_key'.$company->getId(), (string) $request->request->get('_token'))) {

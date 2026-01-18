@@ -12,7 +12,6 @@ use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvid
 use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -32,7 +31,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
         private readonly WildberriesWeeklyPnlGenerator $weeklyPnlGenerator,
         private readonly WildberriesReportDetailSourceFieldProvider $sourceFieldProvider,
         private readonly EntityManagerInterface $em,
-    ) {}
+    ) {
+    }
 
     #[Route(path: '', name: 'index', methods: ['GET'])]
     public function index(Request $request): Response
@@ -42,8 +42,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
         $fromParam = $request->query->get('from');
         $toParam = $request->query->get('to');
 
-        $to = $toParam ? new DateTimeImmutable((string) $toParam) : new DateTimeImmutable('today');
-        $from = $fromParam ? new DateTimeImmutable((string) $fromParam) : $to->modify('-6 days');
+        $to = $toParam ? new \DateTimeImmutable((string) $toParam) : new \DateTimeImmutable('today');
+        $from = $fromParam ? new \DateTimeImmutable((string) $fromParam) : $to->modify('-6 days');
 
         $sourceFieldOptions = $this->sourceFieldProvider->getOptions();
 
@@ -92,8 +92,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             if (!empty($mappingsByCombination[$combinationKey])) {
                 foreach ($mappingsByCombination[$combinationKey] as $mapping) {
                     $items[] = [
-                        'supplierOperName' => $supplierOperName !== '' ? $supplierOperName : null,
-                        'docTypeName' => $docTypeName !== '' ? $docTypeName : null,
+                        'supplierOperName' => '' !== $supplierOperName ? $supplierOperName : null,
+                        'docTypeName' => '' !== $docTypeName ? $docTypeName : null,
                         'rowsCount' => $rowsCount,
                         'mapping' => $mapping,
                     ];
@@ -101,8 +101,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             } else {
                 // нет ни одного правила для этой комбинации — добавляем пустую строку
                 $items[] = [
-                    'supplierOperName' => $supplierOperName !== '' ? $supplierOperName : null,
-                    'docTypeName' => $docTypeName !== '' ? $docTypeName : null,
+                    'supplierOperName' => '' !== $supplierOperName ? $supplierOperName : null,
+                    'docTypeName' => '' !== $docTypeName ? $docTypeName : null,
                     'rowsCount' => $rowsCount,
                     'mapping' => null,
                 ];
@@ -188,7 +188,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             }
 
             // Если категория не выбрана и правила ещё нет — просто пропускаем строку
-            if (empty($plCategoryId) && $mapping === null) {
+            if (empty($plCategoryId) && null === $mapping) {
                 continue;
             }
 
@@ -202,13 +202,13 @@ final class WildberriesReportDetailMappingController extends AbstractController
             if (!$mapping instanceof WildberriesReportDetailMapping) {
                 $mapping = new WildberriesReportDetailMapping(Uuid::uuid4()->toString(), $company);
                 $mapping->setSupplierOperName($supplierOperName);
-                $mapping->setDocTypeName($docTypeName !== '' ? $docTypeName : null);
+                $mapping->setDocTypeName('' !== $docTypeName ? $docTypeName : null);
                 $mapping->setSiteCountry(null);
             }
 
             $mapping->setSourceField((string) $sourceField);
             $mapping->setSignMultiplier($signMultiplier);
-            $mapping->setNote($note !== '' ? $note : null);
+            $mapping->setNote('' !== $note ? $note : null);
 
             $plCategory = $this->plCategoryRepository->find($plCategoryId);
 
@@ -219,7 +219,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $mapping
                 ->setPlCategory($plCategory)
                 ->setIsActive(!empty($mappingData['isActive']))
-                ->setUpdatedAt(new DateTimeImmutable());
+                ->setUpdatedAt(new \DateTimeImmutable());
 
             $this->em->persist($mapping);
         }
@@ -262,8 +262,8 @@ final class WildberriesReportDetailMappingController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token');
         }
 
-        $from = new DateTimeImmutable((string) $request->request->get('from'));
-        $to = new DateTimeImmutable((string) $request->request->get('to'));
+        $from = new \DateTimeImmutable((string) $request->request->get('from'));
+        $to = new \DateTimeImmutable((string) $request->request->get('to'));
 
         $result = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
 

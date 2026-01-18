@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Ai\Service\Llm;
 
-use JsonException;
-
 final class LlmResponse
 {
     private ?array $json;
@@ -49,8 +47,8 @@ final class LlmResponse
         }
 
         try {
-            $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
-        } catch (JsonException) {
+            $decoded = json_decode($trimmed, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
             return null;
         }
 

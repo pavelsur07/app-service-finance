@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Tests\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;

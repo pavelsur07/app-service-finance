@@ -3,8 +3,8 @@
 namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceCategoryType;
-use App\Entity\Company;
 use App\Balance\Repository\BalanceCategoryRepository;
+use App\Entity\Company;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

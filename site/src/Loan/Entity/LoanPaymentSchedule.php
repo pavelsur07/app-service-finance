@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Loan\Entity;
 
 use App\Loan\Repository\LoanPaymentScheduleRepository;
-use DateTimeImmutable;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
@@ -25,7 +24,7 @@ class LoanPaymentSchedule
     private ?Loan $loan = null;
 
     #[ORM\Column(type: 'date_immutable')]
-    private DateTimeImmutable $dueDate;
+    private \DateTimeImmutable $dueDate;
 
     #[ORM\Column(type: Types::DECIMAL, precision: 18, scale: 2)]
     private string $totalPaymentAmount;
@@ -43,18 +42,18 @@ class LoanPaymentSchedule
     private bool $isPaid = false;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $createdAt;
+    private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(type: 'datetime_immutable')]
-    private DateTimeImmutable $updatedAt;
+    private \DateTimeImmutable $updatedAt;
 
     public function __construct(
         Loan $loan,
-        DateTimeImmutable $dueDate,
+        \DateTimeImmutable $dueDate,
         string $totalPaymentAmount,
         string $principalPart,
         string $interestPart,
-        string $feePart
+        string $feePart,
     ) {
         $this->id = Uuid::uuid4()->toString();
         $this->loan = $loan;
@@ -64,8 +63,8 @@ class LoanPaymentSchedule
         $this->interestPart = $interestPart;
         $this->feePart = $feePart;
         $this->isPaid = false;
-        $this->createdAt = new DateTimeImmutable();
-        $this->updatedAt = new DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): string
@@ -85,12 +84,12 @@ class LoanPaymentSchedule
         return $this;
     }
 
-    public function getDueDate(): DateTimeImmutable
+    public function getDueDate(): \DateTimeImmutable
     {
         return $this->dueDate;
     }
 
-    public function setDueDate(DateTimeImmutable $dueDate): self
+    public function setDueDate(\DateTimeImmutable $dueDate): self
     {
         $this->dueDate = $dueDate;
 
@@ -157,24 +156,24 @@ class LoanPaymentSchedule
         return $this;
     }
 
-    public function getCreatedAt(): DateTimeImmutable
+    public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
     }
 
-    public function setCreatedAt(DateTimeImmutable $createdAt): self
+    public function setCreatedAt(\DateTimeImmutable $createdAt): self
     {
         $this->createdAt = $createdAt;
 
         return $this;
     }
 
-    public function getUpdatedAt(): DateTimeImmutable
+    public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
     }
 
-    public function setUpdatedAt(DateTimeImmutable $updatedAt): self
+    public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
 

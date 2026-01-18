@@ -20,6 +20,7 @@ final class PlReportProjectsCompareBuilder
 
     /**
      * @param ProjectDirection[] $projects
+     *
      * @return array{
      *   period: array{id:string,label:string,from:string,to:string},
      *   projects: array<int,array{id:string,name:string,isOverhead:bool}>,
@@ -33,7 +34,7 @@ final class PlReportProjectsCompareBuilder
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
         array $projects,
-        ?ProjectDirection $overheadProject = null
+        ?ProjectDirection $overheadProject = null,
     ): array {
         if ($from > $to) {
             [$from, $to] = [$to, $from];
@@ -55,9 +56,7 @@ final class PlReportProjectsCompareBuilder
         $rawValues = [];
 
         if (!$this->calc->supportsProjectDimension()) {
-            throw new \LogicException(
-                'P&L projects view requires project dimension support in facts'
-            );
+            throw new \LogicException('P&L projects view requires project dimension support in facts');
         }
 
         // считаем по каждому проекту

@@ -13,7 +13,7 @@ final class CashflowAgentInput
 {
     /**
      * @param TotalsByCategory $totalsByCategory
-     * @param DailyBalances    $dailyBalances
+     * @param DailyBalances $dailyBalances
      * @param list<UpcomingPayment> $upcomingPayments
      */
     public function __construct(

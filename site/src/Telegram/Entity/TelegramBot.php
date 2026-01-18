@@ -2,10 +2,9 @@
 
 namespace App\Telegram\Entity;
 
+use App\Telegram\Repository\TelegramBotRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
-
-use App\Telegram\Repository\TelegramBotRepository;
 
 #[ORM\Entity(repositoryClass: TelegramBotRepository::class)]
 #[ORM\Table(name: '`telegram_bots`')]

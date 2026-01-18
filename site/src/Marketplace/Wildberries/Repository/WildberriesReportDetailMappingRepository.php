@@ -33,7 +33,7 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
         Company $company,
         ?string $supplierOperName,
         ?string $docTypeName,
-        ?string $siteCountry
+        ?string $siteCountry,
     ): ?WildberriesReportDetailMapping {
         $qb = $this->createQueryBuilder('m')
             ->andWhere('m.company = :company')
@@ -60,7 +60,7 @@ class WildberriesReportDetailMappingRepository extends ServiceEntityRepository
 
     private function addNullableEqual(QueryBuilder $qb, string $field, string $paramName, mixed $value): void
     {
-        if ($value === null) {
+        if (null === $value) {
             $qb->andWhere(sprintf('%s IS NULL', $field));
 
             return;

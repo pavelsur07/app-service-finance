@@ -7,7 +7,6 @@ namespace App\Ai\Service;
 use App\Ai\Entity\AiAgent;
 use App\Ai\Repository\AiRunRepository;
 use Psr\Log\LoggerInterface;
-use Throwable;
 
 final class AiAgentRunner
 {
@@ -41,7 +40,7 @@ final class AiAgentRunner
 
         try {
             $implementation->run($agent);
-        } catch (Throwable $exception) {
+        } catch (\Throwable $exception) {
             $pendingRun = $this->runRepository->findLatestPendingRunForAgent($agent);
             if (null !== $pendingRun) {
                 $pendingRun->markAsFailed($exception->getMessage());

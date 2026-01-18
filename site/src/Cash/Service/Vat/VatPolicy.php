@@ -18,9 +18,9 @@ class VatPolicy
 
         return match ($taxSystem) {
             CompanyTaxSystem::USN_NO_VAT => null,
-            CompanyTaxSystem::USN_VAT_5 => $direction === CashDirection::OUTFLOW ? 5 : null,
-            CompanyTaxSystem::USN_VAT_7 => $direction === CashDirection::OUTFLOW ? 7 : null,
-            CompanyTaxSystem::OSNO => $direction === CashDirection::OUTFLOW ? 20 : null,
+            CompanyTaxSystem::USN_VAT_5 => CashDirection::OUTFLOW === $direction ? 5 : null,
+            CompanyTaxSystem::USN_VAT_7 => CashDirection::OUTFLOW === $direction ? 7 : null,
+            CompanyTaxSystem::OSNO => CashDirection::OUTFLOW === $direction ? 20 : null,
         };
     }
 }

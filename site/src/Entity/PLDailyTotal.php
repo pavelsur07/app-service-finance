@@ -2,7 +2,6 @@
 
 namespace App\Entity;
 
-use App\Entity\ProjectDirection;
 use App\Repository\PLDailyTotalRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;

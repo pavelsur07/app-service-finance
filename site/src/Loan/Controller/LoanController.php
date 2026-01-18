@@ -6,15 +6,14 @@ namespace App\Loan\Controller;
 
 use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;
-use App\Loan\Form\LoanType;
 use App\Loan\Form\LoanPaymentScheduleType;
 use App\Loan\Form\LoanScheduleUploadType;
+use App\Loan\Form\LoanType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Loan\Service\LoanScheduleToDocumentService;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
-use DateTimeImmutable;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -22,7 +21,6 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
-use SplFileObject;
 
 #[Route('/loans')]
 class LoanController extends AbstractController
@@ -51,7 +49,7 @@ class LoanController extends AbstractController
         PLCategoryRepository $plCategoryRepository,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
-        $loan = new Loan($company, '', '0.00', new DateTimeImmutable());
+        $loan = new Loan($company, '', '0.00', new \DateTimeImmutable());
         $categories = $plCategoryRepository->findTreeByCompany($company);
         $form = $this->createForm(LoanType::class, $loan, [
             'categories' => $categories,
@@ -59,7 +57,7 @@ class LoanController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $loan->setUpdatedAt(new DateTimeImmutable());
+            $loan->setUpdatedAt(new \DateTimeImmutable());
             $entityManager->persist($loan);
             $entityManager->flush();
 
@@ -93,7 +91,7 @@ class LoanController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $loan->setUpdatedAt(new DateTimeImmutable());
+            $loan->setUpdatedAt(new \DateTimeImmutable());
             $entityManager->flush();
 
             return $this->redirectToRoute('loan_index');
@@ -110,7 +108,7 @@ class LoanController extends AbstractController
     public function schedule(
         Loan $loan,
         ActiveCompanyService $activeCompanyService,
-        LoanPaymentScheduleRepository $paymentScheduleRepository
+        LoanPaymentScheduleRepository $paymentScheduleRepository,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         if ($loan->getCompany() !== $company) {
@@ -130,7 +128,7 @@ class LoanController extends AbstractController
         LoanRepository $loanRepository,
         LoanPaymentScheduleRepository $paymentScheduleRepository,
         EntityManagerInterface $entityManager,
-        ActiveCompanyService $activeCompanyService
+        ActiveCompanyService $activeCompanyService,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = $loanRepository->find($id);
@@ -147,8 +145,8 @@ class LoanController extends AbstractController
             $file = $form->get('file')->getData();
 
             if ($file instanceof UploadedFile) {
-                $csv = new SplFileObject($file->getPathname());
-                $csv->setFlags(SplFileObject::READ_CSV | SplFileObject::SKIP_EMPTY | SplFileObject::DROP_NEW_LINE);
+                $csv = new \SplFileObject($file->getPathname());
+                $csv->setFlags(\SplFileObject::READ_CSV | \SplFileObject::SKIP_EMPTY | \SplFileObject::DROP_NEW_LINE);
                 $csv->setCsvControl(';');
 
                 foreach ($paymentScheduleRepository->findByLoanOrderedByDueDate($loan) as $item) {
@@ -169,7 +167,7 @@ class LoanController extends AbstractController
 
                     [$date, $totalPayment, $principalPart, $interestPart, $feePart, $isPaid] = $row;
 
-                    $dueDate = DateTimeImmutable::createFromFormat('Y-m-d', (string) $date);
+                    $dueDate = \DateTimeImmutable::createFromFormat('Y-m-d', (string) $date);
                     if (false === $dueDate) {
                         continue;
                     }
@@ -205,19 +203,19 @@ class LoanController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         ActiveCompanyService $activeCompanyService,
-        LoanPaymentScheduleRepository $paymentScheduleRepository
+        LoanPaymentScheduleRepository $paymentScheduleRepository,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         if ($loan->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
 
-        $schedule = new LoanPaymentSchedule($loan, new DateTimeImmutable(), '0.00', '0.00', '0.00', '0.00');
+        $schedule = new LoanPaymentSchedule($loan, new \DateTimeImmutable(), '0.00', '0.00', '0.00', '0.00');
         $form = $this->createForm(LoanPaymentScheduleType::class, $schedule);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $schedule->setUpdatedAt(new DateTimeImmutable());
+            $schedule->setUpdatedAt(new \DateTimeImmutable());
             $loan->addPaymentScheduleItem($schedule);
             $entityManager->persist($schedule);
             $entityManager->flush();
@@ -241,7 +239,7 @@ class LoanController extends AbstractController
         LoanRepository $loanRepository,
         LoanPaymentScheduleRepository $paymentScheduleRepository,
         EntityManagerInterface $entityManager,
-        ActiveCompanyService $activeCompanyService
+        ActiveCompanyService $activeCompanyService,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = $loanRepository->find($loanId);
@@ -259,7 +257,7 @@ class LoanController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $schedule->setUpdatedAt(new DateTimeImmutable());
+            $schedule->setUpdatedAt(new \DateTimeImmutable());
             $entityManager->flush();
 
             return $this->redirectToRoute('loan_schedule', ['id' => $loan->getId()]);
@@ -281,7 +279,7 @@ class LoanController extends AbstractController
         LoanRepository $loanRepository,
         LoanPaymentScheduleRepository $paymentScheduleRepository,
         EntityManagerInterface $entityManager,
-        ActiveCompanyService $activeCompanyService
+        ActiveCompanyService $activeCompanyService,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = $loanRepository->find($loanId);
@@ -313,7 +311,7 @@ class LoanController extends AbstractController
         $response->headers->set('Content-Disposition', 'attachment; filename="loan_schedule_template.csv"');
 
         $response->setCallback(function () {
-            $handle = fopen('php://output', 'wb');
+            $handle = fopen('php://output', 'w');
 
             $rows = [
                 ['date', 'total_payment', 'principal_part', 'interest_part', 'fee_part', 'is_paid'],
@@ -345,7 +343,7 @@ class LoanController extends AbstractController
         LoanPaymentScheduleRepository $paymentScheduleRepository,
         LoanScheduleToDocumentService $scheduleToDocumentService,
         ActiveCompanyService $activeCompanyService,
-        EntityManagerInterface $entityManager
+        EntityManagerInterface $entityManager,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = $loanRepository->find($loanId);

@@ -10,8 +10,8 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[Route('/admin/telegram/bots', name: 'admin_telegram_bot_')]
 class TelegramBotController extends AbstractController
@@ -155,7 +155,7 @@ class TelegramBotController extends AbstractController
                 ],
             ]);
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 $this->addFlash('danger', sprintf('Telegram API вернул статус %d', $response->getStatusCode()));
 
                 return $this->redirectToRoute('admin_telegram_bot_index');
@@ -183,7 +183,7 @@ class TelegramBotController extends AbstractController
 
         // После вызова setWebhook сразу проверяем фактический статус через getWebhookInfo
         $infoPayload = $this->fetchWebhookInfo($bot, $httpClient);
-        if ($infoPayload !== null) {
+        if (null !== $infoPayload) {
             $this->addFlash('webhook_status', $this->buildWebhookStatus($infoPayload));
         }
 
@@ -207,7 +207,7 @@ class TelegramBotController extends AbstractController
         }
 
         $payload = $this->fetchWebhookInfo($bot, $httpClient);
-        if ($payload === null) {
+        if (null === $payload) {
             return $this->redirectToRoute('admin_telegram_bot_index');
         }
 
@@ -224,7 +224,7 @@ class TelegramBotController extends AbstractController
             // Вызываем Telegram API getWebhookInfo, чтобы узнать актуальный адрес и ошибки доставки
             $response = $httpClient->request('GET', sprintf('https://api.telegram.org/bot%s/getWebhookInfo', $bot->getToken()));
 
-            if ($response->getStatusCode() !== 200) {
+            if (200 !== $response->getStatusCode()) {
                 $this->addFlash('danger', sprintf('Telegram API вернул статус %d', $response->getStatusCode()));
 
                 return null;
@@ -250,7 +250,7 @@ class TelegramBotController extends AbstractController
         $lastErrorMessage = $result['last_error_message'] ?? null;
 
         // Вебхук считаем установленным, когда Telegram возвращает ожидаемый адрес
-        $webhookInstalled = $url === self::TARGET_WEBHOOK_URL;
+        $webhookInstalled = self::TARGET_WEBHOOK_URL === $url;
         // Эвристика для MVP: webhook считаем живым, если он установлен и Telegram не сообщает об ошибках доставки
         $webhookAlive = $webhookInstalled && empty($lastErrorMessage);
 

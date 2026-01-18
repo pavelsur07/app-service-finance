@@ -9,7 +9,6 @@ use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\PLDailyTotal;
 use App\Entity\User;
 use App\Enum\CounterpartyType;
 use App\Enum\DocumentType;

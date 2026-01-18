@@ -71,6 +71,7 @@ class BalanceBuilder
 
     /**
      * @param list<BalanceCategoryLink> $links
+     *
      * @return array<string,list<BalanceCategoryLink>>
      */
     private function groupLinksByCategoryId(array $links): array
@@ -140,6 +141,7 @@ class BalanceBuilder
 
     /**
      * @param list<string> $currencies
+     *
      * @return array<string,float>
      */
     private function initializeAmounts(array $currencies): array
@@ -157,6 +159,7 @@ class BalanceBuilder
      * @param list<BalanceCategoryLink> $links
      * @param array<string,string> $cashTotals
      * @param array<string,float> $fundTotals
+     *
      * @return array<string,float>
      */
     private function calculateOwnAmounts(
@@ -187,6 +190,7 @@ class BalanceBuilder
      * @param list<string> $currencies
      * @param array<string,float> $left
      * @param array<string,float> $right
+     *
      * @return array<string,float>
      */
     private function mergeAmounts(array $currencies, array $left, array $right): array
