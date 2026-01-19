@@ -105,6 +105,11 @@ class ProjectDirection
         return $this->parent ? $this->parent->getLevel() + 1 : 1;
     }
 
+    public function getIndentedName(string $char = '—'): string
+    {
+        return str_repeat($char, max(0, $this->getLevel() - 1)).' '.$this->name;
+    }
+
     public function __toString(): string
     {
         return $this->name;

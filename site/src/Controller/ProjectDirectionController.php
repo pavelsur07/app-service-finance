@@ -28,11 +28,14 @@ class ProjectDirectionController extends AbstractController
     }
 
     #[Route('/new', name: 'project_direction_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function new(Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
     {
         $company = $companyService->getActiveCompany();
+        $parents = $repo->findTreeByCompany($company);
         $direction = new ProjectDirection(Uuid::uuid4()->toString(), $company, '');
-        $form = $this->createForm(ProjectDirectionType::class, $direction);
+        $form = $this->createForm(ProjectDirectionType::class, $direction, [
+            'parents' => $parents,
+        ]);
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $em->persist($direction);
@@ -47,13 +50,20 @@ class ProjectDirectionController extends AbstractController
     }
 
     #[Route('/{id}/edit', name: 'project_direction_edit', methods: ['GET', 'POST'])]
-    public function edit(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService): Response
+    public function edit(ProjectDirection $direction, Request $request, EntityManagerInterface $em, ActiveCompanyService $companyService, ProjectDirectionRepository $repo): Response
     {
         $company = $companyService->getActiveCompany();
         if ($direction->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
-        $form = $this->createForm(ProjectDirectionType::class, $direction);
+        $parents = $repo->findTreeByCompany($company);
+        $parentsFiltered = array_filter(
+            $parents,
+            static fn(ProjectDirection $parent) => $parent->getId() !== $direction->getId()
+        );
+        $form = $this->createForm(ProjectDirectionType::class, $direction, [
+            'parents' => $parentsFiltered,
+        ]);
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             $em->flush();
