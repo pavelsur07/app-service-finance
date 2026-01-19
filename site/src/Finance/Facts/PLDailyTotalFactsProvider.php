@@ -10,6 +10,7 @@ use App\Entity\PLDailyTotal;
 use App\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
+use App\Repository\ProjectDirectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PLDailyTotalFactsProvider implements FactsProviderInterface
@@ -17,6 +18,7 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly PLCategoryRepository $plCategories,
+        private readonly ProjectDirectionRepository $projectDirections,
     ) {
     }
 
@@ -56,9 +58,10 @@ final class PLDailyTotalFactsProvider implements FactsProviderInterface
             ->setParameter('to', $to);
 
         if ($projectDirection instanceof ProjectDirection) {
+            $nodes = $this->projectDirections->collectSelfAndDescendants($projectDirection);
             $qb
-                ->andWhere('dt.projectDirection = :pd')
-                ->setParameter('pd', $projectDirection);
+                ->andWhere('dt.projectDirection IN (:pds)')
+                ->setParameter('pds', $nodes);
         }
 
         $row = $qb->getQuery()->getOneOrNullResult();
