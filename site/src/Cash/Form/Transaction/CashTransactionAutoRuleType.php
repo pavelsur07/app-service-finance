@@ -8,6 +8,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
+use App\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CollectionType;
@@ -58,7 +59,7 @@ class CashTransactionAutoRuleType extends AbstractType
                 },
                 'label' => 'Категория движения ДДС',
             ])
-            ->add('projectDirection', EntityType::class, [
+            ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['projectDirections'],
                 'choice_label' => function (ProjectDirection $item) {

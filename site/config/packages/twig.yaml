@@ -1,6 +1,8 @@
 twig:
     default_path: '%kernel.project_dir%/templates'
-    form_themes: ['bootstrap_5_layout.html.twig']
+    form_themes:
+        - 'bootstrap_5_layout.html.twig'
+        - 'form/project_direction_picker_theme.html.twig'
     paths:
         '%kernel.project_dir%/templates/balance': Balance
         '%kernel.project_dir%/templates/loan': Loan

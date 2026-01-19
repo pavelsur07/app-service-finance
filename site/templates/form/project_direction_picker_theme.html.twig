@@ -1,0 +1,183 @@
+{# Reusable ProjectDirection picker widget (Tabler/Bootstrap 5) #}
+
+{% block project_direction_picker_widget %}
+    {# ---- helpers ---- #}
+    {% set fieldId = form.vars.id %}
+    {% set fieldName = form.vars.full_name %}
+    {% set currentValue = form.vars.value %}
+    {% set attr = form.vars.attr|default({}) %}
+    {% set attrClass = (attr.class|default('')) %}
+    {% set placeholder = form.vars.placeholder is defined ? form.vars.placeholder : null %}
+
+    {# find current label #}
+    {% set currentLabel = '' %}
+    {% for c in form.vars.choices %}
+        {% if c.value == currentValue %}
+            {% set currentLabel = c.data ? c.data.name : c.label %}
+        {% endif %}
+    {% endfor %}
+    {% if currentValue is empty %}
+        {% set currentLabel = '' %}
+    {% endif %}
+
+    {% set modalId = 'pd_modal__' ~ fieldId %}
+    {% set treeId = 'pd_tree__' ~ fieldId %}
+    {% set inputId = 'pd_input__' ~ fieldId %}
+    {% set searchId = 'pd_search__' ~ fieldId %}
+
+    <div class="pd-picker" data-pd-picker data-pd-field-id="{{ fieldId }}">
+        {# IMPORTANT: keep real <select> in DOM, but hidden (existing scripts rely on .value) #}
+        <select
+            id="{{ fieldId }}"
+            name="{{ fieldName }}"
+            class="form-select d-none {{ attrClass }}"
+            {% if form.vars.required %}required="required"{% endif %}
+            {% for k,v in attr %}{% if k != 'class' %}{{ k }}="{{ v }}"{% endif %}{% endfor %}
+        >
+            {% if placeholder is not empty %}
+                <option value="" {% if currentValue is empty %}selected="selected"{% endif %}>{{ placeholder }}</option>
+            {% endif %}
+
+            {% for choice in form.vars.choices %}
+                <option
+                    value="{{ choice.value }}"
+                    {% if choice.value == currentValue %}selected="selected"{% endif %}
+                    {% for ak,av in choice.attr %}{{ ak }}="{{ av }}"{% endfor %}
+                >
+                    {{ choice.label }}
+                </option>
+            {% endfor %}
+        </select>
+
+        {# Visible control (Tabler) #}
+        <div class="input-group">
+            <input
+                id="{{ inputId }}"
+                type="text"
+                class="form-control"
+                value="{{ currentLabel }}"
+                placeholder="Выберите проект"
+                readonly
+                data-pd-display
+            />
+            <button
+                class="btn btn-outline-secondary"
+                type="button"
+                data-bs-toggle="modal"
+                data-bs-target="#{{ modalId }}"
+                data-pd-open
+                aria-label="Открыть выбор проекта"
+            >
+                <i class="ti ti-folder"></i>
+            </button>
+            <button
+                class="btn btn-outline-secondary"
+                type="button"
+                data-pd-clear
+                aria-label="Очистить выбор"
+                {% if currentValue is empty %}disabled{% endif %}
+            >
+                <i class="ti ti-x"></i>
+            </button>
+        </div>
+
+        {# Modal with tree #}
+        <div class="modal modal-blur fade" id="{{ modalId }}" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content">
+
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title">Выбор проекта</h5>
+                            <div class="text-muted small">Выбирайте только конечные элементы (листья)</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="d-flex gap-2 align-items-center mb-3">
+                            <div class="flex-fill">
+                                <input id="{{ searchId }}" type="text" class="form-control" placeholder="Поиск..." data-pd-search />
+                            </div>
+                            <button type="button" class="btn btn-outline-secondary" data-pd-expand-all>
+                                <i class="ti ti-arrows-diagonal-2"></i> Развернуть
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" data-pd-collapse-all>
+                                <i class="ti ti-arrows-diagonal-minimize-2"></i> Свернуть
+                            </button>
+                        </div>
+
+                        <div class="pd-tree-wrap" data-pd-scroll>
+                            <div id="{{ treeId }}" class="pd-tree" role="tree" aria-label="Дерево проектов">
+                                {% set choicesByParent = {} %}
+                                {% set rootChoices = [] %}
+                                {% for choice in form.vars.choices %}
+                                    {% if choice.data %}
+                                        {% set parentId = choice.data.parent ? choice.data.parent.id : '' %}
+                                        {% if parentId is empty %}
+                                            {% set rootChoices = rootChoices|merge([choice]) %}
+                                        {% else %}
+                                            {% set currentChildren = choicesByParent[parentId]|default([]) %}
+                                            {% set choicesByParent = choicesByParent|merge({ (parentId): currentChildren|merge([choice]) }) %}
+                                        {% endif %}
+                                    {% endif %}
+                                {% endfor %}
+
+                                {% macro render_nodes(nodes, choicesByParent, fieldId, level) %}
+                                    {% for ch in nodes %}
+                                        {% set entity = ch.data %}
+                                        {% if entity %}
+                                            {% set nodeId = ch.value %}
+                                            {% set safeNodeId = fieldId ~ '__' ~ nodeId %}
+                                            {% set hasChildren = choicesByParent[nodeId] is defined and choicesByParent[nodeId] is not empty %}
+                                            <div class="pd-node" data-pd-node data-id="{{ nodeId }}" data-level="{{ level }}" data-has-children="{{ hasChildren ? '1' : '0' }}">
+                                                <div class="pd-row d-flex align-items-center gap-2" role="treeitem" aria-expanded="{{ hasChildren ? 'false' : 'true' }}">
+                                                    {% if hasChildren %}
+                                                        <button type="button" class="btn btn-sm btn-ghost-secondary pd-toggle" data-pd-toggle data-target="#pd_collapse_{{ safeNodeId }}" aria-label="Свернуть/развернуть">
+                                                            <i class="ti ti-chevron-right"></i>
+                                                        </button>
+                                                        <span class="text-muted pd-kind" title="Группа"><i class="ti ti-folder"></i></span>
+                                                    {% else %}
+                                                        <span class="pd-spacer"></span>
+                                                        <span class="text-muted pd-kind" title="Элемент"><i class="ti ti-file"></i></span>
+                                                    {% endif %}
+
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-link p-0 text-start pd-select text-decoration-none"
+                                                        data-pd-select
+                                                        data-id="{{ nodeId }}"
+                                                        data-label="{{ entity.name }}"
+                                                        {% if hasChildren %}data-disabled="1"{% endif %}
+                                                    >
+                                                        <span class="pd-name">{{ entity.name }}</span>
+                                                    </button>
+                                                </div>
+
+                                                {% if hasChildren %}
+                                                    <div class="pd-children collapse" id="pd_collapse_{{ safeNodeId }}">
+                                                        {{ _self.render_nodes(choicesByParent[nodeId], choicesByParent, fieldId, level + 1) }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+                                    {% endfor %}
+                                {% endmacro %}
+
+                                {{ _self.render_nodes(rootChoices, choicesByParent, fieldId, 1) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <div class="text-muted small me-auto">
+                            Выбрано: <span data-pd-selected-label>{{ currentLabel ?: '—' }}</span>
+                        </div>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
