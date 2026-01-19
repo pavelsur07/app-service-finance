@@ -14,6 +14,8 @@ class ProjectDirectionPickerType extends EntityType
 
         $resolver->setDefaults([
             'class' => ProjectDirection::class,
+            'choice_label' => 'name',
+            'choice_value' => 'id',
             'required' => false,
         ]);
     }

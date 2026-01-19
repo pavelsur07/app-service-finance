@@ -1,5 +1,12 @@
 function qs(root, sel) { return root.querySelector(sel); }
 function qsa(root, sel) { return Array.from(root.querySelectorAll(sel)); }
+function escapeSelector(value) {
+    if (window.CSS && typeof window.CSS.escape === 'function') {
+        return window.CSS.escape(value);
+    }
+
+    return String(value).replace(/([ #;?%&,.+*~':"!^$[\]()=>|/\\])/g, '\\$1');
+}
 
 function getBootstrap() {
     // Tabler обычно включает Bootstrap bundle; если нет — graceful fallback
@@ -11,7 +18,7 @@ function initOnePicker(picker) {
     picker.dataset.pdInited = '1';
 
     const fieldId = picker.getAttribute('data-pd-field-id');
-    const select = qs(picker, `#${CSS.escape(fieldId)}`);
+    const select = qs(picker, `#${escapeSelector(fieldId)}`);
     const display = qs(picker, '[data-pd-display]');
     const clearBtn = qs(picker, '[data-pd-clear]');
     const modal = picker.querySelector('.modal');
@@ -54,7 +61,7 @@ function initOnePicker(picker) {
 
         if (!id) return;
 
-        const btn = modal.querySelector(`[data-pd-select][data-id="${CSS.escape(id)}"]`);
+        const btn = modal.querySelector(`[data-pd-select][data-id="${escapeSelector(id)}"]`);
         if (btn) {
             btn.classList.add('pd-selected');
             btn.closest('.pd-row')?.classList.add('pd-row-selected');
@@ -82,7 +89,12 @@ function initOnePicker(picker) {
     qsa(modal, '[data-pd-toggle]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const targetSel = btn.getAttribute('data-target');
-            const target = targetSel ? modal.querySelector(targetSel) : null;
+            let target = null;
+            if (targetSel && targetSel.startsWith('#')) {
+                target = document.getElementById(targetSel.slice(1));
+            } else if (targetSel) {
+                target = modal.querySelector(targetSel);
+            }
             if (!target) return;
 
             const icon = btn.querySelector('i');
