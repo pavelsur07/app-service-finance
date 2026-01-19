@@ -110,7 +110,8 @@ body {
 
 /* ProjectDirection Picker (Tabler) */
 .pd-tree-wrap {
-    max-height: 340px;            /* фиксированная высота области дерева */
+    height: 340px;                /* фиксированная высота области дерева */
+    max-height: 340px;
     overflow: auto;               /* скролл внутри */
     border: 1px solid var(--tblr-border-color, #d9e2ef);
     border-radius: .5rem;
