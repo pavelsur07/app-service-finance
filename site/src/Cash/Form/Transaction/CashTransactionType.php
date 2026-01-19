@@ -10,6 +10,7 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Company;
 use App\Entity\ProjectDirection;
+use App\Form\Type\ProjectDirectionPickerType;
 use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use Symfony\Component\Form\AbstractType;
@@ -63,11 +64,10 @@ class CashTransactionType extends AbstractType
                 'choice_attr' => fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
-            ->add('projectDirection', ChoiceType::class, [
+            ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'required' => false,
                 'choices' => $company ? $this->projectDirectionRepo->findTreeByCompany($company) : [],
                 'choice_label' => fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
-                'choice_value' => 'id',
                 'choice_attr' => fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
