@@ -60,14 +60,15 @@ class CashTransactionType extends AbstractType
                 'choices' => $company ? $this->categoryRepo->findTreeByCompany($company) : [],
                 'choice_label' => fn (CashflowCategory $c) => str_repeat("\u{a0}", $c->getLevel() - 1).$c->getName(),
                 'choice_value' => 'id',
-                'choice_attr' => fn (CashflowCategory $c) => $c->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
+                'choice_attr' => fn (CashflowCategory $c) => !$c->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('projectDirection', ChoiceType::class, [
                 'required' => false,
-                'choices' => $company ? $this->projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']) : [],
-                'choice_label' => fn (ProjectDirection $projectDirection) => $projectDirection->getName(),
+                'choices' => $company ? $this->projectDirectionRepo->findTreeByCompany($company) : [],
+                'choice_label' => fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
                 'choice_value' => 'id',
+                'choice_attr' => fn (ProjectDirection $projectDirection) => !$projectDirection->getChildren()->isEmpty() ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [
