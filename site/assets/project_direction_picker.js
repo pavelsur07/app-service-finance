@@ -89,7 +89,12 @@ function initOnePicker(picker) {
     qsa(modal, '[data-pd-toggle]').forEach((btn) => {
         btn.addEventListener('click', () => {
             const targetSel = btn.getAttribute('data-target');
-            const target = targetSel ? modal.querySelector(targetSel) : null;
+            let target = null;
+            if (targetSel && targetSel.startsWith('#')) {
+                target = document.getElementById(targetSel.slice(1));
+            } else if (targetSel) {
+                target = modal.querySelector(targetSel);
+            }
             if (!target) return;
 
             const icon = btn.querySelector('i');
