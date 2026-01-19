@@ -19,11 +19,43 @@ class ProjectDirectionRepository extends ServiceEntityRepository
      */
     public function findByCompany(Company $company): array
     {
+        return $this->findTreeByCompany($company);
+    }
+
+    /**
+     * @return ProjectDirection[]
+     */
+    public function findRootByCompany(Company $company): array
+    {
         return $this->createQueryBuilder('d')
             ->andWhere('d.company = :company')
+            ->andWhere('d.parent IS NULL')
             ->setParameter('company', $company)
-            ->orderBy('d.name', 'ASC')
+            ->orderBy('d.sort', 'ASC')
+            ->addOrderBy('d.name', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * @return ProjectDirection[]
+     */
+    public function findTreeByCompany(Company $company): array
+    {
+        $roots = $this->findRootByCompany($company);
+        $result = [];
+        foreach ($roots as $root) {
+            $this->collectTree($root, $result);
+        }
+
+        return $result;
+    }
+
+    private function collectTree(ProjectDirection $node, array &$result): void
+    {
+        $result[] = $node;
+        foreach ($node->getChildren() as $child) {
+            $this->collectTree($child, $result);
+        }
     }
 }
