@@ -13,6 +13,66 @@ function getBootstrap() {
     return window.bootstrap || null;
 }
 
+function resolveBootstrap() {
+    return window.bootstrap || null;
+}
+
+function isCollapseShown(el) {
+    return el.classList.contains('show');
+}
+
+function getCollapse(el) {
+    const bs = resolveBootstrap();
+    if (bs?.Collapse) {
+        return bs.Collapse.getOrCreateInstance(el, { toggle: false });
+    }
+    return null;
+}
+
+function showCollapse(el) {
+    const inst = getCollapse(el);
+    if (inst) {
+        inst.show();
+    } else {
+        el.classList.add('show');
+    }
+}
+
+function hideCollapse(el) {
+    const inst = getCollapse(el);
+    if (inst) {
+        inst.hide();
+    } else {
+        el.classList.remove('show');
+    }
+}
+
+function toggleCollapse(el) {
+    const nowShown = !isCollapseShown(el);
+    if (nowShown) {
+        showCollapse(el);
+    } else {
+        hideCollapse(el);
+    }
+    return nowShown;
+}
+
+function hideModalSafe(modal) {
+    const bs = resolveBootstrap();
+    if (bs?.Modal) {
+        const inst = bs.Modal.getOrCreateInstance(modal);
+        inst.hide();
+        return;
+    }
+
+    modal.classList.remove('show');
+    modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    qsa(document, '.modal-backdrop').forEach((el) => el.remove());
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+}
+
 function initOnePicker(picker) {
     if (picker.dataset.pdInited === '1') return;
     picker.dataset.pdInited = '1';
@@ -28,8 +88,6 @@ function initOnePicker(picker) {
     const collapseAllBtn = qs(modal, '[data-pd-collapse-all]');
 
     if (!select || !display || !modal) return;
-
-    const bs = getBootstrap();
 
     function setValue(id, label) {
         select.value = id || '';
@@ -71,12 +129,7 @@ function initOnePicker(picker) {
             while (parent) {
                 const children = parent.querySelector(':scope > .pd-children');
                 if (children) {
-                    if (bs && bs.Collapse) {
-                        const inst = bs.Collapse.getOrCreateInstance(children, { toggle: false });
-                        inst.show();
-                    } else {
-                        children.classList.add('show');
-                    }
+                    showCollapse(children);
                     const toggle = parent.querySelector(':scope .pd-toggle i');
                     if (toggle) toggle.className = 'ti ti-chevron-down';
                 }
@@ -99,16 +152,8 @@ function initOnePicker(picker) {
 
             const icon = btn.querySelector('i');
 
-            if (bs && bs.Collapse) {
-                const inst = bs.Collapse.getOrCreateInstance(target, { toggle: false });
-                const isShown = target.classList.contains('show');
-                if (isShown) inst.hide(); else inst.show();
-                if (icon) icon.className = isShown ? 'ti ti-chevron-right' : 'ti ti-chevron-down';
-            } else {
-                const isShown = target.classList.contains('show');
-                target.classList.toggle('show', !isShown);
-                if (icon) icon.className = isShown ? 'ti ti-chevron-right' : 'ti ti-chevron-down';
-            }
+            const nowShown = toggleCollapse(target);
+            if (icon) icon.className = nowShown ? 'ti ti-chevron-down' : 'ti ti-chevron-right';
         });
     });
 
@@ -122,12 +167,7 @@ function initOnePicker(picker) {
             const label = btn.getAttribute('data-label') || btn.textContent.trim();
             setValue(id, label);
 
-            if (bs && bs.Modal) {
-                const inst = bs.Modal.getOrCreateInstance(modal);
-                inst.hide();
-            } else {
-                modal.classList.remove('show');
-            }
+            hideModalSafe(modal);
         });
     });
 
@@ -138,20 +178,10 @@ function initOnePicker(picker) {
 
     // expand/collapse all
     function showOne(el) {
-        if (bs && bs.Collapse) {
-            const inst = bs.Collapse.getOrCreateInstance(el, { toggle: false });
-            inst.show();
-        } else {
-            el.classList.add('show');
-        }
+        showCollapse(el);
     }
     function hideOne(el) {
-        if (bs && bs.Collapse) {
-            const inst = bs.Collapse.getOrCreateInstance(el, { toggle: false });
-            inst.hide();
-        } else {
-            el.classList.remove('show');
-        }
+        hideCollapse(el);
     }
 
     if (expandAllBtn) {
