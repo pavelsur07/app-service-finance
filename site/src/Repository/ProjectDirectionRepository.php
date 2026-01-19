@@ -89,4 +89,18 @@ class ProjectDirectionRepository extends ServiceEntityRepository
             }
         }
     }
+
+    /**
+     * @return ProjectDirection[]
+     */
+    public function collectSelfAndDescendants(ProjectDirection $root): array
+    {
+        $result = [$root];
+
+        foreach ($root->getChildren() as $child) {
+            $result = array_merge($result, $this->collectSelfAndDescendants($child));
+        }
+
+        return $result;
+    }
 }
