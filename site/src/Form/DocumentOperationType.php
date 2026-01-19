@@ -6,6 +6,7 @@ use App\Entity\Counterparty;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\ProjectDirection;
+use App\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -41,7 +42,7 @@ class DocumentOperationType extends AbstractType
                     'data-operation-counterparty' => 'true',
                 ],
             ])
-            ->add('projectDirection', EntityType::class, [
+            ->add('projectDirection', ProjectDirectionPickerType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['project_directions'],
                 'choice_label' => function (ProjectDirection $item) {

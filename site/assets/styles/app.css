@@ -107,3 +107,29 @@ body {
 .modal.modal-blur .modal-footer {
     color: inherit;
 }
+
+/* ProjectDirection Picker (Tabler) */
+.pd-tree-wrap {
+    max-height: 340px;            /* фиксированная высота области дерева */
+    overflow: auto;               /* скролл внутри */
+    border: 1px solid var(--tblr-border-color, #d9e2ef);
+    border-radius: .5rem;
+    padding: .25rem;
+    background: var(--tblr-bg-surface, #fff);
+}
+
+.pd-node { padding-left: .25rem; }
+.pd-row { padding: .15rem .35rem; border-radius: .35rem; }
+.pd-row:hover { background: rgba(10,21,72,.05); }
+
+.pd-kind { width: 18px; display: inline-flex; justify-content: center; }
+.pd-spacer { width: 32px; display: inline-block; }
+
+.pd-toggle.btn { height: 24px; width: 24px; padding: 0; }
+
+.pd-name { font-size: .875rem; line-height: 1.15rem; }
+
+.pd-row-selected { background: rgba(10,21,72,.08); }
+.pd-selected { font-weight: 600; }
+
+.pd-children { margin-left: 14px; border-left: 1px dashed rgba(10,21,72,.15); padding-left: 10px; }
