@@ -61,7 +61,10 @@ class CashTransactionAutoRuleType extends AbstractType
             ->add('projectDirection', EntityType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['projectDirections'],
-                'choice_label' => fn (ProjectDirection $item) => $item->getName(),
+                'choice_label' => function (ProjectDirection $item) {
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                },
+                'choice_attr' => fn (ProjectDirection $item) => $item->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'placeholder' => 'Не выбрано',
                 'required' => false,
                 'label' => 'Направление / проект',

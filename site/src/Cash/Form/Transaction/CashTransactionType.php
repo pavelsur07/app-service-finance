@@ -65,9 +65,10 @@ class CashTransactionType extends AbstractType
             ])
             ->add('projectDirection', ChoiceType::class, [
                 'required' => false,
-                'choices' => $company ? $this->projectDirectionRepo->findBy(['company' => $company], ['name' => 'ASC']) : [],
-                'choice_label' => fn (ProjectDirection $projectDirection) => $projectDirection->getName(),
+                'choices' => $company ? $this->projectDirectionRepo->findTreeByCompany($company) : [],
+                'choice_label' => fn (ProjectDirection $projectDirection) => str_repeat("\u{a0}", $projectDirection->getLevel() - 1).$projectDirection->getName(),
                 'choice_value' => 'id',
+                'choice_attr' => fn (ProjectDirection $projectDirection) => $projectDirection->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'mapped' => false,
             ])
             ->add('counterparty', ChoiceType::class, [

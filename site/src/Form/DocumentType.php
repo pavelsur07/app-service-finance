@@ -50,7 +50,10 @@ class DocumentType extends AbstractType
             ->add('projectDirection', EntityType::class, [
                 'class' => ProjectDirection::class,
                 'choices' => $options['project_directions'],
-                'choice_label' => 'name',
+                'choice_label' => function (ProjectDirection $item) {
+                    return str_repeat('—', $item->getLevel() - 1).' '.$item->getName();
+                },
+                'choice_attr' => fn (ProjectDirection $item) => $item->getChildren()->count() > 0 ? ['disabled' => 'disabled'] : [],
                 'placeholder' => '—',
                 'required' => false,
                 'label' => 'Проект',
