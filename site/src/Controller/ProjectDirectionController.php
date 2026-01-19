@@ -57,15 +57,26 @@ class ProjectDirectionController extends AbstractController
             throw $this->createNotFoundException();
         }
         $parents = $repo->findTreeByCompany($company);
-        $parentsFiltered = array_filter(
+        $excluded = $repo->collectSelfAndDescendants($direction);
+        $excludedIds = array_map(static fn(ProjectDirection $direction) => (string) $direction->getId(), $excluded);
+        $parentsFiltered = array_values(array_filter(
             $parents,
-            static fn(ProjectDirection $parent) => $parent->getId() !== $direction->getId()
-        );
+            static fn(ProjectDirection $parent) => !in_array((string) $parent->getId(), $excludedIds, true)
+        ));
         $form = $this->createForm(ProjectDirectionType::class, $direction, [
             'parents' => $parentsFiltered,
         ]);
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
+            $parent = $direction->getParent();
+            if ($parent && in_array((string) $parent->getId(), $excludedIds, true)) {
+                $this->addFlash('danger', 'Нельзя выбрать родителем текущий элемент или его потомка (цикл).');
+
+                return $this->render('project_direction/edit.html.twig', [
+                    'form' => $form->createView(),
+                    'item' => $direction,
+                ]);
+            }
             $em->flush();
 
             return $this->redirectToRoute('project_direction_index');
