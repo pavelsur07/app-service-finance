@@ -27,7 +27,7 @@
                     <tbody>
                     {% for item in items %}
                         <tr>
-                            <td>{{ item.name }}</td>
+                            <td>{{ item.indentedName }}</td>
                             <td class="text-end">
                                 <a href="{{ path('project_direction_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
                                 <form method="post" action="{{ path('project_direction_delete', {id: item.id}) }}" style="display:inline;" onsubmit="return confirm('Удалить?');">
