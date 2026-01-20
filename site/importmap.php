@@ -25,6 +25,9 @@ return [
     'react-dom' => [
         'version' => '18.3.1',
     ],
+    'scheduler' => [
+        'version' => '0.23.2',
+    ],
     '@hotwired/stimulus' => [
         'version' => '3.2.2',
     ],
