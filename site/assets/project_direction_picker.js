@@ -57,12 +57,16 @@ function toggleCollapse(el) {
     return nowShown;
 }
 
-function hideModalSafe(modal) {
+function hideModalSafe(modal, fallbackFocusEl) {
     const bs = resolveBootstrap();
     if (bs?.Modal) {
         const inst = bs.Modal.getOrCreateInstance(modal);
         inst.hide();
         return;
+    }
+
+    if (fallbackFocusEl && modal.contains(document.activeElement)) {
+        fallbackFocusEl.focus({ preventScroll: true });
     }
 
     modal.classList.remove('show');
@@ -88,6 +92,7 @@ function initOnePicker(picker) {
     const select = qs(picker, `#${escapeSelector(fieldId)}`);
     const display = qs(picker, '[data-pd-display]');
     const clearBtn = qs(picker, '[data-pd-clear]');
+    const openBtn = qs(picker, '[data-pd-open]');
     const modal = picker.querySelector('.modal');
     const selectedLabelEl = qs(modal, '[data-pd-selected-label]');
     const search = qs(modal, '[data-pd-search]');
@@ -167,6 +172,14 @@ function initOnePicker(picker) {
         log('toggle click', { targetSel, nowShown });
     }
 
+    const fallbackFocusEl = openBtn || display;
+
+    function ensureFocusOutsideModal() {
+        if (fallbackFocusEl && modal.contains(document.activeElement)) {
+            fallbackFocusEl.focus({ preventScroll: true });
+        }
+    }
+
     function handleSelectClick(btn) {
         const disabled = btn.getAttribute('data-disabled') === '1';
         if (disabled) {
@@ -179,7 +192,7 @@ function initOnePicker(picker) {
         log('select click', { id, label });
         setValue(id, label);
 
-        hideModalSafe(modal);
+        hideModalSafe(modal, fallbackFocusEl);
     }
 
     // delegate clicks to handle dynamic content and bubbling issues
@@ -274,6 +287,8 @@ function initOnePicker(picker) {
     if (search) {
         search.addEventListener('input', () => applySearch(search.value));
     }
+
+    modal.addEventListener('hide.bs.modal', ensureFocusOutsideModal);
 
     // keep sync when select changes externally (document scripts)
     select.addEventListener('change', syncFromSelect);
