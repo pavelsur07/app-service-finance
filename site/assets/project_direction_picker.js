@@ -77,6 +77,13 @@ function initOnePicker(picker) {
     if (picker.dataset.pdInited === '1') return;
     picker.dataset.pdInited = '1';
 
+    const debug = picker.dataset.pdDebug === '1';
+    const log = (...args) => {
+        if (debug) {
+            console.debug('[pd-picker]', ...args);
+        }
+    };
+
     const fieldId = picker.getAttribute('data-pd-field-id');
     const select = qs(picker, `#${escapeSelector(fieldId)}`);
     const display = qs(picker, '[data-pd-display]');
@@ -90,6 +97,7 @@ function initOnePicker(picker) {
     if (!select || !display || !modal) return;
 
     function setValue(id, label) {
+        log('setValue', { id, label });
         select.value = id || '';
         select.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -108,6 +116,7 @@ function initOnePicker(picker) {
         if (selectedLabelEl) selectedLabelEl.textContent = display.value || '—';
         if (clearBtn) clearBtn.disabled = !select.value;
         highlightSelected(select.value);
+        log('syncFromSelect', { value: select.value, label: display.value });
     }
 
     // highlight in tree
@@ -138,37 +147,56 @@ function initOnePicker(picker) {
         }
     }
 
-    // toggle children
-    qsa(modal, '[data-pd-toggle]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const targetSel = btn.getAttribute('data-target');
-            let target = null;
-            if (targetSel && targetSel.startsWith('#')) {
-                target = document.getElementById(targetSel.slice(1));
-            } else if (targetSel) {
-                target = modal.querySelector(targetSel);
-            }
-            if (!target) return;
+    function handleToggleClick(btn) {
+        const targetSel = btn.getAttribute('data-target');
+        let target = null;
+        if (targetSel && targetSel.startsWith('#')) {
+            target = document.getElementById(targetSel.slice(1));
+        } else if (targetSel) {
+            target = modal.querySelector(targetSel);
+        }
+        if (!target) {
+            log('toggle click: target not found', { targetSel });
+            return;
+        }
 
-            const icon = btn.querySelector('i');
+        const icon = btn.querySelector('i');
 
-            const nowShown = toggleCollapse(target);
-            if (icon) icon.className = nowShown ? 'ti ti-chevron-down' : 'ti ti-chevron-right';
-        });
-    });
+        const nowShown = toggleCollapse(target);
+        if (icon) icon.className = nowShown ? 'ti ti-chevron-down' : 'ti ti-chevron-right';
+        log('toggle click', { targetSel, nowShown });
+    }
 
-    // select node (only leaves)
-    qsa(modal, '[data-pd-select]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-            const disabled = btn.getAttribute('data-disabled') === '1';
-            if (disabled) return;
+    function handleSelectClick(btn) {
+        const disabled = btn.getAttribute('data-disabled') === '1';
+        if (disabled) {
+            log('select click ignored (disabled)', { id: btn.getAttribute('data-id') });
+            return;
+        }
 
-            const id = btn.getAttribute('data-id');
-            const label = btn.getAttribute('data-label') || btn.textContent.trim();
-            setValue(id, label);
+        const id = btn.getAttribute('data-id');
+        const label = btn.getAttribute('data-label') || btn.textContent.trim();
+        log('select click', { id, label });
+        setValue(id, label);
 
-            hideModalSafe(modal);
-        });
+        hideModalSafe(modal);
+    }
+
+    // delegate clicks to handle dynamic content and bubbling issues
+    modal.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+
+        const selectBtn = target.closest('[data-pd-select]');
+        if (selectBtn && modal.contains(selectBtn)) {
+            handleSelectClick(selectBtn);
+            return;
+        }
+
+        const toggleBtn = target.closest('[data-pd-toggle]');
+        if (toggleBtn && modal.contains(toggleBtn)) {
+            handleToggleClick(toggleBtn);
+        }
     });
 
     // clear
