@@ -1,0 +1,171 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Маппинг колонок{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Маппинг колонок файла</h2>
+                    {% if fileName %}
+                        <div class="text-muted">{{ fileName }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-body">
+                <form action="{{ path('cash_file_import_mapping_save') }}" method="post">
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <label class="form-label required" for="date_column">Дата операции</label>
+                            <select class="form-select" id="date_column" name="date_column" required>
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.date is defined and mapping.date == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="amount_column">Сумма (одна колонка со знаком)</label>
+                            <select class="form-select" id="amount_column" name="amount_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.amount is defined and mapping.amount == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="inflow_column">Приход (отдельная колонка)</label>
+                            <select class="form-select" id="inflow_column" name="inflow_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.inflow is defined and mapping.inflow == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="outflow_column">Расход (отдельная колонка)</label>
+                            <select class="form-select" id="outflow_column" name="outflow_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.outflow is defined and mapping.outflow == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="counterparty_column">Контрагент</label>
+                            <select class="form-select" id="counterparty_column" name="counterparty_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.counterparty is defined and mapping.counterparty == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="description_column">Назначение платежа</label>
+                            <select class="form-select" id="description_column" name="description_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.description is defined and mapping.description == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="currency_column">Валюта</label>
+                            <select class="form-select" id="currency_column" name="currency_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.currency is defined and mapping.currency == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-6">
+                            <label class="form-label" for="doc_number_column">Номер документа</label>
+                            <select class="form-select" id="doc_number_column" name="doc_number_column">
+                                <option value="">— не использовать —</option>
+                                {% for header in headers %}
+                                    {% set headerLabel = header is empty ? 'Колонка ' ~ loop.index : header %}
+                                    <option value="{{ headerLabel }}" {% if mapping.doc_number is defined and mapping.doc_number == headerLabel %}selected{% endif %}>
+                                        {{ headerLabel }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_mapping') }}">
+                    <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="submit" class="btn btn-primary">Далее</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if headers is not empty %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Пример данных</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-striped">
+                        <thead>
+                            <tr>
+                                {% for header in headers %}
+                                    <th>{{ header is empty ? 'Колонка ' ~ loop.index : header }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if sampleRows is empty %}
+                                <tr>
+                                    <td colspan="{{ headers|length }}" class="text-muted text-center">Нет данных для предпросмотра.</td>
+                                </tr>
+                            {% else %}
+                                {% for row in sampleRows %}
+                                    <tr>
+                                        {% for cell in row %}
+                                            <td>{{ cell }}</td>
+                                        {% endfor %}
+                                    </tr>
+                                {% endfor %}
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
