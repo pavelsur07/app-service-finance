@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Import;
 
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Service\Import\File\FileTabularReader;
 use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -103,5 +104,133 @@ class CashFileImportController extends AbstractController
         ]);
 
         return new RedirectResponse('/cash/import/file/mapping', Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/mapping', name: 'cash_file_import_mapping', methods: ['GET'])]
+    public function mapping(SessionInterface $session, FileTabularReader $fileTabularReader): Response
+    {
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $fileHash = $importPayload['file_hash'] ?? null;
+        $storedExtension = $importPayload['stored_ext'] ?? null;
+        if (!$fileHash || !is_string($fileHash)) {
+            $this->addFlash('error', 'Не удалось определить файл импорта.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $extensionSuffix = '';
+        if (is_string($storedExtension) && '' !== $storedExtension) {
+            $extensionSuffix = '.'.$storedExtension;
+        }
+
+        $filePath = sprintf(
+            '%s/var/storage/cash-file-imports/%s%s',
+            $this->getParameter('kernel.project_dir'),
+            $fileHash,
+            $extensionSuffix
+        );
+
+        if (!is_file($filePath)) {
+            $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $headers = $fileTabularReader->readHeader($filePath);
+        $sampleRows = $fileTabularReader->readSampleRows($filePath);
+        $mapping = [];
+        if (isset($importPayload['mapping']) && is_array($importPayload['mapping'])) {
+            $mapping = $importPayload['mapping'];
+        }
+
+        return $this->render('cash/file_import_mapping.html.twig', [
+            'fileName' => $importPayload['file_name'] ?? '',
+            'headers' => $headers,
+            'sampleRows' => $sampleRows,
+            'mapping' => $mapping,
+        ]);
+    }
+
+    #[Route('/mapping', name: 'cash_file_import_mapping_save', methods: ['POST'])]
+    public function mappingSave(Request $request, SessionInterface $session): Response
+    {
+        if (!$this->isCsrfTokenValid('cash_file_import_mapping', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Некорректный CSRF-токен.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $dateColumn = $this->normalizeMappingColumn($request->request->get('date_column'));
+        $amountColumn = $this->normalizeMappingColumn($request->request->get('amount_column'));
+        $inflowColumn = $this->normalizeMappingColumn($request->request->get('inflow_column'));
+        $outflowColumn = $this->normalizeMappingColumn($request->request->get('outflow_column'));
+        $counterpartyColumn = $this->normalizeMappingColumn($request->request->get('counterparty_column'));
+        $descriptionColumn = $this->normalizeMappingColumn($request->request->get('description_column'));
+        $currencyColumn = $this->normalizeMappingColumn($request->request->get('currency_column'));
+        $docNumberColumn = $this->normalizeMappingColumn($request->request->get('doc_number_column'));
+
+        if (null === $dateColumn) {
+            $this->addFlash('error', 'Укажите колонку с датой операции.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $hasAmount = null !== $amountColumn;
+        $hasInflowOutflow = null !== $inflowColumn && null !== $outflowColumn;
+
+        if (!$hasAmount && !$hasInflowOutflow) {
+            $this->addFlash('error', 'Укажите колонку суммы или пары колонок приход/расход.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        if ($hasAmount) {
+            $inflowColumn = null;
+            $outflowColumn = null;
+        } else {
+            $amountColumn = null;
+        }
+
+        $importPayload['mapping'] = [
+            'date' => $dateColumn,
+            'amount' => $amountColumn,
+            'inflow' => $inflowColumn,
+            'outflow' => $outflowColumn,
+            'counterparty' => $counterpartyColumn,
+            'description' => $descriptionColumn,
+            'currency' => $currencyColumn,
+            'doc_number' => $docNumberColumn,
+        ];
+
+        $session->set('cash_file_import', $importPayload);
+
+        return new RedirectResponse('/cash/import/file/preview', Response::HTTP_SEE_OTHER);
+    }
+
+    private function normalizeMappingColumn(mixed $value): ?string
+    {
+        if (!is_string($value)) {
+            return null;
+        }
+
+        $trimmed = trim($value);
+        if ('' === $trimmed) {
+            return null;
+        }
+
+        return $trimmed;
     }
 }
