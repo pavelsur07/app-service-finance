@@ -3,6 +3,7 @@
 namespace App\Cash\Controller\Import;
 
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -218,6 +219,111 @@ class CashFileImportController extends AbstractController
         $session->set('cash_file_import', $importPayload);
 
         return new RedirectResponse('/cash/import/file/preview', Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/preview', name: 'cash_file_import_preview', methods: ['GET'])]
+    public function preview(
+        SessionInterface $session,
+        FileTabularReader $fileTabularReader,
+        CashFileRowNormalizer $rowNormalizer,
+        MoneyAccountRepository $accountRepository,
+    ): Response {
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $mapping = $importPayload['mapping'] ?? null;
+        if (!is_array($mapping) || [] === $mapping) {
+            $this->addFlash('error', 'Сначала настройте маппинг колонок.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $fileHash = $importPayload['file_hash'] ?? null;
+        $storedExtension = $importPayload['stored_ext'] ?? null;
+        if (!$fileHash || !is_string($fileHash)) {
+            $this->addFlash('error', 'Не удалось определить файл импорта.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $accountId = $importPayload['account_id'] ?? null;
+        if (!$accountId) {
+            $this->addFlash('error', 'Не удалось определить кассу для импорта.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $account = $accountRepository->findOneBy([
+            'id' => $accountId,
+            'company' => $company,
+        ]);
+
+        if (!$account) {
+            $this->addFlash('error', 'Выбранная касса не найдена.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $extensionSuffix = '';
+        if (is_string($storedExtension) && '' !== $storedExtension) {
+            $extensionSuffix = '.'.$storedExtension;
+        }
+
+        $filePath = sprintf(
+            '%s/var/storage/cash-file-imports/%s%s',
+            $this->getParameter('kernel.project_dir'),
+            $fileHash,
+            $extensionSuffix
+        );
+
+        if (!is_file($filePath)) {
+            $this->addFlash('error', 'Файл импорта не найден. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $headers = $fileTabularReader->readHeader($filePath);
+        $sampleRows = $fileTabularReader->readSampleRows($filePath, 100);
+
+        $headerLabels = [];
+        foreach ($headers as $index => $header) {
+            if (null === $header || '' === $header) {
+                $headerLabels[$index] = sprintf('Колонка %d', $index + 1);
+            } else {
+                $headerLabels[$index] = $header;
+            }
+        }
+
+        $previewRows = [];
+        foreach ($sampleRows as $row) {
+            $rowByHeader = [];
+            foreach ($headerLabels as $index => $label) {
+                $rowByHeader[$label] = $row[$index] ?? null;
+            }
+
+            $normalized = $rowNormalizer->normalize($rowByHeader, $mapping, $account->getCurrency());
+            $previewRows[] = [
+                'ok' => $normalized['ok'],
+                'errors' => $normalized['errors'],
+                'date' => $normalized['occurredAt']?->format('d.m.Y'),
+                'direction' => $normalized['direction']?->value,
+                'amount' => $normalized['amount'],
+                'counterparty' => $normalized['counterpartyName'],
+                'description' => $normalized['description'],
+                'currency' => $normalized['currency'],
+                'docNumber' => $normalized['docNumber'],
+            ];
+        }
+
+        return $this->render('cash/file_import_preview.html.twig', [
+            'fileName' => $importPayload['file_name'] ?? '',
+            'previewRows' => $previewRows,
+        ]);
     }
 
     private function normalizeMappingColumn(mixed $value): ?string
