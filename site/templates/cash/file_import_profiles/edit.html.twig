@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Редактирование профиля{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Редактирование профиля</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                {% include 'cash/file_import_profiles/_form.html.twig' with {
+                    name: name,
+                    mapping: mapping,
+                    options: options
+                } %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
