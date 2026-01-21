@@ -1,0 +1,59 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Профили импорта{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Профили импорта</h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{{ path('cash_file_import_profile_new') }}" class="btn btn-primary">Добавить профиль</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Тип</th>
+                            <th>Обновлено</th>
+                            <th class="w-1"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    {% for profile in profiles %}
+                        <tr>
+                            <td>{{ profile.name }}</td>
+                            <td>{{ profile.type }}</td>
+                            <td>{{ profile.updatedAt|date('d.m.Y H:i') }}</td>
+                            <td class="text-end">
+                                <a href="{{ path('cash_file_import_profile_edit', {'id': profile.id}) }}" class="btn btn-icon" title="Редактировать">
+                                    <i class="ti ti-pencil"></i>
+                                </a>
+                                <form method="post" action="{{ path('cash_file_import_profile_delete', {'id': profile.id}) }}" class="d-inline" onsubmit="return confirm('Удалить профиль?');">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ profile.id) }}">
+                                    <button class="btn btn-icon btn-danger" title="Удалить">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center text-secondary">Профилей ещё нет.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}

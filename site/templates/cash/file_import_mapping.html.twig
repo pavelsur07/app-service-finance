@@ -19,8 +19,42 @@
     <div class="container-xl mt-3">
         <div class="card mb-3">
             <div class="card-body">
+                <div class="row g-3 align-items-end">
+                    <div class="col-12 col-md-6">
+                        <form action="{{ path('cash_file_import_mapping_profile_apply') }}" method="post" class="row g-2 align-items-end">
+                            <div class="col-12 col-md-8">
+                                <label class="form-label" for="profile_id">Профиль</label>
+                                <select class="form-select" id="profile_id" name="profile_id">
+                                    <option value="">— выбрать профиль —</option>
+                                    {% for profile in profiles %}
+                                        <option value="{{ profile.id }}" {% if selectedProfileId is defined and selectedProfileId == profile.id %}selected{% endif %}>
+                                            {{ profile.name }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-12 col-md-4">
+                                <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_profile_apply') }}">
+                                <button type="submit" class="btn btn-outline-primary w-100">Применить</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="col-12 col-md-6 text-md-end">
+                        <a href="{{ path('cash_file_import_profile_index') }}" class="btn btn-outline-secondary">Управление профилями</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-body">
                 <form action="{{ path('cash_file_import_mapping_save') }}" method="post">
                     <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="profile_name">Сохранить как профиль</label>
+                            <input class="form-control" id="profile_name" name="profile_name" placeholder="Название профиля">
+                            <div class="form-hint">Введите название и нажмите «Сохранить как профиль», чтобы переиспользовать маппинг.</div>
+                        </div>
                         <div class="col-12 col-md-6">
                             <label class="form-label required" for="date_column">Дата операции</label>
                             <select class="form-select" id="date_column" name="date_column" required>
@@ -128,6 +162,7 @@
 
                     <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_mapping') }}">
                     <div class="d-flex justify-content-end gap-2 mt-4">
+                        <button type="submit" class="btn btn-outline-secondary" formaction="{{ path('cash_file_import_mapping_profile_save') }}">Сохранить как профиль</button>
                         <button type="submit" class="btn btn-primary">Далее</button>
                     </div>
                 </form>

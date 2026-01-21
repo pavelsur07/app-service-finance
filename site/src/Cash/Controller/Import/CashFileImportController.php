@@ -3,8 +3,10 @@
 namespace App\Cash\Controller\Import;
 
 use App\Cash\Entity\Import\CashFileImportJob;
+use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Import\CashFileImportProfileRepository;
 use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
@@ -119,8 +121,11 @@ class CashFileImportController extends AbstractController
     }
 
     #[Route('/mapping', name: 'cash_file_import_mapping', methods: ['GET'])]
-    public function mapping(SessionInterface $session, FileTabularReader $fileTabularReader): Response
-    {
+    public function mapping(
+        SessionInterface $session,
+        FileTabularReader $fileTabularReader,
+        CashFileImportProfileRepository $profileRepository,
+    ): Response {
         $importPayload = $session->get('cash_file_import');
         if (!is_array($importPayload)) {
             $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
@@ -161,11 +166,16 @@ class CashFileImportController extends AbstractController
             $mapping = $importPayload['mapping'];
         }
 
+        $company = $this->activeCompanyService->getActiveCompany();
+        $profiles = $profileRepository->findByCompanyAndType($company, CashFileImportProfile::TYPE_CASH_TRANSACTION);
+
         return $this->render('cash/file_import_mapping.html.twig', [
             'fileName' => $importPayload['file_name'] ?? '',
             'headers' => $headers,
             'sampleRows' => $sampleRows,
             'mapping' => $mapping,
+            'profiles' => $profiles,
+            'selectedProfileId' => $importPayload['profile_id'] ?? null,
         ]);
     }
 
@@ -230,6 +240,148 @@ class CashFileImportController extends AbstractController
         $session->set('cash_file_import', $importPayload);
 
         return new RedirectResponse('/cash/import/file/preview', Response::HTTP_SEE_OTHER);
+    }
+
+    #[Route('/mapping/profile/apply', name: 'cash_file_import_mapping_profile_apply', methods: ['POST'])]
+    public function mappingApplyProfile(
+        Request $request,
+        SessionInterface $session,
+        CashFileImportProfileRepository $profileRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('cash_file_import_profile_apply', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Некорректный CSRF-токен.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $profileId = $request->request->get('profile_id');
+        if (!$profileId) {
+            $this->addFlash('error', 'Выберите профиль импорта.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $profile = $profileRepository->find($profileId);
+        if (
+            !$profile
+            || $profile->getCompany()->getId() !== $company->getId()
+            || $profile->getType() !== CashFileImportProfile::TYPE_CASH_TRANSACTION
+        ) {
+            $this->addFlash('error', 'Профиль импорта не найден.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $importPayload['mapping'] = $profile->getMapping();
+        $importPayload['options'] = $profile->getOptions();
+        $importPayload['profile_id'] = $profile->getId();
+        $session->set('cash_file_import', $importPayload);
+
+        $this->addFlash('success', 'Профиль применён.');
+
+        return $this->redirectToRoute('cash_file_import_mapping');
+    }
+
+    #[Route('/mapping/profile/save', name: 'cash_file_import_mapping_profile_save', methods: ['POST'])]
+    public function mappingSaveProfile(
+        Request $request,
+        SessionInterface $session,
+    ): Response {
+        if (!$this->isCsrfTokenValid('cash_file_import_mapping', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Некорректный CSRF-токен.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $profileName = trim((string) $request->request->get('profile_name'));
+        if ('' === $profileName) {
+            $this->addFlash('error', 'Укажите название профиля.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $dateColumn = $this->normalizeMappingColumn($request->request->get('date_column'));
+        $amountColumn = $this->normalizeMappingColumn($request->request->get('amount_column'));
+        $inflowColumn = $this->normalizeMappingColumn($request->request->get('inflow_column'));
+        $outflowColumn = $this->normalizeMappingColumn($request->request->get('outflow_column'));
+        $counterpartyColumn = $this->normalizeMappingColumn($request->request->get('counterparty_column'));
+        $descriptionColumn = $this->normalizeMappingColumn($request->request->get('description_column'));
+        $currencyColumn = $this->normalizeMappingColumn($request->request->get('currency_column'));
+        $docNumberColumn = $this->normalizeMappingColumn($request->request->get('doc_number_column'));
+
+        if (null === $dateColumn) {
+            $this->addFlash('error', 'Укажите колонку с датой операции.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $hasAmount = null !== $amountColumn;
+        $hasInflowOutflow = null !== $inflowColumn && null !== $outflowColumn;
+
+        if (!$hasAmount && !$hasInflowOutflow) {
+            $this->addFlash('error', 'Укажите колонку суммы или пары колонок приход/расход.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        if ($hasAmount) {
+            $inflowColumn = null;
+            $outflowColumn = null;
+        } else {
+            $amountColumn = null;
+        }
+
+        $mapping = [
+            'date' => $dateColumn,
+            'amount' => $amountColumn,
+            'inflow' => $inflowColumn,
+            'outflow' => $outflowColumn,
+            'counterparty' => $counterpartyColumn,
+            'description' => $descriptionColumn,
+            'currency' => $currencyColumn,
+            'doc_number' => $docNumberColumn,
+        ];
+
+        $options = [];
+        if (isset($importPayload['options']) && is_array($importPayload['options'])) {
+            $options = $importPayload['options'];
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $profile = new CashFileImportProfile(
+            Uuid::uuid4()->toString(),
+            $company,
+            $profileName,
+            $mapping,
+            $options,
+            CashFileImportProfile::TYPE_CASH_TRANSACTION
+        );
+
+        $this->entityManager->persist($profile);
+        $this->entityManager->flush();
+
+        $importPayload['mapping'] = $mapping;
+        $importPayload['profile_id'] = $profile->getId();
+        $session->set('cash_file_import', $importPayload);
+
+        $this->addFlash('success', 'Профиль сохранён.');
+
+        return $this->redirectToRoute('cash_file_import_mapping');
     }
 
     #[Route('/preview', name: 'cash_file_import_preview', methods: ['GET'])]
