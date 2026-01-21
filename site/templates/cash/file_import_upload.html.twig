@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Импорт из файла{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Импорт операций ДДС из файла</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card">
+            <div class="card-body">
+                <form action="{{ path('cash_file_import_upload_post') }}"
+                      method="post"
+                      enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label class="form-label required" for="money_account_id">Касса/кошелёк</label>
+                        <select class="form-select" id="money_account_id" name="money_account_id" required>
+                            {% if accounts is not empty %}
+                                <option value="">Выберите кассу/кошелёк</option>
+                                {% for account in accounts %}
+                                    <option value="{{ account.id }}">{{ account.name }}</option>
+                                {% endfor %}
+                            {% else %}
+                                <option value="" disabled selected>Нет доступных касс</option>
+                            {% endif %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required" for="import_file">Файл импорта</label>
+                        <input type="file"
+                               class="form-control"
+                               id="import_file"
+                               name="import_file"
+                               accept=".csv,.xls,.xlsx"
+                               required>
+                    </div>
+                    <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_upload') }}">
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="submit" class="btn btn-primary">Далее</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
