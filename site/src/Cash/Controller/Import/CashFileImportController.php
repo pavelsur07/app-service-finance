@@ -10,6 +10,7 @@ use App\Cash\Repository\Import\CashFileImportProfileRepository;
 use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
+use App\Cash\Service\Import\File\HeaderAutoMapper;
 use App\Entity\User;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -124,6 +125,7 @@ class CashFileImportController extends AbstractController
     public function mapping(
         SessionInterface $session,
         FileTabularReader $fileTabularReader,
+        HeaderAutoMapper $headerAutoMapper,
         CashFileImportProfileRepository $profileRepository,
     ): Response {
         $importPayload = $session->get('cash_file_import');
@@ -164,6 +166,9 @@ class CashFileImportController extends AbstractController
         $mapping = [];
         if (isset($importPayload['mapping']) && is_array($importPayload['mapping'])) {
             $mapping = $importPayload['mapping'];
+        }
+        if ([] === $mapping) {
+            $mapping = $headerAutoMapper->suggest($headers);
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
