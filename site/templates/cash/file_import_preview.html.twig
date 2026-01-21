@@ -1,0 +1,103 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Предпросмотр импорта кассы{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .preview-row-error { --tblr-table-bg: rgba(239, 68, 68, 0.08); }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Предпросмотр импорта кассовых операций</h2>
+                    {% if fileName %}
+                        <div class="text-muted small">Файл: <strong>{{ fileName }}</strong></div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title mb-0">Нормализованные строки</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Направление</th>
+                            <th class="text-end">Сумма</th>
+                            <th>Контрагент</th>
+                            <th>Описание</th>
+                            <th>Валюта</th>
+                            <th>Документ</th>
+                            <th>Ошибки</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in previewRows %}
+                            {% set hasErrors = row.errors is not empty %}
+                            <tr class="{{ hasErrors ? 'preview-row-error' : '' }}">
+                                <td>{{ row.date ?? '—' }}</td>
+                                <td>
+                                    {% if row.direction == 'INFLOW' %}
+                                        <span class="text-success">Приход</span>
+                                    {% elseif row.direction == 'OUTFLOW' %}
+                                        <span class="text-danger">Расход</span>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if row.amount %}
+                                        {{ row.amount|number_format(2, ',', ' ') }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.counterparty ?? '—' }}</td>
+                                <td>{{ row.description ?? '—' }}</td>
+                                <td>{{ row.currency ?? '—' }}</td>
+                                <td>{{ row.docNumber ?? '—' }}</td>
+                                <td>
+                                    {% if hasErrors %}
+                                        <ul class="list-unstyled mb-0">
+                                            {% for error in row.errors %}
+                                                <li class="text-danger small">{{ error }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center text-muted">Нет данных для предпросмотра.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-body">
+                <form action="/cash/import/file/commit" method="post">
+                    <input type="hidden" name="_token" value="{{ csrf_token('cash_file_import_commit') }}">
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">Запустить импорт</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
