@@ -2,23 +2,34 @@
 
 namespace App\Cash\Controller\Import;
 
+use App\Cash\Entity\Import\CashFileImportJob;
+use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
+use App\Entity\User;
 use App\Service\ActiveCompanyService;
+use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\HttpFoundation\UploadedFile;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Core\User\UserInterface;
 
 #[Route('/cash/import/file')]
 class CashFileImportController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
+        private readonly ImportLogger $importLogger,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
@@ -323,6 +334,107 @@ class CashFileImportController extends AbstractController
         return $this->render('cash/file_import_preview.html.twig', [
             'fileName' => $importPayload['file_name'] ?? '',
             'previewRows' => $previewRows,
+        ]);
+    }
+
+    #[Route('/commit', name: 'cash_file_import_commit', methods: ['POST'])]
+    public function commit(
+        Request $request,
+        SessionInterface $session,
+        MoneyAccountRepository $accountRepository,
+    ): Response {
+        if (!$this->isCsrfTokenValid('cash_file_import_commit', $request->request->get('_token'))) {
+            $this->addFlash('error', 'Некорректный CSRF-токен.');
+
+            return $this->redirectToRoute('cash_file_import_preview');
+        }
+
+        $importPayload = $session->get('cash_file_import');
+        if (!is_array($importPayload)) {
+            $this->addFlash('error', 'Сессия импорта не найдена. Загрузите файл заново.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $mapping = $importPayload['mapping'] ?? null;
+        if (!is_array($mapping) || [] === $mapping) {
+            $this->addFlash('error', 'Сначала настройте маппинг колонок.');
+
+            return $this->redirectToRoute('cash_file_import_mapping');
+        }
+
+        $fileHash = $importPayload['file_hash'] ?? null;
+        if (!is_string($fileHash) || '' === $fileHash) {
+            $this->addFlash('error', 'Не удалось определить файл импорта.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $fileName = $importPayload['file_name'] ?? null;
+        if (!is_string($fileName) || '' === $fileName) {
+            $this->addFlash('error', 'Не удалось определить имя файла.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $accountId = $importPayload['account_id'] ?? null;
+        if (!$accountId) {
+            $this->addFlash('error', 'Не удалось определить кассу для импорта.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $company = $this->activeCompanyService->getActiveCompany();
+        $account = $accountRepository->findOneBy([
+            'id' => $accountId,
+            'company' => $company,
+        ]);
+
+        if (!$account) {
+            $this->addFlash('error', 'Выбранная касса не найдена.');
+
+            return $this->redirectToRoute('cash_file_import_upload');
+        }
+
+        $user = $this->getUser();
+        $userIdentifier = null;
+        if ($user instanceof User) {
+            $userIdentifier = $user->getId();
+        } elseif ($user instanceof UserInterface) {
+            $candidate = $user->getUserIdentifier();
+            if (is_string($candidate) && Uuid::isValid($candidate)) {
+                $userIdentifier = $candidate;
+            }
+        } elseif (is_string($user) && Uuid::isValid($user)) {
+            $userIdentifier = $user;
+        }
+
+        $importLog = $this->importLogger->start($company, 'cash:file', false, $userIdentifier, $fileName);
+        $this->entityManager->flush();
+
+        $jobId = Uuid::uuid4()->toString();
+        $job = new CashFileImportJob(
+            $jobId,
+            $company,
+            $account,
+            'cash:file',
+            $fileName,
+            $fileHash,
+            $mapping,
+            []
+        );
+        $job->setImportLog($importLog);
+
+        $this->entityManager->persist($job);
+        $this->entityManager->flush();
+
+        $this->messageBus->dispatch(new CashFileImportMessage($jobId));
+
+        $session->remove('cash_file_import');
+
+        return $this->render('cash/file_import_queued.html.twig', [
+            'jobId' => $jobId,
+            'importLogId' => $importLog->getId(),
         ]);
     }
 
