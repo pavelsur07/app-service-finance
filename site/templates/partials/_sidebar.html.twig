@@ -113,7 +113,26 @@
                 </a>
             </li>
 
-
+            <!-- Справочники -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <span class="nav-link-icon"><i class="ti ti-books"></i></span>
+                    <span class="nav-link-title"> Справочники </span>
+                </a>
+                <div class="dropdown-menu">
+                    <div class="dropdown-menu-columns">
+                        <div class="dropdown-menu-column">
+                            <a class="dropdown-item" href="{{ path('cashflow_category_index') }}">Категории ДДС</a>
+                            <a class="dropdown-item" href="{{ path('pl_category_index') }}">Категории ОПиУ</a>
+                            <a class="dropdown-item" href="{{ path('balance_structure_index') }}">Настройка баланса</a>
+                            <a class="dropdown-item" href="{{ path('money_account_index') }}">Счета и кассы</a>
+                            <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
+                            <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>
+                            <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_index') }}">Автоправила ДДС</a>
+                        </div>
+                    </div>
+                </div>
+            </li>
 
     {% set report_account_balances_active = current_route == 'report_account_balances_index' %}
     {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
@@ -174,6 +193,9 @@
                 </div>
             </li>
 
+
+
+
             {% set handbooks_menu_open =
                 current_route == 'cashflow_category_index'
                 or current_route == 'pl_category_index'
@@ -183,7 +205,7 @@
                 or current_route == 'project_direction_index'
                 or current_route == 'cash_transaction_auto_rule_index'
             %}
-            <li class="nav-item {{ handbooks_menu_open ? 'active' : '' }}">
+            {#<li class="nav-item {{ handbooks_menu_open ? 'active' : '' }}">
                 <a class="nav-link {{ handbooks_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-handbooks" href="#" role="button" aria-expanded="{{ handbooks_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
                     <span class="nav-link-icon"><i class="ti ti-books"></i></span>
                     <span class="nav-link-title hide-when-collapsed">Справочники</span>
@@ -191,60 +213,60 @@
                 </a>
                 <div class="collapse {{ handbooks_menu_open ? 'show' : '' }}" id="menu-handbooks" data-bs-parent="#sidebar-menu">
                     <ul class="nav nav-pills nav-sub">
-                        {% set cashflow_category_active = current_route == 'cashflow_category_index' %}
+                        #}{#{% set cashflow_category_active = current_route == 'cashflow_category_index' %}
                         <li class="nav-item {{ cashflow_category_active ? 'active' : '' }}">
                             <a class="nav-link {{ cashflow_category_active ? 'active' : '' }}" href="{{ path('cashflow_category_index') }}" title="Категории ДДС">
                                 <span class="nav-link-icon"><i class="ti ti-category"></i></span>
                                 <span class="hide-when-collapsed">Категории ДДС</span>
                             </a>
-                        </li>
-                        {% set pl_category_active = current_route == 'pl_category_index' %}
+                        </li>#}{#
+                        #}{#{% set pl_category_active = current_route == 'pl_category_index' %}
                         <li class="nav-item {{ pl_category_active ? 'active' : '' }}">
                             <a class="nav-link {{ pl_category_active ? 'active' : '' }}" href="{{ path('pl_category_index') }}" title="Категории ОПиУ">
                                 <span class="nav-link-icon"><i class="ti ti-hierarchy-2"></i></span>
                                 <span class="hide-when-collapsed">Категории ОПиУ</span>
                             </a>
-                        </li>
-                        {% set balance_structure_active = current_route starts with 'balance_structure_' %}
+                        </li>#}{#
+                        #}{#{% set balance_structure_active = current_route starts with 'balance_structure_' %}
                         <li class="nav-item {{ balance_structure_active ? 'active' : '' }}">
                             <a class="nav-link {{ balance_structure_active ? 'active' : '' }}" href="{{ path('balance_structure_index') }}" title="Настройка баланса">
                                 <span class="nav-link-icon"><i class="ti ti-adjustments"></i></span>
                                 <span class="hide-when-collapsed">Настройка баланса</span>
                             </a>
-                        </li>
-                        {% set money_account_active = current_route == 'money_account_index' %}
+                        </li>#}{#
+                        #}{#{% set money_account_active = current_route == 'money_account_index' %}
                         <li class="nav-item {{ money_account_active ? 'active' : '' }}">
                             <a class="nav-link {{ money_account_active ? 'active' : '' }}" href="{{ path('money_account_index') }}" title="Счета / касса / кошелек">
                                 <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
                                 <span class="hide-when-collapsed">Счета / касса / кошелёк</span>
                             </a>
-                        </li>
+                        </li>#}{#
 
-                        {% set counterparty_active = current_route == 'counterparty_index' %}
+                        #}{#{% set counterparty_active = current_route == 'counterparty_index' %}
                         <li class="nav-item {{ counterparty_active ? 'active' : '' }}">
                             <a class="nav-link {{ counterparty_active ? 'active' : '' }}" href="{{ path('counterparty_index') }}" title="Контрагенты">
                                 <span class="nav-link-icon"><i class="ti ti-address-book"></i></span>
                                 <span class="hide-when-collapsed">Контрагенты</span>
                             </a>
-                        </li>
-                        {% set project_direction_active = current_route == 'project_direction_index' %}
+                        </li>#}{#
+                        #}{#{% set project_direction_active = current_route == 'project_direction_index' %}
                         <li class="nav-item {{ project_direction_active ? 'active' : '' }}">
                             <a class="nav-link {{ project_direction_active ? 'active' : '' }}" href="{{ path('project_direction_index') }}" title="Проекты">
                                 <span class="nav-link-icon"><i class="ti ti-folder"></i></span>
                                 <span class="hide-when-collapsed">Проекты</span>
                             </a>
-                        </li>
+                        </li>#}{#
 
-                        {% set cash_transaction_auto_rule_active = current_route == 'cash_transaction_auto_rule_index' %}
+                       #}{# {% set cash_transaction_auto_rule_active = current_route == 'cash_transaction_auto_rule_index' %}
                         <li class="nav-item {{ cash_transaction_auto_rule_active ? 'active' : '' }}">
                             <a class="nav-link {{ cash_transaction_auto_rule_active ? 'active' : '' }}"  href="{{ path('cash_transaction_auto_rule_index') }}" title="Журнал импорта">
                                 <span class="nav-link-icon"><i class="ti ti-notebook"></i></span>
                                 <span class="hide-when-collapsed">Автоправила ДДС</span>
                             </a>
-                        </li>
+                        </li>#}{#
                     </ul>
                 </div>
-            </li>
+            </li>#}
 
 
             <!-- Импорт -->
