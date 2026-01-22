@@ -14,6 +14,7 @@ use App\Repository\CounterpartyRepository;
 use DateTimeImmutable;
 use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
+use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLS\Reader as XlsReader;
@@ -261,7 +262,12 @@ final class CashFileImportService
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
         return match ($extension) {
-            'csv' => new CsvReader(),
+            'csv' => (function () use ($filePath): CsvReader {
+                $options = new CsvOptions();
+                $options->FIELD_DELIMITER = $this->detectCsvDelimiter($filePath);
+
+                return new CsvReader($options);
+            })(),
             'xlsx' => new XlsxReader(),
             'xls' => new XlsReader(),
             default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
@@ -354,5 +360,50 @@ final class CashFileImportService
         $this->entityManager->clear(CashTransaction::class);
         $this->entityManager->clear(Counterparty::class);
         $this->counterpartyCache = [];
+    }
+
+    private function detectCsvDelimiter(string $filePath): string
+    {
+        $handle = fopen($filePath, 'rb');
+        if (false === $handle) {
+            return ',';
+        }
+
+        $delimiters = [';', ',', "\t"];
+        $counts = array_fill_keys($delimiters, 0);
+        $linesRead = 0;
+
+        try {
+            while (!feof($handle) && $linesRead < 5) {
+                $line = fgets($handle);
+                if (false === $line) {
+                    break;
+                }
+
+                $trimmed = trim($line);
+                if ('' === $trimmed) {
+                    continue;
+                }
+
+                foreach ($delimiters as $delimiter) {
+                    $counts[$delimiter] += substr_count($line, $delimiter);
+                }
+
+                ++$linesRead;
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        $bestDelimiter = ',';
+        $bestCount = 0;
+        foreach ($counts as $delimiter => $count) {
+            if ($count > $bestCount) {
+                $bestCount = $count;
+                $bestDelimiter = $delimiter;
+            }
+        }
+
+        return $bestDelimiter;
     }
 }
