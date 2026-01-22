@@ -74,11 +74,63 @@ class FileTabularReader
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 
         return match ($extension) {
-            'csv' => new CsvReader(),
+            'csv' => $this->openCsvReader($filePath),
             'xlsx' => new XlsxReader(),
             'xls' => new XlsReader(),
             default => throw new InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
         };
+    }
+
+    private function openCsvReader(string $filePath): CsvReader
+    {
+        $reader = new CsvReader();
+        $reader->setFieldDelimiter($this->detectCsvDelimiter($filePath));
+
+        return $reader;
+    }
+
+    private function detectCsvDelimiter(string $filePath): string
+    {
+        $handle = fopen($filePath, 'rb');
+        if (false === $handle) {
+            return ';';
+        }
+
+        try {
+            $line = '';
+            while (!feof($handle)) {
+                $line = fgets($handle);
+                if (false === $line) {
+                    break;
+                }
+                $line = trim($line);
+                if ($line !== '') {
+                    break;
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        if ($line === '' || $line === false) {
+            return ';';
+        }
+
+        $line = preg_replace('/^\xEF\xBB\xBF/', '', $line);
+        $candidates = [';', "\t", ','];
+        $bestDelimiter = ';';
+        $bestCount = 1;
+
+        foreach ($candidates as $delimiter) {
+            $columns = str_getcsv($line, $delimiter);
+            $count = count($columns);
+            if ($count > $bestCount) {
+                $bestCount = $count;
+                $bestDelimiter = $delimiter;
+            }
+        }
+
+        return $bestDelimiter;
     }
 
     private function normalizeValue(mixed $value, bool $trim): ?string
