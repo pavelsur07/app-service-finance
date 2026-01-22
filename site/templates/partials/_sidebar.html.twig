@@ -273,13 +273,14 @@
                     </ul>
                 </div>
             </li>
-            {% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
+
+            {#{% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
             <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
                 <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
                     <span class="nav-link-icon"><i class="ti ti-sparkles"></i></span>
                     <span class="nav-link-title hide-when-collapsed">AI-рекомендации</span>
                 </a>
-            </li>
+            </li>#}
 
             {% set integrations_active =
                 current_route starts with 'ozon_'
