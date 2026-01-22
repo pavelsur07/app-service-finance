@@ -68,7 +68,7 @@
             <li class="nav-item {{ documents_active ? 'active' : '' }}">
                 <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
                     <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
-                    <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
+                    <span class="nav-link-title hide-when-collapsed">Доходы и расходы</span>
                 </a>
             </li>
             <!-- ОПиУ -->
@@ -113,26 +113,6 @@
                 </a>
             </li>
 
-            <!-- Справочники -->
-            <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
-                    <span class="nav-link-icon"><i class="ti ti-books"></i></span>
-                    <span class="nav-link-title"> Справочники </span>
-                </a>
-                <div class="dropdown-menu">
-                    <div class="dropdown-menu-columns">
-                        <div class="dropdown-menu-column">
-                            <a class="dropdown-item" href="{{ path('cashflow_category_index') }}">Категории ДДС</a>
-                            <a class="dropdown-item" href="{{ path('pl_category_index') }}">Категории ОПиУ</a>
-                            <a class="dropdown-item" href="{{ path('balance_structure_index') }}">Настройка баланса</a>
-                            <a class="dropdown-item" href="{{ path('money_account_index') }}">Счета и кассы</a>
-                            <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
-                            <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>
-                            <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_index') }}">Автоправила ДДС</a>
-                        </div>
-                    </div>
-                </div>
-            </li>
 
     {% set report_account_balances_active = current_route == 'report_account_balances_index' %}
     {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
@@ -193,7 +173,27 @@
                 </div>
             </li>
 
-
+            <!-- Справочники -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <span class="nav-link-icon"><i class="ti ti-books"></i></span>
+                    <span class="nav-link-title"> Справочники </span>
+                </a>
+                <div class="dropdown-menu">
+                    <div class="dropdown-menu-columns">
+                        <div class="dropdown-menu-column">
+                            <a class="dropdown-item" href="{{ path('cashflow_category_index') }}">Категории ДДС</a>
+                            <a class="dropdown-item" href="{{ path('pl_category_index') }}">Категории ОПиУ</a>
+                            <a class="dropdown-item" href="{{ path('balance_structure_index') }}">Настройка баланса</a>
+                            <a class="dropdown-item" href="{{ path('money_account_index') }}">Счета и кассы</a>
+                            <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
+                            <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>
+                            <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_index') }}">Автоправила ДДС</a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <!-- Справочники -->
 
 
             {% set handbooks_menu_open =
