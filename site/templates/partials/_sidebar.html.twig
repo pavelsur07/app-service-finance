@@ -62,6 +62,17 @@
                 </div>
             </li>
             <!-- Деньги -->
+
+            <!-- ОПиУ -->
+            {% set documents_active = current_route == 'document_index' %}
+            <li class="nav-item {{ documents_active ? 'active' : '' }}">
+                <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
+                    <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
+                    <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
+                </a>
+            </li>
+            <!-- ОПиУ -->
+
             {#{% set cash_transactions_active = current_route == 'cash_transaction_index' %}
             <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
                 <a class="nav-link {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}" title="Операции ДДС">
@@ -101,13 +112,7 @@
                     <span class="nav-link-title hide-when-collapsed">Кредиты</span>
                 </a>
             </li>
-            {% set documents_active = current_route == 'document_index' %}
-            <li class="nav-item {{ documents_active ? 'active' : '' }}">
-                <a class="nav-link {{ documents_active ? 'active' : '' }}" href="{{ path('document_index') }}" title="Документы ОПиУ">
-                    <span class="nav-link-icon"><i class="ti ti-file-invoice"></i></span>
-                    <span class="nav-link-title hide-when-collapsed">Документы ОПиУ</span>
-                </a>
-            </li>
+
 
 
     {% set report_account_balances_active = current_route == 'report_account_balances_index' %}
