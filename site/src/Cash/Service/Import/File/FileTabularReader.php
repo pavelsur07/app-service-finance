@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Import\File;
 
 use InvalidArgumentException;
+use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLS\Reader as XlsReader;
@@ -83,10 +84,10 @@ class FileTabularReader
 
     private function openCsvReader(string $filePath): CsvReader
     {
-        $reader = new CsvReader();
-        $reader->setFieldDelimiter($this->detectCsvDelimiter($filePath));
+        $options = new CsvOptions();
+        $options->FIELD_DELIMITER = $this->detectCsvDelimiter($filePath);
 
-        return $reader;
+        return new CsvReader($options);
     }
 
     private function detectCsvDelimiter(string $filePath): string
