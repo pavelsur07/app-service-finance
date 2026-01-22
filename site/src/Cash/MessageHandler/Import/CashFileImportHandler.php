@@ -3,10 +3,9 @@
 namespace App\Cash\MessageHandler\Import;
 
 use App\Cash\Entity\Import\CashFileImportJob;
-use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Message\Import\CashFileImportMessage;
-use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\File\CashFileImportService;
+use Doctrine\DBAL\LockMode;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -16,19 +15,37 @@ final class CashFileImportHandler
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CashFileImportService $importService,
-        private readonly ImportLogger $importLogger,
     ) {
     }
 
     public function __invoke(CashFileImportMessage $message): void
     {
-        $job = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
-        if (!$job instanceof CashFileImportJob) {
-            throw new \InvalidArgumentException('Cash file import job not found.');
-        }
+        $this->entityManager->beginTransaction();
 
-        $job->start();
-        $this->entityManager->flush();
+        try {
+            $job = $this->entityManager->find(
+                CashFileImportJob::class,
+                $message->getJobId(),
+                LockMode::PESSIMISTIC_WRITE
+            );
+            if (!$job instanceof CashFileImportJob) {
+                throw new \InvalidArgumentException('Cash file import job not found.');
+            }
+
+            if ($job->getStatus() !== CashFileImportJob::STATUS_QUEUED) {
+                $this->entityManager->commit();
+
+                return;
+            }
+
+            $job->start();
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+        } catch (\Throwable $exception) {
+            $this->entityManager->rollback();
+
+            throw $exception;
+        }
 
         try {
             $this->importService->import($job);
@@ -39,11 +56,6 @@ final class CashFileImportHandler
             $this->entityManager->flush();
 
             throw $exception;
-        } finally {
-            $importLog = $job->getImportLog();
-            if ($importLog instanceof ImportLog) {
-                $this->importLogger->finish($importLog);
-            }
         }
     }
 }
