@@ -3,7 +3,9 @@
 namespace App\Cash\MessageHandler\Import;
 
 use App\Cash\Entity\Import\CashFileImportJob;
+use App\Cash\Entity\Import\ImportLog;
 use App\Cash\Message\Import\CashFileImportMessage;
+use App\Cash\Service\Import\ImportLogger;
 use App\Cash\Service\Import\File\CashFileImportService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -14,6 +16,7 @@ final class CashFileImportHandler
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly CashFileImportService $importService,
+        private readonly ImportLogger $importLogger,
     ) {
     }
 
@@ -36,6 +39,11 @@ final class CashFileImportHandler
             $this->entityManager->flush();
 
             throw $exception;
+        } finally {
+            $importLog = $job->getImportLog();
+            if ($importLog instanceof ImportLog) {
+                $this->importLogger->finish($importLog);
+            }
         }
     }
 }
