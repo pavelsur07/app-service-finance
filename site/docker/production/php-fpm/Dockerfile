@@ -64,6 +64,13 @@ RUN php /app/bin/console asset-map:compile
 
 RUN chown www-data:www-data ./var -R
 
+COPY ./docker/production/entrypoint-init-storage.sh /usr/local/bin/entrypoint-init-storage
+RUN chmod 555 /usr/local/bin/entrypoint-init-storage
+
+ENTRYPOINT ["/usr/local/bin/entrypoint-init-storage"]
+CMD ["php-fpm"]
+
+
 HEALTHCHECK --interval=5s --timeout=3s --start-period=1s \
     CMD REDIRECT_STATUS=true SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET \
     cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 1
