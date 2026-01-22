@@ -94,6 +94,8 @@ services:
             - traefik.http.routers.myapp-http.middlewares=redirect-to-https
             - traefik.http.routers.myapp-http.priority=10
             - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
+        volumes:
+          - site_storage:/app/var/storage
     
     
     site-php-fpm:
@@ -119,6 +121,8 @@ services:
         depends_on:
             - site-postgres
             - site-redis
+        volumes:
+          - site_storage:/app/var/storage
     site-php-cli:
         build:
             context: site
@@ -141,6 +145,8 @@ services:
         depends_on:
             - site-postgres
             - site-redis
+        volumes:
+          - site_storage:/app/var/storage
     site-messenger-worker:
         build:
             context: site
@@ -165,6 +171,8 @@ services:
         depends_on:
             - site-postgres
             - site-redis
+        volumes:
+          - site_storage:/app/var/storage
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -219,6 +227,7 @@ services:
         restart: unless-stopped
 
 volumes:
+    site_storage:
     traefik-certs:
     postgres_data:
     site-redis-data:
