@@ -208,6 +208,11 @@ final class CashFileImportService
                 }
                 $this->accountBalanceService->recalculateDailyRange($company, $moneyAccount, $createdMinDate, $toDate);
             }
+        } catch (\Throwable $exception) {
+            if ($importLog) {
+                $this->importLogger->fail($importLog);
+            }
+            throw $exception;
         } finally {
             if ($importLog) {
                 $this->importLogger->finish($importLog);
