@@ -246,7 +246,30 @@
                 </div>
             </li>
 
-            {% set cash_bank1c_import_upload_active = current_route == 'cash_bank1c_import_upload' %}
+
+            <!-- Импорт -->
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <span class="nav-link-icon"><i class="ti ti-download"></i></span>
+                    <span class="nav-link-title"> Импорт </span>
+                </a>
+                <div class="dropdown-menu">
+                    <div class="dropdown-menu-columns">
+                        <div class="dropdown-menu-column">
+                            <a class="dropdown-item" href="{{ path('cash_bank1c_import_upload') }}">
+                                Импорт выписок 1С
+                            </a>
+                            <a class="dropdown-item" href="#">
+                                Импорт касса xlsx/csv
+                            </a>
+                            <a class="dropdown-item" href="{{ path('import_logs_index') }}">Журнал импорта </a>
+                        </div>
+                    </div>
+                </div>
+            </li>
+
+
+           {# {% set cash_bank1c_import_upload_active = current_route == 'cash_bank1c_import_upload' %}
             {% set import_logs_active = current_route == 'import_logs_index' %}
             {% set import_menu_open = cash_bank1c_import_upload_active or import_logs_active %}
             <li class="nav-item {{ import_menu_open ? 'active' : '' }}">
@@ -277,7 +300,7 @@
                         </li>
                     </ul>
                 </div>
-            </li>
+            </li>#}
 
             {#{% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
             <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
