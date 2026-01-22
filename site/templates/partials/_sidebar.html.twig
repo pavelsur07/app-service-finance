@@ -39,35 +39,60 @@
                     <span class="nav-link-title hide-when-collapsed">Главная</span>
                 </a>
             </li>
+
             <!-- Деньги -->
-            {% set cash_transactions_active = current_route == 'cash_transaction_index' %}
+            <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+                    <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                    <span class="nav-link-title"> Деньги </span>
+                </a>
+                <div class="dropdown-menu">
+                    <div class="dropdown-menu-columns">
+                        <div class="dropdown-menu-column">
+                            <a class="dropdown-item" href="{{ path('cash_transaction_index') }}">
+                                Операции ДДС
+                                <span class="badge badge-sm bg-green-lt text-uppercase ms-auto">New</span>
+                            </a>
+                            <a class="dropdown-item" href="{{ path('finance_funds_index') }}">Фонды (конверты) </a>
+                            <a class="dropdown-item" href="{{ path('payment_calendar_index') }}">Платежный календарь </a>
+                            <a class="dropdown-item" href="{{ path('report_account_balances_structured_index') }}">Остатки и счета </a>
+                            {#<a class="dropdown-item" href="#">Движение денег </a>#}
+                        </div>
+                    </div>
+                </div>
+            </li>
+            <!-- Деньги -->
+            {#{% set cash_transactions_active = current_route == 'cash_transaction_index' %}
             <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
                 <a class="nav-link {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}" title="Операции ДДС">
                     <span class="nav-link-icon"><i class="ti ti-arrows-exchange"></i></span>
                     <span class="nav-link-title hide-when-collapsed">Операции</span>
                 </a>
-            </li>
-            {% set report_account_balances_structured_active = current_route == 'report_account_balances_structured_index' %}
+            </li>#}
+
+           {# {% set report_account_balances_structured_active = current_route == 'report_account_balances_structured_index' %}
             <li class="nav-item {{ report_account_balances_structured_active ? 'active' : '' }}">
                 <a class="nav-link {{ report_account_balances_structured_active ? 'active' : '' }}" href="{{ path('report_account_balances_structured_index') }}" title="Остатки и счета (структура)">
                     <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
                     <span class="nav-link-title hide-when-collapsed">Остатки и счета</span>
                 </a>
-            </li>
-            {% set finance_funds_active = current_route == 'finance_funds_index' %}
+            </li>#}
+
+            {#{% set finance_funds_active = current_route == 'finance_funds_index' %}
             <li class="nav-item {{ finance_funds_active ? 'active' : '' }}">
                 <a class="nav-link {{ finance_funds_active ? 'active' : '' }}"  href="{{ path('finance_funds_index') }}" title="Фонды (конверты)">
                     <span class="nav-link-icon"><i class="ti ti-pig-money"></i></span>
                     <span class="nav-link-title hide-when-collapsed">Фонды (конверты)</span>
                 </a>
-            </li>
-            {% set payment_calendar_active = current_route == 'payment_calendar_index' %}
+            </li>#}
+
+            {#{% set payment_calendar_active = current_route == 'payment_calendar_index' %}
             <li class="nav-item {{ payment_calendar_active ? 'active' : '' }}">
                 <a class="nav-link {{ payment_calendar_active ? 'active' : '' }}" href="{{ path('payment_calendar_index') }}" title="Планирование">
                     <span class="nav-link-icon"><i class="ti ti-calendar-due"></i></span>
                     <span class="nav-link-title hide-when-collapsed">Платежный календарь</span>
                 </a>
-            </li>
+            </li>#}
 
             {% set loans_active = current_route starts with 'loan_' %}
             <li class="nav-item {{ loans_active ? 'active' : '' }}">
