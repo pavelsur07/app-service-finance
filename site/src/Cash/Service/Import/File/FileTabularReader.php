@@ -70,6 +70,11 @@ class FileTabularReader
         return $rows;
     }
 
+    public function openReader(string $filePath): ReaderInterface
+    {
+        return $this->openReaderByExtension($filePath);
+    }
+
     private function openReaderByExtension(string $filePath): ReaderInterface
     {
         $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
