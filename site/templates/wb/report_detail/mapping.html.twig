@@ -244,6 +244,7 @@
                     <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
                     {% if importId %}
                         <input type="hidden" name="importId" value="{{ importId }}">
+                        <input type="hidden" name="reportId" value="{{ importId }}">
                     {% endif %}
                     <button type="submit" class="btn btn-success">Создать документ</button>
                 </form>

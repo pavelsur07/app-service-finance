@@ -70,6 +70,9 @@ class WildberriesCommissionerXlsxReport
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $warningsJson = null;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $pnlDocumentId = null;
+
     public function __construct(string $id, Company $company, \DateTimeImmutable $createdAt)
     {
         $this->id = $id;
@@ -250,5 +253,15 @@ class WildberriesCommissionerXlsxReport
     public function setWarningsJson(?array $warningsJson): void
     {
         $this->warningsJson = $warningsJson;
+    }
+
+    public function getPnlDocumentId(): ?string
+    {
+        return $this->pnlDocumentId;
+    }
+
+    public function setPnlDocumentId(?string $pnlDocumentId): void
+    {
+        $this->pnlDocumentId = $pnlDocumentId;
     }
 }
