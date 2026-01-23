@@ -87,7 +87,7 @@ final class WbCommissionerXlsxImportHandler
             return;
         }
 
-        $result = $this->importer->import($report, $absolutePath);
+        $result = $this->importer->import($report);
 
         $report->setStatus('processed');
         $report->setProcessedAt(new \DateTimeImmutable('now'));
