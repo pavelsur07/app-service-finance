@@ -16,14 +16,21 @@
             <i class="ti ti-player-play me-1"></i>Пересчитать
           </button>
         </form>
-        <form class="d-inline" method="post" action="{{ path('wb_report_detail_mapping_create_document') }}">
-          <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
-          <input type="hidden" name="reportId" value="{{ report.id }}">
+        <form class="d-inline" method="post" action="{{ path('wb_commissioner_reports_generate_pnl', {id: report.id}) }}">
+          <input type="hidden" name="_token" value="{{ csrf_token('wb_commissioner_report_generate_pnl' ~ report.id) }}">
           <button class="btn btn-success" {% if not canCreatePnl %}disabled aria-disabled="true"{% endif %}>
-            <i class="ti ti-report-money me-1"></i>Создать ОПиУ за период
+            <i class="ti ti-report-money me-1"></i>Сформировать ОПиУ за период
           </button>
           {% if not canCreatePnl %}
-            <span class="text-warning ms-2">Заполни сопоставления для всех новых значений</span>
+            <span class="text-warning ms-2">
+              {% if hasUnmapped %}
+                Есть unmapped значения — заполни сопоставления.
+              {% elseif hasMappedWithoutPlCategory %}
+                Не все mapped строки имеют PL категорию.
+              {% else %}
+                Нет данных для формирования ОПиУ.
+              {% endif %}
+            </span>
           {% endif %}
         </form>
         <a class="btn btn-outline-secondary" href="{{ path('wb_commissioner_reports_index') }}">
