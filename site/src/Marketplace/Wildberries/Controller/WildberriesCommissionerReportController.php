@@ -7,8 +7,11 @@ namespace App\Marketplace\Wildberries\Controller;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Form\WildberriesCommissionerReportUploadType;
 use App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage;
+use App\Marketplace\Wildberries\CommissionerReport\Entity\WbAggregationResult;
+use App\Marketplace\Wildberries\CommissionerReport\Entity\WbDimensionValue;
+use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostMappingRepository;
+use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostTypeRepository;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
-use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\Storage\StorageService;
@@ -30,8 +33,9 @@ final class WildberriesCommissionerReportController extends AbstractController
         private readonly StorageService $storageService,
         private readonly WbCommissionerXlsxFormatValidator $formatValidator,
         private readonly MessageBusInterface $bus,
-        private readonly WildberriesWeeklyPnlGenerator $weeklyPnlGenerator,
         private readonly PLCategoryRepository $plCategoryRepository,
+        private readonly WbCostTypeRepository $costTypeRepository,
+        private readonly WbCostMappingRepository $costMappingRepository,
     ) {
     }
 
@@ -123,20 +127,109 @@ final class WildberriesCommissionerReportController extends AbstractController
             throw $this->createNotFoundException('Отчёт не найден.');
         }
 
-        $aggregated = $this->weeklyPnlGenerator->aggregateForImportId($company, $report->getId());
+        $aggregationRepository = $this->doctrine->getRepository(WbAggregationResult::class);
+        $mappedResults = $aggregationRepository->createQueryBuilder('result')
+            ->select('costType.id AS costTypeId', 'costType.title AS costTypeTitle', 'SUM(result.amount) AS amount')
+            ->innerJoin('result.costType', 'costType')
+            ->andWhere('result.company = :company')
+            ->andWhere('result.report = :report')
+            ->andWhere('result.status = :status')
+            ->setParameter('company', $company)
+            ->setParameter('report', $report)
+            ->setParameter('status', 'mapped')
+            ->groupBy('costType.id', 'costType.title')
+            ->orderBy('costType.title', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+        $unmappedResults = $aggregationRepository->createQueryBuilder('result')
+            ->select(
+                'dimension.id AS dimensionValueId',
+                'dimension.dimensionKey AS dimensionKey',
+                'dimension.value AS dimensionValue',
+                'SUM(result.amount) AS amount'
+            )
+            ->innerJoin('result.dimensionValue', 'dimension')
+            ->andWhere('result.company = :company')
+            ->andWhere('result.report = :report')
+            ->andWhere('result.status = :status')
+            ->setParameter('company', $company)
+            ->setParameter('report', $report)
+            ->setParameter('status', 'unmapped')
+            ->groupBy('dimension.id', 'dimension.dimensionKey', 'dimension.value')
+            ->orderBy('dimension.dimensionKey', 'ASC')
+            ->addOrderBy('dimension.value', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        $costTypes = $this->costTypeRepository->createQueryBuilder('costType')
+            ->andWhere('costType.company = :company')
+            ->andWhere('costType.isActive = true')
+            ->setParameter('company', $company)
+            ->orderBy('costType.title', 'ASC')
+            ->getQuery()
+            ->getResult();
+
         $categories = $this->plCategoryRepository->findTreeByCompany($company);
-        $categoryById = [];
+        $categoryOptions = [];
 
         foreach ($categories as $category) {
-            $categoryById[(string) $category->getId()] = $category;
+            $depth = max(0, $category->getLevel() - 1);
+            $categoryOptions[] = [
+                'id' => (string) $category->getId(),
+                'name' => $category->getName(),
+                'depth' => $depth,
+                'label' => str_repeat('— ', $depth).$category->getName(),
+            ];
+        }
+
+        $dimensionValueIds = array_values(array_filter(array_map(
+            static fn (array $item): ?string => $item['dimensionValueId'] ?? null,
+            $unmappedResults
+        )));
+
+        $dimensionValues = [];
+        if ([] !== $dimensionValueIds) {
+            $dimensionValues = $this->doctrine->getRepository(WbDimensionValue::class)
+                ->createQueryBuilder('dimension')
+                ->andWhere('dimension.company = :company')
+                ->andWhere('dimension.report = :report')
+                ->andWhere('dimension.id IN (:dimensionValueIds)')
+                ->setParameter('company', $company)
+                ->setParameter('report', $report)
+                ->setParameter('dimensionValueIds', $dimensionValueIds)
+                ->getQuery()
+                ->getResult();
+        }
+
+        $costMappings = $this->costMappingRepository->findByDimensionValues($company, $dimensionValues);
+        $mappingByDimensionId = [];
+
+        foreach ($costMappings as $mapping) {
+            $mappingByDimensionId[$mapping->getDimensionValue()->getId()] = $mapping;
+        }
+
+        $hasMappingGaps = false;
+        foreach ($unmappedResults as $item) {
+            $dimensionValueId = $item['dimensionValueId'] ?? null;
+            if (null === $dimensionValueId) {
+                continue;
+            }
+
+            if (!isset($mappingByDimensionId[$dimensionValueId])) {
+                $hasMappingGaps = true;
+                break;
+            }
         }
 
         return $this->render('wildberries/commissioner_report/show.html.twig', [
             'report' => $report,
-            'totals' => $aggregated['totals'],
-            'unmapped' => $aggregated['unmapped'],
-            'hasUnmapped' => [] !== $aggregated['unmapped'],
-            'categoryById' => $categoryById,
+            'mappedResults' => $mappedResults,
+            'unmappedResults' => $unmappedResults,
+            'hasUnmapped' => [] !== $unmappedResults,
+            'costTypes' => $costTypes,
+            'categoryOptions' => $categoryOptions,
+            'mappingByDimensionId' => $mappingByDimensionId,
+            'canCreatePnl' => [] === $unmappedResults && !$hasMappingGaps,
         ]);
     }
 
