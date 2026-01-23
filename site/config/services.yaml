@@ -5,6 +5,7 @@
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
     feature_funds_and_widget: '%env(bool:FEATURE_FUNDS_AND_WIDGET)%'
+    app.storage_root: '%kernel.project_dir%/var/storage'
 
 services:
     # default configuration for services in *this* file
@@ -50,6 +51,10 @@ services:
     App\Service\FeatureFlagService:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
+
+    App\Service\Storage\StorageService:
+        arguments:
+            $storageRoot: '%app.storage_root%'
 
     # Логгер для HTTP-клиента Ozon
     App\Marketplace\Ozon\Adapter\OzonApiClient:

@@ -1,0 +1,64 @@
+{% extends 'base.html.twig' %}
+{% block title %}Отчёт комиссионера WB{% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">Отчёт комиссионера WB</h2>
+        <div class="text-secondary mt-1">Карточка загруженного XLSX без обработки.</div>
+      </div>
+      <div class="col-auto ms-auto">
+        <a class="btn btn-outline-secondary" href="{{ path('wb_commissioner_reports_index') }}">
+          <i class="ti ti-arrow-left me-1"></i>К списку
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="text-secondary">Период</div>
+            <div>{{ report.periodStart|date('Y-m-d') }} — {{ report.periodEnd|date('Y-m-d') }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Статус</div>
+            <div>{{ report.status }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Файл</div>
+            <div>{{ report.originalFilename }}</div>
+            <div class="text-secondary small">{{ report.storagePath }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Хэш файла</div>
+            <div class="font-monospace">{{ report.fileHash }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Создан</div>
+            <div>{{ report.createdAt|date('Y-m-d H:i') }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Обработан</div>
+            <div>{{ report.processedAt ? report.processedAt|date('Y-m-d H:i') : '—' }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Строки</div>
+            <div>{{ report.rowsParsed }}/{{ report.rowsTotal }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Ошибки / предупреждения</div>
+            <div>{{ report.errorsCount }} / {{ report.warningsCount }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
