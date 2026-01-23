@@ -13,6 +13,7 @@ use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostMapping;
 use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostMappingRepository;
 use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostTypeRepository;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
+use App\Marketplace\Wildberries\CommissionerReport\Service\WbCommissionerPnlDocumentGenerator;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\Storage\StorageService;
@@ -37,6 +38,7 @@ final class WildberriesCommissionerReportController extends AbstractController
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly WbCostTypeRepository $costTypeRepository,
         private readonly WbCostMappingRepository $costMappingRepository,
+        private readonly WbCommissionerPnlDocumentGenerator $pnlDocumentGenerator,
     ) {
     }
 
@@ -222,6 +224,57 @@ final class WildberriesCommissionerReportController extends AbstractController
             }
         }
 
+        $mappedDimensionRows = $aggregationRepository->createQueryBuilder('result')
+            ->select('dimension.id AS dimensionValueId')
+            ->leftJoin('result.dimensionValue', 'dimension')
+            ->andWhere('result.company = :company')
+            ->andWhere('result.report = :report')
+            ->andWhere('result.status = :status')
+            ->setParameter('company', $company)
+            ->setParameter('report', $report)
+            ->setParameter('status', 'mapped')
+            ->getQuery()
+            ->getArrayResult();
+
+        $mappedDimensionIds = [];
+        $hasMappedWithoutPlCategory = false;
+        foreach ($mappedDimensionRows as $row) {
+            $dimensionValueId = $row['dimensionValueId'] ?? null;
+            if (null === $dimensionValueId) {
+                $hasMappedWithoutPlCategory = true;
+                break;
+            }
+
+            $mappedDimensionIds[] = (string) $dimensionValueId;
+        }
+
+        if (!$hasMappedWithoutPlCategory && [] !== $mappedDimensionIds) {
+            $mappedDimensionIds = array_values(array_unique($mappedDimensionIds));
+            $mappedDimensions = $this->doctrine->getRepository(WbDimensionValue::class)
+                ->createQueryBuilder('dimension')
+                ->andWhere('dimension.company = :company')
+                ->andWhere('dimension.report = :report')
+                ->andWhere('dimension.id IN (:ids)')
+                ->setParameter('company', $company)
+                ->setParameter('report', $report)
+                ->setParameter('ids', $mappedDimensionIds)
+                ->getQuery()
+                ->getResult();
+
+            $mappedMappings = $this->costMappingRepository->findByDimensionValues($company, $mappedDimensions);
+            $mappedMappingByDimensionId = [];
+            foreach ($mappedMappings as $mapping) {
+                $mappedMappingByDimensionId[$mapping->getDimensionValue()->getId()] = $mapping;
+            }
+
+            foreach ($mappedDimensionIds as $dimensionValueId) {
+                if (!isset($mappedMappingByDimensionId[$dimensionValueId])) {
+                    $hasMappedWithoutPlCategory = true;
+                    break;
+                }
+            }
+        }
+
         return $this->render('wildberries/commissioner_report/show.html.twig', [
             'report' => $report,
             'mappedResults' => $mappedResults,
@@ -230,7 +283,8 @@ final class WildberriesCommissionerReportController extends AbstractController
             'costTypes' => $costTypes,
             'categoryOptions' => $categoryOptions,
             'mappingByDimensionId' => $mappingByDimensionId,
-            'canCreatePnl' => [] === $unmappedResults && !$hasMappingGaps,
+            'canCreatePnl' => [] === $unmappedResults && !$hasMappingGaps && !$hasMappedWithoutPlCategory && [] !== $mappedResults,
+            'hasMappedWithoutPlCategory' => $hasMappedWithoutPlCategory,
         ]);
     }
 
@@ -254,6 +308,38 @@ final class WildberriesCommissionerReportController extends AbstractController
         $this->bus->dispatch(new WbCommissionerXlsxImportMessage((string) $company->getId(), $report->getId()));
 
         $this->addFlash('success', 'Отчёт отправлен на обработку.');
+
+        return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+    }
+
+    #[Route(path: '/{id}/generate-pnl', name: 'generate_pnl', methods: ['POST'])]
+    public function generatePnl(Request $request, string $id): Response
+    {
+        $company = $this->companyContext->getActiveCompany();
+        $report = $this->doctrine->getRepository(WildberriesCommissionerXlsxReport::class)
+            ->findOneBy(['id' => $id, 'company' => $company]);
+
+        if (!$report instanceof WildberriesCommissionerXlsxReport) {
+            throw $this->createNotFoundException('Отчёт не найден.');
+        }
+
+        if (
+            !$this->isCsrfTokenValid(
+                'wb_commissioner_report_generate_pnl'.$report->getId(),
+                (string) $request->request->get('_token')
+            )
+        ) {
+            $this->addFlash('danger', 'Неверный CSRF-токен при генерации ОПиУ.');
+
+            return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+        }
+
+        try {
+            $this->pnlDocumentGenerator->createOrUpdateForReport($company, $report);
+            $this->addFlash('success', 'ОПиУ сформирован.');
+        } catch (\DomainException | \RuntimeException $exception) {
+            $this->addFlash('danger', $exception->getMessage());
+        }
 
         return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
     }
