@@ -1,0 +1,71 @@
+{% extends 'base.html.twig' %}
+{% block title %}WB отчёты комиссионера (XLSX){% endblock %}
+
+{% block body %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="row g-2 align-items-center">
+      <div class="col">
+        <h2 class="page-title">WB: Отчёты комиссионера (XLSX)</h2>
+        <div class="text-secondary mt-1">Список загруженных отчётов по активной компании.</div>
+      </div>
+      <div class="col-auto ms-auto">
+        <a class="btn btn-primary" href="{{ path('wb_commissioner_reports_new') }}">
+          <i class="ti ti-upload me-1"></i>Загрузить отчёт
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+  <div class="container-xl">
+    <div class="card">
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-vcenter table-striped mb-0">
+            <thead>
+              <tr>
+                <th>Дата загрузки</th>
+                <th>Период</th>
+                <th>Файл</th>
+                <th>Статус</th>
+                <th>Строки</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for report in reports %}
+                <tr>
+                  <td>
+                    <a href="{{ path('wb_commissioner_reports_show', {id: report.id}) }}">
+                      {{ report.createdAt|date('Y-m-d H:i') }}
+                    </a>
+                  </td>
+                  <td>
+                    {{ report.periodStart|date('Y-m-d') }} — {{ report.periodEnd|date('Y-m-d') }}
+                  </td>
+                  <td>
+                    {{ report.originalFilename }}
+                    <div class="text-secondary small">{{ report.storagePath }}</div>
+                  </td>
+                  <td>{{ report.status }}</td>
+                  <td>
+                    {{ report.rowsParsed }}/{{ report.rowsTotal }}
+                    {% if report.errorsCount > 0 %}
+                      <span class="text-danger ms-1">Ошибки: {{ report.errorsCount }}</span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% else %}
+                <tr>
+                  <td colspan="5" class="text-secondary">Отчёты ещё не загружены.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
