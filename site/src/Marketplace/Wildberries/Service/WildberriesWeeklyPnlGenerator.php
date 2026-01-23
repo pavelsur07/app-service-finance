@@ -102,6 +102,79 @@ final class WildberriesWeeklyPnlGenerator
         ];
     }
 
+    /**
+     * @return array{
+     *   totals: array<string, float>,
+     *   unmapped: array<int, array{
+     *     supplierOperName: ?string,
+     *     docTypeName: ?string,
+     *     rowsCount: int
+     *   }>
+     * }
+     */
+    public function aggregateForImportId(
+        Company $company,
+        string $importId,
+    ): array {
+        $rows = $this->details->createQueryBuilder('wrd')
+            ->andWhere('wrd.company = :company')
+            ->andWhere('wrd.importId = :importId')
+            ->setParameter('company', $company)
+            ->setParameter('importId', $importId)
+            ->getQuery()
+            ->getResult();
+
+        $totals = [];
+        $unmapped = [];
+
+        foreach ($rows as $row) {
+            $mappings = $this->mappingResolver->resolveManyForRow($company, $row);
+
+            if ([] === $mappings) {
+                $key = \sprintf(
+                    '%s|%s',
+                    (string) $row->getSupplierOperName(),
+                    (string) $row->getDocTypeName(),
+                );
+
+                if (!isset($unmapped[$key])) {
+                    $unmapped[$key] = [
+                        'supplierOperName' => $row->getSupplierOperName(),
+                        'docTypeName' => $row->getDocTypeName(),
+                        'rowsCount' => 0,
+                    ];
+                }
+
+                ++$unmapped[$key]['rowsCount'];
+
+                continue;
+            }
+
+            foreach ($mappings as $mapping) {
+                if (!$mapping->isActive()) {
+                    continue;
+                }
+
+                $sourceField = $mapping->getSourceField();
+                $value = $this->sourceFieldProvider->resolveValue($row, $sourceField);
+
+                if (null === $value) {
+                    continue;
+                }
+
+                $amount = (float) $value * (float) $mapping->getSignMultiplier();
+
+                $plCategoryId = (string) $mapping->getPlCategory()->getId();
+                $totals[$plCategoryId] = ($totals[$plCategoryId] ?? 0.0) + $amount;
+            }
+        }
+
+        return [
+            'totals' => $totals,
+            'unmapped' => array_values($unmapped),
+        ];
+    }
+
     public function createWeeklyDocumentFromTotals(
         Company $company,
         \DateTimeImmutable $from,

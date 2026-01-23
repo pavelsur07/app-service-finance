@@ -4,12 +4,22 @@
 
 {% block body %}
     <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h1 class="mb-0">Детализация Wildberries — маппинг и ОПиУ</h1>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <h1 class="mb-0">Детализация Wildberries — маппинг и ОПиУ</h1>
+            {% if importId %}
+                <span class="badge bg-info-subtle text-info-emphasis">
+                    Фильтр: отчёт комиссионера (importId={{ importId }})
+                </span>
+            {% endif %}
+        </div>
     </div>
 
     {% include 'wb/report_detail/_tabs.html.twig' %}
 
     <form method="get" class="row g-3 mb-4">
+        {% if importId %}
+            <input type="hidden" name="importId" value="{{ importId }}">
+        {% endif %}
         <div class="col-sm-6 col-md-4 col-lg-3">
             <label for="filter-from" class="form-label">Период с</label>
             <input id="filter-from" type="date" name="from" value="{{ from|date('Y-m-d') }}" class="form-control">
@@ -49,6 +59,9 @@
                 <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping') }}">
                 <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
                 <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+                {% if importId %}
+                    <input type="hidden" name="importId" value="{{ importId }}">
+                {% endif %}
                 <div id="wb-mapping-deleted" class="d-none"></div>
 
                 <div class="table-responsive mb-3">
@@ -159,6 +172,9 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_clear') }}">
                     <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
                     <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+                    {% if importId %}
+                        <input type="hidden" name="importId" value="{{ importId }}">
+                    {% endif %}
                     <button type="submit" class="btn btn-outline-danger">- Очистить</button>
                 </form>
                 <button type="submit" form="wb-report-mapping-form" class="btn btn-primary">Сохранить маппинг</button>
@@ -226,6 +242,9 @@
                     <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
                     <input type="hidden" name="from" value="{{ from|date('Y-m-d') }}">
                     <input type="hidden" name="to" value="{{ to|date('Y-m-d') }}">
+                    {% if importId %}
+                        <input type="hidden" name="importId" value="{{ importId }}">
+                    {% endif %}
                     <button type="submit" class="btn btn-success">Создать документ</button>
                 </form>
             </div>

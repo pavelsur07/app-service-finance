@@ -39,6 +39,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
+        $importId = $request->query->get('importId');
         $fromParam = $request->query->get('from');
         $toParam = $request->query->get('to');
 
@@ -47,12 +48,20 @@ final class WildberriesReportDetailMappingController extends AbstractController
 
         $sourceFieldOptions = $this->sourceFieldProvider->getOptions();
 
-        $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
-            $company,
-            $from,
-            $to,
-            $this->detailRepository
-        );
+        if (!empty($importId)) {
+            $combinations = $this->mappingResolver->collectDistinctKeysForImportId(
+                $company,
+                (string) $importId,
+                $this->detailRepository
+            );
+        } else {
+            $combinations = $this->mappingResolver->collectDistinctKeysForCompany(
+                $company,
+                $from,
+                $to,
+                $this->detailRepository
+            );
+        }
 
         // карта "oper|docType => суммарный rowsCount"
         $combinationCounts = [];
@@ -125,12 +134,17 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $categoryById[(string) $category->getId()] = $category;
         }
 
-        $aggregated = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
+        if (!empty($importId)) {
+            $aggregated = $this->weeklyPnlGenerator->aggregateForImportId($company, (string) $importId);
+        } else {
+            $aggregated = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
+        }
 
         return $this->render('wb/report_detail/mapping.html.twig', [
             'company' => $company,
             'from' => $from,
             'to' => $to,
+            'importId' => $importId,
             'items' => $items,
             'categories' => $categories,
             'categoryOptions' => $categoryOptions,
@@ -145,6 +159,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
     public function saveMappings(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $importId = $request->request->get('importId');
 
         if (!$this->isCsrfTokenValid('wb_report_detail_mapping', $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token');
@@ -231,6 +246,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
         return $this->redirectToRoute('wb_report_detail_mapping_index', [
             'from' => $request->request->get('from'),
             'to' => $request->request->get('to'),
+            'importId' => $importId,
         ]);
     }
 
@@ -238,6 +254,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
     public function clear(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $importId = $request->request->get('importId');
 
         if (!$this->isCsrfTokenValid('wb_report_detail_mapping_clear', $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token');
@@ -250,6 +267,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
         return $this->redirectToRoute('wb_report_detail_mapping_index', [
             'from' => $request->request->get('from'),
             'to' => $request->request->get('to'),
+            'importId' => $importId,
         ]);
     }
 
@@ -257,6 +275,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
     public function createWeeklyDocument(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $importId = $request->request->get('importId');
 
         if (!$this->isCsrfTokenValid('wb_report_detail_mapping_create_document', $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token');
@@ -265,7 +284,11 @@ final class WildberriesReportDetailMappingController extends AbstractController
         $from = new \DateTimeImmutable((string) $request->request->get('from'));
         $to = new \DateTimeImmutable((string) $request->request->get('to'));
 
-        $result = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
+        if (!empty($importId)) {
+            $result = $this->weeklyPnlGenerator->aggregateForImportId($company, (string) $importId);
+        } else {
+            $result = $this->weeklyPnlGenerator->aggregateForPeriod($company, $from, $to);
+        }
 
         if ([] !== $result['unmapped']) {
             $this->addFlash('danger', 'Есть немапнутые операции Wildberries, сначала дополни маппинг.');
@@ -273,6 +296,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             return $this->redirectToRoute('wb_report_detail_mapping_index', [
                 'from' => $from->format('Y-m-d'),
                 'to' => $to->format('Y-m-d'),
+                'importId' => $importId,
             ]);
         }
 
