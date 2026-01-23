@@ -9,6 +9,7 @@ use App\Marketplace\Wildberries\Form\WildberriesCommissionerReportUploadType;
 use App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage;
 use App\Marketplace\Wildberries\CommissionerReport\Entity\WbAggregationResult;
 use App\Marketplace\Wildberries\CommissionerReport\Entity\WbDimensionValue;
+use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostMapping;
 use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostMappingRepository;
 use App\Marketplace\Wildberries\CommissionerReport\Repository\WbCostTypeRepository;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
@@ -253,6 +254,159 @@ final class WildberriesCommissionerReportController extends AbstractController
         $this->bus->dispatch(new WbCommissionerXlsxImportMessage((string) $company->getId(), $report->getId()));
 
         $this->addFlash('success', 'Отчёт отправлен на обработку.');
+
+        return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+    }
+
+    #[Route(path: '/{id}/mappings', name: 'mappings', methods: ['POST'])]
+    public function saveMappings(Request $request, string $id): Response
+    {
+        $company = $this->companyContext->getActiveCompany();
+        $report = $this->doctrine->getRepository(WildberriesCommissionerXlsxReport::class)
+            ->findOneBy(['id' => $id, 'company' => $company]);
+
+        if (!$report instanceof WildberriesCommissionerXlsxReport) {
+            throw $this->createNotFoundException('Отчёт не найден.');
+        }
+
+        if (!$this->isCsrfTokenValid('wb_commissioner_report_mappings'.$report->getId(), (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF-токен при сохранении сопоставлений.');
+
+            return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+        }
+
+        $mappings = $request->request->all('mappings');
+        if (!is_array($mappings)) {
+            $this->addFlash('warning', 'Нет данных для сохранения сопоставлений.');
+
+            return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+        }
+
+        $dimensionValueIds = [];
+        $costTypeIds = [];
+        $plCategoryIds = [];
+
+        foreach ($mappings as $mappingData) {
+            if (!is_array($mappingData)) {
+                continue;
+            }
+
+            $dimensionValueId = $mappingData['dimensionValueId'] ?? null;
+            $costTypeId = $mappingData['costTypeId'] ?? null;
+            $plCategoryId = $mappingData['plCategoryId'] ?? null;
+
+            if ($dimensionValueId) {
+                $dimensionValueIds[] = (string) $dimensionValueId;
+            }
+            if ($costTypeId) {
+                $costTypeIds[] = (string) $costTypeId;
+            }
+            if ($plCategoryId) {
+                $plCategoryIds[] = (string) $plCategoryId;
+            }
+        }
+
+        $dimensionValueIds = array_values(array_unique($dimensionValueIds));
+        $costTypeIds = array_values(array_unique($costTypeIds));
+        $plCategoryIds = array_values(array_unique($plCategoryIds));
+
+        $dimensionValuesById = [];
+        if ([] !== $dimensionValueIds) {
+            $dimensionValues = $this->doctrine->getRepository(WbDimensionValue::class)
+                ->createQueryBuilder('dimension')
+                ->andWhere('dimension.company = :company')
+                ->andWhere('dimension.report = :report')
+                ->andWhere('dimension.id IN (:ids)')
+                ->setParameter('company', $company)
+                ->setParameter('report', $report)
+                ->setParameter('ids', $dimensionValueIds)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($dimensionValues as $dimensionValue) {
+                $dimensionValuesById[$dimensionValue->getId()] = $dimensionValue;
+            }
+        }
+
+        $costTypesById = [];
+        if ([] !== $costTypeIds) {
+            $costTypes = $this->costTypeRepository->createQueryBuilder('costType')
+                ->andWhere('costType.company = :company')
+                ->andWhere('costType.id IN (:ids)')
+                ->setParameter('company', $company)
+                ->setParameter('ids', $costTypeIds)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($costTypes as $costType) {
+                $costTypesById[$costType->getId()] = $costType;
+            }
+        }
+
+        $plCategoriesById = [];
+        if ([] !== $plCategoryIds) {
+            $plCategories = $this->plCategoryRepository->createQueryBuilder('category')
+                ->andWhere('category.company = :company')
+                ->andWhere('category.id IN (:ids)')
+                ->setParameter('company', $company)
+                ->setParameter('ids', $plCategoryIds)
+                ->getQuery()
+                ->getResult();
+
+            foreach ($plCategories as $category) {
+                $plCategoriesById[$category->getId()] = $category;
+            }
+        }
+
+        $em = $this->doctrine->getManager();
+
+        foreach ($mappings as $mappingData) {
+            if (!is_array($mappingData)) {
+                continue;
+            }
+
+            $dimensionValueId = $mappingData['dimensionValueId'] ?? null;
+            $costTypeId = $mappingData['costTypeId'] ?? null;
+            $plCategoryId = $mappingData['plCategoryId'] ?? null;
+
+            if (!$dimensionValueId || !$costTypeId || !$plCategoryId) {
+                continue;
+            }
+
+            $dimensionValue = $dimensionValuesById[(string) $dimensionValueId] ?? null;
+            $costType = $costTypesById[(string) $costTypeId] ?? null;
+            $plCategory = $plCategoriesById[(string) $plCategoryId] ?? null;
+
+            if (!$dimensionValue || !$costType || !$plCategory) {
+                continue;
+            }
+
+            $mapping = $this->costMappingRepository->findOneBy([
+                'company' => $company,
+                'dimensionValue' => $dimensionValue,
+            ]);
+
+            if (!$mapping instanceof WbCostMapping) {
+                $mapping = new WbCostMapping(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $dimensionValue,
+                    $costType,
+                    $plCategory
+                );
+            } else {
+                $mapping
+                    ->setCostType($costType)
+                    ->setPlCategory($plCategory)
+                    ->setUpdatedAt(new \DateTimeImmutable());
+            }
+
+            $em->persist($mapping);
+        }
+
+        $em->flush();
+
+        $this->addFlash('success', 'Сопоставления сохранены.');
 
         return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
     }
