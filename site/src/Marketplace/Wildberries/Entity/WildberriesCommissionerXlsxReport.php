@@ -70,6 +70,12 @@ class WildberriesCommissionerXlsxReport
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $warningsJson = null;
 
+    #[ORM\Column(length: 32, options: ['default' => 'not_calculated'])]
+    private string $aggregationStatus = 'not_calculated';
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $aggregationErrorsJson = null;
+
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $pnlDocumentId = null;
 
@@ -253,6 +259,26 @@ class WildberriesCommissionerXlsxReport
     public function setWarningsJson(?array $warningsJson): void
     {
         $this->warningsJson = $warningsJson;
+    }
+
+    public function getAggregationStatus(): string
+    {
+        return $this->aggregationStatus;
+    }
+
+    public function setAggregationStatus(string $aggregationStatus): void
+    {
+        $this->aggregationStatus = $aggregationStatus;
+    }
+
+    public function getAggregationErrorsJson(): ?array
+    {
+        return $this->aggregationErrorsJson;
+    }
+
+    public function setAggregationErrorsJson(?array $aggregationErrorsJson): void
+    {
+        $this->aggregationErrorsJson = $aggregationErrorsJson;
     }
 
     public function getPnlDocumentId(): ?string
