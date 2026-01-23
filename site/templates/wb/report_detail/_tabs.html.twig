@@ -1,14 +1,28 @@
 {% set currentRoute = app.request.attributes.get('_route') %}
 
+{# ВАЖНО: сохраняем query-параметры, чтобы не терять контекст (importId) #}
+{% set q = {} %}
+{% if app.request.query.get('importId') %}
+    {% set q = q|merge({'importId': app.request.query.get('importId')}) %}
+{% endif %}
+{% if app.request.query.get('dateFrom') %}
+    {% set q = q|merge({'dateFrom': app.request.query.get('dateFrom')}) %}
+{% endif %}
+{% if app.request.query.get('dateTo') %}
+    {% set q = q|merge({'dateTo': app.request.query.get('dateTo')}) %}
+{% endif %}
+
 <nav class="mb-4">
     <ul class="nav nav-tabs">
         <li class="nav-item">
-            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_index' ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
+            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_index' ? 'active' : '' }}"
+               href="{{ path('wb_report_detail_index', q) }}">
                 Операции
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_mapping_' ? 'active' : '' }}" href="{{ path('wb_report_detail_mapping_index') }}">
+            <a class="nav-link {{ currentRoute starts with 'wb_report_detail_mapping_' ? 'active' : '' }}"
+               href="{{ path('wb_report_detail_mapping_index', q) }}">
                 Маппинг и ОПиУ
             </a>
         </li>
