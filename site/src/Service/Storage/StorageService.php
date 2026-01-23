@@ -50,4 +50,9 @@ final class StorageService
             'originalFilename' => $originalFilename,
         ];
     }
+
+    public function getAbsolutePath(string $relativePath): string
+    {
+        return $this->storageRoot.'/'.ltrim($relativePath, '/');
+    }
 }
