@@ -8,6 +8,8 @@ use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Form\WildberriesCommissionerReportUploadType;
 use App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
+use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
+use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use App\Service\Storage\StorageService;
 use Doctrine\Persistence\ManagerRegistry;
@@ -28,6 +30,8 @@ final class WildberriesCommissionerReportController extends AbstractController
         private readonly StorageService $storageService,
         private readonly WbCommissionerXlsxFormatValidator $formatValidator,
         private readonly MessageBusInterface $bus,
+        private readonly WildberriesWeeklyPnlGenerator $weeklyPnlGenerator,
+        private readonly PLCategoryRepository $plCategoryRepository,
     ) {
     }
 
@@ -112,8 +116,20 @@ final class WildberriesCommissionerReportController extends AbstractController
             throw $this->createNotFoundException('Отчёт не найден.');
         }
 
+        $aggregated = $this->weeklyPnlGenerator->aggregateForImportId($company, $report->getId());
+        $categories = $this->plCategoryRepository->findTreeByCompany($company);
+        $categoryById = [];
+
+        foreach ($categories as $category) {
+            $categoryById[(string) $category->getId()] = $category;
+        }
+
         return $this->render('wildberries/commissioner_report/show.html.twig', [
             'report' => $report,
+            'totals' => $aggregated['totals'],
+            'unmapped' => $aggregated['unmapped'],
+            'hasUnmapped' => [] !== $aggregated['unmapped'],
+            'categoryById' => $categoryById,
         ]);
     }
 
