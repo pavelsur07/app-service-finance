@@ -17,8 +17,10 @@ class FileTabularReader
     public function readHeader(string $filePath): array
     {
         $reader = $this->openReaderByExtension($filePath);
+        $opened = false;
         try {
             $reader->open($filePath);
+            $opened = true;
             foreach ($reader->getSheetIterator() as $sheet) {
                 foreach ($sheet->getRowIterator() as $row) {
                     $cells = $row->toArray();
@@ -27,7 +29,9 @@ class FileTabularReader
                 break;
             }
         } finally {
-            $reader->close();
+            if ($opened) {
+                $reader->close();
+            }
         }
 
         return [];
