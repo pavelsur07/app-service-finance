@@ -6,6 +6,7 @@ namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Form\WildberriesCommissionerReportUploadType;
+use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
 use App\Service\ActiveCompanyService;
 use App\Service\Storage\StorageService;
 use Doctrine\Persistence\ManagerRegistry;
@@ -23,6 +24,7 @@ final class WildberriesCommissionerReportController extends AbstractController
         private readonly ManagerRegistry $doctrine,
         private readonly ActiveCompanyService $companyContext,
         private readonly StorageService $storageService,
+        private readonly WbCommissionerXlsxFormatValidator $formatValidator,
     ) {
     }
 
@@ -58,6 +60,9 @@ final class WildberriesCommissionerReportController extends AbstractController
                 );
 
                 $stored = $this->storageService->storeUploadedFile($file, $storagePath);
+                $validationResult = $this->formatValidator->validate(
+                    $this->storageService->getAbsolutePath($stored['storagePath'])
+                );
 
                 $report = new WildberriesCommissionerXlsxReport($reportId, $company, new \DateTimeImmutable());
                 $report->setPeriodStart($data['periodStart']);
@@ -65,7 +70,16 @@ final class WildberriesCommissionerReportController extends AbstractController
                 $report->setStoragePath($stored['storagePath']);
                 $report->setFileHash($stored['fileHash']);
                 $report->setOriginalFilename($stored['originalFilename']);
+                $report->setHeadersHash($validationResult->headersHash);
+                $report->setFormatStatus($validationResult->status);
+                $report->setWarningsJson([] !== $validationResult->warnings ? $validationResult->warnings : null);
+                $report->setErrorsJson([] !== $validationResult->errors ? $validationResult->errors : null);
+                $report->setWarningsCount(count($validationResult->warnings));
+                $report->setErrorsCount(count($validationResult->errors));
                 $report->setStatus('uploaded');
+                if (WbCommissionerXlsxFormatValidator::STATUS_FAILED === $validationResult->status) {
+                    $report->setStatus('failed');
+                }
 
                 $em = $this->doctrine->getManager();
                 $em->persist($report);
