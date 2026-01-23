@@ -16,16 +16,19 @@
             <i class="ti ti-player-play me-1"></i>{{ report.status == 'processed' ? 'Пересчитать' : 'Обработать' }}
           </button>
         </form>
-        <a class="btn btn-outline-primary" href="{{ path('wb_report_detail_mapping_index', {from: report.periodStart|date('Y-m-d'), to: report.periodEnd|date('Y-m-d')}) }}">
-          <i class="ti ti-settings me-1"></i>Перейти к маппингу
+        <a class="btn btn-outline-primary" href="{{ path('wb_report_detail_mapping_index', {importId: report.id}) }}">
+          <i class="ti ti-settings me-1"></i>Открыть маппинг
         </a>
         <form class="d-inline" method="post" action="{{ path('wb_report_detail_mapping_create_document') }}">
           <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
           <input type="hidden" name="from" value="{{ report.periodStart|date('Y-m-d') }}">
           <input type="hidden" name="to" value="{{ report.periodEnd|date('Y-m-d') }}">
-          <button class="btn btn-success">
+          <button class="btn btn-success" {% if hasUnmapped %}disabled aria-disabled="true"{% endif %}>
             <i class="ti ti-report-money me-1"></i>Создать ОПиУ за период
           </button>
+          {% if hasUnmapped %}
+            <span class="text-warning ms-2">Закрой unmapped в маппинге</span>
+          {% endif %}
         </form>
         <a class="btn btn-outline-secondary" href="{{ path('wb_commissioner_reports_index') }}">
           <i class="ti ti-arrow-left me-1"></i>К списку
@@ -112,6 +115,63 @@
         </div>
       </div>
     </div>
+
+    <div class="card mt-3">
+      <div class="card-body">
+        <h3 class="card-title">Агрегация (по отчёту)</h3>
+        <div class="table-responsive">
+          <table class="table table-striped align-middle mb-0">
+            <thead>
+            <tr>
+              <th>PL категория</th>
+              <th class="text-end">Сумма</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for categoryId, amount in totals %}
+              {% set category = categoryById[categoryId] ?? null %}
+              <tr>
+                <td>{{ category ? category.name : categoryId }}</td>
+                <td class="text-end">{{ amount|number_format(2, '.', ' ') }}</td>
+              </tr>
+            {% else %}
+              <tr>
+                <td colspan="2" class="text-center">Нет данных для отчёта</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    {% if unmapped is not empty %}
+      <div class="card mt-3">
+        <div class="card-body">
+          <h3 class="card-title">Unmapped</h3>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+              <tr>
+                <th>Тип документа</th>
+                <th>Обоснование</th>
+                <th class="text-end">Строк</th>
+              </tr>
+              </thead>
+              <tbody>
+              {% for item in unmapped %}
+                <tr>
+                  <td>{{ item.docTypeName ?? '—' }}</td>
+                  <td>{{ item.supplierOperName ?? '—' }}</td>
+                  <td class="text-end">{{ item.rowsCount }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
