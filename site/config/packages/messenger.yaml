@@ -26,6 +26,7 @@ framework:
             App\Message\SendRegistrationEmailMessage: async
             App\Message\Ozon\SyncOzonOrders: async
             App\Marketplace\Wildberries\Message\WbFinanceReportImportMessage: async
+            App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage: async
             App\Cash\Message\Import\BankImportMessage: async
             App\Cash\Message\Import\CashFileImportMessage: async
             Symfony\Component\Mailer\Messenger\SendEmailMessage: async

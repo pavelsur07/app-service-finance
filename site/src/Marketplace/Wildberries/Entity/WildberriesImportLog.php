@@ -50,6 +50,9 @@ class WildberriesImportLog
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $fileName = null;
 
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $meta = null;
+
     public function __construct(string $id, Company $company, \DateTimeImmutable $startedAt)
     {
         $this->id = $id;
@@ -160,5 +163,15 @@ class WildberriesImportLog
     public function setFileName(?string $v): void
     {
         $this->fileName = $v;
+    }
+
+    public function getMeta(): ?array
+    {
+        return $this->meta;
+    }
+
+    public function setMeta(?array $meta): void
+    {
+        $this->meta = $meta;
     }
 }
