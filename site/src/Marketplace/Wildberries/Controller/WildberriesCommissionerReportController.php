@@ -92,7 +92,14 @@ final class WildberriesCommissionerReportController extends AbstractController
                 $em->persist($report);
                 $em->flush();
 
-                $this->addFlash('success', 'Отчёт загружен и сохранён.');
+                if (WbCommissionerXlsxFormatValidator::STATUS_FAILED === $validationResult->status) {
+                    $this->addFlash(
+                        'danger',
+                        'Отчёт загружен, но формат не распознан. Открой карточку отчёта и посмотри ошибки валидации.'
+                    );
+                } else {
+                    $this->addFlash('success', 'Отчёт загружен и сохранён.');
+                }
 
                 return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $reportId]);
             }
