@@ -6,6 +6,7 @@ namespace App\Marketplace\Wildberries\Service\CommissionerReport;
 
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Marketplace\Wildberries\Service\CommissionerReport\Dto\ValidationResultDTO;
+use ZipArchive;
 
 final class WbCommissionerXlsxFormatValidator
 {
@@ -36,12 +37,65 @@ final class WbCommissionerXlsxFormatValidator
 
     public function validate(string $absoluteFilePath): ValidationResultDTO
     {
-        $headersRaw = $this->tabularReader->readHeader($absoluteFilePath);
+        $errors = [];
+        $warnings = [];
+        $requiredMissing = [];
+        $headersNormalized = [];
+        $emptyHeadersHash = hash('sha256', json_encode([], JSON_UNESCAPED_UNICODE));
+
+        if (!file_exists($absoluteFilePath) || !is_readable($absoluteFilePath)) {
+            $errors[] = 'Файл не найден или недоступен для чтения.';
+        } elseif (0 >= filesize($absoluteFilePath)) {
+            $errors[] = 'Файл пустой.';
+        } else {
+            $zip = new ZipArchive();
+            $zipOpenResult = $zip->open($absoluteFilePath);
+            if (true !== $zipOpenResult) {
+                $errors[] = 'Файл не является корректным XLSX (ZIP) архивом.';
+            } else {
+                $requiredEntries = [
+                    'xl/_rels/workbook.xml.rels',
+                    'xl/workbook.xml',
+                ];
+
+                foreach ($requiredEntries as $entry) {
+                    if (false === $zip->locateName($entry)) {
+                        $errors[] = sprintf('В файле отсутствует обязательная часть: %s.', $entry);
+                    }
+                }
+            }
+
+            if (true === $zipOpenResult) {
+                $zip->close();
+            }
+        }
+
+        if ([] !== $errors) {
+            return new ValidationResultDTO(
+                $headersNormalized,
+                $emptyHeadersHash,
+                $requiredMissing,
+                $warnings,
+                $errors,
+                self::STATUS_FAILED
+            );
+        }
+
+        try {
+            $headersRaw = $this->tabularReader->readHeader($absoluteFilePath);
+        } catch (\Throwable $exception) {
+            return new ValidationResultDTO(
+                $headersNormalized,
+                $emptyHeadersHash,
+                $requiredMissing,
+                $warnings,
+                ['Не удалось открыть XLSX. Проверь, что файл действительно .xlsx (не .xls/.csv) и не повреждён.'],
+                self::STATUS_FAILED
+            );
+        }
+
         $headersNormalized = array_map([$this, 'normalizeHeader'], $headersRaw);
         $headersHash = hash('sha256', json_encode($headersNormalized, JSON_UNESCAPED_UNICODE));
-
-        $warnings = [];
-        $errors = [];
 
         if ([] === $headersNormalized) {
             $errors[] = 'Не удалось прочитать заголовки файла.';
