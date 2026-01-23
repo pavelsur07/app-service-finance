@@ -17,6 +17,7 @@
         <testsuite name="integration">
             <directory>tests/Integration</directory>
             <directory>tests/Controller</directory>
+            <directory>tests/Marketplace</directory>
         </testsuite>
         <testsuite name="functional">
             <directory>tests/Functional</directory>
