@@ -21,8 +21,7 @@
         </a>
         <form class="d-inline" method="post" action="{{ path('wb_report_detail_mapping_create_document') }}">
           <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
-          <input type="hidden" name="from" value="{{ report.periodStart|date('Y-m-d') }}">
-          <input type="hidden" name="to" value="{{ report.periodEnd|date('Y-m-d') }}">
+          <input type="hidden" name="reportId" value="{{ report.id }}">
           <button class="btn btn-success" {% if hasUnmapped %}disabled aria-disabled="true"{% endif %}>
             <i class="ti ti-report-money me-1"></i>Создать ОПиУ за период
           </button>

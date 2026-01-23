@@ -8,6 +8,7 @@ use App\Entity\Company;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Enum\DocumentType;
+use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Repository\PLCategoryRepository;
 use App\Service\PLRegisterUpdater;
@@ -186,6 +187,68 @@ final class WildberriesWeeklyPnlGenerator
         }
 
         $document = new Document(Uuid::uuid4()->toString(), $company);
+        $this->applyTotalsToDocument($document, $from, $to, $totals);
+
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $this->plRegisterUpdater->updateForDocument($document);
+
+        return $document;
+    }
+
+    public function createOrUpdateDocumentForCommissionerReport(
+        Company $company,
+        WildberriesCommissionerXlsxReport $report,
+    ): Document {
+        $result = $this->aggregateForImportId($company, $report->getId());
+
+        if ([] !== $result['unmapped']) {
+            throw new \DomainException('Найдены немапнутые операции Wildberries. Сначала дополни маппинг.');
+        }
+
+        if ([] === $result['totals']) {
+            throw new \DomainException('Cannot create WB weekly PnL document: totals are empty');
+        }
+
+        $documentId = $report->getPnlDocumentId();
+
+        if (null !== $documentId) {
+            $document = $this->em->find(Document::class, $documentId);
+
+            if (!$document instanceof Document) {
+                throw new \RuntimeException('Не удалось найти документ ОПиУ для отчёта комиссионера.');
+            }
+
+            foreach ($document->getOperations()->toArray() as $operation) {
+                $document->removeOperation($operation);
+            }
+        } else {
+            $document = new Document(Uuid::uuid4()->toString(), $company);
+        }
+
+        $this->applyTotalsToDocument($document, $report->getPeriodStart(), $report->getPeriodEnd(), $result['totals']);
+
+        $this->em->persist($document);
+
+        if (null === $documentId) {
+            $report->setPnlDocumentId((string) $document->getId());
+            $this->em->persist($report);
+        }
+
+        $this->em->flush();
+
+        $this->plRegisterUpdater->updateForDocument($document);
+
+        return $document;
+    }
+
+    private function applyTotalsToDocument(
+        Document $document,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        array $totals,
+    ): void {
         $document
             ->setDate($to)
             ->setType(DocumentType::OTHER)
@@ -205,12 +268,5 @@ final class WildberriesWeeklyPnlGenerator
 
             $document->addOperation($operation);
         }
-
-        $this->em->persist($document);
-        $this->em->flush();
-
-        $this->plRegisterUpdater->updateForDocument($document);
-
-        return $document;
     }
 }

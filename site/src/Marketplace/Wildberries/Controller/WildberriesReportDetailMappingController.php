@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetailMapping;
+use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailMappingRepository;
 use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
@@ -276,9 +277,38 @@ final class WildberriesReportDetailMappingController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
         $importId = $request->request->get('importId');
+        $reportId = $request->request->get('reportId');
 
         if (!$this->isCsrfTokenValid('wb_report_detail_mapping_create_document', $request->request->get('_token'))) {
             throw $this->createAccessDeniedException('Invalid CSRF token');
+        }
+
+        if (!empty($reportId)) {
+            $report = $this->em->getRepository(WildberriesCommissionerXlsxReport::class)
+                ->findOneBy(['id' => $reportId, 'company' => $company]);
+
+            if (!$report instanceof WildberriesCommissionerXlsxReport) {
+                throw $this->createNotFoundException('Отчёт комиссионера не найден.');
+            }
+
+            $hadDocument = null !== $report->getPnlDocumentId();
+
+            try {
+                $this->weeklyPnlGenerator->createOrUpdateDocumentForCommissionerReport($company, $report);
+            } catch (\DomainException|\RuntimeException $exception) {
+                $this->addFlash('danger', $exception->getMessage());
+
+                return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+            }
+
+            $this->addFlash(
+                'success',
+                $hadDocument
+                    ? 'Документ ОПиУ по Wildberries обновлён.'
+                    : 'Документ ОПиУ по Wildberries успешно создан.'
+            );
+
+            return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
         }
 
         $from = new \DateTimeImmutable((string) $request->request->get('from'));
