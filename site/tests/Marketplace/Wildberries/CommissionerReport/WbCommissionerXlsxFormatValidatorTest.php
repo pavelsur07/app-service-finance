@@ -27,6 +27,19 @@ final class WbCommissionerXlsxFormatValidatorTest extends TestCase
         self::assertNotSame('', $result->headersHash);
     }
 
+    public function testInvalidFileReturnsFailedFormat(): void
+    {
+        $validator = new WbCommissionerXlsxFormatValidator(new FileTabularReader());
+        $fixturePath = dirname(__DIR__, 3).'/Fixtures/invalid-not-xlsx.xlsx';
+
+        self::assertFileExists($fixturePath);
+
+        $result = $validator->validate($fixturePath);
+
+        self::assertSame(WbCommissionerXlsxFormatValidator::STATUS_FAILED, $result->status);
+        self::assertNotEmpty($result->errors);
+    }
+
     private function createFixture(): string
     {
         $tempPath = tempnam(sys_get_temp_dir(), 'wb_commissioner_');
