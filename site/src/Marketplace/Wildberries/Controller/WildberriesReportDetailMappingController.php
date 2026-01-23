@@ -11,6 +11,7 @@ use App\Marketplace\Wildberries\Repository\WildberriesReportDetailRepository;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvider;
 use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
+use App\Marketplace\Wildberries\CommissionerReport\Service\WbCommissionerPnlDocumentGenerator;
 use App\Repository\PLCategoryRepository;
 use App\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
         private readonly WildberriesReportDetailRepository $detailRepository,
         private readonly PLCategoryRepository $plCategoryRepository,
         private readonly WildberriesWeeklyPnlGenerator $weeklyPnlGenerator,
+        private readonly WbCommissionerPnlDocumentGenerator $commissionerPnlGenerator,
         private readonly WildberriesReportDetailSourceFieldProvider $sourceFieldProvider,
         private readonly EntityManagerInterface $em,
     ) {
@@ -294,7 +296,7 @@ final class WildberriesReportDetailMappingController extends AbstractController
             $hadDocument = null !== $report->getPnlDocumentId();
 
             try {
-                $this->weeklyPnlGenerator->createOrUpdateDocumentForCommissionerReport($company, $report);
+                $this->commissionerPnlGenerator->createOrUpdateForReport($company, $report);
             } catch (\DomainException|\RuntimeException $exception) {
                 $this->addFlash('danger', $exception->getMessage());
 
