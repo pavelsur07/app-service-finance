@@ -6,6 +6,7 @@ namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Form\WildberriesCommissionerReportUploadType;
+use App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
 use App\Service\ActiveCompanyService;
 use App\Service\Storage\StorageService;
@@ -15,6 +16,7 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Annotation\Route;
 
 #[Route(path: '/marketplace/wb/commissioner-reports', name: 'wb_commissioner_reports_')]
@@ -25,6 +27,7 @@ final class WildberriesCommissionerReportController extends AbstractController
         private readonly ActiveCompanyService $companyContext,
         private readonly StorageService $storageService,
         private readonly WbCommissionerXlsxFormatValidator $formatValidator,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
@@ -112,5 +115,29 @@ final class WildberriesCommissionerReportController extends AbstractController
         return $this->render('wildberries/commissioner_report/show.html.twig', [
             'report' => $report,
         ]);
+    }
+
+    #[Route(path: '/{id}/process', name: 'process', methods: ['POST'])]
+    public function process(Request $request, string $id): Response
+    {
+        $company = $this->companyContext->getActiveCompany();
+        $report = $this->doctrine->getRepository(WildberriesCommissionerXlsxReport::class)
+            ->findOneBy(['id' => $id, 'company' => $company]);
+
+        if (!$report instanceof WildberriesCommissionerXlsxReport) {
+            throw $this->createNotFoundException('Отчёт не найден.');
+        }
+
+        if (!$this->isCsrfTokenValid('wb_commissioner_report_process'.$report->getId(), (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF-токен при запуске обработки.');
+
+            return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
+        }
+
+        $this->bus->dispatch(new WbCommissionerXlsxImportMessage((string) $company->getId(), $report->getId()));
+
+        $this->addFlash('success', 'Отчёт отправлен на обработку.');
+
+        return $this->redirectToRoute('wb_commissioner_reports_show', ['id' => $report->getId()]);
     }
 }

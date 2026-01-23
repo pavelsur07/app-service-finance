@@ -10,6 +10,12 @@
         <div class="text-secondary mt-1">Карточка загруженного XLSX без обработки.</div>
       </div>
       <div class="col-auto ms-auto">
+        <form class="d-inline" method="post" action="{{ path('wb_commissioner_reports_process', {id: report.id}) }}">
+          <input type="hidden" name="_token" value="{{ csrf_token('wb_commissioner_report_process' ~ report.id) }}">
+          <button class="btn btn-primary">
+            <i class="ti ti-player-play me-1"></i>{{ report.status == 'processed' ? 'Пересчитать' : 'Обработать' }}
+          </button>
+        </form>
         <a class="btn btn-outline-secondary" href="{{ path('wb_commissioner_reports_index') }}">
           <i class="ti ti-arrow-left me-1"></i>К списку
         </a>
