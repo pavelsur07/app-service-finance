@@ -86,4 +86,28 @@ final class WildberriesReportDetailMappingResolver
 
         return $qb->getQuery()->getArrayResult();
     }
+
+    /**
+     * @return array<int, array{
+     *   supplierOperName: ?string,
+     *   docTypeName: ?string,
+     *   rowsCount: int
+     * }>
+     */
+    public function collectDistinctKeysForImportId(
+        Company $company,
+        string $importId,
+        WildberriesReportDetailRepository $detailRepository,
+    ): array {
+        return $detailRepository->createQueryBuilder('wrd')
+            ->select('wrd.supplierOperName', 'wrd.docTypeName', 'COUNT(wrd.id) AS rowsCount')
+            ->andWhere('wrd.company = :company')
+            ->andWhere('wrd.importId = :importId')
+            ->groupBy('wrd.supplierOperName')
+            ->addGroupBy('wrd.docTypeName')
+            ->setParameter('company', $company)
+            ->setParameter('importId', $importId)
+            ->getQuery()
+            ->getArrayResult();
+    }
 }
