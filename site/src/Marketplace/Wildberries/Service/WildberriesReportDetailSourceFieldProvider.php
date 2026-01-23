@@ -36,8 +36,14 @@ final class WildberriesReportDetailSourceFieldProvider
             'acquiringFee' => static fn (WildberriesReportDetail $row) => $row->getAcquiringFee(),
             // Вознаграждение за ПВЗ
             'ppvz_reward' => static fn (WildberriesReportDetail $row) => $row->getRaw()['ppvz_reward'] ?? null,
+            // Комиссия WB без НДС
+            'ppvz_sales_commission' => static fn (WildberriesReportDetail $row) => $row->getPpvzSalesCommission()
+                ?? ($row->getRaw()['ppvz_sales_commission'] ?? 0.0),
+            // НДС с комиссии WB
+            'ppvz_sales_commission_vat' => static fn (WildberriesReportDetail $row) => $row->getRaw()['ppvz_sales_commission_vat'] ?? 0.0,
             // Сумма к выплате продавцу
-            'ppvz_for_pay' => static fn (WildberriesReportDetail $row) => $row->getRaw()['ppvz_for_pay'] ?? null,
+            'ppvz_for_pay' => static fn (WildberriesReportDetail $row) => $row->getPpvzForPay()
+                ?? ($row->getRaw()['ppvz_for_pay'] ?? 0.0),
             // Возмещение логистики/склада
             'rebill_logistic_cost' => static fn (WildberriesReportDetail $row) => $row->getRaw()['rebill_logistic_cost'] ?? null,
         ];
