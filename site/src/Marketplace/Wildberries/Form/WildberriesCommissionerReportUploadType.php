@@ -8,6 +8,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 use Symfony\Component\Form\FormBuilderInterface;
+use Symfony\Component\Validator\Constraints\File;
 
 final class WildberriesCommissionerReportUploadType extends AbstractType
 {
@@ -17,6 +18,16 @@ final class WildberriesCommissionerReportUploadType extends AbstractType
             ->add('file', FileType::class, [
                 'required' => true,
                 'label' => 'XLSX файл отчёта комиссионера',
+                'constraints' => [
+                    new File([
+                        'maxSize' => '20M',
+                        'mimeTypes' => [
+                            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                            'application/octet-stream',
+                        ],
+                        'mimeTypesMessage' => 'Загрузи файл XLSX (не XLS, не CSV).',
+                    ]),
+                ],
             ])
             ->add('periodStart', DateType::class, [
                 'widget' => 'single_text',
