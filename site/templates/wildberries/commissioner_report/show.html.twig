@@ -7,13 +7,24 @@
     <div class="row g-2 align-items-center">
       <div class="col">
         <h2 class="page-title">Отчёт комиссионера WB</h2>
-        <div class="text-secondary mt-1">Карточка загруженного XLSX без обработки.</div>
+        <div class="text-secondary mt-1">Карточка загрузки, проверка формата и переход к маппингу.</div>
       </div>
       <div class="col-auto ms-auto">
         <form class="d-inline" method="post" action="{{ path('wb_commissioner_reports_process', {id: report.id}) }}">
           <input type="hidden" name="_token" value="{{ csrf_token('wb_commissioner_report_process' ~ report.id) }}">
           <button class="btn btn-primary">
             <i class="ti ti-player-play me-1"></i>{{ report.status == 'processed' ? 'Пересчитать' : 'Обработать' }}
+          </button>
+        </form>
+        <a class="btn btn-outline-primary" href="{{ path('wb_report_detail_mapping_index', {from: report.periodStart|date('Y-m-d'), to: report.periodEnd|date('Y-m-d')}) }}">
+          <i class="ti ti-settings me-1"></i>Перейти к маппингу
+        </a>
+        <form class="d-inline" method="post" action="{{ path('wb_report_detail_mapping_create_document') }}">
+          <input type="hidden" name="_token" value="{{ csrf_token('wb_report_detail_mapping_create_document') }}">
+          <input type="hidden" name="from" value="{{ report.periodStart|date('Y-m-d') }}">
+          <input type="hidden" name="to" value="{{ report.periodEnd|date('Y-m-d') }}">
+          <button class="btn btn-success">
+            <i class="ti ti-report-money me-1"></i>Создать ОПиУ за период
           </button>
         </form>
         <a class="btn btn-outline-secondary" href="{{ path('wb_commissioner_reports_index') }}">
@@ -36,6 +47,10 @@
           <div class="col-md-6">
             <div class="text-secondary">Статус</div>
             <div>{{ report.status }}</div>
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Проверка формата</div>
+            <div>{{ report.formatStatus ?? '—' }}</div>
           </div>
           <div class="col-md-6">
             <div class="text-secondary">Файл</div>
@@ -61,6 +76,38 @@
           <div class="col-md-6">
             <div class="text-secondary">Ошибки / предупреждения</div>
             <div>{{ report.errorsCount }} / {{ report.warningsCount }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mt-3">
+      <div class="card-body">
+        <h3 class="card-title">Валидация формата</h3>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="text-secondary">Ошибки</div>
+            {% if report.errorsJson is empty %}
+              <div class="text-success">Ошибок не найдено.</div>
+            {% else %}
+              <ul class="text-danger mb-0">
+                {% for error in report.errorsJson %}
+                  <li>{{ error }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
+          </div>
+          <div class="col-md-6">
+            <div class="text-secondary">Предупреждения</div>
+            {% if report.warningsJson is empty %}
+              <div class="text-success">Предупреждений нет.</div>
+            {% else %}
+              <ul class="text-warning mb-0">
+                {% for warning in report.warningsJson %}
+                  <li>{{ warning }}</li>
+                {% endfor %}
+              </ul>
+            {% endif %}
           </div>
         </div>
       </div>

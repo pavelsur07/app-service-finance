@@ -26,39 +26,52 @@
           <table class="table table-vcenter table-striped mb-0">
             <thead>
               <tr>
-                <th>Дата загрузки</th>
                 <th>Период</th>
                 <th>Файл</th>
                 <th>Статус</th>
-                <th>Строки</th>
+                <th>Проверка формата</th>
+                <th>Создан</th>
+                <th class="text-end">Действия</th>
               </tr>
             </thead>
             <tbody>
               {% for report in reports %}
                 <tr>
                   <td>
-                    <a href="{{ path('wb_commissioner_reports_show', {id: report.id}) }}">
-                      {{ report.createdAt|date('Y-m-d H:i') }}
-                    </a>
-                  </td>
-                  <td>
-                    {{ report.periodStart|date('Y-m-d') }} — {{ report.periodEnd|date('Y-m-d') }}
+                    <div class="fw-semibold">{{ report.periodStart|date('Y-m-d') }} — {{ report.periodEnd|date('Y-m-d') }}</div>
+                    <div class="text-secondary small">Строки: {{ report.rowsParsed }}/{{ report.rowsTotal }}</div>
                   </td>
                   <td>
                     {{ report.originalFilename }}
                     <div class="text-secondary small">{{ report.storagePath }}</div>
                   </td>
-                  <td>{{ report.status }}</td>
                   <td>
-                    {{ report.rowsParsed }}/{{ report.rowsTotal }}
+                    <div>{{ report.status }}</div>
                     {% if report.errorsCount > 0 %}
-                      <span class="text-danger ms-1">Ошибки: {{ report.errorsCount }}</span>
+                      <span class="text-danger small">Ошибки: {{ report.errorsCount }}</span>
+                    {% elseif report.warningsCount > 0 %}
+                      <span class="text-warning small">Предупреждения: {{ report.warningsCount }}</span>
                     {% endif %}
+                  </td>
+                  <td>{{ report.formatStatus ?? '—' }}</td>
+                  <td>{{ report.createdAt|date('Y-m-d H:i') }}</td>
+                  <td class="text-end">
+                    <div class="btn-list justify-content-end">
+                      <a class="btn btn-outline-primary btn-sm" href="{{ path('wb_commissioner_reports_show', {id: report.id}) }}">
+                        Открыть
+                      </a>
+                      <form class="d-inline" method="post" action="{{ path('wb_commissioner_reports_process', {id: report.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('wb_commissioner_report_process' ~ report.id) }}">
+                        <button class="btn btn-primary btn-sm">
+                          {{ report.status == 'processed' ? 'Пересчитать' : 'Обработать' }}
+                        </button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               {% else %}
                 <tr>
-                  <td colspan="5" class="text-secondary">Отчёты ещё не загружены.</td>
+                  <td colspan="6" class="text-secondary">Отчёты ещё не загружены.</td>
                 </tr>
               {% endfor %}
             </tbody>
