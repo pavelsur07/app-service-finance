@@ -2,12 +2,12 @@
 
 namespace App\Controller\Api;
 
+use App\Company\Service\ReportApiKeyManager;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Repository\ProjectDirectionRepository;
 use App\Service\RateLimiter\ReportsApiRateLimiter;
-use App\Service\ReportApiKeyManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

@@ -2,8 +2,8 @@
 
 namespace App\Company\Controller;
 
+use App\Company\Service\ReportApiKeyManager;
 use App\Service\ActiveCompanyService;
-use App\Service\ReportApiKeyManager;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;

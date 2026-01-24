@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service;
+namespace App\Company\Service;
 
 use App\Entity\Company;
 use App\Entity\ReportApiKey;
