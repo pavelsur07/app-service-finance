@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Command;
+namespace App\Cash\Command;
 
 use App\Repository\CompanyRepository;
 use App\Service\DailyBalanceRecalculator;
