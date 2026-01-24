@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Doctrine;
+namespace App\Cash\EventSubscriber\Transaction;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Message\EnqueueAutoRulesForRange;
