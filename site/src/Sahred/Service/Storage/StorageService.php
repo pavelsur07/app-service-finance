@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Service\Storage;
+namespace App\Sahred\Service\Storage;
 
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 

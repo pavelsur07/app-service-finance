@@ -8,7 +8,7 @@ use App\Cash\Service\Import\File\FileTabularReader;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
 use App\Marketplace\Wildberries\Service\CommissionerReport\Dto\ImportResultDTO;
-use App\Service\Storage\StorageService;
+use App\Sahred\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
