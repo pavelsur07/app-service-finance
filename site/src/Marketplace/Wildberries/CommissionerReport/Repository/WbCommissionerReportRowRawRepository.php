@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\CommissionerReport\Repository;
 
 use App\Entity\Company;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCommissionerReportRowRaw;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCommissionerReportRowRaw;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;

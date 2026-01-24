@@ -2,19 +2,23 @@
 
 declare(strict_types=1);
 
-namespace App\Marketplace\Wildberries\CommissionerReport\Entity;
+namespace App\Marketplace\Wildberries\Entity\CommissionerReport;
 
 use App\Entity\Company;
-use App\Marketplace\Wildberries\CommissionerReport\Repository\WbAggregationResultRepository;
+use App\Marketplace\Wildberries\CommissionerReport\Repository\WbDimensionValueRepository;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity(repositoryClass: WbAggregationResultRepository::class)]
-#[ORM\Table(name: 'wildberries_commissioner_aggregation_results')]
-#[ORM\Index(name: 'idx_wb_commissioner_agg_company_report', columns: ['company_id', 'report_id'])]
-#[ORM\Index(name: 'idx_wb_commissioner_agg_company_report_status', columns: ['company_id', 'report_id', 'status'])]
-class WbAggregationResult
+#[ORM\Entity(repositoryClass: WbDimensionValueRepository::class)]
+#[ORM\Table(name: 'wildberries_commissioner_dimension_values')]
+#[ORM\UniqueConstraint(
+    name: 'uniq_wb_commissioner_dimension_value_company_report_key_value',
+    columns: ['company_id', 'report_id', 'dimension_key', 'normalized_value']
+)]
+#[ORM\Index(name: 'idx_wb_commissioner_dimension_value_company', columns: ['company_id'])]
+#[ORM\Index(name: 'idx_wb_commissioner_dimension_value_report', columns: ['report_id'])]
+class WbDimensionValue
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
@@ -28,19 +32,17 @@ class WbAggregationResult
     #[ORM\JoinColumn(name: 'report_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private WildberriesCommissionerXlsxReport $report;
 
-    #[ORM\ManyToOne(targetEntity: WbCostType::class)]
-    #[ORM\JoinColumn(name: 'cost_type_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
-    private ?WbCostType $costType = null;
+    #[ORM\Column(name: 'dimension_key', length: 64)]
+    private string $dimensionKey;
 
-    #[ORM\ManyToOne(targetEntity: WbDimensionValue::class)]
-    #[ORM\JoinColumn(name: 'dimension_value_id', referencedColumnName: 'id', nullable: true, onDelete: 'SET NULL')]
-    private ?WbDimensionValue $dimensionValue = null;
+    #[ORM\Column(type: 'text')]
+    private string $value;
 
-    #[ORM\Column(type: 'decimal', precision: 15, scale: 2)]
-    private string $amount;
+    #[ORM\Column(name: 'normalized_value', type: 'text')]
+    private string $normalizedValue;
 
-    #[ORM\Column(length: 32)]
-    private string $status;
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $occurrences = 0;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -49,20 +51,18 @@ class WbAggregationResult
         string $id,
         Company $company,
         WildberriesCommissionerXlsxReport $report,
-        string $amount,
-        string $status,
-        ?WbCostType $costType = null,
-        ?WbDimensionValue $dimensionValue = null,
+        string $dimensionKey,
+        string $value,
+        string $normalizedValue,
         ?\DateTimeImmutable $createdAt = null
     ) {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
         $this->report = $report;
-        $this->amount = $amount;
-        $this->status = $status;
-        $this->costType = $costType;
-        $this->dimensionValue = $dimensionValue;
+        $this->dimensionKey = $dimensionKey;
+        $this->value = $value;
+        $this->normalizedValue = $normalizedValue;
         $this->createdAt = $createdAt ?? new \DateTimeImmutable();
     }
 
@@ -95,50 +95,57 @@ class WbAggregationResult
         return $this;
     }
 
-    public function getCostType(): ?WbCostType
+    public function getDimensionKey(): string
     {
-        return $this->costType;
+        return $this->dimensionKey;
     }
 
-    public function setCostType(?WbCostType $costType): self
+    public function setDimensionKey(string $dimensionKey): self
     {
-        $this->costType = $costType;
+        $this->dimensionKey = $dimensionKey;
 
         return $this;
     }
 
-    public function getDimensionValue(): ?WbDimensionValue
+    public function getValue(): string
     {
-        return $this->dimensionValue;
+        return $this->value;
     }
 
-    public function setDimensionValue(?WbDimensionValue $dimensionValue): self
+    public function setValue(string $value): self
     {
-        $this->dimensionValue = $dimensionValue;
+        $this->value = $value;
 
         return $this;
     }
 
-    public function getAmount(): string
+    public function getNormalizedValue(): string
     {
-        return $this->amount;
+        return $this->normalizedValue;
     }
 
-    public function setAmount(string $amount): self
+    public function setNormalizedValue(string $normalizedValue): self
     {
-        $this->amount = $amount;
+        $this->normalizedValue = $normalizedValue;
 
         return $this;
     }
 
-    public function getStatus(): string
+    public function getOccurrences(): int
     {
-        return $this->status;
+        return $this->occurrences;
     }
 
-    public function setStatus(string $status): self
+    public function setOccurrences(int $occurrences): self
     {
-        $this->status = $status;
+        $this->occurrences = $occurrences;
+
+        return $this;
+    }
+
+    public function incrementOccurrences(int $by = 1): self
+    {
+        $this->occurrences += $by;
 
         return $this;
     }

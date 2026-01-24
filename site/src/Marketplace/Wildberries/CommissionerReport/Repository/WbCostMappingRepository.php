@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\CommissionerReport\Repository;
 
 use App\Entity\Company;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostMapping;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbDimensionValue;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCostMapping;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbDimensionValue;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

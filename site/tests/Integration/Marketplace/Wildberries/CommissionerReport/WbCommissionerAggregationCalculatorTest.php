@@ -6,13 +6,13 @@ namespace App\Tests\Integration\Marketplace\Wildberries\CommissionerReport;
 
 use App\Entity\Company;
 use App\Entity\PLCategory;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbAggregationResult;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCommissionerReportRowRaw;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostMapping;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostType;
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbDimensionValue;
 use App\Marketplace\Wildberries\CommissionerReport\Service\WbCommissionerAggregationCalculator;
 use App\Marketplace\Wildberries\CommissionerReport\Service\WbCommissionerDimensionExtractor;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbAggregationResult;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCommissionerReportRowRaw;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCostMapping;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCostType;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbDimensionValue;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Marketplace\Wildberries\CommissionerReport\Entity;
+namespace App\Marketplace\Wildberries\Entity\CommissionerReport;
 
 use App\Entity\Company;
 use App\Entity\PLCategory;

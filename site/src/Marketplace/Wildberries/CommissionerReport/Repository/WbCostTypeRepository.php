@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Wildberries\CommissionerReport\Repository;
 
-use App\Marketplace\Wildberries\CommissionerReport\Entity\WbCostType;
+use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCostType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
