@@ -30,18 +30,6 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Ai/Entity'
                 prefix: 'App\Ai\Entity'
                 alias: Ai
-            MarketplaceOzon:
-                type: attribute
-                is_bundle: false
-                dir: '%kernel.project_dir%/src/Marketplace/Ozon/Entity'
-                prefix: 'App\Marketplace\Ozon\Entity'
-                alias: MarketplaceOzon
-            MarketplaceWildberries:
-                type: attribute
-                is_bundle: false
-                dir: '%kernel.project_dir%/src/Marketplace/Wildberries/Entity'
-                prefix: 'App\Marketplace\Wildberries\Entity'
-                alias: MarketplaceWildberries
             Telegram:
                 type: attribute
                 is_bundle: false
