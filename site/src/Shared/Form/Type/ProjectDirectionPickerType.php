@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Sahred\Form\Type;
+namespace App\Shared\Form\Type;
 
 use App\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;

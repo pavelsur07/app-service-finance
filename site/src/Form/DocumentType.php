@@ -6,7 +6,7 @@ use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\ProjectDirection;
 use App\Enum\DocumentType as DocumentTypeEnum;
-use App\Sahred\Form\Type\ProjectDirectionPickerType;
+use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;

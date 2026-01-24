@@ -12,7 +12,7 @@ use App\Entity\Company;
 use App\Entity\ProjectDirection;
 use App\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
-use App\Sahred\Form\Type\ProjectDirectionPickerType;
+use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
