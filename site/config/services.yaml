@@ -40,11 +40,11 @@ services:
             - '@session.redis'
             - { prefix: 'sess_', ttl: 1209600 } # 14 дней
 
-    App\Service\RateLimiter\ReportsApiRateLimiter:
+    App\Sahred\Service\RateLimiter\ReportsApiRateLimiter:
         arguments:
             $factory: '@?limiter.reports_api'
 
-    App\Service\RateLimiter\RegistrationRateLimiter:
+    App\Sahred\Service\RateLimiter\RegistrationRateLimiter:
         arguments:
             $factory: '@?limiter.registration'
 
@@ -52,7 +52,7 @@ services:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
 
-    App\Service\Storage\StorageService:
+    App\Sahred\Service\Storage\StorageService:
         arguments:
             $storageRoot: '%app.storage_root%'
 
