@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service\RateLimiter;
+namespace App\Sahred\Service\RateLimiter;
 
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 

@@ -5,7 +5,7 @@ namespace App\Controller\Api;
 use App\Company\Service\ReportApiKeyManager;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportRequestMapper;
-use App\Service\RateLimiter\ReportsApiRateLimiter;
+use App\Sahred\Service\RateLimiter\ReportsApiRateLimiter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

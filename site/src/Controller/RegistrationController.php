@@ -6,7 +6,7 @@ use App\Entity\Company;
 use App\Entity\User;
 use App\Form\RegistrationFormType;
 use App\Message\SendRegistrationEmailMessage;
-use App\Service\RateLimiter\RegistrationRateLimiter;
+use App\Sahred\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -7,7 +7,7 @@ use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Repository\ProjectDirectionRepository;
-use App\Service\RateLimiter\ReportsApiRateLimiter;
+use App\Sahred\Service\RateLimiter\ReportsApiRateLimiter;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
