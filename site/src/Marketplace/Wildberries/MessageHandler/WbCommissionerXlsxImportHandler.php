@@ -15,7 +15,7 @@ use App\Marketplace\Wildberries\Entity\WildberriesImportLog;
 use App\Marketplace\Wildberries\Message\WbCommissionerXlsxImportMessage;
 use App\Marketplace\Wildberries\Repository\WildberriesCommissionerXlsxReportRepository;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
-use App\Sahred\Service\Storage\StorageService;
+use App\Shared\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;

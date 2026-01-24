@@ -52,7 +52,7 @@ services:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
 
-    App\Sahred\Service\Storage\StorageService:
+    App\Shared\Service\Storage\StorageService:
         arguments:
             $storageRoot: '%app.storage_root%'
 
