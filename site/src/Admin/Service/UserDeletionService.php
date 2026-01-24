@@ -63,8 +63,6 @@ final class UserDeletionService
      */
     private function deleteCompanyRelatedData(array $companyIds): void
     {
-        $platform = $this->connection->getDatabasePlatform();
-
         $this->deleteFromTables(
             [
                 'payment_plan_match',
@@ -78,11 +76,6 @@ final class UserDeletionService
                 'report_api_key',
                 'pl_daily_totals',
                 'pl_monthly_snapshots',
-                'ozon_product_sales',
-                'ozon_product_stocks',
-                'ozon_products',
-                'ozon_sync_cursor',
-                'wildberries_sales',
                 'money_fund_movement',
                 'money_fund',
                 'project_directions',
@@ -92,34 +85,6 @@ final class UserDeletionService
                 'money_account',
             ],
             $companyIds,
-        );
-
-        $quotedOrdersTable = $platform->quoteIdentifier('ozon_orders');
-
-        $this->connection->executeStatement(
-            sprintf(
-                'DELETE FROM %s WHERE order_id IN (SELECT id FROM %s WHERE company_id IN (:company_ids))',
-                $platform->quoteIdentifier('ozon_order_status_history'),
-                $quotedOrdersTable,
-            ),
-            ['company_ids' => $companyIds],
-            ['company_ids' => ArrayParameterType::STRING],
-        );
-
-        $this->connection->executeStatement(
-            sprintf(
-                'DELETE FROM %s WHERE order_id IN (SELECT id FROM %s WHERE company_id IN (:company_ids))',
-                $platform->quoteIdentifier('ozon_order_items'),
-                $quotedOrdersTable,
-            ),
-            ['company_ids' => $companyIds],
-            ['company_ids' => ArrayParameterType::STRING],
-        );
-
-        $this->connection->executeStatement(
-            sprintf('DELETE FROM %s WHERE company_id IN (:company_ids)', $quotedOrdersTable),
-            ['company_ids' => $companyIds],
-            ['company_ids' => ArrayParameterType::STRING],
         );
     }
 
