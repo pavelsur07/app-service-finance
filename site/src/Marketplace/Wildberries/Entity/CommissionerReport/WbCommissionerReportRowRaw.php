@@ -25,7 +25,7 @@ class WbCommissionerReportRowRaw
     #[ORM\JoinColumn(name: 'company_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private Company $company;
 
-    #[ORM\ManyToOne(targetEntity: WildberriesCommissionerXlsxReport::class)]
+    #[ORM\ManyToOne(targetEntity: WildberriesCommissionerXlsxReport::class, cascade: ['persist'])]
     #[ORM\JoinColumn(name: 'report_id', referencedColumnName: 'id', nullable: false, onDelete: 'CASCADE')]
     private WildberriesCommissionerXlsxReport $report;
 
