@@ -6,7 +6,7 @@ namespace App\Loan\Controller;
 
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;

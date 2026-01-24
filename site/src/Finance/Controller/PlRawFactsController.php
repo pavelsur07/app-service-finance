@@ -9,7 +9,7 @@ use App\Enum\PLCategoryType;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Entity\WildberriesImportLog;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

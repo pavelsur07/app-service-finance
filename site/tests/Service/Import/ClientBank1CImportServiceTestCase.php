@@ -12,7 +12,7 @@ use App\Entity\Counterparty;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Repository\CounterpartyRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;

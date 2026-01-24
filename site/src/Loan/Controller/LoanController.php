@@ -13,7 +13,7 @@ use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Loan\Service\LoanScheduleToDocumentService;
 use App\Repository\PLCategoryRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

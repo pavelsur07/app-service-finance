@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Wildberries\Controller;
 
 use App\Marketplace\Wildberries\Service\WildberriesRnpReportService;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;

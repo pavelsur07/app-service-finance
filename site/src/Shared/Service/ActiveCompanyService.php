@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Sahred\Service;
+namespace App\Shared\Service;
 
 use App\Entity\Company;
 use App\Repository\CompanyRepository;

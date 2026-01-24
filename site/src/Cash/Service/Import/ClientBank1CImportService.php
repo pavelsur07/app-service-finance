@@ -12,7 +12,7 @@ use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\CounterpartyType;
 use App\Repository\CounterpartyRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;

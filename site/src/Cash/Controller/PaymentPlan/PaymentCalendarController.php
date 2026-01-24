@@ -18,7 +18,7 @@ use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

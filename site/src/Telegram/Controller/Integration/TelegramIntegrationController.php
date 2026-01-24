@@ -2,7 +2,7 @@
 
 namespace App\Telegram\Controller\Integration;
 
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use App\Telegram\Entity\BotLink;
 use App\Telegram\Repository\TelegramBotRepository;
 use Doctrine\ORM\EntityManagerInterface;

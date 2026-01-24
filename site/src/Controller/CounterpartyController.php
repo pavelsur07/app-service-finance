@@ -6,7 +6,7 @@ use App\Entity\Counterparty;
 use App\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Form\CounterpartyType;
 use App\Repository\CounterpartyRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

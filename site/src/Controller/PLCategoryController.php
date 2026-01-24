@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\PLCategory;
 use App\Form\PLCategoryFormType;
 use App\Repository\PLCategoryRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

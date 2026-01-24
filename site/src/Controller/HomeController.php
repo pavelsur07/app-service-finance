@@ -8,7 +8,7 @@ use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;

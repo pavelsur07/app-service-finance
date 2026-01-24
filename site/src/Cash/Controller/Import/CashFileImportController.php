@@ -12,7 +12,7 @@ use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
 use App\Cash\Service\Import\ImportLogger;
 use App\Entity\User;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

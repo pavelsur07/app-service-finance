@@ -13,7 +13,7 @@ use App\Marketplace\Wildberries\Service\WildberriesReportDetailMappingResolver;
 use App\Marketplace\Wildberries\Service\WildberriesReportDetailSourceFieldProvider;
 use App\Marketplace\Wildberries\Service\WildberriesWeeklyPnlGenerator;
 use App\Repository\PLCategoryRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -9,7 +9,7 @@ use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Entity\Company;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

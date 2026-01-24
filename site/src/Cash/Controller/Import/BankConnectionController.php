@@ -6,7 +6,7 @@ use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Form\Bank\BankConnectionType;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

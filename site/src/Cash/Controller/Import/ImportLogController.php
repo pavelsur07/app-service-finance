@@ -3,7 +3,7 @@
 namespace App\Cash\Controller\Import;
 
 use App\Cash\Repository\Import\ImportLogRepository;
-use App\Sahred\Service\ActiveCompanyService;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
