@@ -30,6 +30,8 @@ final class WbCommissionerReportRawIngestor
         string $filePath,
     ): WbCommissionerReportRawIngestResult {
         $this->rowRawRepository->deleteByReport($company, $report);
+        $companyRef = $this->em->getReference(Company::class, (string) $company->getId());
+        $reportRef = $this->em->getReference(WildberriesCommissionerXlsxReport::class, (string) $report->getId());
 
         $reader = $this->tabularReader->openReader($filePath);
 
@@ -75,8 +77,8 @@ final class WbCommissionerReportRawIngestor
 
                     $rowRaw = new WbCommissionerReportRowRaw(
                         Uuid::uuid4()->toString(),
-                        $company,
-                        $report,
+                        $companyRef,
+                        $reportRef,
                         $rowIndex,
                         $dataJson
                     );

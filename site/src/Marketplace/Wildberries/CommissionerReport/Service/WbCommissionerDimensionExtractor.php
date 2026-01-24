@@ -35,6 +35,9 @@ final class WbCommissionerDimensionExtractor
         Company $company,
         WildberriesCommissionerXlsxReport $report,
     ): WbCommissionerDimensionExtractResult {
+        $companyRef = $this->em->getReference(Company::class, (string) $company->getId());
+        $reportRef = $this->em->getReference(WildberriesCommissionerXlsxReport::class, (string) $report->getId());
+
         $this->dimensionValueRepository->deleteByReport($company, $report);
 
         $query = $this->rowRawRepository->createQueryBuilder('row')
@@ -78,8 +81,8 @@ final class WbCommissionerDimensionExtractor
         foreach ($dimensions as $item) {
             $dimension = new WbDimensionValue(
                 Uuid::uuid4()->toString(),
-                $company,
-                $report,
+                $companyRef,
+                $reportRef,
                 $item['dimensionKey'],
                 $item['value'],
                 $item['normalizedValue']
