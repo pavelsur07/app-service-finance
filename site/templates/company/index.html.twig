@@ -35,25 +35,13 @@
                                 <a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a>
                             </td>
                             <td>
-                                {% if company.wildberriesApiKey %}
-                                    <span class="badge bg-green-lt">Есть</span>
-                                {% else %}
-                                    <span class="badge bg-red-lt">Нет</span>
-                                {% endif %}
+                                <span class="badge bg-red-lt">Нет</span>
                             </td>
                             <td>
-                                {% if company.ozonSellerId %}
-                                    <span class="badge bg-green-lt">Есть</span>
-                                {% else %}
-                                    <span class="badge bg-red-lt">Нет</span>
-                                {% endif %}
+                                <span class="badge bg-red-lt">Нет</span>
                             </td>
                             <td>
-                                {% if company.ozonApiKey %}
-                                    <span class="badge bg-green-lt">Есть</span>
-                                {% else %}
-                                    <span class="badge bg-red-lt">Нет</span>
-                                {% endif %}
+                                <span class="badge bg-red-lt">Нет</span>
                             </td>
                             <td>
                                 <a href="{{ path('company_edit', {'id': company.id}) }}" class="btn btn-sm btn-warning">✏️</a>
