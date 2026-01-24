@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Enum;
+namespace App\Company\Enum;
 
 enum CounterpartyType: string
 {

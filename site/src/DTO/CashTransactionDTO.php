@@ -3,7 +3,7 @@
 namespace App\DTO;
 
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Enum\CounterpartyType;
+use App\Company\Enum\CounterpartyType;
 use Symfony\Component\Validator\Constraints as Assert;
 
 class CashTransactionDTO

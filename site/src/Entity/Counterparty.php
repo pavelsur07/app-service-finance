@@ -2,7 +2,7 @@
 
 namespace App\Entity;
 
-use App\Enum\CounterpartyType;
+use App\Company\Enum\CounterpartyType;
 use App\Repository\CounterpartyRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;

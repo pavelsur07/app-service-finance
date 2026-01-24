@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Tests\Entity;
 
+use App\Company\Enum\CounterpartyType;
 use App\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\User;
-use App\Enum\CounterpartyType;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 
