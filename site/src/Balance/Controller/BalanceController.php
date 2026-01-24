@@ -3,7 +3,7 @@
 namespace App\Balance\Controller;
 
 use App\Balance\Service\BalanceBuilder;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

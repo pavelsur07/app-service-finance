@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Entity\ProjectDirection;
 use App\Form\ProjectDirectionType;
 use App\Repository\ProjectDirectionRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

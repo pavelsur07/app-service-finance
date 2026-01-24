@@ -5,7 +5,7 @@ namespace App\Controller;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\DTO\NotificationContext;
 use App\Notification\Service\NotificationRouter;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;

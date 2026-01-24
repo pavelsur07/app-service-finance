@@ -14,7 +14,7 @@ use App\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Repository\ProjectDirectionRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use App\Service\PlNatureResolver;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;

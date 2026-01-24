@@ -9,7 +9,7 @@ use App\Cash\Form\Accounts\MoneyFundType;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Entity\User;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use App\Service\FeatureFlagService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

@@ -7,7 +7,7 @@ use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Enum\MoneyAccountType;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

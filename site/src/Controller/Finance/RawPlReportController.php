@@ -9,7 +9,7 @@ use App\Entity\PLDailyTotal;
 use App\Enum\PlNature;
 use App\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use App\Service\PlNatureResolver;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

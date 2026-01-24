@@ -4,7 +4,7 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

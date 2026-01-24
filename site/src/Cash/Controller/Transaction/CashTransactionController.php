@@ -14,7 +14,7 @@ use App\DTO\CashTransactionDTO;
 use App\Entity\Document;
 use App\Enum\DocumentType;
 use App\Repository\CounterpartyRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;

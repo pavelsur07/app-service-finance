@@ -8,7 +8,7 @@ use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Repository\ProjectDirectionRepository;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use App\Service\Onboarding\AccountBootstrapper;
 use App\Service\PLRegisterUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

@@ -5,7 +5,7 @@ namespace App\Controller\Finance;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Report\Cashflow\CashflowReportRequestMapper;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;

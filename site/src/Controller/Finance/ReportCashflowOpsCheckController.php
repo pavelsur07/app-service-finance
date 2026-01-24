@@ -6,7 +6,7 @@ namespace App\Controller\Finance;
 
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Entity\Company;
-use App\Service\ActiveCompanyService;
+use App\Sahred\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
