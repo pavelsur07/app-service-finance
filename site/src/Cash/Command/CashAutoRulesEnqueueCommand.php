@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Command;
+namespace App\Cash\Command;
 
 use App\Message\EnqueueAutoRulesForRange;
 use Ramsey\Uuid\Uuid;

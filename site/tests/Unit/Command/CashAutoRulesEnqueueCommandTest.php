@@ -2,7 +2,7 @@
 
 namespace App\Tests\Unit\Command;
 
-use App\Command\CashAutoRulesEnqueueCommand;
+use App\Cash\Command\CashAutoRulesEnqueueCommand;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
