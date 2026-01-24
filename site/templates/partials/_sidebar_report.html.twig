@@ -1,0 +1,90 @@
+{#
+    {% set report_account_balances_active = current_route == 'report_account_balances_index' %}
+    {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
+    {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
+    {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
+    {% set wb_rnp_active = current_route starts with 'wb_reports_rnp' %}
+    {% set wb_commissioner_reports_active = current_route starts with 'wb_commissioner_reports_' %}
+    {% set balance_report_active = current_route == 'balance_index' %}
+    {% set reports_menu_open = report_cashflow_active or finance_report_preview_active or wb_report_detail_active or wb_commissioner_reports_active or balance_report_active or report_account_balances_active %}
+    <li class="nav-item {{ reports_menu_open ? 'active' : '' }}">
+        <a class="nav-link {{ reports_menu_open ? 'active' : '' }}" data-bs-toggle="collapse" data-bs-target="#menu-report" href="#" role="button" aria-expanded="{{ reports_menu_open ? 'true' : 'false' }}" aria-controls="menu-handbooks" title="Справочники">
+            <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
+            <span class="nav-link-title hide-when-collapsed">Отчёты</span>
+            <span class="ms-auto hide-when-collapsed"><i class="ti ti-chevron-down"></i></span>
+        </a>
+        <div class="collapse {{ reports_menu_open ? 'show' : '' }}" id="menu-report" data-bs-parent="#sidebar-menu">
+            <ul class="nav nav-pills nav-sub">
+                {% set report_cashflow_active = current_route == 'report_cashflow_index' %}
+                <li class="nav-item {{ report_cashflow_active ? 'active' : '' }}">
+                    <a class="nav-link {{ report_cashflow_active ? 'active' : '' }}" href="{{ path('report_cashflow_index') }}" title="Категории ДДС">
+                        <span class="nav-link-icon"><i class="ti ti-arrows-left-right"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Движение денег</span>
+                    </a>
+                </li>
+                {% set finance_report_preview_active = current_route == 'finance_report_preview' %}
+                <li class="nav-item {{ finance_report_preview_active ? 'active' : '' }}">
+                    <a class="nav-link {{ finance_report_preview_active ? 'active' : '' }}" href="{{ path('finance_report_preview') }}" title="Категории ОПиУ">
+                        <span class="nav-link-icon"><i class="ti ti-report-money"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Прибыль и убытки</span>
+                    </a>
+                </li>
+                <li class="nav-item {{ balance_report_active ? 'active' : '' }}">
+                    <a class="nav-link {{ balance_report_active ? 'active' : '' }}" href="{{ path('balance_index') }}" title="Баланс">
+                        <span class="nav-link-icon"><i class="ti ti-scale"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Баланс</span>
+                    </a>
+                </li>
+                <li class="nav-item {{ wb_rnp_active ? 'active' : '' }}">
+                    <a class="nav-link {{ wb_rnp_active ? 'active' : '' }}"
+                       href="{{ path('wb_reports_rnp', {'period':'month'}) }}"
+                       title="РНП — Рука на пульсе (Wildberries)">
+                        <span class="nav-link-icon"><i class="ti ti-activity"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">РНП (Wildberries)</span>
+                    </a>
+                </li>
+                <li class="nav-item {{ wb_commissioner_reports_active ? 'active' : '' }}">
+                    <a class="nav-link {{ wb_commissioner_reports_active ? 'active' : '' }}"
+                       href="{{ path('wb_commissioner_reports_index') }}"
+                       title="WB: Отчёт комиссионера (XLSX)">
+                        <span class="nav-link-icon"><i class="ti ti-file-spreadsheet"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">WB: Отчёт комиссионера (XLSX)</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="{{ path('report_cashflow_ops_check_index') }}" class="nav-link">
+                        <span class="nav-link-icon"><i class="ti ti-report-search"></i></span>
+                        <span class="nav-link-title">Проверка операций ДДС</span>
+                    </a>
+                </li>
+                <li class="nav-item {{ report_account_balances_active ? 'active' : '' }}">
+                    <a class="nav-link {{ report_account_balances_active ? 'active' : '' }}" href="{{ path('report_account_balances_index') }}" title="Остатки и счета">
+                        <span class="nav-link-icon"><i class="ti ti-wallet"></i></span>
+                        <span class="nav-link-title hide-when-collapsed">Остатки и счета</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </li>#}
+
+<!-- Справочники -->
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#navbar-base" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="false">
+        <span class="nav-link-icon"><i class="ti ti-chart-pie"></i></span>
+        <span class="nav-link-title"> Отчёты </span>
+    </a>
+    <div class="dropdown-menu">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+                <a class="dropdown-item" href="{{ path('report_cashflow_index') }}">Движение денег</a>
+                <a class="dropdown-item" href="{{ path('finance_report_preview') }}">Прибыль и убытки</a>
+                <a class="dropdown-item" href="{{ path('balance_index') }}">Баланс</a>
+                <a class="dropdown-item" href="{{ path('wb_commissioner_reports_index') }}">WB: Отчёт комиссионера</a>
+                <a class="dropdown-item" href="{{ path('report_cashflow_ops_check_index') }}">Проверка операций ДДС</a>
+            </div>
+        </div>
+    </div>
+</li>
+<!-- Справочники -->
+
+
