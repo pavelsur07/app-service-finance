@@ -3,11 +3,6 @@
 namespace App\Entity;
 
 use App\Enum\CompanyTaxSystem;
-use App\Marketplace\Ozon\Entity\OzonProduct;
-use App\Marketplace\Wildberries\Entity\WildberriesSale;
-use Doctrine\Common\Collections\ArrayCollection;
-use Doctrine\Common\Collections\Collection;
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -25,15 +20,6 @@ class Company
     #[ORM\Column(length: 12, nullable: true)]
     private ?string $inn = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $wildberriesApiKey = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $ozonSellerId = null;
-
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $ozonApiKey = null;
-
     #[ORM\ManyToOne(inversedBy: 'companies')]
     #[ORM\JoinColumn(nullable: false)]
     private User $user;
@@ -44,19 +30,11 @@ class Company
     #[ORM\Column(enumType: CompanyTaxSystem::class, nullable: true)]
     private ?CompanyTaxSystem $taxSystem = null;
 
-    #[ORM\OneToMany(targetEntity: OzonProduct::class, mappedBy: 'company', orphanRemoval: true)]
-    private Collection $ozonProducts;
-
-    #[ORM\OneToMany(targetEntity: WildberriesSale::class, mappedBy: 'company', orphanRemoval: true)]
-    private Collection $wildberriesSales;
-
     public function __construct(string $id, User $user)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->user = $user;
-        $this->ozonProducts = new ArrayCollection();
-        $this->wildberriesSales = new ArrayCollection();
     }
 
     public function getId(): ?string
@@ -88,42 +66,6 @@ class Company
         return $this;
     }
 
-    public function getWildberriesApiKey(): ?string
-    {
-        return $this->wildberriesApiKey;
-    }
-
-    public function setWildberriesApiKey(?string $wildberriesApiKey): self
-    {
-        $this->wildberriesApiKey = $wildberriesApiKey;
-
-        return $this;
-    }
-
-    public function getOzonSellerId(): ?string
-    {
-        return $this->ozonSellerId;
-    }
-
-    public function setOzonSellerId(?string $ozonSellerId): self
-    {
-        $this->ozonSellerId = $ozonSellerId;
-
-        return $this;
-    }
-
-    public function getOzonApiKey(): ?string
-    {
-        return $this->ozonApiKey;
-    }
-
-    public function setOzonApiKey(?string $ozonApiKey): self
-    {
-        $this->ozonApiKey = $ozonApiKey;
-
-        return $this;
-    }
-
     public function getUser(): ?User
     {
         return $this->user;
@@ -134,16 +76,6 @@ class Company
         $this->user = $user;
 
         return $this;
-    }
-
-    public function getOzonProducts(): Collection
-    {
-        return $this->ozonProducts;
-    }
-
-    public function getWildberriesSales(): Collection
-    {
-        return $this->wildberriesSales;
     }
 
     public function getFinanceLockBefore(): ?\DateTimeImmutable
