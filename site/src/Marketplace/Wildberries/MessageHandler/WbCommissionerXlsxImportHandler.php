@@ -17,6 +17,7 @@ use App\Marketplace\Wildberries\Repository\WildberriesCommissionerXlsxReportRepo
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxFormatValidator;
 use App\Shared\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -35,6 +36,7 @@ final class WbCommissionerXlsxImportHandler
         private readonly WbAggregationResultRepository $aggregationResultRepository,
         private readonly StorageService $storageService,
         private readonly EntityManagerInterface $em,
+        private readonly ManagerRegistry $registry,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -218,10 +220,18 @@ final class WbCommissionerXlsxImportHandler
                 'error' => $exception->getMessage(),
             ]);
         } finally {
-            if ($log instanceof WildberriesImportLog) {
-                $this->em->persist($log);
+            $em = $this->em;
+            if (!$em->isOpen()) {
+                $this->logger->warning('WB commissioner report import: entity manager closed, resetting for log flush', [
+                    'report_id' => $report instanceof WildberriesCommissionerXlsxReport ? $report->getId() : $message->getReportId(),
+                    'company_id' => $company ? (string) $company->getId() : $message->getCompanyId(),
+                ]);
+                $em = $this->registry->resetManager();
             }
-            $this->em->flush();
+            if ($log instanceof WildberriesImportLog) {
+                $em->persist($log);
+            }
+            $em->flush();
         }
     }
 }
