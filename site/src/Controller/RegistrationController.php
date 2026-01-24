@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
+use App\Company\Form\RegistrationFormType;
 use App\Entity\Company;
 use App\Entity\User;
-use App\Form\RegistrationFormType;
 use App\Message\SendRegistrationEmailMessage;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;

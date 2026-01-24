@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Company\Form;
 
 use App\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;

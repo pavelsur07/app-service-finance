@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Form;
+namespace App\Company\Form;
 
 use App\Entity\Counterparty;
 use App\Enum\CounterpartyType as CounterpartyTypeEnum;
