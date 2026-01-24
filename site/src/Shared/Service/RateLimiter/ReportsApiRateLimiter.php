@@ -1,10 +1,10 @@
 <?php
 
-namespace App\Sahred\Service\RateLimiter;
+namespace App\Shared\Service\RateLimiter;
 
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 
-final class RegistrationRateLimiter
+final class ReportsApiRateLimiter
 {
     public function __construct(private readonly ?object $factory = null)
     {

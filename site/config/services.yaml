@@ -40,11 +40,11 @@ services:
             - '@session.redis'
             - { prefix: 'sess_', ttl: 1209600 } # 14 дней
 
-    App\Sahred\Service\RateLimiter\ReportsApiRateLimiter:
+    App\Shared\Service\RateLimiter\ReportsApiRateLimiter:
         arguments:
             $factory: '@?limiter.reports_api'
 
-    App\Sahred\Service\RateLimiter\RegistrationRateLimiter:
+    App\Shared\Service\RateLimiter\RegistrationRateLimiter:
         arguments:
             $factory: '@?limiter.registration'
 
