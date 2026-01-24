@@ -24,18 +24,6 @@ class CompanyType extends AbstractType
                 'label' => 'ИНН',
                 'required' => false,
             ])
-            ->add('wildberriesApiKey', TextType::class, [
-                'label' => 'Wildberries API ключ',
-                'required' => false,
-            ])
-            ->add('ozonSellerId', TextType::class, [
-                'label' => 'Ozon Seller ID',
-                'required' => false,
-            ])
-            ->add('ozonApiKey', TextType::class, [
-                'label' => 'Ozon API ключ',
-                'required' => false,
-            ])
             ->add('taxSystem', ChoiceType::class, [
                 'label' => 'Налоговый режим (НДС)',
                 'choices' => CompanyTaxSystem::cases(),

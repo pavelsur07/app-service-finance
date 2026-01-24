@@ -15,7 +15,7 @@ class WildberriesSale
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
 
-    #[ORM\ManyToOne(targetEntity: Company::class, inversedBy: 'wildberriesSales')]
+    #[ORM\ManyToOne(targetEntity: Company::class)]
     #[ORM\JoinColumn(name: 'company_id', nullable: false, onDelete: 'CASCADE')]
     private Company $company;
 
