@@ -41,69 +41,78 @@ final class WbCommissionerXlsxImportHandler
 
     public function __invoke(WbCommissionerXlsxImportMessage $message): void
     {
-        $report = $this->reports->find($message->getReportId());
-        if (!$report instanceof WildberriesCommissionerXlsxReport) {
-            $this->logger->warning('WB commissioner report import: report not found', [
-                'report_id' => $message->getReportId(),
-                'company_id' => $message->getCompanyId(),
-            ]);
-
-            return;
-        }
-
-        if ((string) $report->getCompany()->getId() !== $message->getCompanyId()) {
-            $this->logger->warning('WB commissioner report import: company mismatch', [
-                'report_id' => $message->getReportId(),
-                'company_id' => $message->getCompanyId(),
-            ]);
-
-            return;
-        }
-
-        $report->setStatus('processing');
-        $this->em->flush();
-
-        $absolutePath = $this->storageService->getAbsolutePath($report->getStoragePath());
-        $validation = $this->formatValidator->validate($absolutePath);
-
-        $report->setHeadersHash($validation->headersHash);
-        $report->setFormatStatus($validation->status);
-        $report->setWarningsJson([] !== $validation->warnings ? $validation->warnings : null);
-        $report->setErrorsJson([] !== $validation->errors ? $validation->errors : null);
-        $report->setWarningsCount(\count($validation->warnings));
-        $report->setErrorsCount(\count($validation->errors));
-
-        $startedAt = new \DateTimeImmutable('now');
-        $log = new WildberriesImportLog(Uuid::uuid4()->toString(), $report->getCompany(), $startedAt);
-        $log->setSource('wb_commissioner_xlsx');
-        $log->setFileName($report->getOriginalFilename());
-
-        if (WbCommissionerXlsxFormatValidator::STATUS_FAILED === $validation->status) {
-            $report->setStatus('failed');
-            $log->setErrorsCount(\count($validation->errors));
-            $log->setFinishedAt(new \DateTimeImmutable('now'));
-            $log->setMeta([
-                'reportId' => $report->getId(),
-                'headersHash' => $validation->headersHash,
-                'rowsTotal' => 0,
-                'rowsParsed' => 0,
-                'errorsCount' => \count($validation->errors),
-                'warningsCount' => \count($validation->warnings),
-            ]);
-
-            $this->em->persist($log);
-            $this->em->flush();
-
-            return;
-        }
-
-        $company = $report->getCompany();
+        $report = null;
+        $log = null;
+        $company = null;
+        $validation = null;
         $rowsTotal = 0;
         $rowsParsed = 0;
         $errorsCount = 0;
         $warningsCount = 0;
 
         try {
+            $report = $this->reports->find($message->getReportId());
+            if (!$report instanceof WildberriesCommissionerXlsxReport) {
+                $this->logger->warning('WB commissioner report import: report not found', [
+                    'report_id' => $message->getReportId(),
+                    'company_id' => $message->getCompanyId(),
+                ]);
+
+                return;
+            }
+
+            if ((string) $report->getCompany()->getId() !== $message->getCompanyId()) {
+                $this->logger->warning('WB commissioner report import: company mismatch', [
+                    'report_id' => $message->getReportId(),
+                    'company_id' => $message->getCompanyId(),
+                ]);
+
+                return;
+            }
+
+            $company = $report->getCompany();
+            $startedAt = new \DateTimeImmutable('now');
+            $log = new WildberriesImportLog(Uuid::uuid4()->toString(), $company, $startedAt);
+            $log->setSource('wb_commissioner_xlsx');
+            $log->setFileName($report->getOriginalFilename());
+
+            $report->setStatus('processing');
+            $this->em->flush();
+
+            $absolutePath = $this->storageService->getAbsolutePath($report->getStoragePath());
+            $validation = $this->formatValidator->validate($absolutePath);
+
+            $report->setHeadersHash($validation->headersHash);
+            $report->setFormatStatus($validation->status);
+            $report->setWarningsJson([] !== $validation->warnings ? $validation->warnings : null);
+            $report->setErrorsJson([] !== $validation->errors ? $validation->errors : null);
+            $report->setWarningsCount(\count($validation->warnings));
+            $report->setErrorsCount(\count($validation->errors));
+
+            if (WbCommissionerXlsxFormatValidator::STATUS_FAILED === $validation->status) {
+                $report->setStatus('failed');
+                $report->setProcessedAt(new \DateTimeImmutable('now'));
+                $report->setRowsTotal(0);
+                $report->setRowsParsed(0);
+
+                $log->setErrorsCount(\count($validation->errors));
+                $log->setFinishedAt(new \DateTimeImmutable('now'));
+                $log->setMeta([
+                    'reportId' => $report->getId(),
+                    'headersHash' => $validation->headersHash,
+                    'rowsTotal' => 0,
+                    'rowsParsed' => 0,
+                    'errorsCount' => \count($validation->errors),
+                    'warningsCount' => \count($validation->warnings),
+                    'status' => 'failed',
+                ]);
+
+                $this->em->persist($log);
+                $this->em->flush();
+
+                return;
+            }
+
             $this->rowRawRepository->deleteByReport($company, $report);
             $this->dimensionValueRepository->deleteByReport($company, $report);
             $this->aggregationResultRepository->deleteByReport($company, $report);
@@ -125,45 +134,94 @@ final class WbCommissionerXlsxImportHandler
                         : ['message' => 'WB commissioner aggregation failed']
                 );
                 $report->setStatus('failed');
-                throw new \RuntimeException('WB commissioner aggregation failed');
+                $errorsCount = max(1, $errorsCount);
+            } else {
+                $report->setAggregationStatus('calculated');
+                $report->setAggregationErrorsJson(null);
+                $report->setStatus('processed');
             }
 
-            $report->setAggregationStatus('calculated');
-            $report->setAggregationErrorsJson(null);
-            $report->setStatus('processed');
+            $report->setProcessedAt(new \DateTimeImmutable('now'));
+            $report->setRowsTotal($rowsTotal);
+            $report->setRowsParsed($rowsParsed);
+            $report->setErrorsCount($errorsCount);
+            $report->setWarningsCount($warningsCount);
+
+            $log->setErrorsCount($errorsCount);
+            $log->setFinishedAt(new \DateTimeImmutable('now'));
+            $log->setMeta([
+                'reportId' => $report->getId(),
+                'headersHash' => $validation->headersHash,
+                'rowsTotal' => $rowsTotal,
+                'rowsParsed' => $rowsParsed,
+                'errorsCount' => $errorsCount,
+                'warningsCount' => $warningsCount,
+                'status' => $report->getStatus(),
+            ]);
         } catch (\Throwable $exception) {
+            if ($report instanceof WildberriesCommissionerXlsxReport) {
+                $report->setStatus('failed');
+                $report->setProcessedAt(new \DateTimeImmutable('now'));
+                $report->setErrorsCount(max(1, $errorsCount));
+                $report->setWarningsCount($warningsCount);
+                $report->setRowsTotal($rowsTotal);
+                $report->setRowsParsed($rowsParsed);
+                $report->setAggregationStatus('failed');
+
+                $errorDetails = [
+                    'message' => $exception->getMessage(),
+                    'class' => $exception::class,
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ];
+                $existingErrors = $report->getErrorsJson();
+                if (!\is_array($existingErrors)) {
+                    $existingErrors = [];
+                }
+                $existingErrors['exception'] = $errorDetails;
+                $report->setErrorsJson($existingErrors);
+
+                $aggregationErrors = $report->getAggregationErrorsJson();
+                if (!\is_array($aggregationErrors)) {
+                    $aggregationErrors = [];
+                }
+                $aggregationErrors[] = sprintf('Unhandled exception: %s', $exception->getMessage());
+                $report->setAggregationErrorsJson($aggregationErrors);
+            }
+
+            if ($log instanceof WildberriesImportLog) {
+                $log->setErrorsCount(max(1, $errorsCount));
+                $log->setFinishedAt(new \DateTimeImmutable('now'));
+                $logMeta = $log->getMeta();
+                if (!\is_array($logMeta)) {
+                    $logMeta = [];
+                }
+                $logMeta['status'] = 'failed';
+                $logMeta['exception'] = [
+                    'message' => $exception->getMessage(),
+                    'class' => $exception::class,
+                    'file' => $exception->getFile(),
+                    'line' => $exception->getLine(),
+                ];
+                if ($report instanceof WildberriesCommissionerXlsxReport) {
+                    $logMeta['reportId'] = $report->getId();
+                }
+                if ($validation) {
+                    $logMeta['headersHash'] = $validation->headersHash;
+                }
+                $log->setMeta($logMeta);
+            }
+
             $this->logger->error('WB commissioner report import: pipeline failed', [
-                'report_id' => $report->getId(),
-                'company_id' => (string) $company->getId(),
+                'report_id' => $report instanceof WildberriesCommissionerXlsxReport ? $report->getId() : $message->getReportId(),
+                'company_id' => $company ? (string) $company->getId() : $message->getCompanyId(),
                 'error' => $exception->getMessage(),
             ]);
-
-            $report->setAggregationStatus('failed');
-            if (null === $report->getAggregationErrorsJson()) {
-                $report->setAggregationErrorsJson(['message' => $exception->getMessage()]);
+        } finally {
+            if ($log instanceof WildberriesImportLog) {
+                $this->em->persist($log);
             }
-            $report->setStatus('failed');
-            $errorsCount = max(1, $errorsCount);
+            $this->em->flush();
         }
-
-        $report->setProcessedAt(new \DateTimeImmutable('now'));
-        $report->setRowsTotal($rowsTotal);
-        $report->setRowsParsed($rowsParsed);
-        $report->setErrorsCount($errorsCount);
-        $report->setWarningsCount($warningsCount);
-
-        $log->setErrorsCount($errorsCount);
-        $log->setFinishedAt(new \DateTimeImmutable('now'));
-        $log->setMeta([
-            'reportId' => $report->getId(),
-            'headersHash' => $validation->headersHash,
-            'rowsTotal' => $rowsTotal,
-            'rowsParsed' => $rowsParsed,
-            'errorsCount' => $errorsCount,
-            'warningsCount' => $warningsCount,
-        ]);
-
-        $this->em->persist($log);
-        $this->em->flush();
     }
 }
