@@ -62,6 +62,9 @@ final class WbCommissionerAggregationCalculator
         Company $company,
         WildberriesCommissionerXlsxReport $report,
     ): WbCommissionerAggregationResult {
+        $companyRef = $this->em->getReference(Company::class, (string) $company->getId());
+        $reportRef = $this->em->getReference(WildberriesCommissionerXlsxReport::class, (string) $report->getId());
+
         $this->aggregationResultRepository->deleteByReport($company, $report);
 
         $errors = [];
@@ -204,8 +207,8 @@ final class WbCommissionerAggregationCalculator
         foreach ($aggregated as $item) {
             $result = new WbAggregationResult(
                 Uuid::uuid4()->toString(),
-                $company,
-                $report,
+                $companyRef,
+                $reportRef,
                 $this->formatAmountFromMinor($item['amountMinor']),
                 $item['status'],
                 $item['costType'],
