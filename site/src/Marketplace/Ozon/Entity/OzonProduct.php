@@ -31,7 +31,7 @@ class OzonProduct
     #[ORM\Column(type: 'boolean')]
     private bool $archived = false;
 
-    #[ORM\ManyToOne(targetEntity: Company::class, inversedBy: 'ozonProducts')]
+    #[ORM\ManyToOne(targetEntity: Company::class)]
     #[ORM\JoinColumn(nullable: false)]
     private Company $company;
 
