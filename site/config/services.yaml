@@ -56,16 +56,6 @@ services:
         arguments:
             $storageRoot: '%app.storage_root%'
 
-    # Логгер для HTTP-клиента Ozon
-    App\Marketplace\Ozon\Adapter\OzonApiClient:
-        arguments:
-            $logger: '@monolog.logger.ozon.http'
-
-    # Логгер для синка заказов
-    App\Marketplace\Ozon\Service\OzonOrderSyncService:
-        arguments:
-            $logger: '@monolog.logger.ozon.sync'
-
     App\Finance\Facts\PLDailyTotalFactsProvider:
         autowire: true
         autoconfigure: true

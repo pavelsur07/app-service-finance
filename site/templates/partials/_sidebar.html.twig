@@ -266,13 +266,6 @@
                 </div>
             </li>#}
 
-            {#{% set ai_suggestions_active = current_route starts with 'app_ai_suggestions_' %}
-            <li class="nav-item {{ ai_suggestions_active ? 'active' : '' }}">
-                <a class="nav-link {{ ai_suggestions_active ? 'active' : '' }}" href="{{ path('app_ai_suggestions_index') }}" title="AI-рекомендации">
-                    <span class="nav-link-icon"><i class="ti ti-sparkles"></i></span>
-                    <span class="nav-link-title hide-when-collapsed">AI-рекомендации</span>
-                </a>
-            </li>#}
 
             {% set integrations_active =
                 current_route starts with 'ozon_'
@@ -301,27 +294,6 @@
                             <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
                                 <span>Банки / Подключения</span>
                             </a>
-                            {% set wildberries_sales_active = current_route starts with 'wildberries_sales' %}
-                            <a class="dropdown-item {{ wildberries_sales_active ? 'active' : '' }}" href="{{ path('wildberries_sales') }}">
-                                <span>Wb / Продажи</span>
-                            </a>
-
-                            {% set wb_report_detail_active = current_route starts with 'wb_report_detail_' %}
-                            <a class="dropdown-item {{ wb_report_detail_active ? 'active' : '' }}" href="{{ path('wb_report_detail_index') }}">
-                                <span>Wb / Операции (фин. отчёт)</span>
-                            </a>
-                            {% set wildberries_import_logs_active = current_route starts with 'wildberries_import_logs_' %}
-                            <a class="dropdown-item {{ wildberries_import_logs_active ? 'active' : '' }}" href="{{ path('wildberries_import_logs_index') }}">
-                                <span>Wb / Журнал импорта отчётов</span>
-                            </a>
-                            {% set ozon_orders_active = current_route starts with 'ozon_order' %}
-                            <a class="dropdown-item {{ ozon_orders_active ? 'active' : '' }}" href="{{ path('ozon_orders') }}">
-                                <span>Ozon / Заказы</span>
-                            </a>
-                        {% set ozon_products_active = current_route starts with 'ozon_products' %}
-                        <a class="dropdown-item {{ ozon_products_active ? 'active' : '' }}" href="{{ path('ozon_products') }}">
-                            <span>Ozon / Товары</span>
-                        </a>
                     </div>
                 </div>
             </li>
@@ -342,10 +314,6 @@
                         {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
                         <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
                             <span>Настройки отчётов (API-ключ)</span>
-                        </a>
-                        {% set company_wb_tools_active = current_route starts with 'company_wb_tools_' %}
-                        <a class="dropdown-item {{ company_wb_tools_active ? 'active' : '' }}" href="{{ path('company_wb_tools_index') }}">
-                            <span>WB: Тех. операции</span>
                         </a>
 
                         {% set reports_debug_active =

@@ -40,18 +40,6 @@ loan_controllers:
         namespace: App\Loan\Controller
     type: attribute
 
-ozon_controllers:
-    resource:
-        path: ../src/Marketplace/Ozon/Controller/
-        namespace: App\Marketplace\Ozon\Controller
-    type: attribute
-
-wildberries_controllers:
-    resource:
-        path: ../src/Marketplace/Wildberries/Controller/
-        namespace: App\Marketplace\Wildberries\Controller
-    type: attribute
-
 telegram_integration_controllers:
     # Импортируем все контроллеры Telegram (вебхук, workspace, admin)
     resource:

@@ -3,8 +3,6 @@ monolog:
         - deprecation # Deprecations are logged in the dedicated "deprecation" channel when it exists
         - import.bank1c
         - recalc
-        - ozon.sync
-        - ozon.http
 
 when@dev:
     monolog:
