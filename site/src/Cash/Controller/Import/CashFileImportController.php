@@ -271,7 +271,7 @@ class CashFileImportController extends AbstractController
         if (
             !$profile
             || $profile->getCompany()->getId() !== $company->getId()
-            || $profile->getType() !== CashFileImportProfile::TYPE_CASH_TRANSACTION
+            || CashFileImportProfile::TYPE_CASH_TRANSACTION !== $profile->getType()
         ) {
             $this->addFlash('error', 'Профиль импорта не найден.');
 

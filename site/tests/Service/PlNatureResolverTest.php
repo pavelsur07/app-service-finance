@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Company\Entity\User;
 use App\Enum\PLFlow;
 use App\Enum\PlNature;
 use App\Service\PlNatureResolver;

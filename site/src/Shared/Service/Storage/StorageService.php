@@ -15,7 +15,7 @@ final class StorageService
     public function ensureDir(string $relativeDir): void
     {
         $relativeDir = trim($relativeDir, '/');
-        $targetDir = $this->storageRoot.($relativeDir !== '' ? '/'.$relativeDir : '');
+        $targetDir = $this->storageRoot.('' !== $relativeDir ? '/'.$relativeDir : '');
 
         if (is_dir($targetDir)) {
             return;

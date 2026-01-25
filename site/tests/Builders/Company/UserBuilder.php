@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Company;
 
 use App\Company\Entity\User;
-use InvalidArgumentException;
 
 final class UserBuilder
 {
@@ -83,7 +82,7 @@ final class UserBuilder
     {
         $unknownRoles = array_diff($roles, self::ALLOWED_ROLES);
         if ([] !== $unknownRoles) {
-            throw new InvalidArgumentException(sprintf('Unsupported roles: %s', implode(', ', $unknownRoles)));
+            throw new \InvalidArgumentException(sprintf('Unsupported roles: %s', implode(', ', $unknownRoles)));
         }
 
         $clone = clone $this;

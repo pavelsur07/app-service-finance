@@ -18,7 +18,7 @@ final class DbReset
         $schemaManager = $connection->createSchemaManager();
         $tableNames = $schemaManager->listTableNames();
 
-        if ($tableNames === []) {
+        if ([] === $tableNames) {
             return;
         }
 

@@ -58,10 +58,10 @@ class ProjectDirectionController extends AbstractController
         }
         $parents = $repo->findTreeByCompany($company);
         $excluded = $repo->collectSelfAndDescendants($direction);
-        $excludedIdsMap = array_flip(array_map(static fn(ProjectDirection $direction) => (string) $direction->getId(), $excluded));
+        $excludedIdsMap = array_flip(array_map(static fn (ProjectDirection $direction) => (string) $direction->getId(), $excluded));
         $parentsFiltered = array_values(array_filter(
             $parents,
-            static fn(ProjectDirection $parent) => !isset($excludedIdsMap[(string) $parent->getId()])
+            static fn (ProjectDirection $parent) => !isset($excludedIdsMap[(string) $parent->getId()])
         ));
         $form = $this->createForm(ProjectDirectionType::class, $direction, [
             'parents' => $parentsFiltered,

@@ -7,12 +7,10 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Company;
+use App\Company\Enum\CounterpartyType;
 use App\Entity\Counterparty;
 use App\Repository\CounterpartyRepository;
-use DateTimeImmutable;
-use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
@@ -117,7 +115,7 @@ final class CashFileImportService
                             continue;
                         }
 
-                        $occurredAtUtc = $occurredAt->setTimezone(new DateTimeZone('UTC'));
+                        $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
                         $amountMinor = (int) str_replace('.', '', $amount);
                         $dedupeHash = $this->makeDedupeHash(
                             $companyId,
@@ -153,7 +151,7 @@ final class CashFileImportService
                             'row' => $rowByHeader,
                             'mapping' => $mapping,
                         ]);
-                        $transaction->setUpdatedAt(new DateTimeImmutable());
+                        $transaction->setUpdatedAt(new \DateTimeImmutable());
 
                         if (is_string($docNumber)) {
                             $trimmedDocNumber = trim($docNumber);
@@ -201,7 +199,7 @@ final class CashFileImportService
             }
 
             if ($created > 0 && null !== $createdMinDate) {
-                $today = new DateTimeImmutable('today');
+                $today = new \DateTimeImmutable('today');
                 $toDate = $createdMaxDate ?? $createdMinDate;
                 if ($createdMinDate <= $today) {
                     $toDate = $today;
@@ -230,7 +228,7 @@ final class CashFileImportService
             }
         }
 
-        $fileExtension = pathinfo($job->getFilename(), PATHINFO_EXTENSION);
+        $fileExtension = pathinfo($job->getFilename(), \PATHINFO_EXTENSION);
         if ('' !== $fileExtension) {
             $extensions[] = strtolower($fileExtension);
         }
@@ -259,7 +257,7 @@ final class CashFileImportService
 
     private function openReaderByExtension(string $filePath): ReaderInterface
     {
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
 
         return match ($extension) {
             'csv' => (function () use ($filePath): CsvReader {
@@ -310,9 +308,9 @@ final class CashFileImportService
     private function makeDedupeHash(
         string $companyId,
         string $moneyAccountId,
-        DateTimeImmutable $occurredAtUtc,
+        \DateTimeImmutable $occurredAtUtc,
         int $amountMinor,
-        string $purposeRaw
+        string $purposeRaw,
     ): string {
         $payload = $companyId
             .'|'.$moneyAccountId
@@ -364,7 +362,7 @@ final class CashFileImportService
 
     private function detectCsvDelimiter(string $filePath): string
     {
-        $handle = fopen($filePath, 'rb');
+        $handle = fopen($filePath, 'r');
         if (false === $handle) {
             return ',';
         }

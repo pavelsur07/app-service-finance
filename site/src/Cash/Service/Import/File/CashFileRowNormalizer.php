@@ -3,7 +3,6 @@
 namespace App\Cash\Service\Import\File;
 
 use App\Cash\Enum\Transaction\CashDirection;
-use DateTimeImmutable;
 
 class CashFileRowNormalizer
 {
@@ -14,7 +13,7 @@ class CashFileRowNormalizer
      * @return array{
      *     ok: bool,
      *     errors: list<string>,
-     *     occurredAt: ?DateTimeImmutable,
+     *     occurredAt: ?\DateTimeImmutable,
      *     direction: ?CashDirection,
      *     amount: ?string,
      *     counterpartyName: ?string,
@@ -148,7 +147,7 @@ class CashFileRowNormalizer
         return null;
     }
 
-    private function parseDate(?string $value): ?DateTimeImmutable
+    private function parseDate(?string $value): ?\DateTimeImmutable
     {
         if (null === $value) {
             return null;
@@ -160,19 +159,19 @@ class CashFileRowNormalizer
         }
 
         foreach (['d.m.Y', 'Y-m-d', 'd/m/Y'] as $format) {
-            $date = DateTimeImmutable::createFromFormat($format, $trimmed);
+            $date = \DateTimeImmutable::createFromFormat($format, $trimmed);
             if (false === $date) {
                 continue;
             }
 
-            $errors = DateTimeImmutable::getLastErrors();
+            $errors = \DateTimeImmutable::getLastErrors();
             if (is_array($errors) && (0 === $errors['warning_count'] && 0 === $errors['error_count'])) {
                 return $date;
             }
         }
 
         try {
-            return new DateTimeImmutable($trimmed);
+            return new \DateTimeImmutable($trimmed);
         } catch (\Exception) {
             return null;
         }

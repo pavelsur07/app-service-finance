@@ -2,7 +2,6 @@
 
 namespace App\Cash\Service\Import\File;
 
-use InvalidArgumentException;
 use OpenSpout\Reader\CSV\Options as CsvOptions;
 use OpenSpout\Reader\CSV\Reader as CsvReader;
 use OpenSpout\Reader\ReaderInterface;
@@ -24,6 +23,7 @@ class FileTabularReader
             foreach ($reader->getSheetIterator() as $sheet) {
                 foreach ($sheet->getRowIterator() as $row) {
                     $cells = $row->toArray();
+
                     return array_map(fn ($value) => $this->normalizeValue($value, true), $cells);
                 }
                 break;
@@ -81,13 +81,13 @@ class FileTabularReader
 
     private function openReaderByExtension(string $filePath): ReaderInterface
     {
-        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        $extension = strtolower(pathinfo($filePath, \PATHINFO_EXTENSION));
 
         return match ($extension) {
             'csv' => $this->openCsvReader($filePath),
             'xlsx' => new XlsxReader(),
             'xls' => new XlsReader(),
-            default => throw new InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
+            default => throw new \InvalidArgumentException(sprintf('Unsupported file extension: %s', $extension)),
         };
     }
 
@@ -101,7 +101,7 @@ class FileTabularReader
 
     private function detectCsvDelimiter(string $filePath): string
     {
-        $handle = fopen($filePath, 'rb');
+        $handle = fopen($filePath, 'r');
         if (false === $handle) {
             return ';';
         }
@@ -114,7 +114,7 @@ class FileTabularReader
                     break;
                 }
                 $line = trim($line);
-                if ($line !== '') {
+                if ('' !== $line) {
                     break;
                 }
             }
@@ -122,7 +122,7 @@ class FileTabularReader
             fclose($handle);
         }
 
-        if ($line === '' || $line === false) {
+        if ('' === $line || false === $line) {
             return ';';
         }
 

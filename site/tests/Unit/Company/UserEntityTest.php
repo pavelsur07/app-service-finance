@@ -7,16 +7,14 @@ namespace App\Tests\Unit\Company;
 use App\Company\Entity\User;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use DateTimeImmutable;
 use Doctrine\Common\Collections\Collection;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class UserEntityTest extends TestCase
 {
     public function testConstructorInvalidUuidThrows(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         new User('not-uuid');
     }
@@ -25,12 +23,12 @@ final class UserEntityTest extends TestCase
     {
         $user = new User(UserBuilder::DEFAULT_USER_ID);
 
-        self::assertInstanceOf(DateTimeImmutable::class, $user->getCreatedAt());
+        self::assertInstanceOf(\DateTimeImmutable::class, $user->getCreatedAt());
     }
 
     public function testConstructorUsesPassedCreatedAt(): void
     {
-        $createdAt = new DateTimeImmutable('2026-01-01 10:00:00');
+        $createdAt = new \DateTimeImmutable('2026-01-01 10:00:00');
 
         $user = new User(UserBuilder::DEFAULT_USER_ID, $createdAt);
 
@@ -41,7 +39,7 @@ final class UserEntityTest extends TestCase
     {
         $user = UserBuilder::aUser()->build();
 
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         $user->setEmail('not-email');
     }
@@ -129,9 +127,9 @@ final class UserEntityTest extends TestCase
 
         $data = $user->__serialize();
 
-        self::assertArrayHasKey("\0" . User::class . "\0password", $data);
-        self::assertSame(hash('crc32c', 'secret_hash'), $data["\0" . User::class . "\0password"]);
-        self::assertNotSame('secret_hash', $data["\0" . User::class . "\0password"]);
+        self::assertArrayHasKey("\0".User::class."\0password", $data);
+        self::assertSame(hash('crc32c', 'secret_hash'), $data["\0".User::class."\0password"]);
+        self::assertNotSame('secret_hash', $data["\0".User::class."\0password"]);
     }
 
     public function testEraseCredentialsDoesNotThrow(): void

@@ -32,7 +32,7 @@ final class CashFileImportHandler
                 throw new \InvalidArgumentException('Cash file import job not found.');
             }
 
-            if ($job->getStatus() !== CashFileImportJob::STATUS_QUEUED) {
+            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
                 $this->entityManager->commit();
 
                 return;

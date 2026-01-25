@@ -5,9 +5,9 @@ namespace App\Cash\Service\Accounts;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Entity\Company;
 use App\DTO\DailyBalancesDTO;
 use App\DTO\MoneyBalanceDTO;
-use App\Company\Entity\Company;
 
 class AccountBalanceService
 {

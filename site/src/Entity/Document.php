@@ -2,8 +2,8 @@
 
 namespace App\Entity;
 
-use App\Company\Entity\Company;
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Company\Entity\Company;
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
 use App\Repository\DocumentRepository;

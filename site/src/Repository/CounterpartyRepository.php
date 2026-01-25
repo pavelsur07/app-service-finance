@@ -2,8 +2,8 @@
 
 namespace App\Repository;
 
-use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Company;
+use App\Company\Enum\CounterpartyType;
 use App\Entity\Counterparty;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;

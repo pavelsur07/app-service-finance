@@ -88,7 +88,7 @@ final class WbCommissionerXlsxImporterNormalizationTest extends KernelTestCase
         $hex = substr($hash, 0, 15);
         $rrdId = (int) base_convert($hex, 16, 10);
 
-        if ($rrdId < 0 || $rrdId > PHP_INT_MAX) {
+        if ($rrdId < 0 || $rrdId > \PHP_INT_MAX) {
             throw new \RuntimeException('Generated rrdId is out of bigint range.');
         }
 

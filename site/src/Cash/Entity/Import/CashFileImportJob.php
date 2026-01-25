@@ -73,7 +73,7 @@ class CashFileImportJob
         string $filename,
         string $fileHash,
         array $mapping,
-        array $options = []
+        array $options = [],
     ) {
         Assert::uuid($id);
 

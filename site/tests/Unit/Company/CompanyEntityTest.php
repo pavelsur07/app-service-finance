@@ -9,9 +9,6 @@ use App\Company\Entity\User;
 use App\Enum\CompanyTaxSystem;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use DateTimeImmutable;
-use Doctrine\Common\Collections\Collection;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class CompanyEntityTest extends TestCase
@@ -23,7 +20,7 @@ final class CompanyEntityTest extends TestCase
         $owner = UserBuilder::aUser()->build();
 
         // Then
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         // When
         new Company($id, $owner);
@@ -84,13 +81,13 @@ final class CompanyEntityTest extends TestCase
     {
         // Given
         $company = CompanyBuilder::aCompany()->build();
-        $date = new DateTimeImmutable('2026-01-25 13:45:10');
+        $date = new \DateTimeImmutable('2026-01-25 13:45:10');
 
         // When
         $company->setFinanceLockBefore($date);
 
         // Then
-        self::assertInstanceOf(DateTimeImmutable::class, $company->getFinanceLockBefore());
+        self::assertInstanceOf(\DateTimeImmutable::class, $company->getFinanceLockBefore());
         self::assertSame('2026-01-25 00:00:00', $company->getFinanceLockBefore()?->format('Y-m-d H:i:s'));
     }
 
@@ -98,13 +95,13 @@ final class CompanyEntityTest extends TestCase
     {
         // Given
         $company = CompanyBuilder::aCompany()->build();
-        $company->setFinanceLockBefore(new DateTimeImmutable('2026-01-25 13:45:10'));
+        $company->setFinanceLockBefore(new \DateTimeImmutable('2026-01-25 13:45:10'));
 
         // When
         $company->setFinanceLockBefore(null);
 
         // Then
-        self::assertSame(null, $company->getFinanceLockBefore());
+        self::assertNull($company->getFinanceLockBefore());
     }
 
     public function testTaxSystemRoundtrip(): void
@@ -122,6 +119,6 @@ final class CompanyEntityTest extends TestCase
         $company->setTaxSystem(null);
 
         // Then
-        self::assertSame(null, $company->getTaxSystem());
+        self::assertNull($company->getTaxSystem());
     }
 }

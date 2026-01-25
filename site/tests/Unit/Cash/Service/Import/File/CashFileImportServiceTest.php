@@ -10,8 +10,6 @@ use App\Cash\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
 use App\Repository\CounterpartyRepository;
-use DateTimeImmutable;
-use DateTimeZone;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
@@ -32,7 +30,7 @@ final class CashFileImportServiceTest extends TestCase
         $method = new \ReflectionMethod(CashFileImportService::class, 'makeDedupeHash');
         $method->setAccessible(true);
 
-        $occurredAt = new DateTimeImmutable('2025-12-01', new DateTimeZone('UTC'));
+        $occurredAt = new \DateTimeImmutable('2025-12-01', new \DateTimeZone('UTC'));
 
         $hashOne = $method->invoke(
             $service,

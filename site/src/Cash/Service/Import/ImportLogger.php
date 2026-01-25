@@ -44,7 +44,7 @@ final class ImportLogger
 
     public function finish(ImportLog $log): void
     {
-        if ($log->getFinishedAt() === null) {
+        if (null === $log->getFinishedAt()) {
             $log->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
         }
         $this->entityManager->persist($log);

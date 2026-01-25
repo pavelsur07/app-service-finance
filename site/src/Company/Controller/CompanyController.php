@@ -3,8 +3,8 @@
 namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
-use App\Company\Form\CompanyType;
 use App\Company\Entity\Company;
+use App\Company\Form\CompanyType;
 use App\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -102,5 +102,4 @@ class CompanyController extends AbstractController
 
         return $this->redirectToRoute('company_index');
     }
-
 }

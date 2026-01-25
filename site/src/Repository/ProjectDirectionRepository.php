@@ -60,13 +60,13 @@ class ProjectDirectionRepository extends ServiceEntityRepository
 
         usort(
             $roots,
-            static fn(ProjectDirection $a, ProjectDirection $b) => [$a->getSort(), $a->getName()] <=> [$b->getSort(), $b->getName()]
+            static fn (ProjectDirection $a, ProjectDirection $b) => [$a->getSort(), $a->getName()] <=> [$b->getSort(), $b->getName()]
         );
 
         foreach ($childrenMap as &$children) {
             usort(
                 $children,
-                static fn(ProjectDirection $a, ProjectDirection $b) => $a->getSort() <=> $b->getSort()
+                static fn (ProjectDirection $a, ProjectDirection $b) => $a->getSort() <=> $b->getSort()
             );
         }
         unset($children);

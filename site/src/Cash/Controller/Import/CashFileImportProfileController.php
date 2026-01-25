@@ -100,8 +100,8 @@ class CashFileImportProfileController extends AbstractController
 
         $formData = [
             'name' => $profile->getName(),
-            'mapping' => json_encode($profile->getMapping(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            'options' => json_encode($profile->getOptions(), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            'mapping' => json_encode($profile->getMapping(), \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE),
+            'options' => json_encode($profile->getOptions(), \JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE),
             'profile' => $profile,
         ];
 
@@ -186,7 +186,7 @@ class CashFileImportProfileController extends AbstractController
         }
 
         $decoded = json_decode($payload, true);
-        if (JSON_ERROR_NONE !== json_last_error() || !is_array($decoded)) {
+        if (\JSON_ERROR_NONE !== json_last_error() || !is_array($decoded)) {
             $this->addFlash('error', sprintf('Некорректный JSON для %s.', $label));
 
             return null;
