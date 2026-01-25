@@ -4,7 +4,7 @@ namespace App\MessageHandler;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Message\EnqueueAutoRulesForRange;
 use Doctrine\ORM\EntityManagerInterface;

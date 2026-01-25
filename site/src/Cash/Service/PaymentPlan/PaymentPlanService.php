@@ -4,7 +4,7 @@ namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Util\StringNormalizer;

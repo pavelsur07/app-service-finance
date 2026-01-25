@@ -2,7 +2,7 @@
 
 namespace App\Company\Form;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Enum\CompanyTaxSystem;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;

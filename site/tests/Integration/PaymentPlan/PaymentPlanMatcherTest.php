@@ -13,7 +13,7 @@ use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;

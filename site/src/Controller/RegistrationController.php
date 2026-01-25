@@ -3,7 +3,7 @@
 namespace App\Controller;
 
 use App\Company\Form\RegistrationFormType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Message\SendRegistrationEmailMessage;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;

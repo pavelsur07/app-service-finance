@@ -6,7 +6,7 @@ namespace App\Tests\Fund\Factory;
 
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Ramsey\Uuid\Uuid;
 
 final class MoneyFundMovementFactory

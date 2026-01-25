@@ -3,7 +3,7 @@
 namespace App\Cash\Service\Accounts;
 
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 
 class AccountBalanceProvider
 {

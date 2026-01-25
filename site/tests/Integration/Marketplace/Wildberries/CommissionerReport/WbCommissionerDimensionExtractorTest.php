@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\Wildberries\CommissionerReport;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Marketplace\Wildberries\CommissionerReport\Service\WbCommissionerDimensionExtractor;
 use App\Marketplace\Wildberries\Entity\CommissionerReport\WbCommissionerReportRowRaw;
 use App\Marketplace\Wildberries\Entity\CommissionerReport\WbDimensionValue;

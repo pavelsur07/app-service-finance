@@ -8,7 +8,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,7 +97,7 @@ final class FundControllerTest extends WebTestCase
         $em->createQuery('DELETE FROM App\\Entity\\MoneyFund f')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
     }
 

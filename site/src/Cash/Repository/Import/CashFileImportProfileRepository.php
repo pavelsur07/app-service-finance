@@ -3,7 +3,7 @@
 namespace App\Cash\Repository\Import;
 
 use App\Cash\Entity\Import\CashFileImportProfile;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

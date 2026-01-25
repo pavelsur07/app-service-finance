@@ -2,7 +2,7 @@
 
 namespace App\Admin\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;

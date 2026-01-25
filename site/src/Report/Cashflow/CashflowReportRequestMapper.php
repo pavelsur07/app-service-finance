@@ -2,7 +2,7 @@
 
 namespace App\Report\Cashflow;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Symfony\Component\HttpFoundation\Request;
 
 final class CashflowReportRequestMapper

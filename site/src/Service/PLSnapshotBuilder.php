@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\PLMonthlySnapshot;
 use App\Repository\PLMonthlySnapshotRepository;
 use Doctrine\DBAL\Types\Types;

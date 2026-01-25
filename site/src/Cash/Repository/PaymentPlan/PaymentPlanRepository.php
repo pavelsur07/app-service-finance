@@ -6,7 +6,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;

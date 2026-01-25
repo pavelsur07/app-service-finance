@@ -6,7 +6,7 @@ namespace App\Ai\Entity;
 
 use App\Ai\Enum\AiRunStatus;
 use App\Ai\Repository\AiRunRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 

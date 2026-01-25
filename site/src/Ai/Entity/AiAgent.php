@@ -6,7 +6,7 @@ namespace App\Ai\Entity;
 
 use App\Ai\Enum\AiAgentType;
 use App\Ai\Repository\AiAgentRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 

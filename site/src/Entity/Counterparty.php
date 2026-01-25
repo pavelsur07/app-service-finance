@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Company\Entity\Company;
 use App\Company\Enum\CounterpartyType;
 use App\Repository\CounterpartyRepository;
 use Doctrine\ORM\Mapping as ORM;

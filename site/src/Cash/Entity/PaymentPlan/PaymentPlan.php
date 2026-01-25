@@ -5,7 +5,7 @@ namespace App\Cash\Entity\PaymentPlan;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus;
 use App\Enum\PaymentPlanType;

@@ -2,7 +2,7 @@
 
 namespace App\Controller\Finance;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\MoneyAccount;
 use App\Enum\CashDirection;
 use App\Repository\CashTransactionRepository;

@@ -4,7 +4,7 @@ namespace App\Cash\Service\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Intl\Currencies;
 

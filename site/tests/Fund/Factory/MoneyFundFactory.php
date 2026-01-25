@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Fund\Factory;
 
 use App\Cash\Entity\Accounts\MoneyFund;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Ramsey\Uuid\Uuid;
 
 final class MoneyFundFactory

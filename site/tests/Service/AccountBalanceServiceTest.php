@@ -10,7 +10,7 @@ use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\DTO\CashTransactionDTO;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Doctrine\ORM\EntityManager;

@@ -2,7 +2,7 @@
 
 namespace App\Company\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\ReportApiKey;
 use App\Repository\ReportApiKeyRepository;
 use Doctrine\ORM\EntityManagerInterface;

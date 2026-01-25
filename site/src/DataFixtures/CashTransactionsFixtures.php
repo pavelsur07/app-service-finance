@@ -6,7 +6,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use Doctrine\Bundle\FixturesBundle\Fixture;

@@ -2,7 +2,7 @@
 
 namespace App\Report\Cashflow;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 
 final class CashflowReportParams
 {

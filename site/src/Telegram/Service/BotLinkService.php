@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Telegram\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Telegram\Entity\BotLink;
 use App\Telegram\Entity\TelegramBot;
 use App\Telegram\Repository\BotLinkRepository;

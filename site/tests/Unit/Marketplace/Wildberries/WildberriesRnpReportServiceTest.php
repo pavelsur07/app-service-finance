@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Wildberries;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Marketplace\Wildberries\Repository\WildberriesRnpDailyRepository;
 use App\Marketplace\Wildberries\Service\WildberriesRnpReportService;
 use PHPUnit\Framework\TestCase;

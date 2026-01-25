@@ -8,7 +8,7 @@ use App\Balance\Enum\BalanceCategoryType;
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

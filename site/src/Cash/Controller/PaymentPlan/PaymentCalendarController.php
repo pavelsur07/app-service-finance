@@ -14,7 +14,7 @@ use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;

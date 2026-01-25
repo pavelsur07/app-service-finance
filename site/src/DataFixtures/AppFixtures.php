@@ -6,7 +6,7 @@ use App\Balance\Service\BalanceStructureSeeder;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;

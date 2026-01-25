@@ -6,7 +6,7 @@ namespace App\Ai\Repository;
 
 use App\Ai\Entity\AiRun;
 use App\Ai\Entity\AiSuggestion;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

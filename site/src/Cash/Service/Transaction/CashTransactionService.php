@@ -11,7 +11,7 @@ use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
 use App\DTO\CashTransactionDTO;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;

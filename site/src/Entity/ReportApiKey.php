@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Company\Entity\Company;
 use App\Repository\ReportApiKeyRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
