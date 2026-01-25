@@ -23,7 +23,7 @@ final class CashFileImportServiceTest extends TestCase
             $this->createMock(CashFileRowNormalizer::class),
             $this->createMock(CounterpartyRepository::class),
             $this->createMock(CashTransactionRepository::class),
-            $this->createMock(ImportLogger::class),
+            new ImportLogger($this->createMock(EntityManagerInterface::class)),
             $this->createMock(EntityManagerInterface::class),
             $this->createMock(AccountBalanceService::class),
             '/tmp'
