@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Cash\Entity\Transaction\CashTransaction;
+use App\Company\Entity\Counterparty;
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
 use App\Repository\DocumentRepository;

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Controller;
 
+use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
 use App\Entity\Company;
-use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;

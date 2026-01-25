@@ -6,7 +6,7 @@ namespace App\DTO;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class PaymentPlanDTO

@@ -2,7 +2,7 @@
 
 namespace App\Form;
 
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\ProjectDirection;

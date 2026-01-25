@@ -2,7 +2,7 @@
 
 namespace App\Form;
 
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\ProjectDirection;
 use App\Enum\DocumentType as DocumentTypeEnum;

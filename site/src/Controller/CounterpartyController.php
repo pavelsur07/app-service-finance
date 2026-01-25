@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
+use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Company\Form\CounterpartyType;
-use App\Entity\Counterparty;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
