@@ -2,8 +2,8 @@
 
 namespace App\Controller;
 
+use App\Company\Entity\ProjectDirection;
 use App\Company\Form\ProjectDirectionType;
-use App\Entity\ProjectDirection;
 use App\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;

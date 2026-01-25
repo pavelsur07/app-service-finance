@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Entity;
+namespace App\Company\Entity;
 
+use App\Entity\Company;
 use App\Repository\ProjectDirectionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;

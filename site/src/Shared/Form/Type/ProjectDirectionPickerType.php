@@ -2,7 +2,7 @@
 
 namespace App\Shared\Form\Type;
 
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 

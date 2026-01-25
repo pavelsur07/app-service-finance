@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Finance\Report;
 
+use App\Company\Entity\ProjectDirection;
 use App\Entity\Company;
 use App\Entity\PLCategory;
-use App\Entity\ProjectDirection;
 use App\Enum\PLCategoryType;
 use App\Finance\Engine\DependencyExtractor;
 use App\Finance\Engine\Graph;

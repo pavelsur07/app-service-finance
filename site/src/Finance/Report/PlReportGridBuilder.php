@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Report;
 
+use App\Company\Entity\ProjectDirection;
 use App\Entity\Company;
-use App\Entity\ProjectDirection;
 
 final class PlReportGridBuilder
 {

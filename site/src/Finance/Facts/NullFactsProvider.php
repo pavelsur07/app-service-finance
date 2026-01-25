@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Finance\Facts;
 
+use App\Company\Entity\ProjectDirection;
 use App\Entity\Company;
-use App\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 
 final class NullFactsProvider implements FactsProviderInterface

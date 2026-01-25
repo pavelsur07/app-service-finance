@@ -7,7 +7,7 @@ use App\Cash\Entity\Transaction\CashTransactionAutoRule;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Company\Entity\Counterparty;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

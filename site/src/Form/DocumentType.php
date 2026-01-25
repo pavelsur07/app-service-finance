@@ -3,8 +3,8 @@
 namespace App\Form;
 
 use App\Company\Entity\Counterparty;
+use App\Company\Entity\ProjectDirection;
 use App\Entity\Document;
-use App\Entity\ProjectDirection;
 use App\Enum\DocumentType as DocumentTypeEnum;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
