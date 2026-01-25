@@ -5,7 +5,7 @@ namespace App\Cash\Entity\Transaction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleConditionRepository;
-use App\Company\Entity\Counterparty;
+use App\Entity\Counterparty;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;

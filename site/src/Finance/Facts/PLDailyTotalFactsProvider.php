@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Finance\Facts;
 
-use App\Company\Entity\ProjectDirection;
 use App\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
+use App\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
 use App\Repository\ProjectDirectionRepository;

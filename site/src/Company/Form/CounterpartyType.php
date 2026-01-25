@@ -2,8 +2,8 @@
 
 namespace App\Company\Form;
 
-use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
+use App\Entity\Counterparty;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;

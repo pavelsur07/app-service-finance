@@ -2,7 +2,7 @@
 
 namespace App\Company\Form;
 
-use App\Company\Entity\ProjectDirection;
+use App\Entity\ProjectDirection;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\IntegerType;
