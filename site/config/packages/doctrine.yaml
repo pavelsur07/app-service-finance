@@ -54,6 +54,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Cash/Entity'
                 prefix: 'App\Cash\Entity'
                 alias: Cash
+            Company:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Company/Entity'
+                prefix: 'App\Company\Entity'
+                alias: Company
         controller_resolver:
             auto_mapping: false
 
