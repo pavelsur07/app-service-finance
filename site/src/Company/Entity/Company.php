@@ -2,7 +2,7 @@
 
 namespace App\Company\Entity;
 
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\CompanyTaxSystem;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;

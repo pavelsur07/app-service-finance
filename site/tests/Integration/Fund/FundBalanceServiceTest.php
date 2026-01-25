@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Fund;
 
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Tests\Fund\Factory\MoneyFundFactory;
 use App\Tests\Fund\Factory\MoneyFundMovementFactory;
 use Doctrine\ORM\EntityManagerInterface;

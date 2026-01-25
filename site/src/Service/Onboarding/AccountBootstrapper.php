@@ -11,7 +11,7 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Repository\CompanyRepository;
 use App\Repository\PLCategoryRepository;

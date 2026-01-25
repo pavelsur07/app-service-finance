@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Company;
 
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 
 final class CompanyBuilder
 {

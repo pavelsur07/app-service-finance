@@ -9,7 +9,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Company\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;

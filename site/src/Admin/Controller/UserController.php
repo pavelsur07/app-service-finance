@@ -3,7 +3,7 @@
 namespace App\Admin\Controller;
 
 use App\Admin\Service\UserDeletionService;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

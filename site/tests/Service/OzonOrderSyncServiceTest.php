@@ -3,7 +3,7 @@
 namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonOrder;
 use App\Marketplace\Ozon\Entity\OzonOrderItem;

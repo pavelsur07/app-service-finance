@@ -7,7 +7,7 @@ use App\Cash\Entity\PaymentPlan\PaymentRecurrenceRule;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\PaymentRecurrenceService;
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

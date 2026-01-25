@@ -3,7 +3,7 @@
 namespace App\Admin\Service;
 
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
