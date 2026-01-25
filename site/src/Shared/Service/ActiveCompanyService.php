@@ -2,7 +2,7 @@
 
 namespace App\Shared\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Repository\CompanyRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RequestStack;

@@ -7,7 +7,7 @@ namespace App\Cash\Form\PaymentPlan;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\DTO\PaymentPlanDTO;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus;
 use Doctrine\ORM\EntityRepository;

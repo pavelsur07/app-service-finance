@@ -12,7 +12,7 @@ use App\Cash\Repository\Bank\BankImportCursorRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Import\Bank\Provider\BankStatementsProviderInterface;
 use App\Cash\Service\Import\ImportLogger;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;

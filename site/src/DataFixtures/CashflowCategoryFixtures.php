@@ -3,7 +3,7 @@
 namespace App\DataFixtures;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;

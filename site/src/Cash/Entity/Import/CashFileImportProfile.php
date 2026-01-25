@@ -3,7 +3,7 @@
 namespace App\Cash\Entity\Import;
 
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 
 #[ORM\Entity(repositoryClass: CashFileImportProfileRepository::class)]

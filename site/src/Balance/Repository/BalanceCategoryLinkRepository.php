@@ -4,7 +4,7 @@ namespace App\Balance\Repository;
 
 use App\Balance\Entity\BalanceCategory;
 use App\Balance\Entity\BalanceCategoryLink;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

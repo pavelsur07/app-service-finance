@@ -5,7 +5,7 @@ namespace App\Tests\Service;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
@@ -24,7 +24,7 @@ class AccountBalanceProviderTest extends KernelTestCase
 
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccountDailyBalance b')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyAccount a')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
 
         $user = new User(Uuid::uuid4()->toString());

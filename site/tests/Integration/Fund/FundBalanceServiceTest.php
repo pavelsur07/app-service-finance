@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Fund;
 
 use App\Cash\Service\Accounts\FundBalanceService;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Tests\Fund\Factory\MoneyFundFactory;
 use App\Tests\Fund\Factory\MoneyFundMovementFactory;
@@ -24,7 +24,7 @@ final class FundBalanceServiceTest extends KernelTestCase
 
         $em->createQuery('DELETE FROM App\\Entity\\MoneyFundMovement m')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\MoneyFund f')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
 
         $user = new User(Uuid::uuid4()->toString());

@@ -8,7 +8,7 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Repository\CounterpartyRepository;
 use DateTimeImmutable;

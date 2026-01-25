@@ -6,7 +6,7 @@ namespace App\Telegram\Command;
 
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Repository\TelegramBotRepository;
 use Doctrine\ORM\EntityManagerInterface;

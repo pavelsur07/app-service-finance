@@ -3,7 +3,7 @@
 namespace App\Cash\Entity\Import;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

@@ -19,7 +19,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
 #[AutoconfigureTag('app.ai.agent')]

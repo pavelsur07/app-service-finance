@@ -3,7 +3,7 @@
 namespace App\Cash\Repository\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

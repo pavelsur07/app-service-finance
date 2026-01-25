@@ -9,7 +9,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;

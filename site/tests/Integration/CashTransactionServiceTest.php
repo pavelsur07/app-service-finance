@@ -17,7 +17,7 @@ use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Enum\CounterpartyType;
 use App\DTO\CashTransactionDTO;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Entity\User;
 use App\Enum\MoneyAccountType;

@@ -4,7 +4,7 @@ namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\PLCategory;
 use App\Enum\PaymentPlanType;
 use Doctrine\Common\Collections\ArrayCollection;

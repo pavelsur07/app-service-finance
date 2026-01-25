@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Report;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\ProjectDirection;
 use App\Finance\Engine\ValueFormatter;
 use App\Repository\PLCategoryRepository;

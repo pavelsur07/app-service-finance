@@ -2,7 +2,7 @@
 
 namespace App\DTO;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 
 class DocumentListDTO
 {

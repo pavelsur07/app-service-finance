@@ -2,7 +2,7 @@
 
 namespace App\Tests\Service;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Marketplace\Ozon\Adapter\OzonApiClient;
 use App\Marketplace\Ozon\Entity\OzonOrder;

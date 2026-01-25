@@ -8,7 +8,7 @@ use App\Balance\Form\BalanceCategoryFormType;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
 use App\Balance\Service\BalanceStructureSeeder;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

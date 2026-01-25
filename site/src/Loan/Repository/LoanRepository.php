@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Repository;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Loan\Entity\Loan;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;

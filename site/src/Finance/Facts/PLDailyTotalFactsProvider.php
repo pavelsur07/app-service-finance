@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Facts;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
 use App\Entity\ProjectDirection;

@@ -2,7 +2,7 @@
 
 namespace App\Tests\MessageHandler;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Message\SendRegistrationEmailMessage;
 use App\MessageHandler\SendRegistrationEmailHandler;

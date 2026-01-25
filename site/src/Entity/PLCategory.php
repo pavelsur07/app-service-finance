@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Company\Entity\Company;
 use App\Enum\PLCategoryType;
 use App\Enum\PLFlow;
 use App\Enum\PlNature;

@@ -4,7 +4,7 @@ namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
 use App\Company\Form\CompanyType;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

@@ -3,7 +3,7 @@
 namespace App\Cash\Repository\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyFund;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

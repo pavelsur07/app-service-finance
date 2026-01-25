@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Marketplace\Wildberries\CommissionerReport;
 
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use App\Entity\User;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
@@ -30,7 +30,7 @@ final class WbCommissionerXlsxImporterNormalizationTest extends KernelTestCase
 
         $em->createQuery('DELETE FROM App\\Marketplace\\Wildberries\\Entity\\WildberriesReportDetail d')->execute();
         $em->createQuery('DELETE FROM App\\Marketplace\\Wildberries\\Entity\\WildberriesCommissionerXlsxReport r')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Company c')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
         $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
 
         $user = new User(Uuid::uuid4()->toString());

@@ -4,7 +4,7 @@ namespace App\Balance\Entity;
 
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

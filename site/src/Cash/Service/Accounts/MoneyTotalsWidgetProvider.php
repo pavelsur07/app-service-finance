@@ -3,7 +3,7 @@
 namespace App\Cash\Service\Accounts;
 
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
-use App\Entity\Company;
+use App\Company\Entity\Company;
 use Symfony\Component\Intl\Currencies;
 
 class MoneyTotalsWidgetProvider
