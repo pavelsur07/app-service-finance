@@ -144,9 +144,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeCompany(Company $company): self
     {
         if ($this->companies->removeElement($company)) {
-            if ($company->getUser() === $this) {
-                $company->setUser(null);
-            }
         }
 
         return $this;

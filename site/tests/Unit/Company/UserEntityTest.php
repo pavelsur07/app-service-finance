@@ -109,7 +109,7 @@ final class UserEntityTest extends TestCase
         self::assertSame(1, $user->getCompanies()->count());
     }
 
-    public function testRemoveCompanyRemovesAndNullsCompanyUserIfOwned(): void
+    public function testRemoveCompanyRemovesAndKeepsCompanyUserIfOwned(): void
     {
         $user = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()->build();
@@ -119,7 +119,7 @@ final class UserEntityTest extends TestCase
         $user->removeCompany($company);
 
         self::assertFalse($user->getCompanies()->contains($company));
-        self::assertNull($company->getUser());
+        self::assertSame($user, $company->getUser());
     }
 
     public function testSerializeHashesPasswordNotPlain(): void
