@@ -134,7 +134,7 @@ final class CashFileRowNormalizerTest extends TestCase
     /**
      * @return iterable<string, array{0: array<string, string|null>, 1: CashDirection, 2: string}>
      */
-    public function inflowOutflowProvider(): iterable
+    public static function inflowOutflowProvider(): iterable
     {
         yield 'inflow' => [
             ['Inflow' => '2500', 'Outflow' => null],
