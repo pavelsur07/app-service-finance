@@ -142,3 +142,21 @@ final class <Entity>Builder
         return $entity;
     }
 }
+```
+---
+
+11) Чек-лист для ревью (быстро)
+
+ final, strict_types=1, private __construct
+
+ есть a<Entity>()
+
+ все with* через clone
+
+ дефолты в public const DEFAULT_*
+
+ валидация через InvalidArgumentException там, где нужны ограничения
+
+ build() использует реальный ctor + setter’ы, без догадок
+
+ значения детерминированы (никаких random)
