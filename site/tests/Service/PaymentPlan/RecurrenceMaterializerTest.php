@@ -14,7 +14,7 @@ use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\MoneyAccountType;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;

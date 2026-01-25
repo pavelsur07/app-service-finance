@@ -3,7 +3,7 @@
 namespace App\MessageHandler;
 
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Message\SendRegistrationEmailMessage;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\Service\NotificationRouter;

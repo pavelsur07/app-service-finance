@@ -9,7 +9,7 @@ use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\MoneyAccountType;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

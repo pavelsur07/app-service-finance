@@ -19,7 +19,7 @@ use App\Company\Enum\CounterpartyType;
 use App\DTO\CashTransactionDTO;
 use App\Company\Entity\Company;
 use App\Entity\Counterparty;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\MoneyAccountType;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;

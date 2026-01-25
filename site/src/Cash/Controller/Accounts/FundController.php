@@ -8,7 +8,7 @@ use App\Cash\Form\Accounts\MoneyFundMovementType;
 use App\Cash\Form\Accounts\MoneyFundType;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Service\FeatureFlagService;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;

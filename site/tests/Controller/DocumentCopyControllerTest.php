@@ -10,7 +10,7 @@ use App\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Enum\DocumentType;
 use App\Enum\PLFlow;
 use Doctrine\ORM\EntityManagerInterface;

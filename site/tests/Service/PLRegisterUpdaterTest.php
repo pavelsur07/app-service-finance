@@ -88,7 +88,7 @@ final class PLRegisterUpdaterTest extends TestCase
 
     private function createCompany(): Company
     {
-        $user = new \App\Entity\User(Uuid::uuid4()->toString());
+        $user = new \App\Company\Entity\User(Uuid::uuid4()->toString());
         $user->setEmail('pnl@example.com');
         $user->setPassword('secret');
 

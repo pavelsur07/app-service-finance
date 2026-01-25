@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Marketplace\Wildberries\CommissionerReport;
 
 use App\Company\Entity\Company;
-use App\Entity\User;
+use App\Company\Entity\User;
 use App\Marketplace\Wildberries\Entity\WildberriesCommissionerXlsxReport;
 use App\Marketplace\Wildberries\Entity\WildberriesReportDetail;
 use App\Marketplace\Wildberries\Service\CommissionerReport\WbCommissionerXlsxImporter;
