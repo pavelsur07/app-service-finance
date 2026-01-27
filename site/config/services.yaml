@@ -75,7 +75,7 @@ services:
     App\Notification\Channel\EmailSender:
         tags: ['app.notification.sender']
         arguments:
-            $defaultFrom: '%env(APP_MAIL_FROM)%'
+            $defaultFrom: '%env(string:APP_MAIL_FROM)%'
             $defaultReplyTo: '%env(string:APP_MAIL_REPLY_TO)%'
 
     App\Notification\Service\NotificationRouter:

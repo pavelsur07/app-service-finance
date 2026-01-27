@@ -50,7 +50,7 @@ final class DashboardNotifyController extends AbstractController
         }
 
         $vars = [
-            'subject' => 'ФинПлан — аккаунт создан',
+            'subject' => 'Аккаунт создан —  Ваш Финдир',
             'company_name' => method_exists($company, 'getName') ? $company->getName() : 'Компания',
             'company_id' => method_exists($company, 'getId') ? (string) $company->getId() : '—',
             'company_slug' => method_exists($company, 'getSlug') ? $company->getSlug() : null,

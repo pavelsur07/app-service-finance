@@ -108,11 +108,11 @@
             <td class="footer">
               <div class="divider"></div>
               {% block footer %}
-                <p class="muted">Это автоматическое письмо от {{ app_name|default('FinPlan') }} — пожалуйста, не отвечайте на него.</p>
+                <p class="muted">Это автоматическое письмо от {{ app_name|default('Ваш Финдир') }} — пожалуйста, не отвечайте на него.</p>
                 {% if unsubscribe_url is defined and unsubscribe_url %}
                   <p class="muted"><a href="{{ unsubscribe_url }}">Отписаться от уведомлений</a></p>
                 {% endif %}
-                <p class="muted">© {{ "now"|date("Y") }} {{ app_name|default('FinPlan') }}</p>
+                <p class="muted">© {{ "now"|date("Y") }} {{ app_name|default('Ваш Финдир') }}</p>
               {% endblock %}
             </td>
           </tr>
