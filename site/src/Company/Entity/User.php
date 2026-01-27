@@ -65,10 +65,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->email;
     }
 
+    public static function normalizeEmail(string $email): string
+    {
+        return \mb_strtolower(\trim($email));
+    }
+
     public function setEmail(string $email): static
     {
-        Assert::email($email);
-        $this->email = $email;
+        $normalizedEmail = self::normalizeEmail($email);
+        Assert::email($normalizedEmail);
+        $this->email = $normalizedEmail;
 
         return $this;
     }

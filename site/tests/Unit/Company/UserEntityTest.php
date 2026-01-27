@@ -54,6 +54,15 @@ final class UserEntityTest extends TestCase
         self::assertSame('a@b.test', $user->getUserIdentifier());
     }
 
+    public function testSetEmailNormalizesToLowercaseTrimmed(): void
+    {
+        $user = UserBuilder::aUser()->build();
+
+        $user->setEmail('  MyEmail@Example.COM  ');
+
+        self::assertSame('myemail@example.com', $user->getEmail());
+    }
+
     public function testGetRolesAlwaysContainsRoleUserAndUnique(): void
     {
         $user = UserBuilder::aUser()->build();
