@@ -158,6 +158,12 @@ class CompanyInvite
         $this->revokedAt = $at ?? new \DateTimeImmutable();
     }
 
+    public function renewToken(string $tokenHash, \DateTimeImmutable $expiresAt): void
+    {
+        $this->tokenHash = $tokenHash;
+        $this->expiresAt = $expiresAt;
+    }
+
     public function isPending(?\DateTimeImmutable $now = null): bool
     {
         return $this->getStatus($now) === self::STATUS_PENDING;
