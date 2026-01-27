@@ -1,0 +1,28 @@
+{% extends 'security/base.html.twig' %}
+
+{% block title %}Приглашение в компанию{% endblock %}
+
+{% block body %}
+    <div class="page page-center">
+        <div class="container-tight py-4">
+            <div class="card card-md">
+                <div class="card-body text-center">
+                    <h2 class="card-title">Вас пригласили в компанию</h2>
+                    <p class="text-muted">Email приглашения: {{ invite.email }}</p>
+
+                    {% if app.user %}
+                        <form method="post" action="{{ path('company_invite_accept', {token: token}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('invite_accept_' ~ invite.id) }}">
+                            <button class="btn btn-primary w-100">Принять приглашение</button>
+                        </form>
+                    {% else %}
+                        <div class="d-grid gap-2">
+                            <a class="btn btn-primary" href="{{ path('app_login') }}">Войти</a>
+                            <a class="btn btn-outline-primary" href="{{ path('app_register', {invite: token}) }}">Зарегистрироваться</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
