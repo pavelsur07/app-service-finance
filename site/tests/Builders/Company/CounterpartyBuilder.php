@@ -7,7 +7,6 @@ namespace App\Tests\Builders\Company;
 use App\Company\Entity\Company;
 use App\Company\Enum\CounterpartyType;
 use App\Entity\Counterparty;
-use InvalidArgumentException;
 use Webmozart\Assert\Assert;
 
 final class CounterpartyBuilder
@@ -72,11 +71,11 @@ final class CounterpartyBuilder
     public function withName(string $name): self
     {
         if ('' === $name) {
-            throw new InvalidArgumentException('Name cannot be empty.');
+            throw new \InvalidArgumentException('Name cannot be empty.');
         }
 
         if (mb_strlen($name) > 255) {
-            throw new InvalidArgumentException('Name must be 255 characters or fewer.');
+            throw new \InvalidArgumentException('Name must be 255 characters or fewer.');
         }
 
         $clone = clone $this;
@@ -88,7 +87,7 @@ final class CounterpartyBuilder
     public function withInn(?string $inn): self
     {
         if (null !== $inn && 1 !== preg_match('/^\d{10}(\d{2})?$/', $inn)) {
-            throw new InvalidArgumentException('Inn must contain 10 or 12 digits.');
+            throw new \InvalidArgumentException('Inn must contain 10 or 12 digits.');
         }
 
         $clone = clone $this;
