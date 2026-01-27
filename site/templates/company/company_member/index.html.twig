@@ -1,0 +1,220 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Участники компании{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Участники {{ company.name }}</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-xl mt-3">
+        {% set inviteTokens = app.flashes('invite_token') %}
+        {% if inviteTokens is not empty %}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h3 class="card-title">Ссылка для приглашения</h3>
+                    {% for token in inviteTokens %}
+                        <div class="input-group mb-2">
+                            {% set inviteUrl = url('company_invite_show', {token: token}) %}
+                            <input type="text" class="form-control" value="{{ inviteUrl }}" readonly>
+                            <button class="btn btn-outline-primary js-copy-invite" type="button" data-copy="{{ inviteUrl }}">
+                                Копировать
+                            </button>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Пригласить участника</h3>
+            </div>
+            <div class="card-body">
+                {% if isOwner %}
+                    {{ form_start(inviteForm, {
+                        action: path('company_users_invite', {companyId: company.id}),
+                        method: 'POST'
+                    }) }}
+                    <div class="row g-2 align-items-end">
+                        <div class="col-md-6">
+                            {{ form_row(inviteForm.email, {'label': 'Email'}) }}
+                        </div>
+                        <div class="col-md-3">
+                            <button class="btn btn-primary w-100">Отправить</button>
+                        </div>
+                    </div>
+                    {{ form_end(inviteForm) }}
+                {% else %}
+                    <div class="alert alert-warning mb-0">Приглашать участников может только владелец.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Участники</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th>Дата добавления</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for member in members %}
+                        <tr>
+                            <td>{{ member.user.email }}</td>
+                            <td>{{ member.role }}</td>
+                            <td>
+                                {% if member.status == 'ACTIVE' %}
+                                    <span class="badge bg-green-lt">Активен</span>
+                                {% else %}
+                                    <span class="badge bg-red-lt">Отключен</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ member.createdAt|date('d.m.Y H:i') }}</td>
+                            <td>
+                                {% if isOwner %}
+                                    {% if member.status == 'ACTIVE' %}
+                                        <form method="post"
+                                              action="{{ path('company_member_disable', {companyId: company.id, memberId: member.id}) }}"
+                                              style="display:inline;">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('member_disable_' ~ member.id) }}">
+                                            <button class="btn btn-sm btn-warning">Отключить</button>
+                                        </form>
+                                    {% else %}
+                                        <form method="post"
+                                              action="{{ path('company_member_enable', {companyId: company.id, memberId: member.id}) }}"
+                                              style="display:inline;">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('member_enable_' ~ member.id) }}">
+                                            <button class="btn btn-sm btn-success">Включить</button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center">Нет участников.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Активные приглашения</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Статус</th>
+                        <th>Истекает</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for invite in pendingInvites %}
+                        <tr>
+                            <td>{{ invite.email }}</td>
+                            <td><span class="badge bg-blue-lt">Ожидает</span></td>
+                            <td>{{ invite.expiresAt|date('d.m.Y H:i') }}</td>
+                            <td>
+                                {% if isOwner %}
+                                    <form method="post"
+                                          action="{{ path('company_invite_revoke', {companyId: company.id, inviteId: invite.id}) }}"
+                                          style="display:inline;">
+                                        <input type="hidden" name="_token" value="{{ csrf_token('invite_revoke_' ~ invite.id) }}">
+                                        <button class="btn btn-sm btn-danger">Отозвать</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">Нет активных приглашений.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">История приглашений</h3>
+            </div>
+            <div class="card-body">
+                <table class="table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Email</th>
+                        <th>Статус</th>
+                        <th>Истекает</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for invite in nonPendingInvites %}
+                        {% set status = invite.getStatus() %}
+                        <tr>
+                            <td>{{ invite.email }}</td>
+                            <td>
+                                {% if status == 'ACCEPTED' %}
+                                    <span class="badge bg-green-lt">Принято</span>
+                                {% elseif status == 'REVOKED' %}
+                                    <span class="badge bg-red-lt">Отозвано</span>
+                                {% elseif status == 'EXPIRED' %}
+                                    <span class="badge bg-yellow-lt">Истекло</span>
+                                {% else %}
+                                    <span class="badge bg-blue-lt">Ожидает</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ invite.expiresAt|date('d.m.Y H:i') }}</td>
+                            <td></td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="text-center">История приглашений пуста.</td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    <script>
+        document.querySelectorAll('.js-copy-invite').forEach((button) => {
+            button.addEventListener('click', () => {
+                const value = button.getAttribute('data-copy');
+                if (!value) {
+                    return;
+                }
+                navigator.clipboard.writeText(value);
+                button.textContent = 'Скопировано';
+                setTimeout(() => {
+                    button.textContent = 'Копировать';
+                }, 1500);
+            });
+        });
+    </script>
+{% endblock %}

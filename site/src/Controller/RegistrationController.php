@@ -5,6 +5,9 @@ namespace App\Controller;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Form\RegistrationFormType;
+use App\Company\Repository\CompanyInviteRepository;
+use App\Company\Service\CompanyInviteManager;
+use App\Company\Service\InviteTokenService;
 use App\Message\SendRegistrationEmailMessage;
 use App\Shared\Service\RateLimiter\RegistrationRateLimiter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,11 +33,17 @@ class RegistrationController extends AbstractController
         EntityManagerInterface $entityManager,
         MessageBusInterface $bus,
         RegistrationRateLimiter $registrationRateLimiter,
+        CompanyInviteManager $inviteManager,
+        CompanyInviteRepository $inviteRepository,
+        InviteTokenService $tokenService,
     ): Response {
         $user = new User(id: Uuid::uuid4()->toString());
+        $inviteToken = $request->query->get('invite');
+        $inviteToken = \is_string($inviteToken) ? \trim($inviteToken) : null;
+        $isInvite = $inviteToken !== null && $inviteToken !== '';
+
         $form = $this->createForm(RegistrationFormType::class, $user, [
-            // Можно подключить bootstrap-тему, если используешь form_row/label/widget:
-            // 'attr' => ['class' => 'needs-validation', 'novalidate' => 'novalidate'],
+            'is_invite' => $isInvite,
         ]);
         $form->handleRequest($request);
 
@@ -62,23 +71,39 @@ class RegistrationController extends AbstractController
             $plainPassword = (string) $form->get('plainPassword')->getData();
 
             $user->setPassword($userPasswordHasher->hashPassword($user, $plainPassword));
-            $user->setRoles(['ROLE_COMPANY_OWNER']);
+            if ($isInvite) {
+                $user->setRoles(['ROLE_COMPANY_USER']);
+            } else {
+                $user->setRoles(['ROLE_COMPANY_OWNER']);
+            }
 
             $entityManager->persist($user);
 
-            $company = new Company(Uuid::uuid4()->toString(), $user);
-            $companyName = trim((string) $form->get('companyName')->getData());
-            $company->setName($companyName);
-            $user->addCompany($company);
-            $entityManager->persist($company);
+            if ($isInvite) {
+                $tokenHash = $tokenService->hashToken($inviteToken);
+                $invite = $inviteRepository->findOneByTokenHash($tokenHash);
+                if (!$invite) {
+                    throw $this->createNotFoundException();
+                }
 
-            $entityManager->flush();
-            $createdAt = new \DateTimeImmutable();
-            $bus->dispatch(new SendRegistrationEmailMessage(
-                userId: $user->getId(),
-                companyId: $company->getId(),
-                createdAt: $createdAt,
-            ));
+                $companyId = $invite->getCompany()->getId();
+                $inviteManager->acceptInvite($inviteToken, $user);
+                $request->getSession()->set('active_company_id', $companyId);
+            } else {
+                $company = new Company(Uuid::uuid4()->toString(), $user);
+                $companyName = trim((string) $form->get('companyName')->getData());
+                $company->setName($companyName);
+                $user->addCompany($company);
+                $entityManager->persist($company);
+
+                $entityManager->flush();
+                $createdAt = new \DateTimeImmutable();
+                $bus->dispatch(new SendRegistrationEmailMessage(
+                    userId: $user->getId(),
+                    companyId: $company->getId(),
+                    createdAt: $createdAt,
+                ));
+            }
 
             // Мгновенный логин
             return $security->login($user, 'form_login', 'main');

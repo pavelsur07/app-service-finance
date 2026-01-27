@@ -36,6 +36,22 @@ class CompanyMemberRepository extends ServiceEntityRepository
         return $result;
     }
 
+    /**
+     * @return list<CompanyMember>
+     */
+    public function findByCompany(Company $company): array
+    {
+        /** @var list<CompanyMember> $result */
+        $result = $this->createQueryBuilder('member')
+            ->andWhere('member.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('member.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
     public function findOneByCompanyAndUser(Company $company, User $user): ?CompanyMember
     {
         return $this->createQueryBuilder('member')

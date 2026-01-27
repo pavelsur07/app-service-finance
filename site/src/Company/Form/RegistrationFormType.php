@@ -17,8 +17,8 @@ class RegistrationFormType extends AbstractType
 {
     public function buildForm(FormBuilderInterface $builder, array $options): void
     {
-        $builder
-            ->add('companyName', TextType::class, [
+        if (!$options['is_invite']) {
+            $builder->add('companyName', TextType::class, [
                 'label' => 'Имя компании',
                 'mapped' => false,
                 'required' => true,
@@ -30,7 +30,10 @@ class RegistrationFormType extends AbstractType
                         'message' => 'Введите имя компании',
                     ]),
                 ],
-            ])
+            ]);
+        }
+
+        $builder
             ->add('email')
             ->add('agreeTerms', CheckboxType::class, [
                 'label' => 'Я принимаю Пользовательское соглашение и Политику конфиденциальности',
@@ -75,6 +78,7 @@ class RegistrationFormType extends AbstractType
     {
         $resolver->setDefaults([
             'data_class' => User::class,
+            'is_invite' => false,
         ]);
     }
 }
