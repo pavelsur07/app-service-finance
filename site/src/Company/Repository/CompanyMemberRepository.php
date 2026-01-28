@@ -24,12 +24,12 @@ class CompanyMemberRepository extends ServiceEntityRepository
     public function findActiveByCompany(Company $company): array
     {
         /** @var list<CompanyMember> $result */
-        $result = $this->createQueryBuilder('member')
-            ->andWhere('member.company = :company')
-            ->andWhere('member.status = :status')
+        $result = $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.company = :company')
+            ->andWhere('companyMember.status = :status')
             ->setParameter('company', $company)
             ->setParameter('status', CompanyMember::STATUS_ACTIVE)
-            ->orderBy('member.createdAt', 'ASC')
+            ->orderBy('companyMember.createdAt', 'ASC')
             ->getQuery()
             ->getResult();
 
@@ -42,10 +42,10 @@ class CompanyMemberRepository extends ServiceEntityRepository
     public function findByCompany(Company $company): array
     {
         /** @var list<CompanyMember> $result */
-        $result = $this->createQueryBuilder('member')
-            ->andWhere('member.company = :company')
+        $result = $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('member.createdAt', 'ASC')
+            ->orderBy('companyMember.createdAt', 'ASC')
             ->getQuery()
             ->getResult();
 
@@ -54,9 +54,9 @@ class CompanyMemberRepository extends ServiceEntityRepository
 
     public function findOneByCompanyAndUser(Company $company, User $user): ?CompanyMember
     {
-        return $this->createQueryBuilder('member')
-            ->andWhere('member.company = :company')
-            ->andWhere('member.user = :user')
+        return $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.company = :company')
+            ->andWhere('companyMember.user = :user')
             ->setParameter('company', $company)
             ->setParameter('user', $user)
             ->getQuery()
