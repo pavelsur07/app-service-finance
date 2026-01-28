@@ -6,6 +6,7 @@ use App\Company\Entity\Company;
 use App\Company\Form\CompanyInviteOperatorType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
+use App\Company\Repository\CompanyRepository;
 use App\Company\Service\CompanyInviteManager;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\DTO\NotificationContext;
@@ -24,14 +25,11 @@ use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 class CompanyMemberController extends AbstractController
 {
     #[Route('/users', name: 'company_users_index', methods: ['GET'])]
-    #[Route('/{companyId}/users', name: 'company_users_index_legacy', methods: ['GET'])]
     public function index(
-        string $companyId = '',
         ActiveCompanyService $activeCompanyService,
         CompanyMemberRepository $memberRepository,
         CompanyInviteRepository $inviteRepository,
     ): Response {
-        // legacy param ignored
         $company = $activeCompanyService->getActiveCompany();
         $this->assertCompanyMemberAccess($company, $memberRepository);
 
@@ -55,16 +53,13 @@ class CompanyMemberController extends AbstractController
     }
 
     #[Route('/users/invite', name: 'company_users_invite', methods: ['POST'])]
-    #[Route('/{companyId}/users/invite', name: 'company_users_invite_legacy', methods: ['POST'])]
     public function invite(
-        string $companyId = '',
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyInviteManager $inviteManager,
         NotificationRouter $notifier,
         LoggerInterface $logger,
     ): Response {
-        // legacy param ignored
         $company = $activeCompanyService->getActiveCompany();
         $this->assertOwner($company);
         $user = $this->getUser();
@@ -143,16 +138,13 @@ class CompanyMemberController extends AbstractController
     }
 
     #[Route('/invites/{inviteId}/revoke', name: 'company_invite_revoke', methods: ['POST'])]
-    #[Route('/{companyId}/invites/{inviteId}/revoke', name: 'company_invite_revoke_legacy', methods: ['POST'])]
     public function revokeInvite(
-        string $companyId = '',
         string $inviteId,
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyInviteRepository $inviteRepository,
         CompanyInviteManager $inviteManager,
     ): Response {
-        // legacy param ignored
         $company = $activeCompanyService->getActiveCompany();
         $this->assertOwner($company);
         $user = $this->getUser();
@@ -176,16 +168,13 @@ class CompanyMemberController extends AbstractController
     }
 
     #[Route('/users/{memberId}/disable', name: 'company_member_disable', methods: ['POST'])]
-    #[Route('/{companyId}/users/{memberId}/disable', name: 'company_member_disable_legacy', methods: ['POST'])]
     public function disableMember(
-        string $companyId = '',
         string $memberId,
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyMemberRepository $memberRepository,
         EntityManagerInterface $entityManager,
     ): Response {
-        // legacy param ignored
         $company = $activeCompanyService->getActiveCompany();
         $this->assertOwner($company);
 
@@ -206,16 +195,13 @@ class CompanyMemberController extends AbstractController
     }
 
     #[Route('/users/{memberId}/enable', name: 'company_member_enable', methods: ['POST'])]
-    #[Route('/{companyId}/users/{memberId}/enable', name: 'company_member_enable_legacy', methods: ['POST'])]
     public function enableMember(
-        string $companyId = '',
         string $memberId,
         Request $request,
         ActiveCompanyService $activeCompanyService,
         CompanyMemberRepository $memberRepository,
         EntityManagerInterface $entityManager,
     ): Response {
-        // legacy param ignored
         $company = $activeCompanyService->getActiveCompany();
         $this->assertOwner($company);
 
@@ -233,6 +219,111 @@ class CompanyMemberController extends AbstractController
         $this->addFlash('success', 'Участник активирован.');
 
         return $this->redirectToRoute('company_users_index');
+    }
+
+    #[Route('/{companyId}/users', name: 'company_users_index_legacy', methods: ['GET'])]
+    public function legacyIndex(
+        string $companyId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        CompanyInviteRepository $inviteRepository,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->index($activeCompanyService, $memberRepository, $inviteRepository);
+    }
+
+    #[Route('/{companyId}/users/invite', name: 'company_users_invite_legacy', methods: ['POST'])]
+    public function legacyInvite(
+        string $companyId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        CompanyInviteManager $inviteManager,
+        NotificationRouter $notifier,
+        LoggerInterface $logger,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->invite($request, $activeCompanyService, $inviteManager, $notifier, $logger);
+    }
+
+    #[Route('/{companyId}/invites/{inviteId}/revoke', name: 'company_invite_revoke_legacy', methods: ['POST'])]
+    public function legacyRevoke(
+        string $companyId,
+        string $inviteId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        CompanyInviteRepository $inviteRepository,
+        CompanyInviteManager $inviteManager,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->revokeInvite($inviteId, $request, $activeCompanyService, $inviteRepository, $inviteManager);
+    }
+
+    #[Route('/{companyId}/users/{memberId}/disable', name: 'company_member_disable_legacy', methods: ['POST'])]
+    public function legacyDisable(
+        string $companyId,
+        string $memberId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->disableMember(
+            $memberId,
+            $request,
+            $activeCompanyService,
+            $memberRepository,
+            $entityManager,
+        );
+    }
+
+    #[Route('/{companyId}/users/{memberId}/enable', name: 'company_member_enable_legacy', methods: ['POST'])]
+    public function legacyEnable(
+        string $companyId,
+        string $memberId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+        ActiveCompanyService $activeCompanyService,
+        EntityManagerInterface $entityManager,
+    ): Response {
+        $this->activateLegacyCompany($companyId, $request, $companyRepository, $memberRepository);
+
+        return $this->enableMember(
+            $memberId,
+            $request,
+            $activeCompanyService,
+            $memberRepository,
+            $entityManager,
+        );
+    }
+
+    private function activateLegacyCompany(
+        string $companyId,
+        Request $request,
+        CompanyRepository $companyRepository,
+        CompanyMemberRepository $memberRepository,
+    ): Company {
+        $company = $companyRepository->find($companyId);
+        if (!$company) {
+            throw $this->createNotFoundException();
+        }
+
+        $this->assertCompanyMemberAccess($company, $memberRepository);
+        $request->getSession()->set('active_company_id', $company->getId());
+
+        return $company;
     }
 
     private function assertCompanyMemberAccess(Company $company, CompanyMemberRepository $memberRepository): void
