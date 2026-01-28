@@ -2,124 +2,130 @@
 <!doctype html>
 <html lang="{{ locale|default('ru') }}">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width">
-  <meta http-equiv="x-ua-compatible" content="ie=edge">
-  <title>{{ subject|default(app_name|default('FinPlan') ~ ' — уведомление') }}</title>
-  <style>
-    /* ===== Brand palette ===== */
-    :root{
-      --brand-bg: #0A1548;      /* синий */
-      --brand-accent: #FF1F1F;  /* красный */
-      --text: #1F2937;          /* серо-черный */
-      --muted: #6B7280;         /* серый для подписи */
-      --card: #ffffff;
-      --border: #E5E7EB;
-      --page: #F5F7FB;
-    }
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>{{ subject|default(app_name|default('FinPlan') ~ ' — уведомление') }}</title>
 
-    /* ===== Base ===== */
-    body {
-      margin: 0;
-      padding: 0;
-      background: var(--page);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, Arial, sans-serif;
-    }
-    a { color: var(--brand-accent); text-decoration: none; }
-    img { border: 0; line-height: 100%; vertical-align: middle; }
-    table { border-collapse: collapse; }
+    {# В email-клиентах часть CSS из <head> может резаться, поэтому тут только reset + mobile. #}
+    <style>
+        html, body { margin:0 !important; padding:0 !important; height:100% !important; width:100% !important; }
+        * { -ms-text-size-adjust:100%; -webkit-text-size-adjust:100%; }
+        table, td { mso-table-lspace:0pt; mso-table-rspace:0pt; border-collapse:collapse !important; }
+        img { -ms-interpolation-mode:bicubic; border:0; outline:none; text-decoration:none; display:block; }
+        a { text-decoration:none; }
 
-    .preheader {
-      display: none !important; visibility: hidden; opacity: 0; color: transparent;
-      height: 0; width: 0; overflow: hidden; mso-hide: all;
-    }
+        .preheader {
+            display:none !important; visibility:hidden; opacity:0; color:transparent;
+            height:0; width:0; overflow:hidden; mso-hide:all;
+        }
 
-    /* ===== Layout ===== */
-    .wrapper { width:100%; background: var(--page); padding: 24px 0; }
-    .container {
-      width: 100%; max-width: 640px; margin: 0 auto; background: var(--card);
-      border-radius: 12px; box-shadow: 0 2px 12px rgba(10,21,72,0.08); overflow: hidden;
-    }
-    .header { background: var(--brand-bg); color: #fff; padding: 20px 24px; }
-    .brand { font-weight: 700; letter-spacing: .2px; font-size: 16px; }
-    .content { padding: 24px; }
-    h1, h2, h3 { color: var(--brand-bg); margin: 0 0 12px; }
-    p { margin: 0 0 12px; line-height: 1.55; }
-
-    .cta {
-      display: inline-block; padding: 12px 18px; border-radius: 10px;
-      background: var(--brand-accent); color: #fff !important; font-weight: 600;
-    }
-    .divider { height: 1px; background: var(--border); margin: 16px 0; }
-    .footer { color: var(--muted); font-size: 12px; padding: 16px 24px 24px; }
-
-    @media (max-width: 480px) {
-      .content { padding: 18px; }
-      .header { padding: 16px 18px; }
-    }
-  </style>
+        @media screen and (max-width: 480px) {
+            .container { width:100% !important; }
+            .px { padding-left:18px !important; padding-right:18px !important; }
+            .py-header { padding-top:16px !important; padding-bottom:16px !important; }
+            .py-content { padding-top:18px !important; padding-bottom:18px !important; }
+        }
+    </style>
 </head>
-<body>
-  {# Важная невидимая строка для превью в почтовых клиентах #}
-  <span class="preheader">{{ preheader|default('') }}</span>
 
-  <table role="presentation" class="wrapper" width="100%" cellpadding="0" cellspacing="0">
+<body style="margin:0; padding:0; background:#F5F7FB; color:#1F2937; font-family:-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;">
+{# Превью-строка (невидимая) #}
+<span class="preheader">{{ preheader|default('') }}</span>
+
+{# Полная ширина фона #}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#F5F7FB" style="background:#F5F7FB; width:100%;">
     <tr>
-      <td align="center">
-        <table role="presentation" class="container" width="100%" cellpadding="0" cellspacing="0">
-          <tr>
-            <td class="header">
-              <table role="presentation" width="100%">
+        <td align="center" style="padding:24px 0;">
+
+            {# Outlook фиксирует ширину через VML/условные комментарии лучше, чем max-width #}
+            <!--[if (mso)|(IE)]>
+            <table role="presentation" width="640" align="center" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <td align="left" style="vertical-align: middle;">
-                    <table role="presentation">
-                      <tr>
-                        {% if brand_logo_url is defined and brand_logo_url %}
-                          <td style="padding-right:12px;">
-                            <img src="{{ brand_logo_url }}"
-                                 alt="{{ app_name|default('FinPlan') }}"
-                                 width="112" style="height:auto; display:block;">
-                          </td>
-                        {% endif %}
-                        <td class="brand">
-                          {{ app_name|default('FinPlan') }}
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td align="right" style="color:#cbd5e1; font-size:12px;">
-                    {% block header_meta %}{% endblock %}
-                  </td>
+                    <td>
+            <![endif]-->
+
+            {# Контейнер письма #}
+            <table role="presentation" class="container" width="100%" cellpadding="0" cellspacing="0" border="0"
+                   style="max-width:640px; width:100%; background:#FFFFFF; border:1px solid #E5E7EB; border-radius:12px; overflow:hidden;">
+                {# Header #}
+                <tr>
+                    <td class="px py-header" bgcolor="#0A1548"
+                        style="background:#0A1548; padding:20px 24px; color:#FFFFFF;">
+                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                            <tr>
+                                <td align="left" valign="middle">
+                                    <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                                        <tr>
+                                            {% if brand_logo_url is defined and brand_logo_url %}
+                                                <td valign="middle" style="padding-right:12px;">
+                                                    <img src="{{ brand_logo_url }}"
+                                                         alt="{{ app_name|default('FinPlan') }}"
+                                                         width="112"
+                                                         style="width:112px; height:auto; display:block;">
+                                                </td>
+                                            {% endif %}
+
+                                            <td valign="middle"
+                                                style="color:#FFFFFF; font-size:16px; line-height:20px; letter-spacing:0.2px; font-weight:400;">
+                                                {{ app_name|default('FinPlan') }}
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+
+                                <td align="right" valign="middle"
+                                    style="color:#CBD5E1; font-size:12px; line-height:16px; font-weight:400;">
+                                    {% block header_meta %}{% endblock %}
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
                 </tr>
-              </table>
-            </td>
-          </tr>
 
-          <tr>
-            <td class="content">
-              {% block content %}{% endblock %}
-            </td>
-          </tr>
+                {# Content #}
+                <tr>
+                    <td class="px py-content"
+                        style="padding:24px; background:#FFFFFF; color:#1F2937; font-size:14px; line-height:22px;">
+                        {# Базовые стили заголовков лучше инлайнить там, где используются, но оставим общий тон. #}
+                        {% block content %}{% endblock %}
+                    </td>
+                </tr>
 
-          <tr>
-            <td class="footer">
-              <div class="divider"></div>
-              {% block footer %}
-                <p class="muted">Это автоматическое письмо от {{ app_name|default('Ваш Финдир') }} — пожалуйста, не отвечайте на него.</p>
-                {% if unsubscribe_url is defined and unsubscribe_url %}
-                  <p class="muted"><a href="{{ unsubscribe_url }}">Отписаться от уведомлений</a></p>
-                {% endif %}
-                <p class="muted">© {{ "now"|date("Y") }} {{ app_name|default('Ваш Финдир') }}</p>
-              {% endblock %}
-            </td>
-          </tr>
+                {# Footer #}
+                <tr>
+                    <td class="px" style="padding:0 24px 24px; background:#FFFFFF;">
+                        <div style="height:1px; background:#E5E7EB; margin:0 0 16px;"></div>
 
-        </table>
-      </td>
+                        <div style="color:#6B7280; font-size:12px; line-height:18px; font-weight:400;">
+                            {% block footer %}
+                                <p style="margin:0 0 8px;">
+                                    Это автоматическое письмо от {{ app_name|default('Ваш Финдир') }} — пожалуйста, не отвечайте на него.
+                                </p>
+
+                                {% if unsubscribe_url is defined and unsubscribe_url %}
+                                    <p style="margin:0 0 8px;">
+                                        <a href="{{ unsubscribe_url }}" style="color:#FF1F1F; text-decoration:none;">Отписаться от уведомлений</a>
+                                    </p>
+                                {% endif %}
+
+                                <p style="margin:0;">
+                                    © {{ "now"|date("Y") }} {{ app_name|default('Ваш Финдир') }}
+                                </p>
+                            {% endblock %}
+                        </div>
+                    </td>
+                </tr>
+            </table>
+
+            <!--[if (mso)|(IE)]>
+            </td>
+            </tr>
+            </table>
+            <![endif]-->
+
+        </td>
     </tr>
-  </table>
+</table>
 </body>
 </html>
