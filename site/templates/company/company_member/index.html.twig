@@ -39,7 +39,7 @@
             <div class="card-body">
                 {% if isOwner %}
                     {{ form_start(inviteForm, {
-                        action: path('company_users_invite', {companyId: company.id}),
+                        action: path('company_users_invite'),
                         method: 'POST'
                     }) }}
                     <div class="row g-2 align-items-end">
@@ -89,14 +89,14 @@
                                 {% if isOwner %}
                                     {% if member.status == 'ACTIVE' %}
                                         <form method="post"
-                                              action="{{ path('company_member_disable', {companyId: company.id, memberId: member.id}) }}"
+                                              action="{{ path('company_member_disable', {memberId: member.id}) }}"
                                               style="display:inline;">
                                             <input type="hidden" name="_token" value="{{ csrf_token('member_disable_' ~ member.id) }}">
                                             <button class="btn btn-sm btn-warning">Отключить</button>
                                         </form>
                                     {% else %}
                                         <form method="post"
-                                              action="{{ path('company_member_enable', {companyId: company.id, memberId: member.id}) }}"
+                                              action="{{ path('company_member_enable', {memberId: member.id}) }}"
                                               style="display:inline;">
                                             <input type="hidden" name="_token" value="{{ csrf_token('member_enable_' ~ member.id) }}">
                                             <button class="btn btn-sm btn-success">Включить</button>
@@ -138,7 +138,7 @@
                             <td>
                                 {% if isOwner %}
                                     <form method="post"
-                                          action="{{ path('company_invite_revoke', {companyId: company.id, inviteId: invite.id}) }}"
+                                          action="{{ path('company_invite_revoke', {inviteId: invite.id}) }}"
                                           style="display:inline;">
                                         <input type="hidden" name="_token" value="{{ csrf_token('invite_revoke_' ~ invite.id) }}">
                                         <button class="btn btn-sm btn-danger">Отозвать</button>
