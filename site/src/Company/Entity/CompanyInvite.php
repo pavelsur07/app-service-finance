@@ -130,11 +130,11 @@ class CompanyInvite
 
     public function getStatus(?\DateTimeImmutable $now = null): string
     {
-        if ($this->acceptedAt !== null) {
+        if (null !== $this->acceptedAt) {
             return self::STATUS_ACCEPTED;
         }
 
-        if ($this->revokedAt !== null) {
+        if (null !== $this->revokedAt) {
             return self::STATUS_REVOKED;
         }
 
@@ -166,6 +166,6 @@ class CompanyInvite
 
     public function isPending(?\DateTimeImmutable $now = null): bool
     {
-        return $this->getStatus($now) === self::STATUS_PENDING;
+        return self::STATUS_PENDING === $this->getStatus($now);
     }
 }

@@ -324,12 +324,10 @@
 
                         {% if active_company_id %}
                             <a class="dropdown-item {{ company_users_active ? 'active' : '' }}" href="{{ path('company_users_index', { companyId: active_company_id }) }}">
-                                <i class="ti ti-users me-2"></i>
                                 <span>Пользователи</span>
                             </a>
                         {% else %}
                             <a class="dropdown-item {{ company_users_active ? 'active' : '' }}" href="{{ path('company_index') }}">
-                                <i class="ti ti-users me-2"></i>
                                 <span>Пользователи</span>
                             </a>
                         {% endif %}

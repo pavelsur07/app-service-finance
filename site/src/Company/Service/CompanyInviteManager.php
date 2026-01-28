@@ -31,7 +31,7 @@ class CompanyInviteManager
         Company $company,
         string $email,
         User $actor,
-        \DateTimeImmutable $now = null,
+        ?\DateTimeImmutable $now = null,
     ): CompanyInviteResult {
         $this->assertOwner($company, $actor);
 
@@ -77,7 +77,7 @@ class CompanyInviteManager
     public function acceptInvite(
         string $plainToken,
         User $user,
-        \DateTimeImmutable $now = null,
+        ?\DateTimeImmutable $now = null,
     ): void {
         $now = $now ?? new \DateTimeImmutable();
         $tokenHash = $this->tokenService->hashToken($plainToken);
@@ -115,7 +115,7 @@ class CompanyInviteManager
     public function revokeInvite(
         CompanyInvite $invite,
         User $actor,
-        \DateTimeImmutable $now = null,
+        ?\DateTimeImmutable $now = null,
     ): void {
         $this->assertOwner($invite->getCompany(), $actor);
         $invite->revoke($now ?? new \DateTimeImmutable());
