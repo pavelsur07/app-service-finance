@@ -1,9 +1,7 @@
 {% set current_route = app.request ? app.request.attributes.get('_route') : '' %}
 {% set user_roles = [] %}
-{% set active_company_id = null %}
 {% if app.user %}
     {% set user_roles = app.user.roles|default([]) %}
-    {% set active_company_id = app.session.get('active_company_id') %}
 {% endif %}
 <style>
     :root{
@@ -300,15 +298,11 @@
                 </div>
             </li>
 
-            {% set company_users_active = current_route in [
-                'company_users_index',
-                'company_users_invite',
-                'company_invite_revoke',
-                'company_member_disable',
-                'company_member_enable',
-                'company_invite_show',
-                'company_invite_accept'
-            ] %}
+            {% set company_users_active =
+                current_route starts with 'company_users_'
+                or current_route starts with 'company_member_'
+                or current_route starts with 'company_invite_'
+            %}
             {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or company_users_active %}
             <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
@@ -322,15 +316,10 @@
                             <span>Профиль компании</span>
                         </a>
 
-                        {% if active_company_id %}
-                            <a class="dropdown-item {{ company_users_active ? 'active' : '' }}" href="{{ path('company_users_index', { companyId: active_company_id }) }}">
-                                <span>Пользователи</span>
-                            </a>
-                        {% else %}
-                            <a class="dropdown-item {{ company_users_active ? 'active' : '' }}" href="{{ path('company_index') }}">
-                                <span>Пользователи</span>
-                            </a>
-                        {% endif %}
+                        <a class="dropdown-item {{ company_users_active ? 'active' : '' }}" href="{{ path('company_users_index') }}">
+                            <span class="me-1"><i class="ti ti-users"></i></span>
+                            <span>Пользователи</span>
+                        </a>
 
                         {% set report_api_key_active = current_route starts with 'settings_report_api_key_' %}
                         <a class="dropdown-item {{ report_api_key_active ? 'active' : '' }}" href="{{ path('settings_report_api_key_index') }}">
