@@ -64,7 +64,7 @@ class CompanyController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}', name: 'company_show', methods: ['GET'])]
+    #[Route('/{id}', name: 'company_show', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function show(string $id, Company $company): Response
     {
         // Можно добавить проверку владельца!
@@ -73,7 +73,7 @@ class CompanyController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'])]
+    #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function edit(string $id, Request $request, Company $company, EntityManagerInterface $em): Response
     {
         // Можно добавить проверку владельца!
@@ -92,7 +92,7 @@ class CompanyController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/delete', name: 'company_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'company_delete', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
     public function delete(Request $request, Company $company, EntityManagerInterface $em): Response
     {
         if ($this->isCsrfTokenValid('delete'.$company->getId(), $request->request->get('_token'))) {
