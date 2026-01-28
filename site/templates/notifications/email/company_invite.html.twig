@@ -1,0 +1,18 @@
+{% extends 'notifications/email/base.html.twig' %}
+
+{% set subject = subject ?? ('Приглашение в компанию "' ~ company_name ~ '"') %}
+{% set preheader = preheader ?? ('Вас пригласили в компанию ' ~ company_name) %}
+
+{% block content %}
+  <h2 style="margin-top:0;">Приглашение в компанию</h2>
+  <p>Вас пригласили присоединиться к компании <strong>{{ company_name }}</strong> в роли <strong>Оператор</strong>.</p>
+  <p>Приглашение отправлено на адрес: <strong>{{ invited_email }}</strong>.</p>
+  <p>Срок действия приглашения: <strong>{{ expires_at|date('d.m.Y H:i') }}</strong>.</p>
+
+  <p style="margin-top:16px;">
+    <a class="cta" href="{{ invite_url }}">Принять приглашение</a>
+  </p>
+
+  <p>Если кнопка не работает, перейдите по ссылке:</p>
+  <p><a href="{{ invite_url }}">{{ invite_url }}</a></p>
+{% endblock %}

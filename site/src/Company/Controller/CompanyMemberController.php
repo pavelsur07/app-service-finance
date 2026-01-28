@@ -7,11 +7,16 @@ use App\Company\Form\CompanyInviteOperatorType;
 use App\Company\Repository\CompanyInviteRepository;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Company\Service\CompanyInviteManager;
+use App\Notification\DTO\EmailMessage;
+use App\Notification\DTO\NotificationContext;
+use App\Notification\Service\NotificationRouter;
 use App\Repository\CompanyRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Core\Exception\AccessDeniedException;
 
@@ -53,6 +58,8 @@ class CompanyMemberController extends AbstractController
         Request $request,
         CompanyRepository $companyRepository,
         CompanyInviteManager $inviteManager,
+        NotificationRouter $notifier,
+        LoggerInterface $logger,
     ): Response {
         $company = $this->getCompanyOrThrow($companyRepository, $companyId);
         $this->assertOwner($company);
@@ -70,6 +77,61 @@ class CompanyMemberController extends AbstractController
 
             if ($result->plainToken) {
                 $this->addFlash('invite_token', $result->plainToken);
+            }
+
+            if ($result->invite && $result->plainToken) {
+                $inviteUrl = $this->generateUrl('company_invite_show', [
+                    'token' => $result->plainToken,
+                ], UrlGeneratorInterface::ABSOLUTE_URL);
+                $subject = sprintf('Приглашение в компанию "%s"', $company->getName());
+                $vars = [
+                    'subject' => $subject,
+                    'company' => $company,
+                    'company_name' => $company->getName(),
+                    'invite_url' => $inviteUrl,
+                    'expires_at' => $result->invite->getExpiresAt(),
+                    'invited_email' => $result->invite->getEmail(),
+                ];
+
+                $message = new EmailMessage(
+                    to: $result->invite->getEmail(),
+                    subject: $subject,
+                    htmlTemplate: 'notifications/email/company_invite.html.twig',
+                    textTemplate: 'notifications/email/company_invite.txt.twig',
+                    vars: $vars,
+                );
+
+                $ctx = new NotificationContext(
+                    companyId: (string) $company->getId(),
+                    locale: 'ru',
+                    idempotencyKey: sprintf('company_invite:%s', $result->invite->getId()),
+                );
+
+                $exceptionThrown = false;
+                try {
+                    $sent = $notifier->send('email', $message, $ctx);
+                } catch (\Throwable $exception) {
+                    $sent = false;
+                    $exceptionThrown = true;
+                    $logger->warning('Company invite email failed', [
+                        'companyId' => (string) $company->getId(),
+                        'inviteId' => $result->invite->getId(),
+                        'email' => $result->invite->getEmail(),
+                        'exception' => $exception,
+                    ]);
+                }
+
+                if (!$sent && !$exceptionThrown) {
+                    $logger->warning('Company invite email not sent', [
+                        'companyId' => (string) $company->getId(),
+                        'inviteId' => $result->invite->getId(),
+                        'email' => $result->invite->getEmail(),
+                    ]);
+                }
+
+                if (!$sent) {
+                    $this->addFlash('warning', 'Не удалось отправить письмо с приглашением.');
+                }
             }
 
             $this->addFlash('success', 'Приглашение отправлено.');
