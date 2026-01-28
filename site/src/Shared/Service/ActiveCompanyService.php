@@ -3,6 +3,7 @@
 namespace App\Shared\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Repository\CompanyMemberRepository;
 use App\Repository\CompanyRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RequestStack;
@@ -13,6 +14,7 @@ class ActiveCompanyService
     public function __construct(
         private RequestStack $requestStack,
         private CompanyRepository $companyRepository,
+        private CompanyMemberRepository $companyMemberRepository,
         private Security $security,
     ) {
     }
@@ -23,14 +25,25 @@ class ActiveCompanyService
         $id = $session->get('active_company_id');
         $user = $this->security->getUser();
 
+        if ($user === null) {
+            throw new NotFoundHttpException();
+        }
+
         if ($id) {
             $company = $this->companyRepository->find($id);
-            if ($company && $company->getUser() === $user) {
+            if (
+                $company
+                && (
+                    $company->getUser() === $user
+                    || $this->companyMemberRepository->findActiveOneByCompanyAndUser($company, $user) !== null
+                )
+            ) {
                 return $company;
             }
         }
 
-        $company = $this->companyRepository->findOneBy(['user' => $user]);
+        $company = $this->companyRepository->findOneBy(['user' => $user])
+            ?? $this->companyMemberRepository->findFirstActiveCompanyForUser($user);
         if (!$company) {
             throw new NotFoundHttpException();
         }
