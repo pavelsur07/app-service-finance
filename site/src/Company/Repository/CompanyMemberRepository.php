@@ -62,4 +62,38 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
+
+    public function findActiveOneByCompanyAndUser(Company $company, User $user): ?CompanyMember
+    {
+        return $this->createQueryBuilder('companyMember')
+            ->andWhere('companyMember.company = :company')
+            ->andWhere('companyMember.user = :user')
+            ->andWhere('companyMember.status = :status')
+            ->setParameter('company', $company)
+            ->setParameter('user', $user)
+            ->setParameter('status', CompanyMember::STATUS_ACTIVE)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findFirstActiveCompanyForUser(User $user): ?Company
+    {
+        $company = $this->createQueryBuilder('companyMember')
+            ->select('company')
+            ->innerJoin('companyMember.company', 'company')
+            ->andWhere('companyMember.user = :user')
+            ->andWhere('companyMember.status = :status')
+            ->setParameter('user', $user)
+            ->setParameter('status', CompanyMember::STATUS_ACTIVE)
+            ->orderBy('companyMember.createdAt', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        if ($company instanceof Company) {
+            return $company;
+        }
+
+        return null;
+    }
 }
