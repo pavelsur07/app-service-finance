@@ -1,0 +1,248 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Интеграции - Финансовый учет{% endblock %}
+
+{% block stylesheets %}
+  {{ parent() }}
+  <style>
+    body {
+      background-color: #f6f8fb;
+    }
+
+    /* Выравнивание высоты карточек */
+    .row-cards {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .row-cards > [class*='col-'] {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .card-integration {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      transition: transform 0.2s;
+      border: 1px solid #e6e8eb;
+    }
+
+    .card-integration .card-body {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+    }
+
+    .card-integration .mt-auto {
+      margin-top: auto !important;
+    }
+
+    .card-integration:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .badge-free {
+      background-color: #e6f7ee;
+      color: #2fb344;
+      border: none;
+      font-weight: 500;
+    }
+
+    .section-title {
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+  </style>
+{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="container-xl">
+      <div class="row g-2 align-items-center">
+        <div class="col">
+          <h2 class="page-title">Интеграции и маркетплейс</h2>
+          <div class="text-muted mt-1">Подключите ваши банковские счета и сервисы для автоматизации учета</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-xl">
+    <h3 class="section-title text-primary">Банки</h3>
+    <div class="row row-cards mb-5">
+      <div class="col-md-6 col-lg-4">
+        <div class="card card-integration">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <span class="avatar avatar-md bg-red-lt me-3">АБ</span>
+              <div><h4 class="m-0">Альфа-Банк</h4><small class="text-muted">DirectBank</small></div>
+            </div>
+            <p class="text-muted small">Автоматическая загрузка операций и остатков по счетам юрлиц и ИП.</p>
+            <div class="mt-auto d-flex align-items-center justify-content-between">
+              <span class="badge badge-free">Бесплатно</span>
+              <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Альфа-Банк">Подключить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card card-integration">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <span class="avatar avatar-md bg-green-lt me-3">СБ</span>
+              <div><h4 class="m-0">Сбербанк</h4><small class="text-muted">СберБизнес</small></div>
+            </div>
+            <p class="text-muted small">Интеграция с крупнейшим банком РФ для синхронизации выписок в реальном времени.</p>
+            <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Сбербанк">Настроить</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card card-integration border-primary">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <span class="avatar avatar-md bg-yellow-lt me-3">Т</span>
+              <div><h4 class="m-0">Т-Банк</h4><small class="text-muted">API Тинькофф</small></div>
+            </div>
+            <p class="text-muted small">Моментальное получение уведомлений о поступлениях и списаниях.</p>
+            <div class="mt-auto"><button class="btn btn-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Т-Банк">Подключить за 1 мин</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card card-integration">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <span class="avatar avatar-md bg-blue-lt me-3">ВТБ</span>
+              <div><h4 class="m-0">ВТБ Банк</h4><small class="text-muted">Бизнес-онлайн</small></div>
+            </div>
+            <p class="text-muted small">Полная синхронизация валютных и рублевых счетов предприятия.</p>
+            <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="ВТБ">Подключить</button></div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6 col-lg-4">
+        <div class="card card-integration">
+          <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+              <span class="avatar avatar-md bg-purple-lt me-3">Тч</span>
+              <div><h4 class="m-0">Точка</h4><small class="text-muted">Для ИП и ООО</small></div>
+            </div>
+            <p class="text-muted small">Прямая интеграция и автоматическое распознавание категорий платежей.</p>
+            <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Точка">Подключить</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 class="section-title text-orange">Сервисы и Маркетплейсы</h3>
+    <div class="row row-cards">
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-blue-lt me-3">1С</span><div><h4 class="m-0">1С-Фрэш</h4><small class="text-muted">Облачная бухгалтерия</small></div></div>
+        <p class="text-muted small">Двусторонняя синхронизация проводок и документов с облачной 1С.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="1С-Фрэш">Настроить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-blue-lt me-3">МС</span><div><h4 class="m-0">МойСклад</h4><small class="text-muted">Товарный учет</small></div></div>
+        <p class="text-muted small">Импорт заказов и остатков для точного расчета себестоимости и маржи.</p>
+        <div class="mt-auto d-flex align-items-center justify-content-between"><span class="badge badge-free">14 дней бесплатно</span><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="МойСклад">Подключить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-purple-lt me-3">WB</span><div><h4 class="m-0">Wildberries</h4><small class="text-muted">Ecommerce</small></div></div>
+        <p class="text-muted small">Автоматический расчет прибыли на основе еженедельных отчетов реализации.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Wildberries">Настроить API</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-blue-lt me-3">OZ</span><div><h4 class="m-0">Ozon</h4><small class="text-muted">Ecommerce</small></div></div>
+        <p class="text-muted small">Учет начислений, возвратов и рекламных расходов маркетплейса.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Ozon">Подключить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-info-lt me-3">TG</span><div><h4 class="m-0">Telegram</h4><small class="text-muted">Бот-помощник</small></div></div>
+        <p class="text-muted small">Уведомления о критических изменениях баланса и ежедневные отчеты в мессенджер.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Telegram">Запустить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-blue-lt me-3">amo</span><div><h4 class="m-0">amoCRM</h4><small class="text-muted">Продажи</small></div></div>
+        <p class="text-muted small">Автоматическое создание платежей при переходе сделок на этап "Оплачено".</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="amoCRM">Подключить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-azure-lt me-3">Б24</span><div><h4 class="m-0">Битрикс 24</h4><small class="text-muted">CRM и задачи</small></div></div>
+        <p class="text-muted small">Синхронизация счетов и контроль дебиторской задолженности из CRM.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Битрикс 24">Настроить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-orange-lt me-3">МД</span><div><h4 class="m-0">Моё дело</h4><small class="text-muted">Интернет-бухгалтерия</small></div></div>
+        <p class="text-muted small">Передача данных для налогового учета и формирования КУДиР.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="Моё дело">Подключить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-red-lt me-3">1С</span><div><h4 class="m-0">1С-Бухобслуживание</h4><small class="text-muted">Аутсорсинг</small></div></div>
+        <p class="text-muted small">Связь с вашим бухгалтером на аутсорсе для выгрузки первичных данных.</p>
+        <div class="mt-auto"><button class="btn btn-outline-primary btn-sm w-100" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="1С-Бухобслуживание">Настроить</button></div>
+      </div></div></div>
+
+      <div class="col-md-6 col-lg-4"><div class="card card-integration"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="avatar avatar-md bg-dark-lt me-3">ЮK</span><div><h4 class="m-0">ЮKassa</h4><small class="text-muted">Платежи</small></div></div>
+        <p class="text-muted small">Автоматический учет комиссий платежной системы и холдирования.</p>
+        <div class="mt-auto d-flex align-items-center justify-content-between"><span class="badge badge-free">Бесплатно</span><button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-setup" data-service="ЮKassa">Подключить</button></div>
+      </div></div></div>
+    </div>
+  </div>
+
+  <div class="modal modal-blur fade" id="modal-setup" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Настройка интеграции: <span id="target-service">Сервис</span></h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="steps steps-blue steps-counter mb-4">
+            <span class="step-item active"></span>
+            <span class="step-item"></span>
+            <span class="step-item"></span>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">API-ключ или Токен</label>
+            <input type="password" class="form-control" placeholder="Введите ключ доступа...">
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" checked>
+            <span class="form-check-label">Автоматически синхронизировать данные за последние 30 дней</span>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary ms-auto" onclick="this.classList.add('btn-loading'); setTimeout(()=>location.reload(), 1500)">Установить соединение</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block javascripts %}
+  {{ parent() }}
+  <script>
+    const modal = document.getElementById('modal-setup');
+    modal.addEventListener('show.bs.modal', function (event) {
+      const button = event.relatedTarget;
+      const service = button.getAttribute('data-service');
+      document.getElementById('target-service').textContent = service;
+    });
+  </script>
+{% endblock %}
