@@ -272,6 +272,7 @@
                 or current_route starts with 'wildberries_'
                 or current_route starts with 'telegram_integration_'
                 or current_route starts with 'cash_bank_connection_'
+                or current_route starts with 'integrations_marketplace_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
@@ -283,6 +284,7 @@
                     or current_route starts with 'wildberries_'
                     or current_route starts with 'telegram_integration_'
                     or current_route starts with 'cash_bank_connection_'
+                    or current_route starts with 'integrations_marketplace_'
                 ) ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
@@ -293,6 +295,10 @@
                             {% set bank_connections_active = current_route starts with 'cash_bank_connection_' %}
                             <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
                                 <span>Банки / Подключения</span>
+                            </a>
+                            {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
+                            <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('integrations_marketplace_index') }}">
+                                <span>Маркетплей</span>
                             </a>
                     </div>
                 </div>
