@@ -25,6 +25,19 @@
       width: 100% !important;
       margin-top: 15px;
     }
+
+    .kpi-trend {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      margin-top: 0.35rem;
+    }
+
+    .kpi-trend i {
+      font-size: 1rem;
+    }
   </style>
 {% endblock %}
 
@@ -112,6 +125,11 @@
             <div class="px-3">
               <div class="subheader">Остаток на счетах (Cash)</div>
               <div class="h1 mb-0">4 850 000 ₽</div>
+              <div class="kpi-trend text-success">
+                <span>+4%</span>
+                <i class="ti ti-trending-up" aria-hidden="true"></i>
+                <span>Прирост за период</span>
+              </div>
             </div>
             <div id="chart-cash-sparkline" class="chart-sparkline"></div>
           </div>
@@ -123,6 +141,11 @@
             <div class="px-3">
               <div class="subheader">Чистая прибыль (LTM)</div>
               <div class="h1 mb-0">1 240 000 ₽</div>
+              <div class="kpi-trend text-danger">
+                <span>-1%</span>
+                <i class="ti ti-trending-down" aria-hidden="true"></i>
+                <span>Снижение за период</span>
+              </div>
             </div>
             <div id="chart-profit-sparkline" class="chart-sparkline"></div>
           </div>
