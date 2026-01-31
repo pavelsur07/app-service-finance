@@ -1,0 +1,57 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Billing · Plans{% endblock %}
+
+{% block body %}
+  <div class="row row-cards">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Plans</h3>
+        </div>
+        <div class="card-body">
+          {% if plans is empty %}
+            <p class="text-muted mb-0">Планы пока не добавлены.</p>
+          {% else %}
+            <div class="table-responsive">
+              <table class="table table-vcenter table-striped">
+                <thead>
+                <tr>
+                  <th>Code</th>
+                  <th>Name</th>
+                  <th>Price</th>
+                  <th>Period</th>
+                  <th>Active</th>
+                  <th>Created</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for plan in plans %}
+                  <tr>
+                    <td>
+                      <a href="{{ path('admin_billing_plans_show', { id: plan.id }) }}">
+                        {{ plan.code }}
+                      </a>
+                    </td>
+                    <td>{{ plan.name }}</td>
+                    <td>{{ plan.priceAmount }} {{ plan.priceCurrency }}</td>
+                    <td>{{ plan.billingPeriod.value }}</td>
+                    <td>
+                      {% if plan.isActive %}
+                        <span class="badge bg-green">Да</span>
+                      {% else %}
+                        <span class="badge bg-muted">Нет</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ plan.createdAt|date('Y-m-d H:i') }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

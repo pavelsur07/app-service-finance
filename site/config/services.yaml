@@ -18,6 +18,10 @@ services:
     App\:
         resource: '../src/'
 
+    App\Billing\:
+        resource: '%kernel.project_dir%/../src/Billing/'
+        exclude: '%kernel.project_dir%/../src/Billing/{Contract,Dto,Entity,Enum,Event,EventListener,Fixture,Repository,README.md}'
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
         # Клиент Redis для сессий

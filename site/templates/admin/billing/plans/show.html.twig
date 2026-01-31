@@ -1,0 +1,96 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Billing · {{ plan.name }}{% endblock %}
+
+{% block body %}
+  <div class="row row-cards">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Plan {{ plan.name }}</h3>
+          <div class="card-actions">
+            <a href="{{ path('admin_billing_plans_list') }}" class="btn btn-sm btn-outline-secondary">
+              Назад к списку
+            </a>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="table-responsive">
+            <table class="table table-vcenter">
+              <tbody>
+              <tr>
+                <th>Code</th>
+                <td>{{ plan.code }}</td>
+              </tr>
+              <tr>
+                <th>Name</th>
+                <td>{{ plan.name }}</td>
+              </tr>
+              <tr>
+                <th>Price</th>
+                <td>{{ plan.priceAmount }} {{ plan.priceCurrency }}</td>
+              </tr>
+              <tr>
+                <th>Period</th>
+                <td>{{ plan.billingPeriod.value }}</td>
+              </tr>
+              <tr>
+                <th>Active</th>
+                <td>
+                  {% if plan.isActive %}
+                    <span class="badge bg-green">Да</span>
+                  {% else %}
+                    <span class="badge bg-muted">Нет</span>
+                  {% endif %}
+                </td>
+              </tr>
+              <tr>
+                <th>Created</th>
+                <td>{{ plan.createdAt|date('Y-m-d H:i') }}</td>
+              </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row row-cards">
+    <div class="col-12">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">Plan features</h3>
+        </div>
+        <div class="card-body">
+          {% if planFeatures is empty %}
+            <p class="text-muted mb-0">Для этого плана нет настроенных фич.</p>
+          {% else %}
+            <div class="table-responsive">
+              <table class="table table-vcenter table-striped">
+                <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Value</th>
+                  <th>Soft limit</th>
+                  <th>Hard limit</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for planFeature in planFeatures %}
+                  <tr>
+                    <td>{{ planFeature.feature.code }}</td>
+                    <td>{{ planFeature.value }}</td>
+                    <td>{{ planFeature.softLimit ?? '—' }}</td>
+                    <td>{{ planFeature.hardLimit ?? '—' }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
