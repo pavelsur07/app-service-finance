@@ -35,6 +35,18 @@ final class PlanRepository extends ServiceEntityRepository
     /**
      * @return Plan[]
      */
+    public function findAllOrderedByCreatedAt(): array
+    {
+        return $this->createQueryBuilder('plan')
+            ->orderBy('plan.createdAt', 'DESC')
+            ->addOrderBy('plan.code', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * @return Plan[]
+     */
     public function findAllActiveOrdered(): array
     {
         return $this->createQueryBuilder('plan')
