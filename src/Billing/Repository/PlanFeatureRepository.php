@@ -28,6 +28,21 @@ final class PlanFeatureRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * @return PlanFeature[]
+     */
+    public function findByPlanOrdered(Plan $plan): array
+    {
+        return $this->createQueryBuilder('planFeature')
+            ->innerJoin('planFeature.feature', 'feature')
+            ->addSelect('feature')
+            ->andWhere('planFeature.plan = :plan')
+            ->setParameter('plan', $plan)
+            ->orderBy('feature.code', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findOneByPlanAndFeatureCode(Plan $plan, string $featureCode): ?PlanFeature
     {
         return $this->createQueryBuilder('planFeature')
