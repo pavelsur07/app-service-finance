@@ -1,0 +1,81 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · План {{ plan.code }}{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">План {{ plan.name }}</h2>
+        <div class="text-muted mt-1">{{ plan.code }}</div>
+      </div>
+      <div class="col-auto ms-auto">
+        <a class="btn" href="{{ path('admin_billing_plans_list') }}">Назад к списку</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-12 col-md-3 text-muted">Код</dt>
+        <dd class="col-12 col-md-9"><code>{{ plan.code }}</code></dd>
+
+        <dt class="col-12 col-md-3 text-muted">Название</dt>
+        <dd class="col-12 col-md-9">{{ plan.name }}</dd>
+
+        <dt class="col-12 col-md-3 text-muted">Цена</dt>
+        <dd class="col-12 col-md-9">{{ plan.priceAmount }} {{ plan.priceCurrency }}</dd>
+
+        <dt class="col-12 col-md-3 text-muted">Период</dt>
+        <dd class="col-12 col-md-9">{{ plan.billingPeriod.value }}</dd>
+
+        <dt class="col-12 col-md-3 text-muted">Активен</dt>
+        <dd class="col-12 col-md-9">
+          {% if plan.isActive %}
+            <span class="badge bg-success-lt">Да</span>
+          {% else %}
+            <span class="badge bg-secondary-lt">Нет</span>
+          {% endif %}
+        </dd>
+
+        <dt class="col-12 col-md-3 text-muted">Создан</dt>
+        <dd class="col-12 col-md-9">{{ plan.createdAt|date('d.m.Y H:i') }}</dd>
+      </dl>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Фичи плана</h3>
+    </div>
+    <div class="card-body">
+      {% if planFeatures is not empty %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th scope="col">Feature</th>
+                <th scope="col">Значение</th>
+                <th scope="col">Soft limit</th>
+                <th scope="col">Hard limit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for planFeature in planFeatures %}
+                <tr>
+                  <td><code>{{ planFeature.feature.code }}</code></td>
+                  <td>{{ planFeature.value }}</td>
+                  <td>{{ planFeature.softLimit is not null ? planFeature.softLimit : '—' }}</td>
+                  <td>{{ planFeature.hardLimit is not null ? planFeature.hardLimit : '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Для плана нет настроенных фич.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
