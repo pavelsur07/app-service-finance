@@ -60,6 +60,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Company/Entity'
                 prefix: 'App\Company\Entity'
                 alias: Company
+            Billing:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Billing/Entity'
+                prefix: 'App\Billing\Entity'
+                alias: Billing
         controller_resolver:
             auto_mapping: false
 

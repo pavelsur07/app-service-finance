@@ -1,0 +1,63 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Billing Plans{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Plans</h2>
+      </div>
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-body">
+      {% if plans is not empty %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th scope="col">Code</th>
+                <th scope="col">Name</th>
+                <th scope="col">Price</th>
+                <th scope="col">Period</th>
+                <th scope="col">Active</th>
+                <th scope="col">Created</th>
+                <th scope="col" class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for plan in plans %}
+                <tr>
+                  <td><code>{{ plan.code }}</code></td>
+                  <td>{{ plan.name }}</td>
+                  <td>{{ plan.priceAmount }} {{ plan.priceCurrency }}</td>
+                  <td>{{ plan.billingPeriod.value }}</td>
+                  <td>
+                    {% if plan.isActive %}
+                      <span class="badge bg-success-lt">Да</span>
+                    {% else %}
+                      <span class="badge bg-secondary-lt">Нет</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ plan.createdAt|date('d.m.Y H:i') }}</td>
+                  <td class="text-end">
+                    <a
+                      href="{{ path('admin_billing_plans_show', { id: plan.id }) }}"
+                      class="btn btn-outline-primary btn-sm"
+                    >
+                      Просмотр
+                    </a>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Планы пока не созданы.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}
