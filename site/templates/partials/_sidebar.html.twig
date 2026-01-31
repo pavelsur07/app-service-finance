@@ -273,6 +273,7 @@
                 or current_route starts with 'telegram_integration_'
                 or current_route starts with 'cash_bank_connection_'
                 or current_route starts with 'integrations_marketplace_'
+                or current_route starts with 'company_price_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
@@ -285,6 +286,7 @@
                     or current_route starts with 'telegram_integration_'
                     or current_route starts with 'cash_bank_connection_'
                     or current_route starts with 'integrations_marketplace_'
+                    or current_route starts with 'company_price_'
                 ) ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
@@ -299,6 +301,10 @@
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
                             <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('integrations_marketplace_index') }}">
                                 <span>Маркетплей</span>
+                            </a>
+                            {% set company_price_active = current_route starts with 'company_price_' %}
+                            <a class="dropdown-item {{ company_price_active ? 'active' : '' }}" href="{{ path('company_price_index') }}">
+                                <span>Тарифы</span>
                             </a>
                     </div>
                 </div>
