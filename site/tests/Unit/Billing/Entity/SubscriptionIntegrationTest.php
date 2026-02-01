@@ -13,6 +13,7 @@ use App\Billing\Enum\IntegrationBillingType;
 use App\Billing\Enum\SubscriptionIntegrationStatus;
 use App\Billing\Enum\SubscriptionStatus;
 use App\Company\Entity\Company;
+use App\Tests\Builders\Company\CompanyBuilder;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionIntegrationTest extends TestCase
@@ -81,10 +82,13 @@ final class SubscriptionIntegrationTest extends TestCase
     private function createSubscription(): Subscription
     {
         $createdAt = new \DateTimeImmutable('2024-01-01 00:00:00');
+        $company = CompanyBuilder::aCompany()
+            ->withId('22222222-2222-2222-2222-222222222222')
+            ->build();
 
         return new Subscription(
             '33333333-3333-3333-3333-333333333333',
-            new Company('22222222-2222-2222-2222-222222222222'),
+            $company,
             $this->createPlan(),
             SubscriptionStatus::ACTIVE,
             null,
