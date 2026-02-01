@@ -27,7 +27,7 @@ class Company
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $financeLockBefore = null;
 
-    #[ORM\Column(enumType: CompanyTaxSystem::class, nullable: true)]
+    #[ORM\Column(nullable: true, enumType: CompanyTaxSystem::class)]
     private ?CompanyTaxSystem $taxSystem = null;
 
     public function __construct(string $id, User $user)
