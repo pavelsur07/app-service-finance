@@ -61,8 +61,9 @@ final class CompanyInviteManagerTest extends TestCase
 
         self::assertSame('invite_created', $result->type);
         self::assertSame($expectedToken, $result->plainToken);
-        self::assertSame($capturedInvite, $result->invite);
+        self::assertNotNull($result->invite);
         self::assertNotNull($capturedInvite);
+        self::assertSame($capturedInvite->getId(), $result->invite->getId());
         self::assertSame('operator@example.test', $capturedInvite->getEmail());
         self::assertSame(CompanyMember::ROLE_OPERATOR, $capturedInvite->getRole());
         self::assertSame($expectedHash, $capturedInvite->getTokenHash());
@@ -110,7 +111,8 @@ final class CompanyInviteManagerTest extends TestCase
 
         self::assertSame('invite_renewed', $result->type);
         self::assertSame($expectedToken, $result->plainToken);
-        self::assertSame($invite, $result->invite);
+        self::assertNotNull($result->invite);
+        self::assertSame($invite->getId(), $result->invite->getId());
         self::assertSame($expectedHash, $invite->getTokenHash());
         self::assertSame($expectedExpiresAt, $invite->getExpiresAt());
     }
