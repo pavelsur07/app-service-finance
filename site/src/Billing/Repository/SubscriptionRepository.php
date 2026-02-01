@@ -32,10 +32,10 @@ final class SubscriptionRepository extends ServiceEntityRepository
             ->setParameter('now', $now ?? new \DateTimeImmutable())
             ->addOrderBy(
                 'CASE '
-                . 'WHEN subscription.status = :active THEN 1 '
-                . 'WHEN subscription.status = :trial THEN 2 '
-                . 'WHEN subscription.status = :grace THEN 3 '
-                . 'ELSE 4 END'
+                .'WHEN subscription.status = :active THEN 1 '
+                .'WHEN subscription.status = :trial THEN 2 '
+                .'WHEN subscription.status = :grace THEN 3 '
+                .'ELSE 4 END'
             )
             ->addOrderBy('subscription.currentPeriodEnd', 'DESC')
             ->setParameter('active', SubscriptionStatus::ACTIVE)

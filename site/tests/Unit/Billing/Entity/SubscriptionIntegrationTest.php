@@ -13,8 +13,6 @@ use App\Billing\Enum\IntegrationBillingType;
 use App\Billing\Enum\SubscriptionIntegrationStatus;
 use App\Billing\Enum\SubscriptionStatus;
 use App\Company\Entity\Company;
-use DateTimeImmutable;
-use LogicException;
 use PHPUnit\Framework\TestCase;
 
 final class SubscriptionIntegrationTest extends TestCase
@@ -28,7 +26,7 @@ final class SubscriptionIntegrationTest extends TestCase
         );
 
         self::assertSame(SubscriptionIntegrationStatus::ACTIVE, $subscriptionIntegration->getStatus());
-        self::assertInstanceOf(DateTimeImmutable::class, $subscriptionIntegration->getStartedAt());
+        self::assertInstanceOf(\DateTimeImmutable::class, $subscriptionIntegration->getStartedAt());
         self::assertNull($subscriptionIntegration->getEndedAt());
     }
 
@@ -40,13 +38,13 @@ final class SubscriptionIntegrationTest extends TestCase
             $this->createIntegration(),
         );
 
-        $disabledAt = new DateTimeImmutable('2024-02-01 12:00:00');
+        $disabledAt = new \DateTimeImmutable('2024-02-01 12:00:00');
         $subscriptionIntegration->disable($disabledAt);
 
         self::assertSame(SubscriptionIntegrationStatus::DISABLED, $subscriptionIntegration->getStatus());
         self::assertSame($disabledAt, $subscriptionIntegration->getEndedAt());
 
-        $activatedAt = new DateTimeImmutable('2024-02-02 12:00:00');
+        $activatedAt = new \DateTimeImmutable('2024-02-02 12:00:00');
         $subscriptionIntegration->activate($activatedAt);
 
         self::assertSame(SubscriptionIntegrationStatus::ACTIVE, $subscriptionIntegration->getStatus());
@@ -62,8 +60,8 @@ final class SubscriptionIntegrationTest extends TestCase
             $this->createIntegration(),
         );
 
-        $this->expectException(LogicException::class);
-        $subscriptionIntegration->activate(new DateTimeImmutable('2024-03-01 12:00:00'));
+        $this->expectException(\LogicException::class);
+        $subscriptionIntegration->activate(new \DateTimeImmutable('2024-03-01 12:00:00'));
     }
 
     public function testDisableWhileDisabledThrows(): void
@@ -74,15 +72,15 @@ final class SubscriptionIntegrationTest extends TestCase
             $this->createIntegration(),
         );
 
-        $subscriptionIntegration->disable(new DateTimeImmutable('2024-03-10 12:00:00'));
+        $subscriptionIntegration->disable(new \DateTimeImmutable('2024-03-10 12:00:00'));
 
-        $this->expectException(LogicException::class);
-        $subscriptionIntegration->disable(new DateTimeImmutable('2024-03-11 12:00:00'));
+        $this->expectException(\LogicException::class);
+        $subscriptionIntegration->disable(new \DateTimeImmutable('2024-03-11 12:00:00'));
     }
 
     private function createSubscription(): Subscription
     {
-        $createdAt = new DateTimeImmutable('2024-01-01 00:00:00');
+        $createdAt = new \DateTimeImmutable('2024-01-01 00:00:00');
 
         return new Subscription(
             '33333333-3333-3333-3333-333333333333',
@@ -107,7 +105,7 @@ final class SubscriptionIntegrationTest extends TestCase
             'USD',
             BillingPeriod::MONTH,
             true,
-            new DateTimeImmutable('2024-01-01 00:00:00'),
+            new \DateTimeImmutable('2024-01-01 00:00:00'),
         );
     }
 

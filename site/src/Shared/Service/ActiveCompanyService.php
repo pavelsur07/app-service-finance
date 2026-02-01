@@ -25,7 +25,7 @@ class ActiveCompanyService
         $id = $session->get('active_company_id');
         $user = $this->security->getUser();
 
-        if ($user === null) {
+        if (null === $user) {
             throw new NotFoundHttpException();
         }
 
@@ -35,7 +35,7 @@ class ActiveCompanyService
                 $company
                 && (
                     $company->getUser() === $user
-                    || $this->companyMemberRepository->findActiveOneByCompanyAndUser($company, $user) !== null
+                    || null !== $this->companyMemberRepository->findActiveOneByCompanyAndUser($company, $user)
                 )
             ) {
                 return $company;

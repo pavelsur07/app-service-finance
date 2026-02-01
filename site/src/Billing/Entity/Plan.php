@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Billing\Entity;
 
 use App\Billing\Enum\BillingPeriod;
+use App\Billing\Repository\PlanRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\PlanRepository::class)]
+#[ORM\Entity(repositoryClass: PlanRepository::class)]
 #[ORM\Table(name: 'billing_plan')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_plan_code', columns: ['code'])]
 #[ORM\Index(name: 'idx_billing_plan_is_active', columns: ['is_active'])]

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Billing\Entity;
 
 use App\Billing\Enum\FeatureType;
+use App\Billing\Repository\FeatureRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\FeatureRepository::class)]
+#[ORM\Entity(repositoryClass: FeatureRepository::class)]
 #[ORM\Table(name: 'billing_feature')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_feature_code', columns: ['code'])]
 final class Feature

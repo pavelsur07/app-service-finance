@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace App\Billing\Entity;
 
+use App\Billing\Repository\UsageCounterRepository;
 use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\UsageCounterRepository::class)]
+#[ORM\Entity(repositoryClass: UsageCounterRepository::class)]
 #[ORM\Table(name: 'billing_usage_counter')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_usage_counter_company_period_metric', columns: ['company_id', 'period_key', 'metric'])]
 final class UsageCounter

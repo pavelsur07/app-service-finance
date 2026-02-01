@@ -160,12 +160,12 @@ final class CompanyInviteBuilder
             $this->createdAt,
         );
 
-        if ($this->acceptedAt !== null) {
+        if (null !== $this->acceptedAt) {
             Assert::notNull($this->acceptedByUser, 'An accepted invite must have a user who accepted it.');
             $invite->accept($this->acceptedByUser, $this->acceptedAt);
         }
 
-        if ($this->revokedAt !== null) {
+        if (null !== $this->revokedAt) {
             $invite->revoke($this->revokedAt);
         }
 

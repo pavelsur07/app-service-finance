@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Billing\Entity;
 
+use App\Billing\Repository\PlanFeatureRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\PlanFeatureRepository::class)]
+#[ORM\Entity(repositoryClass: PlanFeatureRepository::class)]
 #[ORM\Table(name: 'billing_plan_feature')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_plan_feature_plan_feature', columns: ['plan_id', 'feature_id'])]
 final class PlanFeature

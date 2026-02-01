@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Billing\Entity;
 
 use App\Billing\Enum\IntegrationBillingType;
+use App\Billing\Repository\IntegrationRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\IntegrationRepository::class)]
+#[ORM\Entity(repositoryClass: IntegrationRepository::class)]
 #[ORM\Table(name: 'billing_integration')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_integration_code', columns: ['code'])]
 #[ORM\Index(name: 'idx_billing_integration_is_active', columns: ['is_active'])]

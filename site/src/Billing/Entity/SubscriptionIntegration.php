@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace App\Billing\Entity;
 
 use App\Billing\Enum\SubscriptionIntegrationStatus;
+use App\Billing\Repository\SubscriptionIntegrationRepository;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\SubscriptionIntegrationRepository::class)]
+#[ORM\Entity(repositoryClass: SubscriptionIntegrationRepository::class)]
 #[ORM\Table(name: 'billing_subscription_integration')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_subscription_integration_subscription_integration', columns: ['subscription_id', 'integration_id'])]
 final class SubscriptionIntegration
@@ -49,7 +50,7 @@ final class SubscriptionIntegration
 
     public function activate(\DateTimeImmutable $at): void
     {
-        if ($this->status === SubscriptionIntegrationStatus::ACTIVE) {
+        if (SubscriptionIntegrationStatus::ACTIVE === $this->status) {
             throw new \LogicException('Subscription integration is already active.');
         }
 
@@ -60,7 +61,7 @@ final class SubscriptionIntegration
 
     public function disable(\DateTimeImmutable $at): void
     {
-        if ($this->status === SubscriptionIntegrationStatus::DISABLED) {
+        if (SubscriptionIntegrationStatus::DISABLED === $this->status) {
             throw new \LogicException('Subscription integration is already disabled.');
         }
 

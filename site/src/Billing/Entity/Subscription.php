@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Billing\Entity;
 
 use App\Billing\Enum\SubscriptionStatus;
+use App\Billing\Repository\SubscriptionRepository;
 use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 
-#[ORM\Entity(repositoryClass: \App\Billing\Repository\SubscriptionRepository::class)]
+#[ORM\Entity(repositoryClass: SubscriptionRepository::class)]
 #[ORM\Table(name: 'billing_subscription')]
 #[ORM\Index(name: 'idx_billing_subscription_company_status_period_end', columns: ['company_id', 'status', 'current_period_end'])]
 final class Subscription

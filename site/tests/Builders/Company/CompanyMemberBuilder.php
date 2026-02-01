@@ -104,7 +104,7 @@ final class CompanyMemberBuilder
     {
         $member = new CompanyMember($this->id, $this->company, $this->user, $this->role, $this->createdAt);
 
-        if ($this->status === CompanyMember::STATUS_DISABLED) {
+        if (CompanyMember::STATUS_DISABLED === $this->status) {
             $member->disable();
         }
 

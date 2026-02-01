@@ -40,7 +40,7 @@ class RegistrationController extends AbstractController
         $user = new User(id: Uuid::uuid4()->toString());
         $inviteToken = $request->query->get('invite');
         $inviteToken = \is_string($inviteToken) ? \trim($inviteToken) : null;
-        $isInvite = $inviteToken !== null && $inviteToken !== '';
+        $isInvite = null !== $inviteToken && '' !== $inviteToken;
 
         $form = $this->createForm(RegistrationFormType::class, $user, [
             'is_invite' => $isInvite,
