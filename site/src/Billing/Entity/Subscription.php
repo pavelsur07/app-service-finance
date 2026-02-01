@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: SubscriptionRepository::class)]
 #[ORM\Table(name: 'billing_subscription')]
 #[ORM\Index(name: 'idx_billing_subscription_company_status_period_end', columns: ['company_id', 'status', 'current_period_end'])]
-final class Subscription
+class Subscription
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]

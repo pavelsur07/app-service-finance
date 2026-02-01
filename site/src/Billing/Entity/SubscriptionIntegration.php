@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: SubscriptionIntegrationRepository::class)]
 #[ORM\Table(name: 'billing_subscription_integration')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_subscription_integration_subscription_integration', columns: ['subscription_id', 'integration_id'])]
-final class SubscriptionIntegration
+class SubscriptionIntegration
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]

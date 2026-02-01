@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: UsageCounterRepository::class)]
 #[ORM\Table(name: 'billing_usage_counter')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_usage_counter_company_period_metric', columns: ['company_id', 'period_key', 'metric'])]
-final class UsageCounter
+class UsageCounter
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]

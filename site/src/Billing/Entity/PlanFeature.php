@@ -10,7 +10,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: PlanFeatureRepository::class)]
 #[ORM\Table(name: 'billing_plan_feature')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_plan_feature_plan_feature', columns: ['plan_id', 'feature_id'])]
-final class PlanFeature
+class PlanFeature
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]

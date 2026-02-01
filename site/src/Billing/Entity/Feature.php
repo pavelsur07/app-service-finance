@@ -11,7 +11,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Entity(repositoryClass: FeatureRepository::class)]
 #[ORM\Table(name: 'billing_feature')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_feature_code', columns: ['code'])]
-final class Feature
+class Feature
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]

@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 #[ORM\Table(name: 'billing_plan')]
 #[ORM\UniqueConstraint(name: 'uniq_billing_plan_code', columns: ['code'])]
 #[ORM\Index(name: 'idx_billing_plan_is_active', columns: ['is_active'])]
-final class Plan
+class Plan
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid')]
