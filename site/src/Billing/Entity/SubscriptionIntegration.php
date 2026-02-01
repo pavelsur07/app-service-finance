@@ -13,7 +13,7 @@ use Doctrine\ORM\Mapping as ORM;
 final class SubscriptionIntegration
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'uuid')]
+    #[ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\ManyToOne(targetEntity: Subscription::class)]

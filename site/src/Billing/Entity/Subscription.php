@@ -14,7 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 final class Subscription
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'uuid')]
+    #[ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\ManyToOne(targetEntity: Company::class)]

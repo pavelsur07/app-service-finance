@@ -14,7 +14,7 @@ use Doctrine\ORM\Mapping as ORM;
 final class Plan
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'uuid')]
+    #[ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\Column(type: 'string')]

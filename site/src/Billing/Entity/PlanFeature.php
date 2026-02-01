@@ -12,7 +12,7 @@ use Doctrine\ORM\Mapping as ORM;
 final class PlanFeature
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'uuid')]
+    #[ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\ManyToOne(targetEntity: Plan::class)]
