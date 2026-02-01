@@ -12,7 +12,6 @@ use App\Billing\Enum\BillingPeriod;
 use App\Billing\Enum\IntegrationBillingType;
 use App\Billing\Enum\SubscriptionIntegrationStatus;
 use App\Billing\Enum\SubscriptionStatus;
-use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use PHPUnit\Framework\TestCase;
 
@@ -119,7 +118,7 @@ final class SubscriptionIntegrationTest extends TestCase
             '88888888-8888-8888-8888-888888888888',
             'INTEGRATION_CODE',
             'Integration Name',
-            IntegrationBillingType::PAID,
+            IntegrationBillingType::ADDON,
             1500,
             'USD',
             true,
