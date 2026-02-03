@@ -21,16 +21,21 @@ final class DealItemType extends AbstractType
         $builder
             ->add('name', TextType::class, [
                 'label' => 'Наименование',
+                'required' => true,
             ])
             ->add('kind', ChoiceType::class, [
                 'label' => 'Тип',
-                'choices' => [
-                    'Товар' => DealItemKind::GOOD,
-                    'Услуга' => DealItemKind::SERVICE,
-                    'Работа' => DealItemKind::WORK,
-                    'Командировка' => DealItemKind::TRIP,
-                ],
+                'choices' => DealItemKind::cases(),
+                'choice_label' => static function (DealItemKind $kind): string {
+                    return match ($kind) {
+                        DealItemKind::GOOD => 'Товар',
+                        DealItemKind::SERVICE => 'Услуга',
+                        DealItemKind::WORK => 'Работа',
+                        DealItemKind::TRIP => 'Командировка',
+                    };
+                },
                 'choice_value' => static fn (?DealItemKind $kind) => $kind?->value,
+                'required' => true,
             ])
             ->add('unit', TextType::class, [
                 'label' => 'Ед. изм.',
@@ -40,11 +45,13 @@ final class DealItemType extends AbstractType
                 'label' => 'Количество',
                 'scale' => 2,
                 'input' => 'string',
+                'required' => true,
             ])
             ->add('price', NumberType::class, [
                 'label' => 'Цена',
                 'scale' => 2,
                 'input' => 'string',
+                'required' => true,
             ]);
     }
 

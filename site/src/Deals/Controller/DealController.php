@@ -10,7 +10,6 @@ use App\Deals\DTO\DealChargeFormData;
 use App\Deals\DTO\DealItemFormData;
 use App\Deals\Entity\Deal;
 use App\Deals\Enum\DealChannel;
-use App\Deals\Enum\DealItemKind;
 use App\Deals\Enum\DealStatus;
 use App\Deals\Exception\AccessDenied as DealAccessDenied;
 use App\Deals\Exception\DealNotFound;
@@ -261,10 +260,15 @@ final class DealController extends AbstractController
 
         $user = $this->getUserOrFail();
         $data = $form->getData();
+        $chargeTypeId = $data->chargeType?->getId();
+        if (!$chargeTypeId) {
+            throw new ValidationFailed('Charge type is required.');
+        }
+
         $chargeRequest = new AddDealChargeRequest(
             $data->recognizedAt,
             $data->amount,
-            $data->chargeTypeId?->getId() ?? '',
+            (string) $chargeTypeId,
             $data->comment,
         );
 
@@ -366,7 +370,7 @@ final class DealController extends AbstractController
         DealRepository $dealRepository,
         DealManager $dealManager,
     ): Response {
-        $company = $this->companyContextService->getCompany();
+        $company = $this->companyService->getActiveCompany();
         try {
             $deal = $this->getDealOrFail($id, $company, $dealRepository);
         } catch (\Throwable $exception) {
@@ -538,12 +542,15 @@ final class DealController extends AbstractController
 
     private function buildItemRequest(Deal $deal, DealItemFormData $data): AddDealItemRequest
     {
-        $name = trim($data->name);
+        $name = trim((string) $data->name);
         if ($name === '') {
             throw new ValidationFailed('Название позиции обязательно.');
         }
 
-        $kind = $data->kind ?? DealItemKind::GOOD;
+        $kind = $data->kind;
+        if (!$kind) {
+            throw new ValidationFailed('Тип позиции обязателен.');
+        }
         $unit = $data->unit ? trim($data->unit) : null;
 
         $qty = (string) $data->qty;

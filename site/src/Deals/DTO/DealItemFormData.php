@@ -10,16 +10,18 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class DealItemFormData
 {
     #[Assert\NotBlank]
-    public string $name = '';
+    public ?string $name = null;
 
     #[Assert\NotNull]
-    public ?DealItemKind $kind = DealItemKind::GOOD;
+    public ?DealItemKind $kind = null;
 
     public ?string $unit = null;
 
+    #[Assert\NotBlank]
     #[Assert\Positive]
-    public string $qty = '0';
+    public ?string $qty = null;
 
+    #[Assert\NotBlank]
     #[Assert\Positive]
-    public string $price = '0';
+    public ?string $price = null;
 }

@@ -10,7 +10,7 @@ use Symfony\Component\Validator\Constraints as Assert;
 final class DealChargeFormData
 {
     #[Assert\NotNull]
-    public ?ChargeType $chargeTypeId = null;
+    public ?ChargeType $chargeType = null;
 
     #[Assert\NotNull]
     public \DateTimeImmutable $recognizedAt;
