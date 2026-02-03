@@ -40,6 +40,12 @@ loan_controllers:
         namespace: App\Loan\Controller
     type: attribute
 
+deals_controllers:
+    resource:
+        path: ../src/Deals/Controller/
+        namespace: App\Deals\Controller
+    type: attribute
+
 telegram_integration_controllers:
     # Импортируем все контроллеры Telegram (вебхук, workspace, admin)
     resource:
