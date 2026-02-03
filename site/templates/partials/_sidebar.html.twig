@@ -73,6 +73,32 @@
             </li>
             <!-- ОПиУ -->
 
+            {% set deals_path = app.request ? app.request.pathinfo : '' %}
+            {% set deals_active = deals_path starts with '/deals' %}
+            <li class="nav-item dropdown {{ deals_active ? 'show' : '' }}">
+                <a class="nav-link dropdown-toggle {{ deals_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ deals_active ? 'true' : 'false' }}">
+                    <span class="nav-link-icon"><i class="ti ti-handshake"></i></span>
+                    <span class="nav-link-title">Сделки</span>
+                </a>
+                {% set deals_show = deals_active ? 'show' : '' %}
+                <div class="dropdown-menu {{ deals_show }}">
+                    <div class="dropdown-menu-column">
+                        {% set deal_index_active = current_route == 'deal_index' %}
+                        <a class="dropdown-item {{ deal_index_active ? 'active' : '' }}" href="{{ path('deal_index') }}">
+                            <span>Реестр сделок</span>
+                        </a>
+                        {% set deal_new_active = current_route == 'deal_new' %}
+                        <a class="dropdown-item {{ deal_new_active ? 'active' : '' }}" href="{{ path('deal_new') }}">
+                            <span>Создать сделку</span>
+                        </a>
+                        {% set deal_charge_types_active = deals_path == '/deals/charge-types' %}
+                        <a class="dropdown-item {{ deal_charge_types_active ? 'active' : '' }}" href="/deals/charge-types">
+                            <span>Типы расходов</span>
+                        </a>
+                    </div>
+                </div>
+            </li>
+
             {#{% set cash_transactions_active = current_route == 'cash_transaction_index' %}
             <li class="nav-item {{ cash_transactions_active ? 'active' : '' }}">
                 <a class="nav-link {{ cash_transactions_active ? 'active' : '' }}" href="{{ path('cash_transaction_index') }}" title="Операции ДДС">
