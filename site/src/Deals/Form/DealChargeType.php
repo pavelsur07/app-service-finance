@@ -24,7 +24,7 @@ final class DealChargeType extends AbstractType
         $company = $options['company'];
 
         $builder
-            ->add('chargeTypeId', EntityType::class, [
+            ->add('chargeType', EntityType::class, [
                 'class' => ChargeType::class,
                 'label' => 'Тип начисления',
                 'placeholder' => 'Выберите тип начисления',
