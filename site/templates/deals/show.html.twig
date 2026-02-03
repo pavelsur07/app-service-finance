@@ -162,7 +162,7 @@
                 </div>
 
                 {{ form_start(chargeForm, {action: path('deal_charge_add', {id: deal.id})}) }}
-                    {{ form_row(chargeForm.chargeTypeId) }}
+                    {{ form_row(chargeForm.chargeType) }}
                     {{ form_row(chargeForm.recognizedAt) }}
                     {{ form_row(chargeForm.amount) }}
                     {{ form_row(chargeForm.comment) }}
