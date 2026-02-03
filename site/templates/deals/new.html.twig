@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Новая сделка{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Новая сделка</h2>
+    <div class="ms-auto d-print-none">
+        <a href="{{ path('deal_index') }}" class="btn btn-outline-secondary">К списку</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {{ form_start(form) }}
+            {{ form_row(form.recognizedAt) }}
+            {{ form_row(form.title) }}
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.type) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.channel) }}
+                </div>
+            </div>
+            {{ form_row(form.counterpartyId) }}
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Создать</button>
+            </div>
+        {{ form_end(form) }}
+    </div>
+</div>
+{% endblock %}
