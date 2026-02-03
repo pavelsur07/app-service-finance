@@ -6,7 +6,7 @@
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
     <h2 class="page-title mb-0">Сделки</h2>
     <div class="ms-auto d-print-none">
-        <a href="{{ path('deal_new') }}" class="btn btn-primary">Новая сделка</a>
+        <a href="{{ path('deal_new') }}" class="btn btn-primary">Создать</a>
     </div>
 </div>
 
@@ -57,6 +57,8 @@
                     <th>Канал</th>
                     <th>Статус</th>
                     <th class="text-end">Сумма</th>
+                    <th class="text-end">Прямые расходы</th>
+                    <th class="text-end">Маржа</th>
                 </tr>
             </thead>
             <tbody>
@@ -70,10 +72,12 @@
                     <td>{{ deal.channel.value }}</td>
                     <td>{{ deal.status.value }}</td>
                     <td class="text-end">{{ deal.totalAmount|number_format(2, ',', ' ') }}</td>
+                    <td class="text-end">{{ deal.totalDirectCost|number_format(2, ',', ' ') }}</td>
+                    <td class="text-end">{{ (deal.totalAmount - deal.totalDirectCost)|number_format(2, ',', ' ') }}</td>
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted">Сделок пока нет.</td>
+                    <td colspan="8" class="text-center text-muted">Сделок пока нет.</td>
                 </tr>
             {% endfor %}
             </tbody>
