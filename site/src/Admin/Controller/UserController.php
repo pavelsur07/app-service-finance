@@ -24,13 +24,17 @@ final class UserController extends AbstractController
     ];
 
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(UserRepository $userRepository): Response
+    public function index(Request $request, UserRepository $userRepository): Response
     {
         $lastWeek = new \DateTimeImmutable('-7 days');
+        $page = max(1, (int) $request->query->get('page', 1));
+        $pager = $userRepository->getRegisteredUsers($page);
+        $users = iterator_to_array($pager->getCurrentPageResults());
 
         return $this->render('admin/users/index.html.twig', [
             'title' => 'Зарегистрированные пользователи',
-            'users' => $userRepository->getRegisteredUsers(),
+            'users' => $users,
+            'pager' => $pager,
             'totalUsers' => $userRepository->countRegisteredUsers(),
             'recentUsers' => $userRepository->countRegisteredUsersSince($lastWeek),
         ]);
