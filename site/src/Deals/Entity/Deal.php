@@ -6,6 +6,7 @@ use App\Company\Entity\Company;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
 use App\Deals\Enum\DealType;
+use App\Entity\Counterparty;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -16,6 +17,7 @@ use Webmozart\Assert\Assert;
 #[ORM\UniqueConstraint(name: 'uniq_deal_company_number', columns: ['company_id', 'number'])]
 #[ORM\Index(name: 'idx_deal_company_recognized_at', columns: ['company_id', 'recognized_at'])]
 #[ORM\Index(name: 'idx_deal_company_status', columns: ['company_id', 'status'])]
+#[ORM\Index(name: 'idx_deal_company_counterparty', columns: ['company_id', 'counterparty_id'])]
 class Deal
 {
     #[ORM\Id]
@@ -31,6 +33,10 @@ class Deal
 
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $title = null;
+
+    #[ORM\ManyToOne(targetEntity: Counterparty::class)]
+    #[ORM\JoinColumn(name: 'counterparty_id', nullable: true, onDelete: 'RESTRICT')]
+    private ?Counterparty $counterparty = null;
 
     #[ORM\Column(length: 32, enumType: DealType::class)]
     private DealType $type;
@@ -131,6 +137,18 @@ class Deal
     public function setTitle(?string $title): self
     {
         $this->title = $title;
+
+        return $this;
+    }
+
+    public function getCounterparty(): ?Counterparty
+    {
+        return $this->counterparty;
+    }
+
+    public function setCounterparty(?Counterparty $counterparty): self
+    {
+        $this->counterparty = $counterparty;
 
         return $this;
     }
