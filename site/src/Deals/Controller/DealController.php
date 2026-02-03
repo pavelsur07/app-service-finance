@@ -538,30 +538,20 @@ final class DealController extends AbstractController
 
     private function buildItemRequest(Deal $deal, DealItemFormData $data): AddDealItemRequest
     {
-        $product = $data->productId;
-        if (!$product) {
-            throw new ValidationFailed('Product is required.');
+        $name = trim($data->name);
+        if ($name === '') {
+            throw new ValidationFailed('Название позиции обязательно.');
         }
 
-        $kind = DealItemKind::GOOD;
-        if (method_exists($product, 'getKind')) {
-            $candidate = $product->getKind();
-            if ($candidate instanceof DealItemKind) {
-                $kind = $candidate;
-            }
-        }
-
-        $unit = null;
-        if (method_exists($product, 'getUnit')) {
-            $unit = $product->getUnit();
-        }
+        $kind = $data->kind ?? DealItemKind::GOOD;
+        $unit = $data->unit ? trim($data->unit) : null;
 
         $qty = (string) $data->qty;
         $price = (string) $data->price;
         $amount = $this->multiplyAmount($qty, $price);
 
         return new AddDealItemRequest(
-            name: (string) $product->getName(),
+            name: $name,
             kind: $kind,
             qty: $qty,
             price: $price,

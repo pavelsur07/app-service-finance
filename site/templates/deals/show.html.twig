@@ -102,7 +102,15 @@
                 </div>
 
                 {{ form_start(itemForm, {action: path('deal_item_add', {id: deal.id})}) }}
-                    {{ form_row(itemForm.productId) }}
+                    {{ form_row(itemForm.name) }}
+                    <div class="row">
+                        <div class="col-md-6">
+                            {{ form_row(itemForm.kind) }}
+                        </div>
+                        <div class="col-md-6">
+                            {{ form_row(itemForm.unit) }}
+                        </div>
+                    </div>
                     <div class="row">
                         <div class="col-md-6">
                             {{ form_row(itemForm.qty) }}
