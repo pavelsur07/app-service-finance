@@ -7,14 +7,21 @@
     <h2 class="page-title mb-0">Сделка {{ deal.number }}</h2>
     <div class="ms-auto d-print-none">
         <a href="{{ path('deal_index') }}" class="btn btn-outline-secondary">К списку</a>
-        <form method="post" action="{{ path('deal_confirm', {id: deal.id}) }}" class="d-inline">
-            <input type="hidden" name="_token" value="{{ csrf_token('deal_confirm' ~ deal.id) }}">
-            <button type="submit" class="btn btn-success">Подтвердить</button>
-        </form>
-        <form method="post" action="{{ path('deal_cancel', {id: deal.id}) }}" class="d-inline">
-            <input type="hidden" name="_token" value="{{ csrf_token('deal_cancel' ~ deal.id) }}">
-            <button type="submit" class="btn btn-outline-danger">Отменить</button>
-        </form>
+        {% if deal.isDraft %}
+            <form method="post" action="{{ path('deal_confirm', {id: deal.id}) }}" class="d-inline">
+                <input type="hidden" name="_token" value="{{ csrf_token('deal_confirm' ~ deal.id) }}">
+                <button type="submit" class="btn btn-success">Подтвердить</button>
+            </form>
+            <form method="post" action="{{ path('deal_cancel', {id: deal.id}) }}" class="d-inline">
+                <input type="hidden" name="_token" value="{{ csrf_token('deal_cancel' ~ deal.id) }}">
+                <button type="submit" class="btn btn-outline-danger">Отменить</button>
+            </form>
+        {% elseif deal.isConfirmed %}
+            <form method="post" action="{{ path('deal_cancel', {id: deal.id}) }}" class="d-inline">
+                <input type="hidden" name="_token" value="{{ csrf_token('deal_cancel' ~ deal.id) }}">
+                <button type="submit" class="btn btn-outline-danger">Отменить</button>
+            </form>
+        {% endif %}
     </div>
 </div>
 
@@ -32,6 +39,20 @@
             <div class="col-md-4">
                 <div class="text-muted">Статус</div>
                 <div>{{ deal.status.value }}</div>
+            </div>
+        </div>
+        <div class="row mt-3">
+            <div class="col-md-4">
+                <div class="text-muted">Сумма</div>
+                <div>{{ deal.totalAmount|number_format(2, ',', ' ') }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted">Прямые расходы</div>
+                <div>{{ deal.totalDirectCost|number_format(2, ',', ' ') }}</div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-muted">Маржа</div>
+                <div>{{ (deal.totalAmount - deal.totalDirectCost)|number_format(2, ',', ' ') }}</div>
             </div>
         </div>
         <div class="mt-3">
@@ -62,8 +83,8 @@
                             <tr>
                                 <td>{{ item.name }}</td>
                                 <td>{{ item.qty }}</td>
-                                <td>{{ item.price }}</td>
-                                <td class="text-end">{{ item.amount }}</td>
+                                <td>{{ item.price|number_format(2, ',', ' ') }}</td>
+                                <td class="text-end">{{ item.amount|number_format(2, ',', ' ') }}</td>
                                 <td class="text-end">
                                     <form method="post" action="{{ path('deal_item_remove', {id: deal.id, itemId: item.id}) }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('deal_item_remove' ~ item.id) }}">
@@ -99,7 +120,7 @@
     <div class="col-lg-6">
         <div class="card mb-4">
             <div class="card-body">
-                <h3 class="card-title">Начисления</h3>
+                <h3 class="card-title">Прямые расходы</h3>
                 <div class="table-responsive mb-3">
                     <table class="table table-vcenter">
                         <thead>
@@ -115,7 +136,7 @@
                             <tr>
                                 <td>{{ charge.chargeType.name }}</td>
                                 <td>{{ charge.recognizedAt|date('d.m.Y') }}</td>
-                                <td class="text-end">{{ charge.amount }}</td>
+                                <td class="text-end">{{ charge.amount|number_format(2, ',', ' ') }}</td>
                                 <td class="text-end">
                                     <form method="post" action="{{ path('deal_charge_remove', {id: deal.id, chargeId: charge.id}) }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_remove' ~ charge.id) }}">
@@ -125,7 +146,7 @@
                             </tr>
                         {% else %}
                             <tr>
-                                <td colspan="4" class="text-center text-muted">Пока нет начислений.</td>
+                                <td colspan="4" class="text-center text-muted">Пока нет расходов.</td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -137,7 +158,7 @@
                     {{ form_row(chargeForm.recognizedAt) }}
                     {{ form_row(chargeForm.amount) }}
                     {{ form_row(chargeForm.comment) }}
-                    <button type="submit" class="btn btn-primary">Добавить начисление</button>
+                    <button type="submit" class="btn btn-primary">Добавить расход</button>
                 {{ form_end(chargeForm) }}
             </div>
         </div>
@@ -159,7 +180,7 @@
                             <tr>
                                 <td>{{ adjustment.type.value }}</td>
                                 <td>{{ adjustment.recognizedAt|date('d.m.Y') }}</td>
-                                <td class="text-end">{{ adjustment.amount }}</td>
+                                <td class="text-end">{{ adjustment.amount|number_format(2, ',', ' ') }}</td>
                             </tr>
                         {% else %}
                             <tr>
