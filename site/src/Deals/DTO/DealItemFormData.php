@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Deals\DTO;
 
-use App\Catalog\Entity\Product;
+use App\Deals\Enum\DealItemKind;
 use Symfony\Component\Validator\Constraints as Assert;
 
 final class DealItemFormData
 {
+    #[Assert\NotBlank]
+    public string $name = '';
+
     #[Assert\NotNull]
-    public ?Product $productId = null;
+    public ?DealItemKind $kind = DealItemKind::GOOD;
+
+    public ?string $unit = null;
 
     #[Assert\Positive]
     public string $qty = '0';
