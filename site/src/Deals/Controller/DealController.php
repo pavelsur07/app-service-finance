@@ -33,13 +33,11 @@ use App\Shared\Service\ActiveCompanyService;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
-use Symfony\Component\HttpKernel\Exception\ConflictHttpException;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\HttpKernel\Exception\UnprocessableEntityHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/deals')]
@@ -104,7 +102,7 @@ final class DealController extends AbstractController
             try {
                 $deal = $dealManager->createDeal($createRequest, $user, $company);
             } catch (\Throwable $exception) {
-                $this->handleDealException($exception);
+                return $this->handleDealException($exception, $request);
             }
 
             $this->addFlash('success', 'Сделка создана.');
@@ -118,10 +116,14 @@ final class DealController extends AbstractController
     }
 
     #[Route('/{id}', name: 'deal_show', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['GET'])]
-    public function show(string $id, DealRepository $dealRepository): Response
+    public function show(Request $request, string $id, DealRepository $dealRepository): Response
     {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         return $this->renderShowPage($deal, $this->createItemForm($company), $this->createChargeForm($company), $this->createAdjustmentForm($company));
     }
@@ -134,7 +136,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         if (!$this->isCsrfTokenValid('deal_confirm'.$deal->getId(), (string) $request->request->get('_token'))) {
             throw new AccessDeniedHttpException('Invalid CSRF token.');
@@ -145,7 +151,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->confirmDeal($deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Сделка подтверждена.');
@@ -161,7 +167,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         if (!$this->isCsrfTokenValid('deal_cancel'.$deal->getId(), (string) $request->request->get('_token'))) {
             throw new AccessDeniedHttpException('Invalid CSRF token.');
@@ -172,7 +182,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->cancelDeal($deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Сделка отменена.');
@@ -188,7 +198,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         $form = $this->createItemForm($company);
         $form->handleRequest($request);
@@ -210,7 +224,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->addItem($itemRequest, $deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Позиция добавлена.');
@@ -226,7 +240,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         $form = $this->createChargeForm($company);
         $form->handleRequest($request);
@@ -253,7 +271,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->addCharge($chargeRequest, $deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Начисление добавлено.');
@@ -269,7 +287,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         $form = $this->createAdjustmentForm($company);
         $form->handleRequest($request);
@@ -296,7 +318,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->addAdjustment($adjustmentRequest, $deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Корректировка добавлена.');
@@ -313,7 +335,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyService->getActiveCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         if (!$this->isCsrfTokenValid('deal_item_remove'.$itemId, (string) $request->request->get('_token'))) {
             throw new AccessDeniedHttpException('Invalid CSRF token.');
@@ -324,7 +350,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->removeItem(new RemoveDealItemRequest($itemId), $deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Позиция удалена.');
@@ -341,7 +367,11 @@ final class DealController extends AbstractController
         DealManager $dealManager,
     ): Response {
         $company = $this->companyContextService->getCompany();
-        $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        try {
+            $deal = $this->getDealOrFail($id, $company, $dealRepository);
+        } catch (\Throwable $exception) {
+            return $this->handleDealException($exception, $request);
+        }
 
         if (!$this->isCsrfTokenValid('deal_charge_remove'.$chargeId, (string) $request->request->get('_token'))) {
             throw new AccessDeniedHttpException('Invalid CSRF token.');
@@ -352,7 +382,7 @@ final class DealController extends AbstractController
         try {
             $dealManager->removeCharge(new RemoveDealChargeRequest($chargeId), $deal, $user, $company);
         } catch (\Throwable $exception) {
-            $this->handleDealException($exception);
+            return $this->handleDealException($exception, $request);
         }
 
         $this->addFlash('success', 'Начисление удалено.');
@@ -406,13 +436,13 @@ final class DealController extends AbstractController
         try {
             $uuid = Uuid::fromString($id);
         } catch (\InvalidArgumentException $exception) {
-            throw new BadRequestHttpException('Invalid deal id.', $exception);
+            throw new ValidationFailed('Invalid deal id.', previous: $exception);
         }
 
         $deal = $dealRepository->findOneByIdForCompany($uuid, $company);
 
         if (!$deal) {
-            throw new NotFoundHttpException('Deal not found.');
+            throw new DealNotFound('Deal not found.');
         }
 
         return $deal;
@@ -429,25 +459,66 @@ final class DealController extends AbstractController
         return $user;
     }
 
-    private function handleDealException(\Throwable $exception): never
+    private function handleDealException(\Throwable $exception, Request $request): Response
     {
         if ($exception instanceof DealAccessDenied) {
-            throw new AccessDeniedHttpException($exception->getMessage(), $exception);
+            return $this->buildDealErrorResponse($exception->getMessage(), Response::HTTP_FORBIDDEN, $request);
         }
 
         if ($exception instanceof DealNotFound) {
-            throw new NotFoundHttpException($exception->getMessage(), $exception);
+            return $this->buildDealErrorResponse($exception->getMessage(), Response::HTTP_NOT_FOUND, $request);
         }
 
         if ($exception instanceof InvalidDealState) {
-            throw new ConflictHttpException($exception->getMessage(), $exception);
+            return $this->buildDealErrorResponse($exception->getMessage(), Response::HTTP_CONFLICT, $request);
         }
 
         if ($exception instanceof ValidationFailed) {
-            throw new UnprocessableEntityHttpException($exception->getMessage(), $exception);
+            return $this->buildDealErrorResponse($exception->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY, $request, $exception->errors);
         }
 
         throw $exception;
+    }
+
+    /**
+     * @param array<string, mixed> $errors
+     */
+    private function buildDealErrorResponse(
+        string $message,
+        int $status,
+        Request $request,
+        array $errors = [],
+    ): Response {
+        if ($this->isApiRequest($request)) {
+            $payload = ['message' => $message];
+            if ($errors !== []) {
+                $payload['errors'] = $errors;
+            }
+
+            return new JsonResponse($payload, $status);
+        }
+
+        $this->addFlash('danger', $message);
+
+        return $this->render('deals/error.html.twig', [
+            'message' => $message,
+            'status' => $status,
+        ], new Response(status: $status));
+    }
+
+    private function isApiRequest(Request $request): bool
+    {
+        if ($request->isXmlHttpRequest()) {
+            return true;
+        }
+
+        $format = $request->getRequestFormat();
+        if ($format === 'json') {
+            return true;
+        }
+
+        $acceptHeader = (string) $request->headers->get('Accept');
+        return str_contains($acceptHeader, 'application/json');
     }
 
     private function createItemForm(Company $company, ?DealItemFormData $data = null): FormInterface
@@ -469,7 +540,7 @@ final class DealController extends AbstractController
     {
         $product = $data->productId;
         if (!$product) {
-            throw new UnprocessableEntityHttpException('Product is required.');
+            throw new ValidationFailed('Product is required.');
         }
 
         $kind = DealItemKind::GOOD;
