@@ -6,6 +6,8 @@ use App\Company\Entity\Company;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
 use App\Deals\Enum\DealType;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -60,6 +62,9 @@ class Deal
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    #[ORM\OneToMany(mappedBy: 'deal', targetEntity: DealItem::class, cascade: ['persist', 'remove'])]
+    private Collection $items;
+
     public function __construct(
         string $id,
         Company $company,
@@ -78,6 +83,7 @@ class Deal
         $this->recognizedAt = $recognizedAt;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = $this->createdAt;
+        $this->items = new ArrayCollection();
     }
 
     public function getId(): ?string
@@ -237,6 +243,33 @@ class Deal
     public function setUpdatedAt(\DateTimeImmutable $updatedAt): self
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    /** @return Collection<int, DealItem> */
+    public function getItems(): Collection
+    {
+        return $this->items;
+    }
+
+    public function addItem(DealItem $item): self
+    {
+        if (!$this->items->contains($item)) {
+            $this->items->add($item);
+            $item->setDeal($this);
+        }
+
+        return $this;
+    }
+
+    public function removeItem(DealItem $item): self
+    {
+        if ($this->items->removeElement($item)) {
+            if ($item->getDeal() === $this) {
+                $item->setDeal(null);
+            }
+        }
 
         return $this;
     }
