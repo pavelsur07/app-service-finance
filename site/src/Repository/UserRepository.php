@@ -5,6 +5,8 @@ namespace App\Repository;
 use App\Company\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Symfony\Bridge\Doctrine\Security\User\UserLoaderInterface;
 use Symfony\Component\Security\Core\Exception\UnsupportedUserException;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
@@ -35,14 +37,21 @@ class UserRepository extends ServiceEntityRepository implements PasswordUpgrader
     }
 
     /**
-     * @return list<User>
+     * @return Pagerfanta<User>
      */
-    public function getRegisteredUsers(): array
+    public function getRegisteredUsers(int $page, int $limit = 20): Pagerfanta
     {
-        return $this->createQueryBuilder('user')
-            ->orderBy('user.email', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $page = max(1, $page);
+
+        $queryBuilder = $this->createQueryBuilder('user')
+            ->orderBy('user.createdAt', 'DESC');
+
+        $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
+        $pager->setMaxPerPage($limit);
+        $pager->setAllowOutOfRangePages(true);
+        $pager->setCurrentPage($page);
+
+        return $pager;
     }
 
     public function countRegisteredUsers(): int

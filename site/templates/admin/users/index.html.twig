@@ -86,5 +86,8 @@
         <p class="text-muted mb-0">Нет зарегистрированных пользователей.</p>
       {% endif %}
     </div>
+    <div class="card-footer d-flex align-items-center">
+      {% include 'partials/_pagerfanta.html.twig' with { pager: pager } %}
+    </div>
   </div>
 {% endblock %}
