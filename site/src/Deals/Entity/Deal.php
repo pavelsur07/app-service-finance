@@ -68,6 +68,9 @@ class Deal
     #[ORM\OneToMany(mappedBy: 'deal', targetEntity: DealCharge::class, cascade: ['persist', 'remove'])]
     private Collection $charges;
 
+    #[ORM\OneToMany(mappedBy: 'deal', targetEntity: DealAdjustment::class, cascade: ['persist', 'remove'])]
+    private Collection $adjustments;
+
     public function __construct(
         string $id,
         Company $company,
@@ -88,6 +91,7 @@ class Deal
         $this->updatedAt = $this->createdAt;
         $this->items = new ArrayCollection();
         $this->charges = new ArrayCollection();
+        $this->adjustments = new ArrayCollection();
     }
 
     public function getId(): ?string
@@ -299,6 +303,33 @@ class Deal
         if ($this->charges->removeElement($charge)) {
             if ($charge->getDeal() === $this) {
                 $charge->setDeal(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /** @return Collection<int, DealAdjustment> */
+    public function getAdjustments(): Collection
+    {
+        return $this->adjustments;
+    }
+
+    public function addAdjustment(DealAdjustment $adjustment): self
+    {
+        if (!$this->adjustments->contains($adjustment)) {
+            $this->adjustments->add($adjustment);
+            $adjustment->setDeal($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAdjustment(DealAdjustment $adjustment): self
+    {
+        if ($this->adjustments->removeElement($adjustment)) {
+            if ($adjustment->getDeal() === $this) {
+                $adjustment->setDeal(null);
             }
         }
 
