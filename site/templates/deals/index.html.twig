@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Сделки{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Сделки</h2>
+    <div class="ms-auto d-print-none">
+        <a href="{{ path('deal_new') }}" class="btn btn-primary">Новая сделка</a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label" for="deal-date-from">Дата с</label>
+                <input id="deal-date-from" type="date" name="dateFrom" value="{{ filters.dateFrom }}" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="deal-date-to">Дата по</label>
+                <input id="deal-date-to" type="date" name="dateTo" value="{{ filters.dateTo }}" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="deal-status">Статус</label>
+                <select id="deal-status" name="status" class="form-select">
+                    <option value="">Все</option>
+                    {% for status in statusOptions %}
+                        <option value="{{ status.value }}" {% if filters.status == status.value %}selected{% endif %}>{{ status.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="deal-channel">Канал</label>
+                <select id="deal-channel" name="channel" class="form-select">
+                    <option value="">Все</option>
+                    {% for channel in channelOptions %}
+                        <option value="{{ channel.value }}" {% if filters.channel == channel.value %}selected{% endif %}>{{ channel.value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-outline-primary">Применить фильтры</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+                <tr>
+                    <th>Номер</th>
+                    <th>Название</th>
+                    <th>Дата признания</th>
+                    <th>Канал</th>
+                    <th>Статус</th>
+                    <th class="text-end">Сумма</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for deal in deals %}
+                <tr>
+                    <td>
+                        <a href="{{ path('deal_show', {id: deal.id}) }}">{{ deal.number }}</a>
+                    </td>
+                    <td>{{ deal.title ?: '—' }}</td>
+                    <td>{{ deal.recognizedAt ? deal.recognizedAt|date('d.m.Y') : '—' }}</td>
+                    <td>{{ deal.channel.value }}</td>
+                    <td>{{ deal.status.value }}</td>
+                    <td class="text-end">{{ deal.totalAmount|number_format(2, ',', ' ') }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted">Сделок пока нет.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
