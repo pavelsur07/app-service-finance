@@ -16,6 +16,7 @@ use App\Enum\DocumentType;
 use App\Repository\CounterpartyRepository;
 use App\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -111,6 +112,24 @@ class CashTransactionController extends AbstractController
             'categories' => $categories,
             'counterparties' => $counterparties,
             'pager' => $pager,
+        ]);
+    }
+
+    #[Route('/deleted', name: 'cash_transaction_deleted_index', methods: ['GET'])]
+    public function deletedIndex(
+        Request $request,
+        CashTransactionRepository $txRepo,
+        CompanyContextService $companyContextService,
+    ): Response {
+        $companyId = $companyContextService->getCompanyId();
+        $page = max(1, (int) $request->query->get('page', 1));
+        $perPage = 50;
+
+        $pager = $txRepo->paginateDeletedByCompany($companyId, $page, $perPage);
+
+        return $this->render('cash/transaction/deleted_index.html.twig', [
+            'pager' => $pager,
+            'transactions' => iterator_to_array($pager->getCurrentPageResults()),
         ]);
     }
 
@@ -318,6 +337,32 @@ class CashTransactionController extends AbstractController
             'canCreatePnlDocument' => $this->canCreatePnlDocument($tx),
             'pnlDocuments' => $this->getDocumentsForTransaction($tx),
         ]);
+    }
+
+    #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    public function restore(
+        Request $request,
+        int $id,
+        CashTransactionRepository $txRepo,
+        EntityManagerInterface $em,
+    ): Response {
+        $company = $this->companyService->getActiveCompany();
+        $tx = $txRepo->find($id);
+        if (!$tx || $tx->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('tx_restore'.$tx->getId(), $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF токен');
+
+            return $this->redirectToRoute('cash_transaction_deleted_index');
+        }
+
+        $tx->restore();
+        $em->flush();
+        $this->addFlash('success', 'Транзакция восстановлена');
+
+        return $this->redirectToRoute('cash_transaction_deleted_index');
     }
 
     #[Route('/{id}/delete', name: 'cash_transaction_delete', methods: ['POST'])]

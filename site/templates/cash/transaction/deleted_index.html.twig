@@ -1,0 +1,65 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Удалённые транзакции ДДС{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Удалённые транзакции ДДС</h2>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_index') }}">Все</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_audit_index') }}">История</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ path('cash_transaction_deleted_index') }}">Удалённые</a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+                <tr>
+                    <th>Дата удаления</th>
+                    <th class="text-end text-nowrap">Сумма</th>
+                    <th>Счёт/категория</th>
+                    <th class="text-end">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for tx in transactions %}
+                <tr>
+                    <td>{{ tx.deletedAt ? tx.deletedAt|date('d.m.Y H:i') : '—' }}</td>
+                    <td class="text-end text-nowrap">
+                        <span class="text-{{ tx.direction.value == 'INFLOW' ? 'success' : 'danger' }}">
+                            {{ tx.direction.value == 'INFLOW' ? '+' : '-' }}{{ tx.amount|number_format(2, ',', ' ') }} {{ tx.currency }}
+                        </span>
+                    </td>
+                    <td>
+                        <div>{{ tx.moneyAccount ? tx.moneyAccount.name : '—' }}</div>
+                        <div class="text-muted small">{{ tx.cashflowCategory ? tx.cashflowCategory.name : '—' }}</div>
+                    </td>
+                    <td class="text-end">
+                        <form method="post" action="{{ path('cash_transaction_restore', {id: tx.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('tx_restore' ~ tx.id) }}">
+                            <button type="submit" class="btn btn-outline-primary btn-sm">Восстановить</button>
+                        </form>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">Нет удалённых транзакций</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex align-items-center">
+        {% include 'partials/_pagerfanta.html.twig' with {pager: pager} %}
+    </div>
+</div>
+{% endblock %}
