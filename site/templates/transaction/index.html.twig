@@ -62,6 +62,18 @@
         </div>
     </div>
 </div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ path('cash_transaction_index') }}">Все</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_audit_index') }}">История</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_deleted_index') }}">Удалённые</a>
+    </li>
+</ul>
 {% if transactions is defined and transactions|length == 0 %}
   <div class="card my-3">
     <div class="card-body text-center">
