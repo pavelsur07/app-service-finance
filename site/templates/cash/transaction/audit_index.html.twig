@@ -1,0 +1,80 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}История транзакций ДДС{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">История транзакций ДДС</h2>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_index') }}">Все</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ path('cash_transaction_audit_index') }}">История</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_deleted_index') }}">Удалённые</a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+                <tr>
+                    <th>Дата/время</th>
+                    <th>Действие</th>
+                    <th>Пользователь</th>
+                    <th>EntityId</th>
+                    <th>Diff</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for audit in auditLogs %}
+                <tr>
+                    <td>{{ audit.createdAt|date('d.m.Y H:i:s') }}</td>
+                    <td>{{ audit.action.value }}</td>
+                    <td>{{ audit.actorUserId ?? '—' }}</td>
+                    <td>
+                        {% if audit.entityId matches '/^\\d+$/' %}
+                            <a href="{{ path('cash_transaction_show', {id: audit.entityId}) }}">{{ audit.entityId }}</a>
+                        {% else %}
+                            {{ audit.entityId }}
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if audit.diff %}
+                            <pre class="mb-0">{{ audit.diff|json_encode(constant('JSON_PRETTY_PRINT')) }}</pre>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">Нет записей</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between">
+        <div>
+            {% if auditPager.hasPreviousPage %}
+                <a class="btn btn-outline-secondary" href="{{ path('cash_transaction_audit_index', {page: auditPager.getPreviousPage}) }}">Назад</a>
+            {% else %}
+                <span class="btn btn-outline-secondary disabled">Назад</span>
+            {% endif %}
+        </div>
+        <div>
+            {% if auditPager.hasNextPage %}
+                <a class="btn btn-outline-secondary" href="{{ path('cash_transaction_audit_index', {page: auditPager.getNextPage}) }}">Вперёд</a>
+            {% else %}
+                <span class="btn btn-outline-secondary disabled">Вперёд</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
