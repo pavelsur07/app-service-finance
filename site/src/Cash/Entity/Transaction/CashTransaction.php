@@ -100,6 +100,15 @@ class CashTransaction
     #[ORM\Column(type: 'datetime')]
     private \DateTimeInterface $updatedAt;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deletedAt = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $deletedBy = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $deleteReason = null;
+
     public function __construct(
         string $id,
         Company $company,
@@ -442,6 +451,29 @@ class CashTransaction
         $this->updatedAt = $u;
 
         return $this;
+    }
+
+    public function isDeleted(): bool
+    {
+        return null !== $this->deletedAt;
+    }
+
+    public function markDeleted(?string $userId, ?string $reason = null): void
+    {
+        if (null !== $this->deletedAt) {
+            return;
+        }
+
+        $this->deletedAt = new \DateTimeImmutable();
+        $this->deletedBy = $userId;
+        $this->deleteReason = $reason;
+    }
+
+    public function restore(): void
+    {
+        $this->deletedAt = null;
+        $this->deletedBy = null;
+        $this->deleteReason = null;
     }
 
     private function calculateRemainingAmount(?Document $excludingDocument): float
