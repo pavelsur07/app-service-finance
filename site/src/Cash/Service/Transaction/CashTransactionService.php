@@ -238,7 +238,7 @@ class CashTransactionService
      * Удаление транзакции.
      * Сначала удаляем и фиксируем это в БД, затем запускаем пересчёт по затронутому счёту.
      */
-    public function delete(CashTransaction $tx): void
+    public function delete(CashTransaction $tx, ?string $userId = null, ?string $reason = null): void
     {
         $company = $tx->getCompany();
 
@@ -252,7 +252,7 @@ class CashTransactionService
         $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
 
         // Удаляем и фиксируем
-        $this->em->remove($tx);
+        $tx->markDeleted($userId, $reason);
         $this->em->flush(); // ← flush перед пересчётом обязателен
 
         // Пересчёт по счёту
