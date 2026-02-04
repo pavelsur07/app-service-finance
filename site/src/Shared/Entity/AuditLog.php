@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace App\Shared\Entity;
 
 use App\Shared\Enum\AuditLogAction;
+use App\Shared\Repository\AuditLogRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: AuditLogRepository::class)]
 #[ORM\Table(name: 'audit_log')]
 #[ORM\Index(name: 'idx_audit_log_company_created_at', columns: ['company_id', 'created_at'])]
 #[ORM\Index(name: 'idx_audit_log_entity_created_at', columns: ['entity_class', 'entity_id', 'created_at'])]
