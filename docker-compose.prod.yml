@@ -1,5 +1,11 @@
 version: '3.8'
+x-logging: &default-logging
+    driver: "json-file"
+    options:
+        max-size: "10m"
+        max-file: "3"
 services:
+
     traefik:
         image: traefik:3.3               # Рекомендуется указать конкретную версию (например, 3.3.4)
         container_name: traefik
@@ -104,6 +110,7 @@ services:
             dockerfile: docker/production/php-fpm/Dockerfile
         container_name: site-php-fpm
         restart: always
+        logging: *default-logging
         environment:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
             APP_ENV: PROD
@@ -123,6 +130,12 @@ services:
             - site-redis
         volumes:
           - site_storage:/app/var/storage
+        deploy:
+          resources:
+            limits:
+              memory: 1500M # Максимум, который может забрать PHP
+            reservations:
+              memory: 256M
     site-php-cli:
         build:
             context: site
@@ -173,18 +186,38 @@ services:
             - site-redis
         volumes:
           - site_storage:/app/var/storage
+#    Legacy setting
+#    site-postgres:
+#        image: postgres:15-alpine
+#        container_name: symfony-postgres
+#        restart: always
+#        environment:
+#            POSTGRES_DB: app
+#            POSTGRES_USER: app
+#            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+#        volumes:
+#            - postgres_data:/var/lib/postgresql/data
+#        networks:
+#            - default
     site-postgres:
-        image: postgres:15-alpine
-        container_name: symfony-postgres
-        restart: always
-        environment:
-            POSTGRES_DB: app
-            POSTGRES_USER: app
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-        volumes:
-            - postgres_data:/var/lib/postgresql/data
-        networks:
-            - default
+      image: postgres:15-alpine
+      container_name: symfony-postgres
+      restart: always
+      logging: *default-logging
+      environment:
+        POSTGRES_DB: app
+        POSTGRES_USER: app
+        POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      command: >
+        postgres 
+        -c shared_buffers=1GB 
+        -c effective_cache_size=3GB 
+        -c work_mem=16MB 
+        -c maintenance_work_mem=256MB
+      volumes:
+        - postgres_data:/var/lib/postgresql/data
+      networks:
+        - default
     site-redis:
         image: redis:7-alpine
         container_name: site-redis
