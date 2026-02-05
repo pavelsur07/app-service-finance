@@ -30,6 +30,14 @@ jobs:
                   file: ./landing/docker/production/nginx/Dockerfile
                   push: true
                   tags: ghcr.io/pavelsur07/land-nginx:latest
+            # НОВЫЙ ШАГ: Сборка тяжелого PHP-FPM
+            - name: 🛠 Build and Push Site PHP-FPM
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./site
+                  file: ./site/docker/production/php-fpm/Dockerfile
+                  push: true
+                  tags: ghcr.io/pavelsur07/site-php-fpm:latest
 
     # 2. ЭТАП ДЕПЛОЯ: Отправка конфигов и запуск
     deploy:
