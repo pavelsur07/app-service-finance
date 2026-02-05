@@ -52,9 +52,6 @@ services:
             - traefik.http.routers.legacy-app.tls=true
             - traefik.http.routers.legacy-app.tls.certresolver=letsEncrypt
     land:
-        #build:
-        #    context: landing
-        #    dockerfile: docker/production/nginx/Dockerfile
         image: ghcr.io/pavelsur07/land-nginx:latest # <-- Добавляем это
         container_name: land-nginx
         restart: always
@@ -77,9 +74,10 @@ services:
             - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
 
     site:
-        build:
-            context: site
-            dockerfile: docker/production/nginx/Dockerfile
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/nginx/Dockerfile
+        image: ghcr.io/pavelsur07/site-nginx:latest
         container_name: site-nginx
         restart: always
         depends_on:
@@ -106,9 +104,6 @@ services:
     
     
     site-php-fpm:
-        #build:
-        #    context: site
-        #    dockerfile: docker/production/php-fpm/Dockerfile
         image: ghcr.io/pavelsur07/site-php-fpm:latest # <-- Добавляем
         container_name: site-php-fpm
         restart: always
@@ -139,9 +134,10 @@ services:
             reservations:
               memory: 256M
     site-php-cli:
-        build:
-            context: site
-            dockerfile: docker/production/php-cli/Dockerfile
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/php-cli/Dockerfile
+        image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-php-cli
         environment:
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
@@ -163,9 +159,10 @@ services:
         volumes:
           - site_storage:/app/var/storage
     site-messenger-worker:
-        build:
-            context: site
-            dockerfile: docker/production/php-cli/Dockerfile
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/php-cli/Dockerfile
+        image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker
         restart: always
         command: php bin/console messenger:consume async -vv --time-limit=3600
@@ -188,19 +185,6 @@ services:
             - site-redis
         volumes:
           - site_storage:/app/var/storage
-#    Legacy setting
-#    site-postgres:
-#        image: postgres:15-alpine
-#        container_name: symfony-postgres
-#        restart: always
-#        environment:
-#            POSTGRES_DB: app
-#            POSTGRES_USER: app
-#            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-#        volumes:
-#            - postgres_data:/var/lib/postgresql/data
-#        networks:
-#            - default
     site-postgres:
       image: postgres:15-alpine
       container_name: symfony-postgres
@@ -231,9 +215,10 @@ services:
             - default
 
     scheduler:
-        build:
-            context: site
-            dockerfile: docker/production/php-cli/Dockerfile
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/php-cli/Dockerfile
+        image: ghcr.io/pavelsur07/site-php-cli:latest
         user: root
         entrypoint: ["/bin/sh", "-lc"]
         command: >
