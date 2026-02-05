@@ -8,7 +8,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
-use Pagerfanta\Doctrine\ORM\DoctrineORMAdapter;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 
 class CashTransactionRepository extends ServiceEntityRepository
@@ -80,7 +80,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->orderBy('t.deletedAt', 'DESC');
 
-        $pager = new Pagerfanta(new DoctrineORMAdapter($qb));
+        $pager = new Pagerfanta(new QueryAdapter($qb));
         $pager->setMaxPerPage($perPage);
         $pager->setAllowOutOfRangePages(true);
         $pager->setCurrentPage($page);
