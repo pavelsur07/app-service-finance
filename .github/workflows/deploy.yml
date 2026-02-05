@@ -30,14 +30,6 @@ jobs:
                   file: ./landing/docker/production/nginx/Dockerfile
                   push: true
                   tags: ghcr.io/pavelsur07/land-nginx:latest
-            # НОВЫЙ ШАГ: Сборка тяжелого PHP-FPM
-            - name: 🛠 Build and Push Site PHP-FPM
-              uses: docker/build-push-action@v5
-              with:
-                  context: ./site
-                  file: ./site/docker/production/php-fpm/Dockerfile
-                  push: true
-                  tags: ghcr.io/pavelsur07/site-php-fpm:latest
 
     # 2. ЭТАП ДЕПЛОЯ: Отправка конфигов и запуск
     deploy:
@@ -81,9 +73,8 @@ jobs:
 
                     cd ./current
 
-                    echo "🚚 Скачивание образов"
-   #                docker compose -f docker-compose.prod.yml pull land
-                    docker compose -f docker-compose.prod.yml pull land site-php-fpm
+                    echo "🚚 Скачивание свежего образа Landing"
+                    docker compose -f docker-compose.prod.yml pull land
 
                     echo "🐳 Запуск сервисов"
                     APP_ENV="${{ secrets.APP_ENV }}" \

@@ -106,10 +106,9 @@ services:
     
     
     site-php-fpm:
-    #    build:
-    #        context: site
-    #        dockerfile: docker/production/php-fpm/Dockerfile
-        image: ghcr.io/pavelsur07/site-php-fpm:latest # <-- Добавляем
+        build:
+            context: site
+            dockerfile: docker/production/php-fpm/Dockerfile
         container_name: site-php-fpm
         restart: always
         logging: *default-logging
