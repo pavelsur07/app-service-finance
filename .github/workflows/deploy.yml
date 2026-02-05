@@ -81,8 +81,9 @@ jobs:
 
                     cd ./current
 
-                    echo "🚚 Скачивание свежего образа Landing"
-                    docker compose -f docker-compose.prod.yml pull land
+                    echo "🚚 Скачивание образов"
+   #                docker compose -f docker-compose.prod.yml pull land
+                    docker compose -f docker-compose.prod.yml pull land site-php-fpm
 
                     echo "🐳 Запуск сервисов"
                     APP_ENV="${{ secrets.APP_ENV }}" \
