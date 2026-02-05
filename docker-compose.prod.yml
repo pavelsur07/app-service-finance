@@ -52,9 +52,10 @@ services:
             - traefik.http.routers.legacy-app.tls=true
             - traefik.http.routers.legacy-app.tls.certresolver=letsEncrypt
     land:
-        build:
-            context: landing
-            dockerfile: docker/production/nginx/Dockerfile
+        #build:
+        #    context: landing
+        #    dockerfile: docker/production/nginx/Dockerfile
+        image: ghcr.io/pavelsur07/land-nginx:latest # <-- Добавляем это
         container_name: land-nginx
         restart: always
         expose:
