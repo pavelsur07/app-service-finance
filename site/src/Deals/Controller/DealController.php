@@ -260,10 +260,11 @@ final class DealController extends AbstractController
 
         $user = $this->getUserOrFail();
         $data = $form->getData();
-        $chargeTypeId = $data->chargeType?->getId();
-        if (!$chargeTypeId) {
+        $chargeType = $data->chargeType;
+        if (!$chargeType) {
             throw new ValidationFailed('Charge type is required.');
         }
+        $chargeTypeId = $chargeType->getId();
 
         $chargeRequest = new AddDealChargeRequest(
             $data->recognizedAt,
