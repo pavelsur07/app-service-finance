@@ -3,7 +3,7 @@ name: 🚀 Deploy to Production
 on:
     push:
         branches: [ master ]
-    pull_request:
+    # pull_request:
 
 jobs:
     # 1. ЭТАП СБОРКИ: Используем кэш GitHub для ускорения
