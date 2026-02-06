@@ -1,5 +1,12 @@
+# .dockerignore
 /site/.readynode_modules
 
 vendor
 .git
 .DS_Store
+.github
+var/cache
+var/log
+vendor/
+node_modules/
+tests/
