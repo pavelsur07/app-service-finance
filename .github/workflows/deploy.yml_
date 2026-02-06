@@ -3,31 +3,12 @@ name: 🚀 Deploy to Production
 on:
     push:
         branches: [ master ]
+    # pull_request:
 
 jobs:
-    # 1. ЭТАП СБОРКИ: Запускаем 4 сборки одновременно
+    # 1. ЭТАП СБОРКИ: Используем кэш GitHub для ускорения
     build-and-push:
         runs-on: ubuntu-latest
-        strategy:
-            fail-fast: false # Продолжать сборку остальных, если один упал
-            matrix:
-                include:
-                    - service: landing
-                      context: ./landing
-                      file: ./landing/docker/production/nginx/Dockerfile
-                      tag: land-nginx:latest
-                    - service: site-nginx
-                      context: ./site
-                      file: ./site/docker/production/nginx/Dockerfile
-                      tag: site-nginx:latest
-                    - service: site-php-fpm
-                      context: ./site
-                      file: ./site/docker/production/php-fpm/Dockerfile
-                      tag: site-php-fpm:latest
-                    - service: site-php-cli
-                      context: ./site
-                      file: ./site/docker/production/php-cli/Dockerfile
-                      tag: site-php-cli:latest
         permissions:
             contents: read
             packages: write
@@ -45,19 +26,49 @@ jobs:
             - name: 🛠 Set up Docker Buildx
               uses: docker/setup-buildx-action@v3
 
-            - name: 🛠 Build and Push ${{ matrix.service }}
+            - name: 🛠 Build and Push Landing Image
               uses: docker/build-push-action@v5
               with:
-                  context: ${{ matrix.context }}
-                  file: ${{ matrix.file }}
+                  context: ./landing
+                  file: ./landing/docker/production/nginx/Dockerfile
                   push: true
-                  tags: ghcr.io/pavelsur07/${{ matrix.tag }}
+                  tags: ghcr.io/pavelsur07/land-nginx:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: 🛠 Build and Push Site Nginx Image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./site
+                  file: ./site/docker/production/nginx/Dockerfile
+                  push: true
+                  tags: ghcr.io/pavelsur07/site-nginx:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: 🛠 Build and Push Site PHP-FPM Image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./site
+                  file: ./site/docker/production/php-fpm/Dockerfile
+                  push: true
+                  tags: ghcr.io/pavelsur07/site-php-fpm:latest
+                  cache-from: type=gha
+                  cache-to: type=gha,mode=max
+
+            - name: 🛠 Build and Push Site PHP-CLI Image
+              uses: docker/build-push-action@v5
+              with:
+                  context: ./site
+                  file: ./site/docker/production/php-cli/Dockerfile
+                  push: true
+                  tags: ghcr.io/pavelsur07/site-php-cli:latest
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
 
     # 2. ЭТАП ДЕПЛОЯ
     deploy:
-        needs: build-and-push # Ждет завершения ВСЕХ сборок из матрицы
+        needs: build-and-push
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
@@ -71,9 +82,13 @@ jobs:
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            - name: 📦 Create deploy archive (Configs only)
+            - name: 📦 Create deploy archive
               run: |
-                  zip -r app.zip docker-compose.prod.yml docker/
+                  zip -r app.zip . \
+                    -x "vendor/*" \
+                    -x "var/*" \
+                    -x "node_modules/*" \
+                    -x "app.zip"
 
             - name: 📤 Upload archive to server
               run: |
