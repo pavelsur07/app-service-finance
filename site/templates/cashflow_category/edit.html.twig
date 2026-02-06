@@ -10,7 +10,20 @@
         <div class="card">
             <div class="card-body">
                 {{ form_start(form) }}
-                {{ form_widget(form) }}
+                <div class="row">
+                    <div class="col-8">
+                        {{ form_row(form.name) }}
+                    </div>
+                    <div class="col-4">
+                        {{ form_row(form.parent) }}
+                    </div>
+                </div>
+                {{ form_row(form.description) }}
+                {{ form_row(form.status) }}
+                {{ form_row(form.sort) }}
+                {{ form_row(form.allowPlDocument) }}
+                {{ form_row(form.plCategory) }}
+                {{ form_rest(form) }}
                 <button class="btn btn-primary mt-2">Сохранить</button>
                 {{ form_end(form) }}
             </div>
