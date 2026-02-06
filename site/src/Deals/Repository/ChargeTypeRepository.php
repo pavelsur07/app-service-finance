@@ -44,6 +44,23 @@ class ChargeTypeRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findOneByCompanyAndCode(Company $company, string $code, ?string $excludeId = null): ?ChargeType
+    {
+        $queryBuilder = $this->createQueryBuilder('type')
+            ->andWhere('type.company = :company')
+            ->andWhere('type.code = :code')
+            ->setParameter('company', $company)
+            ->setParameter('code', $code);
+
+        if ($excludeId !== null) {
+            $queryBuilder
+                ->andWhere('type.id <> :excludeId')
+                ->setParameter('excludeId', $excludeId);
+        }
+
+        return $queryBuilder->getQuery()->getOneOrNullResult();
+    }
+
     /**
      * @return Pagerfanta<ChargeType>
      */
