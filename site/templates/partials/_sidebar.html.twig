@@ -77,7 +77,7 @@
             {% set deals_active = deals_path starts with '/deals' %}
             <li class="nav-item dropdown {{ deals_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ deals_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ deals_active ? 'true' : 'false' }}">
-                    <span class="nav-link-icon"><i class="ti ti-handshake"></i></span>
+                    <span class="nav-link-icon"><i class="ti ti-briefcase"></i></span>
                     <span class="nav-link-title">Сделки</span>
                 </a>
                 {% set deals_show = deals_active ? 'show' : '' %}
