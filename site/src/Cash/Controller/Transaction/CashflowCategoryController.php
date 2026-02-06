@@ -41,7 +41,7 @@ class CashflowCategoryController extends AbstractController
         $company = $companyService->getActiveCompany();
         $article = new CashflowCategory(Uuid::uuid4()->toString(), $company);
 
-        $parents = $repo->findBy(['company' => $company], ['sort' => 'ASC']);
+        $parents = $repo->findTreeByCompany($company);
         $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
@@ -80,7 +80,7 @@ class CashflowCategoryController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        $parents = $repo->findBy(['company' => $company], ['sort' => 'ASC']);
+        $parents = $repo->findTreeByCompany($company);
         $plCategories = $plCategoryRepository->findTreeByCompany($company);
 
         $form = $this->createForm(CashflowCategoryType::class, $article, [
