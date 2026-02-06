@@ -32,4 +32,38 @@ class ChargeTypeRepository extends ServiceEntityRepository
 
         return new Pagerfanta(new QueryAdapter($queryBuilder));
     }
+
+    public function findOneByIdForCompany(string $id, Company $company): ?ChargeType
+    {
+        return $this->createQueryBuilder('type')
+            ->andWhere('type.id = :id')
+            ->andWhere('type.company = :company')
+            ->setParameter('id', $id)
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @return Pagerfanta<ChargeType>
+     */
+    public function findListForCompany(Company $company, ?bool $isActive, int $page, int $limit): Pagerfanta
+    {
+        $queryBuilder = $this->createQueryBuilder('type')
+            ->andWhere('type.company = :company')
+            ->orderBy('type.name', 'ASC')
+            ->setParameter('company', $company);
+
+        if ($isActive !== null) {
+            $queryBuilder
+                ->andWhere('type.isActive = :isActive')
+                ->setParameter('isActive', $isActive);
+        }
+
+        $pager = new Pagerfanta(new QueryAdapter($queryBuilder));
+        $pager->setMaxPerPage($limit);
+        $pager->setCurrentPage($page);
+
+        return $pager;
+    }
 }
