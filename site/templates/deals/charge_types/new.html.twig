@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Новый тип начислений{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Новый тип начислений</h2>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% include 'deals/charge_types/_form.html.twig' with { form: form, button_label: 'Создать' } %}
+    </div>
+</div>
+{% endblock %}
