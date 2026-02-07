@@ -1,0 +1,56 @@
+<div class="table-responsive mb-3">
+    <table class="table table-vcenter">
+        <thead>
+            <tr>
+                <th>Наименование</th>
+                <th>Кол-во</th>
+                <th>Цена</th>
+                <th class="text-end">Сумма</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for item in deal.items %}
+            <tr>
+                <td>{{ item.name }}</td>
+                <td>{{ item.qty }}</td>
+                <td>{{ item.price|number_format(2, ',', ' ') }}</td>
+                <td class="text-end">{{ item.amount|number_format(2, ',', ' ') }}</td>
+                <td class="text-end">
+                    <form method="post" action="{{ path('deal_item_remove', {id: deal.id, itemId: item.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('deal_item_remove' ~ item.id) }}">
+                        <input type="hidden" name="_tab" value="items">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="5" class="text-center text-muted">Пока нет позиций.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{{ form_start(itemForm, {action: path('deal_item_add', {id: deal.id})}) }}
+    <input type="hidden" name="_tab" value="items">
+    {{ form_row(itemForm.name) }}
+    <div class="row">
+        <div class="col-md-6">
+            {{ form_row(itemForm.kind) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_row(itemForm.unit) }}
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-md-6">
+            {{ form_row(itemForm.qty) }}
+        </div>
+        <div class="col-md-6">
+            {{ form_row(itemForm.price) }}
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Добавить позицию</button>
+{{ form_end(itemForm) }}
