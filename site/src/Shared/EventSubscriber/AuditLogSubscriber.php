@@ -42,12 +42,16 @@ final class AuditLogSubscriber implements EventSubscriber
             return;
         }
 
-        $companyId = $this->auditContextProvider->getCompanyId();
+        // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
+        $companyId = $this->resolveCompanyId($entity);
+
         if ($companyId === null) {
+            // Если компанию определить невозможно (ни из сессии, ни из сущности) — выходим
             return;
         }
 
-        $actorUserId = $this->auditContextProvider->getActorUserId();
+        // Получаем ID пользователя (или null, если это делает система)
+        $actorUserId = $this->resolveActorUserId();
 
         $auditLog = new AuditLog(
             $companyId,
@@ -73,7 +77,9 @@ final class AuditLogSubscriber implements EventSubscriber
             return;
         }
 
-        $companyId = $this->auditContextProvider->getCompanyId();
+        // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
+        $companyId = $this->resolveCompanyId($entity);
+
         if ($companyId === null) {
             return;
         }
@@ -90,7 +96,8 @@ final class AuditLogSubscriber implements EventSubscriber
             $action = $newValue !== null ? AuditLogAction::SOFT_DELETE : AuditLogAction::RESTORE;
         }
 
-        $actorUserId = $this->auditContextProvider->getActorUserId();
+        // Получаем ID пользователя (или null, если это делает система)
+        $actorUserId = $this->resolveActorUserId();
 
         $auditLog = new AuditLog(
             $companyId,
@@ -102,5 +109,45 @@ final class AuditLogSubscriber implements EventSubscriber
         );
 
         $this->entityManager->persist($auditLog);
+    }
+
+    /**
+     * Пытается найти ID компании:
+     * 1. Сначала из контекста (сессия пользователя)
+     * 2. Если нет (мы в консоли/воркере) — берет из самой сущности
+     */
+    private function resolveCompanyId(CashTransaction $entity): ?string
+    {
+        // 1. Пробуем взять из провайдера (если есть сессия)
+        try {
+            $contextCompanyId = $this->auditContextProvider->getCompanyId();
+            if ($contextCompanyId !== null) {
+                return $contextCompanyId;
+            }
+        } catch (\Throwable $e) {
+            // Игнорируем ошибки сессии (SessionNotFoundException и др.)
+        }
+
+        // 2. Если контекста нет (мы в Воркере), берем ID из самой транзакции
+        $company = $entity->getCompany();
+        // Убедимся, что компания загружена и имеет ID
+        if (method_exists($company, 'getId')) {
+            return (string) $company->getId();
+        }
+
+        return null;
+    }
+
+    /**
+     * Безопасное получение ID пользователя
+     */
+    private function resolveActorUserId(): ?string
+    {
+        try {
+            return $this->auditContextProvider->getActorUserId();
+        } catch (\Throwable $e) {
+            // Если сессии нет, возвращаем null (действие выполнила Система)
+            return null;
+        }
     }
 }
