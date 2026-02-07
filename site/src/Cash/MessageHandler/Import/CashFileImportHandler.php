@@ -29,7 +29,9 @@ final class CashFileImportHandler
                 LockMode::PESSIMISTIC_WRITE
             );
             if (!$job instanceof CashFileImportJob) {
-                throw new \InvalidArgumentException('Cash file import job not found.');
+                $this->entityManager->rollback();
+
+                return;
             }
 
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
@@ -50,12 +52,20 @@ final class CashFileImportHandler
         try {
             $this->importService->import($job);
             $job->finishOk();
+            $job->setErrorMessage(null);
             $this->entityManager->flush();
         } catch (\Throwable $exception) {
-            $job->fail($exception->getMessage());
-            $this->entityManager->flush();
+            $message = sprintf(
+                '[%s] %s at %s:%d',
+                $exception::class,
+                $exception->getMessage(),
+                $exception->getFile(),
+                $exception->getLine()
+            );
+            $message = mb_substr($message, 0, 2000);
 
-            throw $exception;
+            $job->fail($message);
+            $this->entityManager->flush();
         }
     }
 }
