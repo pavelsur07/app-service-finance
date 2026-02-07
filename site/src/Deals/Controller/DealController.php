@@ -124,15 +124,14 @@ final class DealController extends AbstractController
             return $this->handleDealException($exception, $request);
         }
 
-        $chargeData = $this->createChargeFormData($deal);
-        $adjustmentData = $this->createAdjustmentFormData($deal);
         $activeTab = $this->resolveActiveTab($request);
+        $forms = $this->buildShowForms($company, $deal);
 
         return $this->renderShowPage(
             $deal,
-            $this->createItemForm($company),
-            $this->createChargeForm($company, $chargeData),
-            $this->createAdjustmentForm($company, $adjustmentData),
+            $forms['itemForm'],
+            $forms['chargeForm'],
+            $forms['adjustmentForm'],
             $activeTab,
         );
     }
@@ -223,11 +222,12 @@ final class DealController extends AbstractController
             if ($activeTab !== 'items') {
                 $activeTab = 'items';
             }
+            $forms = $this->buildShowForms($company, $deal, itemForm: $form);
             return $this->renderShowPage(
                 $deal,
-                $form,
-                $this->createChargeForm($company, $this->createChargeFormData($deal)),
-                $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
+                $forms['itemForm'],
+                $forms['chargeForm'],
+                $forms['adjustmentForm'],
                 $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
@@ -271,11 +271,12 @@ final class DealController extends AbstractController
             if ($activeTab !== 'charges') {
                 $activeTab = 'charges';
             }
+            $forms = $this->buildShowForms($company, $deal, chargeForm: $form);
             return $this->renderShowPage(
                 $deal,
-                $this->createItemForm($company),
-                $form,
-                $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
+                $forms['itemForm'],
+                $forms['chargeForm'],
+                $forms['adjustmentForm'],
                 $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
@@ -330,11 +331,12 @@ final class DealController extends AbstractController
             if ($activeTab !== 'adjustments') {
                 $activeTab = 'adjustments';
             }
+            $forms = $this->buildShowForms($company, $deal, adjustmentForm: $form);
             return $this->renderShowPage(
                 $deal,
-                $this->createItemForm($company),
-                $this->createChargeForm($company, $this->createChargeFormData($deal)),
-                $form,
+                $forms['itemForm'],
+                $forms['chargeForm'],
+                $forms['adjustmentForm'],
                 $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
@@ -571,6 +573,26 @@ final class DealController extends AbstractController
     private function createAdjustmentForm(Company $company, ?DealAdjustmentFormData $data = null): FormInterface
     {
         return $this->createForm(DealAdjustmentType::class, $data ?? new DealAdjustmentFormData(), ['company' => $company]);
+    }
+
+    /**
+     * @return array{itemForm: FormInterface, chargeForm: FormInterface, adjustmentForm: FormInterface}
+     */
+    private function buildShowForms(
+        Company $company,
+        Deal $deal,
+        ?FormInterface $itemForm = null,
+        ?FormInterface $chargeForm = null,
+        ?FormInterface $adjustmentForm = null,
+    ): array {
+        return [
+            'itemForm' => $itemForm ?? $this->createItemForm($company),
+            'chargeForm' => $chargeForm ?? $this->createChargeForm($company, $this->createChargeFormData($deal)),
+            'adjustmentForm' => $adjustmentForm ?? $this->createAdjustmentForm(
+                $company,
+                $this->createAdjustmentFormData($deal),
+            ),
+        ];
     }
 
     private function createChargeFormData(Deal $deal): DealChargeFormData
