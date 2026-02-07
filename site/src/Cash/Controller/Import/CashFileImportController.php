@@ -2,18 +2,16 @@
 
 namespace App\Cash\Controller\Import;
 
-use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Message\Import\CashFileImportMessage;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
+use App\Cash\Service\Import\File\CashFileImportFacade;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\File\FileTabularReader;
 use App\Cash\Service\Import\File\HeaderAutoMapper;
-use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\User;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
@@ -30,8 +28,7 @@ class CashFileImportController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly ImportLogger $importLogger,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly CashFileImportFacade $importFacade,
         private readonly MessageBusInterface $messageBus,
     ) {
     }
@@ -368,17 +365,13 @@ class CashFileImportController extends AbstractController
         }
 
         $company = $this->activeCompanyService->getActiveCompany();
-        $profile = new CashFileImportProfile(
-            Uuid::uuid4()->toString(),
+        $profile = $this->importFacade->createProfile(
             $company,
             $profileName,
             $mapping,
             $options,
             CashFileImportProfile::TYPE_CASH_TRANSACTION
         );
-
-        $this->entityManager->persist($profile);
-        $this->entityManager->flush();
 
         $importPayload['mapping'] = $mapping;
         $importPayload['profile_id'] = $profile->getId();
@@ -566,32 +559,25 @@ class CashFileImportController extends AbstractController
             $userIdentifier = $user;
         }
 
-        $importLog = $this->importLogger->start($company, 'cash:file', false, $userIdentifier, $fileName);
-        $this->entityManager->flush();
-
-        $jobId = Uuid::uuid4()->toString();
-        $job = new CashFileImportJob(
-            $jobId,
+        $job = $this->importFacade->createJob(
             $company,
             $account,
             'cash:file',
             $fileName,
             $fileHash,
             $mapping,
-            []
+            [],
+            $userIdentifier
         );
-        $job->setImportLog($importLog);
+        $this->importFacade->commitJob($job);
 
-        $this->entityManager->persist($job);
-        $this->entityManager->flush();
-
-        $this->messageBus->dispatch(new CashFileImportMessage($jobId));
+        $this->messageBus->dispatch(new CashFileImportMessage($job->getId()));
 
         $session->remove('cash_file_import');
 
         return $this->render('cash/file_import_queued.html.twig', [
-            'jobId' => $jobId,
-            'importLogId' => $importLog->getId(),
+            'jobId' => $job->getId(),
+            'importLogId' => $job->getImportLog()?->getId(),
         ]);
     }
 

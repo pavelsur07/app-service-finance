@@ -4,9 +4,8 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Entity\Import\CashFileImportProfile;
 use App\Cash\Repository\Import\CashFileImportProfileRepository;
+use App\Cash\Service\Import\File\CashFileImportFacade;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,7 +16,7 @@ class CashFileImportProfileController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
-        private readonly EntityManagerInterface $entityManager,
+        private readonly CashFileImportFacade $importFacade,
     ) {
     }
 
@@ -67,17 +66,13 @@ class CashFileImportProfileController extends AbstractController
                 return $this->render('cash/file_import_profiles/new.html.twig', $formData);
             }
 
-            $profile = new CashFileImportProfile(
-                Uuid::uuid4()->toString(),
+            $this->importFacade->createProfile(
                 $company,
                 $name,
                 $mapping,
                 $options,
                 CashFileImportProfile::TYPE_CASH_TRANSACTION
             );
-
-            $this->entityManager->persist($profile);
-            $this->entityManager->flush();
 
             return $this->redirectToRoute('cash_file_import_profile_index');
         }
@@ -130,12 +125,13 @@ class CashFileImportProfileController extends AbstractController
                 return $this->render('cash/file_import_profiles/edit.html.twig', $formData);
             }
 
-            $profile->setName($name);
-            $profile->setMapping($mapping);
-            $profile->setOptions($options);
-            $profile->setType(CashFileImportProfile::TYPE_CASH_TRANSACTION);
-
-            $this->entityManager->flush();
+            $this->importFacade->updateProfile(
+                $profile,
+                $name,
+                $mapping,
+                $options,
+                CashFileImportProfile::TYPE_CASH_TRANSACTION
+            );
 
             return $this->redirectToRoute('cash_file_import_profile_index');
         }
@@ -157,8 +153,7 @@ class CashFileImportProfileController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$profile->getId(), (string) $request->request->get('_token'))) {
-            $this->entityManager->remove($profile);
-            $this->entityManager->flush();
+            $this->importFacade->deleteProfile($profile);
         }
 
         return $this->redirectToRoute('cash_file_import_profile_index');
