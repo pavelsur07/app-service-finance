@@ -4,7 +4,6 @@ namespace App\Cash\Controller\Import;
 
 use App\Cash\Repository\Import\ImportLogRepository;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\Tools\Pagination\Paginator;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -28,28 +27,16 @@ class ImportLogController extends AbstractController
         $dateFrom = $request->query->get('date_from');
         $dateTo = $request->query->get('date_to');
 
-        $qb = $repo->createQueryBuilder('l')
-            ->andWhere('l.company = :c')->setParameter('c', $company)
-            ->orderBy('l.startedAt', 'DESC');
-
-        if ($source) {
-            $qb->andWhere('l.source = :s')->setParameter('s', $source);
-        }
-        if ($dateFrom) {
-            $qb->andWhere('l.startedAt >= :df')->setParameter('df', new \DateTimeImmutable($dateFrom.' 00:00:00'));
-        }
-        if ($dateTo) {
-            $qb->andWhere('l.startedAt <= :dt')->setParameter('dt', new \DateTimeImmutable($dateTo.' 23:59:59'));
-        }
-
-        $query = $qb->getQuery();
-        $paginator = new Paginator($query);
-        $total = count($paginator);
-
-        $query->setFirstResult(($page - 1) * $limit)->setMaxResults($limit);
-        $items = iterator_to_array($paginator);
+        $pager = $repo->paginateByCompany($company, $page, $limit, [
+            'source' => $source,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+        ]);
+        $items = iterator_to_array($pager->getCurrentPageResults());
+        $total = $pager->getNbResults();
 
         return $this->render('import_log/index.html.twig', [
+            'pager' => $pager,
             'items' => $items,
             'total' => $total,
             'page' => $page,
