@@ -88,6 +88,54 @@ class CashTransactionRepository extends ServiceEntityRepository
         return $pager;
     }
 
+    public function paginateByCompanyWithFilters(
+        Company $company,
+        array $filters,
+        int $page,
+        int $perPage
+    ): Pagerfanta {
+        $qb = $this->createQueryBuilder('t')
+            ->andWhere('t.company = :company')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->orderBy('t.occurredAt', 'DESC');
+
+        if ($filters['dateFrom']) {
+            $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
+        }
+        if ($filters['dateTo']) {
+            $qb->andWhere('t.occurredAt <= :dt')->setParameter('dt', new \DateTimeImmutable($filters['dateTo']));
+        }
+        if ($filters['accountId']) {
+            $qb->andWhere('t.moneyAccount = :acc')->setParameter('acc', $filters['accountId']);
+        }
+        if ($filters['categoryId']) {
+            $qb->andWhere('t.cashflowCategory = :cat')->setParameter('cat', $filters['categoryId']);
+        }
+        if ($filters['counterpartyId']) {
+            $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
+        }
+        if ($filters['direction']) {
+            $qb->andWhere('t.direction = :dir')->setParameter('dir', $filters['direction']);
+        }
+        if ($filters['amountMin']) {
+            $qb->andWhere('t.amount >= :amin')->setParameter('amin', $filters['amountMin']);
+        }
+        if ($filters['amountMax']) {
+            $qb->andWhere('t.amount <= :amax')->setParameter('amax', $filters['amountMax']);
+        }
+        if ($filters['q']) {
+            $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
+        }
+
+        $pager = new Pagerfanta(new QueryAdapter($qb));
+        $pager->setMaxPerPage($perPage);
+        $pager->setAllowOutOfRangePages(true);
+        $pager->setCurrentPage($page);
+
+        return $pager;
+    }
+
     /**
      * @param list<string> $accountIds
      *
