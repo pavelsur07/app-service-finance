@@ -19,8 +19,6 @@ use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
-use Pagerfanta\Doctrine\ORM\QueryAdapter;
-use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -57,47 +55,10 @@ class CashTransactionController extends AbstractController
             'q' => $request->query->get('q'),
         ];
 
-        $qb = $txRepo->createQueryBuilder('t')
-            ->andWhere('t.company = :company')
-            ->andWhere('t.deletedAt IS NULL')
-            ->setParameter('company', $company)
-            ->orderBy('t.occurredAt', 'DESC');
-
-        if ($filters['dateFrom']) {
-            $qb->andWhere('t.occurredAt >= :df')->setParameter('df', new \DateTimeImmutable($filters['dateFrom']));
-        }
-        if ($filters['dateTo']) {
-            $qb->andWhere('t.occurredAt <= :dt')->setParameter('dt', new \DateTimeImmutable($filters['dateTo']));
-        }
-        if ($filters['accountId']) {
-            $qb->andWhere('t.moneyAccount = :acc')->setParameter('acc', $filters['accountId']);
-        }
-        if ($filters['categoryId']) {
-            $qb->andWhere('t.cashflowCategory = :cat')->setParameter('cat', $filters['categoryId']);
-        }
-        if ($filters['counterpartyId']) {
-            $qb->andWhere('t.counterparty = :cp')->setParameter('cp', $filters['counterpartyId']);
-        }
-        if ($filters['direction']) {
-            $qb->andWhere('t.direction = :dir')->setParameter('dir', $filters['direction']);
-        }
-        if ($filters['amountMin']) {
-            $qb->andWhere('t.amount >= :amin')->setParameter('amin', $filters['amountMin']);
-        }
-        if ($filters['amountMax']) {
-            $qb->andWhere('t.amount <= :amax')->setParameter('amax', $filters['amountMax']);
-        }
-        if ($filters['q']) {
-            $qb->andWhere('t.description LIKE :q')->setParameter('q', '%'.$filters['q'].'%');
-        }
-
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = 20;
 
-        $pager = new Pagerfanta(new QueryAdapter($qb));
-        $pager->setMaxPerPage($limit);
-        $pager->setAllowOutOfRangePages(true);
-        $pager->setCurrentPage($page);
+        $pager = $txRepo->paginateByCompanyWithFilters($company, $filters, $page, $limit);
 
         $transactions = iterator_to_array($pager->getCurrentPageResults());
 
