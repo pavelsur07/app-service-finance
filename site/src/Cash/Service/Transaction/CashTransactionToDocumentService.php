@@ -8,10 +8,18 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Enum\DocumentType;
+use App\Service\PLRegisterUpdater;
+use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 class CashTransactionToDocumentService
 {
+    public function __construct(
+        private EntityManagerInterface $em,
+        private PLRegisterUpdater $plRegisterUpdater,
+    ) {
+    }
+
     /**
      * Создаёт документ ОПиУ на полный доступный остаток транзакции ДДС.
      */
@@ -21,6 +29,25 @@ class CashTransactionToDocumentService
         $transaction->assertCanAllocateAmount($remaining);
 
         return $this->createDocument($transaction, $remaining);
+    }
+
+    public function createPnlDocumentFromTransaction(CashTransaction $transaction): Document
+    {
+        $this->em->beginTransaction();
+        try {
+            $document = $this->createFromCashTransaction($transaction);
+
+            $this->em->persist($document);
+            $this->em->flush();
+
+            $this->plRegisterUpdater->updateForDocument($document);
+            $this->em->commit();
+
+            return $document;
+        } catch (\Exception $e) {
+            $this->em->rollback();
+            throw $e;
+        }
     }
 
     /**
@@ -74,6 +101,7 @@ class CashTransactionToDocumentService
         $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
         $document
             ->setDate($transaction->getOccurredAt())
+            ->setDescription($transaction->getDescription())
             ->setType(DocumentType::CASHFLOW_EXPENSE)
             ->setCounterparty($transaction->getCounterparty())
             ->setCashTransaction($transaction);
