@@ -34,14 +34,19 @@ final class CashFileImportHandler
                 return;
             }
 
+            $this->debugMark($job, 'handler_enter');
+
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
                 $this->entityManager->commit();
 
                 return;
             }
 
+            $this->debugMark($job, 'queued_confirmed');
+
             $job->start();
             $this->entityManager->flush();
+            $this->debugMark($job, 'job_started_committed');
             $this->entityManager->commit();
         } catch (\Throwable $exception) {
             $this->entityManager->rollback();
@@ -52,6 +57,7 @@ final class CashFileImportHandler
         $importException = null;
 
         try {
+            $this->debugMark($job, 'before_import');
             $this->importService->import($job);
         } catch (\Throwable $exception) {
             $importException = $exception;
@@ -63,6 +69,7 @@ final class CashFileImportHandler
         }
 
         if (null === $importException) {
+            $this->debugMark($freshJob, 'after_import');
             $freshJob->finishOk();
             $freshJob->setErrorMessage(null);
             $this->entityManager->flush();
@@ -70,8 +77,11 @@ final class CashFileImportHandler
             return;
         }
 
+        $this->debugMark($freshJob, 'import_exception');
+        $debugTimestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
         $message = sprintf(
-            '[%s] %s at %s:%d',
+            'DBG:import_exception %s [%s] %s at %s:%d',
+            $debugTimestamp,
             $importException::class,
             $importException->getMessage(),
             $importException->getFile(),
@@ -80,6 +90,13 @@ final class CashFileImportHandler
         $message = mb_substr($message, 0, 2000);
 
         $freshJob->fail($message);
+        $this->entityManager->flush();
+    }
+
+    private function debugMark(CashFileImportJob $job, string $stage): void
+    {
+        $timestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
+        $job->setErrorMessage(sprintf('DBG:%s %s', $stage, $timestamp));
         $this->entityManager->flush();
     }
 }
