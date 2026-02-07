@@ -21,8 +21,10 @@ framework:
             messenger.bus.default: []
 
         routing:
-            App\Message\ApplyAutoRulesForTransaction: async
-            App\Message\EnqueueAutoRulesForRange: async
+            'App\Message\ApplyAutoRulesForTransaction': async
+            'App\Message\EnqueueAutoRulesForRange': async
+            #App\Message\ApplyAutoRulesForTransaction: async
+            #App\Message\EnqueueAutoRulesForRange: async
             App\Message\SendRegistrationEmailMessage: async
             App\Cash\Message\Import\BankImportMessage: async
             App\Cash\Message\Import\CashFileImportMessage: async
