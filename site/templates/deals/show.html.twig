@@ -62,11 +62,35 @@
     </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-lg-6">
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title">Позиции</h3>
+<div class="card">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+            <li class="nav-item">
+                <a href="#deal-tab-items" class="nav-link {% if activeTab == 'items' %}active{% endif %}">
+                    <i class="ti ti-list"></i>
+                    Позиции
+                    <span class="badge bg-secondary-lt ms-1">{{ deal.items|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#deal-tab-charges" class="nav-link {% if activeTab == 'charges' %}active{% endif %}">
+                    <i class="ti ti-receipt"></i>
+                    Прямые расходы
+                    <span class="badge bg-secondary-lt ms-1">{{ deal.charges|length }}</span>
+                </a>
+            </li>
+            <li class="nav-item">
+                <a href="#deal-tab-adjustments" class="nav-link {% if activeTab == 'adjustments' %}active{% endif %}">
+                    <i class="ti ti-adjustments"></i>
+                    Корректировки
+                    <span class="badge bg-secondary-lt ms-1">{{ deal.adjustments|length }}</span>
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="card-body">
+        <div class="tab-content">
+            <div class="tab-pane {% if activeTab == 'items' %}active show{% endif %}" id="deal-tab-items">
                 <div class="table-responsive mb-3">
                     <table class="table table-vcenter">
                         <thead>
@@ -88,6 +112,7 @@
                                 <td class="text-end">
                                     <form method="post" action="{{ path('deal_item_remove', {id: deal.id, itemId: item.id}) }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('deal_item_remove' ~ item.id) }}">
+                                        <input type="hidden" name="_tab" value="items">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
                                     </form>
                                 </td>
@@ -102,6 +127,7 @@
                 </div>
 
                 {{ form_start(itemForm, {action: path('deal_item_add', {id: deal.id})}) }}
+                    <input type="hidden" name="_tab" value="items">
                     {{ form_row(itemForm.name) }}
                     <div class="row">
                         <div class="col-md-6">
@@ -122,12 +148,8 @@
                     <button type="submit" class="btn btn-primary">Добавить позицию</button>
                 {{ form_end(itemForm) }}
             </div>
-        </div>
-    </div>
 
-    <div class="col-lg-6">
-        <div class="card mb-4">
-            <div class="card-body">
+            <div class="tab-pane {% if activeTab == 'charges' %}active show{% endif %}" id="deal-tab-charges">
                 <div class="d-flex align-items-center justify-content-between">
                     <h3 class="card-title mb-0">Прямые расходы</h3>
                     <a class="btn btn-sm btn-outline-secondary" href="{{ path('deal_charge_type_index') }}">Типы расходов</a>
@@ -151,6 +173,7 @@
                                 <td class="text-end">
                                     <form method="post" action="{{ path('deal_charge_remove', {id: deal.id, chargeId: charge.id}) }}">
                                         <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_remove' ~ charge.id) }}">
+                                        <input type="hidden" name="_tab" value="charges">
                                         <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
                                     </form>
                                 </td>
@@ -165,6 +188,7 @@
                 </div>
 
                 {{ form_start(chargeForm, {action: path('deal_charge_add', {id: deal.id})}) }}
+                    <input type="hidden" name="_tab" value="charges">
                     {{ form_row(chargeForm.chargeType) }}
                     {{ form_row(chargeForm.recognizedAt) }}
                     {{ form_row(chargeForm.amount) }}
@@ -172,11 +196,8 @@
                     <button type="submit" class="btn btn-primary">Добавить расход</button>
                 {{ form_end(chargeForm) }}
             </div>
-        </div>
 
-        <div class="card">
-            <div class="card-body">
-                <h3 class="card-title">Корректировки</h3>
+            <div class="tab-pane {% if activeTab == 'adjustments' %}active show{% endif %}" id="deal-tab-adjustments">
                 <div class="table-responsive mb-3">
                     <table class="table table-vcenter">
                         <thead>
@@ -203,6 +224,7 @@
                 </div>
 
                 {{ form_start(adjustmentForm, {action: path('deal_adjustment_add', {id: deal.id})}) }}
+                    <input type="hidden" name="_tab" value="adjustments">
                     {{ form_row(adjustmentForm.type) }}
                     {{ form_row(adjustmentForm.recognizedAt) }}
                     {{ form_row(adjustmentForm.amount) }}

@@ -126,12 +126,14 @@ final class DealController extends AbstractController
 
         $chargeData = $this->createChargeFormData($deal);
         $adjustmentData = $this->createAdjustmentFormData($deal);
+        $activeTab = $this->resolveActiveTab($request);
 
         return $this->renderShowPage(
             $deal,
             $this->createItemForm($company),
             $this->createChargeForm($company, $chargeData),
             $this->createAdjustmentForm($company, $adjustmentData),
+            $activeTab,
         );
     }
 
@@ -162,8 +164,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Сделка подтверждена.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/cancel', name: 'deal_cancel', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -193,8 +196,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Сделка отменена.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/items/add', name: 'deal_item_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -215,11 +219,16 @@ final class DealController extends AbstractController
         $form->handleRequest($request);
 
         if (!$form->isSubmitted() || !$form->isValid()) {
+            $activeTab = $this->resolveActiveTab($request);
+            if ($activeTab !== 'items') {
+                $activeTab = 'items';
+            }
             return $this->renderShowPage(
                 $deal,
                 $form,
                 $this->createChargeForm($company, $this->createChargeFormData($deal)),
                 $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
+                $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
@@ -235,8 +244,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Позиция добавлена.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/charges/add', name: 'deal_charge_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -257,11 +267,16 @@ final class DealController extends AbstractController
         $form->handleRequest($request);
 
         if (!$form->isSubmitted() || !$form->isValid()) {
+            $activeTab = $this->resolveActiveTab($request);
+            if ($activeTab !== 'charges') {
+                $activeTab = 'charges';
+            }
             return $this->renderShowPage(
                 $deal,
                 $this->createItemForm($company),
                 $form,
                 $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
+                $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
@@ -288,8 +303,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Начисление добавлено.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/adjustments/add', name: 'deal_adjustment_add', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -310,11 +326,16 @@ final class DealController extends AbstractController
         $form->handleRequest($request);
 
         if (!$form->isSubmitted() || !$form->isValid()) {
+            $activeTab = $this->resolveActiveTab($request);
+            if ($activeTab !== 'adjustments') {
+                $activeTab = 'adjustments';
+            }
             return $this->renderShowPage(
                 $deal,
                 $this->createItemForm($company),
                 $this->createChargeForm($company, $this->createChargeFormData($deal)),
                 $form,
+                $activeTab,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
@@ -335,8 +356,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Корректировка добавлена.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/items/{itemId}/remove', name: 'deal_item_remove', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -367,8 +389,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Позиция удалена.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     #[Route('/{id}/charges/{chargeId}/remove', name: 'deal_charge_remove', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -399,8 +422,9 @@ final class DealController extends AbstractController
         }
 
         $this->addFlash('success', 'Начисление удалено.');
+        $activeTab = $this->resolveActiveTab($request);
 
-        return $this->redirectToRoute('deal_show', ['id' => $deal->getId()]);
+        return $this->redirectToRoute('deal_show', ['id' => $deal->getId(), 'tab' => $activeTab]);
     }
 
     private function parseDate(?string $value): ?\DateTimeImmutable
@@ -614,6 +638,7 @@ final class DealController extends AbstractController
         FormInterface $itemForm,
         FormInterface $chargeForm,
         FormInterface $adjustmentForm,
+        string $activeTab,
         int $status = Response::HTTP_OK,
     ): Response {
         return $this->render('deals/show.html.twig', [
@@ -621,6 +646,22 @@ final class DealController extends AbstractController
             'itemForm' => $itemForm->createView(),
             'chargeForm' => $chargeForm->createView(),
             'adjustmentForm' => $adjustmentForm->createView(),
+            'activeTab' => $activeTab,
         ], new Response(status: $status));
+    }
+
+    private function resolveActiveTab(Request $request): string
+    {
+        $tab = $request->request->get('_tab');
+        if (!is_string($tab) || $tab === '') {
+            $tab = $request->query->get('tab');
+        }
+        if (!is_string($tab) || $tab === '') {
+            $tab = 'items';
+        }
+
+        $allowedTabs = ['items', 'charges', 'adjustments'];
+
+        return in_array($tab, $allowedTabs, true) ? $tab : 'items';
     }
 }
