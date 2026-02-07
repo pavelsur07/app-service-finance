@@ -263,10 +263,10 @@ class CashTransactionController extends AbstractController
         ]);
     }
 
-    #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => '\\d+'], methods: ['POST'])]
+    #[Route('/{id}/restore', name: 'cash_transaction_restore', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
     public function restore(
         Request $request,
-        int $id,
+        string $id,
         CashTransactionRepository $txRepo,
         CashTransactionService $service,
     ): Response {
