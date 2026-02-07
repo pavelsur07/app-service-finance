@@ -1,0 +1,33 @@
+<div class="table-responsive mb-3">
+    <table class="table table-vcenter">
+        <thead>
+            <tr>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th class="text-end">Сумма</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for adjustment in deal.adjustments %}
+            <tr>
+                <td>{{ adjustment.type.value }}</td>
+                <td>{{ adjustment.recognizedAt|date('d.m.Y') }}</td>
+                <td class="text-end">{{ adjustment.amount|number_format(2, ',', ' ') }}</td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="3" class="text-center text-muted">Пока нет корректировок.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{{ form_start(adjustmentForm, {action: path('deal_adjustment_add', {id: deal.id})}) }}
+    <input type="hidden" name="_tab" value="adjustments">
+    {{ form_row(adjustmentForm.type) }}
+    {{ form_row(adjustmentForm.recognizedAt) }}
+    {{ form_row(adjustmentForm.amount) }}
+    {{ form_row(adjustmentForm.comment) }}
+    <button type="submit" class="btn btn-primary">Добавить корректировку</button>
+{{ form_end(adjustmentForm) }}
