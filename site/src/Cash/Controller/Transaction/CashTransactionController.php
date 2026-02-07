@@ -12,14 +12,10 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Document;
-use App\Enum\DocumentType;
 use App\Repository\CounterpartyRepository;
-use App\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
-use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Exception\ORMException;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
@@ -114,8 +110,6 @@ class CashTransactionController extends AbstractController
         Request $request,
         CashTransaction $tx,
         CashTransactionToDocumentService $operationFactory,
-        EntityManagerInterface $em,
-        PLRegisterUpdater $plRegisterUpdater,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         if ($tx->getCompany() !== $company) {
@@ -135,7 +129,7 @@ class CashTransactionController extends AbstractController
         }
 
         try {
-            $document = $this->createPnlDocumentFromTransaction($tx, $operationFactory, $em, $plRegisterUpdater);
+            $document = $operationFactory->createPnlDocumentFromTransaction($tx);
             $this->addFlash('success', 'Документ ОПиУ создан.');
 
             return $this->redirectToRoute('document_edit', ['id' => $document->getId()]);
@@ -168,37 +162,6 @@ class CashTransactionController extends AbstractController
         );
 
         return $documents;
-    }
-
-    private function createPnlDocumentFromTransaction(
-        CashTransaction $transaction,
-        CashTransactionToDocumentService $operationFactory,
-        EntityManagerInterface $em,
-        PLRegisterUpdater $plRegisterUpdater,
-    ): Document {
-        if (!$this->canCreatePnlDocument($transaction)) {
-            throw new \DomainException('Для транзакции нельзя создать документ ОПиУ.');
-        }
-
-        $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
-        $document->setDate($transaction->getOccurredAt());
-        $document->setDescription($transaction->getDescription());
-        $document->setType(DocumentType::CASHFLOW_EXPENSE);
-        $document->setCounterparty($transaction->getCounterparty());
-        $document->setCashTransaction($transaction);
-
-        $operation = $operationFactory->createOperationFromTransaction($transaction);
-        $operation->setAmount(number_format($transaction->getRemainingAmount(), 2, '.', ''));
-        $document->addOperation($operation);
-
-        $transaction->addDocument($document);
-
-        $em->persist($document);
-        $em->flush();
-
-        $plRegisterUpdater->updateForDocument($document);
-
-        return $document;
     }
 
     /**
