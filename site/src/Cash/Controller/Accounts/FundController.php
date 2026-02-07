@@ -8,10 +8,10 @@ use App\Cash\Form\Accounts\MoneyFundMovementType;
 use App\Cash\Form\Accounts\MoneyFundType;
 use App\Cash\Repository\Accounts\MoneyFundRepository;
 use App\Cash\Service\Accounts\FundBalanceService;
+use App\Cash\Service\Accounts\FundService;
 use App\Company\Entity\User;
 use App\Service\FeatureFlagService;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -50,7 +50,7 @@ class FundController extends AbstractController
     }
 
     #[Route('/new', name: 'finance_funds_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $entityManager): Response
+    public function new(Request $request, FundService $fundService): Response
     {
         $this->assertFeatureEnabled();
         $company = $this->activeCompanyService->getActiveCompany();
@@ -61,8 +61,7 @@ class FundController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             $fund->setCompany($company);
-            $entityManager->persist($fund);
-            $entityManager->flush();
+            $fundService->createFund($fund);
 
             $this->addFlash('success', 'Фонд создан.');
 
@@ -78,7 +77,7 @@ class FundController extends AbstractController
     public function addMovement(
         MoneyFund $fund,
         Request $request,
-        EntityManagerInterface $entityManager,
+        FundService $fundService,
     ): Response {
         $this->assertFeatureEnabled();
         $company = $this->activeCompanyService->getActiveCompany();
@@ -109,8 +108,7 @@ class FundController extends AbstractController
             $user = $this->getUser();
             $movement->setUserId($user instanceof User ? $user->getId() : null);
 
-            $entityManager->persist($movement);
-            $entityManager->flush();
+            $fundService->createMovement($movement);
 
             $this->addFlash('success', 'Движение по фонду создано.');
 
