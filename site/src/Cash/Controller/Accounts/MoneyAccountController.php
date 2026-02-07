@@ -6,9 +6,9 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Form\Accounts\MoneyAccountType as MoneyAccountFormType;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Service\Accounts\AccountBalanceService;
+use App\Cash\Service\Accounts\MoneyAccountService;
 use App\Enum\MoneyAccountType;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
@@ -19,7 +19,10 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/accounts')]
 class MoneyAccountController extends AbstractController
 {
-    public function __construct(private ActiveCompanyService $activeCompanyService)
+    public function __construct(
+        private ActiveCompanyService $activeCompanyService,
+        private MoneyAccountService $moneyAccountService
+    )
     {
     }
 
@@ -35,7 +38,7 @@ class MoneyAccountController extends AbstractController
     }
 
     #[Route('/new', name: 'money_account_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $account = new MoneyAccount(
@@ -50,8 +53,7 @@ class MoneyAccountController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($account);
-            $em->flush();
+            $this->moneyAccountService->create($account);
 
             return $this->redirectToRoute('money_account_index');
         }
@@ -65,7 +67,6 @@ class MoneyAccountController extends AbstractController
     public function edit(
         Request $request,
         MoneyAccount $account,
-        EntityManagerInterface $em,
         AccountBalanceService $balanceService,
     ): Response {
         $form = $this->createForm(MoneyAccountFormType::class, $account);
@@ -157,7 +158,7 @@ class MoneyAccountController extends AbstractController
                 }
             }
 
-            $em->flush();
+            $this->moneyAccountService->update();
 
             $company = $account->getCompany();
             $balanceService->recalculateDailyRange(
@@ -172,7 +173,7 @@ class MoneyAccountController extends AbstractController
                 new \DateTimeImmutable('today')
             );
             $account->setCurrentBalance($todayBalance->closing);
-            $em->flush();
+            $this->moneyAccountService->update();
 
             return $this->redirectToRoute('money_account_index');
         }
