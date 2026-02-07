@@ -91,146 +91,15 @@
     <div class="card-body">
         <div class="tab-content">
             <div class="tab-pane {% if activeTab == 'items' %}active show{% endif %}" id="deal-tab-items">
-                <div class="table-responsive mb-3">
-                    <table class="table table-vcenter">
-                        <thead>
-                            <tr>
-                                <th>Наименование</th>
-                                <th>Кол-во</th>
-                                <th>Цена</th>
-                                <th class="text-end">Сумма</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for item in deal.items %}
-                            <tr>
-                                <td>{{ item.name }}</td>
-                                <td>{{ item.qty }}</td>
-                                <td>{{ item.price|number_format(2, ',', ' ') }}</td>
-                                <td class="text-end">{{ item.amount|number_format(2, ',', ' ') }}</td>
-                                <td class="text-end">
-                                    <form method="post" action="{{ path('deal_item_remove', {id: deal.id, itemId: item.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('deal_item_remove' ~ item.id) }}">
-                                        <input type="hidden" name="_tab" value="items">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="5" class="text-center text-muted">Пока нет позиций.</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                {{ form_start(itemForm, {action: path('deal_item_add', {id: deal.id})}) }}
-                    <input type="hidden" name="_tab" value="items">
-                    {{ form_row(itemForm.name) }}
-                    <div class="row">
-                        <div class="col-md-6">
-                            {{ form_row(itemForm.kind) }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form_row(itemForm.unit) }}
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-6">
-                            {{ form_row(itemForm.qty) }}
-                        </div>
-                        <div class="col-md-6">
-                            {{ form_row(itemForm.price) }}
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Добавить позицию</button>
-                {{ form_end(itemForm) }}
+                {% include 'deals/_tabs/items.html.twig' with {deal: deal, itemForm: itemForm} %}
             </div>
 
             <div class="tab-pane {% if activeTab == 'charges' %}active show{% endif %}" id="deal-tab-charges">
-                <div class="d-flex align-items-center justify-content-between">
-                    <h3 class="card-title mb-0">Прямые расходы</h3>
-                    <a class="btn btn-sm btn-outline-secondary" href="{{ path('deal_charge_type_index') }}">Типы расходов</a>
-                </div>
-                <div class="table-responsive mb-3">
-                    <table class="table table-vcenter">
-                        <thead>
-                            <tr>
-                                <th>Тип</th>
-                                <th>Дата</th>
-                                <th class="text-end">Сумма</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for charge in deal.charges %}
-                            <tr>
-                                <td>{{ charge.chargeType.name }}</td>
-                                <td>{{ charge.recognizedAt|date('d.m.Y') }}</td>
-                                <td class="text-end">{{ charge.amount|number_format(2, ',', ' ') }}</td>
-                                <td class="text-end">
-                                    <form method="post" action="{{ path('deal_charge_remove', {id: deal.id, chargeId: charge.id}) }}">
-                                        <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_remove' ~ charge.id) }}">
-                                        <input type="hidden" name="_tab" value="charges">
-                                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="4" class="text-center text-muted">Пока нет расходов.</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                {{ form_start(chargeForm, {action: path('deal_charge_add', {id: deal.id})}) }}
-                    <input type="hidden" name="_tab" value="charges">
-                    {{ form_row(chargeForm.chargeType) }}
-                    {{ form_row(chargeForm.recognizedAt) }}
-                    {{ form_row(chargeForm.amount) }}
-                    {{ form_row(chargeForm.comment) }}
-                    <button type="submit" class="btn btn-primary">Добавить расход</button>
-                {{ form_end(chargeForm) }}
+                {% include 'deals/_tabs/charges.html.twig' with {deal: deal, chargeForm: chargeForm} %}
             </div>
 
             <div class="tab-pane {% if activeTab == 'adjustments' %}active show{% endif %}" id="deal-tab-adjustments">
-                <div class="table-responsive mb-3">
-                    <table class="table table-vcenter">
-                        <thead>
-                            <tr>
-                                <th>Тип</th>
-                                <th>Дата</th>
-                                <th class="text-end">Сумма</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                        {% for adjustment in deal.adjustments %}
-                            <tr>
-                                <td>{{ adjustment.type.value }}</td>
-                                <td>{{ adjustment.recognizedAt|date('d.m.Y') }}</td>
-                                <td class="text-end">{{ adjustment.amount|number_format(2, ',', ' ') }}</td>
-                            </tr>
-                        {% else %}
-                            <tr>
-                                <td colspan="3" class="text-center text-muted">Пока нет корректировок.</td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
-                {{ form_start(adjustmentForm, {action: path('deal_adjustment_add', {id: deal.id})}) }}
-                    <input type="hidden" name="_tab" value="adjustments">
-                    {{ form_row(adjustmentForm.type) }}
-                    {{ form_row(adjustmentForm.recognizedAt) }}
-                    {{ form_row(adjustmentForm.amount) }}
-                    {{ form_row(adjustmentForm.comment) }}
-                    <button type="submit" class="btn btn-primary">Добавить корректировку</button>
-                {{ form_end(adjustmentForm) }}
+                {% include 'deals/_tabs/adjustments.html.twig' with {deal: deal, adjustmentForm: adjustmentForm} %}
             </div>
         </div>
     </div>
