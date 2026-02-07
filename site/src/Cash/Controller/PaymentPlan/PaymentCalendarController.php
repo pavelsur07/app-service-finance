@@ -10,6 +10,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Cash\Service\PaymentPlan\ForecastBalanceService;
+use App\Cash\Service\PaymentPlan\PaymentCalendarFacade;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Entity\Company;
@@ -17,11 +18,9 @@ use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
-use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -35,6 +34,7 @@ final class PaymentCalendarController extends AbstractController
         private PaymentPlanRepository $paymentPlanRepository,
         private EntityManagerInterface $entityManager,
         private PaymentPlanService $paymentPlanService,
+        private PaymentCalendarFacade $paymentCalendarFacade,
         private ForecastBalanceService $forecastBalanceService,
         private RecurrenceMaterializer $recurrenceMaterializer,
     ) {
@@ -62,28 +62,7 @@ final class PaymentCalendarController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid() && null !== $dto->cashflowCategory) {
-            $plan = new PaymentPlan(
-                Uuid::uuid4()->toString(),
-                $company,
-                $dto->cashflowCategory,
-                \DateTimeImmutable::createFromInterface($dto->plannedAt),
-                (string) $dto->amount
-            );
-
-            $this->paymentPlanService->applyCompanyScope($plan, $company);
-            $plan->setCashflowCategory($dto->cashflowCategory);
-            $plan->setPlannedAt(\DateTimeImmutable::createFromInterface($dto->plannedAt));
-            $plan->setAmount((string) $dto->amount);
-            $plan->setMoneyAccount($dto->moneyAccount);
-            $plan->setCounterparty($dto->counterparty);
-            $plan->setComment($dto->comment);
-
-            $resolvedType = $this->paymentPlanService->resolveTypeByCategory($dto->cashflowCategory);
-            $plan->setType(PaymentPlanTypeEnum::from($resolvedType));
-            $plan->setStatus($this->resolveStatus($dto->status));
-
-            $this->entityManager->persist($plan);
-            $this->entityManager->flush();
+            $this->paymentCalendarFacade->createPlanFromDto($company, $dto);
 
             $this->addFlash('success', 'Создано');
 
@@ -127,19 +106,7 @@ final class PaymentCalendarController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid() && null !== $dto->cashflowCategory) {
-            $this->paymentPlanService->applyCompanyScope($plan, $company);
-            $plan->setCashflowCategory($dto->cashflowCategory);
-            $plan->setPlannedAt(\DateTimeImmutable::createFromInterface($dto->plannedAt));
-            $plan->setAmount((string) $dto->amount);
-            $plan->setMoneyAccount($dto->moneyAccount);
-            $plan->setCounterparty($dto->counterparty);
-            $plan->setComment($dto->comment);
-
-            $resolvedType = $this->paymentPlanService->resolveTypeByCategory($dto->cashflowCategory);
-            $plan->setType(PaymentPlanTypeEnum::from($resolvedType));
-            $plan->setStatus($this->resolveStatus($dto->status));
-
-            $this->entityManager->flush();
+            $this->paymentCalendarFacade->updatePlanFromDto($plan, $company, $dto);
 
             $this->addFlash('success', 'Сохранено');
 
@@ -189,8 +156,7 @@ final class PaymentCalendarController extends AbstractController
         }
 
         try {
-            $this->paymentPlanService->transitionStatus($plan, $targetStatus);
-            $this->entityManager->flush();
+            $this->paymentCalendarFacade->changeStatus($plan, $targetStatus);
         } catch (\DomainException $exception) {
             $this->addFlash('danger', $exception->getMessage());
 
@@ -237,8 +203,7 @@ final class PaymentCalendarController extends AbstractController
             return $this->redirectToRoute('payment_calendar_index', $this->buildFilterQuery($filters));
         }
 
-        $plan->setPlannedAt($plannedAt->modify(sprintf('+%d day', $days)));
-        $this->entityManager->flush();
+        $this->paymentCalendarFacade->postpone($plan, $days);
 
         $this->addFlash('success', sprintf('Платёж перенесён на %d дн.', $days));
 
@@ -416,15 +381,6 @@ final class PaymentCalendarController extends AbstractController
         $result = $qb->getQuery()->getResult();
 
         return $result;
-    }
-
-    private function resolveStatus(?string $status): PaymentPlanStatusEnum
-    {
-        if (null === $status || '' === $status) {
-            return PaymentPlanStatusEnum::PLANNED;
-        }
-
-        return PaymentPlanStatusEnum::from($status);
     }
 
     /**
