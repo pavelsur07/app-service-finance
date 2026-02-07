@@ -458,6 +458,11 @@ class CashTransaction
         return null !== $this->deletedAt;
     }
 
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
     public function markDeleted(?string $userId, ?string $reason = null): void
     {
         if (null !== $this->deletedAt) {
