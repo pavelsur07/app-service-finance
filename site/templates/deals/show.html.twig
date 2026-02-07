@@ -66,21 +66,21 @@
     <div class="card-header">
         <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
             <li class="nav-item">
-                <a href="#deal-tab-items" class="nav-link {% if activeTab == 'items' %}active{% endif %}">
+                <a href="#deal-tab-items" class="nav-link {% if activeTab == 'items' %}active{% endif %}" data-bs-toggle="tab">
                     <i class="ti ti-list"></i>
                     Позиции
                     <span class="badge bg-secondary-lt ms-1">{{ deal.items|length }}</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#deal-tab-charges" class="nav-link {% if activeTab == 'charges' %}active{% endif %}">
+                <a href="#deal-tab-charges" class="nav-link {% if activeTab == 'charges' %}active{% endif %}" data-bs-toggle="tab">
                     <i class="ti ti-receipt"></i>
                     Прямые расходы
                     <span class="badge bg-secondary-lt ms-1">{{ deal.charges|length }}</span>
                 </a>
             </li>
             <li class="nav-item">
-                <a href="#deal-tab-adjustments" class="nav-link {% if activeTab == 'adjustments' %}active{% endif %}">
+                <a href="#deal-tab-adjustments" class="nav-link {% if activeTab == 'adjustments' %}active{% endif %}" data-bs-toggle="tab">
                     <i class="ti ti-adjustments"></i>
                     Корректировки
                     <span class="badge bg-secondary-lt ms-1">{{ deal.adjustments|length }}</span>
