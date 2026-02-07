@@ -49,23 +49,37 @@ final class CashFileImportHandler
             throw $exception;
         }
 
+        $importException = null;
+
         try {
             $this->importService->import($job);
-            $job->finishOk();
-            $job->setErrorMessage(null);
-            $this->entityManager->flush();
         } catch (\Throwable $exception) {
-            $message = sprintf(
-                '[%s] %s at %s:%d',
-                $exception::class,
-                $exception->getMessage(),
-                $exception->getFile(),
-                $exception->getLine()
-            );
-            $message = mb_substr($message, 0, 2000);
-
-            $job->fail($message);
-            $this->entityManager->flush();
+            $importException = $exception;
         }
+
+        $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
+        if (!$freshJob instanceof CashFileImportJob) {
+            return;
+        }
+
+        if (null === $importException) {
+            $freshJob->finishOk();
+            $freshJob->setErrorMessage(null);
+            $this->entityManager->flush();
+
+            return;
+        }
+
+        $message = sprintf(
+            '[%s] %s at %s:%d',
+            $importException::class,
+            $importException->getMessage(),
+            $importException->getFile(),
+            $importException->getLine()
+        );
+        $message = mb_substr($message, 0, 2000);
+
+        $freshJob->fail($message);
+        $this->entityManager->flush();
     }
 }
