@@ -15,6 +15,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 #[AsDoctrineListener(event: Events::postPersist)]
+#[AsDoctrineListener(event: Events::postUpdate)]
 final class CashTransactionAutoRulesSubscriber implements EventSubscriber
 {
     public function __construct(
@@ -27,7 +28,13 @@ final class CashTransactionAutoRulesSubscriber implements EventSubscriber
 
     public function getSubscribedEvents(): array
     {
-        return [Events::postPersist];
+        return [Events::postPersist, Events::postUpdate]; // <--- И ЭТО
+    }
+
+    // 2. Добавьте метод postUpdate (или сделайте алиас)
+    public function postUpdate(LifecycleEventArgs $args): void
+    {
+        $this->postPersist($args);
     }
 
     public function postPersist(LifecycleEventArgs $args): void
