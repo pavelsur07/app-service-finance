@@ -285,12 +285,8 @@ final class DealManager
         $this->assertDealAccess($deal, $company);
 
         return $this->transactional(function () use ($deal): Deal {
-            if ($deal->isConfirmed()) {
-                throw new InvalidDealState('Confirmed deals can only be adjusted.');
-            }
-
             if ($deal->isCancelled() || $deal->getStatus() === DealStatus::CLOSED) {
-                throw new InvalidDealState('Deal cannot be cancelled in the current state.');
+                throw new InvalidDealState('Deal cannot be cancelled in current state.');
             }
 
             $deal->markCancelled();
