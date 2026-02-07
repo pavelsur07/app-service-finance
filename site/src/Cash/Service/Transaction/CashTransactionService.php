@@ -260,6 +260,31 @@ class CashTransactionService
     }
 
     /**
+     * Восстановление транзакции.
+     * Сначала восстанавливаем и фиксируем это в БД, затем запускаем пересчёт по затронутому счёту.
+     */
+    public function restore(CashTransaction $tx): void
+    {
+        $company = $tx->getCompany();
+
+        // --- Безопасность: нельзя восстанавливать транзакцию из закрытого периода
+        $this->assertNotLockedForCompany($company, $tx->getOccurredAt());
+
+        $account = $tx->getMoneyAccount();
+
+        // Диапазон пересчёта
+        $from = $tx->getOccurredAt()->setTime(0, 0);
+        $to = (new \DateTimeImmutable('today'))->setTime(0, 0);
+
+        // Восстанавливаем и фиксируем
+        $tx->restore();
+        $this->em->flush(); // ← flush перед пересчётом обязателен
+
+        // Пересчёт по счёту
+        $this->recalculator->recalcRange($company, $from, $to, [$account->getId()]);
+    }
+
+    /**
      * Жёсткая проверка «замка периода» на уровне компании.
      * Если в Company задана дата financeLockBefore, то любые операции с датой строго ранее этой даты запрещены.
      * Бросаем DomainException — контроллер покажет сообщение пользователю.

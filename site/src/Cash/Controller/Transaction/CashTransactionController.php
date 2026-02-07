@@ -268,7 +268,7 @@ class CashTransactionController extends AbstractController
         Request $request,
         int $id,
         CashTransactionRepository $txRepo,
-        EntityManagerInterface $em,
+        CashTransactionService $service,
     ): Response {
         $company = $this->companyService->getActiveCompany();
         $tx = $txRepo->find($id);
@@ -282,8 +282,7 @@ class CashTransactionController extends AbstractController
             return $this->redirectToRoute('cash_transaction_deleted_index');
         }
 
-        $tx->restore();
-        $em->flush();
+        $service->restore($tx);
         $this->addFlash('success', 'Транзакция восстановлена');
 
         return $this->redirectToRoute('cash_transaction_deleted_index');
