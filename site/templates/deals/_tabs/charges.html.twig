@@ -1,0 +1,45 @@
+<div class="d-flex align-items-center justify-content-between">
+    <h3 class="card-title mb-0">Прямые расходы</h3>
+    <a class="btn btn-sm btn-outline-secondary" href="{{ path('deal_charge_type_index') }}">Типы расходов</a>
+</div>
+<div class="table-responsive mb-3">
+    <table class="table table-vcenter">
+        <thead>
+            <tr>
+                <th>Тип</th>
+                <th>Дата</th>
+                <th class="text-end">Сумма</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for charge in deal.charges %}
+            <tr>
+                <td>{{ charge.chargeType.name }}</td>
+                <td>{{ charge.recognizedAt|date('d.m.Y') }}</td>
+                <td class="text-end">{{ charge.amount|number_format(2, ',', ' ') }}</td>
+                <td class="text-end">
+                    <form method="post" action="{{ path('deal_charge_remove', {id: deal.id, chargeId: charge.id}) }}">
+                        <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_remove' ~ charge.id) }}">
+                        <input type="hidden" name="_tab" value="charges">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                    </form>
+                </td>
+            </tr>
+        {% else %}
+            <tr>
+                <td colspan="4" class="text-center text-muted">Пока нет расходов.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{{ form_start(chargeForm, {action: path('deal_charge_add', {id: deal.id})}) }}
+    <input type="hidden" name="_tab" value="charges">
+    {{ form_row(chargeForm.chargeType) }}
+    {{ form_row(chargeForm.recognizedAt) }}
+    {{ form_row(chargeForm.amount) }}
+    {{ form_row(chargeForm.comment) }}
+    <button type="submit" class="btn btn-primary">Добавить расход</button>
+{{ form_end(chargeForm) }}
