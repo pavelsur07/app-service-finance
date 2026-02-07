@@ -37,6 +37,7 @@ final class CashFileImportHandler
             $this->debugMark($job, 'handler_enter');
 
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
+                $this->debugMark($job, sprintf('skip_not_queued status=%s', $job->getStatus()));
                 $this->entityManager->commit();
 
                 return;
