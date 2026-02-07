@@ -7,7 +7,9 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
+use App\Entity\ProjectDirection;
 use App\Enum\DocumentType;
+use App\Repository\ProjectDirectionRepository;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -17,6 +19,7 @@ class CashTransactionToDocumentService
     public function __construct(
         private EntityManagerInterface $em,
         private PLRegisterUpdater $plRegisterUpdater,
+        private ProjectDirectionRepository $projectDirections,
     ) {
     }
 
@@ -68,6 +71,7 @@ class CashTransactionToDocumentService
         $operation = new DocumentOperation();
         $operation->setAmount($transaction->getAmount());
         $operation->setCounterparty($transaction->getCounterparty());
+        $operation->setProjectDirection($this->resolveProjectDirection($transaction));
 
         $category = $transaction->getCashflowCategory();
         if ($category instanceof CashflowCategory) {
@@ -98,23 +102,41 @@ class CashTransactionToDocumentService
             throw new \DomainException('Не настроена категория ОПиУ для выбранной категории ДДС.');
         }
 
+        $projectDirection = $this->resolveProjectDirection($transaction);
         $document = new Document(Uuid::uuid4()->toString(), $transaction->getCompany());
         $document
             ->setDate($transaction->getOccurredAt())
             ->setDescription($transaction->getDescription())
             ->setType(DocumentType::CASHFLOW_EXPENSE)
             ->setCounterparty($transaction->getCounterparty())
+            ->setProjectDirection($projectDirection)
             ->setCashTransaction($transaction);
 
         $operation = new DocumentOperation();
         $operation
             ->setAmount(number_format($amount, 2, '.', ''))
             ->setCounterparty($transaction->getCounterparty())
-            ->setCategory($plCategory);
+            ->setCategory($plCategory)
+            ->setProjectDirection($projectDirection);
 
         $document->addOperation($operation);
         $transaction->addDocument($document);
 
         return $document;
+    }
+
+    private function resolveProjectDirection(CashTransaction $transaction): ProjectDirection
+    {
+        $projectDirection = $transaction->getProjectDirection();
+        if ($projectDirection instanceof ProjectDirection) {
+            return $projectDirection;
+        }
+
+        $defaultProject = $this->projectDirections->findDefaultForCompany($transaction->getCompany());
+        if (!$defaultProject instanceof ProjectDirection) {
+            throw new \DomainException('Не найден системный проект "Основной".');
+        }
+
+        return $defaultProject;
     }
 }

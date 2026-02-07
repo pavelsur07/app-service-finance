@@ -9,9 +9,19 @@ use Doctrine\Persistence\ManagerRegistry;
 
 class ProjectDirectionRepository extends ServiceEntityRepository
 {
+    private const DEFAULT_PROJECT_NAME = 'Основной';
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, ProjectDirection::class);
+    }
+
+    public function findDefaultForCompany(Company $company): ?ProjectDirection
+    {
+        return $this->findOneBy([
+            'company' => $company,
+            'name' => self::DEFAULT_PROJECT_NAME,
+        ]);
     }
 
     /**
