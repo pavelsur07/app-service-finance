@@ -124,7 +124,15 @@ final class DealController extends AbstractController
             return $this->handleDealException($exception, $request);
         }
 
-        return $this->renderShowPage($deal, $this->createItemForm($company), $this->createChargeForm($company), $this->createAdjustmentForm($company));
+        $chargeData = $this->createChargeFormData($deal);
+        $adjustmentData = $this->createAdjustmentFormData($deal);
+
+        return $this->renderShowPage(
+            $deal,
+            $this->createItemForm($company),
+            $this->createChargeForm($company, $chargeData),
+            $this->createAdjustmentForm($company, $adjustmentData),
+        );
     }
 
     #[Route('/{id}/confirm', name: 'deal_confirm', requirements: ['id' => '[0-9a-fA-F-]{36}'], methods: ['POST'])]
@@ -210,8 +218,8 @@ final class DealController extends AbstractController
             return $this->renderShowPage(
                 $deal,
                 $form,
-                $this->createChargeForm($company),
-                $this->createAdjustmentForm($company),
+                $this->createChargeForm($company, $this->createChargeFormData($deal)),
+                $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
@@ -253,7 +261,7 @@ final class DealController extends AbstractController
                 $deal,
                 $this->createItemForm($company),
                 $form,
-                $this->createAdjustmentForm($company),
+                $this->createAdjustmentForm($company, $this->createAdjustmentFormData($deal)),
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
         }
@@ -305,7 +313,7 @@ final class DealController extends AbstractController
             return $this->renderShowPage(
                 $deal,
                 $this->createItemForm($company),
-                $this->createChargeForm($company),
+                $this->createChargeForm($company, $this->createChargeFormData($deal)),
                 $form,
                 Response::HTTP_UNPROCESSABLE_ENTITY,
             );
@@ -539,6 +547,22 @@ final class DealController extends AbstractController
     private function createAdjustmentForm(Company $company, ?DealAdjustmentFormData $data = null): FormInterface
     {
         return $this->createForm(DealAdjustmentType::class, $data ?? new DealAdjustmentFormData(), ['company' => $company]);
+    }
+
+    private function createChargeFormData(Deal $deal): DealChargeFormData
+    {
+        $chargeData = new DealChargeFormData();
+        $chargeData->recognizedAt = $deal->getRecognizedAt();
+
+        return $chargeData;
+    }
+
+    private function createAdjustmentFormData(Deal $deal): DealAdjustmentFormData
+    {
+        $adjustmentData = new DealAdjustmentFormData();
+        $adjustmentData->recognizedAt = $deal->getRecognizedAt();
+
+        return $adjustmentData;
     }
 
     private function buildItemRequest(Deal $deal, DealItemFormData $data): AddDealItemRequest

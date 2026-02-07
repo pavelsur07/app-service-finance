@@ -1,0 +1,78 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Типы расходов{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Типы расходов</h2>
+    <div class="ms-auto d-print-none">
+        <a href="{{ path('deal_charge_type_new') }}" class="btn btn-primary">Создать</a>
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label" for="charge-type-active">Статус</label>
+                <select id="charge-type-active" name="isActive" class="form-select">
+                    <option value="">Все</option>
+                    <option value="1" {% if filters.isActive == '1' %}selected{% endif %}>Активные</option>
+                    <option value="0" {% if filters.isActive == '0' %}selected{% endif %}>Неактивные</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-outline-primary">Применить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+                <tr>
+                    <th>Название</th>
+                    <th>Код</th>
+                    <th>Статус</th>
+                    <th class="text-end">Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for chargeType in chargeTypes %}
+                <tr>
+                    <td>{{ chargeType.name }}</td>
+                    <td>{{ chargeType.code }}</td>
+                    <td>
+                        {% if chargeType.isActive %}
+                            <span class="badge bg-green-lt">Активен</span>
+                        {% else %}
+                            <span class="badge bg-secondary-lt">Неактивен</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <div class="btn-list justify-content-end">
+                            <a href="{{ path('deal_charge_type_edit', {id: chargeType.id}) }}" class="btn btn-outline-primary btn-sm">Изменить</a>
+                            <form method="post" action="{{ path('deal_charge_type_toggle', {id: chargeType.id}) }}">
+                                <input type="hidden" name="_token" value="{{ csrf_token('deal_charge_type_toggle' ~ chargeType.id) }}">
+                                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                    {{ chargeType.isActive ? 'Отключить' : 'Включить' }}
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">Типов расходов пока нет.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex align-items-center">
+        {% include 'partials/_pagerfanta.html.twig' with { pager: pager } %}
+    </div>
+</div>
+{% endblock %}
