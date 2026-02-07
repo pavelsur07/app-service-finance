@@ -6,8 +6,8 @@ use App\Cash\Entity\Bank\BankConnection;
 use App\Cash\Form\Bank\BankConnectionType;
 use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
+use App\Cash\Service\Bank\BankConnectionService;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -21,6 +21,7 @@ class BankConnectionController extends AbstractController
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
         private MessageBusInterface $bus,
+        private BankConnectionService $bankConnectionService,
     ) {
     }
 
@@ -36,7 +37,7 @@ class BankConnectionController extends AbstractController
     }
 
     #[Route('/new', name: 'cash_bank_connection_new', methods: ['GET', 'POST'])]
-    public function new(Request $request, EntityManagerInterface $em): Response
+    public function new(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $connection = new BankConnection(
@@ -53,8 +54,7 @@ class BankConnectionController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            $em->persist($connection);
-            $em->flush();
+            $this->bankConnectionService->create($connection);
 
             return $this->redirectToRoute('cash_bank_connection_index');
         }
@@ -69,7 +69,6 @@ class BankConnectionController extends AbstractController
         Request $request,
         string $id,
         BankConnectionRepository $repository,
-        EntityManagerInterface $em,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
         $connection = $repository->find($id);
@@ -92,7 +91,7 @@ class BankConnectionController extends AbstractController
                 $connection->setApiKey($submittedApiKey);
             }
 
-            $em->flush();
+            $this->bankConnectionService->update();
 
             return $this->redirectToRoute('cash_bank_connection_index');
         }
@@ -108,7 +107,6 @@ class BankConnectionController extends AbstractController
         Request $request,
         string $id,
         BankConnectionRepository $repository,
-        EntityManagerInterface $em,
     ): Response {
         $company = $this->activeCompanyService->getActiveCompany();
         $connection = $repository->find($id);
@@ -118,8 +116,7 @@ class BankConnectionController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$connection->getId(), (string) $request->request->get('_token'))) {
-            $em->remove($connection);
-            $em->flush();
+            $this->bankConnectionService->delete($connection);
         }
 
         return $this->redirectToRoute('cash_bank_connection_index');
