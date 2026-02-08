@@ -20,6 +20,7 @@ class CashFileRowNormalizer
      *     description: ?string,
      *     currency: string,
      *     docNumber: ?string,
+     *     externalId: ?string,
      *     raw: array<string, mixed>
      * }
      */
@@ -46,6 +47,8 @@ class CashFileRowNormalizer
         );
         $errors = array_merge($errors, $currencyErrors);
 
+        $externalId = $this->buildExternalId($occurredAt, $amount, $counterpartyName, $description);
+
         return [
             'ok' => [] === $errors,
             'errors' => $errors,
@@ -56,6 +59,7 @@ class CashFileRowNormalizer
             'description' => $description,
             'currency' => $currency,
             'docNumber' => $docNumber,
+            'externalId' => $externalId,
             'raw' => $rowByHeader,
         ];
     }
@@ -221,5 +225,49 @@ class CashFileRowNormalizer
     private function formatAmount(float $amount): string
     {
         return number_format($amount, 2, '.', '');
+    }
+
+    private function buildExternalId(
+        ?\DateTimeImmutable $occurredAt,
+        ?string $amount,
+        ?string $counterpartyName,
+        ?string $description
+    ): ?string {
+        if (null === $occurredAt || null === $amount || '' === $amount) {
+            return null;
+        }
+
+        $date = $occurredAt->format('Y-m-d');
+        $amountNormalized = $amount; // уже нормализован formatAmount()
+
+        $counterparty = $this->normalizeTextForHash($counterpartyName);
+        $desc = $this->normalizeTextForHash($description);
+
+        $source = implode('|', [
+            'v1',
+            $date,
+            $amountNormalized,
+            $counterparty,
+            $desc,
+        ]);
+
+        return hash('sha256', $source);
+    }
+
+    private function normalizeTextForHash(?string $value): string
+    {
+        if (null === $value) {
+            return '';
+        }
+
+        $trimmed = trim($value);
+        if ('' === $trimmed) {
+            return '';
+        }
+
+        $lower = mb_strtolower($trimmed);
+        $collapsed = preg_replace('/\s+/u', ' ', $lower);
+
+        return $collapsed ?? $lower;
     }
 }

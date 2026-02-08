@@ -10,13 +10,15 @@ final class CashTransactionExternalIdGenerator
         DateTimeInterface $occurredAt,
         float $amount,
         ?string $counterparty,
-        ?string $description
+        ?string $description,
+        ?int $rowIndex = null
     ): string {
         $normalizedParts = $this->normalizeParts(
             $occurredAt,
             $amount,
             $counterparty,
-            $description
+            $description,
+            $rowIndex
         );
 
         $sourceString = $this->buildSourceString($normalizedParts);
@@ -29,20 +31,29 @@ final class CashTransactionExternalIdGenerator
      *     date: string,
      *     amount: string,
      *     counterparty: string,
-     *     description: string
+     *     description: string,
+     *     rowIndex: string
      * }
      */
     private function normalizeParts(
         DateTimeInterface $occurredAt,
         float $amount,
         ?string $counterparty,
-        ?string $description
+        ?string $description,
+        ?int $rowIndex
     ): array {
+        $counterpartyNorm = $this->normalizeOptionalText($counterparty);
+        $descriptionNorm = $this->normalizeOptionalText($description);
+
+        $needsRowIndex = ($counterpartyNorm === '' && $descriptionNorm === '');
+        $rowIndexNorm = $needsRowIndex ? $this->normalizeRowIndex($rowIndex) : '';
+
         return [
             'date' => $this->normalizeDate($occurredAt),
             'amount' => $this->normalizeAmount($amount),
-            'counterparty' => $this->normalizeOptionalText($counterparty),
-            'description' => $this->normalizeOptionalText($description),
+            'counterparty' => $counterpartyNorm,
+            'description' => $descriptionNorm,
+            'rowIndex' => $rowIndexNorm,
         ];
     }
 
@@ -70,6 +81,17 @@ final class CashTransactionExternalIdGenerator
         return mb_strtolower($value);
     }
 
+    private function normalizeRowIndex(?int $rowIndex): string
+    {
+        // Важно: если rowIndex почему-то не передали — оставляем пусто.
+        // Но тогда останутся коллизии. Лучше обеспечь передачу rowIndex всегда.
+        if ($rowIndex === null || $rowIndex < 0) {
+            return '';
+        }
+
+        return (string) $rowIndex;
+    }
+
     /**
      * @param array<string,string> $parts
      */
@@ -80,6 +102,7 @@ final class CashTransactionExternalIdGenerator
             $parts['amount'],
             $parts['counterparty'],
             $parts['description'],
+            $parts['rowIndex'],
         ]);
     }
 
