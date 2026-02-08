@@ -70,6 +70,7 @@ final class CashFileImportHandler
         $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
         if (!$freshJob instanceof CashFileImportJob) {
             $this->debugMark($job, 'job_not_found', $runId);
+
             return;
         }
 
@@ -107,7 +108,7 @@ final class CashFileImportHandler
         $timestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
         $line = sprintf('DBG:%s %s run=%s', $stage, $timestamp, $runId);
         $existingMessage = $job->getErrorMessage();
-        $message = $existingMessage ? $existingMessage . "\n" . $line : $line;
+        $message = $existingMessage ? $existingMessage."\n".$line : $line;
         if (mb_strlen($message) > 2000) {
             $message = mb_substr($message, -2000);
         }

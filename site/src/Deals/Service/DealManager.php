@@ -6,9 +6,9 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Repository\CompanyMemberRepository;
 use App\Deals\Entity\Deal;
+use App\Deals\Entity\DealAdjustment;
 use App\Deals\Entity\DealCharge;
 use App\Deals\Entity\DealItem;
-use App\Deals\Entity\DealAdjustment;
 use App\Deals\Enum\DealStatus;
 use App\Deals\Exception\AccessDenied;
 use App\Deals\Exception\DealNotFound;
@@ -269,7 +269,7 @@ final class DealManager
                 throw new InvalidDealState('Deal is already confirmed.');
             }
 
-            if ($deal->isCancelled() || $deal->getStatus() === DealStatus::CLOSED) {
+            if ($deal->isCancelled() || DealStatus::CLOSED === $deal->getStatus()) {
                 throw new InvalidDealState('Deal cannot be confirmed in the current state.');
             }
 
@@ -285,7 +285,7 @@ final class DealManager
         $this->assertDealAccess($deal, $company);
 
         return $this->transactional(function () use ($deal): Deal {
-            if ($deal->isCancelled() || $deal->getStatus() === DealStatus::CLOSED) {
+            if ($deal->isCancelled() || DealStatus::CLOSED === $deal->getStatus()) {
                 throw new InvalidDealState('Deal cannot be cancelled in current state.');
             }
 
@@ -349,21 +349,21 @@ final class DealManager
             throw new InvalidDealState('Confirmed deals can only be adjusted.');
         }
 
-        if ($deal->isCancelled() || $deal->getStatus() === DealStatus::CLOSED) {
+        if ($deal->isCancelled() || DealStatus::CLOSED === $deal->getStatus()) {
             throw new InvalidDealState('Deal cannot be changed in the current state.');
         }
     }
 
     private function assertDealAllowsAdjustment(Deal $deal): void
     {
-        if ($deal->isCancelled() || $deal->getStatus() === DealStatus::CLOSED) {
+        if ($deal->isCancelled() || DealStatus::CLOSED === $deal->getStatus()) {
             throw new InvalidDealState('Deal cannot be adjusted in the current state.');
         }
     }
 
     private function resolveDealNumber(?string $number, Company $company): string
     {
-        if ($number === null) {
+        if (null === $number) {
             return $this->numberGenerator->generate($company);
         }
 

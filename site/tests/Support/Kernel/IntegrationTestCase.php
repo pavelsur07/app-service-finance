@@ -42,14 +42,14 @@ abstract class IntegrationTestCase extends KernelTestCase
         $tables = [];
         foreach ($metadata as $m) {
             $tableName = $m->getTableName();
-            if (!is_string($tableName) || $tableName === '') {
+            if (!is_string($tableName) || '' === $tableName) {
                 continue;
             }
             $tables[] = $tableName;
         }
 
         $tables = array_values(array_unique($tables));
-        if ($tables === []) {
+        if ([] === $tables) {
             return;
         }
 

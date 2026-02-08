@@ -21,7 +21,7 @@ class DealTotalsCalculator
             $amount = $adjustment->getAmount();
             $type = $adjustment->getType();
 
-            if ($type === DealAdjustmentType::RETURN || $type === DealAdjustmentType::DISCOUNT) {
+            if (DealAdjustmentType::RETURN === $type || DealAdjustmentType::DISCOUNT === $type) {
                 $amount = $this->negate($amount);
             }
 
@@ -52,6 +52,6 @@ class DealTotalsCalculator
             return $normalized;
         }
 
-        return '-' . $normalized;
+        return '-'.$normalized;
     }
 }

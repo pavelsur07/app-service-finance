@@ -45,7 +45,7 @@ final class AuditLogSubscriber implements EventSubscriber
         // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
         $companyId = $this->resolveCompanyId($entity);
 
-        if ($companyId === null) {
+        if (null === $companyId) {
             // Если компанию определить невозможно (ни из сессии, ни из сущности) — выходим
             return;
         }
@@ -80,7 +80,7 @@ final class AuditLogSubscriber implements EventSubscriber
         // ИСПРАВЛЕНИЕ: Используем безопасный метод получения ID компании
         $companyId = $this->resolveCompanyId($entity);
 
-        if ($companyId === null) {
+        if (null === $companyId) {
             return;
         }
 
@@ -93,7 +93,7 @@ final class AuditLogSubscriber implements EventSubscriber
         $action = AuditLogAction::UPDATE;
         if (array_key_exists('deletedAt', $changeSet)) {
             $newValue = $changeSet['deletedAt'][1] ?? null;
-            $action = $newValue !== null ? AuditLogAction::SOFT_DELETE : AuditLogAction::RESTORE;
+            $action = null !== $newValue ? AuditLogAction::SOFT_DELETE : AuditLogAction::RESTORE;
         }
 
         // Получаем ID пользователя (или null, если это делает система)
@@ -121,7 +121,7 @@ final class AuditLogSubscriber implements EventSubscriber
         // 1. Пробуем взять из провайдера (если есть сессия)
         try {
             $contextCompanyId = $this->auditContextProvider->getCompanyId();
-            if ($contextCompanyId !== null) {
+            if (null !== $contextCompanyId) {
                 return $contextCompanyId;
             }
         } catch (\Throwable $e) {
@@ -139,7 +139,7 @@ final class AuditLogSubscriber implements EventSubscriber
     }
 
     /**
-     * Безопасное получение ID пользователя
+     * Безопасное получение ID пользователя.
      */
     private function resolveActorUserId(): ?string
     {

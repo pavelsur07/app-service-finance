@@ -92,7 +92,7 @@ class CashTransactionRepository extends ServiceEntityRepository
         Company $company,
         array $filters,
         int $page,
-        int $perPage
+        int $perPage,
     ): Pagerfanta {
         $qb = $this->createQueryBuilder('t')
             ->andWhere('t.company = :company')

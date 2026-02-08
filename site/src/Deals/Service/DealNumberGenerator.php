@@ -22,7 +22,7 @@ class DealNumberGenerator
 
         $year = (new \DateTimeImmutable())->format('Y');
 
-        for ($attempt = 0; $attempt < self::MAX_ATTEMPTS; $attempt++) {
+        for ($attempt = 0; $attempt < self::MAX_ATTEMPTS; ++$attempt) {
             $sequence = $this->nextSequenceNumber($companyId);
             $number = sprintf(self::FORMAT, $year, $sequence);
 

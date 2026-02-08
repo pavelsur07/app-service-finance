@@ -2,16 +2,14 @@
 
 namespace App\Cash\Service\Import\Identity;
 
-use DateTimeInterface;
-
 final class CashTransactionExternalIdGenerator
 {
     public function generate(
-        DateTimeInterface $occurredAt,
+        \DateTimeInterface $occurredAt,
         float $amount,
         ?string $counterparty,
         ?string $description,
-        ?int $rowIndex = null
+        ?int $rowIndex = null,
     ): string {
         $normalizedParts = $this->normalizeParts(
             $occurredAt,
@@ -36,16 +34,16 @@ final class CashTransactionExternalIdGenerator
      * }
      */
     private function normalizeParts(
-        DateTimeInterface $occurredAt,
+        \DateTimeInterface $occurredAt,
         float $amount,
         ?string $counterparty,
         ?string $description,
-        ?int $rowIndex
+        ?int $rowIndex,
     ): array {
         $counterpartyNorm = $this->normalizeOptionalText($counterparty);
         $descriptionNorm = $this->normalizeOptionalText($description);
 
-        $needsRowIndex = ($counterpartyNorm === '' && $descriptionNorm === '');
+        $needsRowIndex = ('' === $counterpartyNorm && '' === $descriptionNorm);
         $rowIndexNorm = $needsRowIndex ? $this->normalizeRowIndex($rowIndex) : '';
 
         return [
@@ -57,7 +55,7 @@ final class CashTransactionExternalIdGenerator
         ];
     }
 
-    private function normalizeDate(DateTimeInterface $date): string
+    private function normalizeDate(\DateTimeInterface $date): string
     {
         return $date->format('Y-m-d');
     }
@@ -69,12 +67,12 @@ final class CashTransactionExternalIdGenerator
 
     private function normalizeOptionalText(?string $value): string
     {
-        if ($value === null) {
+        if (null === $value) {
             return '';
         }
 
         $value = trim($value);
-        if ($value === '') {
+        if ('' === $value) {
             return '';
         }
 
@@ -85,7 +83,7 @@ final class CashTransactionExternalIdGenerator
     {
         // Важно: если rowIndex почему-то не передали — оставляем пусто.
         // Но тогда останутся коллизии. Лучше обеспечь передачу rowIndex всегда.
-        if ($rowIndex === null || $rowIndex < 0) {
+        if (null === $rowIndex || $rowIndex < 0) {
             return '';
         }
 

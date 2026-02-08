@@ -356,17 +356,17 @@ class Deal
 
     public function isDraft(): bool
     {
-        return $this->status === DealStatus::DRAFT;
+        return DealStatus::DRAFT === $this->status;
     }
 
     public function isConfirmed(): bool
     {
-        return $this->status === DealStatus::CONFIRMED;
+        return DealStatus::CONFIRMED === $this->status;
     }
 
     public function isCancelled(): bool
     {
-        return $this->status === DealStatus::CANCELLED;
+        return DealStatus::CANCELLED === $this->status;
     }
 
     public function markConfirmed(): self

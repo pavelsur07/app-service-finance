@@ -52,7 +52,7 @@ class ChargeTypeRepository extends ServiceEntityRepository
             ->setParameter('company', $company)
             ->setParameter('code', $code);
 
-        if ($excludeId !== null) {
+        if (null !== $excludeId) {
             $queryBuilder
                 ->andWhere('type.id <> :excludeId')
                 ->setParameter('excludeId', $excludeId);
@@ -71,7 +71,7 @@ class ChargeTypeRepository extends ServiceEntityRepository
             ->orderBy('type.name', 'ASC')
             ->setParameter('company', $company);
 
-        if ($isActive !== null) {
+        if (null !== $isActive) {
             $queryBuilder
                 ->andWhere('type.isActive = :isActive')
                 ->setParameter('isActive', $isActive);

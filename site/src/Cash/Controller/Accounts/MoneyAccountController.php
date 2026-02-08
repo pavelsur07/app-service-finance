@@ -21,9 +21,8 @@ class MoneyAccountController extends AbstractController
 {
     public function __construct(
         private ActiveCompanyService $activeCompanyService,
-        private MoneyAccountService $moneyAccountService
-    )
-    {
+        private MoneyAccountService $moneyAccountService,
+    ) {
     }
 
     #[Route('/', name: 'money_account_index', methods: ['GET'])]

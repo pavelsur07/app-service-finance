@@ -231,7 +231,7 @@ class CashFileRowNormalizer
         ?\DateTimeImmutable $occurredAt,
         ?string $amount,
         ?string $counterpartyName,
-        ?string $description
+        ?string $description,
     ): ?string {
         if (null === $occurredAt || null === $amount || '' === $amount) {
             return null;

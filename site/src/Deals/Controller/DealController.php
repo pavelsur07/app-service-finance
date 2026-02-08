@@ -2,8 +2,8 @@
 
 namespace App\Deals\Controller;
 
-use App\Company\Entity\User;
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Deals\DTO\CreateDealFormData;
 use App\Deals\DTO\DealAdjustmentFormData;
 use App\Deals\DTO\DealChargeFormData;
@@ -219,10 +219,11 @@ final class DealController extends AbstractController
 
         if (!$form->isSubmitted() || !$form->isValid()) {
             $activeTab = $this->resolveActiveTab($request);
-            if ($activeTab !== 'items') {
+            if ('items' !== $activeTab) {
                 $activeTab = 'items';
             }
             $forms = $this->buildShowForms($company, $deal, itemForm: $form);
+
             return $this->renderShowPage(
                 $deal,
                 $forms['itemForm'],
@@ -268,10 +269,11 @@ final class DealController extends AbstractController
 
         if (!$form->isSubmitted() || !$form->isValid()) {
             $activeTab = $this->resolveActiveTab($request);
-            if ($activeTab !== 'charges') {
+            if ('charges' !== $activeTab) {
                 $activeTab = 'charges';
             }
             $forms = $this->buildShowForms($company, $deal, chargeForm: $form);
+
             return $this->renderShowPage(
                 $deal,
                 $forms['itemForm'],
@@ -328,10 +330,11 @@ final class DealController extends AbstractController
 
         if (!$form->isSubmitted() || !$form->isValid()) {
             $activeTab = $this->resolveActiveTab($request);
-            if ($activeTab !== 'adjustments') {
+            if ('adjustments' !== $activeTab) {
                 $activeTab = 'adjustments';
             }
             $forms = $this->buildShowForms($company, $deal, adjustmentForm: $form);
+
             return $this->renderShowPage(
                 $deal,
                 $forms['itemForm'],
@@ -530,7 +533,7 @@ final class DealController extends AbstractController
     ): Response {
         if ($this->isApiRequest($request)) {
             $payload = ['message' => $message];
-            if ($errors !== []) {
+            if ([] !== $errors) {
                 $payload['errors'] = $errors;
             }
 
@@ -552,11 +555,12 @@ final class DealController extends AbstractController
         }
 
         $format = $request->getRequestFormat();
-        if ($format === 'json') {
+        if ('json' === $format) {
             return true;
         }
 
         $acceptHeader = (string) $request->headers->get('Accept');
+
         return str_contains($acceptHeader, 'application/json');
     }
 
@@ -614,7 +618,7 @@ final class DealController extends AbstractController
     private function buildItemRequest(Deal $deal, DealItemFormData $data): AddDealItemRequest
     {
         $name = trim((string) $data->name);
-        if ($name === '') {
+        if ('' === $name) {
             throw new ValidationFailed('Название позиции обязательно.');
         }
 
@@ -675,10 +679,10 @@ final class DealController extends AbstractController
     private function resolveActiveTab(Request $request): string
     {
         $tab = $request->request->get('_tab');
-        if (!is_string($tab) || $tab === '') {
+        if (!is_string($tab) || '' === $tab) {
             $tab = $request->query->get('tab');
         }
-        if (!is_string($tab) || $tab === '') {
+        if (!is_string($tab) || '' === $tab) {
             $tab = 'items';
         }
 

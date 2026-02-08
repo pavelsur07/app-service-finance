@@ -167,15 +167,15 @@ final class ChargeTypeController extends AbstractController
 
     private function parseIsActive(mixed $value): ?bool
     {
-        if ($value === null || $value === '') {
+        if (null === $value || '' === $value) {
             return null;
         }
 
-        if ((string) $value === '1') {
+        if ('1' === (string) $value) {
             return true;
         }
 
-        if ((string) $value === '0') {
+        if ('0' === (string) $value) {
             return false;
         }
 

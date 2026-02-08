@@ -2,9 +2,9 @@
 
 namespace App\Cash\Service\Import\File;
 
+use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Import\CashFileImportJob;
 use App\Cash\Entity\Import\CashFileImportProfile;
-use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
