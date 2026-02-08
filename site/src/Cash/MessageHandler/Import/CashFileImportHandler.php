@@ -20,98 +20,95 @@ final class CashFileImportHandler
 
     public function __invoke(CashFileImportMessage $message): void
     {
-        $runId = bin2hex(random_bytes(4));
+        // --- ШАГ 1: Взятие в работу (Транзакция) ---
         $this->entityManager->beginTransaction();
 
         try {
+            // Блокируем строку для записи, чтобы другие воркеры не взяли её
             $job = $this->entityManager->find(
                 CashFileImportJob::class,
                 $message->getJobId(),
                 LockMode::PESSIMISTIC_WRITE
             );
+
+            // Если задачи нет, просто выходим
             if (!$job instanceof CashFileImportJob) {
-                $jobReference = $this->entityManager->getReference(CashFileImportJob::class, $message->getJobId());
-                $this->debugMark($jobReference, 'job_not_found', $runId);
-                $this->entityManager->commit();
-
+                $this->entityManager->rollback();
                 return;
             }
 
-            $this->debugMark($job, 'handler_enter', $runId);
-
+            // Если статус уже не QUEUED (кто-то другой взял), выходим
             if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
-                $this->debugMark($job, sprintf('skip_not_queued status=%s', $job->getStatus()), $runId);
                 $this->entityManager->commit();
-
                 return;
             }
 
-            $this->debugMark($job, 'queued_confirmed', $runId);
-
+            // Ставим статус "В работе"
             $job->start();
             $this->entityManager->flush();
-            $this->debugMark($job, 'job_started_committed', $runId);
             $this->entityManager->commit();
         } catch (\Throwable $exception) {
-            $this->entityManager->rollback();
-
+            // Если что-то пошло не так на старте - откатываем
+            if ($this->entityManager->getConnection()->isTransactionActive()) {
+                $this->entityManager->rollback();
+            }
             throw $exception;
         }
 
+        // --- ШАГ 2: Выполнение импорта ---
         $importException = null;
 
         try {
-            $this->debugMark($job, 'before_import', $runId);
+            // Запускаем сервис (он сам управляет своими батчами и памятью)
             $this->importService->import($job);
         } catch (\Throwable $exception) {
             $importException = $exception;
         }
 
+        // --- ШАГ 3: Финализация (Сохранение результата) ---
+
+        // Критическая проверка: если EntityManager закрылся (например, из-за ошибки SQL внутри сервиса),
+        // мы не сможем сохранить статус через ORM.
+        if (!$this->entityManager->isOpen()) {
+            // Здесь можно пересоздать менеджер через ManagerRegistry, если очень нужно,
+            // но для простоты просто выбрасываем исключение, чтобы Messenger увидел проблему.
+            throw new \RuntimeException(
+                'Entity Manager closed during import. Job ID: ' . $message->getJobId(),
+                0,
+                $importException
+            );
+        }
+
+        // Очищаем память Doctrine, чтобы подтянуть свежее состояние Job из базы
+        // Это важно, если сервис импорта делал $em->clear()
+        $this->entityManager->clear();
+
         $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
+
         if (!$freshJob instanceof CashFileImportJob) {
-            $this->debugMark($job, 'job_not_found', $runId);
             return;
         }
 
         if (null === $importException) {
-            $this->debugMark($freshJob, 'after_import', $runId);
+            // Успех
             $freshJob->finishOk();
+            // Очищаем поле ошибки, если там были старые записи
             $freshJob->setErrorMessage(null);
-            $this->entityManager->flush();
+        } else {
+            // Ошибка
+            $errorMsg = sprintf(
+                'Error [%s]: %s at %s:%d',
+                $importException::class,
+                $importException->getMessage(),
+                $importException->getFile(),
+                $importException->getLine()
+            );
 
-            return;
+            // Обрезаем сообщение до 2000 символов (или сколько у вас в базе)
+            $freshJob->fail(mb_substr($errorMsg, 0, 2000));
         }
 
-        $this->debugMark(
-            $freshJob,
-            sprintf('import_exception [%s] %s', $importException::class, $importException->getMessage()),
-            $runId
-        );
-        $debugTimestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
-        $message = sprintf(
-            'DBG:import_exception %s [%s] %s at %s:%d',
-            $debugTimestamp,
-            $importException::class,
-            $importException->getMessage(),
-            $importException->getFile(),
-            $importException->getLine()
-        );
-        $message = mb_substr($message, 0, 2000);
-
-        $freshJob->fail($message);
-        $this->entityManager->flush();
-    }
-
-    private function debugMark(CashFileImportJob $job, string $stage, string $runId): void
-    {
-        $timestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
-        $line = sprintf('DBG:%s %s run=%s', $stage, $timestamp, $runId);
-        $existingMessage = $job->getErrorMessage();
-        $message = $existingMessage ? $existingMessage . "\n" . $line : $line;
-        if (mb_strlen($message) > 2000) {
-            $message = mb_substr($message, -2000);
-        }
-        $job->setErrorMessage($message);
+        // Финальное сохранение статуса
         $this->entityManager->flush();
     }
 }

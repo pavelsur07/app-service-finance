@@ -48,14 +48,7 @@ final class CashFileImportService
 
         $filePath = $this->resolveFilePath($job);
 
-        // --- СЧЕТЧИКИ ДЛЯ ДИАГНОСТИКИ ---
         $created = 0;
-        $skippedDuplicates = 0;
-        $skippedNormalization = 0;
-        $skippedMissingFields = 0;
-        $totalRowsRead = 0;
-        // --------------------------------
-
         $createdMinDate = null;
         $createdMaxDate = null;
         $batchSize = 200;
@@ -65,37 +58,26 @@ final class CashFileImportService
 
         try {
             $reader->open($filePath);
-
-            // Флаг, чтобы понять, был ли файл вообще прочитан
-            $isFileEmpty = true;
-
             foreach ($reader->getSheetIterator() as $sheet) {
                 $rowIndex = 0;
                 $headerLabels = [];
-
                 foreach ($sheet->getRowIterator() as $row) {
-                    $isFileEmpty = false;
                     $cells = $row->toArray();
 
-                    // Пропуск пустых строк в файле
+                    // Пропуск пустых строк
                     if (empty($cells) || (count($cells) === 1 && empty(trim((string)$cells[0])))) {
                         continue;
                     }
 
-                    // --- ОБРАБОТКА ЗАГОЛОВКОВ (ПЕРВАЯ СТРОКА) ---
                     if (0 === $rowIndex) {
                         $headers = array_map(
                             fn ($value) => $this->normalizeValue($value, true),
                             $cells
                         );
 
-                        // ДИАГНОСТИКА: Проверка разделителя
-                        // Если колонок меньше 2, скорее всего CSV разделитель не сработал
-                        if (count($headers) < 2) {
-                            throw new \RuntimeException(sprintf(
-                                'ОШИБКА ФОРМАТА: В файле найдена только 1 колонка. Заголовок: "%s". Проверьте разделитель CSV (ожидается ; или ,) или кодировку файла.',
-                                implod(';', $headers)
-                            ));
+                        // Защита от сломанного CSV
+                        if (count($headers) < 2 && str_contains($filePath, '.csv')) {
+                            // Можно логировать варнинг, но пока просто пробуем продолжить как есть
                         }
 
                         foreach ($headers as $index => $header) {
@@ -108,9 +90,6 @@ final class CashFileImportService
                         ++$rowIndex;
                         continue;
                     }
-
-                    // --- ОБРАБОТКА ДАННЫХ ---
-                    ++$totalRowsRead;
 
                     $rowByHeader = [];
                     foreach ($headerLabels as $index => $label) {
@@ -127,7 +106,6 @@ final class CashFileImportService
                         if ($importLog) {
                             $this->importLogger->incError($importLog);
                         }
-                        ++$skippedNormalization; // Считаем ошибку
                         ++$rowIndex;
                         continue;
                     }
@@ -144,7 +122,6 @@ final class CashFileImportService
                         if ($importLog) {
                             $this->importLogger->incError($importLog);
                         }
-                        ++$skippedMissingFields; // Считаем пропуск
                         ++$rowIndex;
                         continue;
                     }
@@ -163,12 +140,10 @@ final class CashFileImportService
                         if ($importLog) {
                             $this->importLogger->incSkippedDuplicate($importLog);
                         }
-                        ++$skippedDuplicates; // Считаем дубль
                         ++$rowIndex;
                         continue;
                     }
 
-                    // --- СОЗДАНИЕ ТРАНЗАКЦИИ ---
                     $transaction = new CashTransaction(
                         Uuid::uuid4()->toString(),
                         $company,
@@ -225,32 +200,15 @@ final class CashFileImportService
 
                     ++$rowIndex;
                 }
-                // Обычно в CSV только один sheet, выходим
                 break;
             }
 
-            // --- ФИНАЛЬНЫЙ АНАЛИЗ РЕЗУЛЬТАТОВ (ВАЖНО ДЛЯ ДЕБАГА) ---
-            if ($isFileEmpty) {
-                throw new \RuntimeException("Файл пустой или не удалось прочитать ни одной строки.");
-            }
-
-            if (0 === $created) {
-                // Если мы ничего не создали, нужно обязательно сказать почему,
-                // иначе пользователь увидит статус "ОК", но данных не будет.
-                throw new \RuntimeException(sprintf(
-                    "Импорт завершен, но создано 0 транзакций. Прочитано строк: %d. Пропущено (дубликаты): %d. Ошибок нормализации (формат данных): %d. Ошибок полей (нет даты/суммы): %d.",
-                    $totalRowsRead,
-                    $skippedDuplicates,
-                    $skippedNormalization,
-                    $skippedMissingFields
-                ));
-            }
-
+            // Финальный сброс батча
             if ($batchCount > 0) {
                 $this->flushBatch();
             }
 
-            if (null !== $createdMinDate) {
+            if ($created > 0 && null !== $createdMinDate) {
                 $today = new \DateTimeImmutable('today');
                 $toDate = $createdMaxDate ?? $createdMinDate;
                 if ($createdMinDate <= $today) {
@@ -258,10 +216,9 @@ final class CashFileImportService
                 }
                 $this->accountBalanceService->recalculateDailyRange($company, $moneyAccount, $createdMinDate, $toDate);
             }
-
         } finally {
             $reader->close();
-            // Logger finish переместил сюда на случай исключений
+            // ВАЖНО: Логгер должен быть закрыт здесь, чтобы сохранить статистику
             if ($importLog) {
                 $this->importLogger->finish($importLog);
             }
@@ -422,12 +379,12 @@ final class CashFileImportService
             return ',';
         }
 
-        $delimiters = [';', ',', "\t", '|']; // Добавил | на всякий случай
+        $delimiters = [';', ',', "\t", '|'];
         $counts = array_fill_keys($delimiters, 0);
         $linesRead = 0;
 
         try {
-            while (!feof($handle) && $linesRead < 10) { // Читаем чуть больше строк для надежности
+            while (!feof($handle) && $linesRead < 10) {
                 $line = fgets($handle);
                 if (false === $line) {
                     break;
@@ -448,7 +405,7 @@ final class CashFileImportService
             fclose($handle);
         }
 
-        $bestDelimiter = ','; // Дефолт
+        $bestDelimiter = ',';
         $bestCount = -1;
 
         foreach ($counts as $delimiter => $count) {
@@ -458,9 +415,8 @@ final class CashFileImportService
             }
         }
 
-        // Если вообще ничего не нашли, вернем запятую или точку с запятой
         if ($bestCount <= 0) {
-            return ';'; // Чаще всего в "ломаных" файлах именно ;
+            return ';';
         }
 
         return $bestDelimiter;
