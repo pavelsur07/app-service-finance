@@ -20,6 +20,7 @@ final class CashFileImportHandler
 
     public function __invoke(CashFileImportMessage $message): void
     {
+        $runId = bin2hex(random_bytes(4));
         $this->entityManager->beginTransaction();
 
         try {
@@ -29,25 +30,27 @@ final class CashFileImportHandler
                 LockMode::PESSIMISTIC_WRITE
             );
             if (!$job instanceof CashFileImportJob) {
-                $this->entityManager->rollback();
-
-                return;
-            }
-
-            $this->debugMark($job, 'handler_enter');
-
-            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
-                $this->debugMark($job, sprintf('skip_not_queued status=%s', $job->getStatus()));
+                $jobReference = $this->entityManager->getReference(CashFileImportJob::class, $message->getJobId());
+                $this->debugMark($jobReference, 'job_not_found', $runId);
                 $this->entityManager->commit();
 
                 return;
             }
 
-            $this->debugMark($job, 'queued_confirmed');
+            $this->debugMark($job, 'handler_enter', $runId);
+
+            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
+                $this->debugMark($job, sprintf('skip_not_queued status=%s', $job->getStatus()), $runId);
+                $this->entityManager->commit();
+
+                return;
+            }
+
+            $this->debugMark($job, 'queued_confirmed', $runId);
 
             $job->start();
             $this->entityManager->flush();
-            $this->debugMark($job, 'job_started_committed');
+            $this->debugMark($job, 'job_started_committed', $runId);
             $this->entityManager->commit();
         } catch (\Throwable $exception) {
             $this->entityManager->rollback();
@@ -58,7 +61,7 @@ final class CashFileImportHandler
         $importException = null;
 
         try {
-            $this->debugMark($job, 'before_import');
+            $this->debugMark($job, 'before_import', $runId);
             $this->importService->import($job);
         } catch (\Throwable $exception) {
             $importException = $exception;
@@ -66,11 +69,12 @@ final class CashFileImportHandler
 
         $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
         if (!$freshJob instanceof CashFileImportJob) {
+            $this->debugMark($job, 'job_not_found', $runId);
             return;
         }
 
         if (null === $importException) {
-            $this->debugMark($freshJob, 'after_import');
+            $this->debugMark($freshJob, 'after_import', $runId);
             $freshJob->finishOk();
             $freshJob->setErrorMessage(null);
             $this->entityManager->flush();
@@ -78,7 +82,11 @@ final class CashFileImportHandler
             return;
         }
 
-        $this->debugMark($freshJob, 'import_exception');
+        $this->debugMark(
+            $freshJob,
+            sprintf('import_exception [%s] %s', $importException::class, $importException->getMessage()),
+            $runId
+        );
         $debugTimestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
         $message = sprintf(
             'DBG:import_exception %s [%s] %s at %s:%d',
@@ -94,10 +102,16 @@ final class CashFileImportHandler
         $this->entityManager->flush();
     }
 
-    private function debugMark(CashFileImportJob $job, string $stage): void
+    private function debugMark(CashFileImportJob $job, string $stage, string $runId): void
     {
         $timestamp = (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM);
-        $job->setErrorMessage(sprintf('DBG:%s %s', $stage, $timestamp));
+        $line = sprintf('DBG:%s %s run=%s', $stage, $timestamp, $runId);
+        $existingMessage = $job->getErrorMessage();
+        $message = $existingMessage ? $existingMessage . "\n" . $line : $line;
+        if (mb_strlen($message) > 2000) {
+            $message = mb_substr($message, -2000);
+        }
+        $job->setErrorMessage($message);
         $this->entityManager->flush();
     }
 }
