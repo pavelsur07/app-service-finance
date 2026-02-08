@@ -54,7 +54,15 @@ final class UserBuilder
     public function withIndex(int $index): self
     {
         $clone = clone $this;
+
+        // email
         $clone->email = sprintf('user+%d@example.test', $index);
+
+        // deterministic, but VALID UUID (уникальный в рамках теста)
+        $clone->id = sprintf(
+            '22222222-2222-2222-2222-%012d',
+            $index
+        );
 
         return $clone;
     }

@@ -53,9 +53,12 @@ site-test-int: site-test-init
 site-test: site-test-init
 	docker-compose run --rm site-php-cli composer test
 
+site-test-smoke: site-test-init
+	docker-compose run --rm -T site-php-cli php bin/phpunit --testsuite=integration --filter SmokePersistenceTest
+
 # Покрытие (нужен xdebug или pcov в CLI-образе)
 site-test-cov: site-test-init
-	docker-compose run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml.dist --coverage-html var/coverage --coverage-text
+	docker-compose run --rm -e XDEBUG_MODE=coverage site-php-cli ./vendor/bin/phpunit -c phpunit.xml --coverage-html var/coverage --coverage-text
 
 # ---- подготовка окружения тестов ----
 site-test-init: site-composer-install site-test-env site-test-wait-db site-test-db site-test-migrations site-test-fixtures
@@ -70,7 +73,7 @@ site-test-wait-db:
 	until docker-compose exec -T site-postgres pg_isready --timeout=0 --dbname=app ; do sleep 1 ; done
 
 site-test-db:
-	- docker-compose run --rm site-php-cli php bin/console doctrine:database:create --env=test
+	docker-compose run --rm -T site-php-cli php bin/console doctrine:database:create --if-not-exists --env=test
 
 site-test-migrations:
 	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test

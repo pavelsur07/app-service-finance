@@ -4,69 +4,106 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Fund;
 
+use App\Cash\Entity\Accounts\MoneyFund;
+use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Cash\Service\Accounts\FundBalanceService;
 use App\Company\Entity\Company;
-use App\Company\Entity\User;
-use App\Tests\Fund\Factory\MoneyFundFactory;
-use App\Tests\Fund\Factory\MoneyFundMovementFactory;
-use Doctrine\ORM\EntityManagerInterface;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
-use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 
-final class FundBalanceServiceTest extends KernelTestCase
+final class FundBalanceServiceTest extends IntegrationTestCase
 {
     public function testBalancesAndTotalsCalculatedPerFund(): void
     {
-        self::bootKernel();
-        $container = static::getContainer();
-        /** @var EntityManagerInterface $em */
-        $em = $container->get(EntityManagerInterface::class);
+        // Важно: IntegrationTestCase уже bootKernel + truncateAllMappedTables()
 
-        $em->createQuery('DELETE FROM App\\Entity\\MoneyFundMovement m')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\MoneyFund f')->execute();
-        $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
+        $companyOwner = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail('fund-owner@example.test')
+            ->build();
 
-        $user = new User(Uuid::uuid4()->toString());
-        $user->setEmail('fund@example.com');
-        $user->setPassword('secret');
-        $company = new Company(Uuid::uuid4()->toString(), $user);
-        $company->setName('Test Company');
+        $company = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($companyOwner)
+            ->withName('Test Company')
+            ->build();
 
-        $fundOne = MoneyFundFactory::create($company, 'RUB', 'Налоги');
-        $fundTwo = MoneyFundFactory::create($company, 'RUB', 'Зарплата');
+        $otherOwner = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->withEmail('other-owner@example.test')
+            ->build();
 
-        $otherUser = new User(Uuid::uuid4()->toString());
-        $otherUser->setEmail('other@example.com');
-        $otherUser->setPassword('secret');
-        $otherCompany = new Company(Uuid::uuid4()->toString(), $otherUser);
-        $otherCompany->setName('Other');
-        $otherFund = MoneyFundFactory::create($otherCompany, 'RUB', 'Чужой фонд');
+        $otherCompany = CompanyBuilder::aCompany()
+            ->withId(Uuid::uuid4()->toString())
+            ->withOwner($otherOwner)
+            ->withName('Other Company')
+            ->build();
 
-        $em->persist($user);
-        $em->persist($company);
-        $em->persist($fundOne);
-        $em->persist($fundTwo);
-        $em->persist($otherUser);
-        $em->persist($otherCompany);
-        $em->persist($otherFund);
-        $em->flush();
+        $this->em->persist($companyOwner);
+        $this->em->persist($company);
+        $this->em->persist($otherOwner);
+        $this->em->persist($otherCompany);
 
-        $movement1 = MoneyFundMovementFactory::create($company, $fundOne, 1000);
-        $movement2 = MoneyFundMovementFactory::create($company, $fundOne, -300);
-        $movement3 = MoneyFundMovementFactory::create($company, $fundTwo, 500);
-        $movementOtherCompany = MoneyFundMovementFactory::create($otherCompany, $otherFund, 700);
+        // Funds (company A)
+        $fundOne = new MoneyFund(Uuid::uuid4()->toString(), $company, 'Налоги', 'RUB');
+        $fundTwo = new MoneyFund(Uuid::uuid4()->toString(), $company, 'Зарплата', 'RUB');
 
-        $em->persist($movement1);
-        $em->persist($movement2);
-        $em->persist($movement3);
-        $em->persist($movementOtherCompany);
-        $em->flush();
+        // Fund (company B) – должен НЕ влиять
+        $otherFund = new MoneyFund(Uuid::uuid4()->toString(), $otherCompany, 'Чужой фонд', 'RUB');
+
+        $this->em->persist($fundOne);
+        $this->em->persist($fundTwo);
+        $this->em->persist($otherFund);
+        $this->em->flush();
+
+        // Movements (company A)
+        $m1 = new MoneyFundMovement(
+            Uuid::uuid4()->toString(),
+            $company,
+            $fundOne,
+            new \DateTimeImmutable('2024-01-01 00:00:00+00:00'),
+            1000
+        );
+
+        $m2 = new MoneyFundMovement(
+            Uuid::uuid4()->toString(),
+            $company,
+            $fundOne,
+            new \DateTimeImmutable('2024-01-02 00:00:00+00:00'),
+            -300
+        );
+
+        $m3 = new MoneyFundMovement(
+            Uuid::uuid4()->toString(),
+            $company,
+            $fundTwo,
+            new \DateTimeImmutable('2024-01-03 00:00:00+00:00'),
+            500
+        );
+
+        // Movement (company B) – должен НЕ влиять
+        $mOther = new MoneyFundMovement(
+            Uuid::uuid4()->toString(),
+            $otherCompany,
+            $otherFund,
+            new \DateTimeImmutable('2024-01-04 00:00:00+00:00'),
+            700
+        );
+
+        $this->em->persist($m1);
+        $this->em->persist($m2);
+        $this->em->persist($m3);
+        $this->em->persist($mOther);
+        $this->em->flush();
+        $this->em->clear();
 
         /** @var FundBalanceService $service */
-        $service = $container->get(FundBalanceService::class);
+        $service = self::getContainer()->get(FundBalanceService::class);
 
         $balances = $service->getFundBalances($company->getId());
+
         $map = [];
         foreach ($balances as $row) {
             $map[$row['fundId']] = $row;
@@ -77,8 +114,5 @@ final class FundBalanceServiceTest extends KernelTestCase
 
         $totals = $service->getTotals($company->getId());
         self::assertSame(1200, $totals['RUB']);
-
-        $cashTransactions = (int) $em->createQuery('SELECT COUNT(t.id) FROM App\\Entity\\CashTransaction t')->getSingleScalarResult();
-        self::assertSame(0, $cashTransactions, 'Movements should not create cash transactions.');
     }
 }

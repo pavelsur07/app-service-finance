@@ -1,156 +1,64 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Integration;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
-use App\Cash\Entity\PaymentPlan\PaymentPlan;
-use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashflowCategory;
-use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
-use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
-use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Cash\Service\Accounts\AccountBalanceService;
-use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
-use App\Cash\Service\PaymentPlan\PaymentPlanService;
-use App\Cash\Service\Transaction\CashTransactionService;
-use App\Company\Entity\Company;
-use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Counterparty;
 use App\Enum\MoneyAccountType;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Tools\SchemaTool;
-use Doctrine\ORM\Tools\Setup;
-use Doctrine\Persistence\ManagerRegistry;
-use PHPUnit\Framework\TestCase;
+use App\Cash\Service\Transaction\CashTransactionService;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\MessageBusInterface;
 
-class SimpleManagerRegistry implements ManagerRegistry
+final class CashTransactionServiceTest extends IntegrationTestCase
 {
-    public function __construct(private EntityManager $em)
-    {
-    }
-
-    public function getDefaultConnectionName(): string
-    {
-        return 'default';
-    }
-
-    public function getConnection($name = null): object
-    {
-        return $this->em->getConnection();
-    }
-
-    public function getConnections(): array
-    {
-        return [$this->em->getConnection()];
-    }
-
-    public function getConnectionNames(): array
-    {
-        return ['default'];
-    }
-
-    public function getDefaultManagerName(): string
-    {
-        return 'default';
-    }
-
-    public function getManager($name = null): \Doctrine\Persistence\ObjectManager
-    {
-        return $this->em;
-    }
-
-    public function getManagers(): array
-    {
-        return ['default' => $this->em];
-    }
-
-    public function resetManager($name = null): \Doctrine\Persistence\ObjectManager
-    {
-        return $this->em;
-    }
-
-    public function getAliasNamespace($alias)
-    {
-        return 'App\\Entity';
-    }
-
-    public function getManagerNames(): array
-    {
-        return ['default'];
-    }
-
-    public function getRepository($persistentObject, $persistentManagerName = null): \Doctrine\Persistence\ObjectRepository
-    {
-        return $this->em->getRepository($persistentObject);
-    }
-
-    public function getManagerForClass($class): ?\Doctrine\Persistence\ObjectManager
-    {
-        return $this->em;
-    }
-}
-
-class NullMessageBus implements MessageBusInterface
-{
-    public function dispatch(object $message, array $stamps = []): Envelope
-    {
-        return new Envelope($message);
-    }
-}
-
-class CashTransactionServiceTest extends TestCase
-{
-    private EntityManager $em;
     private CashTransactionService $txService;
 
     protected function setUp(): void
     {
-        $config = Setup::createAttributeMetadataConfiguration([__DIR__.'/../../src/Entity'], true);
-        $conn = ['driver' => 'pdo_sqlite', 'memory' => true];
-        $this->em = EntityManager::create($conn, $config);
-        $schemaTool = new SchemaTool($this->em);
-        $classes = [
-            $this->em->getClassMetadata(User::class),
-            $this->em->getClassMetadata(Company::class),
-            $this->em->getClassMetadata(MoneyAccount::class),
-            $this->em->getClassMetadata(CashTransaction::class),
-            $this->em->getClassMetadata(MoneyAccountDailyBalance::class),
-            $this->em->getClassMetadata(CashflowCategory::class),
-            $this->em->getClassMetadata(Counterparty::class),
-            $this->em->getClassMetadata(PaymentPlan::class),
-            $this->em->getClassMetadata(PaymentPlanMatch::class),
-        ];
-        $schemaTool->createSchema($classes);
-        $registry = new SimpleManagerRegistry($this->em);
-        $txRepo = new \App\Cash\Repository\Transaction\CashTransactionRepository($registry);
-        $balanceRepo = new \App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository($registry);
-        $balanceService = new AccountBalanceService($txRepo, $balanceRepo);
-        $planRepository = new PaymentPlanRepository($registry);
-        $planMatchRepository = new PaymentPlanMatchRepository($registry);
-        $paymentPlanMatcher = new PaymentPlanMatcher($this->em, $planRepository, $planMatchRepository, new PaymentPlanService());
-        $this->txService = new CashTransactionService($this->em, $balanceService, $txRepo, new NullMessageBus(), $paymentPlanMatcher);
+        parent::setUp();
+
+        $this->txService = self::getContainer()->get(CashTransactionService::class);
     }
 
     public function testAddPersistsAllFields(): void
     {
-        $user = new User(Uuid::uuid4()->toString());
-        $user->setEmail('t@example.com');
-        $user->setPassword('pass');
-        $company = new Company(Uuid::uuid4()->toString(), $user);
-        $company->setName('Test');
-        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $user = UserBuilder::aUser()
+            ->withEmail('t@example.com')
+            ->withPasswordHash('pass')
+            ->build();
+
+        $company = CompanyBuilder::aCompany()
+            ->withOwner($user)
+            ->withName('Test')
+            ->build();
+
+        $account = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $company,
+            MoneyAccountType::BANK,
+            'Main',
+            'USD'
+        );
         $account->setOpeningBalance('0');
         $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
         $category = new CashflowCategory(Uuid::uuid4()->toString(), $company);
         $category->setName('Sales');
-        $counterparty = new Counterparty(Uuid::uuid4()->toString(), $company, 'Client', CounterpartyType::CUSTOMER);
+
+        $counterparty = new Counterparty(
+            Uuid::uuid4()->toString(),
+            $company,
+            'Client',
+            CounterpartyType::LEGAL_ENTITY
+        );
 
         $this->em->persist($user);
         $this->em->persist($company);

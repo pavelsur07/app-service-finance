@@ -7,32 +7,28 @@ namespace App\Tests\Integration\Company;
 use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
-use App\Tests\Support\Kernel\KernelTestCaseBase;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
 
-final class CompanyPersistenceTest extends KernelTestCaseBase
+final class CompanyPersistenceTest extends IntegrationTestCase
 {
-    protected function setUp(): void
-    {
-        parent::setUp();
-        self::bootKernel();
-        $this->resetDb();
-    }
-
     public function testCompanyPersistsWithOwner(): void
     {
-        $em = $this->em();
+        $user = UserBuilder::aUser()
+            ->withId(Uuid::uuid4()->toString())
+            ->build();
 
-        $user = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()
             ->withOwner($user)
             ->build();
 
-        $em->persist($user);
-        $em->persist($company);
-        $em->flush();
-        $em->clear();
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->flush();
+        $this->em->clear();
 
-        $companyFromDb = $em->getRepository(Company::class)->find($company->getId());
+        /** @var Company|null $companyFromDb */
+        $companyFromDb = $this->em->getRepository(Company::class)->find($company->getId());
 
         self::assertNotNull($companyFromDb);
         self::assertNotNull($companyFromDb->getUser());

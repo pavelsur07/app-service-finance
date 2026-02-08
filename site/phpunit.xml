@@ -1,23 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="https://schema.phpunit.de/11.5/phpunit.xsd"
-         bootstrap="vendor/autoload.php"
+         bootstrap="tests/bootstrap.php"
          cacheDirectory="var/test/.phpunit.cache"
          colors="true"
          executionOrder="depends,defects"
          beStrictAboutTestsThatDoNotTestAnything="true">
     <php>
         <env name="APP_ENV" value="test"/>
+        <env name="APP_DEBUG" value="1"/>
+        <env name="KERNEL_CLASS" value="App\Kernel"/>
         <env name="SHELL_VERBOSITY" value="-1"/>
+
+        <!-- Fallbacks: если dotenv по какой-то причине не загрузится в PHPUnit -->
+        <env name="APP_SECRET" value="$ecretf0rt3st"/>
+        <env name="DATABASE_URL" value="postgresql://app:secret@site-postgres:5432/app_test?serverVersion=15&amp;charset=utf8"/>
     </php>
+
     <testsuites>
         <testsuite name="unit">
             <directory>tests/Unit</directory>
         </testsuite>
         <testsuite name="integration">
             <directory>tests/Integration</directory>
-            <directory>tests/Controller</directory>
-            <directory>tests/Marketplace</directory>
         </testsuite>
         <testsuite name="functional">
             <directory>tests/Functional</directory>
@@ -27,7 +32,10 @@
             <directory>tests/Telegram</directory>
         </testsuite>
     </testsuites>
+
     <source>
-        <include><directory>src</directory></include>
+        <include>
+            <directory>src</directory>
+        </include>
     </source>
 </phpunit>

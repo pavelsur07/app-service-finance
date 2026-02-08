@@ -41,6 +41,12 @@ final class CompanyBuilder
         $clone = clone $this;
         $clone->name = sprintf('Company %d', $index);
 
+        // Детерминированный UUID на основе индекса (уникален в рамках теста)
+        $clone->id = sprintf(
+            '11111111-1111-1111-1111-%012d',
+            $index
+        );
+
         return $clone;
     }
 
