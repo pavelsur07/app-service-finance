@@ -20,95 +20,120 @@ final class CashFileImportHandler
 
     public function __invoke(CashFileImportMessage $message): void
     {
-        // --- ШАГ 1: Взятие в работу (Транзакция) ---
-        $this->entityManager->beginTransaction();
+        $jobId = $message->getJobId();
 
+        // 1. ПОПЫТКА ВЗЯТЬ ЗАДАЧУ (Блокировка и старт)
+        if (!$this->tryStartJob($jobId)) {
+            // Если не удалось взять (занята или не найдена) - просто уходим
+            return;
+        }
+
+        $error = null;
+
+        // 2. ВЫПОЛНЕНИЕ (Делегируем всю работу сервису)
         try {
-            // Блокируем строку для записи, чтобы другие воркеры не взяли её
-            $job = $this->entityManager->find(
-                CashFileImportJob::class,
-                $message->getJobId(),
-                LockMode::PESSIMISTIC_WRITE
-            );
+            // Передаем ID, а не объект, чтобы сервис загрузил свежую копию сам
+            $this->importService->import($jobId);
+        } catch (\Throwable $e) {
+            $error = $e;
+        }
 
-            // Если задачи нет, просто выходим
+        // 3. ФИНАЛИЗАЦИЯ (Сохранение итога)
+        // Мы делаем это в отдельном методе, который умеет "воскрешать" EntityManager
+        $this->finishJob($jobId, $error);
+    }
+
+    /**
+     * Пытается перевести задачу в статус "В работе".
+     * Возвращает true, если успешно начали.
+     */
+    private function tryStartJob(string $jobId): bool
+    {
+        $this->entityManager->beginTransaction();
+        try {
+            // PESSIMISTIC_WRITE блокирует строку в БД, чтобы другие воркеры ждали
+            $job = $this->entityManager->find(CashFileImportJob::class, $jobId, LockMode::PESSIMISTIC_WRITE);
+
+            if (!$job instanceof CashFileImportJob) {
+                $this->entityManager->rollback();
+                return false;
+            }
+
+            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
+                $this->entityManager->commit();
+                return false;
+            }
+
+            $job->start();
+            $this->entityManager->flush();
+            $this->entityManager->commit();
+
+            return true;
+        } catch (\Throwable $e) {
+            // Если транзакция упала - откатываем
+            if ($this->entityManager->getConnection()->isTransactionActive()) {
+                $this->entityManager->rollback();
+            }
+            // Можно залогировать ошибку старта, если нужно
+            return false;
+        }
+    }
+
+    /**
+     * Гарантированно сохраняет финальный статус задачи.
+     */
+    private function finishJob(string $jobId, ?\Throwable $exception): void
+    {
+        // Если EntityManager "умер" во время импорта (ошибка SQL), его нельзя использовать.
+        // Проверяем и если закрыт - выбрасываем исключение (Messenger его поймает и перезапустит воркер, если надо)
+        if (!$this->entityManager->isOpen()) {
+            // В Symfony Messenger это заставит воркер корректно умереть и перезапуститься
+            throw new \RuntimeException('EntityManager closed during import. Job status might not be saved.', 0, $exception);
+        }
+
+        // Очищаем IdentityMap. Это критически важно после пакетной обработки (batch processing),
+        // чтобы Doctrine забыла старые ссылки на сущности и загрузила Job заново.
+        $this->entityManager->clear();
+
+        $this->entityManager->beginTransaction();
+        try {
+            // Снова блокируем, чтобы безопасно обновить статус
+            $job = $this->entityManager->find(CashFileImportJob::class, $jobId, LockMode::PESSIMISTIC_WRITE);
+
             if (!$job instanceof CashFileImportJob) {
                 $this->entityManager->rollback();
                 return;
             }
 
-            // Если статус уже не QUEUED (кто-то другой взял), выходим
-            if (CashFileImportJob::STATUS_QUEUED !== $job->getStatus()) {
-                $this->entityManager->commit();
-                return;
+            $now = new \DateTimeImmutable();
+
+            if (null === $exception) {
+                $job->finishOk();
+                $job->setErrorMessage(null);
+            } else {
+                $errorMsg = sprintf(
+                    'Error: %s [%s] at %s:%d',
+                    $exception->getMessage(),
+                    $exception::class,
+                    basename($exception->getFile()),
+                    $exception->getLine()
+                );
+                $job->fail(mb_substr($errorMsg, 0, 2000));
             }
 
-            // Ставим статус "В работе"
-            $job->start();
+            // Принудительно ставим дату завершения (страховка)
+            if (method_exists($job, 'setFinishedAt')) {
+                $job->setFinishedAt($now);
+            }
+
             $this->entityManager->flush();
             $this->entityManager->commit();
-        } catch (\Throwable $exception) {
-            // Если что-то пошло не так на старте - откатываем
+        } catch (\Throwable $e) {
             if ($this->entityManager->getConnection()->isTransactionActive()) {
                 $this->entityManager->rollback();
             }
-            throw $exception;
+            // Тут уже ничего не поделаешь, просто логируем в поток вывода
+            file_put_contents('php://stderr', "CRITICAL: Failed to save job status: " . $e->getMessage());
         }
-
-        // --- ШАГ 2: Выполнение импорта ---
-        $importException = null;
-
-        try {
-            // Запускаем сервис (он сам управляет своими батчами и памятью)
-            $this->importService->import($job);
-        } catch (\Throwable $exception) {
-            $importException = $exception;
-        }
-
-        // --- ШАГ 3: Финализация (Сохранение результата) ---
-
-        // Критическая проверка: если EntityManager закрылся (например, из-за ошибки SQL внутри сервиса),
-        // мы не сможем сохранить статус через ORM.
-        if (!$this->entityManager->isOpen()) {
-            // Здесь можно пересоздать менеджер через ManagerRegistry, если очень нужно,
-            // но для простоты просто выбрасываем исключение, чтобы Messenger увидел проблему.
-            throw new \RuntimeException(
-                'Entity Manager closed during import. Job ID: ' . $message->getJobId(),
-                0,
-                $importException
-            );
-        }
-
-        // Очищаем память Doctrine, чтобы подтянуть свежее состояние Job из базы
-        // Это важно, если сервис импорта делал $em->clear()
-        $this->entityManager->clear();
-
-        $freshJob = $this->entityManager->find(CashFileImportJob::class, $message->getJobId());
-
-        if (!$freshJob instanceof CashFileImportJob) {
-            return;
-        }
-
-        if (null === $importException) {
-            // Успех
-            $freshJob->finishOk();
-            // Очищаем поле ошибки, если там были старые записи
-            $freshJob->setErrorMessage(null);
-        } else {
-            // Ошибка
-            $errorMsg = sprintf(
-                'Error [%s]: %s at %s:%d',
-                $importException::class,
-                $importException->getMessage(),
-                $importException->getFile(),
-                $importException->getLine()
-            );
-
-            // Обрезаем сообщение до 2000 символов (или сколько у вас в базе)
-            $freshJob->fail(mb_substr($errorMsg, 0, 2000));
-        }
-
-        // Финальное сохранение статуса
-        $this->entityManager->flush();
     }
 }
