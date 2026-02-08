@@ -53,8 +53,11 @@ site-test-int: site-test-init
 site-test: site-test-init
 	docker-compose run --rm site-php-cli composer test
 
-site-test-smoke: site-test-init
-	docker-compose run --rm -T site-php-cli php bin/phpunit --testsuite=integration --filter SmokePersistenceTest
+# ---- подготовка окружения тестов (smoke) ----
+site-test-smoke-init: site-composer-install site-test-env site-test-wait-db site-test-db site-test-migrations
+
+site-test-smoke: site-test-smoke-init
+	docker-compose run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
 
 # Покрытие (нужен xdebug или pcov в CLI-образе)
 site-test-cov: site-test-init
