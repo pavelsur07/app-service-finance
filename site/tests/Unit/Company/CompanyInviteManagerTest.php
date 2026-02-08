@@ -63,11 +63,16 @@ final class CompanyInviteManagerTest extends TestCase
         self::assertSame($expectedToken, $result->plainToken);
         self::assertNotNull($result->invite);
         self::assertNotNull($capturedInvite);
+
+        // never assertSame() for objects here
         self::assertSame($capturedInvite->getId(), $result->invite->getId());
+
         self::assertSame('operator@example.test', $capturedInvite->getEmail());
         self::assertSame(CompanyMember::ROLE_OPERATOR, $capturedInvite->getRole());
         self::assertSame($expectedHash, $capturedInvite->getTokenHash());
-        self::assertSame($expectedExpiresAt, $capturedInvite->getExpiresAt());
+
+        // DateTimeImmutable сравниваем по значению, не по ссылке
+        self::assertEquals($expectedExpiresAt, $capturedInvite->getExpiresAt());
     }
 
     public function testInviteOperatorRenewsPendingInvite(): void
@@ -112,9 +117,14 @@ final class CompanyInviteManagerTest extends TestCase
         self::assertSame('invite_renewed', $result->type);
         self::assertSame($expectedToken, $result->plainToken);
         self::assertNotNull($result->invite);
+
+        // never assertSame() for objects here
         self::assertSame($invite->getId(), $result->invite->getId());
+
         self::assertSame($expectedHash, $invite->getTokenHash());
-        self::assertSame($expectedExpiresAt, $invite->getExpiresAt());
+
+        // DateTimeImmutable сравниваем по значению, не по ссылке
+        self::assertEquals($expectedExpiresAt, $invite->getExpiresAt());
     }
 
     public function testAcceptInviteCreatesCompanyMemberAndMarksAccepted(): void
@@ -164,7 +174,10 @@ final class CompanyInviteManagerTest extends TestCase
 
         $manager->acceptInvite($plainToken, $user, $now);
 
-        self::assertSame($now, $invite->getAcceptedAt());
+        // DateTimeImmutable сравниваем по значению, не по ссылке
+        self::assertEquals($now, $invite->getAcceptedAt());
+
+        // user — это тот же объект, его можно сравнивать по ссылке
         self::assertSame($user, $invite->getAcceptedByUser());
     }
 

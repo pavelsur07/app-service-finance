@@ -40,7 +40,7 @@ final class DealManagerTest extends TestCase
         $user = UserBuilder::aUser()->build();
         $company = CompanyBuilder::aCompany()->withOwner($user)->build();
         $deal = DealBuilder::aDeal()->forCompany($company)->build();
-        $deal->confirm();
+        $deal->markConfirmed();
 
         $request = new AddDealItemRequest(
             name: 'Item',
