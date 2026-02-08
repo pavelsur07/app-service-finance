@@ -48,7 +48,14 @@ final class CashFileImportService
 
         $filePath = $this->resolveFilePath($job);
 
+        // --- СЧЕТЧИКИ ДЛЯ ДИАГНОСТИКИ ---
         $created = 0;
+        $skippedDuplicates = 0;
+        $skippedNormalization = 0;
+        $skippedMissingFields = 0;
+        $totalRowsRead = 0;
+        // --------------------------------
+
         $createdMinDate = null;
         $createdMaxDate = null;
         $batchSize = 200;
@@ -57,148 +64,193 @@ final class CashFileImportService
         $reader = $this->openReaderByExtension($filePath);
 
         try {
-            try {
-                $reader->open($filePath);
-                foreach ($reader->getSheetIterator() as $sheet) {
-                    $rowIndex = 0;
-                    $headerLabels = [];
-                    foreach ($sheet->getRowIterator() as $row) {
-                        $cells = $row->toArray();
-                        if (0 === $rowIndex) {
-                            $headers = array_map(
-                                fn ($value) => $this->normalizeValue($value, true),
-                                $cells
-                            );
-                            foreach ($headers as $index => $header) {
-                                if (null === $header || '' === $header) {
-                                    $headerLabels[$index] = sprintf('Колонка %d', $index + 1);
-                                } else {
-                                    $headerLabels[$index] = $header;
-                                }
-                            }
-                            ++$rowIndex;
-                            continue;
-                        }
+            $reader->open($filePath);
 
-                        $rowByHeader = [];
-                        foreach ($headerLabels as $index => $label) {
-                            $rowByHeader[$label] = $this->normalizeValue($cells[$index] ?? null, false);
-                        }
+            // Флаг, чтобы понять, был ли файл вообще прочитан
+            $isFileEmpty = true;
 
-                        $normalized = $this->rowNormalizer->normalize(
-                            $rowByHeader,
-                            $mapping,
-                            $moneyAccount->getCurrency()
-                        );
+            foreach ($reader->getSheetIterator() as $sheet) {
+                $rowIndex = 0;
+                $headerLabels = [];
 
-                        if (false === $normalized['ok']) {
-                            if ($importLog) {
-                                $this->importLogger->incError($importLog);
-                            }
-                            ++$rowIndex;
-                            continue;
-                        }
+                foreach ($sheet->getRowIterator() as $row) {
+                    $isFileEmpty = false;
+                    $cells = $row->toArray();
 
-                        $occurredAt = $normalized['occurredAt'];
-                        $direction = $normalized['direction'];
-                        $amount = $normalized['amount'];
-                        $currency = $normalized['currency'];
-                        $description = $normalized['description'];
-                        $docNumber = $normalized['docNumber'];
-                        $counterpartyName = $normalized['counterpartyName'];
-
-                        if (!$occurredAt || !$direction || !$amount) {
-                            if ($importLog) {
-                                $this->importLogger->incError($importLog);
-                            }
-                            ++$rowIndex;
-                            continue;
-                        }
-
-                        $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
-                        $amountMinor = (int) str_replace('.', '', $amount);
-                        $dedupeHash = $this->makeDedupeHash(
-                            $companyId,
-                            $accountId,
-                            $occurredAtUtc,
-                            $amountMinor,
-                            $description ?? ''
-                        );
-
-                        if ($this->cashTransactionRepository->existsByCompanyAndDedupe($companyId, $dedupeHash)) {
-                            if ($importLog) {
-                                $this->importLogger->incSkippedDuplicate($importLog);
-                            }
-                            ++$rowIndex;
-                            continue;
-                        }
-
-                        $transaction = new CashTransaction(
-                            Uuid::uuid4()->toString(),
-                            $company,
-                            $moneyAccount,
-                            $direction,
-                            $amount,
-                            $currency,
-                            $occurredAt,
-                        );
-                        $transaction->setDedupeHash($dedupeHash);
-                        $transaction->setImportSource('file');
-                        $transaction->setDocNumber($docNumber);
-                        $transaction->setDescription($description);
-                        $transaction->setBookedAt($occurredAt);
-                        $transaction->setRawData([
-                            'row' => $rowByHeader,
-                            'mapping' => $mapping,
-                        ]);
-                        $transaction->setUpdatedAt(new \DateTimeImmutable());
-
-                        if (is_string($docNumber)) {
-                            $trimmedDocNumber = trim($docNumber);
-                            if ('' !== $trimmedDocNumber) {
-                                $transaction->setExternalId($trimmedDocNumber);
-                            }
-                        }
-
-                        if (null !== $counterpartyName) {
-                            $counterparty = $this->getOrCreateCounterparty($companyId, $counterpartyName, $company);
-                            $transaction->setCounterparty($counterparty);
-                        } else {
-                            $transaction->setCounterparty(null);
-                        }
-
-                        $this->entityManager->persist($transaction);
-
-                        ++$created;
-                        if ($importLog) {
-                            $this->importLogger->incCreated($importLog);
-                        }
-
-                        if (null === $createdMinDate || $occurredAt < $createdMinDate) {
-                            $createdMinDate = $occurredAt;
-                        }
-                        if (null === $createdMaxDate || $occurredAt > $createdMaxDate) {
-                            $createdMaxDate = $occurredAt;
-                        }
-
-                        ++$batchCount;
-                        if ($batchCount >= $batchSize) {
-                            $this->flushBatch();
-                            $batchCount = 0;
-                        }
-
-                        ++$rowIndex;
+                    // Пропуск пустых строк в файле
+                    if (empty($cells) || (count($cells) === 1 && empty(trim((string)$cells[0])))) {
+                        continue;
                     }
-                    break;
+
+                    // --- ОБРАБОТКА ЗАГОЛОВКОВ (ПЕРВАЯ СТРОКА) ---
+                    if (0 === $rowIndex) {
+                        $headers = array_map(
+                            fn ($value) => $this->normalizeValue($value, true),
+                            $cells
+                        );
+
+                        // ДИАГНОСТИКА: Проверка разделителя
+                        // Если колонок меньше 2, скорее всего CSV разделитель не сработал
+                        if (count($headers) < 2) {
+                            throw new \RuntimeException(sprintf(
+                                'ОШИБКА ФОРМАТА: В файле найдена только 1 колонка. Заголовок: "%s". Проверьте разделитель CSV (ожидается ; или ,) или кодировку файла.',
+                                implod(';', $headers)
+                            ));
+                        }
+
+                        foreach ($headers as $index => $header) {
+                            if (null === $header || '' === $header) {
+                                $headerLabels[$index] = sprintf('Колонка %d', $index + 1);
+                            } else {
+                                $headerLabels[$index] = $header;
+                            }
+                        }
+                        ++$rowIndex;
+                        continue;
+                    }
+
+                    // --- ОБРАБОТКА ДАННЫХ ---
+                    ++$totalRowsRead;
+
+                    $rowByHeader = [];
+                    foreach ($headerLabels as $index => $label) {
+                        $rowByHeader[$label] = $this->normalizeValue($cells[$index] ?? null, false);
+                    }
+
+                    $normalized = $this->rowNormalizer->normalize(
+                        $rowByHeader,
+                        $mapping,
+                        $moneyAccount->getCurrency()
+                    );
+
+                    if (false === $normalized['ok']) {
+                        if ($importLog) {
+                            $this->importLogger->incError($importLog);
+                        }
+                        ++$skippedNormalization; // Считаем ошибку
+                        ++$rowIndex;
+                        continue;
+                    }
+
+                    $occurredAt = $normalized['occurredAt'];
+                    $direction = $normalized['direction'];
+                    $amount = $normalized['amount'];
+                    $currency = $normalized['currency'];
+                    $description = $normalized['description'];
+                    $docNumber = $normalized['docNumber'];
+                    $counterpartyName = $normalized['counterpartyName'];
+
+                    if (!$occurredAt || !$direction || !$amount) {
+                        if ($importLog) {
+                            $this->importLogger->incError($importLog);
+                        }
+                        ++$skippedMissingFields; // Считаем пропуск
+                        ++$rowIndex;
+                        continue;
+                    }
+
+                    $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
+                    $amountMinor = (int) str_replace('.', '', $amount);
+                    $dedupeHash = $this->makeDedupeHash(
+                        $companyId,
+                        $accountId,
+                        $occurredAtUtc,
+                        $amountMinor,
+                        $description ?? ''
+                    );
+
+                    if ($this->cashTransactionRepository->existsByCompanyAndDedupe($companyId, $dedupeHash)) {
+                        if ($importLog) {
+                            $this->importLogger->incSkippedDuplicate($importLog);
+                        }
+                        ++$skippedDuplicates; // Считаем дубль
+                        ++$rowIndex;
+                        continue;
+                    }
+
+                    // --- СОЗДАНИЕ ТРАНЗАКЦИИ ---
+                    $transaction = new CashTransaction(
+                        Uuid::uuid4()->toString(),
+                        $company,
+                        $moneyAccount,
+                        $direction,
+                        $amount,
+                        $currency,
+                        $occurredAt,
+                    );
+                    $transaction->setDedupeHash($dedupeHash);
+                    $transaction->setImportSource('file');
+                    $transaction->setDocNumber($docNumber);
+                    $transaction->setDescription($description);
+                    $transaction->setBookedAt($occurredAt);
+                    $transaction->setRawData([
+                        'row' => $rowByHeader,
+                        'mapping' => $mapping,
+                    ]);
+                    $transaction->setUpdatedAt(new \DateTimeImmutable());
+
+                    if (is_string($docNumber)) {
+                        $trimmedDocNumber = trim($docNumber);
+                        if ('' !== $trimmedDocNumber) {
+                            $transaction->setExternalId($trimmedDocNumber);
+                        }
+                    }
+
+                    if (null !== $counterpartyName) {
+                        $counterparty = $this->getOrCreateCounterparty($companyId, $counterpartyName, $company);
+                        $transaction->setCounterparty($counterparty);
+                    } else {
+                        $transaction->setCounterparty(null);
+                    }
+
+                    $this->entityManager->persist($transaction);
+
+                    ++$created;
+                    if ($importLog) {
+                        $this->importLogger->incCreated($importLog);
+                    }
+
+                    if (null === $createdMinDate || $occurredAt < $createdMinDate) {
+                        $createdMinDate = $occurredAt;
+                    }
+                    if (null === $createdMaxDate || $occurredAt > $createdMaxDate) {
+                        $createdMaxDate = $occurredAt;
+                    }
+
+                    ++$batchCount;
+                    if ($batchCount >= $batchSize) {
+                        $this->flushBatch();
+                        $batchCount = 0;
+                    }
+
+                    ++$rowIndex;
                 }
-            } finally {
-                $reader->close();
-                if ($batchCount > 0) {
-                    $this->flushBatch();
-                }
+                // Обычно в CSV только один sheet, выходим
+                break;
             }
 
-            if ($created > 0 && null !== $createdMinDate) {
+            // --- ФИНАЛЬНЫЙ АНАЛИЗ РЕЗУЛЬТАТОВ (ВАЖНО ДЛЯ ДЕБАГА) ---
+            if ($isFileEmpty) {
+                throw new \RuntimeException("Файл пустой или не удалось прочитать ни одной строки.");
+            }
+
+            if (0 === $created) {
+                // Если мы ничего не создали, нужно обязательно сказать почему,
+                // иначе пользователь увидит статус "ОК", но данных не будет.
+                throw new \RuntimeException(sprintf(
+                    "Импорт завершен, но создано 0 транзакций. Прочитано строк: %d. Пропущено (дубликаты): %d. Ошибок нормализации (формат данных): %d. Ошибок полей (нет даты/суммы): %d.",
+                    $totalRowsRead,
+                    $skippedDuplicates,
+                    $skippedNormalization,
+                    $skippedMissingFields
+                ));
+            }
+
+            if ($batchCount > 0) {
+                $this->flushBatch();
+            }
+
+            if (null !== $createdMinDate) {
                 $today = new \DateTimeImmutable('today');
                 $toDate = $createdMaxDate ?? $createdMinDate;
                 if ($createdMinDate <= $today) {
@@ -206,7 +258,10 @@ final class CashFileImportService
                 }
                 $this->accountBalanceService->recalculateDailyRange($company, $moneyAccount, $createdMinDate, $toDate);
             }
+
         } finally {
+            $reader->close();
+            // Logger finish переместил сюда на случай исключений
             if ($importLog) {
                 $this->importLogger->finish($importLog);
             }
@@ -367,12 +422,12 @@ final class CashFileImportService
             return ',';
         }
 
-        $delimiters = [';', ',', "\t"];
+        $delimiters = [';', ',', "\t", '|']; // Добавил | на всякий случай
         $counts = array_fill_keys($delimiters, 0);
         $linesRead = 0;
 
         try {
-            while (!feof($handle) && $linesRead < 5) {
+            while (!feof($handle) && $linesRead < 10) { // Читаем чуть больше строк для надежности
                 $line = fgets($handle);
                 if (false === $line) {
                     break;
@@ -393,13 +448,19 @@ final class CashFileImportService
             fclose($handle);
         }
 
-        $bestDelimiter = ',';
-        $bestCount = 0;
+        $bestDelimiter = ','; // Дефолт
+        $bestCount = -1;
+
         foreach ($counts as $delimiter => $count) {
             if ($count > $bestCount) {
                 $bestCount = $count;
                 $bestDelimiter = $delimiter;
             }
+        }
+
+        // Если вообще ничего не нашли, вернем запятую или точку с запятой
+        if ($bestCount <= 0) {
+            return ';'; // Чаще всего в "ломаных" файлах именно ;
         }
 
         return $bestDelimiter;
