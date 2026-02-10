@@ -47,6 +47,17 @@ class CashflowCategoryRepository extends ServiceEntityRepository
         return $result;
     }
 
+    public function findSystemUnallocatedByCompany(Company $company): ?CashflowCategory
+    {
+        return $this->createQueryBuilder('c')
+            ->andWhere('c.company = :company')
+            ->andWhere('c.systemCode = :code')
+            ->setParameter('company', $company)
+            ->setParameter('code', CashflowCategory::SYSTEM_UNALLOCATED)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     private function collectTree(CashflowCategory $category, array &$result): void
     {
         $result[] = $category;
