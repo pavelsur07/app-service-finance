@@ -63,7 +63,9 @@ class BalanceBuilder
         $this->totalsCache = [];
 
         $roots = $this->balanceCategoryRepository->findRootByCompany($company);
+        /** @var array<string,float> $cashTotals */
         $cashTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_ACCOUNTS_TOTAL, $company, $date);
+        /** @var array<string,float> $fundTotals */
         $fundTotals = $this->getTotalsCached(BalanceLinkSourceType::MONEY_FUNDS_TOTAL, $company, $date);
 
         $currencies = array_unique(array_merge(array_keys($cashTotals), array_keys($fundTotals)));
