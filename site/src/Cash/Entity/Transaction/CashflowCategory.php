@@ -16,6 +16,8 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: '`cashflow_categories`')]
 class CashflowCategory
 {
+    public const SYSTEM_UNALLOCATED = 'UNALLOCATED';
+
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
     private ?string $id = null;
@@ -51,6 +53,9 @@ class CashflowCategory
 
     #[ORM\ManyToOne(targetEntity: PLCategory::class)]
     private ?PLCategory $plCategory = null;
+
+    #[ORM\Column(type: 'string', length: 32, nullable: true)]
+    private ?string $systemCode = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -175,6 +180,18 @@ class CashflowCategory
     public function setPlCategory(?PLCategory $plCategory): self
     {
         $this->plCategory = $plCategory;
+
+        return $this;
+    }
+
+    public function getSystemCode(): ?string
+    {
+        return $this->systemCode;
+    }
+
+    public function setSystemCode(?string $code): self
+    {
+        $this->systemCode = $code;
 
         return $this;
     }
