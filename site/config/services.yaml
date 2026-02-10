@@ -62,6 +62,20 @@ services:
 
     App\Finance\Facts\FactsProviderInterface: '@App\Finance\Facts\PLDailyTotalFactsProvider'
 
+    # ---------- Balance value providers ------------ #
+    App\Balance\Provider\:
+        resource: '../src/Balance/Provider/'
+
+    App\Balance\Provider\CashTotalsProvider:
+        tags: ['app.balance.value_provider']
+
+    App\Balance\Provider\FundsTotalsProvider:
+        tags: ['app.balance.value_provider']
+
+    App\Balance\Provider\BalanceValueProviderRegistry:
+        arguments:
+            $providers: !tagged_iterator app.balance.value_provider
+
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'
