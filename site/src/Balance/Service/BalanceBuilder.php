@@ -7,6 +7,7 @@ use App\Balance\Entity\BalanceCategory;
 use App\Balance\Entity\BalanceCategoryLink;
 use App\Balance\Enum\BalanceLinkSourceType;
 use App\Balance\Provider\BalanceValueProviderRegistry;
+use App\Balance\ReadModel\BalanceReport;
 use App\Balance\Repository\BalanceCategoryLinkRepository;
 use App\Balance\Repository\BalanceCategoryRepository;
 use App\Company\Entity\Company;
@@ -27,6 +28,37 @@ class BalanceBuilder
      * @return array{date:\DateTimeImmutable, currencies:list<string>, roots:list<BalanceRowView>, totals: array<string,float>}
      */
     public function buildForCompanyAndDate(Company $company, \DateTimeImmutable $date): array
+    {
+        $report = $this->buildReportForCompanyAndDate($company, $date);
+
+        return [
+            'date' => $report->getDate(),
+            'currencies' => $report->getCurrencies(),
+            'roots' => $report->getRoots(),
+            'totals' => $report->getTotals(),
+        ];
+    }
+
+    public function buildReportForCompanyAndDate(Company $company, \DateTimeImmutable $date): BalanceReport
+    {
+        [
+            'currencies' => $currencies,
+            'roots' => $rootViews,
+            'totals' => $totals,
+        ] = $this->collectReportData($company, $date);
+
+        return new BalanceReport(
+            date: $date,
+            currencies: $currencies,
+            roots: $rootViews,
+            totals: $totals,
+        );
+    }
+
+    /**
+     * @return array{currencies:list<string>, roots:list<BalanceRowView>, totals: array<string,float>}
+     */
+    private function collectReportData(Company $company, \DateTimeImmutable $date): array
     {
         $this->totalsCache = [];
 
@@ -60,7 +92,6 @@ class BalanceBuilder
         }
 
         return [
-            'date' => $date,
             'currencies' => $currencies,
             'roots' => $rootViews,
             'totals' => $totals,
