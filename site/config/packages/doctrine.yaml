@@ -78,6 +78,18 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Shared/Entity'
                 prefix: 'App\Shared\Entity'
                 alias: Shared
+            Catalog:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Catalog/Entity'
+                prefix: 'App\Catalog\Entity'
+                alias: Catalog
+            Marketplace:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Marketplace/Entity'
+                prefix: 'App\Marketplace\Entity'
+                alias: Marketplace
         controller_resolver:
             auto_mapping: false
 
