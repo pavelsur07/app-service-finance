@@ -4,6 +4,7 @@ namespace App\MessageHandler;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Service\Category\CashflowSystemCategoryService;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
 use App\Message\ApplyAutoRulesForTransaction;
 use Doctrine\ORM\EntityManagerInterface;
@@ -17,6 +18,7 @@ final class ApplyAutoRulesForTransactionHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly CashTransactionRepository $transactionRepository,
         private readonly CashTransactionAutoRuleService $autoRuleService,
+        private readonly CashflowSystemCategoryService $cashflowSystemCategoryService,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -58,6 +60,13 @@ final class ApplyAutoRulesForTransactionHandler
             $changed = $this->autoRuleService->applyRule($rule, $transaction);
             $ruleId = $rule->getId();
             $ruleName = $rule->getName();
+        }
+
+        if (null === $transaction->getCashflowCategory()) {
+            $unallocatedCategory = $this->cashflowSystemCategoryService->getOrCreateUnallocated($transaction->getCompany());
+            $transaction->setCashflowCategory($unallocatedCategory);
+            $this->entityManager->flush();
+            $changed = true;
         }
 
         $this->logger->info('Cash auto rules applied', [
