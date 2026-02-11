@@ -1,0 +1,215 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Маркетплейсы{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Интеграции с маркетплейсами</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            {# Flash messages #}
+            {% for label, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible" role="alert">
+                        <div class="d-flex">
+                            <div>{{ message }}</div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+
+            <div class="row row-deck row-cards">
+
+                {# Подключения #}
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Активные подключения</h3>
+                            <div class="card-actions">
+                                <a href="#" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#modal-add-connection">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                                    Добавить подключение
+                                </a>
+                            </div>
+                        </div>
+                        <div class="card-body">
+                            {% if connections is empty %}
+                                <div class="empty">
+                                    <div class="empty-icon">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="7" cy="18" r="2" /><circle cx="7" cy="6" r="2" /><circle cx="17" cy="12" r="2" /><line x1="7" y1="8" x2="7" y2="16" /><path d="M7 8a4 4 0 0 0 4 4h4" /></svg>
+                                    </div>
+                                    <p class="empty-title">Нет активных подключений</p>
+                                    <p class="empty-subtitle text-muted">
+                                        Добавьте подключение к маркетплейсу для начала работы
+                                    </p>
+                                </div>
+                            {% else %}
+                                <div class="list-group list-group-flush">
+                                    {% for connection in connections %}
+                                        <div class="list-group-item">
+                                            <div class="row align-items-center">
+                                                <div class="col-auto">
+                                                    <span class="avatar" style="background-image: url(https://via.placeholder.com/40)">{{ connection.marketplace.value|slice(0,2)|upper }}</span>
+                                                </div>
+                                                <div class="col text-truncate">
+                                                    <div class="text-reset d-block">{{ connection.marketplace.displayName }}</div>
+                                                    <div class="d-block text-muted text-truncate mt-n1">
+                                                        API Key: {{ connection.apiKey|slice(0, 20) }}***
+                                                    </div>
+                                                    <div class="d-block text-muted text-truncate mt-1">
+                                                        {% if connection.lastSyncAt %}
+                                                            <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
+                                                        {% else %}
+                                                            <small class="text-warning">Ещё не синхронизировалось</small>
+                                                        {% endif %}
+                                                    </div>
+                                                    {% if connection.lastSyncError %}
+                                                        <div class="text-danger mt-1">
+                                                            <small>Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+                                                <div class="col-auto">
+                                                <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
+                                                    {{ connection.isActive ? 'Активно' : 'Неактивно' }}
+                                                </span>
+                                                </div>
+                                                <div class="col-auto">
+                                                    <div class="btn-list">
+                                                        <a href="{{ path('marketplace_connection_test', {id: connection.id}) }}" class="btn btn-sm btn-outline-info">
+                                                            Проверить
+                                                        </a>
+                                                        <a href="{{ path('marketplace_connection_sync', {id: connection.id}) }}" class="btn btn-sm btn-primary">
+                                                            Синхронизировать
+                                                        </a>
+                                                        <a href="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">
+                                                            {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
+                                                        </a>
+                                                        <form method="post" action="{{ path('marketplace_connection_delete', {id: connection.id}) }}" style="display: inline;">
+                                                            <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить подключение?')">
+                                                                Удалить
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {# История синхронизаций #}
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">История синхронизаций</h3>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table card-table table-vcenter">
+                                <thead>
+                                <tr>
+                                    <th>Маркетплейс</th>
+                                    <th>Тип документа</th>
+                                    <th>Period</th>
+                                    <th>Записей</th>
+                                    <th>Создано</th>
+                                    <th>Пропущено</th>
+                                    <th>Дата</th>
+                                    <th></th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% if rawDocuments is empty %}
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted">Нет данных</td>
+                                    </tr>
+                                {% else %}
+                                    {% for doc in rawDocuments %}
+                                        <tr>
+                                            <td>
+                                                <span class="badge bg-azure">{{ doc.marketplace.displayName }}</span>
+                                            </td>
+                                            <td>{{ doc.documentType }}</td>
+                                            <td>
+                                                <small>{{ doc.periodFrom|date('d.m.Y') }} - {{ doc.periodTo|date('d.m.Y') }}</small>
+                                            </td>
+                                            <td>{{ doc.recordsCount }}</td>
+                                            <td>
+                                                <span class="badge bg-success">{{ doc.recordsCreated }}</span>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary">{{ doc.recordsSkipped }}</span>
+                                            </td>
+                                            <td>
+                                                <small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small>
+                                            </td>
+                                            <td class="text-end">
+                                                {% if doc.syncNotes %}
+                                                    <span class="badge bg-warning" data-bs-toggle="tooltip" title="{{ doc.syncNotes }}">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-alert-triangle" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v2m0 4v.01" /><path d="M5 19h14a2 2 0 0 0 1.84 -2.75l-7.1 -12.25a2 2 0 0 0 -3.5 0l-7.1 12.25a2 2 0 0 0 1.75 2.75" /></svg>
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endif %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Добавить подключение #}
+    <div class="modal modal-blur fade" id="modal-add-connection" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('marketplace_connection_create') }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Новое подключение</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Маркетплейс</label>
+                            <select name="marketplace" class="form-select" required>
+                                <option value="">Выберите маркетплейс</option>
+                                {% for marketplace in availableMarketplaces %}
+                                    <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">API ключ</label>
+                            <input type="text" name="api_key" class="form-control" placeholder="Введите API ключ" required>
+                            <small class="form-hint">
+                                Получите API ключ в личном кабинете маркетплейса
+                            </small>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Добавить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
