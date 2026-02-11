@@ -5,15 +5,17 @@ namespace App\DataFixtures;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use Doctrine\Bundle\FixturesBundle\Fixture;
+use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;
 use Ramsey\Uuid\Uuid;
 
-class MarketplaceCostCategoriesFixtures extends Fixture
+class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixtureInterface
 {
     public function load(ObjectManager $manager): void
     {
-        // Получить все компании
-        $companies = $manager->getRepository(Company::class)->findAll();
+        // Получаем компанию "Ромашка" из AppFixtures
+        /** @var Company $company */
+        $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA, Company::class);
 
         $categories = [
             // Wildberries
@@ -34,30 +36,35 @@ class MarketplaceCostCategoriesFixtures extends Fixture
             ['code' => 'ozon_advertising', 'name' => 'Реклама на Ozon'],
         ];
 
-        foreach ($companies as $company) {
-            foreach ($categories as $cat) {
-                // Проверить существует ли уже
-                $existing = $manager->getRepository(MarketplaceCostCategory::class)
-                    ->findOneBy([
-                        'company' => $company,
-                        'code' => $cat['code']
-                    ]);
+        foreach ($categories as $cat) {
+            // Проверяем существует ли уже
+            $existing = $manager->getRepository(MarketplaceCostCategory::class)
+                ->findOneBy([
+                    'company' => $company,
+                    'code' => $cat['code']
+                ]);
 
-                if ($existing) {
-                    continue; // Пропускаем если уже есть
-                }
-
-                $category = new MarketplaceCostCategory(
-                    Uuid::uuid4()->toString(),
-                    $company
-                );
-                $category->setCode($cat['code']);
-                $category->setName($cat['name']);
-
-                $manager->persist($category);
+            if ($existing) {
+                continue; // Пропускаем если уже есть
             }
+
+            $category = new MarketplaceCostCategory(
+                Uuid::uuid4()->toString(),
+                $company
+            );
+            $category->setCode($cat['code']);
+            $category->setName($cat['name']);
+
+            $manager->persist($category);
         }
 
         $manager->flush();
+    }
+
+    public function getDependencies(): array
+    {
+        return [
+            AppFixtures::class,
+        ];
     }
 }
