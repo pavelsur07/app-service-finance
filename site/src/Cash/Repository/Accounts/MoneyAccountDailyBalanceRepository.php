@@ -84,33 +84,31 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
      */
     public function getLatestClosingTotalsUpToDate(Company $company, \DateTimeInterface $date): array
     {
-        $lastDate = $this->createQueryBuilder('b')
-            ->select('MAX(b.date)')
-            ->where('b.company = :company')
-            ->andWhere('b.date <= :date')
-            ->setParameter('company', $company)
-            ->setParameter('date', \DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE)
-            ->getQuery()
-            ->getSingleScalarResult();
+        $conn = $this->getEntityManager()->getConnection();
 
-        if (null === $lastDate) {
-            return [];
-        }
+        $sql = <<<SQL
+            SELECT t.currency, COALESCE(SUM(t.closing_balance), 0) AS total_closing
+            FROM (
+                SELECT DISTINCT ON (b.money_account_id)
+                    b.money_account_id,
+                    b.currency,
+                    b.closing_balance
+                FROM money_account_daily_balance b
+                WHERE b.company_id = :company_id
+                  AND b.date <= :date
+                ORDER BY b.money_account_id, b.date DESC
+            ) t
+            GROUP BY t.currency
+        SQL;
 
-        $rows = $this->createQueryBuilder('b')
-            ->select('b.currency as currency')
-            ->addSelect('COALESCE(SUM(b.closingBalance), 0) as totalClosing')
-            ->where('b.company = :company')
-            ->andWhere('b.date = :lastDate')
-            ->setParameter('company', $company)
-            ->setParameter('lastDate', new \DateTimeImmutable($lastDate), Types::DATE_IMMUTABLE)
-            ->groupBy('b.currency')
-            ->getQuery()
-            ->getArrayResult();
+        $rows = $conn->fetchAllAssociative($sql, [
+            'company_id' => $company->getId(),
+            'date' => \DateTimeImmutable::createFromInterface($date)->setTime(0, 0),
+        ]);
 
         $result = [];
         foreach ($rows as $row) {
-            $result[$row['currency']] = (string) $row['totalClosing'];
+            $result[$row['currency']] = (string) $row['total_closing'];
         }
 
         return $result;
