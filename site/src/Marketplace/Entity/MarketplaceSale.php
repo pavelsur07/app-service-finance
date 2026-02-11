@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_sales')]
 #[ORM\Index(columns: ['company_id', 'sale_date'], name: 'idx_company_sale_date')]
 #[ORM\Index(columns: ['marketplace', 'external_order_id'], name: 'idx_marketplace_order')]
-#[ORM\UniqueConstraint(name: 'uniq_marketplace_order', columns: ['marketplace', 'external_order_id'])]
+#[ORM\UniqueConstraint(name: 'uniq_marketplace_srid', columns: ['marketplace', 'external_order_id'])]
 class MarketplaceSale
 {
     #[ORM\Id]

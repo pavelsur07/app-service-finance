@@ -48,6 +48,33 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         }
     }
 
+    public function fetchRawSales(
+        Company $company,
+        \DateTimeInterface $fromDate,
+        \DateTimeInterface $toDate
+    ): array {
+        $connection = $this->getConnection($company);
+
+        if (!$connection) {
+            throw new \RuntimeException('Wildberries connection not found');
+        }
+
+        $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+            'headers' => [
+                'Authorization' => $connection->getApiKey(),
+            ],
+            'query' => [
+                'dateFrom' => $fromDate->format('Y-m-d'),
+                'dateTo' => $toDate->format('Y-m-d'),
+                'limit' => 100000,
+                'rrdid' => 0,
+            ],
+        ]);
+
+        // Возвращаем КАК ЕСТЬ - оригинальный массив от WB
+        return $response->toArray();
+    }
+
     public function fetchSales(
         Company $company,
         \DateTimeInterface $fromDate,
@@ -86,15 +113,17 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 continue;
             }
 
+            // НЕ сохраняем rawData в DTO для экономии памяти
+            // rawData будет только в MarketplaceRawDocument
             $sales[] = new SaleData(
                 marketplace: MarketplaceType::WILDBERRIES,
-                externalOrderId: (string)$item['realizationreport_id'], // Уникальный ID реализации
-                saleDate: new \DateTimeImmutable($item['rr_dt']), // Дата отчёта
-                marketplaceSku: $item['sa_name'], // Артикул поставщика
+                externalOrderId: (string)$item['realizationreport_id'],
+                saleDate: new \DateTimeImmutable($item['rr_dt']),
+                marketplaceSku: $item['sa_name'],
                 quantity: abs((int)$item['quantity']),
                 pricePerUnit: (string)$item['retail_price'],
                 totalRevenue: (string)abs($retailAmount),
-                rawData: $item
+                rawData: null // Не дублируем данные
             );
         }
 

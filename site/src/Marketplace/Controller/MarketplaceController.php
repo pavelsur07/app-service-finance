@@ -3,6 +3,8 @@
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -110,8 +112,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync')]
     public function syncConnection(
         string $id,
-        WildberriesAdapter $wbAdapter,
-        MarketplaceSyncService $syncService
+        WildberriesAdapter $wbAdapter
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -125,33 +126,122 @@ class MarketplaceController extends AbstractController
         $this->em->flush();
 
         try {
-            // Синхронизация за последние 7 дней
+            // ТОЛЬКО загружаем raw данные
             $fromDate = new \DateTimeImmutable('-7 days');
             $toDate = new \DateTimeImmutable();
 
             if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
-                $salesCount = $syncService->syncSales($company, $wbAdapter, $fromDate, $toDate);
-                $costsCount = $syncService->syncCosts($company, $wbAdapter, $fromDate, $toDate);
-                $returnsCount = $syncService->syncReturns($company, $wbAdapter, $fromDate, $toDate);
+                // Получаем ОРИГИНАЛЬНЫЕ данные от WB API
+                $response = $wbAdapter->fetchRawSales($company, $fromDate, $toDate);
+
+                // Создаём RawDocument с ОРИГИНАЛЬНЫМ JSON
+                $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
+                    \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    'sales_report'
+                );
+                $rawDoc->setPeriodFrom($fromDate);
+                $rawDoc->setPeriodTo($toDate);
+                $rawDoc->setApiEndpoint('wildberries::reportDetailByPeriod');
+                $rawDoc->setRawData($response); // Сохраняем КАК ЕСТЬ от WB
+                $rawDoc->setRecordsCount(count($response));
+
+                $this->em->persist($rawDoc);
+                $this->em->flush();
 
                 $connection->markSyncSuccess();
                 $this->em->flush();
 
                 $this->addFlash('success', sprintf(
-                    'Синхронизация завершена: %d продаж, %d затрат, %d возвратов',
-                    $salesCount,
-                    $costsCount,
-                    $returnsCount
+                    'Загружено %d записей от WB. Посмотрите JSON и обработайте.',
+                    count($response)
                 ));
             }
         } catch (\Exception $e) {
             $connection->markSyncFailed($e->getMessage());
             $this->em->flush();
 
-            $this->addFlash('error', 'Ошибка синхронизации: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/raw/{id}/view', name: 'marketplace_raw_view')]
+    public function viewRaw(string $id): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => JSON_PRETTY_PRINT]);
+    }
+
+    #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
+    public function processSales(
+        string $id,
+        MarketplaceSyncService $syncService
+    ): Response {
+        $company = $this->companyContext->getCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $count = $syncService->processSalesFromRaw($company, $rawDoc);
+
+            $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ошибка обработки: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/sales', name: 'marketplace_sales_index')]
+    public function salesIndex(): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $sales = $this->em->getRepository(MarketplaceSale::class)
+            ->createQueryBuilder('s')
+            ->where('s.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('s.saleDate', 'DESC')
+            ->setMaxResults(100)
+            ->getQuery()
+            ->getResult();
+
+        return $this->render('marketplace/sales.html.twig', [
+            'sales' => $sales,
+        ]);
+    }
+
+    #[Route('/products', name: 'marketplace_products_index')]
+    public function productsIndex(): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $listings = $this->em->getRepository(MarketplaceListing::class)
+            ->createQueryBuilder('l')
+            ->leftJoin('l.product', 'p')
+            ->where('l.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('l.createdAt', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        return $this->render('marketplace/products.html.twig', [
+            'listings' => $listings,
+        ]);
     }
 
     #[Route('/connection/{id}/toggle', name: 'marketplace_connection_toggle')]
