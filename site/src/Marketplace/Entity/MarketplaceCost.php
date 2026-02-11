@@ -52,8 +52,11 @@ class MarketplaceCost
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $externalId = null; // ID из отчёта маркетплейса (если есть)
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
+
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $rawData = null; // Полные данные от API
+    private ?array $rawData = null; // Только эта строка (опционально)
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -190,6 +193,19 @@ class MarketplaceCost
     public function setRawData(?array $rawData): self
     {
         $this->rawData = $rawData;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function setRawDocumentId(?string $rawDocumentId): self
+    {
+        $this->rawDocumentId = $rawDocumentId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

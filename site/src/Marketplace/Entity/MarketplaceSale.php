@@ -55,8 +55,11 @@ class MarketplaceSale
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $totalRevenue; // quantity * pricePerUnit
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
+
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $rawData = null; // Полные данные от API маркетплейса
+    private ?array $rawData = null; // Только эта строка (опционально)
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -204,6 +207,19 @@ class MarketplaceSale
     public function setRawData(?array $rawData): self
     {
         $this->rawData = $rawData;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function setRawDocumentId(?string $rawDocumentId): self
+    {
+        $this->rawDocumentId = $rawDocumentId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

@@ -52,6 +52,9 @@ class MarketplaceReturn
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
     private ?string $returnLogisticsCost = null;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
+
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $rawData = null;
 
@@ -195,6 +198,19 @@ class MarketplaceReturn
     public function setRawData(?array $rawData): self
     {
         $this->rawData = $rawData;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getRawDocumentId(): ?string
+    {
+        return $this->rawDocumentId;
+    }
+
+    public function setRawDocumentId(?string $rawDocumentId): self
+    {
+        $this->rawDocumentId = $rawDocumentId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
