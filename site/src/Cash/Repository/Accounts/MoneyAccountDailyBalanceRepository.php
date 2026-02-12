@@ -101,10 +101,16 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
             GROUP BY t.currency
         SQL;
 
-        $rows = $conn->fetchAllAssociative($sql, [
-            'company_id' => $company->getId(),
-            'date' => \DateTimeImmutable::createFromInterface($date)->setTime(0, 0),
-        ]);
+        $rows = $conn->fetchAllAssociative(
+            $sql,
+            [
+                'company_id' => $company->getId(),
+                'date' => \DateTimeImmutable::createFromInterface($date)->setTime(0, 0),
+            ],
+            [
+                'date' => Types::DATE_IMMUTABLE,
+            ],
+        );
 
         $result = [];
         foreach ($rows as $row) {
