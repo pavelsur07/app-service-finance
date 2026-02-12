@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Category;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
@@ -27,6 +28,8 @@ class CashflowSystemCategoryService
         $category->setName('Не распределено');
         $category->setParent(null);
         $category->setSort(1000000);
+        $category->setIsSystem(true);
+        $category->setFlowKind(CashflowFlowKind::OPERATING);
         $category->setSystemCode(CashflowCategory::SYSTEM_UNALLOCATED);
 
         $this->entityManager->persist($category);
@@ -35,4 +38,3 @@ class CashflowSystemCategoryService
         return $category;
     }
 }
-
