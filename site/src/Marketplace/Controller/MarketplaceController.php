@@ -3,7 +3,7 @@
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Entity\MarketplaceConnection;
-use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -199,8 +199,43 @@ class MarketplaceController extends AbstractController
             $count = $syncService->processSalesFromRaw($company, $rawDoc);
 
             $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
+        } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+            // Детальная ошибка duplicate
+            preg_match('/Key \((.*?)\)=\((.*?)\)/', $e->getMessage(), $matches);
+            $keys = $matches[1] ?? 'unknown';
+            $values = $matches[2] ?? 'unknown';
+
+            $this->addFlash('error', sprintf(
+                'Дубликат товара! Поля: %s | Значения: %s. Очистите БД и попробуйте снова.',
+                $keys,
+                $values
+            ));
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
+    public function processReturns(
+        string $id,
+        MarketplaceSyncService $syncService
+    ): Response {
+        $company = $this->companyContext->getCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $count = $syncService->processReturnsFromRaw($company, $rawDoc);
+
+            $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ошибка обработки возвратов: ' . $e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -222,6 +257,25 @@ class MarketplaceController extends AbstractController
 
         return $this->render('marketplace/sales.html.twig', [
             'sales' => $sales,
+        ]);
+    }
+
+    #[Route('/returns', name: 'marketplace_returns_index')]
+    public function returnsIndex(): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $returns = $this->em->getRepository(MarketplaceReturn::class)
+            ->createQueryBuilder('r')
+            ->where('r.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('r.returnDate', 'DESC')
+            ->setMaxResults(100)
+            ->getQuery()
+            ->getResult();
+
+        return $this->render('marketplace/returns.html.twig', [
+            'returns' => $returns,
         ]);
     }
 

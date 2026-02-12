@@ -49,9 +49,6 @@ class MarketplaceReturn
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $returnReason = null; // "defect", "wrong_size", "customer_request"
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
-    private ?string $returnLogisticsCost = null;
-
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
 
@@ -172,19 +169,6 @@ class MarketplaceReturn
     public function setReturnReason(?string $returnReason): self
     {
         $this->returnReason = $returnReason;
-        $this->updatedAt = new \DateTimeImmutable();
-
-        return $this;
-    }
-
-    public function getReturnLogisticsCost(): ?string
-    {
-        return $this->returnLogisticsCost;
-    }
-
-    public function setReturnLogisticsCost(?string $returnLogisticsCost): self
-    {
-        $this->returnLogisticsCost = $returnLogisticsCost;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

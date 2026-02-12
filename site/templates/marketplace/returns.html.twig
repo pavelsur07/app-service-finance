@@ -1,0 +1,117 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Возвраты{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Возвраты Wildberries</h2>
+                </div>
+                <div class="col-auto">
+                    <a href="{{ path('marketplace_index') }}" class="btn">
+                        ← Назад к интеграциям
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Дата возврата</th>
+                            <th>Товар</th>
+                            <th class="text-end">Кол-во</th>
+                            <th class="text-end">Возврат</th>
+                            <th>Причина</th>
+                            <th>ID</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if returns is empty %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <div class="empty">
+                                        <div class="empty-icon">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                                        </div>
+                                        <p class="empty-title">Нет данных о возвратах</p>
+                                        <p class="empty-subtitle text-muted">
+                                            Обработайте данные с маркетплейса
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            {% for return in returns %}
+                                <tr>
+                                    <td>
+                                        {{ return.returnDate|date('d.m.Y H:i') }}
+                                    </td>
+                                    <td>
+                                        <strong>{{ return.product.name }}</strong>
+                                    </td>
+                                    <td class="text-end">
+                                        {{ return.quantity }}
+                                    </td>
+                                    <td class="text-end text-danger">
+                                        <strong>-{{ return.refundAmount|number_format(2, '.', ' ') }} ₽</strong>
+                                    </td>
+                                    <td>
+                                        {% if return.returnReason %}
+                                            <span class="badge bg-yellow-lt">{{ return.returnReason }}</span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ return.externalReturnId|slice(0, 20) }}...</small>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                        {% if returns is not empty %}
+                            <tfoot>
+                            <tr>
+                                <th colspan="2">Итого:</th>
+                                <th class="text-end">{{ returns|reduce((carry, r) => carry + r.quantity, 0) }}</th>
+                                <th class="text-end text-danger">
+                                    <strong>-{{ returns|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                                </th>
+                                <th colspan="2"></th>
+                            </tr>
+                            </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+            </div>
+
+            {% if returns is not empty %}
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h3 class="card-title">Статистика</h3>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="text-muted">Всего возвратов</div>
+                                <div class="h2 mb-0">{{ returns|length }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted">Общая сумма возврата</div>
+                                <div class="h2 mb-0 text-danger">
+                                    -{{ returns|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

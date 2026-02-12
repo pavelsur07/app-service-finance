@@ -38,81 +38,301 @@ class MarketplaceSyncService
         $synced = 0;
 
         foreach ($rawData as $item) {
-            // Фильтрация: только продажи
-            if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Продажа') {
-                continue;
-            }
+            try {
+                // Фильтрация: только продажи
+                if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Продажа') {
+                    continue;
+                }
 
-            $retailAmount = (float)($item['retail_amount'] ?? 0);
-            if ($retailAmount <= 0) {
-                continue;
-            }
+                $retailAmount = (float)($item['retail_amount'] ?? 0);
+                if ($retailAmount <= 0) {
+                    continue;
+                }
 
-            $externalOrderId = (string)$item['srid'];
+                $externalOrderId = (string)$item['srid'];
 
-            // Проверка дубликата по srid
-            $existing = $this->saleRepository->findOneBy([
-                'company' => $company,
-                'externalOrderId' => $externalOrderId
-            ]);
+                // Проверка дубликата по srid
+                $existing = $this->saleRepository->findOneBy([
+                    'company' => $company,
+                    'externalOrderId' => $externalOrderId
+                ]);
 
-            if ($existing) {
-                continue;
-            }
+                if ($existing) {
+                    continue;
+                }
 
-            // Данные из WB
-            $nmId = (string)$item['nm_id'];           // Артикул WB
-            $tsName = $item['ts_name'] ?? null;        // Размер (может быть null или пустая строка)
-            $saName = $item['sa_name'];                // Артикул производителя
-            $brandName = $item['brand_name'] ?? '';
-            $subjectName = $item['subject_name'] ?? '';
+                // Данные из WB
+                $nmId = (string)($item['nm_id'] ?? '');   // Артикул WB (строго string)
+                $tsName = trim($item['ts_name'] ?? '');   // Размер (trim!)
+                $saName = $item['sa_name'];               // Артикул производителя
+                $brandName = $item['brand_name'] ?? '';
+                $subjectName = $item['subject_name'] ?? '';
 
-            // Нормализуем пустую строку в null
-            if (empty($tsName)) {
-                $tsName = null;
-            }
+                // Нормализуем: пустая строка → NULL
+                $tsName = ($tsName === '') ? null : $tsName;
 
-            // Ищем Listing по nm_id + size
-            $listing = $this->listingRepository->findByNmIdAndSize(
-                $company,
-                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                $nmId,
-                $tsName
-            );
-
-            if (!$listing) {
-                // Создаём новый Product + Listing
-                $listing = $this->createListingFromWbData($company, [
+                // DEBUG: логируем что ищем
+                $this->logger->info('Looking for listing', [
                     'nm_id' => $nmId,
                     'ts_name' => $tsName,
-                    'sa_name' => $saName,
-                    'brand_name' => $brandName,
-                    'subject_name' => $subjectName,
-                    'retail_price' => $item['retail_price'],
+                    'company_id' => $company->getId()
                 ]);
+
+                // Ищем Listing по nm_id + size
+                $listing = $this->listingRepository->findByNmIdAndSize(
+                    $company,
+                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                    $nmId,
+                    $tsName
+                );
+
+                if ($listing) {
+                    $this->logger->info('Listing found', ['listing_id' => $listing->getId()]);
+                } else {
+                    $this->logger->info('Listing NOT found, creating new');
+                }
+
+                if (!$listing) {
+                    // Создаём новый Product + Listing
+                    try {
+                        $listing = $this->createListingFromWbData($company, [
+                            'nm_id' => $nmId,
+                            'ts_name' => $tsName,
+                            'sa_name' => $saName,
+                            'brand_name' => $brandName,
+                            'subject_name' => $subjectName,
+                            'retail_price' => $item['retail_price'],
+                        ]);
+
+                        // ВАЖНО: flush сразу, чтобы следующая запись видела listing в БД
+                        $this->em->flush();
+
+                        $this->logger->info('Listing created and flushed', [
+                            'listing_id' => $listing->getId(),
+                            'nm_id' => $nmId,
+                            'ts_name' => $tsName
+                        ]);
+
+                    } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+                        // Товар уже создан (race condition или параллельный запрос)
+                        $this->logger->warning('Duplicate listing on creation, searching again', [
+                            'nm_id' => $nmId,
+                            'ts_name' => $tsName
+                        ]);
+
+                        // Очищаем EM и ищем ещё раз
+                        $this->em->clear();
+
+                        $listing = $this->listingRepository->findByNmIdAndSize(
+                            $company,
+                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                            $nmId,
+                            $tsName
+                        );
+
+                        if (!$listing) {
+                            $this->logger->error('Listing still not found after duplicate error', [
+                                'nm_id' => $nmId,
+                                'ts_name' => $tsName
+                            ]);
+                            continue; // Пропускаем эту продажу
+                        }
+                    }
+                }
+
+                // Создать Sale
+                $sale = new MarketplaceSale(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $listing,
+                    $listing->getProduct(),
+                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                );
+
+                $sale->setExternalOrderId($externalOrderId);
+                $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
+                $sale->setQuantity(abs((int)$item['quantity']));
+                $sale->setPricePerUnit((string)$item['retail_price']);
+                $sale->setTotalRevenue((string)abs($retailAmount));
+                $sale->setRawDocumentId($rawDoc->getId());
+
+                $this->em->persist($sale);
+                $synced++;
+
+            } catch (\Exception $e) {
+                // Логируем ошибку и продолжаем
+                $this->logger->error('Failed to process sale item', [
+                    'srid' => $item['srid'] ?? 'unknown',
+                    'nm_id' => $item['nm_id'] ?? 'unknown',
+                    'error' => $e->getMessage()
+                ]);
+                continue;
             }
-
-            // Создать Sale
-            $sale = new MarketplaceSale(
-                Uuid::uuid4()->toString(),
-                $company,
-                $listing,
-                $listing->getProduct(),
-                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
-            );
-
-            $sale->setExternalOrderId($externalOrderId);
-            $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
-            $sale->setQuantity(abs((int)$item['quantity']));
-            $sale->setPricePerUnit((string)$item['retail_price']);
-            $sale->setTotalRevenue((string)abs($retailAmount));
-            $sale->setRawDocumentId($rawDoc->getId());
-
-            $this->em->persist($sale);
-            $synced++;
         }
 
+        // Финальный flush для Sales (listings уже flush-нуты после создания)
         $this->em->flush();
+
+        $this->logger->info('Sales processing completed', [
+            'total_synced' => $synced,
+            'total_records' => count($rawData)
+        ]);
+
+        return $synced;
+    }
+
+    public function processReturnsFromRaw(
+        Company $company,
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+    ): int {
+        $rawData = $rawDoc->getRawData();
+        $synced = 0;
+
+        // Подсчёт всех типов документов для диагностики
+        $docTypes = [];
+        foreach ($rawData as $item) {
+            $docType = $item['doc_type_name'] ?? 'NULL';
+            $docTypes[$docType] = ($docTypes[$docType] ?? 0) + 1;
+        }
+
+        $this->logger->info('Processing returns - doc_type_name distribution', $docTypes);
+
+        foreach ($rawData as $item) {
+            try {
+                // Логируем что пришло
+                if (!isset($item['doc_type_name'])) {
+                    $this->logger->warning('Item has no doc_type_name field', [
+                        'srid' => $item['srid'] ?? 'unknown'
+                    ]);
+                }
+
+                // Фильтрация: только возвраты
+                $docTypeName = $item['doc_type_name'] ?? '';
+
+                // Попробуем разные варианты
+                if ($docTypeName !== 'Возврат' && $docTypeName !== 'возврат' && $docTypeName !== 'Return') {
+                    continue;
+                }
+
+                $this->logger->info('Found return item', [
+                    'doc_type_name' => $docTypeName,
+                    'srid' => $item['srid'] ?? 'unknown'
+                ]);
+
+                // Для возвратов используем retail_price (цена за единицу)
+                $retailPrice = (float)($item['retail_price'] ?? 0);
+                if ($retailPrice <= 0) {
+                    $this->logger->info('Retail price is zero, skipping', [
+                        'retail_price' => $retailPrice
+                    ]);
+                    continue;
+                }
+
+                $externalReturnId = (string)$item['srid'];
+
+                // Проверка дубликата по srid
+                $existing = $this->returnRepository->findOneBy([
+                    'company' => $company,
+                    'externalReturnId' => $externalReturnId
+                ]);
+
+                if ($existing) {
+                    continue;
+                }
+
+                // Данные из WB
+                $nmId = (string)($item['nm_id'] ?? '');
+                $tsName = trim($item['ts_name'] ?? '');
+                $saName = $item['sa_name'];
+                $brandName = $item['brand_name'] ?? '';
+                $subjectName = $item['subject_name'] ?? '';
+
+                // Нормализуем: пустая строка → NULL
+                $tsName = ($tsName === '') ? null : $tsName;
+
+                // Ищем Listing
+                $listing = $this->listingRepository->findByNmIdAndSize(
+                    $company,
+                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                    $nmId,
+                    $tsName
+                );
+
+                if (!$listing) {
+                    // Создаём listing (если его ещё нет)
+                    try {
+                        $listing = $this->createListingFromWbData($company, [
+                            'nm_id' => $nmId,
+                            'ts_name' => $tsName,
+                            'sa_name' => $saName,
+                            'brand_name' => $brandName,
+                            'subject_name' => $subjectName,
+                            'retail_price' => $item['retail_price'] ?? '0',
+                        ]);
+
+                        $this->em->flush();
+
+                    } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+                        $this->em->clear();
+
+                        $listing = $this->listingRepository->findByNmIdAndSize(
+                            $company,
+                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                            $nmId,
+                            $tsName
+                        );
+
+                        if (!$listing) {
+                            $this->logger->error('Listing not found for return', [
+                                'nm_id' => $nmId,
+                                'ts_name' => $tsName
+                            ]);
+                            continue;
+                        }
+                    }
+                }
+
+                // Создать Return
+                $return = new MarketplaceReturn(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $listing->getProduct(),
+                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                );
+
+                $return->setExternalReturnId($externalReturnId);
+                $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
+                $return->setQuantity(abs((int)$item['quantity']));
+                $return->setRefundAmount((string)$retailPrice); // retail_price
+                $return->setReturnReason($item['supplier_oper_name'] ?? '');
+
+                $this->em->persist($return);
+                $synced++;
+
+                $this->logger->info('Return created', [
+                    'srid' => $externalReturnId,
+                    'retail_price' => $retailPrice,
+                    'quantity' => $item['quantity']
+                ]);
+
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to process return item', [
+                    'srid' => $item['srid'] ?? 'unknown',
+                    'nm_id' => $item['nm_id'] ?? 'unknown',
+                    'error' => $e->getMessage()
+                ]);
+                continue;
+            }
+        }
+
+        // Финальный flush для Returns
+        $this->em->flush();
+
+        $this->logger->info('Returns processing completed', [
+            'total_synced' => $synced,
+            'total_records' => count($rawData)
+        ]);
+
         return $synced;
     }
 
@@ -294,7 +514,6 @@ class MarketplaceSyncService
             $return->setQuantity($returnData->quantity);
             $return->setRefundAmount($returnData->refundAmount);
             $return->setReturnReason($returnData->returnReason);
-            $return->setReturnLogisticsCost($returnData->returnLogisticsCost);
 
             $this->em->persist($return);
             $synced++;
