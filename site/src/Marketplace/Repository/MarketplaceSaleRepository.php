@@ -7,6 +7,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MarketplaceSaleRepository extends ServiceEntityRepository
@@ -14,6 +15,14 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceSale::class);
+    }
+
+    public function getByCompanyQueryBuilder(Company $company): QueryBuilder
+    {
+        return $this->createQueryBuilder('s')
+            ->where('s.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('s.saleDate', 'DESC');
     }
 
     public function findByMarketplaceOrder(

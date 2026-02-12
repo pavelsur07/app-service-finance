@@ -34,7 +34,7 @@
                         </tr>
                         </thead>
                         <tbody>
-                        {% if returns is empty %}
+                        {% if pager.nbResults == 0 %}
                             <tr>
                                 <td colspan="6" class="text-center text-muted">
                                     <div class="empty">
@@ -49,7 +49,7 @@
                                 </td>
                             </tr>
                         {% else %}
-                            {% for return in returns %}
+                            {% for return in pager.currentPageResults %}
                                 <tr>
                                     <td>
                                         {{ return.returnDate|date('d.m.Y H:i') }}
@@ -77,13 +77,13 @@
                             {% endfor %}
                         {% endif %}
                         </tbody>
-                        {% if returns is not empty %}
+                        {% if pager.nbResults > 0 %}
                             <tfoot>
                             <tr>
-                                <th colspan="2">Итого:</th>
-                                <th class="text-end">{{ returns|reduce((carry, r) => carry + r.quantity, 0) }}</th>
+                                <th colspan="2">На странице:</th>
+                                <th class="text-end">{{ pager.currentPageResults|reduce((carry, r) => carry + r.quantity, 0) }}</th>
                                 <th class="text-end text-danger">
-                                    <strong>-{{ returns|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                                    <strong>-{{ pager.currentPageResults|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽</strong>
                                 </th>
                                 <th colspan="2"></th>
                             </tr>
@@ -91,21 +91,27 @@
                         {% endif %}
                     </table>
                 </div>
+
+                {% if pager.haveToPaginate %}
+                    <div class="card-footer d-flex align-items-center">
+                        {% include 'partials/_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_returns_index'} %}
+                    </div>
+                {% endif %}
             </div>
 
-            {% if returns is not empty %}
+            {% if pager.nbResults > 0 %}
                 <div class="card mt-3">
                     <div class="card-body">
                         <h3 class="card-title">Статистика</h3>
                         <div class="row">
                             <div class="col-md-6">
                                 <div class="text-muted">Всего возвратов</div>
-                                <div class="h2 mb-0">{{ returns|length }}</div>
+                                <div class="h2 mb-0">{{ pager.nbResults }}</div>
                             </div>
                             <div class="col-md-6">
-                                <div class="text-muted">Общая сумма возврата</div>
+                                <div class="text-muted">На текущей странице</div>
                                 <div class="h2 mb-0 text-danger">
-                                    -{{ returns|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽
+                                    -{{ pager.currentPageResults|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽
                                 </div>
                             </div>
                         </div>

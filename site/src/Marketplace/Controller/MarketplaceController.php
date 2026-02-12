@@ -3,6 +3,7 @@
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -12,6 +13,8 @@ use App\Marketplace\Service\Integration\WildberriesAdapter;
 use App\Marketplace\Service\MarketplaceSyncService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
+use Pagerfanta\Doctrine\ORM\QueryAdapter;
+use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -242,40 +245,42 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/sales', name: 'marketplace_sales_index')]
-    public function salesIndex(): Response
+    public function salesIndex(Request $request): Response
     {
         $company = $this->companyContext->getCompany();
 
-        $sales = $this->em->getRepository(MarketplaceSale::class)
-            ->createQueryBuilder('s')
-            ->where('s.company = :company')
-            ->setParameter('company', $company)
-            ->orderBy('s.saleDate', 'DESC')
-            ->setMaxResults(100)
-            ->getQuery()
-            ->getResult();
+        $queryBuilder = $this->em->getRepository(MarketplaceSale::class)
+            ->getByCompanyQueryBuilder($company);
+
+        $adapter = new QueryAdapter($queryBuilder);
+        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            $adapter,
+            $request->query->get('page', 1),
+            50
+        );
 
         return $this->render('marketplace/sales.html.twig', [
-            'sales' => $sales,
+            'pager' => $pagerfanta,
         ]);
     }
 
     #[Route('/returns', name: 'marketplace_returns_index')]
-    public function returnsIndex(): Response
+    public function returnsIndex(Request $request): Response
     {
         $company = $this->companyContext->getCompany();
 
-        $returns = $this->em->getRepository(MarketplaceReturn::class)
-            ->createQueryBuilder('r')
-            ->where('r.company = :company')
-            ->setParameter('company', $company)
-            ->orderBy('r.returnDate', 'DESC')
-            ->setMaxResults(100)
-            ->getQuery()
-            ->getResult();
+        $queryBuilder = $this->em->getRepository(MarketplaceReturn::class)
+            ->getByCompanyQueryBuilder($company);
+
+        $adapter = new QueryAdapter($queryBuilder);
+        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            $adapter,
+            $request->query->get('page', 1),
+            50
+        );
 
         return $this->render('marketplace/returns.html.twig', [
-            'returns' => $returns,
+            'pager' => $pagerfanta,
         ]);
     }
 

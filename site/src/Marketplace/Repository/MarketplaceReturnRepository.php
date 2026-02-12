@@ -6,6 +6,7 @@ use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceReturn;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MarketplaceReturnRepository extends ServiceEntityRepository
@@ -13,6 +14,14 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceReturn::class);
+    }
+
+    public function getByCompanyQueryBuilder(Company $company): QueryBuilder
+    {
+        return $this->createQueryBuilder('r')
+            ->where('r.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('r.returnDate', 'DESC');
     }
 
     /**

@@ -35,14 +35,14 @@
                         </tr>
                         </thead>
                         <tbody>
-                        {% if sales is empty %}
+                        {% if pager.nbResults == 0 %}
                             <tr>
                                 <td colspan="7" class="text-center text-muted">
                                     Нет данных о продажах
                                 </td>
                             </tr>
                         {% else %}
-                            {% for sale in sales %}
+                            {% for sale in pager.currentPageResults %}
                                 <tr>
                                     <td>
                                         {{ sale.saleDate|date('d.m.Y H:i') }}
@@ -69,14 +69,14 @@
                             {% endfor %}
                         {% endif %}
                         </tbody>
-                        {% if sales is not empty %}
+                        {% if pager.nbResults > 0 %}
                             <tfoot>
                             <tr>
-                                <th colspan="3">Итого:</th>
-                                <th class="text-end">{{ sales|reduce((carry, s) => carry + s.quantity, 0) }}</th>
+                                <th colspan="3">На странице:</th>
+                                <th class="text-end">{{ pager.currentPageResults|reduce((carry, s) => carry + s.quantity, 0) }}</th>
                                 <th></th>
                                 <th class="text-end">
-                                    <strong>{{ sales|reduce((carry, s) => carry + s.totalRevenue, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                                    <strong>{{ pager.currentPageResults|reduce((carry, s) => carry + s.totalRevenue, 0)|number_format(2, '.', ' ') }} ₽</strong>
                                 </th>
                                 <th></th>
                             </tr>
@@ -84,6 +84,12 @@
                         {% endif %}
                     </table>
                 </div>
+
+                {% if pager.haveToPaginate %}
+                    <div class="card-footer d-flex align-items-center">
+                        {% include 'partials/_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_sales_index'} %}
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
