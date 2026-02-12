@@ -3,6 +3,7 @@
 namespace App\Cash\Entity\Transaction;
 
 use App\Cash\Enum\Transaction\CashflowCategoryStatus;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
@@ -57,12 +58,19 @@ class CashflowCategory
     #[ORM\Column(type: 'string', length: 32, nullable: true)]
     private ?string $systemCode = null;
 
+    #[ORM\Column(enumType: CashflowFlowKind::class)]
+    private CashflowFlowKind $flowKind;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isSystem = false;
+
     public function __construct(string $id, Company $company)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
         $this->status = CashflowCategoryStatus::ACTIVE;
+        $this->flowKind = CashflowFlowKind::OPERATING;
         $this->children = new ArrayCollection();
     }
 
@@ -192,6 +200,30 @@ class CashflowCategory
     public function setSystemCode(?string $code): self
     {
         $this->systemCode = $code;
+
+        return $this;
+    }
+
+    public function getFlowKind(): CashflowFlowKind
+    {
+        return $this->flowKind;
+    }
+
+    public function setFlowKind(CashflowFlowKind $kind): self
+    {
+        $this->flowKind = $kind;
+
+        return $this;
+    }
+
+    public function isSystem(): bool
+    {
+        return $this->isSystem;
+    }
+
+    public function setIsSystem(bool $v): self
+    {
+        $this->isSystem = $v;
 
         return $this;
     }
