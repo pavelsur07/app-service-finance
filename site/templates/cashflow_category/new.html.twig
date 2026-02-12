@@ -23,6 +23,20 @@
                 {{ form_row(form.sort) }}
                 {{ form_row(form.allowPlDocument) }}
                 {{ form_row(form.plCategory) }}
+                <div class="mt-3">
+                    <h3 class="h5 mb-3">Метаданные для отчётов</h3>
+                    <div class="row">
+                        <div class="col-md-4">
+                            {{ form_row(form.flowKind, { help: 'для отчёта Денежный поток' }) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.isSystem) }}
+                        </div>
+                        <div class="col-md-4">
+                            {{ form_row(form.systemCode, { help: 'для правил (возвраты/CapEx/переводы) и дашборда' }) }}
+                        </div>
+                    </div>
+                </div>
                 {{ form_rest(form) }}
                 <button class="btn btn-primary mt-2">Сохранить</button>
                 {{ form_end(form) }}
