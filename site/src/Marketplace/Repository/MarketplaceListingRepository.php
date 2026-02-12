@@ -32,6 +32,30 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findByNmIdAndSize(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $nmId,
+        ?string $size
+    ): ?MarketplaceListing {
+        $qb = $this->createQueryBuilder('l')
+            ->where('l.company = :company')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceSku = :nmId')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('nmId', $nmId);
+
+        if ($size === null) {
+            $qb->andWhere('l.size IS NULL');
+        } else {
+            $qb->andWhere('l.size = :size')
+                ->setParameter('size', $size);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
     /**
      * @return MarketplaceListing[]
      */

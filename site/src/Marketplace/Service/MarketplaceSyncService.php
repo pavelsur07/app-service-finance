@@ -48,9 +48,7 @@ class MarketplaceSyncService
                 continue;
             }
 
-            // ИСПОЛЬЗУЕМ srid - это уникальный ID строки
             $externalOrderId = (string)$item['srid'];
-            $marketplaceSku = $item['sa_name'];
 
             // Проверка дубликата по srid
             $existing = $this->saleRepository->findOneBy([
@@ -62,29 +60,37 @@ class MarketplaceSyncService
                 continue;
             }
 
-            // Создаём SaleData с информацией о товаре из WB
-            $saleData = new \App\Marketplace\DTO\SaleData(
-                marketplace: \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                externalOrderId: $externalOrderId,
-                saleDate: new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']),
-                marketplaceSku: $marketplaceSku,
-                quantity: abs((int)$item['quantity']),
-                pricePerUnit: (string)$item['retail_price'],
-                totalRevenue: (string)abs($retailAmount),
-                rawData: null
+            // Данные из WB
+            $nmId = (string)$item['nm_id'];           // Артикул WB
+            $tsName = $item['ts_name'] ?? null;        // Размер (может быть null или пустая строка)
+            $saName = $item['sa_name'];                // Артикул производителя
+            $brandName = $item['brand_name'] ?? '';
+            $subjectName = $item['subject_name'] ?? '';
+
+            // Нормализуем пустую строку в null
+            if (empty($tsName)) {
+                $tsName = null;
+            }
+
+            // Ищем Listing по nm_id + size
+            $listing = $this->listingRepository->findByNmIdAndSize(
+                $company,
+                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                $nmId,
+                $tsName
             );
 
-            // Информация о товаре из WB для создания Product
-            $productInfo = [
-                'brand' => $item['brand_name'] ?? '',
-                'subject' => $item['subject_name'] ?? '',
-                'sku' => $item['sa_name'] ?? '',
-                'barcode' => $item['barcode'] ?? '',
-                'nm_id' => $item['nm_id'] ?? null,
-            ];
-
-            // Найти или создать Product и Listing
-            $listing = $this->findOrCreateListing($company, $saleData, $productInfo);
+            if (!$listing) {
+                // Создаём новый Product + Listing
+                $listing = $this->createListingFromWbData($company, [
+                    'nm_id' => $nmId,
+                    'ts_name' => $tsName,
+                    'sa_name' => $saName,
+                    'brand_name' => $brandName,
+                    'subject_name' => $subjectName,
+                    'retail_price' => $item['retail_price'],
+                ]);
+            }
 
             // Создать Sale
             $sale = new MarketplaceSale(
@@ -92,14 +98,14 @@ class MarketplaceSyncService
                 $company,
                 $listing,
                 $listing->getProduct(),
-                $saleData->marketplace
+                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
             );
 
-            $sale->setExternalOrderId($saleData->externalOrderId);
-            $sale->setSaleDate($saleData->saleDate);
-            $sale->setQuantity($saleData->quantity);
-            $sale->setPricePerUnit($saleData->pricePerUnit);
-            $sale->setTotalRevenue($saleData->totalRevenue);
+            $sale->setExternalOrderId($externalOrderId);
+            $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
+            $sale->setQuantity(abs((int)$item['quantity']));
+            $sale->setPricePerUnit((string)$item['retail_price']);
+            $sale->setTotalRevenue((string)abs($retailAmount));
             $sale->setRawDocumentId($rawDoc->getId());
 
             $this->em->persist($sale);
@@ -296,6 +302,48 @@ class MarketplaceSyncService
 
         $this->em->flush();
         return $synced;
+    }
+
+    private function createListingFromWbData(Company $company, array $wbData): MarketplaceListing
+    {
+        $nmId = $wbData['nm_id'];
+        $tsName = $wbData['ts_name'];
+        $saName = $wbData['sa_name'];
+        $brandName = $wbData['brand_name'];
+        $subjectName = $wbData['subject_name'];
+        $price = $wbData['retail_price'];
+
+        // Формируем название: {brand} {subject} {sa_name} {ts_name если есть}
+        $nameParts = array_filter([
+            $brandName,
+            $subjectName,
+            $saName,
+            $tsName
+        ]);
+        $productName = implode(' ', $nameParts);
+
+        // Создаём Product
+        $product = new Product(Uuid::uuid4()->toString(), $company);
+        $product->setSku($saName); // Internal SKU = артикул производителя
+        $product->setName($productName);
+        $product->setPurchasePrice('0.00'); // Требует заполнения вручную
+        $this->em->persist($product);
+
+        // Создаём Listing
+        $listing = new MarketplaceListing(
+            Uuid::uuid4()->toString(),
+            $company,
+            $product,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+        );
+        $listing->setMarketplaceSku($nmId);           // nm_id
+        $listing->setSupplierSku($saName);            // sa_name
+        $listing->setSize($tsName);                   // ts_name (может быть null)
+        $listing->setPrice((string)$price);
+
+        $this->em->persist($listing);
+
+        return $listing;
     }
 
     private function findOrCreateListing(Company $company, $saleData, array $productInfo = []): MarketplaceListing
