@@ -59,6 +59,16 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
 
         self::assertIsArray($payload['widgets']['revenue']);
 
+
+        self::assertIsArray($payload['widgets']['cashflow_split']);
+        self::assertArrayHasKey('operating', $payload['widgets']['cashflow_split']);
+        self::assertArrayHasKey('investing', $payload['widgets']['cashflow_split']);
+        self::assertArrayHasKey('financing', $payload['widgets']['cashflow_split']);
+        self::assertArrayHasKey('total', $payload['widgets']['cashflow_split']);
+        self::assertArrayHasKey('net', $payload['widgets']['cashflow_split']['operating']);
+        self::assertArrayHasKey('net', $payload['widgets']['cashflow_split']['investing']);
+        self::assertArrayHasKey('net', $payload['widgets']['cashflow_split']['financing']);
+
         self::assertIsArray($payload['widgets']['outflow']);
         self::assertArrayHasKey('sum_abs', $payload['widgets']['outflow']);
         self::assertArrayHasKey('capex_abs', $payload['widgets']['outflow']);
