@@ -14,7 +14,7 @@ final readonly class SnapshotContextResponse
         private DateTimeImmutable $prevFrom,
         private DateTimeImmutable $prevTo,
         private ?string $vatMode,
-        private DateTimeImmutable $lastUpdatedAt,
+        private ?DateTimeImmutable $lastUpdatedAt,
     ) {
     }
 
@@ -31,7 +31,7 @@ final readonly class SnapshotContextResponse
             'prev_from' => $this->prevFrom->format(DATE_ATOM),
             'prev_to' => $this->prevTo->format(DATE_ATOM),
             'vat_mode' => $this->vatMode,
-            'last_updated_at' => $this->lastUpdatedAt->format(DATE_ATOM),
+            'last_updated_at' => $this->lastUpdatedAt?->format(DATE_ATOM),
         ];
     }
 }
