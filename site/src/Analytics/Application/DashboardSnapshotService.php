@@ -37,7 +37,7 @@ final class DashboardSnapshotService
     public function getSnapshot(Company $company, Period $period): SnapshotResponse
     {
         $cacheKey = sprintf(
-            'dashboard:v1:snapshot:%s:%s:%s:%s',
+            'dashboard_v1_snapshot_%s_%s_%s_%s',
             (string) $company->getId(),
             $period->getFrom()->format('Y-m-d'),
             $period->getTo()->format('Y-m-d'),
