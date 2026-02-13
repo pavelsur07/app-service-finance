@@ -43,6 +43,8 @@ final class DashboardSnapshotService
 
             $prevPeriod = $period->prevPeriod();
 
+            $freeCash = $this->freeCashWidgetBuilder->build($company, $period);
+            $inflow = $this->inflowWidgetBuilder->build($company, $period);
             $revenue = $this->revenueWidgetBuilder->build($company, $period);
             $profit = $this->profitWidgetBuilder->build($company, $period);
 
@@ -57,12 +59,44 @@ final class DashboardSnapshotService
                     vatMode: self::VAT_MODE_EXCLUDE,
                     lastUpdatedAt: null,
                 ),
-                $this->freeCashWidgetBuilder->build($company, $period),
-                $this->inflowWidgetBuilder->build($company, $period),
+                $freeCash,
+                $inflow,
                 $revenue['widget'],
                 $profit,
-                $revenue['registryEmpty'] ? ['PL_REGISTRY_EMPTY'] : [],
+                $this->buildAlerts($freeCash->toArray(), $revenue, $profit),
             );
         });
+    }
+
+    /**
+     * @param array<string, mixed> $freeCash
+     * @param array{widget: \\App\\Analytics\\Api\\Response\\RevenueWidgetResponse, registryEmpty: bool} $revenue
+     * @param array<string, mixed> $profit
+     *
+     * @return list<array{code: string}>
+     */
+    private function buildAlerts(array $freeCash, array $revenue, array $profit): array
+    {
+        $alerts = [];
+
+        if (($revenue['registryEmpty'] ?? false) === true) {
+            $alerts[] = ['code' => 'PL_REGISTRY_EMPTY'];
+        }
+
+        // Rule OUTFLOW_GT_INFLOW is intentionally skipped until outflow widget is implemented.
+        if (((float) ($freeCash['delta_pct'] ?? 0.0)) < 0) {
+            $alerts[] = ['code' => 'FREE_CASH_DOWN'];
+        }
+
+        $revenueDeltaAbs = (float) (($revenue['widget']->toArray()['delta_abs'] ?? 0.0));
+        if ($revenueDeltaAbs < 0) {
+            $alerts[] = ['code' => 'REV_DOWN'];
+        }
+
+        if (((float) ($profit['delta']['margin_pp'] ?? 0.0)) < 0) {
+            $alerts[] = ['code' => 'MARGIN_DOWN'];
+        }
+
+        return array_slice($alerts, 0, 5);
     }
 }

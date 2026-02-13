@@ -11,7 +11,7 @@ final readonly class SnapshotResponse
         private RevenueWidgetResponse $revenue,
         /** @var array<string, mixed> */
         private array $profit,
-        /** @var list<string> */
+        /** @var list<array{code: string}> */
         private array $alerts = [],
     ) {
     }
@@ -32,7 +32,14 @@ final readonly class SnapshotResponse
                 'top_cash' => new \stdClass(),
                 'top_pnl' => new \stdClass(),
                 'profit' => $this->profit,
-                'alerts' => ['warnings' => $this->alerts],
+                'alerts' => [
+                    'items' => $this->alerts,
+                    // keep legacy field for compatibility with existing clients
+                    'warnings' => array_map(
+                        static fn (array $alert): string => (string) ($alert['code'] ?? ''),
+                        $this->alerts,
+                    ),
+                ],
             ],
         ];
     }
