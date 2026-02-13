@@ -8,6 +8,9 @@ final readonly class SnapshotResponse
         private SnapshotContextResponse $context,
         private FreeCashWidgetResponse $freeCash,
         private InflowWidgetResponse $inflow,
+        private RevenueWidgetResponse $revenue,
+        /** @var list<string> */
+        private array $alerts = [],
     ) {
     }
 
@@ -23,11 +26,11 @@ final readonly class SnapshotResponse
                 'inflow' => $this->inflow->toArray(),
                 'outflow' => new \stdClass(),
                 'cashflow_split' => new \stdClass(),
-                'revenue' => new \stdClass(),
+                'revenue' => $this->revenue->toArray(),
                 'top_cash' => new \stdClass(),
                 'top_pnl' => new \stdClass(),
                 'profit' => new \stdClass(),
-                'alerts' => new \stdClass(),
+                'alerts' => ['warnings' => $this->alerts],
             ],
         ];
     }

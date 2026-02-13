@@ -6,6 +6,7 @@ use App\Analytics\Api\Response\SnapshotContextResponse;
 use App\Analytics\Api\Response\SnapshotResponse;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
+use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -20,6 +21,7 @@ final class DashboardSnapshotService
         private readonly CacheInterface $cache,
         private readonly FreeCashWidgetBuilder $freeCashWidgetBuilder,
         private readonly InflowWidgetBuilder $inflowWidgetBuilder,
+        private readonly RevenueWidgetBuilder $revenueWidgetBuilder,
     )
     {
     }
@@ -39,6 +41,8 @@ final class DashboardSnapshotService
 
             $prevPeriod = $period->prevPeriod();
 
+            $revenue = $this->revenueWidgetBuilder->build($company, $period);
+
             return new SnapshotResponse(
                 new SnapshotContextResponse(
                     companyId: (string) $company->getId(),
@@ -52,6 +56,8 @@ final class DashboardSnapshotService
                 ),
                 $this->freeCashWidgetBuilder->build($company, $period),
                 $this->inflowWidgetBuilder->build($company, $period),
+                $revenue['widget'],
+                $revenue['registryEmpty'] ? ['PL_REGISTRY_EMPTY'] : [],
             );
         });
     }
