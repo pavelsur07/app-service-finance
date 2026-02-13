@@ -18,6 +18,22 @@ class MoneyFundMovementRepository extends ServiceEntityRepository
         parent::__construct($registry, MoneyFundMovement::class);
     }
 
+    public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
+    {
+        $maxOccurredAt = $this->createQueryBuilder('m')
+            ->select('MAX(m.occurredAt)')
+            ->andWhere('m.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (!$maxOccurredAt instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return \DateTimeImmutable::createFromInterface($maxOccurredAt);
+    }
+
     public function deleteByFund(Company $company, MoneyFund $fund): void
     {
         $this->createQueryBuilder('m')

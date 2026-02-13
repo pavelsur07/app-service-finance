@@ -2,6 +2,7 @@
 
 namespace App\Repository;
 
+use App\Company\Entity\Company;
 use App\Entity\PLDailyTotal;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
@@ -13,6 +14,23 @@ class PLDailyTotalRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, PLDailyTotal::class);
+    }
+
+
+    public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
+    {
+        $maxUpdatedAt = $this->createQueryBuilder('t')
+            ->select('MAX(t.updatedAt)')
+            ->andWhere('t.company = :company')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (!$maxUpdatedAt instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return \DateTimeImmutable::createFromInterface($maxUpdatedAt);
     }
 
     public function upsert(

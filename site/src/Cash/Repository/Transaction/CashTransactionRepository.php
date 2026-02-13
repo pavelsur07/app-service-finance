@@ -19,6 +19,23 @@ class CashTransactionRepository extends ServiceEntityRepository
         parent::__construct($registry, CashTransaction::class);
     }
 
+    public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
+    {
+        $maxUpdatedAt = $this->createQueryBuilder('t')
+            ->select('MAX(t.updatedAt)')
+            ->andWhere('t.company = :company')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (!$maxUpdatedAt instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return \DateTimeImmutable::createFromInterface($maxUpdatedAt);
+    }
+
     /**
      * @return list<array{date:string,inflow:string,outflow:string}>
      */

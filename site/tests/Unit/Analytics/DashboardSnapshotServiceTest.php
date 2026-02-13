@@ -3,6 +3,7 @@
 namespace App\Tests\Unit\Analytics;
 
 use App\Analytics\Application\DashboardSnapshotService;
+use App\Analytics\Application\LastUpdatedAtResolver;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
@@ -94,7 +95,10 @@ final class DashboardSnapshotServiceTest extends TestCase
         $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository);
         $topPnlWidgetBuilder = new TopPnlWidgetBuilder($dailyTotalRepository, $plCategoryRepository, new ParetoTopItemsBuilder());
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder);
+        $lastUpdatedAtResolver = $this->createMock(LastUpdatedAtResolver::class);
+        $lastUpdatedAtResolver->method('resolve')->willReturn(null);
+
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $lastUpdatedAtResolver);
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
