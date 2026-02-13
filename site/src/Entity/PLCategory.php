@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Company\Entity\Company;
 use App\Enum\PLCategoryType;
+use App\Enum\PLExpenseType;
 use App\Enum\PLFlow;
 use App\Enum\PlNature;
 use App\Enum\PLValueFormat;
@@ -54,6 +55,9 @@ class PLCategory
 
     #[ORM\Column(enumType: PLFlow::class, options: ['default' => 'NONE'])]
     private PLFlow $flow = PLFlow::NONE;
+
+    #[ORM\Column(enumType: PLExpenseType::class, options: ['default' => 'other'])]
+    private PLExpenseType $expenseType = PLExpenseType::OTHER;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 4, options: ['default' => '1.0000'])]
     private string $weightInParent = '1.0000'; // вес при суммировании родителем
@@ -280,6 +284,18 @@ class PLCategory
     public function setFlow(PLFlow $flow): self
     {
         $this->flow = $flow;
+
+        return $this;
+    }
+
+    public function getExpenseType(): PLExpenseType
+    {
+        return $this->expenseType;
+    }
+
+    public function setExpenseType(PLExpenseType $t): self
+    {
+        $this->expenseType = $t;
 
         return $this;
     }
