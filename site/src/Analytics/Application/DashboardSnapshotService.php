@@ -4,6 +4,7 @@ namespace App\Analytics\Application;
 
 use App\Analytics\Api\Response\SnapshotContextResponse;
 use App\Analytics\Api\Response\SnapshotResponse;
+use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -14,7 +15,10 @@ final class DashboardSnapshotService
     private const int SNAPSHOT_TTL_SECONDS = 120;
     private const string VAT_MODE_EXCLUDE = 'exclude';
 
-    public function __construct(private readonly CacheInterface $cache)
+    public function __construct(
+        private readonly CacheInterface $cache,
+        private readonly FreeCashWidgetBuilder $freeCashWidgetBuilder,
+    )
     {
     }
 
@@ -44,6 +48,7 @@ final class DashboardSnapshotService
                     vatMode: self::VAT_MODE_EXCLUDE,
                     lastUpdatedAt: null,
                 ),
+                $this->freeCashWidgetBuilder->build($company, $period),
             );
         });
     }
