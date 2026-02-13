@@ -66,7 +66,12 @@ final class ApplyAutoRulesForTransactionHandlerTest extends IntegrationTestCase
         self::assertSame(CashflowCategory::SYSTEM_UNALLOCATED, $firstReloaded->getCashflowCategory()?->getSystemCode());
         self::assertSame('Не распределено', $firstReloaded->getCashflowCategory()?->getName());
 
-        $secondTransaction = $this->createTransaction($company, $account);
+        $reloadedCompany = $this->em->find(Company::class, $company->getId());
+        $reloadedAccount = $this->em->find(MoneyAccount::class, $account->getId());
+        self::assertInstanceOf(Company::class, $reloadedCompany);
+        self::assertInstanceOf(MoneyAccount::class, $reloadedAccount);
+
+        $secondTransaction = $this->createTransaction($reloadedCompany, $reloadedAccount);
         $this->em->persist($secondTransaction);
         $this->em->flush();
 
