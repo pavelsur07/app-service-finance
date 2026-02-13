@@ -93,6 +93,9 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertSame(0.0, $first['widgets']['inflow']['sum']);
         self::assertSame(0.0, $first['widgets']['inflow']['avg_daily']);
         self::assertCount(0, $first['widgets']['inflow']['series']);
+        self::assertIsArray($first['widgets']['alerts']['items']);
+        self::assertIsArray($first['widgets']['alerts']['warnings']);
+        self::assertContains('PL_REGISTRY_EMPTY', $first['widgets']['alerts']['warnings']);
     }
 
     private function createCompany(string $companyId): Company
