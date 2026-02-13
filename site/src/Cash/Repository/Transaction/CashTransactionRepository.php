@@ -5,6 +5,7 @@ namespace App\Cash\Repository\Transaction;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
+use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Company\Entity\Company;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -243,6 +244,46 @@ class CashTransactionRepository extends ServiceEntityRepository
         }
 
         return $series;
+    }
+
+
+    /**
+     * @return array{OPERATING: float, INVESTING: float, FINANCING: float}
+     */
+    public function sumNetByFlowKindExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('category.flowKind as flowKind', 'COALESCE(SUM(t.amount), 0) as net')
+            ->leftJoin('t.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->andWhere('category.flowKind IS NOT NULL')
+            ->groupBy('category.flowKind')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('isTransfer', false)
+            ->getQuery()
+            ->getArrayResult();
+
+        $result = [
+            CashflowFlowKind::OPERATING->value => 0.0,
+            CashflowFlowKind::INVESTING->value => 0.0,
+            CashflowFlowKind::FINANCING->value => 0.0,
+        ];
+
+        foreach ($rows as $row) {
+            $flowKind = (string) ($row['flowKind'] ?? '');
+            if (!array_key_exists($flowKind, $result)) {
+                continue;
+            }
+
+            $result[$flowKind] = round((float) ($row['net'] ?? 0.0), 2);
+        }
+
+        return $result;
     }
 
     public function sumOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float

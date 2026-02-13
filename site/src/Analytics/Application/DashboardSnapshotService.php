@@ -7,6 +7,7 @@ use App\Analytics\Api\Response\SnapshotResponse;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Application\Widget\OutflowWidgetBuilder;
+use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Domain\Period;
@@ -24,6 +25,7 @@ final class DashboardSnapshotService
         private readonly FreeCashWidgetBuilder $freeCashWidgetBuilder,
         private readonly InflowWidgetBuilder $inflowWidgetBuilder,
         private readonly OutflowWidgetBuilder $outflowWidgetBuilder,
+        private readonly CashflowSplitWidgetBuilder $cashflowSplitWidgetBuilder,
         private readonly RevenueWidgetBuilder $revenueWidgetBuilder,
         private readonly ProfitWidgetBuilder $profitWidgetBuilder,
     )
@@ -48,6 +50,7 @@ final class DashboardSnapshotService
             $freeCash = $this->freeCashWidgetBuilder->build($company, $period);
             $inflow = $this->inflowWidgetBuilder->build($company, $period);
             $outflow = $this->outflowWidgetBuilder->build($company, $period, $inflow->toArray());
+            $cashflowSplit = $this->cashflowSplitWidgetBuilder->build($company, $period);
             $revenue = $this->revenueWidgetBuilder->build($company, $period);
             $profit = $this->profitWidgetBuilder->build($company, $period);
 
@@ -65,6 +68,7 @@ final class DashboardSnapshotService
                 $freeCash,
                 $inflow,
                 $outflow,
+                $cashflowSplit,
                 $revenue['widget'],
                 $profit,
                 $this->buildAlerts($freeCash->toArray(), $revenue, $profit),
