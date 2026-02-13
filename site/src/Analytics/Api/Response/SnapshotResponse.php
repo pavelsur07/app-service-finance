@@ -17,6 +17,8 @@ final readonly class SnapshotResponse
         private array $profit,
         /** @var array<string, mixed> */
         private array $topCash,
+        /** @var array<string, mixed> */
+        private array $topPnl,
         /** @var list<array{code: string}> */
         private array $alerts = [],
     ) {
@@ -36,7 +38,7 @@ final readonly class SnapshotResponse
                 'cashflow_split' => $this->cashflowSplit,
                 'revenue' => $this->revenue->toArray(),
                 'top_cash' => $this->topCash,
-                'top_pnl' => new \stdClass(),
+                'top_pnl' => $this->topPnl,
                 'profit' => $this->profit,
                 'alerts' => [
                     'items' => $this->alerts,
