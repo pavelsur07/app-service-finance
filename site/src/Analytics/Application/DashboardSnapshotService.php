@@ -5,6 +5,7 @@ namespace App\Analytics\Application;
 use App\Analytics\Api\Response\SnapshotContextResponse;
 use App\Analytics\Api\Response\SnapshotResponse;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
+use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -18,6 +19,7 @@ final class DashboardSnapshotService
     public function __construct(
         private readonly CacheInterface $cache,
         private readonly FreeCashWidgetBuilder $freeCashWidgetBuilder,
+        private readonly InflowWidgetBuilder $inflowWidgetBuilder,
     )
     {
     }
@@ -49,6 +51,7 @@ final class DashboardSnapshotService
                     lastUpdatedAt: null,
                 ),
                 $this->freeCashWidgetBuilder->build($company, $period),
+                $this->inflowWidgetBuilder->build($company, $period),
             );
         });
     }

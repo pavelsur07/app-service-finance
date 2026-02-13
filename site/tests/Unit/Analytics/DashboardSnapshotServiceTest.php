@@ -4,7 +4,12 @@ namespace App\Tests\Unit\Analytics;
 
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
-use App\Analytics\Api\Response\FreeCashWidgetResponse;
+use App\Analytics\Application\Widget\InflowWidgetBuilder;
+use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
+use App\Cash\Repository\Accounts\MoneyAccountRepository;
+use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use DateInterval;
@@ -19,18 +24,21 @@ final class DashboardSnapshotServiceTest extends TestCase
     public function testUsesCacheForSamePeriodAndCompany(): void
     {
         $cache = new InMemoryCacheSpy();
-        $widgetBuilder = $this->createMock(FreeCashWidgetBuilder::class);
-        $widgetBuilder->method('build')->willReturn(new FreeCashWidgetResponse(
-            value: 0.0,
-            deltaAbs: 0.0,
-            deltaPct: 0.0,
-            cashAtEnd: 0.0,
-            reservedAtEnd: 0.0,
-            lastUpdatedAt: null,
-            drilldown: [],
-        ));
+        $accountRepository = $this->createMock(MoneyAccountRepository::class);
+        $accountRepository->method('findByFilters')->willReturn([]);
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder);
+        $dailyBalanceRepository = $this->createMock(MoneyAccountDailyBalanceRepository::class);
+        $accountBalanceProvider = new AccountBalanceProvider($dailyBalanceRepository);
+
+        $fundMovementRepository = $this->createMock(MoneyFundMovementRepository::class);
+        $fundMovementRepository->method('sumFundBalancesUpToDate')->willReturn([]);
+
+        $cashTransactionRepository = $this->createMock(CashTransactionRepository::class);
+
+        $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository);
+        $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository);
+
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder);
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
@@ -44,6 +52,9 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertNull($first['context']['last_updated_at']);
         self::assertSame(0.0, $first['widgets']['free_cash']['value']);
         self::assertSame(0.0, $first['widgets']['free_cash']['cash_at_end']);
+        self::assertSame(0.0, $first['widgets']['inflow']['sum']);
+        self::assertSame(0.0, $first['widgets']['inflow']['avg_daily']);
+        self::assertCount(0, $first['widgets']['inflow']['series']);
     }
 
     private function createCompany(string $companyId): Company

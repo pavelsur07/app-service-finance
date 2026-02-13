@@ -7,6 +7,7 @@ final readonly class SnapshotResponse
     public function __construct(
         private SnapshotContextResponse $context,
         private FreeCashWidgetResponse $freeCash,
+        private InflowWidgetResponse $inflow,
     ) {
     }
 
@@ -19,6 +20,7 @@ final readonly class SnapshotResponse
             'context' => $this->context->toArray(),
             'widgets' => [
                 'free_cash' => $this->freeCash->toArray(),
+                'inflow' => $this->inflow->toArray(),
             ],
         ];
     }
