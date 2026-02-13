@@ -4,6 +4,7 @@ namespace App\Form;
 
 use App\Entity\PLCategory;
 use App\Enum\PLCategoryType as PLCategoryTypeEnum;
+use App\Enum\PLExpenseType;
 use App\Enum\PLFlow;
 use App\Enum\PLValueFormat;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
@@ -57,6 +58,16 @@ class PLCategoryFormType extends AbstractType
                     'Расход' => PLFlow::EXPENSE,
                     'Нейтральная / составная' => PLFlow::NONE,
                 ],
+            ])
+            ->add('expenseType', ChoiceType::class, [
+                'label' => 'Тип расхода',
+                'choices' => [
+                    'VARIABLE' => PLExpenseType::VARIABLE,
+                    'OPEX' => PLExpenseType::OPEX,
+                    'OTHER' => PLExpenseType::OTHER,
+                ],
+                'data' => PLExpenseType::OTHER,
+                'help' => 'variable — переменные, opex — операционные, other — прочее',
             ])
             ->add('format', ChoiceType::class, [
                 'label' => 'Формат',
