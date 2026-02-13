@@ -307,6 +307,37 @@ class CashTransactionRepository extends ServiceEntityRepository
     }
 
     /**
+     * @return list<array{categoryId:?string,categoryName:string,sumAbs:float}>
+     */
+    public function sumOutflowByCategoryExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('IDENTITY(t.cashflowCategory) as categoryId', 'COALESCE(category.name, :uncategorized) as categoryName', 'ABS(COALESCE(SUM(t.amount), 0)) as sumAbs')
+            ->leftJoin('t.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :outflow')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->groupBy('category.id', 'category.name')
+            ->orderBy('sumAbs', 'DESC')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->setParameter('isTransfer', false)
+            ->setParameter('uncategorized', 'Без категории')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): array => [
+            'categoryId' => isset($row['categoryId']) ? (string) $row['categoryId'] : null,
+            'categoryName' => (string) ($row['categoryName'] ?? ''),
+            'sumAbs' => round((float) ($row['sumAbs'] ?? 0.0), 2),
+        ], $rows);
+    }
+
+    /**
      * @return list<array{date:string,value:float}>
      */
     public function sumOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
