@@ -8,6 +8,8 @@ final readonly class SnapshotResponse
         private SnapshotContextResponse $context,
         private FreeCashWidgetResponse $freeCash,
         private InflowWidgetResponse $inflow,
+        /** @var array<string, mixed> */
+        private array $outflow,
         private RevenueWidgetResponse $revenue,
         /** @var array<string, mixed> */
         private array $profit,
@@ -26,7 +28,7 @@ final readonly class SnapshotResponse
             'widgets' => [
                 'free_cash' => $this->freeCash->toArray(),
                 'inflow' => $this->inflow->toArray(),
-                'outflow' => new \stdClass(),
+                'outflow' => $this->outflow,
                 'cashflow_split' => new \stdClass(),
                 'revenue' => $this->revenue->toArray(),
                 'top_cash' => new \stdClass(),

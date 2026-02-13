@@ -244,4 +244,126 @@ class CashTransactionRepository extends ServiceEntityRepository
 
         return $series;
     }
+
+    public function sumOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float
+    {
+        $result = $this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.amount), 0) as outflow')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :outflow')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->setParameter('isTransfer', false)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return abs((float) $result);
+    }
+
+    /**
+     * @return list<array{date:string,value:float}>
+     */
+    public function sumOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :outflow')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->setParameter('isTransfer', false)
+            ->getQuery()
+            ->getArrayResult();
+
+        $series = [];
+        foreach ($rows as $row) {
+            $date = $row['date'];
+            if ($date instanceof \DateTimeInterface) {
+                $date = $date->format('Y-m-d');
+            }
+
+            $series[] = [
+                'date' => (string) $date,
+                'value' => abs((float) ($row['value'] ?? 0)),
+            ];
+        }
+
+        return $series;
+    }
+
+    public function sumCapexOutflowExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): float
+    {
+        $result = $this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.amount), 0) as outflow')
+            ->leftJoin('t.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :outflow')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('category.systemCode = :systemCode')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->setParameter('isTransfer', false)
+            ->setParameter('systemCode', 'CAPEX')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return abs((float) $result);
+    }
+
+    /**
+     * @return list<array{date:string,value:float}>
+     */
+    public function sumCapexOutflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
+            ->leftJoin('t.cashflowCategory', 'category')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :outflow')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('category.systemCode = :systemCode')
+            ->andWhere('t.deletedAt IS NULL')
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('outflow', CashDirection::OUTFLOW)
+            ->setParameter('isTransfer', false)
+            ->setParameter('systemCode', 'CAPEX')
+            ->getQuery()
+            ->getArrayResult();
+
+        $series = [];
+        foreach ($rows as $row) {
+            $date = $row['date'];
+            if ($date instanceof \DateTimeInterface) {
+                $date = $date->format('Y-m-d');
+            }
+
+            $series[] = [
+                'date' => (string) $date,
+                'value' => abs((float) ($row['value'] ?? 0)),
+            ];
+        }
+
+        return $series;
+    }
 }
