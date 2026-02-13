@@ -5,6 +5,8 @@ namespace App\Tests\Unit\Analytics;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
+use App\Analytics\Application\Widget\ProfitWidgetBuilder;
+use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
@@ -38,7 +40,25 @@ final class DashboardSnapshotServiceTest extends TestCase
         $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository);
         $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository);
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder);
+        $revenueWidgetBuilder = $this->createMock(RevenueWidgetBuilder::class);
+        $revenueWidgetBuilder->method('build')->willReturn([
+            'widget' => new \App\Analytics\Api\Response\RevenueWidgetResponse(0.0, 0.0, 0.0, []),
+            'registryEmpty' => true,
+        ]);
+
+        $profitWidgetBuilder = $this->createMock(ProfitWidgetBuilder::class);
+        $profitWidgetBuilder->method('build')->willReturn([
+            'revenue' => 0.0,
+            'variable_costs' => 0.0,
+            'opex' => 0.0,
+            'gross_profit' => 0.0,
+            'ebitda' => 0.0,
+            'margin_pct' => 0.0,
+            'delta' => ['ebitda_abs' => 0.0, 'margin_pp' => 0.0],
+            'drilldowns' => [],
+        ]);
+
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder);
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));

@@ -6,6 +6,7 @@ use App\Analytics\Api\Response\SnapshotContextResponse;
 use App\Analytics\Api\Response\SnapshotResponse;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
+use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
@@ -22,6 +23,7 @@ final class DashboardSnapshotService
         private readonly FreeCashWidgetBuilder $freeCashWidgetBuilder,
         private readonly InflowWidgetBuilder $inflowWidgetBuilder,
         private readonly RevenueWidgetBuilder $revenueWidgetBuilder,
+        private readonly ProfitWidgetBuilder $profitWidgetBuilder,
     )
     {
     }
@@ -42,6 +44,7 @@ final class DashboardSnapshotService
             $prevPeriod = $period->prevPeriod();
 
             $revenue = $this->revenueWidgetBuilder->build($company, $period);
+            $profit = $this->profitWidgetBuilder->build($company, $period);
 
             return new SnapshotResponse(
                 new SnapshotContextResponse(
@@ -57,6 +60,7 @@ final class DashboardSnapshotService
                 $this->freeCashWidgetBuilder->build($company, $period),
                 $this->inflowWidgetBuilder->build($company, $period),
                 $revenue['widget'],
+                $profit,
                 $revenue['registryEmpty'] ? ['PL_REGISTRY_EMPTY'] : [],
             );
         });
