@@ -22,7 +22,7 @@ use App\Repository\PLDailyTotalRepository;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeInterface;
-use Doctrine\ORM\AbstractQuery;
+use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -56,7 +56,10 @@ final class DashboardSnapshotServiceTest extends TestCase
         $plReportGridBuilder = new PlReportGridBuilder(new PlReportCalculator($plCategoryRepository, $factsProvider));
 
         $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
-        $query = $this->createMock(AbstractQuery::class);
+        $query = $this->getMockBuilder(Query::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSingleScalarResult'])
+            ->getMock();
         $query->method('getSingleScalarResult')->willReturn(0);
 
         $queryBuilder = $this->getMockBuilder(QueryBuilder::class)
