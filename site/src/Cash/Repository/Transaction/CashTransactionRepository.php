@@ -323,7 +323,7 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->andWhere('t.isTransfer = :isTransfer')
             ->andWhere('t.deletedAt IS NULL')
-            ->groupBy('category.id', 'category.name')
+            ->groupBy('t.cashflowCategory', 'category.name')
             ->orderBy('sumAbs', 'DESC')
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
