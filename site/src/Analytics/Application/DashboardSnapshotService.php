@@ -32,6 +32,7 @@ final class DashboardSnapshotService
         private readonly ProfitWidgetBuilder $profitWidgetBuilder,
         private readonly TopCashWidgetBuilder $topCashWidgetBuilder,
         private readonly TopPnlWidgetBuilder $topPnlWidgetBuilder,
+        private readonly LastUpdatedAtResolver $lastUpdatedAtResolver,
     )
     {
     }
@@ -59,6 +60,7 @@ final class DashboardSnapshotService
             $profit = $this->profitWidgetBuilder->build($company, $period);
             $topCash = $this->topCashWidgetBuilder->build($company, $period);
             $topPnl = $this->topPnlWidgetBuilder->build($company, $period);
+            $lastUpdatedAt = $this->lastUpdatedAtResolver->resolve($company);
 
             return new SnapshotResponse(
                 new SnapshotContextResponse(
@@ -69,7 +71,7 @@ final class DashboardSnapshotService
                     prevFrom: $prevPeriod->getFrom(),
                     prevTo: $prevPeriod->getTo(),
                     vatMode: self::VAT_MODE_EXCLUDE,
-                    lastUpdatedAt: null,
+                    lastUpdatedAt: $lastUpdatedAt,
                 ),
                 $freeCash,
                 $inflow,
