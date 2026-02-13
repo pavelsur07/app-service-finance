@@ -52,6 +52,11 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('top_pnl', $payload['widgets']);
         self::assertArrayHasKey('profit', $payload['widgets']);
         self::assertArrayHasKey('alerts', $payload['widgets']);
+
+        self::assertIsArray($payload['widgets']['revenue']);
+        self::assertArrayHasKey('sum', $payload['widgets']['revenue']);
+        self::assertArrayHasKey('delta_abs', $payload['widgets']['revenue']);
+        self::assertArrayHasKey('delta_pct', $payload['widgets']['revenue']);
     }
 }
 
