@@ -95,8 +95,11 @@ final class DashboardSnapshotServiceTest extends TestCase
         $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository);
         $topPnlWidgetBuilder = new TopPnlWidgetBuilder($dailyTotalRepository, $plCategoryRepository, new ParetoTopItemsBuilder());
 
-        $lastUpdatedAtResolver = $this->createMock(LastUpdatedAtResolver::class);
-        $lastUpdatedAtResolver->method('resolve')->willReturn(null);
+        $lastUpdatedAtResolver = new LastUpdatedAtResolver(
+            $cashTransactionRepository,
+            $fundMovementRepository,
+            $dailyTotalRepository,
+        );
 
         $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $lastUpdatedAtResolver);
 
