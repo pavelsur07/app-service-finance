@@ -3,10 +3,10 @@
 namespace App\Analytics\Controller\Api\V1;
 
 use App\Analytics\Application\DashboardSnapshotService;
-use App\Analytics\Domain\Period;
+use App\Analytics\Application\PeriodResolver;
+use App\Analytics\Api\Request\SnapshotQuery;
 use App\Shared\Service\ActiveCompanyService;
-use DateInterval;
-use DateTimeImmutable;
+use InvalidArgumentException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -19,32 +19,39 @@ final class DashboardSnapshotController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly DashboardSnapshotService $dashboardSnapshotService,
+        private readonly PeriodResolver $periodResolver,
     ) {
     }
 
     #[Route('/api/dashboard/v1/snapshot', name: 'analytics_dashboard_snapshot_v1', methods: ['GET'])]
     public function __invoke(Request $request): JsonResponse
     {
-        $company = $this->activeCompanyService->getActiveCompany();
-        $period = $this->parsePeriod($request);
+        try {
+            $period = $this->periodResolver->resolve(new SnapshotQuery(
+                preset: $this->stringOrNull($request->query->get('preset')),
+                from: $this->stringOrNull($request->query->get('from')),
+                to: $this->stringOrNull($request->query->get('to')),
+            ));
+        } catch (InvalidArgumentException $exception) {
+            return $this->json([
+                'type' => 'validation_error',
+                'message' => $exception->getMessage(),
+                'details' => [
+                    'preset' => $request->query->get('preset'),
+                    'from' => $request->query->get('from'),
+                    'to' => $request->query->get('to'),
+                ],
+            ], 422);
+        }
 
+        $company = $this->activeCompanyService->getActiveCompany();
         $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period);
 
         return $this->json($snapshot->toArray());
     }
 
-    private function parsePeriod(Request $request): Period
+    private function stringOrNull(mixed $value): ?string
     {
-        $from = $request->query->get('from');
-        $to = $request->query->get('to');
-
-        if (is_string($from) && is_string($to)) {
-            return new Period(new DateTimeImmutable($from), new DateTimeImmutable($to));
-        }
-
-        $toDate = new DateTimeImmutable('today');
-        $fromDate = $toDate->sub(new DateInterval('P29D'));
-
-        return new Period($fromDate, $toDate);
+        return is_string($value) ? $value : null;
     }
 }
