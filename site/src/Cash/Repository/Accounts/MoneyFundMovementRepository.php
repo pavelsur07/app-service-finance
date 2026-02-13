@@ -29,4 +29,27 @@ class MoneyFundMovementRepository extends ServiceEntityRepository
             ->getQuery()
             ->execute();
     }
+
+    /**
+     * @return array<string,int> fundId => amountMinor
+     */
+    public function sumFundBalancesUpToDate(Company $company, \DateTimeImmutable $date): array
+    {
+        $rows = $this->createQueryBuilder('m')
+            ->select('IDENTITY(m.fund) AS fundId', 'COALESCE(SUM(m.amountMinor), 0) AS amountMinor')
+            ->andWhere('m.company = :company')
+            ->andWhere('m.occurredAt <= :date')
+            ->setParameter('company', $company)
+            ->setParameter('date', $date->setTime(23, 59, 59))
+            ->groupBy('m.fund')
+            ->getQuery()
+            ->getArrayResult();
+
+        $totals = [];
+        foreach ($rows as $row) {
+            $totals[(string) $row['fundId']] = (int) $row['amountMinor'];
+        }
+
+        return $totals;
+    }
 }
