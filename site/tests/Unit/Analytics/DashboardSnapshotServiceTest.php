@@ -9,6 +9,7 @@ use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Application\Widget\OutflowWidgetBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
+use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
@@ -48,6 +49,7 @@ final class DashboardSnapshotServiceTest extends TestCase
         $cashTransactionRepository->method('sumOutflowExcludeTransfers')->willReturn(0.0);
         $cashTransactionRepository->method('sumOutflowByDayExcludeTransfers')->willReturn([]);
         $cashTransactionRepository->method('sumCapexOutflowExcludeTransfers')->willReturn(0.0);
+        $cashTransactionRepository->method('sumOutflowByCategoryExcludeTransfers')->willReturn([]);
         $cashTransactionRepository->method('sumNetByFlowKindExcludeTransfers')->willReturn([
             'OPERATING' => 0.0,
             'INVESTING' => 0.0,
@@ -87,8 +89,9 @@ final class DashboardSnapshotServiceTest extends TestCase
 
         $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository);
         $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository);
+        $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository);
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder);
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder);
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
@@ -112,6 +115,9 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertSame(0.0, $first['widgets']['cashflow_split']['operating']['net']);
         self::assertIsArray($first['widgets']['alerts']['items']);
         self::assertIsArray($first['widgets']['alerts']['warnings']);
+        self::assertIsArray($first['widgets']['top_cash']);
+        self::assertArrayHasKey('items', $first['widgets']['top_cash']);
+        self::assertArrayHasKey('other', $first['widgets']['top_cash']);
         self::assertContains('PL_REGISTRY_EMPTY', $first['widgets']['alerts']['warnings']);
     }
 

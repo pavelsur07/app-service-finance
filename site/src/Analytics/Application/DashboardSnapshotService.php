@@ -10,6 +10,7 @@ use App\Analytics\Application\Widget\OutflowWidgetBuilder;
 use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
+use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -28,6 +29,7 @@ final class DashboardSnapshotService
         private readonly CashflowSplitWidgetBuilder $cashflowSplitWidgetBuilder,
         private readonly RevenueWidgetBuilder $revenueWidgetBuilder,
         private readonly ProfitWidgetBuilder $profitWidgetBuilder,
+        private readonly TopCashWidgetBuilder $topCashWidgetBuilder,
     )
     {
     }
@@ -53,6 +55,7 @@ final class DashboardSnapshotService
             $cashflowSplit = $this->cashflowSplitWidgetBuilder->build($company, $period);
             $revenue = $this->revenueWidgetBuilder->build($company, $period);
             $profit = $this->profitWidgetBuilder->build($company, $period);
+            $topCash = $this->topCashWidgetBuilder->build($company, $period);
 
             return new SnapshotResponse(
                 new SnapshotContextResponse(
@@ -71,6 +74,7 @@ final class DashboardSnapshotService
                 $cashflowSplit,
                 $revenue['widget'],
                 $profit,
+                $topCash,
                 $this->buildAlerts($freeCash->toArray(), $revenue, $profit),
             );
         });
