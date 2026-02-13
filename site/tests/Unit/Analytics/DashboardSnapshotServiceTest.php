@@ -14,6 +14,11 @@ use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
+use App\Finance\Facts\FactsProviderInterface;
+use App\Finance\Report\PlReportCalculator;
+use App\Finance\Report\PlReportGridBuilder;
+use App\Repository\PLCategoryRepository;
+use App\Repository\PLDailyTotalRepository;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeInterface;
@@ -40,23 +45,19 @@ final class DashboardSnapshotServiceTest extends TestCase
         $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository);
         $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository);
 
-        $revenueWidgetBuilder = $this->createMock(RevenueWidgetBuilder::class);
-        $revenueWidgetBuilder->method('build')->willReturn([
-            'widget' => new \App\Analytics\Api\Response\RevenueWidgetResponse(0.0, 0.0, 0.0, []),
-            'registryEmpty' => true,
-        ]);
+        $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
+        $plCategoryRepository->method('findBy')->willReturn([]);
 
-        $profitWidgetBuilder = $this->createMock(ProfitWidgetBuilder::class);
-        $profitWidgetBuilder->method('build')->willReturn([
-            'revenue' => 0.0,
-            'variable_costs' => 0.0,
-            'opex' => 0.0,
-            'gross_profit' => 0.0,
-            'ebitda' => 0.0,
-            'margin_pct' => 0.0,
-            'delta' => ['ebitda_abs' => 0.0, 'margin_pp' => 0.0],
-            'drilldowns' => [],
-        ]);
+        $factsProvider = $this->createMock(FactsProviderInterface::class);
+        $factsProvider->method('value')->willReturn(0.0);
+
+        $plReportGridBuilder = new PlReportGridBuilder(new PlReportCalculator($plCategoryRepository, $factsProvider));
+
+        $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
+        $dailyTotalRepository->method('createQueryBuilder')->willReturn(new DailyTotalQueryBuilderStub());
+
+        $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository);
+        $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository);
 
         $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder);
 
@@ -87,6 +88,37 @@ final class DashboardSnapshotServiceTest extends TestCase
         $company->method('getId')->willReturn($companyId);
 
         return $company;
+    }
+}
+
+final class DailyTotalQueryBuilderStub
+{
+    public function select(string $select): self
+    {
+        return $this;
+    }
+
+    public function andWhere(string $where): self
+    {
+        return $this;
+    }
+
+    public function setParameter(string $key, mixed $value): self
+    {
+        return $this;
+    }
+
+    public function getQuery(): DailyTotalQueryStub
+    {
+        return new DailyTotalQueryStub();
+    }
+}
+
+final class DailyTotalQueryStub
+{
+    public function getSingleScalarResult(): int
+    {
+        return 0;
     }
 }
 
