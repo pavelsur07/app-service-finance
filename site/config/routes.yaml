@@ -52,6 +52,12 @@ marketplace_controllers:
         namespace: App\Marketplace\Controller
     type: attribute
 
+analytics_controllers:
+    resource:
+        path: ../src/Analytics/Controller/
+        namespace: App\Analytics\Controller
+    type: attribute
+
 telegram_integration_controllers:
     # Импортируем все контроллеры Telegram (вебхук, workspace, admin)
     resource:
