@@ -275,7 +275,11 @@ class CashTransactionRepository extends ServiceEntityRepository
         ];
 
         foreach ($rows as $row) {
-            $flowKind = (string) ($row['flowKind'] ?? '');
+            $flowKindValue = $row['flowKind'] ?? null;
+            $flowKind = $flowKindValue instanceof CashflowFlowKind
+                ? $flowKindValue->value
+                : (string) $flowKindValue;
+
             if (!array_key_exists($flowKind, $result)) {
                 continue;
             }
