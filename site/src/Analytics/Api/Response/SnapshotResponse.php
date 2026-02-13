@@ -21,6 +21,13 @@ final readonly class SnapshotResponse
             'widgets' => [
                 'free_cash' => $this->freeCash->toArray(),
                 'inflow' => $this->inflow->toArray(),
+                'outflow' => new \stdClass(),
+                'cashflow_split' => new \stdClass(),
+                'revenue' => new \stdClass(),
+                'top_cash' => new \stdClass(),
+                'top_pnl' => new \stdClass(),
+                'profit' => new \stdClass(),
+                'alerts' => new \stdClass(),
             ],
         ];
     }
