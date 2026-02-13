@@ -12,8 +12,8 @@ use Symfony\Contracts\Cache\ItemInterface;
 
 final class DashboardSnapshotService
 {
-    private const int SNAPSHOT_TTL_SECONDS = 120;
-    private const string VAT_MODE_EXCLUDE = 'exclude';
+    private const SNAPSHOT_TTL_SECONDS = 120;
+    private const VAT_MODE_EXCLUDE = 'exclude';
 
     public function __construct(
         private readonly CacheInterface $cache,
