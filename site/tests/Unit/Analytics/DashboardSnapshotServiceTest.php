@@ -22,6 +22,8 @@ use App\Repository\PLDailyTotalRepository;
 use DateInterval;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -54,7 +56,22 @@ final class DashboardSnapshotServiceTest extends TestCase
         $plReportGridBuilder = new PlReportGridBuilder(new PlReportCalculator($plCategoryRepository, $factsProvider));
 
         $dailyTotalRepository = $this->createMock(PLDailyTotalRepository::class);
-        $dailyTotalRepository->method('createQueryBuilder')->willReturn(new DailyTotalQueryBuilderStub());
+        $query = $this->getMockBuilder(Query::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getSingleScalarResult'])
+            ->getMock();
+        $query->method('getSingleScalarResult')->willReturn(0);
+
+        $queryBuilder = $this->getMockBuilder(QueryBuilder::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['select', 'andWhere', 'setParameter', 'getQuery'])
+            ->getMock();
+        $queryBuilder->method('select')->willReturnSelf();
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setParameter')->willReturnSelf();
+        $queryBuilder->method('getQuery')->willReturn($query);
+
+        $dailyTotalRepository->method('createQueryBuilder')->willReturn($queryBuilder);
 
         $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository);
         $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository);
@@ -88,37 +105,6 @@ final class DashboardSnapshotServiceTest extends TestCase
         $company->method('getId')->willReturn($companyId);
 
         return $company;
-    }
-}
-
-final class DailyTotalQueryBuilderStub
-{
-    public function select(string $select): self
-    {
-        return $this;
-    }
-
-    public function andWhere(string $where): self
-    {
-        return $this;
-    }
-
-    public function setParameter(string $key, mixed $value): self
-    {
-        return $this;
-    }
-
-    public function getQuery(): DailyTotalQueryStub
-    {
-        return new DailyTotalQueryStub();
-    }
-}
-
-final class DailyTotalQueryStub
-{
-    public function getSingleScalarResult(): int
-    {
-        return 0;
     }
 }
 
