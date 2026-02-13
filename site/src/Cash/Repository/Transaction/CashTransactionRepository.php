@@ -182,4 +182,66 @@ class CashTransactionRepository extends ServiceEntityRepository
 
         return $byAccountId;
     }
+
+    public function sumInflowByCompanyAndPeriodExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): string
+    {
+        $result = $this->createQueryBuilder('t')
+            ->select('COALESCE(SUM(t.amount), 0) as inflow')
+            ->join('t.moneyAccount', 'ma')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :inflow')
+            ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('isTransfer', false)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return bcadd((string) $result, '0', 2);
+    }
+
+    /**
+     * @return list<array{date:string,value:string}>
+     */
+    public function sumInflowByDayExcludeTransfers(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
+    {
+        $rows = $this->createQueryBuilder('t')
+            ->select('t.occurredAt as date', 'COALESCE(SUM(t.amount), 0) as value')
+            ->join('t.moneyAccount', 'ma')
+            ->where('t.company = :company')
+            ->andWhere('t.direction = :inflow')
+            ->andWhere('t.currency = ma.currency')
+            ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.isTransfer = :isTransfer')
+            ->andWhere('t.deletedAt IS NULL')
+            ->groupBy('date')
+            ->orderBy('date', 'ASC')
+            ->setParameter('company', $company)
+            ->setParameter('from', $from->setTime(0, 0))
+            ->setParameter('to', $to->setTime(23, 59, 59))
+            ->setParameter('inflow', CashDirection::INFLOW)
+            ->setParameter('isTransfer', false)
+            ->getQuery()
+            ->getArrayResult();
+
+        $series = [];
+        foreach ($rows as $row) {
+            $date = $row['date'];
+            if ($date instanceof \DateTimeInterface) {
+                $date = $date->format('Y-m-d');
+            }
+
+            $series[] = [
+                'date' => (string) $date,
+                'value' => bcadd((string) ($row['value'] ?? '0'), '0', 2),
+            ];
+        }
+
+        return $series;
+    }
 }
