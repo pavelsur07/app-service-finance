@@ -107,4 +107,10 @@ class HomeController extends AbstractController
             ],
         ]);
     }
+
+    #[Route('/dashboard', name: 'app_dashboard_index', methods: ['GET'])]
+    public function dashboard(): Response
+    {
+        return $this->render('home/dashboard.html.twig');
+    }
 }
