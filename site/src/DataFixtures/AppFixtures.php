@@ -56,21 +56,14 @@ class AppFixtures extends Fixture
 
         // --- Контрагенты для ООО "Ромашка" (добавлены Wildberries и Ozon + сервисные контрагенты)
         $counterpartiesData = [
-            // Маркетплейсы как юрлица
             ['Wildberries', '7700000000', CounterpartyType::LEGAL_ENTITY],
             ['Ozon',        '7800000000', CounterpartyType::LEGAL_ENTITY],
-
-            // Юрлица (ИНН 10 знаков)
             ['ООО "Альфа-Снаб"',     '7708123456',   CounterpartyType::LEGAL_ENTITY],
             ['ООО "Бета-Логистик"',  '7812345678',   CounterpartyType::LEGAL_ENTITY],
             ['ООО "Гамма-Маркет"',   '7723456789',   CounterpartyType::LEGAL_ENTITY],
             ['ООО "Дельта-Сервис"',  '7712345670',   CounterpartyType::LEGAL_ENTITY],
-
-            // Индивидуальные предприниматели (ИНН 12 знаков)
             ['ИП Иванов И.И.',       '503212345678', CounterpartyType::INDIVIDUAL_ENTREPRENEUR],
             ['ИП Петров П.П.',       '540812345678', CounterpartyType::INDIVIDUAL_ENTREPRENEUR],
-
-            // Доп. контрагенты для эмуляции ДДС
             ['АО «Альфа-Банк» (Эквайринг/Кредит)', '7700000001',  CounterpartyType::LEGAL_ENTITY],
             ['ООО «Опт-Трейд»',                    '7700000002',  CounterpartyType::LEGAL_ENTITY],
             ['ООО «Digital Ads»',                  '7700000003',  CounterpartyType::LEGAL_ENTITY],
@@ -98,11 +91,8 @@ class AppFixtures extends Fixture
         }
 
         // === Дата начальных остатков ===
-        // ВАЖНО: Используем первый день ПРОШЛОГО месяца (00:00:00)
-        $openingDate = (new \DateTimeImmutable('first day of last month'))->setTime(0, 0, 0);
+        $openingDate = (new \DateTimeImmutable('first day of -2 months'))->setTime(0, 0, 0);
 
-        // ➜ Денежные счета
-        // Альфа-Банк (основной)
         $alfa = new MoneyAccount(
             id: Uuid::uuid4()->toString(),
             company: $company,
@@ -116,7 +106,6 @@ class AppFixtures extends Fixture
         $manager->persist($alfa);
         $this->addReference(self::REF_ACC_ALFA, $alfa);
 
-        // Сбербанк (расчётный) — ➕ новый счёт для техпереводов «Альфа → Сбер» и прочей эмуляции
         $sber = new MoneyAccount(
             id: Uuid::uuid4()->toString(),
             company: $company,
@@ -130,7 +119,6 @@ class AppFixtures extends Fixture
         $manager->persist($sber);
         $this->addReference(self::REF_ACC_SBER, $sber);
 
-        // Касса (основная)
         $cash = new MoneyAccount(
             id: Uuid::uuid4()->toString(),
             company: $company,
@@ -145,13 +133,11 @@ class AppFixtures extends Fixture
 
         $manager->flush();
 
-        // ➜ Пересчёт дневных остатков: с даты начальных остатков по сегодня
         $today = new \DateTimeImmutable('today');
         $this->accountBalanceService->recalculateDailyRange($company, $alfa, $openingDate, $today);
-        $this->accountBalanceService->recalculateDailyRange($company, $sber, $openingDate, $today); // ➕ учли Сбер
+        $this->accountBalanceService->recalculateDailyRange($company, $sber, $openingDate, $today);
         $this->accountBalanceService->recalculateDailyRange($company, $cash, $openingDate, $today);
 
-        // ➜ Остальные пользователи (как было)
         foreach ($usersData as [$email, $plainPassword, $roles]) {
             $user = new User(id: Uuid::uuid4()->toString());
             $user->setEmail($email);
