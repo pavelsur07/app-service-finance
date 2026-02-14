@@ -11,6 +11,7 @@ use InvalidArgumentException;
 final class PeriodResolver
 {
     private const PRESETS = ['day', 'week', 'month'];
+    private const MAX_PERIOD_DAYS = 366;
 
     private DateTimeZone $utc;
 
@@ -42,7 +43,12 @@ final class PeriodResolver
             throw new InvalidArgumentException('Both from and to are required for custom period.');
         }
 
-        return new Period($this->parseDate($from, 'from'), $this->parseDate($to, 'to'));
+        $period = new Period($this->parseDate($from, 'from'), $this->parseDate($to, 'to'));
+        if ($period->days() > self::MAX_PERIOD_DAYS) {
+            throw new InvalidArgumentException(sprintf('Period is too large. Maximum allowed span is %d days.', self::MAX_PERIOD_DAYS));
+        }
+
+        return $period;
     }
 
     private function resolvePreset(string $preset, DateTimeImmutable $now): Period

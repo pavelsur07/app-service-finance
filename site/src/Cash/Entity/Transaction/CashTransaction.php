@@ -18,6 +18,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'cash_transaction')]
 #[ORM\Index(name: 'idx_company_account_occurred', columns: ['company_id', 'money_account_id', 'occurred_at'])]
 #[ORM\Index(name: 'idx_company_occurred', columns: ['company_id', 'occurred_at'])]
+#[ORM\Index(name: 'idx_cash_transaction_company_is_transfer', columns: ['company_id', 'is_transfer'])]
 #[ORM\UniqueConstraint(name: 'uniq_cashflow_import', columns: ['company_id', 'import_source', 'external_id'])]
 class CashTransaction
 {
