@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Application\Widget;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
@@ -14,6 +15,7 @@ final readonly class TopCashWidgetBuilder
 
     public function __construct(
         private CashTransactionRepository $cashTransactionRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -70,16 +72,13 @@ final readonly class TopCashWidgetBuilder
                     'delta_abs' => $deltaAbs,
                     'delta_pct' => $deltaPct,
                     'trend' => $this->resolveTrend($deltaPct),
-                    'drilldown' => [
-                        'key' => 'cash.transactions',
-                        'params' => [
-                            'from' => $period->getFrom()->format('Y-m-d'),
-                            'to' => $period->getTo()->format('Y-m-d'),
-                            'direction' => 'out',
-                            'exclude_transfers' => true,
-                            'category_id' => $categoryId,
-                        ],
-                    ],
+                    'drilldown' => $this->drilldownBuilder->cashTransactions([
+                        'from' => $period->getFrom()->format('Y-m-d'),
+                        'to' => $period->getTo()->format('Y-m-d'),
+                        'direction' => 'out',
+                        'exclude_transfers' => true,
+                        'category_id' => $categoryId,
+                    ]),
                 ];
 
                 $cumulativeSum += $sumAbs;

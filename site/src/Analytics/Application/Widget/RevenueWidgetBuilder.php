@@ -3,6 +3,7 @@
 namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Api\Response\RevenueWidgetResponse;
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
@@ -17,6 +18,7 @@ final readonly class RevenueWidgetBuilder
         private PlReportGridBuilder $plReportGridBuilder,
         private PLCategoryRepository $plCategoryRepository,
         private PLDailyTotalRepository $plDailyTotalRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -41,14 +43,11 @@ final readonly class RevenueWidgetBuilder
                 deltaAbs: $deltaAbs,
                 deltaPct: $deltaPct,
                 series: $current['series'],
-                drilldown: [
-                    'key' => 'pl.documents',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                        'type' => 'revenue',
-                    ],
-                ],
+                drilldown: $this->drilldownBuilder->plDocuments([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                    'type' => 'revenue',
+                ]),
             ),
             'registryEmpty' => $current['registryEmpty'],
         ];

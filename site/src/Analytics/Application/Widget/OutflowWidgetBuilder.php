@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Application\Widget;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
@@ -10,6 +11,7 @@ final readonly class OutflowWidgetBuilder
 {
     public function __construct(
         private CashTransactionRepository $cashTransactionRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -61,25 +63,19 @@ final readonly class OutflowWidgetBuilder
             'ratio_to_inflow' => round($outflowSum / max($inflowSum, 1.0), 4),
             'capex_abs' => $capexAbs,
             'series' => $series,
-            'drilldown' => [
-                'key' => 'cash.transactions',
-                'params' => [
-                    'from' => $period->getFrom()->format('Y-m-d'),
-                    'to' => $period->getTo()->format('Y-m-d'),
-                    'direction' => 'out',
-                    'exclude_transfers' => true,
-                ],
-            ],
-            'capex_drilldown' => [
-                'key' => 'cash.transactions',
-                'params' => [
-                    'from' => $period->getFrom()->format('Y-m-d'),
-                    'to' => $period->getTo()->format('Y-m-d'),
-                    'direction' => 'out',
-                    'exclude_transfers' => true,
-                    'system_code' => 'CAPEX',
-                ],
-            ],
+            'drilldown' => $this->drilldownBuilder->cashTransactions([
+                'from' => $period->getFrom()->format('Y-m-d'),
+                'to' => $period->getTo()->format('Y-m-d'),
+                'direction' => 'out',
+                'exclude_transfers' => true,
+            ]),
+            'capex_drilldown' => $this->drilldownBuilder->cashTransactions([
+                'from' => $period->getFrom()->format('Y-m-d'),
+                'to' => $period->getTo()->format('Y-m-d'),
+                'direction' => 'out',
+                'exclude_transfers' => true,
+                'system_code' => 'CAPEX',
+            ]),
         ];
     }
 }

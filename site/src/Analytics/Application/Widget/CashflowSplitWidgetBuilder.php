@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Application\Widget;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
@@ -11,6 +12,7 @@ final readonly class CashflowSplitWidgetBuilder
 {
     public function __construct(
         private CashTransactionRepository $cashTransactionRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -36,14 +38,11 @@ final readonly class CashflowSplitWidgetBuilder
                     2,
                 ),
             ],
-            'drilldown' => [
-                'key' => 'cash.transactions',
-                'params' => [
-                    'from' => $period->getFrom()->format('Y-m-d'),
-                    'to' => $period->getTo()->format('Y-m-d'),
-                    'exclude_transfers' => true,
-                ],
-            ],
+            'drilldown' => $this->drilldownBuilder->cashTransactions([
+                'from' => $period->getFrom()->format('Y-m-d'),
+                'to' => $period->getTo()->format('Y-m-d'),
+                'exclude_transfers' => true,
+            ]),
             'drilldowns_by_kind' => [
                 CashflowFlowKind::OPERATING->value => $this->buildDrilldownByKind(CashflowFlowKind::OPERATING, $period),
                 CashflowFlowKind::INVESTING->value => $this->buildDrilldownByKind(CashflowFlowKind::INVESTING, $period),
@@ -75,14 +74,11 @@ final readonly class CashflowSplitWidgetBuilder
      */
     private function buildDrilldownByKind(CashflowFlowKind $kind, Period $period): array
     {
-        return [
-            'key' => 'cash.transactions',
-            'params' => [
-                'from' => $period->getFrom()->format('Y-m-d'),
-                'to' => $period->getTo()->format('Y-m-d'),
-                'exclude_transfers' => true,
-                'flow_kind' => $kind->value,
-            ],
-        ];
+        return $this->drilldownBuilder->cashTransactions([
+            'from' => $period->getFrom()->format('Y-m-d'),
+            'to' => $period->getTo()->format('Y-m-d'),
+            'exclude_transfers' => true,
+            'flow_kind' => $kind->value,
+        ]);
     }
 }

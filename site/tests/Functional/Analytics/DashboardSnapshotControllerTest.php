@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Functional\Analytics;
 
+use App\Analytics\Domain\DrilldownKey;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
@@ -62,7 +63,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
 
         self::assertIsArray($payload['widgets']['revenue']);
 
-
         self::assertIsArray($payload['widgets']['cashflow_split']);
         self::assertArrayHasKey('operating', $payload['widgets']['cashflow_split']);
         self::assertArrayHasKey('investing', $payload['widgets']['cashflow_split']);
@@ -83,7 +83,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('delta_abs', $payload['widgets']['revenue']);
         self::assertArrayHasKey('delta_pct', $payload['widgets']['revenue']);
 
-
         self::assertIsArray($payload['widgets']['top_pnl']);
         self::assertArrayHasKey('coverage_target', $payload['widgets']['top_pnl']);
         self::assertArrayHasKey('max_items', $payload['widgets']['top_pnl']);
@@ -102,6 +101,42 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('ebitda', $payload['widgets']['profit']);
         self::assertArrayHasKey('margin_pct', $payload['widgets']['profit']);
         self::assertArrayHasKey('delta', $payload['widgets']['profit']);
+
+        $allowedDrilldownKeys = [
+            DrilldownKey::CASH_TRANSACTIONS,
+            DrilldownKey::CASH_BALANCES,
+            DrilldownKey::FUNDS_RESERVED,
+            DrilldownKey::PL_DOCUMENTS,
+            DrilldownKey::PL_REPORT,
+        ];
+
+        foreach ($this->collectDrilldownKeys($payload) as $drilldownKey) {
+            self::assertTrue(in_array($drilldownKey, $allowedDrilldownKeys, true));
+        }
+    }
+
+    /**
+     * @param mixed $payload
+     *
+     * @return list<string>
+     */
+    private function collectDrilldownKeys(mixed $payload): array
+    {
+        if (!is_array($payload)) {
+            return [];
+        }
+
+        $keys = [];
+        if (isset($payload['key']) && is_string($payload['key'])) {
+            $keys[] = $payload['key'];
+        }
+
+        foreach ($payload as $value) {
+            if (is_array($value)) {
+                $keys = [...$keys, ...$this->collectDrilldownKeys($value)];
+            }
+        }
+
+        return $keys;
     }
 }
-

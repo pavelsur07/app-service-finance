@@ -3,6 +3,7 @@
 namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Api\Response\FreeCashWidgetResponse;
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -18,6 +19,7 @@ final readonly class FreeCashWidgetBuilder
         private MoneyAccountRepository $moneyAccountRepository,
         private AccountBalanceProvider $accountBalanceProvider,
         private MoneyFundMovementRepository $moneyFundMovementRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -64,7 +66,8 @@ final readonly class FreeCashWidgetBuilder
             reservedAtEnd: (float) $reservedAtEnd,
             lastUpdatedAt: new DateTimeImmutable('now', new \DateTimeZone('UTC')),
             drilldown: [
-                'type' => 'accounts_and_funds',
+                'cash_balances' => $this->drilldownBuilder->cashBalances($period->getTo()->format('Y-m-d')),
+                'funds_reserved' => $this->drilldownBuilder->fundsReserved($period->getTo()->format('Y-m-d')),
             ],
         );
     }

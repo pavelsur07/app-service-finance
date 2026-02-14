@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Application\Widget;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
@@ -19,6 +20,7 @@ final readonly class TopPnlWidgetBuilder
         private PLDailyTotalRepository $plDailyTotalRepository,
         private PLCategoryRepository $plCategoryRepository,
         private ParetoTopItemsBuilder $paretoTopItemsBuilder,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -59,16 +61,13 @@ final readonly class TopPnlWidgetBuilder
                 'delta_abs' => $deltaAbs,
                 'delta_pct' => $deltaPct,
                 'trend' => $this->resolveTrend($deltaPct),
-                'drilldown' => [
-                    'key' => 'pl.documents',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                        'type' => 'expense',
-                        'category_id' => $categoryId,
-                        'vat_mode' => self::VAT_MODE,
-                    ],
-                ],
+                'drilldown' => $this->drilldownBuilder->plDocuments([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                    'type' => 'expense',
+                    'category_id' => $categoryId,
+                    'vat_mode' => self::VAT_MODE,
+                ]),
             ];
         }
 
