@@ -125,11 +125,11 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertArrayHasKey('total', $first['widgets']['cashflow_split']);
         self::assertSame(0.0, $first['widgets']['cashflow_split']['operating']['net']);
         self::assertIsArray($first['widgets']['alerts']['items']);
-        self::assertIsArray($first['widgets']['alerts']['warnings']);
         self::assertIsArray($first['widgets']['top_cash']);
         self::assertArrayHasKey('items', $first['widgets']['top_cash']);
         self::assertArrayHasKey('other', $first['widgets']['top_cash']);
-        self::assertContains('PL_REGISTRY_EMPTY', $first['widgets']['alerts']['warnings']);
+        self::assertIsArray($first['widgets']['warnings']['items']);
+        self::assertContains('PL_REGISTRY_EMPTY', array_column($first['widgets']['warnings']['items'], 'code'));
         self::assertIsArray($first['widgets']['top_pnl']);
         self::assertArrayHasKey('coverage_target', $first['widgets']['top_pnl']);
         self::assertArrayHasKey('max_items', $first['widgets']['top_pnl']);
