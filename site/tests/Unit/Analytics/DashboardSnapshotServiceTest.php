@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Analytics;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\LastUpdatedAtResolver;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
@@ -59,10 +60,10 @@ final class DashboardSnapshotServiceTest extends TestCase
             'FINANCING' => 0.0,
         ]);
 
-        $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository);
-        $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository);
-        $outflowWidgetBuilder = new OutflowWidgetBuilder($cashTransactionRepository);
-        $cashflowSplitWidgetBuilder = new CashflowSplitWidgetBuilder($cashTransactionRepository);
+        $widgetBuilder = new FreeCashWidgetBuilder($accountRepository, $accountBalanceProvider, $fundMovementRepository, new DrilldownBuilder());
+        $inflowWidgetBuilder = new InflowWidgetBuilder($accountRepository, $cashTransactionRepository, new DrilldownBuilder());
+        $outflowWidgetBuilder = new OutflowWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
+        $cashflowSplitWidgetBuilder = new CashflowSplitWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
 
         $plCategoryRepository = $this->createMock(PLCategoryRepository::class);
         $plCategoryRepository->method('findBy')->willReturn([]);
@@ -90,10 +91,10 @@ final class DashboardSnapshotServiceTest extends TestCase
 
         $dailyTotalRepository->method('createQueryBuilder')->willReturn($queryBuilder);
 
-        $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository);
-        $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository);
-        $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository);
-        $topPnlWidgetBuilder = new TopPnlWidgetBuilder($dailyTotalRepository, $plCategoryRepository, new ParetoTopItemsBuilder());
+        $revenueWidgetBuilder = new RevenueWidgetBuilder($plReportGridBuilder, $plCategoryRepository, $dailyTotalRepository, new DrilldownBuilder());
+        $profitWidgetBuilder = new ProfitWidgetBuilder($plReportGridBuilder, $plCategoryRepository, new DrilldownBuilder());
+        $topCashWidgetBuilder = new TopCashWidgetBuilder($cashTransactionRepository, new DrilldownBuilder());
+        $topPnlWidgetBuilder = new TopPnlWidgetBuilder($dailyTotalRepository, $plCategoryRepository, new ParetoTopItemsBuilder(), new DrilldownBuilder());
 
         $lastUpdatedAtResolver = new LastUpdatedAtResolver(
             $cashTransactionRepository,

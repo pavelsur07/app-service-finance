@@ -2,6 +2,7 @@
 
 namespace App\Analytics\Application\Widget;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
@@ -14,6 +15,7 @@ final readonly class ProfitWidgetBuilder
     public function __construct(
         private PlReportGridBuilder $plReportGridBuilder,
         private PLCategoryRepository $plCategoryRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -37,37 +39,25 @@ final readonly class ProfitWidgetBuilder
                 'margin_pp' => round($current['margin_pct'] - $previous['margin_pct'], 2),
             ],
             'drilldowns' => [
-                'revenue' => [
-                    'key' => 'pl.documents',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                        'type' => 'revenue',
-                    ],
-                ],
-                'variable_costs' => [
-                    'key' => 'pl.documents',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                        'type' => 'variable',
-                    ],
-                ],
-                'opex' => [
-                    'key' => 'pl.documents',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                        'type' => 'opex',
-                    ],
-                ],
-                'report' => [
-                    'key' => 'pl.report',
-                    'params' => [
-                        'from' => $period->getFrom()->format('Y-m-d'),
-                        'to' => $period->getTo()->format('Y-m-d'),
-                    ],
-                ],
+                'revenue' => $this->drilldownBuilder->plDocuments([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                    'type' => 'revenue',
+                ]),
+                'variable_costs' => $this->drilldownBuilder->plDocuments([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                    'type' => 'variable',
+                ]),
+                'opex' => $this->drilldownBuilder->plDocuments([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                    'type' => 'opex',
+                ]),
+                'report' => $this->drilldownBuilder->plReport([
+                    'from' => $period->getFrom()->format('Y-m-d'),
+                    'to' => $period->getTo()->format('Y-m-d'),
+                ]),
             ],
         ];
     }

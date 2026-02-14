@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Analytics;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
@@ -27,7 +28,7 @@ final class ProfitWidgetBuilderTest extends TestCase
 
         $plReportGridBuilder = new PlReportGridBuilder(new PlReportCalculator($categoryRepository, $factsProvider));
 
-        $builder = new ProfitWidgetBuilder($plReportGridBuilder, $categoryRepository);
+        $builder = new ProfitWidgetBuilder($plReportGridBuilder, $categoryRepository, new DrilldownBuilder());
 
         $result = $builder->build($company, $period);
 

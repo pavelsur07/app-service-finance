@@ -2,6 +2,7 @@
 
 namespace App\Tests\Unit\Analytics;
 
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -35,7 +36,7 @@ final class InflowWidgetBuilderTest extends TestCase
                 ['date' => '2026-03-04', 'value' => '70.00'],
             ]);
 
-        $builder = new InflowWidgetBuilder($accountRepository, $transactionRepository);
+        $builder = new InflowWidgetBuilder($accountRepository, $transactionRepository, new DrilldownBuilder());
 
         $result = $builder->build($company, $period)->toArray();
 

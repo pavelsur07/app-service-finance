@@ -3,6 +3,7 @@
 namespace App\Analytics\Application\Widget;
 
 use App\Analytics\Api\Response\InflowWidgetResponse;
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -14,6 +15,7 @@ final readonly class InflowWidgetBuilder
     public function __construct(
         private MoneyAccountRepository $moneyAccountRepository,
         private CashTransactionRepository $cashTransactionRepository,
+        private DrilldownBuilder $drilldownBuilder,
     ) {
     }
 
@@ -29,7 +31,7 @@ final readonly class InflowWidgetBuilder
                 deltaPct: 0.0,
                 avgDaily: 0.0,
                 series: [],
-                drilldown: ['type' => 'cash_transactions', 'direction' => 'inflow', 'exclude_transfers' => true],
+                drilldown: $this->drilldownBuilder->cashTransactions(['direction' => 'inflow', 'exclude_transfers' => true]),
             );
         }
 
@@ -57,14 +59,13 @@ final readonly class InflowWidgetBuilder
             deltaPct: $deltaPct,
             avgDaily: $avgDaily,
             series: $series,
-            drilldown: [
-                'type' => 'cash_transactions',
+            drilldown: $this->drilldownBuilder->cashTransactions([
                 'direction' => 'inflow',
                 'exclude_transfers' => true,
                 'account_ids' => $accountIds,
                 'from' => $period->getFrom()->format('Y-m-d'),
                 'to' => $period->getTo()->format('Y-m-d'),
-            ],
+            ]),
         );
     }
 }
