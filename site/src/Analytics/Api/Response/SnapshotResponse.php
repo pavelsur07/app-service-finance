@@ -21,6 +21,8 @@ final readonly class SnapshotResponse
         private array $topPnl,
         /** @var list<array{code: string}> */
         private array $alerts = [],
+        /** @var list<array{code: string, message: string}> */
+        private array $warnings = [],
     ) {
     }
 
@@ -42,11 +44,9 @@ final readonly class SnapshotResponse
                 'profit' => $this->profit,
                 'alerts' => [
                     'items' => $this->alerts,
-                    // keep legacy field for compatibility with existing clients
-                    'warnings' => array_map(
-                        static fn (array $alert): string => (string) ($alert['code'] ?? ''),
-                        $this->alerts,
-                    ),
+                ],
+                'warnings' => [
+                    'items' => $this->warnings,
                 ],
             ],
         ];

@@ -82,6 +82,7 @@ final class DashboardSnapshotService
                 $topCash,
                 $topPnl,
                 $this->buildAlerts($freeCash->toArray(), $revenue, $profit),
+                $this->buildWarnings($freeCash->toArray(), $inflow->toArray(), $outflow, $revenue),
             );
         });
     }
@@ -96,10 +97,6 @@ final class DashboardSnapshotService
     private function buildAlerts(array $freeCash, array $revenue, array $profit): array
     {
         $alerts = [];
-
-        if (($revenue['registryEmpty'] ?? false) === true) {
-            $alerts[] = ['code' => 'PL_REGISTRY_EMPTY'];
-        }
 
         // Rule OUTFLOW_GT_INFLOW is intentionally skipped until outflow widget is implemented.
         if (((float) ($freeCash['delta_pct'] ?? 0.0)) < 0) {
@@ -116,5 +113,41 @@ final class DashboardSnapshotService
         }
 
         return array_slice($alerts, 0, 5);
+    }
+
+    /**
+     * @param array<string, mixed>                                                $freeCash
+     * @param array<string, mixed>                                                $inflow
+     * @param array<string, mixed>                                                $outflow
+     * @param array{widget: \App\Analytics\Api\Response\RevenueWidgetResponse, registryEmpty: bool} $revenue
+     *
+     * @return list<array{code: string, message: string}>
+     */
+    private function buildWarnings(array $freeCash, array $inflow, array $outflow, array $revenue): array
+    {
+        $warnings = [];
+
+        if (($revenue['registryEmpty'] ?? false) === true) {
+            $warnings[] = [
+                'code' => 'PL_REGISTRY_EMPTY',
+                'message' => 'Finance registry is empty for selected period.',
+            ];
+        }
+
+        if (0.0 === (float) ($freeCash['cash_at_end'] ?? 0.0) && [] === ($inflow['series'] ?? [])) {
+            $warnings[] = [
+                'code' => 'NO_ACTIVE_ACCOUNTS',
+                'message' => 'No active accounts found. Free cash is 0.',
+            ];
+        }
+
+        if (0.0 === (float) ($inflow['sum'] ?? 0.0) && 0.0 === (float) ($outflow['sum_abs'] ?? 0.0)) {
+            $warnings[] = [
+                'code' => 'NO_CASH_TRANSACTIONS',
+                'message' => 'No cash transactions found for selected period.',
+            ];
+        }
+
+        return $warnings;
     }
 }
