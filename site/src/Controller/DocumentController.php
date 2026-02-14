@@ -72,6 +72,7 @@ class DocumentController extends AbstractController
             'project_directions' => $projectDirections,
         ]);
         $form->handleRequest($request);
+        $initialStatus = $document->getStatus();
 
         if ($form->isSubmitted() && $form->isValid()) {
             if (null !== $document->getProjectDirection()) {
@@ -192,6 +193,7 @@ class DocumentController extends AbstractController
             'counterparties' => $counterparties,
             'project_directions' => $projectDirections,
         ]);
+        $initialStatus = $document->getStatus();
         $form->handleRequest($request);
 
         $transactionAllocation = $this->buildTransactionAllocationView($document);
@@ -222,7 +224,16 @@ class DocumentController extends AbstractController
 
                 $em->flush();
 
-                $this->plRegisterUpdater->updateForDocument($document);
+                $statusChanged = $initialStatus !== $document->getStatus();
+                $statusTransitionAffectsFact = $statusChanged
+                    && (DocumentStatus::ACTIVE === $initialStatus || DocumentStatus::ACTIVE === $document->getStatus());
+
+                if ($statusTransitionAffectsFact) {
+                    $day = $document->getDate()->setTime(0, 0);
+                    $this->plRegisterUpdater->recalcRange($document->getCompany(), $day, $day);
+                } else {
+                    $this->plRegisterUpdater->updateForDocument($document);
+                }
 
                 return $this->redirectToRoute('document_index');
             }
@@ -244,8 +255,11 @@ class DocumentController extends AbstractController
         }
 
         if ($this->isCsrfTokenValid('delete'.$document->getId(), $request->request->get('_token'))) {
+            $documentDate = $document->getDate()->setTime(0, 0);
             $em->remove($document);
             $em->flush();
+
+            $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
         }
 
         return $this->redirectToRoute('document_index');
