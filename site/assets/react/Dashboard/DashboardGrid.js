@@ -1,6 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 const PRESETS = ['day', 'week', 'month'];
+const DRILLDOWN_ROUTES = {
+  'cash.transactions': '/cash/transactions',
+  'cash.balances': '/cash/balances',
+  'funds.reserved': '/funds/reserved',
+  'pl.documents': '/pl/documents',
+  'pl.report': '/pl/report',
+};
 
 function formatAmount(value) {
   const numericValue = Number(value ?? 0);
@@ -15,7 +22,63 @@ function resolveDrilldown(payload) {
   return { key, params };
 }
 
-function DrilldownButton({ payload, label = 'Подробнее' }) {
+function showToast(message) {
+  if (typeof window === 'undefined' || typeof document === 'undefined') {
+    return;
+  }
+
+  let container = document.getElementById('dashboard-toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'dashboard-toast-container';
+    container.className = 'toast-container position-fixed top-0 end-0 p-3';
+    container.style.zIndex = '1080';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'toast show';
+  toast.setAttribute('role', 'alert');
+  toast.innerHTML = `<div class="toast-body">${message}</div>`;
+  container.appendChild(toast);
+
+  window.setTimeout(() => {
+    toast.remove();
+  }, 2500);
+}
+
+function DrilldownRouter({ key, params }) {
+  if (!key) {
+    return;
+  }
+
+  const basePath = DRILLDOWN_ROUTES[key];
+  if (!basePath) {
+    showToast('Раздел в разработке');
+    return;
+  }
+
+  const url = new URL(basePath, window.location.origin);
+  if (params && typeof params === 'object') {
+    Object.entries(params).forEach(([paramKey, value]) => {
+      if (value === null || value === undefined || value === '') {
+        return;
+      }
+
+      url.searchParams.set(paramKey, String(value));
+    });
+  }
+
+  if (window.location.origin === url.origin) {
+    window.location.assign(`${url.pathname}${url.search}`);
+    return;
+  }
+
+  // TODO: переключить на Symfony route paths, когда drilldown-страницы будут доступны во всех окружениях.
+  console.log('Drilldown target is not in current origin', key, params ?? {});
+}
+
+function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   const { key, params } = resolveDrilldown(payload);
 
   if (!key) {
@@ -27,20 +90,41 @@ function DrilldownButton({ payload, label = 'Подробнее' }) {
     {
       type: 'button',
       className: 'btn btn-sm btn-outline-secondary mt-2',
-      onClick: () => console.log(key, params ?? {}),
+      onClick: (event) => {
+        event.stopPropagation();
+        onOpen({ key, params });
+      },
     },
     label,
   );
 }
 
-function KpiCard({ title, value, meta, payload }) {
+function KpiCard({ title, value, meta, payload, onOpen }) {
+  const { key } = resolveDrilldown(payload);
+
   return React.createElement('div', { className: 'col-sm-6 col-lg-3' },
-    React.createElement('div', { className: 'card' },
+    React.createElement('div', {
+      className: `card${key ? ' cursor-pointer' : ''}`,
+      role: key ? 'button' : undefined,
+      tabIndex: key ? 0 : undefined,
+      onClick: key ? () => onOpen(resolveDrilldown(payload)) : undefined,
+      onKeyDown: key ? (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onOpen(resolveDrilldown(payload));
+        }
+      } : undefined,
+    },
       React.createElement('div', { className: 'card-body' },
         React.createElement('div', { className: 'subheader' }, title),
         React.createElement('div', { className: 'h2 mb-1' }, formatAmount(value)),
         React.createElement('div', { className: 'text-muted small' }, meta),
-        React.createElement(DrilldownButton, { payload }),
+        React.createElement(DrilldownButton, {
+          payload,
+          onOpen: (drilldown) => {
+            onOpen(drilldown);
+          },
+        }),
       ),
     ),
   );
@@ -66,6 +150,14 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [retryTick, setRetryTick] = useState(0);
+
+  const openDrilldown = useCallback((drilldown) => {
+    if (!drilldown?.key) {
+      return;
+    }
+
+    DrilldownRouter(drilldown);
+  }, []);
 
   const isCustom = customFrom !== '' && customTo !== '';
 
@@ -194,10 +286,10 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
       ),
     ),
     React.createElement('div', { className: 'row row-cards g-3 mb-3' },
-      React.createElement(KpiCard, { title: 'Free Cash', value: widgets.free_cash?.value, meta: `Δ ${widgets.free_cash?.delta_pct ?? 0}%`, payload: widgets.free_cash }),
-      React.createElement(KpiCard, { title: 'Inflow', value: widgets.inflow?.sum, meta: `Среднее в день: ${formatAmount(widgets.inflow?.avg_daily)}`, payload: widgets.inflow }),
-      React.createElement(KpiCard, { title: 'Outflow', value: widgets.outflow?.sum_abs, meta: `CAPEX: ${formatAmount(widgets.outflow?.capex_abs)}`, payload: widgets.outflow }),
-      React.createElement(KpiCard, { title: 'Revenue', value: widgets.revenue?.value, meta: `Δ ${widgets.revenue?.delta_pct ?? 0}%`, payload: widgets.revenue }),
+      React.createElement(KpiCard, { title: 'Free Cash', value: widgets.free_cash?.value, meta: `Δ ${widgets.free_cash?.delta_pct ?? 0}%`, payload: widgets.free_cash, onOpen: openDrilldown }),
+      React.createElement(KpiCard, { title: 'Inflow', value: widgets.inflow?.sum, meta: `Среднее в день: ${formatAmount(widgets.inflow?.avg_daily)}`, payload: widgets.inflow, onOpen: openDrilldown }),
+      React.createElement(KpiCard, { title: 'Outflow', value: widgets.outflow?.sum_abs, meta: `CAPEX: ${formatAmount(widgets.outflow?.capex_abs)}`, payload: widgets.outflow, onOpen: openDrilldown }),
+      React.createElement(KpiCard, { title: 'Revenue', value: widgets.revenue?.value, meta: `Δ ${widgets.revenue?.delta_pct ?? 0}%`, payload: widgets.revenue, onOpen: openDrilldown }),
     ),
     React.createElement('div', { className: 'row row-cards g-3 mb-3' },
       React.createElement('div', { className: 'col-md-6' },
@@ -207,7 +299,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
             React.createElement('ul', { className: 'list-unstyled mb-0' },
               ['operating', 'investing', 'financing', 'total'].map((key) => React.createElement('li', { key }, `${key}: ${formatAmount(widgets.cashflow_split?.[key]?.net)}`)),
             ),
-            React.createElement(DrilldownButton, { payload: widgets.cashflow_split }),
+            React.createElement(DrilldownButton, { payload: widgets.cashflow_split, onOpen: openDrilldown }),
           ),
         ),
       ),
@@ -220,7 +312,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
               React.createElement('li', null, `EBITDA: ${formatAmount(widgets.profit?.ebitda)}`),
               React.createElement('li', null, `Margin: ${widgets.profit?.margin_pct ?? 0}%`),
             ),
-            React.createElement(DrilldownButton, { payload: widgets.profit }),
+            React.createElement(DrilldownButton, { payload: widgets.profit, onOpen: openDrilldown }),
           ),
         ),
       ),
@@ -233,7 +325,19 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
             topCashItems.length === 0
               ? React.createElement('div', { className: 'text-secondary' }, 'Нет данных')
               : React.createElement('ul', { className: 'list-unstyled mb-0' },
-                topCashItems.map((item) => React.createElement('li', { key: item.category_id || item.category_name }, `${item.category_name}: ${formatAmount(item.sum_abs)}`)),
+                topCashItems.map((item) => React.createElement('li', {
+                  key: item.category_id || item.category_name,
+                  className: item.drilldown?.key ? 'cursor-pointer' : '',
+                  role: item.drilldown?.key ? 'button' : undefined,
+                  tabIndex: item.drilldown?.key ? 0 : undefined,
+                  onClick: item.drilldown?.key ? () => openDrilldown(item.drilldown) : undefined,
+                  onKeyDown: item.drilldown?.key ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openDrilldown(item.drilldown);
+                    }
+                  } : undefined,
+                }, `${item.category_name}: ${formatAmount(item.sum_abs)}`)),
               ),
           ),
         ),
@@ -248,7 +352,19 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
                 React.createElement('p', { className: 'empty-subtitle text-secondary mb-0' }, 'В snapshot отсутствует widgets.top_pnl.items'),
               )
               : React.createElement('ul', { className: 'list-unstyled mb-0' },
-                topPnlItems.map((item, index) => React.createElement('li', { key: item.id || index }, `${item.name}: ${formatAmount(item.value)}`)),
+                topPnlItems.map((item, index) => React.createElement('li', {
+                  key: item.id || index,
+                  className: item.drilldown?.key ? 'cursor-pointer' : '',
+                  role: item.drilldown?.key ? 'button' : undefined,
+                  tabIndex: item.drilldown?.key ? 0 : undefined,
+                  onClick: item.drilldown?.key ? () => openDrilldown(item.drilldown) : undefined,
+                  onKeyDown: item.drilldown?.key ? (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openDrilldown(item.drilldown);
+                    }
+                  } : undefined,
+                }, `${item.name ?? item.category_name}: ${formatAmount(item.value ?? item.sum)}`)),
               ),
           ),
         ),
