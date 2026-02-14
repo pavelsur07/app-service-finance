@@ -10,6 +10,7 @@ use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
 use App\Entity\ProjectDirection;
+use App\Enum\DocumentStatus;
 use App\Enum\PlNature;
 use App\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
@@ -41,7 +42,9 @@ final class PLRegisterUpdater
             ->leftJoin('o.projectDirection', 'opd')
             ->where('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
+            ->andWhere('d.status = :status')
             ->setParameter('company', $company)
+            ->setParameter('status', DocumentStatus::ACTIVE)
             ->setParameter('from', $day->setTime(0, 0), Types::DATETIME_IMMUTABLE)
             ->setParameter('to', $day->setTime(23, 59, 59), Types::DATETIME_IMMUTABLE)
             ->getQuery()
@@ -72,7 +75,9 @@ final class PLRegisterUpdater
             ->leftJoin('o.projectDirection', 'opd')
             ->where('d.company = :company')
             ->andWhere('d.date BETWEEN :from AND :to')
+            ->andWhere('d.status = :status')
             ->setParameter('company', $company)
+            ->setParameter('status', DocumentStatus::ACTIVE)
             ->setParameter('from', $fromDay->setTime(0, 0), Types::DATETIME_IMMUTABLE)
             ->setParameter('to', $toDay->setTime(23, 59, 59), Types::DATETIME_IMMUTABLE)
             ->orderBy('d.date', 'ASC')
