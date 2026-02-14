@@ -13,7 +13,9 @@ use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
 use App\Analytics\Domain\Period;
+use App\Analytics\Infrastructure\Telemetry\SnapshotTelemetry;
 use App\Company\Entity\Company;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
@@ -33,12 +35,17 @@ final class DashboardSnapshotService
         private readonly TopCashWidgetBuilder $topCashWidgetBuilder,
         private readonly TopPnlWidgetBuilder $topPnlWidgetBuilder,
         private readonly LastUpdatedAtResolver $lastUpdatedAtResolver,
+        private readonly LoggerInterface $logger,
     )
     {
     }
 
     public function getSnapshot(Company $company, Period $period): SnapshotResponse
     {
+        $telemetry = new SnapshotTelemetry();
+        $telemetry->start(SnapshotTelemetry::globalTimerName());
+        $cacheHit = true;
+
         $cacheKey = sprintf(
             'dashboard_v1_snapshot_%s_%s_%s_%s',
             (string) $company->getId(),
@@ -47,19 +54,44 @@ final class DashboardSnapshotService
             self::VAT_MODE_EXCLUDE,
         );
 
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($company, $period) {
+        $snapshot = $this->cache->get($cacheKey, function (ItemInterface $item) use ($company, $period, $telemetry, &$cacheHit) {
+            $cacheHit = false;
             $item->expiresAfter(self::SNAPSHOT_TTL_SECONDS);
 
             $prevPeriod = $period->prevPeriod();
 
+            $telemetry->start('free_cash');
             $freeCash = $this->freeCashWidgetBuilder->build($company, $period);
+            $telemetry->stop('free_cash');
+
+            $telemetry->start('inflow');
             $inflow = $this->inflowWidgetBuilder->build($company, $period);
+            $telemetry->stop('inflow');
+
+            $telemetry->start('outflow');
             $outflow = $this->outflowWidgetBuilder->build($company, $period, $inflow->toArray());
+            $telemetry->stop('outflow');
+
+            $telemetry->start('cashflow_split');
             $cashflowSplit = $this->cashflowSplitWidgetBuilder->build($company, $period);
+            $telemetry->stop('cashflow_split');
+
+            $telemetry->start('revenue');
             $revenue = $this->revenueWidgetBuilder->build($company, $period);
+            $telemetry->stop('revenue');
+
+            $telemetry->start('profit');
             $profit = $this->profitWidgetBuilder->build($company, $period);
+            $telemetry->stop('profit');
+
+            $telemetry->start('top_cash');
             $topCash = $this->topCashWidgetBuilder->build($company, $period);
+            $telemetry->stop('top_cash');
+
+            $telemetry->start('top_pnl');
             $topPnl = $this->topPnlWidgetBuilder->build($company, $period);
+            $telemetry->stop('top_pnl');
+
             $lastUpdatedAt = $this->lastUpdatedAtResolver->resolve($company);
 
             return new SnapshotResponse(
@@ -85,6 +117,20 @@ final class DashboardSnapshotService
                 $this->buildWarnings($freeCash->toArray(), $inflow->toArray(), $outflow, $revenue),
             );
         });
+
+        $telemetry->stop(SnapshotTelemetry::globalTimerName());
+        $durations = $telemetry->finish();
+
+        $this->logger->info('Dashboard snapshot telemetry', [
+            'company_id' => (string) $company->getId(),
+            'from' => $period->getFrom()->format('Y-m-d'),
+            'to' => $period->getTo()->format('Y-m-d'),
+            'cache_hit' => $cacheHit,
+            'total_duration_ms' => $durations['total_duration_ms'],
+            'widgets_duration_ms' => $durations['widgets_duration_ms'],
+        ]);
+
+        return $snapshot;
     }
 
     /**
