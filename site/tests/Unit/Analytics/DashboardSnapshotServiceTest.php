@@ -32,6 +32,7 @@ use DateTimeInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
@@ -102,7 +103,7 @@ final class DashboardSnapshotServiceTest extends TestCase
             $dailyTotalRepository,
         );
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $lastUpdatedAtResolver);
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $lastUpdatedAtResolver, new NullLogger());
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
