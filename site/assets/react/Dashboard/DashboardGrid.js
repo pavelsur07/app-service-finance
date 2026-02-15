@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 
 const PRESETS = ['day', 'week', 'month'];
 const DRILLDOWN_ROUTES = {
-  'cash.transactions': '/cash/transactions',
+  'cash.transactions': '/finance/cash-transactions/',
   'cash.balances': '/cash/balances',
   'funds.reserved': '/funds/reserved',
   'pl.documents': '/pl/documents',
