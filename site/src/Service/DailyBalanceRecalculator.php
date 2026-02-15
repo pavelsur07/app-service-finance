@@ -103,6 +103,7 @@ class DailyBalanceRecalculator
         $txList = $this->trxRepo->createQueryBuilder('t')
             ->where('t.company = :c')->setParameter('c', $company)
             ->andWhere('t.moneyAccount = :a')->setParameter('a', $account)
+            ->andWhere('t.deletedAt IS NULL')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $effectiveTo->setTime(23, 59, 59))
