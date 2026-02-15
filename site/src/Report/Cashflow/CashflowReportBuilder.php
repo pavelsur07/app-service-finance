@@ -42,6 +42,7 @@ final class CashflowReportBuilder
             ->select('IDENTITY(t.cashflowCategory) AS category', 't.direction', 't.amount', 't.currency', 't.occurredAt')
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
