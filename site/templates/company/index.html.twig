@@ -32,7 +32,7 @@
                     {% for company in companies %}
                         <tr>
                             <td>
-                                <a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a>
+                                <a href="{{ path('company_edit', {'id': company.id}) }}">{{ company.name }}</a>
                             </td>
                             <td>
                                 <span class="badge bg-red-lt">Нет</span>
