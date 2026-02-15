@@ -204,6 +204,7 @@ class CashTransactionAutoRuleController extends AbstractController
 
         $qb = $txRepo->createQueryBuilder('t')
             ->andWhere('t.company = :company')
+            ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->orderBy('t.occurredAt', 'DESC');
 
