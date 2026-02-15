@@ -231,6 +231,7 @@ from cash_transaction t
 left join money_account acc on acc.id = t.money_account_id
 left join cashflow_categories cat on cat.id = t.cashflow_category_id
 where t.company_id = :company
+  and t.deleted_at is null
   and t.occurred_at >= :from_ts
   and t.occurred_at <  :to_plus1_ts
   and (:acc_id::uuid is null or t.money_account_id = :acc_id::uuid)
@@ -257,6 +258,7 @@ with trx as (
     sum(case when t.direction = 'OUTFLOW' then t.amount else 0 end)::numeric(18,2)    as outflow_trx_abs
   from cash_transaction t
   where t.company_id = :company
+    and t.deleted_at is null
     and t.occurred_at >= :from_ts
     and t.occurred_at <  :to_plus1_ts
     and (:acc_id::uuid is null or t.money_account_id = :acc_id::uuid)
