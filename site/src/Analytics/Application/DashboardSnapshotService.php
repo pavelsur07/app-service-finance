@@ -13,6 +13,7 @@ use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
 use App\Analytics\Domain\Period;
+use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Analytics\Infrastructure\Telemetry\SnapshotTelemetry;
 use App\Company\Entity\Company;
 use Psr\Log\LoggerInterface;
@@ -34,6 +35,7 @@ final class DashboardSnapshotService
         private readonly ProfitWidgetBuilder $profitWidgetBuilder,
         private readonly TopCashWidgetBuilder $topCashWidgetBuilder,
         private readonly TopPnlWidgetBuilder $topPnlWidgetBuilder,
+        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
         private readonly LastUpdatedAtResolver $lastUpdatedAtResolver,
         private readonly LoggerInterface $logger,
     )
@@ -45,10 +47,12 @@ final class DashboardSnapshotService
         $telemetry = new SnapshotTelemetry();
         $telemetry->start(SnapshotTelemetry::globalTimerName());
         $cacheHit = true;
+        $snapshotVersion = $this->snapshotCacheInvalidator->resolveVersionForCompany($company);
 
         $cacheKey = sprintf(
-            'dashboard_v1_snapshot_%s_%s_%s_%s',
+            'dashboard_v1_snapshot_%s_%s_%s_%s_%s',
             (string) $company->getId(),
+            $snapshotVersion,
             $period->getFrom()->format('Y-m-d'),
             $period->getTo()->format('Y-m-d'),
             self::VAT_MODE_EXCLUDE,

@@ -13,6 +13,7 @@ use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
+use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Analytics\Application\Widget\ParetoTopItemsBuilder;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
@@ -103,7 +104,9 @@ final class DashboardSnapshotServiceTest extends TestCase
             $dailyTotalRepository,
         );
 
-        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $lastUpdatedAtResolver, new NullLogger());
+        $snapshotCacheInvalidator = new SnapshotCacheInvalidator($cache);
+
+        $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $snapshotCacheInvalidator, $lastUpdatedAtResolver, new NullLogger());
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
         $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
@@ -111,7 +114,7 @@ final class DashboardSnapshotServiceTest extends TestCase
         $first = $service->getSnapshot($company, $period)->toArray();
         $second = $service->getSnapshot($company, $period)->toArray();
 
-        self::assertSame(1, $cache->missesCount);
+        self::assertSame(1, $cache->snapshotMissesCount);
         self::assertEquals($first, $second);
         self::assertSame('exclude', $first['context']['vat_mode']);
         self::assertNull($first['context']['last_updated_at']);
@@ -136,6 +139,11 @@ final class DashboardSnapshotServiceTest extends TestCase
         self::assertArrayHasKey('max_items', $first['widgets']['top_pnl']);
         self::assertArrayHasKey('items', $first['widgets']['top_pnl']);
         self::assertArrayHasKey('other', $first['widgets']['top_pnl']);
+
+        $snapshotCacheInvalidator->invalidateForCompany($company);
+        $service->getSnapshot($company, $period);
+
+        self::assertSame(2, $cache->snapshotMissesCount);
     }
 
     private function createCompany(string $companyId): Company
@@ -157,11 +165,15 @@ final class InMemoryCacheSpy implements CacheInterface
     private array $data = [];
 
     public int $missesCount = 0;
+    public int $snapshotMissesCount = 0;
 
     public function get(string $key, callable $callback, ?float $beta = null, ?array &$metadata = null): mixed
     {
         if (!array_key_exists($key, $this->data)) {
             ++$this->missesCount;
+            if (str_starts_with($key, 'dashboard_v1_snapshot_')) {
+                ++$this->snapshotMissesCount;
+            }
             $this->data[$key] = $callback(new StubCacheItem($key));
         }
 
