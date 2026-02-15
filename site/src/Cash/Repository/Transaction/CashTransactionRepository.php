@@ -90,6 +90,24 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findActiveByCompanyAccountExternalId(
+        Company $company,
+        MoneyAccount $account,
+        string $externalId
+    ): ?CashTransaction {
+        return $this->createQueryBuilder('t')
+            ->where('t.company = :company')
+            ->andWhere('t.moneyAccount = :account')
+            ->andWhere('t.externalId = :externalId')
+            ->andWhere('t.deletedAt IS NULL')
+            ->setMaxResults(1)
+            ->setParameter('company', $company)
+            ->setParameter('account', $account)
+            ->setParameter('externalId', $externalId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function paginateDeletedByCompany(string $companyId, int $page, int $perPage): Pagerfanta
     {
         $qb = $this->createQueryBuilder('t')
