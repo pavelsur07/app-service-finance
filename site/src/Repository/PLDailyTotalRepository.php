@@ -33,6 +33,21 @@ class PLDailyTotalRepository extends ServiceEntityRepository
         return \DateTimeImmutable::createFromInterface($maxUpdatedAt);
     }
 
+
+    public function maxUpdatedAtGlobal(): ?\DateTimeImmutable
+    {
+        $maxUpdatedAt = $this->createQueryBuilder('t')
+            ->select('MAX(t.updatedAt)')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (!$maxUpdatedAt instanceof \DateTimeInterface) {
+            return null;
+        }
+
+        return \DateTimeImmutable::createFromInterface($maxUpdatedAt);
+    }
+
     public function upsert(
         string $companyId,
         ?string $categoryId,
