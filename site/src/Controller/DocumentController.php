@@ -225,16 +225,19 @@ class DocumentController extends AbstractController
 
                 $em->flush();
 
-                $statusTransitionAffectsFact = DocumentStatus::ACTIVE === $initialStatus
-                    || DocumentStatus::ACTIVE === $document->getStatus();
+                $daysToRecalc = [];
+                $currentDate = $document->getDate()->setTime(0, 0);
 
-                if ($statusTransitionAffectsFact) {
-                    $day = $document->getDate()->setTime(0, 0);
-                    if ($initialDate->format('Y-m-d') !== $day->format('Y-m-d')) {
-                        $this->plRegisterUpdater->recalcRange($company, $initialDate, $initialDate);
-                    }
+                if (DocumentStatus::ACTIVE === $initialStatus) {
+                    $daysToRecalc[$initialDate->format('Y-m-d')] = $initialDate;
+                }
 
-                    $this->plRegisterUpdater->updateForDocument($document);
+                if (DocumentStatus::ACTIVE === $document->getStatus()) {
+                    $daysToRecalc[$currentDate->format('Y-m-d')] = $currentDate;
+                }
+
+                foreach ($daysToRecalc as $day) {
+                    $this->plRegisterUpdater->recalcRange($company, $day, $day);
                 }
 
                 return $this->redirectToRoute('document_index');
@@ -258,14 +261,10 @@ class DocumentController extends AbstractController
 
         if ($this->isCsrfTokenValid('delete'.$document->getId(), $request->request->get('_token'))) {
             $documentDate = $document->getDate()->setTime(0, 0);
-            $wasActive = DocumentStatus::ACTIVE === $document->getStatus();
-
             $em->remove($document);
             $em->flush();
 
-            if ($wasActive) {
-                $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
-            }
+            $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
         }
 
         return $this->redirectToRoute('document_index');
