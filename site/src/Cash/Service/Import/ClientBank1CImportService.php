@@ -304,11 +304,11 @@ class ClientBank1CImportService
             $externalId = $this->generateExternalId($row, $account);
             $isTransfer = $this->shouldMarkAsTransfer($row, $account);
 
-            $transaction = $this->cashTransactionRepository->findOneBy([
-                'company' => $company,
-                'moneyAccount' => $account,
-                'externalId' => $externalId,
-            ]);
+            $transaction = $this->cashTransactionRepository->findActiveByCompanyAccountExternalId(
+                $company,
+                $account,
+                $externalId,
+            );
 
             $occurredAtUtc = $occurredAt->setTimezone(new \DateTimeZone('UTC'));
             $amountMinor = (int) str_replace('.', '', $amount);
