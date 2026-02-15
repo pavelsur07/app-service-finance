@@ -314,6 +314,7 @@ class ReportTransactionsStatementController extends AbstractController
             ->addSelect('category')
             ->where('t.company = :company')
             ->andWhere('t.occurredAt BETWEEN :from AND :to')
+            ->andWhere('t.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('from', $from->setTime(0, 0))
             ->setParameter('to', $to->setTime(23, 59, 59))
