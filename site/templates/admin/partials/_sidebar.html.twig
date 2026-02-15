@@ -33,6 +33,15 @@
           </a>
         </li>
         <li class="nav-item">
+          <a class="nav-link {% if app.request.get('_route') starts with 'admin_analytics_pl_recalc_' %}active{% endif %}"
+             href="{{ path('admin_analytics_pl_recalc_form') }}">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="ti ti-chart-dots-3"></i>
+            </span>
+            <span class="nav-link-title">Analytics · PL Recalc</span>
+          </a>
+        </li>
+        <li class="nav-item">
           <a class="nav-link {% if app.request.get('_route') starts with 'admin_billing_' %}active{% endif %}"
              href="{{ path('admin_billing_index') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">

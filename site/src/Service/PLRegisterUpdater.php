@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Service;
 
+use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Company\Entity\Company;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
@@ -24,6 +25,7 @@ final class PLRegisterUpdater
         private readonly PLDailyTotalRepository $dailyTotals,
         private readonly DocumentRepository $documentRepository,
         private readonly PlNatureResolver $natureResolver,
+        private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
     ) {
     }
 
@@ -54,6 +56,12 @@ final class PLRegisterUpdater
         $this->persistAggregatedTotals($company, $aggregated, true);
 
         $this->em->flush();
+
+        // Пересчёт PL-регистра меняет источник данных для revenue/profit/top_pnl виджетов,
+        // поэтому после flush повышаем версию snapshot cache компании.
+        // Это важно для согласованности: новый snapshot key должен использоваться только
+        // когда пересчитанные агрегаты уже сохранены в БД.
+        $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
     public function recalcRange(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
@@ -88,6 +96,11 @@ final class PLRegisterUpdater
         $this->persistAggregatedTotals($company, $aggregated, true);
 
         $this->em->flush();
+
+        // recalcRange используется при массовом пересчёте интервала и меняет витрину для dashboard.
+        // Повышаем версию snapshot cache только после flush, чтобы новая версия кэша строилась
+        // на уже пересчитанных агрегатах, а не на промежуточном состоянии.
+        $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
     /**
