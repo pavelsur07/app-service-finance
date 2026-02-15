@@ -194,6 +194,10 @@ class DocumentController extends AbstractController
             'project_directions' => $projectDirections,
         ]);
         $initialStatus = $document->getStatus();
+<<<<<<< codex/update-pl-register-to-fact-only
+=======
+        $initialDate = $document->getDate()->setTime(0, 0);
+>>>>>>> master
         $form->handleRequest($request);
 
         $transactionAllocation = $this->buildTransactionAllocationView($document);
@@ -224,6 +228,7 @@ class DocumentController extends AbstractController
 
                 $em->flush();
 
+<<<<<<< codex/update-pl-register-to-fact-only
                 $statusChanged = $initialStatus !== $document->getStatus();
                 $statusTransitionAffectsFact = $statusChanged
                     && (DocumentStatus::ACTIVE === $initialStatus || DocumentStatus::ACTIVE === $document->getStatus());
@@ -232,6 +237,17 @@ class DocumentController extends AbstractController
                     $day = $document->getDate()->setTime(0, 0);
                     $this->plRegisterUpdater->recalcRange($document->getCompany(), $day, $day);
                 } else {
+=======
+                $statusTransitionAffectsFact = DocumentStatus::ACTIVE === $initialStatus
+                    || DocumentStatus::ACTIVE === $document->getStatus();
+
+                if ($statusTransitionAffectsFact) {
+                    $day = $document->getDate()->setTime(0, 0);
+                    if ($initialDate->format('Y-m-d') !== $day->format('Y-m-d')) {
+                        $this->plRegisterUpdater->recalcRange($company, $initialDate, $initialDate);
+                    }
+
+>>>>>>> master
                     $this->plRegisterUpdater->updateForDocument($document);
                 }
 
@@ -256,10 +272,21 @@ class DocumentController extends AbstractController
 
         if ($this->isCsrfTokenValid('delete'.$document->getId(), $request->request->get('_token'))) {
             $documentDate = $document->getDate()->setTime(0, 0);
+<<<<<<< codex/update-pl-register-to-fact-only
             $em->remove($document);
             $em->flush();
 
             $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
+=======
+            $wasActive = DocumentStatus::ACTIVE === $document->getStatus();
+
+            $em->remove($document);
+            $em->flush();
+
+            if ($wasActive) {
+                $this->plRegisterUpdater->recalcRange($company, $documentDate, $documentDate);
+            }
+>>>>>>> master
         }
 
         return $this->redirectToRoute('document_index');
