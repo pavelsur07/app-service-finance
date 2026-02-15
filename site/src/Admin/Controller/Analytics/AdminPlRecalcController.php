@@ -7,9 +7,10 @@ use App\Admin\Form\Analytics\PlRecalcFormType;
 use App\Analytics\Api\Request\SnapshotQuery;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\PeriodResolver;
+use App\Company\Entity\Company;
+use App\Repository\CompanyRepository;
 use App\Repository\PLDailyTotalRepository;
 use App\Service\PLRegisterUpdater;
-use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -21,7 +22,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class AdminPlRecalcController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $activeCompanyService,
+        private readonly CompanyRepository $companyRepository,
         private readonly PLRegisterUpdater $plRegisterUpdater,
         private readonly DashboardSnapshotService $dashboardSnapshotService,
         private readonly PeriodResolver $periodResolver,
@@ -32,19 +33,18 @@ final class AdminPlRecalcController extends AbstractController
     #[Route('', name: 'form', methods: ['GET'])]
     public function form(): Response
     {
-        $company = $this->activeCompanyService->getActiveCompany();
         $form = $this->createForm(PlRecalcFormType::class, new PlRecalcFormData());
 
         return $this->render('admin/analytics/pl_recalc.html.twig', [
             'form' => $form->createView(),
-            'lastRecalcAt' => $this->dailyTotalRepository->maxUpdatedAtForCompany($company),
+            'lastRecalcAt' => $this->dailyTotalRepository->maxUpdatedAtGlobal(),
+            'companiesCount' => $this->companyRepository->count([]),
         ]);
     }
 
     #[Route('', name: 'handle', methods: ['POST'])]
     public function handle(Request $request): Response
     {
-        $company = $this->activeCompanyService->getActiveCompany();
         $formData = new PlRecalcFormData();
         $form = $this->createForm(PlRecalcFormType::class, $formData);
         $form->handleRequest($request);
@@ -52,7 +52,8 @@ final class AdminPlRecalcController extends AbstractController
         if (!$form->isSubmitted() || !$form->isValid()) {
             return $this->render('admin/analytics/pl_recalc.html.twig', [
                 'form' => $form->createView(),
-                'lastRecalcAt' => $this->dailyTotalRepository->maxUpdatedAtForCompany($company),
+                'lastRecalcAt' => $this->dailyTotalRepository->maxUpdatedAtGlobal(),
+                'companiesCount' => $this->companyRepository->count([]),
             ], new Response(status: Response::HTTP_UNPROCESSABLE_ENTITY));
         }
 
@@ -64,25 +65,29 @@ final class AdminPlRecalcController extends AbstractController
 
         $period = $this->periodResolver->resolve($query);
 
-        if ($formData->recalcPl) {
-            $this->plRegisterUpdater->recalcRange($company, $period->getFrom(), $period->getTo());
-        }
+        /** @var list<Company> $companies */
+        $companies = $this->companyRepository->findAll();
+        $processed = 0;
 
-        $lastUpdatedAt = $this->dailyTotalRepository->maxUpdatedAtForCompany($company);
-        if ($formData->warmupSnapshot) {
-            $snapshot = $this->dashboardSnapshotService->getSnapshot($company, $period);
-            $payload = $snapshot->toArray();
-            $lastUpdatedAtRaw = $payload['context']['last_updated_at'] ?? null;
-
-            if (is_string($lastUpdatedAtRaw) && '' !== $lastUpdatedAtRaw) {
-                $lastUpdatedAt = new \DateTimeImmutable($lastUpdatedAtRaw);
+        foreach ($companies as $company) {
+            if ($formData->recalcPl) {
+                $this->plRegisterUpdater->recalcRange($company, $period->getFrom(), $period->getTo());
             }
+
+            if ($formData->warmupSnapshot) {
+                $this->dashboardSnapshotService->getSnapshot($company, $period);
+            }
+
+            ++$processed;
         }
+
+        $lastUpdatedAt = $this->dailyTotalRepository->maxUpdatedAtGlobal();
 
         $this->addFlash(
             'success',
             sprintf(
-                'PL регистр обработан за период %s — %s. last_updated_at: %s',
+                'Обработано компаний: %d. Период %s — %s. last_updated_at: %s',
+                $processed,
                 $period->getFrom()->format('Y-m-d'),
                 $period->getTo()->format('Y-m-d'),
                 $lastUpdatedAt?->format(DATE_ATOM) ?? 'n/a',
