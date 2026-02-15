@@ -10,7 +10,7 @@ use Symfony\Contracts\Cache\ItemInterface;
 
 final class SnapshotCacheInvalidator
 {
-    private const VERSION_CACHE_KEY = 'dashboard:v1:version:%s';
+    private const VERSION_CACHE_KEY = 'dashboard_v1_version_%s';
 
     public function __construct(
         private readonly CacheInterface $cache,
@@ -43,7 +43,8 @@ final class SnapshotCacheInvalidator
 
     private function buildVersionKey(Company $company): string
     {
-        return sprintf(self::VERSION_CACHE_KEY, (string) $company->getId());
+        $companyId = str_replace(['{', '}', '(', ')', '/', '\\', '@', ':'], '_', (string) $company->getId());
+
+        return sprintf(self::VERSION_CACHE_KEY, $companyId);
     }
 }
-
