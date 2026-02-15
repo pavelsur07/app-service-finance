@@ -59,7 +59,7 @@ final class PLRegisterFactOnlyTest extends IntegrationTestCase
         $operation->setAmount('150.00');
         $document->addOperation($operation);
 
-        $this->em->persist($company->getOwner());
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
         $this->em->persist($project);
         $this->em->persist($incomeRoot);
