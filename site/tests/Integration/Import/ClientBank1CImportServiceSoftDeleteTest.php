@@ -20,6 +20,8 @@ use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
+use Doctrine\Persistence\ObjectManager;
+use Doctrine\Persistence\ObjectRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 
 final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
@@ -158,7 +160,7 @@ class ImportManagerRegistry implements ManagerRegistry
         return 'default';
     }
 
-    public function getConnection($name = null): object
+    public function getConnection(?string $name = null): object
     {
         return $this->entityManager->getConnection();
     }
@@ -178,7 +180,7 @@ class ImportManagerRegistry implements ManagerRegistry
         return 'default';
     }
 
-    public function getManager($name = null): object
+    public function getManager(?string $name = null): ObjectManager
     {
         return $this->entityManager;
     }
@@ -188,12 +190,12 @@ class ImportManagerRegistry implements ManagerRegistry
         return ['default' => $this->entityManager];
     }
 
-    public function resetManager($name = null): object
+    public function resetManager(?string $name = null): ObjectManager
     {
         return $this->entityManager;
     }
 
-    public function getAliasNamespace($alias): string
+    public function getAliasNamespace(string $alias): string
     {
         return 'App\\Entity';
     }
@@ -203,12 +205,12 @@ class ImportManagerRegistry implements ManagerRegistry
         return ['default' => 'default'];
     }
 
-    public function getRepository($persistentObject, $persistentManagerName = null): object
+    public function getRepository(string $persistentObject, ?string $persistentManagerName = null): ObjectRepository
     {
         return $this->entityManager->getRepository($persistentObject);
     }
 
-    public function getManagerForClass($class): ?object
+    public function getManagerForClass(string $class): ?ObjectManager
     {
         return $this->entityManager;
     }
