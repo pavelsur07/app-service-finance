@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Tests\Integration\Import;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
@@ -9,22 +11,20 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
-use App\Company\Entity\User;
 use App\Entity\Counterparty;
-use App\Enum\MoneyAccountType;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
-use Doctrine\ORM\EntityManager;
-use Doctrine\ORM\Tools\SchemaTool;
-use Doctrine\ORM\Tools\Setup;
+use App\Tests\Builders\Cash\MoneyAccountBuilder;
+use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\Persistence\ManagerRegistry;
 use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
-use Ramsey\Uuid\Uuid;
 
-class ClientBank1CImportServiceSoftDeleteTest extends TestCase
+final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
 {
-    private EntityManager $entityManager;
+    private EntityManagerInterface $entityManager;
     private Company $company;
     private MoneyAccount $account;
     private CashTransactionRepository $transactionRepository;
@@ -35,17 +35,9 @@ class ClientBank1CImportServiceSoftDeleteTest extends TestCase
 
     protected function setUp(): void
     {
-        $config = Setup::createAttributeMetadataConfiguration([__DIR__.'/../../../src/Entity'], true);
-        $this->entityManager = EntityManager::create(['driver' => 'pdo_sqlite', 'memory' => true], $config);
+        parent::setUp();
 
-        $schemaTool = new SchemaTool($this->entityManager);
-        $schemaTool->createSchema([
-            $this->entityManager->getClassMetadata(User::class),
-            $this->entityManager->getClassMetadata(Company::class),
-            $this->entityManager->getClassMetadata(MoneyAccount::class),
-            $this->entityManager->getClassMetadata(CashTransaction::class),
-            $this->entityManager->getClassMetadata(Counterparty::class),
-        ]);
+        $this->entityManager = $this->em;
 
         $registry = new ImportManagerRegistry($this->entityManager);
         $this->transactionRepository = new CashTransactionRepository($registry);
@@ -54,20 +46,21 @@ class ClientBank1CImportServiceSoftDeleteTest extends TestCase
         $this->accountBalanceService = $this->createMock(AccountBalanceService::class);
         $this->accountBalanceService->expects(self::exactly(2))->method('recalculateDailyRange');
 
-        $user = new User(Uuid::uuid4()->toString());
-        $user->setEmail('test-import@example.com');
-        $user->setPassword('password');
+        $user = UserBuilder::aUser()
+            ->withIndex(101)
+            ->build();
 
-        $this->company = new Company(Uuid::uuid4()->toString(), $user);
-        $this->company->setName('Test Company');
+        $this->company = CompanyBuilder::aCompany()
+            ->withIndex(101)
+            ->withOwner($user)
+            ->withName('Test Company')
+            ->build();
 
-        $this->account = new MoneyAccount(
-            Uuid::uuid4()->toString(),
-            $this->company,
-            MoneyAccountType::BANK,
-            'Main account',
-            'RUB'
-        );
+        $this->account = MoneyAccountBuilder::aMoneyAccount()
+            ->withIndex(101)
+            ->forCompany($this->company)
+            ->withName('Main account')
+            ->build();
         $this->account->setAccountNumber('40702810900000000001');
 
         $this->entityManager->persist($user);
@@ -127,8 +120,6 @@ class ClientBank1CImportServiceSoftDeleteTest extends TestCase
 
     protected function tearDown(): void
     {
-        $this->entityManager->close();
-
         parent::tearDown();
     }
 
@@ -158,7 +149,7 @@ class ClientBank1CImportServiceSoftDeleteTest extends TestCase
 
 class ImportManagerRegistry implements ManagerRegistry
 {
-    public function __construct(private readonly EntityManager $entityManager)
+    public function __construct(private readonly EntityManagerInterface $entityManager)
     {
     }
 
