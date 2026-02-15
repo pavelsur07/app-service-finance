@@ -14,6 +14,7 @@ use App\Entity\PLCategory;
 use App\Entity\ProjectDirection;
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
+use App\Enum\PLCategoryType;
 use App\Enum\PLFlow;
 use App\Service\PLRegisterUpdater;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -39,10 +40,12 @@ final class PLRegisterFactOnlyTest extends IntegrationTestCase
 
         $incomeRoot = new PLCategory(Uuid::uuid4()->toString(), $company);
         $incomeRoot->setName('Revenue');
+        $incomeRoot->setType(PLCategoryType::SUBTOTAL);
 
         $incomeLeaf = new PLCategory(Uuid::uuid4()->toString(), $company);
         $incomeLeaf->setName('Sales');
         $incomeLeaf->setParent($incomeRoot);
+        $incomeLeaf->setCode('REV_SALES');
         $incomeLeaf->setFlow(PLFlow::INCOME);
 
         $documentDate = new \DateTimeImmutable('2026-01-10');
