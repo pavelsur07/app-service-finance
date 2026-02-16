@@ -282,9 +282,24 @@ final class PaymentCalendarController extends AbstractController
      */
     private function extractFilters(Request $request): array
     {
+        $today = new \DateTimeImmutable('today');
+        $defaultFrom = $today->modify('monday this week')->format('Y-m-d');
+        $defaultTo = $today->modify('+60 days')->format('Y-m-d');
+
+        $from = (string) $request->query->get('from', '');
+        $to = (string) $request->query->get('to', '');
+
+        if ('' === trim($from)) {
+            $from = $defaultFrom;
+        }
+
+        if ('' === trim($to)) {
+            $to = $defaultTo;
+        }
+
         return [
-            'from' => (string) $request->query->get('from', ''),
-            'to' => (string) $request->query->get('to', ''),
+            'from' => $from,
+            'to' => $to,
             'account_id' => (string) $request->query->get('account_id', ''),
             'category_id' => (string) $request->query->get('category_id', ''),
             'status' => (string) $request->query->get('status', ''),

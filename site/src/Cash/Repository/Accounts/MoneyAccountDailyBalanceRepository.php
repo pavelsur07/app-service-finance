@@ -36,21 +36,40 @@ class MoneyAccountDailyBalanceRepository extends ServiceEntityRepository
         \DateTimeInterface $date,
         ?MoneyAccount $account = null,
     ): string {
-        $qb = $this->createQueryBuilder('b')
-            ->select('COALESCE(SUM(b.openingBalance), 0) as totalOpening')
-            ->where('b.company = :company')
-            ->andWhere('b.date = :date')
-            ->setParameter('company', $company)
-            ->setParameter('date', \DateTimeImmutable::createFromInterface($date), Types::DATE_IMMUTABLE);
+        $conn = $this->getEntityManager()->getConnection();
+        $normalizedDate = \DateTimeImmutable::createFromInterface($date)->setTime(0, 0);
+
+        $params = [
+            'company_id' => $company->getId(),
+            'date' => $normalizedDate,
+        ];
+        $types = ['date' => Types::DATE_IMMUTABLE];
+        $accountWhere = '';
 
         if (null !== $account) {
-            $qb->andWhere('b.moneyAccount = :account')
-                ->setParameter('account', $account);
+            $accountWhere = ' AND b.money_account_id = :account_id';
+            $params['account_id'] = $account->getId();
         }
 
-        $result = $qb->getQuery()->getSingleScalarResult();
+        $sql = <<<SQL
+            SELECT COALESCE(SUM(account_balance), 0) AS total_opening
+            FROM (
+                SELECT DISTINCT ON (b.money_account_id)
+                    CASE
+                        WHEN b.date = :date THEN b.opening_balance
+                        ELSE b.closing_balance
+                    END AS account_balance
+                FROM money_account_daily_balance b
+                WHERE b.company_id = :company_id
+                  AND b.date <= :date
+                  {$accountWhere}
+                ORDER BY b.money_account_id, b.date DESC
+            ) t
+        SQL;
 
-        return (string) $result;
+        $result = $conn->fetchOne($sql, $params, $types);
+
+        return (string) ($result ?? '0');
     }
 
     /**
