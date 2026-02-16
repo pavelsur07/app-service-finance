@@ -17,6 +17,8 @@ use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
 use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
+use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
+use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -41,6 +43,8 @@ class MarketplaceSyncService
         $this->costCalculators = [
             new WbCommissionCalculator(),
             new WbAcquiringCalculator(),
+            new WbLogisticsDeliveryCalculator(),
+            new WbLogisticsReturnCalculator(),
             // Легко добавить новые: new WbPenaltyCalculator(),
         ];
     }

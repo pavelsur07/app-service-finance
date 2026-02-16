@@ -3,6 +3,7 @@
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
