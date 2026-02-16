@@ -27,5 +27,45 @@
                 {{ form_end(form) }}
             </div>
         </div>
+
+        {% if company is defined %}
+            <div class="card mt-3">
+                <div class="card-header"><b>Пересчёт остатков по операциям и счетам</b></div>
+                <div class="card-body">
+                    <form method="post" action="{{ path('report_account_balances_recalc') }}" class="row g-3 align-items-end">
+                        <input type="hidden" name="_token" value="{{ csrf_token('recalc_balances') }}">
+                        <input type="hidden" name="backDate" value="{{ 'now'|date('Y-m-d') }}">
+
+                        <div class="col-md-4">
+                            <label class="form-label" for="recalc_from">С даты</label>
+                            <input
+                                type="date"
+                                id="recalc_from"
+                                name="from"
+                                class="form-control"
+                                value="{{ company.financeLockBefore ? company.financeLockBefore|date('Y-m-d') : 'now'|date('Y-m-01') }}"
+                                required
+                            >
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label" for="recalc_to">По дату</label>
+                            <input
+                                type="date"
+                                id="recalc_to"
+                                name="to"
+                                class="form-control"
+                                value="{{ 'now'|date('Y-m-d') }}"
+                                required
+                            >
+                        </div>
+
+                        <div class="col-md-4">
+                            <button type="submit" class="btn btn-outline-primary w-100">Пересчитать остатки</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
     </div>
 {% endblock %}
