@@ -4,9 +4,6 @@ namespace App\Tests\Unit\Analytics;
 
 use App\Analytics\Api\Request\SnapshotQuery;
 use App\Analytics\Application\PeriodResolver;
-use DateTimeImmutable;
-use DateTimeZone;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 final class PeriodResolverTest extends TestCase
@@ -22,7 +19,7 @@ final class PeriodResolverTest extends TestCase
     {
         $period = $this->resolver->resolve(
             new SnapshotQuery('day', null, null),
-            new DateTimeImmutable('2026-03-17 18:20:00', new DateTimeZone('UTC')),
+            new \DateTimeImmutable('2026-03-17 18:20:00', new \DateTimeZone('UTC')),
         );
 
         self::assertSame('2026-03-17', $period->getFrom()->format('Y-m-d'));
@@ -33,7 +30,7 @@ final class PeriodResolverTest extends TestCase
     {
         $period = $this->resolver->resolve(
             new SnapshotQuery('week', null, null),
-            new DateTimeImmutable('2026-03-18', new DateTimeZone('UTC')),
+            new \DateTimeImmutable('2026-03-18', new \DateTimeZone('UTC')),
         );
 
         self::assertSame('2026-03-16', $period->getFrom()->format('Y-m-d'));
@@ -44,7 +41,7 @@ final class PeriodResolverTest extends TestCase
     {
         $period = $this->resolver->resolve(
             new SnapshotQuery('month', null, null),
-            new DateTimeImmutable('2026-02-12', new DateTimeZone('UTC')),
+            new \DateTimeImmutable('2026-02-12', new \DateTimeZone('UTC')),
         );
 
         self::assertSame('2026-02-01', $period->getFrom()->format('Y-m-d'));
@@ -61,21 +58,21 @@ final class PeriodResolverTest extends TestCase
 
     public function testThrowsWhenPresetAndCustomAreMixed(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         $this->resolver->resolve(new SnapshotQuery('day', '2026-01-01', '2026-01-02'));
     }
 
     public function testThrowsOnInvalidDateFormat(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         $this->resolver->resolve(new SnapshotQuery(null, '2026/01/01', '2026-01-02'));
     }
 
     public function testThrowsWhenFromIsGreaterThanTo(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         $this->resolver->resolve(new SnapshotQuery(null, '2026-01-03', '2026-01-02'));
     }

@@ -19,7 +19,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     public function findByMarketplaceSku(
         Company $company,
         MarketplaceType $marketplace,
-        string $marketplaceSku
+        string $marketplaceSku,
     ): ?MarketplaceListing {
         return $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -36,7 +36,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         Company $company,
         MarketplaceType $marketplace,
         string $nmId,
-        ?string $size
+        ?string $size,
     ): ?MarketplaceListing {
         $qb = $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -46,7 +46,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('marketplace', $marketplace)
             ->setParameter('nmId', $nmId);
 
-        if ($size === null) {
+        if (null === $size) {
             $qb->andWhere('l.size IS NULL');
         } else {
             $qb->andWhere('l.size = :size')

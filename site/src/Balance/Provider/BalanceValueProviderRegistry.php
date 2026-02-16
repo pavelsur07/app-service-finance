@@ -19,12 +19,7 @@ final class BalanceValueProviderRegistry
                 }
 
                 if (isset($this->providersByType[$type->value])) {
-                    throw new \LogicException(sprintf(
-                        'Duplicate balance value provider for type "%s": "%s" and "%s".',
-                        $type->value,
-                        $this->providersByType[$type->value]::class,
-                        $provider::class,
-                    ));
+                    throw new \LogicException(sprintf('Duplicate balance value provider for type "%s": "%s" and "%s".', $type->value, $this->providersByType[$type->value]::class, $provider::class));
                 }
 
                 $this->providersByType[$type->value] = $provider;

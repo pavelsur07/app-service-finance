@@ -16,6 +16,7 @@ readonly class ProductMarginReport
         public string $costs,
         public string $cogs,
         public string $grossProfit,
-        public string $marginPercent
-    ) {}
+        public string $marginPercent,
+    ) {
+    }
 }

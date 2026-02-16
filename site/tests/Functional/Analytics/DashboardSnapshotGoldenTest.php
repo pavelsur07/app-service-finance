@@ -7,8 +7,8 @@ namespace App\Tests\Functional\Analytics;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\DataFixtures\AppFixtures;
-use App\DataFixtures\CashTransactionsFixtures;
 use App\DataFixtures\CashflowCategoryFixtures;
+use App\DataFixtures\CashTransactionsFixtures;
 use App\DataFixtures\PLCategoryFixtures;
 use App\DataFixtures\PLDocumentsFixtures;
 use App\DataFixtures\ProjectDirectionsFixtures;
@@ -41,7 +41,7 @@ final class DashboardSnapshotGoldenTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(200);
 
-        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
 
         self::assertGreaterThan(0.0, (float) ($payload['widgets']['free_cash']['value'] ?? 0));
         self::assertGreaterThan(0.0, (float) ($payload['widgets']['inflow']['sum'] ?? 0));

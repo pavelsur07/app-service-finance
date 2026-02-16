@@ -30,7 +30,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('r')
             ->where('r.product = :product')
@@ -50,7 +50,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByCompany(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('r')
             ->where('r.company = :company')

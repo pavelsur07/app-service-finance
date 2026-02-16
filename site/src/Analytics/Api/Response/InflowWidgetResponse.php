@@ -6,7 +6,7 @@ final readonly class InflowWidgetResponse
 {
     /**
      * @param list<array{date:string,value:float}> $series
-     * @param array<string, mixed>                 $drilldown
+     * @param array<string, mixed> $drilldown
      */
     public function __construct(
         private float $sum,
@@ -33,4 +33,3 @@ final readonly class InflowWidgetResponse
         ];
     }
 }
-

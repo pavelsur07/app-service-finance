@@ -30,7 +30,7 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
 
     public function findByMarketplace(
         Company $company,
-        MarketplaceType $marketplace
+        MarketplaceType $marketplace,
     ): ?MarketplaceConnection {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')

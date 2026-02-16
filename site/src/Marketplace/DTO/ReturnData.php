@@ -15,6 +15,7 @@ readonly class ReturnData
         public ?string $returnReason = null,
         public ?string $returnLogisticsCost = null,
         public ?string $externalReturnId = null,
-        public ?array $rawData = null
-    ) {}
+        public ?array $rawData = null,
+    ) {
+    }
 }

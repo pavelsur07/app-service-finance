@@ -52,7 +52,7 @@ class MarketplaceConnection
     public function __construct(
         string $id,
         Company $company,
-        MarketplaceType $marketplace
+        MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
         $this->id = $id;

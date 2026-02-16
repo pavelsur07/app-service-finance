@@ -16,7 +16,6 @@ class PLDailyTotalRepository extends ServiceEntityRepository
         parent::__construct($registry, PLDailyTotal::class);
     }
 
-
     public function maxUpdatedAtForCompany(Company $company): ?\DateTimeImmutable
     {
         $maxUpdatedAt = $this->createQueryBuilder('t')
@@ -32,7 +31,6 @@ class PLDailyTotalRepository extends ServiceEntityRepository
 
         return \DateTimeImmutable::createFromInterface($maxUpdatedAt);
     }
-
 
     public function maxUpdatedAtGlobal(): ?\DateTimeImmutable
     {

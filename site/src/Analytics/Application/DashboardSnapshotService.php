@@ -4,10 +4,10 @@ namespace App\Analytics\Application;
 
 use App\Analytics\Api\Response\SnapshotContextResponse;
 use App\Analytics\Api\Response\SnapshotResponse;
+use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
 use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Application\Widget\OutflowWidgetBuilder;
-use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Application\Widget\TopCashWidgetBuilder;
@@ -38,8 +38,7 @@ final class DashboardSnapshotService
         private readonly SnapshotCacheInvalidator $snapshotCacheInvalidator,
         private readonly LastUpdatedAtResolver $lastUpdatedAtResolver,
         private readonly LoggerInterface $logger,
-    )
-    {
+    ) {
     }
 
     public function getSnapshot(Company $company, Period $period): SnapshotResponse
@@ -153,7 +152,7 @@ final class DashboardSnapshotService
             $alerts[] = ['code' => 'FREE_CASH_DOWN'];
         }
 
-        $revenueDeltaAbs = (float) (($revenue['widget']->toArray()['delta_abs'] ?? 0.0));
+        $revenueDeltaAbs = (float) ($revenue['widget']->toArray()['delta_abs'] ?? 0.0);
         if ($revenueDeltaAbs < 0) {
             $alerts[] = ['code' => 'REV_DOWN'];
         }
@@ -166,9 +165,9 @@ final class DashboardSnapshotService
     }
 
     /**
-     * @param array<string, mixed>                                                $freeCash
-     * @param array<string, mixed>                                                $inflow
-     * @param array<string, mixed>                                                $outflow
+     * @param array<string, mixed> $freeCash
+     * @param array<string, mixed> $inflow
+     * @param array<string, mixed> $outflow
      * @param array{widget: \App\Analytics\Api\Response\RevenueWidgetResponse, registryEmpty: bool} $revenue
      *
      * @return list<array{code: string, message: string}>

@@ -93,7 +93,7 @@ class CashTransactionRepository extends ServiceEntityRepository
     public function findActiveByCompanyAccountExternalId(
         Company $company,
         MoneyAccount $account,
-        string $externalId
+        string $externalId,
     ): ?CashTransaction {
         return $this->createQueryBuilder('t')
             ->where('t.company = :company')
@@ -280,7 +280,6 @@ class CashTransactionRepository extends ServiceEntityRepository
 
         return $series;
     }
-
 
     /**
      * @return array{OPERATING: float, INVESTING: float, FINANCING: float}

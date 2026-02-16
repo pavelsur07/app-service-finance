@@ -14,6 +14,7 @@ readonly class SaleData
         public int $quantity,
         public string $pricePerUnit,
         public string $totalRevenue,
-        public ?array $rawData = null
-    ) {}
+        public ?array $rawData = null,
+    ) {
+    }
 }

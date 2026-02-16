@@ -9,7 +9,6 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
-use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
 final class InflowWidgetBuilderTest extends TestCase
@@ -17,7 +16,7 @@ final class InflowWidgetBuilderTest extends TestCase
     public function testBuildReturnsSumsSeriesAndDeltas(): void
     {
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
-        $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-10'));
+        $period = new Period(new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-10'));
 
         $account = $this->createMock(MoneyAccount::class);
         $account->method('getId')->willReturn('acc-1');

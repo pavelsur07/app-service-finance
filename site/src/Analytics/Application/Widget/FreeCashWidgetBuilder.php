@@ -10,7 +10,6 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
-use DateTimeImmutable;
 use Symfony\Component\Intl\Currencies;
 
 final readonly class FreeCashWidgetBuilder
@@ -55,7 +54,7 @@ final readonly class FreeCashWidgetBuilder
         $deltaAbs = (float) bcsub((string) $freeCashAtEnd, (string) $freeCashAtStart, 2);
         $deltaPct = 0.0;
         if (0.0 !== $freeCashAtPrevEnd) {
-            $deltaPct = round(((($freeCashAtEnd - $freeCashAtPrevEnd) / $freeCashAtPrevEnd) * 100), 2);
+            $deltaPct = round((($freeCashAtEnd - $freeCashAtPrevEnd) / $freeCashAtPrevEnd) * 100, 2);
         }
 
         return new FreeCashWidgetResponse(
@@ -64,7 +63,7 @@ final readonly class FreeCashWidgetBuilder
             deltaPct: $deltaPct,
             cashAtEnd: (float) $cashAtEnd,
             reservedAtEnd: (float) $reservedAtEnd,
-            lastUpdatedAt: new DateTimeImmutable('now', new \DateTimeZone('UTC')),
+            lastUpdatedAt: new \DateTimeImmutable('now', new \DateTimeZone('UTC')),
             drilldown: [
                 'cash_balances' => $this->drilldownBuilder->cashBalances($period->getTo()->format('Y-m-d')),
                 'funds_reserved' => $this->drilldownBuilder->fundsReserved($period->getTo()->format('Y-m-d')),

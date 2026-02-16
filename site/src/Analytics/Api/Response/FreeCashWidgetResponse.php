@@ -2,8 +2,6 @@
 
 namespace App\Analytics\Api\Response;
 
-use DateTimeImmutable;
-
 final readonly class FreeCashWidgetResponse
 {
     /**
@@ -15,7 +13,7 @@ final readonly class FreeCashWidgetResponse
         private float $deltaPct,
         private float $cashAtEnd,
         private float $reservedAtEnd,
-        private ?DateTimeImmutable $lastUpdatedAt,
+        private ?\DateTimeImmutable $lastUpdatedAt,
         private array $drilldown = [],
     ) {
     }
@@ -31,7 +29,7 @@ final readonly class FreeCashWidgetResponse
             'delta_pct' => $this->deltaPct,
             'cash_at_end' => $this->cashAtEnd,
             'reserved_at_end' => $this->reservedAtEnd,
-            'last_updated_at' => $this->lastUpdatedAt?->format(DATE_ATOM),
+            'last_updated_at' => $this->lastUpdatedAt?->format(\DATE_ATOM),
             'drilldown' => $this->drilldown,
         ];
     }

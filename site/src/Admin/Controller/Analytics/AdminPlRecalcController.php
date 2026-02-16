@@ -90,7 +90,7 @@ final class AdminPlRecalcController extends AbstractController
                 $processed,
                 $period->getFrom()->format('Y-m-d'),
                 $period->getTo()->format('Y-m-d'),
-                $lastUpdatedAt?->format(DATE_ATOM) ?? 'n/a',
+                $lastUpdatedAt?->format(\DATE_ATOM) ?? 'n/a',
             ),
         );
 

@@ -32,7 +32,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     public function findLatestByType(
         Company $company,
         MarketplaceType $marketplace,
-        string $documentType
+        string $documentType,
     ): ?MarketplaceRawDocument {
         return $this->createQueryBuilder('d')
             ->where('d.company = :company')

@@ -37,7 +37,7 @@ class MarketplaceSyncService
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly MarketplaceCostRepository $costRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
     ) {
         // Регистрируем калькуляторы затрат
         $this->costCalculators = [
@@ -51,7 +51,7 @@ class MarketplaceSyncService
 
     public function processSalesFromRaw(
         Company $company,
-        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc,
     ): int {
         $rawData = $rawDoc->getRawData();
         $synced = 0;
@@ -59,21 +59,21 @@ class MarketplaceSyncService
         foreach ($rawData as $item) {
             try {
                 // Фильтрация: только продажи
-                if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Продажа') {
+                if (!isset($item['doc_type_name']) || 'Продажа' !== $item['doc_type_name']) {
                     continue;
                 }
 
-                $retailAmount = (float)($item['retail_amount'] ?? 0);
+                $retailAmount = (float) ($item['retail_amount'] ?? 0);
                 if ($retailAmount <= 0) {
                     continue;
                 }
 
-                $externalOrderId = (string)$item['srid'];
+                $externalOrderId = (string) $item['srid'];
 
                 // Проверка дубликата по srid
                 $existing = $this->saleRepository->findOneBy([
                     'company' => $company,
-                    'externalOrderId' => $externalOrderId
+                    'externalOrderId' => $externalOrderId,
                 ]);
 
                 if ($existing) {
@@ -81,20 +81,20 @@ class MarketplaceSyncService
                 }
 
                 // Данные из WB
-                $nmId = (string)($item['nm_id'] ?? '');   // Артикул WB (строго string)
+                $nmId = (string) ($item['nm_id'] ?? '');   // Артикул WB (строго string)
                 $tsName = trim($item['ts_name'] ?? '');   // Размер (trim!)
                 $saName = $item['sa_name'];               // Артикул производителя
                 $brandName = $item['brand_name'] ?? '';
                 $subjectName = $item['subject_name'] ?? '';
 
                 // Нормализуем: пустая строка → NULL
-                $tsName = ($tsName === '') ? null : $tsName;
+                $tsName = ('' === $tsName) ? null : $tsName;
 
                 // DEBUG: логируем что ищем
                 $this->logger->info('Looking for listing', [
                     'nm_id' => $nmId,
                     'ts_name' => $tsName,
-                    'company_id' => $company->getId()
+                    'company_id' => $company->getId(),
                 ]);
 
                 // Ищем Listing по nm_id + size
@@ -129,14 +129,13 @@ class MarketplaceSyncService
                         $this->logger->info('Listing created and flushed', [
                             'listing_id' => $listing->getId(),
                             'nm_id' => $nmId,
-                            'ts_name' => $tsName
+                            'ts_name' => $tsName,
                         ]);
-
                     } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
                         // Товар уже создан (race condition или параллельный запрос)
                         $this->logger->warning('Duplicate listing on creation, searching again', [
                             'nm_id' => $nmId,
-                            'ts_name' => $tsName
+                            'ts_name' => $tsName,
                         ]);
 
                         // Очищаем EM и ищем ещё раз
@@ -152,7 +151,7 @@ class MarketplaceSyncService
                         if (!$listing) {
                             $this->logger->error('Listing still not found after duplicate error', [
                                 'nm_id' => $nmId,
-                                'ts_name' => $tsName
+                                'ts_name' => $tsName,
                             ]);
                             continue; // Пропускаем эту продажу
                         }
@@ -170,20 +169,19 @@ class MarketplaceSyncService
 
                 $sale->setExternalOrderId($externalOrderId);
                 $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
-                $sale->setQuantity(abs((int)$item['quantity']));
-                $sale->setPricePerUnit((string)$item['retail_price']);
-                $sale->setTotalRevenue((string)abs($retailAmount));
+                $sale->setQuantity(abs((int) $item['quantity']));
+                $sale->setPricePerUnit((string) $item['retail_price']);
+                $sale->setTotalRevenue((string) abs($retailAmount));
                 $sale->setRawDocumentId($rawDoc->getId());
 
                 $this->em->persist($sale);
-                $synced++;
-
+                ++$synced;
             } catch (\Exception $e) {
                 // Логируем ошибку и продолжаем
                 $this->logger->error('Failed to process sale item', [
                     'srid' => $item['srid'] ?? 'unknown',
                     'nm_id' => $item['nm_id'] ?? 'unknown',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
                 continue;
             }
@@ -194,7 +192,7 @@ class MarketplaceSyncService
 
         $this->logger->info('Sales processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData)
+            'total_records' => count($rawData),
         ]);
 
         return $synced;
@@ -202,7 +200,7 @@ class MarketplaceSyncService
 
     public function processReturnsFromRaw(
         Company $company,
-        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc,
     ): int {
         $rawData = $rawDoc->getRawData();
         $synced = 0;
@@ -221,7 +219,7 @@ class MarketplaceSyncService
                 // Логируем что пришло
                 if (!isset($item['doc_type_name'])) {
                     $this->logger->warning('Item has no doc_type_name field', [
-                        'srid' => $item['srid'] ?? 'unknown'
+                        'srid' => $item['srid'] ?? 'unknown',
                     ]);
                 }
 
@@ -229,30 +227,30 @@ class MarketplaceSyncService
                 $docTypeName = $item['doc_type_name'] ?? '';
 
                 // Попробуем разные варианты
-                if ($docTypeName !== 'Возврат' && $docTypeName !== 'возврат' && $docTypeName !== 'Return') {
+                if ('Возврат' !== $docTypeName && 'возврат' !== $docTypeName && 'Return' !== $docTypeName) {
                     continue;
                 }
 
                 $this->logger->info('Found return item', [
                     'doc_type_name' => $docTypeName,
-                    'srid' => $item['srid'] ?? 'unknown'
+                    'srid' => $item['srid'] ?? 'unknown',
                 ]);
 
                 // Для возвратов используем retail_price (цена за единицу)
-                $retailPrice = (float)($item['retail_price'] ?? 0);
+                $retailPrice = (float) ($item['retail_price'] ?? 0);
                 if ($retailPrice <= 0) {
                     $this->logger->info('Retail price is zero, skipping', [
-                        'retail_price' => $retailPrice
+                        'retail_price' => $retailPrice,
                     ]);
                     continue;
                 }
 
-                $externalReturnId = (string)$item['srid'];
+                $externalReturnId = (string) $item['srid'];
 
                 // Проверка дубликата по srid
                 $existing = $this->returnRepository->findOneBy([
                     'company' => $company,
-                    'externalReturnId' => $externalReturnId
+                    'externalReturnId' => $externalReturnId,
                 ]);
 
                 if ($existing) {
@@ -260,14 +258,14 @@ class MarketplaceSyncService
                 }
 
                 // Данные из WB
-                $nmId = (string)($item['nm_id'] ?? '');
+                $nmId = (string) ($item['nm_id'] ?? '');
                 $tsName = trim($item['ts_name'] ?? '');
                 $saName = $item['sa_name'];
                 $brandName = $item['brand_name'] ?? '';
                 $subjectName = $item['subject_name'] ?? '';
 
                 // Нормализуем: пустая строка → NULL
-                $tsName = ($tsName === '') ? null : $tsName;
+                $tsName = ('' === $tsName) ? null : $tsName;
 
                 // Ищем Listing
                 $listing = $this->listingRepository->findByNmIdAndSize(
@@ -290,7 +288,6 @@ class MarketplaceSyncService
                         ]);
 
                         $this->em->flush();
-
                     } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
                         $this->em->clear();
 
@@ -304,7 +301,7 @@ class MarketplaceSyncService
                         if (!$listing) {
                             $this->logger->error('Listing not found for return', [
                                 'nm_id' => $nmId,
-                                'ts_name' => $tsName
+                                'ts_name' => $tsName,
                             ]);
                             continue;
                         }
@@ -321,24 +318,23 @@ class MarketplaceSyncService
 
                 $return->setExternalReturnId($externalReturnId);
                 $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
-                $return->setQuantity(abs((int)$item['quantity']));
-                $return->setRefundAmount((string)$retailPrice); // retail_price
+                $return->setQuantity(abs((int) $item['quantity']));
+                $return->setRefundAmount((string) $retailPrice); // retail_price
                 $return->setReturnReason($item['supplier_oper_name'] ?? '');
 
                 $this->em->persist($return);
-                $synced++;
+                ++$synced;
 
                 $this->logger->info('Return created', [
                     'srid' => $externalReturnId,
                     'retail_price' => $retailPrice,
-                    'quantity' => $item['quantity']
+                    'quantity' => $item['quantity'],
                 ]);
-
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process return item', [
                     'srid' => $item['srid'] ?? 'unknown',
                     'nm_id' => $item['nm_id'] ?? 'unknown',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
                 continue;
             }
@@ -349,7 +345,7 @@ class MarketplaceSyncService
 
         $this->logger->info('Returns processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData)
+            'total_records' => count($rawData),
         ]);
 
         return $synced;
@@ -357,7 +353,7 @@ class MarketplaceSyncService
 
     public function processCostsFromRaw(
         Company $company,
-        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc,
     ): int {
         $rawData = $rawDoc->getRawData();
         $synced = 0;
@@ -371,9 +367,9 @@ class MarketplaceSyncService
                     }
 
                     // Получаем данные для поиска listing
-                    $nmId = (string)($item['nm_id'] ?? '');
+                    $nmId = (string) ($item['nm_id'] ?? '');
                     $tsName = trim($item['ts_name'] ?? '');
-                    $tsName = ($tsName === '') ? null : $tsName;
+                    $tsName = ('' === $tsName) ? null : $tsName;
 
                     // Ищем Listing
                     $listing = $this->listingRepository->findByNmIdAndSize(
@@ -387,7 +383,7 @@ class MarketplaceSyncService
                         $this->logger->warning('Listing not found for cost calculation', [
                             'nm_id' => $nmId,
                             'ts_name' => $tsName,
-                            'calculator' => get_class($calculator)
+                            'calculator' => $calculator::class,
                         ]);
                         continue;
                     }
@@ -399,7 +395,7 @@ class MarketplaceSyncService
                         // Проверка дубликата
                         $existing = $this->costRepository->findOneBy([
                             'company' => $company,
-                            'externalId' => $costData['external_id']
+                            'externalId' => $costData['external_id'],
                         ]);
 
                         if ($existing) {
@@ -428,7 +424,7 @@ class MarketplaceSyncService
 
                             $this->logger->info('Cost category auto-created', [
                                 'code' => $costData['category_code'],
-                                'marketplace' => 'wildberries'
+                                'marketplace' => 'wildberries',
                             ]);
                         }
 
@@ -447,14 +443,13 @@ class MarketplaceSyncService
                         $cost->setDescription($costData['description']);
 
                         $this->em->persist($cost);
-                        $synced++;
+                        ++$synced;
                     }
                 }
-
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process cost item', [
                     'srid' => $item['srid'] ?? 'unknown',
-                    'error' => $e->getMessage()
+                    'error' => $e->getMessage(),
                 ]);
                 continue;
             }
@@ -465,7 +460,7 @@ class MarketplaceSyncService
 
         $this->logger->info('Costs processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData)
+            'total_records' => count($rawData),
         ]);
 
         return $synced;
@@ -475,7 +470,7 @@ class MarketplaceSyncService
         Company $company,
         MarketplaceAdapterInterface $adapter,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): int {
         // Получаем данные от API
         $salesData = $adapter->fetchSales($company, $fromDate, $toDate);
@@ -489,8 +484,8 @@ class MarketplaceSyncService
         );
         $rawDoc->setPeriodFrom(\DateTimeImmutable::createFromInterface($fromDate));
         $rawDoc->setPeriodTo(\DateTimeImmutable::createFromInterface($toDate));
-        $rawDoc->setApiEndpoint($adapter->getMarketplaceType() . '::fetchSales');
-        $rawDoc->setRawData(array_map(function($s) {
+        $rawDoc->setApiEndpoint($adapter->getMarketplaceType().'::fetchSales');
+        $rawDoc->setRawData(array_map(function ($s) {
             return [
                 'order_id' => $s->externalOrderId,
                 'date' => $s->saleDate->format('Y-m-d'),
@@ -541,7 +536,7 @@ class MarketplaceSyncService
             $sale->setRawDocumentId($rawDocId);
 
             $this->em->persist($sale);
-            $synced++;
+            ++$synced;
         }
 
         // Один flush в конце
@@ -554,7 +549,7 @@ class MarketplaceSyncService
         Company $company,
         MarketplaceAdapterInterface $adapter,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): int {
         $costsData = $adapter->fetchCosts($company, $fromDate, $toDate);
         $synced = 0;
@@ -603,10 +598,11 @@ class MarketplaceSyncService
             $cost->setExternalId($costData->externalId);
 
             $this->em->persist($cost);
-            $synced++;
+            ++$synced;
         }
 
         $this->em->flush();
+
         return $synced;
     }
 
@@ -614,7 +610,7 @@ class MarketplaceSyncService
         Company $company,
         MarketplaceAdapterInterface $adapter,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): int {
         $returnsData = $adapter->fetchReturns($company, $fromDate, $toDate);
         $synced = 0;
@@ -633,7 +629,7 @@ class MarketplaceSyncService
             if ($returnData->externalReturnId) {
                 $existing = $this->returnRepository->findOneBy([
                     'company' => $company,
-                    'externalReturnId' => $returnData->externalReturnId
+                    'externalReturnId' => $returnData->externalReturnId,
                 ]);
 
                 if ($existing) {
@@ -655,10 +651,11 @@ class MarketplaceSyncService
             $return->setReturnReason($returnData->returnReason);
 
             $this->em->persist($return);
-            $synced++;
+            ++$synced;
         }
 
         $this->em->flush();
+
         return $synced;
     }
 
@@ -676,7 +673,7 @@ class MarketplaceSyncService
             $brandName,
             $subjectName,
             $saName,
-            $tsName
+            $tsName,
         ]);
         $productName = implode(' ', $nameParts);
 
@@ -697,7 +694,7 @@ class MarketplaceSyncService
         $listing->setMarketplaceSku($nmId);           // nm_id
         $listing->setSupplierSku($saName);            // sa_name
         $listing->setSize($tsName);                   // ts_name (может быть null)
-        $listing->setPrice((string)$price);
+        $listing->setPrice((string) $price);
 
         $this->em->persist($listing);
 
@@ -732,9 +729,9 @@ class MarketplaceSyncService
 
                 // Название: "{brand} {subject} ({sku})"
                 $name = trim(sprintf('%s %s (%s)', $brand, $subject, $sku));
-                $product->setName($name ?: 'Auto-created from ' . $saleData->marketplace->value);
+                $product->setName($name ?: 'Auto-created from '.$saleData->marketplace->value);
             } else {
-                $product->setName('Auto-created from ' . $saleData->marketplace->value);
+                $product->setName('Auto-created from '.$saleData->marketplace->value);
             }
 
             $product->setPurchasePrice('0.00'); // Требует заполнения

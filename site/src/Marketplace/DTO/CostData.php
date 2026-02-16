@@ -14,6 +14,7 @@ readonly class CostData
         public ?string $marketplaceSku = null, // Nullable для общих затрат
         public ?string $description = null,
         public ?string $externalId = null,
-        public ?array $rawData = null
-    ) {}
+        public ?array $rawData = null,
+    ) {
+    }
 }

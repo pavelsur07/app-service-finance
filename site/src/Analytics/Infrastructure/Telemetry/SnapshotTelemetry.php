@@ -52,4 +52,3 @@ final class SnapshotTelemetry
         return self::GLOBAL_TIMER;
     }
 }
-

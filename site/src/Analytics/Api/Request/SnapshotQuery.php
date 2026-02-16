@@ -11,4 +11,3 @@ final readonly class SnapshotQuery
     ) {
     }
 }
-

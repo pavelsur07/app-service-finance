@@ -59,7 +59,7 @@ class MarketplaceRawDocument
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        string $documentType
+        string $documentType,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -163,7 +163,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsCreated(): self
     {
-        $this->recordsCreated++;
+        ++$this->recordsCreated;
 
         return $this;
     }
@@ -182,7 +182,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsSkipped(): self
     {
-        $this->recordsSkipped++;
+        ++$this->recordsSkipped;
 
         return $this;
     }
@@ -207,7 +207,7 @@ class MarketplaceRawDocument
     public function addSyncNote(string $note): self
     {
         if ($this->syncNotes) {
-            $this->syncNotes .= "\n" . $note;
+            $this->syncNotes .= "\n".$note;
         } else {
             $this->syncNotes = $note;
         }

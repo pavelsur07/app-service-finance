@@ -33,7 +33,7 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
     public function findByCode(
         Company $company,
         MarketplaceType $marketplace,
-        string $code
+        string $code,
     ): ?MarketplaceCostCategory {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')

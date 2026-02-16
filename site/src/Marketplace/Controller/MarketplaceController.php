@@ -30,8 +30,9 @@ class MarketplaceController extends AbstractController
         private readonly CompanyContextService $companyContext,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
-        private readonly EntityManagerInterface $em
-    ) {}
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
 
     #[Route('', name: 'marketplace_index')]
     public function index(): Response
@@ -60,7 +61,8 @@ class MarketplaceController extends AbstractController
         $existing = $this->connectionRepository->findByMarketplace($company, $marketplace);
 
         if ($existing) {
-            $this->addFlash('error', 'Подключение к ' . $marketplace->getDisplayName() . ' уже существует');
+            $this->addFlash('error', 'Подключение к '.$marketplace->getDisplayName().' уже существует');
+
             return $this->redirectToRoute('marketplace_index');
         }
 
@@ -74,7 +76,7 @@ class MarketplaceController extends AbstractController
         $this->em->persist($connection);
         $this->em->flush();
 
-        $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
+        $this->addFlash('success', 'Подключение к '.$marketplace->getDisplayName().' создано');
 
         return $this->redirectToRoute('marketplace_index');
     }
@@ -82,7 +84,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/test', name: 'marketplace_connection_test')]
     public function testConnection(
         string $id,
-        WildberriesAdapter $wbAdapter
+        WildberriesAdapter $wbAdapter,
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -96,7 +98,7 @@ class MarketplaceController extends AbstractController
         $error = null;
 
         try {
-            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+            if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
                 $success = $wbAdapter->authenticate($company);
             }
         } catch (\Exception $e) {
@@ -106,7 +108,7 @@ class MarketplaceController extends AbstractController
         if ($success) {
             $this->addFlash('success', 'Подключение работает корректно');
         } else {
-            $this->addFlash('error', 'Ошибка подключения: ' . ($error ?? 'Неверный API ключ'));
+            $this->addFlash('error', 'Ошибка подключения: '.($error ?? 'Неверный API ключ'));
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -115,7 +117,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync')]
     public function syncConnection(
         string $id,
-        WildberriesAdapter $wbAdapter
+        WildberriesAdapter $wbAdapter,
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -133,13 +135,13 @@ class MarketplaceController extends AbstractController
             $fromDate = new \DateTimeImmutable('-7 days');
             $toDate = new \DateTimeImmutable();
 
-            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+            if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
                 // Получаем ОРИГИНАЛЬНЫЕ данные от WB API
                 $response = $wbAdapter->fetchRawSales($company, $fromDate, $toDate);
 
                 // Создаём RawDocument с ОРИГИНАЛЬНЫМ JSON
                 $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
-                    \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                    Uuid::uuid4()->toString(),
                     $company,
                     MarketplaceType::WILDBERRIES,
                     'sales_report'
@@ -165,7 +167,7 @@ class MarketplaceController extends AbstractController
             $connection->markSyncFailed($e->getMessage());
             $this->em->flush();
 
-            $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка загрузки: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -182,13 +184,13 @@ class MarketplaceController extends AbstractController
             throw $this->createNotFoundException();
         }
 
-        return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => JSON_PRETTY_PRINT]);
+        return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => \JSON_PRETTY_PRINT]);
     }
 
     #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
     public function processSales(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncService $syncService,
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -214,7 +216,7 @@ class MarketplaceController extends AbstractController
                 $values
             ));
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка обработки: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -223,7 +225,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
     public function processReturns(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncService $syncService,
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -238,7 +240,7 @@ class MarketplaceController extends AbstractController
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки возвратов: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка обработки возвратов: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -247,7 +249,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
     public function processCosts(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncService $syncService,
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -262,7 +264,7 @@ class MarketplaceController extends AbstractController
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки затрат: ' . $e->getMessage());
+            $this->addFlash('error', 'Ошибка обработки затрат: '.$e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -362,7 +364,7 @@ class MarketplaceController extends AbstractController
         $this->em->flush();
 
         $status = $connection->isActive() ? 'активировано' : 'деактивировано';
-        $this->addFlash('success', 'Подключение ' . $status);
+        $this->addFlash('success', 'Подключение '.$status);
 
         return $this->redirectToRoute('marketplace_index');
     }

@@ -14,13 +14,14 @@ class MarketplaceAnalyticsService
     public function __construct(
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostRepository $costRepository,
-        private readonly MarketplaceReturnRepository $returnRepository
-    ) {}
+        private readonly MarketplaceReturnRepository $returnRepository,
+    ) {
+    }
 
     public function calculateProductMargin(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): ProductMarginReport {
         // Продажи
         $sales = $this->saleRepository->findByProduct($product, $fromDate, $toDate);
@@ -93,7 +94,7 @@ class MarketplaceAnalyticsService
         Company $company,
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
-        int $limit = 10
+        int $limit = 10,
     ): array {
         $products = $this->saleRepository->findProductsWithSales($company, $fromDate, $toDate);
 
@@ -103,7 +104,7 @@ class MarketplaceAnalyticsService
         }
 
         // Сортировка по profit DESC
-        usort($reports, fn($a, $b) => bccomp($b->grossProfit, $a->grossProfit, 2));
+        usort($reports, fn ($a, $b) => bccomp($b->grossProfit, $a->grossProfit, 2));
 
         return array_slice($reports, 0, $limit);
     }

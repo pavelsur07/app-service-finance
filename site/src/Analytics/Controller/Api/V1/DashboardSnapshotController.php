@@ -2,11 +2,10 @@
 
 namespace App\Analytics\Controller\Api\V1;
 
+use App\Analytics\Api\Request\SnapshotQuery;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\PeriodResolver;
-use App\Analytics\Api\Request\SnapshotQuery;
 use App\Shared\Service\ActiveCompanyService;
-use InvalidArgumentException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,7 +31,7 @@ final class DashboardSnapshotController extends AbstractController
                 from: $this->stringOrNull($request->query->get('from')),
                 to: $this->stringOrNull($request->query->get('to')),
             ));
-        } catch (InvalidArgumentException $exception) {
+        } catch (\InvalidArgumentException $exception) {
             return $this->json([
                 'type' => 'validation_error',
                 'message' => $exception->getMessage(),

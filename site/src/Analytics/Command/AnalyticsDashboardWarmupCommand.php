@@ -8,7 +8,6 @@ use App\Analytics\Application\PeriodResolver;
 use App\Company\Entity\Company;
 use App\Repository\CompanyRepository;
 use App\Service\PLRegisterUpdater;
-use InvalidArgumentException;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -100,7 +99,7 @@ final class AnalyticsDashboardWarmupCommand extends Command
 
         $company = $this->companyRepository->find($companyOption);
         if (!$company instanceof Company) {
-            throw new InvalidArgumentException(sprintf('Company "%s" not found.', $companyOption));
+            throw new \InvalidArgumentException(sprintf('Company "%s" not found.', $companyOption));
         }
 
         return [$company];

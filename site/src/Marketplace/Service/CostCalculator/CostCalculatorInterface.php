@@ -7,12 +7,12 @@ use App\Marketplace\Entity\MarketplaceListing;
 interface CostCalculatorInterface
 {
     /**
-     * Проверяет, может ли этот калькулятор обработать данную запись
+     * Проверяет, может ли этот калькулятор обработать данную запись.
      */
     public function supports(array $item): bool;
 
     /**
-     * Рассчитывает затраты из записи
+     * Рассчитывает затраты из записи.
      *
      * @return array<int, array{
      *     category_code: string,

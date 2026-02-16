@@ -29,10 +29,10 @@ final class HealthControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(200);
 
-        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
 
         self::assertSame('ok', $payload['status'] ?? null);
-        self::assertSame(true, $payload['checks']['postgres'] ?? null);
-        self::assertSame(true, $payload['checks']['redis_cache'] ?? null);
+        self::assertTrue($payload['checks']['postgres'] ?? null);
+        self::assertTrue($payload['checks']['redis_cache'] ?? null);
     }
 }

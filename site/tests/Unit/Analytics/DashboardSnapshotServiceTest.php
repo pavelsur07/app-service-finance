@@ -2,34 +2,31 @@
 
 namespace App\Tests\Unit\Analytics;
 
-use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\DashboardSnapshotService;
+use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Application\LastUpdatedAtResolver;
-use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\CashflowSplitWidgetBuilder;
+use App\Analytics\Application\Widget\FreeCashWidgetBuilder;
 use App\Analytics\Application\Widget\InflowWidgetBuilder;
 use App\Analytics\Application\Widget\OutflowWidgetBuilder;
+use App\Analytics\Application\Widget\ParetoTopItemsBuilder;
 use App\Analytics\Application\Widget\ProfitWidgetBuilder;
 use App\Analytics\Application\Widget\RevenueWidgetBuilder;
 use App\Analytics\Application\Widget\TopCashWidgetBuilder;
 use App\Analytics\Application\Widget\TopPnlWidgetBuilder;
+use App\Analytics\Domain\Period;
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
-use App\Analytics\Application\Widget\ParetoTopItemsBuilder;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
-use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Repository\PLCategoryRepository;
 use App\Repository\PLDailyTotalRepository;
-use DateInterval;
-use DateTimeImmutable;
-use DateTimeInterface;
 use Doctrine\ORM\Query;
 use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\TestCase;
@@ -109,7 +106,7 @@ final class DashboardSnapshotServiceTest extends TestCase
         $service = new DashboardSnapshotService($cache, $widgetBuilder, $inflowWidgetBuilder, $outflowWidgetBuilder, $cashflowSplitWidgetBuilder, $revenueWidgetBuilder, $profitWidgetBuilder, $topCashWidgetBuilder, $topPnlWidgetBuilder, $snapshotCacheInvalidator, $lastUpdatedAtResolver, new NullLogger());
 
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
-        $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
+        $period = new Period(new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31'));
 
         $first = $service->getSnapshot($company, $period)->toArray();
         $second = $service->getSnapshot($company, $period)->toArray();
@@ -218,12 +215,12 @@ final class StubCacheItem implements ItemInterface
         return $this;
     }
 
-    public function expiresAt(?DateTimeInterface $expiration): static
+    public function expiresAt(?\DateTimeInterface $expiration): static
     {
         return $this;
     }
 
-    public function expiresAfter(DateInterval|int|null $time): static
+    public function expiresAfter(\DateInterval|int|null $time): static
     {
         return $this;
     }

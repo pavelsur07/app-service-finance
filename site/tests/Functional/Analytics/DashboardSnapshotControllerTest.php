@@ -38,7 +38,7 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(200);
 
-        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, JSON_THROW_ON_ERROR);
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
 
         self::assertIsArray($payload);
         self::assertArrayHasKey('widgets', $payload);
@@ -62,7 +62,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('warnings', $payload['widgets']);
         self::assertIsArray($payload['widgets']['warnings']);
         self::assertArrayHasKey('items', $payload['widgets']['warnings']);
-
 
         self::assertIsArray($payload['widgets']['revenue']);
 
@@ -119,8 +118,6 @@ final class DashboardSnapshotControllerTest extends WebTestCaseBase
     }
 
     /**
-     * @param mixed $payload
-     *
      * @return list<string>
      */
     private function collectDrilldownKeys(mixed $payload): array

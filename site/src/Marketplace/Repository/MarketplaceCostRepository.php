@@ -30,7 +30,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.product = :product')
@@ -45,13 +45,14 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Общие затраты (не привязанные к товару, например реклама)
+     * Общие затраты (не привязанные к товару, например реклама).
+     *
      * @return MarketplaceCost[]
      */
     public function findGeneralCosts(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')

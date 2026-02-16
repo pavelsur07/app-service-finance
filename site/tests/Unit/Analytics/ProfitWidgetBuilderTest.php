@@ -10,7 +10,6 @@ use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Repository\PLCategoryRepository;
-use DateTimeImmutable;
 use PHPUnit\Framework\TestCase;
 
 final class ProfitWidgetBuilderTest extends TestCase
@@ -18,7 +17,7 @@ final class ProfitWidgetBuilderTest extends TestCase
     public function testBuildContainsProfitKeysAndDelta(): void
     {
         $company = $this->createCompany('76f4b0c3-6fd3-41bb-b426-0ea2fd21ae12');
-        $period = new Period(new DateTimeImmutable('2026-03-01'), new DateTimeImmutable('2026-03-31'));
+        $period = new Period(new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-31'));
 
         $categoryRepository = $this->createMock(PLCategoryRepository::class);
         $categoryRepository->method('findBy')->willReturn([]);
@@ -59,5 +58,4 @@ final class ProfitWidgetBuilderTest extends TestCase
 
         return $company;
     }
-
 }

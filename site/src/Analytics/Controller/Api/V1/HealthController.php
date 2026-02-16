@@ -7,10 +7,10 @@ namespace App\Analytics\Controller\Api\V1;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 final class HealthController extends AbstractController
 {
@@ -58,7 +58,7 @@ final class HealthController extends AbstractController
         try {
             $result = $this->connection->fetchOne('SELECT 1');
 
-            return (string) $result === '1';
+            return '1' === (string) $result;
         } catch (\Throwable) {
             return false;
         }
@@ -73,7 +73,7 @@ final class HealthController extends AbstractController
                 return 'pong';
             });
 
-            return $value === 'pong';
+            return 'pong' === $value;
         } catch (\Throwable) {
             return false;
         }

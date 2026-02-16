@@ -28,7 +28,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findByMarketplaceOrder(
         Company $company,
         MarketplaceType $marketplace,
-        string $externalOrderId
+        string $externalOrderId,
     ): ?MarketplaceSale {
         return $this->createQueryBuilder('s')
             ->where('s.company = :company')
@@ -47,7 +47,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('s')
             ->where('s.product = :product')
@@ -67,7 +67,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findProductsWithSales(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         $qb = $this->createQueryBuilder('s');
 

@@ -10,4 +10,3 @@ enum PLExpenseType: string
     case OPEX = 'opex';
     case OTHER = 'other';
 }
-

@@ -69,4 +69,3 @@ final readonly class InflowWidgetBuilder
         );
     }
 }
-

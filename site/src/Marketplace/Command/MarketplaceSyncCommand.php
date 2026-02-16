@@ -26,7 +26,7 @@ class MarketplaceSyncCommand extends Command
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly WildberriesAdapter $wbAdapter,
         private readonly MarketplaceSyncService $syncService,
-        private readonly UserRepository $userRepository
+        private readonly UserRepository $userRepository,
     ) {
         parent::__construct();
     }
@@ -50,11 +50,12 @@ class MarketplaceSyncCommand extends Command
         try {
             $marketplace = MarketplaceType::from($marketplaceValue);
         } catch (\ValueError $e) {
-            $io->error('Неизвестный маркетплейс: ' . $marketplaceValue);
+            $io->error('Неизвестный маркетплейс: '.$marketplaceValue);
+
             return Command::FAILURE;
         }
 
-        $io->title('Синхронизация с ' . $marketplace->getDisplayName());
+        $io->title('Синхронизация с '.$marketplace->getDisplayName());
 
         // Получить компании для синхронизации
         if ($companyId) {
@@ -64,7 +65,8 @@ class MarketplaceSyncCommand extends Command
         }
 
         if (empty($companies)) {
-            $io->warning('Нет компаний с активными подключениями к ' . $marketplace->getDisplayName());
+            $io->warning('Нет компаний с активными подключениями к '.$marketplace->getDisplayName());
+
             return Command::SUCCESS;
         }
 
@@ -78,7 +80,7 @@ class MarketplaceSyncCommand extends Command
         $totalReturns = 0;
 
         foreach ($companies as $company) {
-            $io->section('Компания: ' . $company->getName());
+            $io->section('Компания: '.$company->getName());
 
             $connection = $this->connectionRepository->findByMarketplace($company, $marketplace);
 
@@ -90,7 +92,7 @@ class MarketplaceSyncCommand extends Command
             try {
                 $adapter = match ($marketplace) {
                     MarketplaceType::WILDBERRIES => $this->wbAdapter,
-                    default => throw new \RuntimeException('Адаптер не реализован')
+                    default => throw new \RuntimeException('Адаптер не реализован'),
                 };
 
                 $io->text('Синхронизация продаж...');
@@ -107,9 +109,8 @@ class MarketplaceSyncCommand extends Command
                 $returnsCount = $this->syncService->syncReturns($company, $adapter, $fromDate, $toDate);
                 $totalReturns += $returnsCount;
                 $io->success("✓ Возвратов: {$returnsCount}");
-
             } catch (\Exception $e) {
-                $io->error('Ошибка: ' . $e->getMessage());
+                $io->error('Ошибка: '.$e->getMessage());
             }
         }
 
@@ -127,6 +128,7 @@ class MarketplaceSyncCommand extends Command
     {
         // Simplified - в реальности нужен CompanyRepository
         $user = $this->userRepository->findOneBy(['id' => $id]);
+
         return $user->getCompanies()->first();
     }
 
@@ -135,9 +137,9 @@ class MarketplaceSyncCommand extends Command
         // Simplified - получить все компании с активным подключением
         $connections = $this->connectionRepository->findBy([
             'marketplace' => $marketplace,
-            'isActive' => true
+            'isActive' => true,
         ]);
 
-        return array_map(fn($c) => $c->getCompany(), $connections);
+        return array_map(fn ($c) => $c->getCompany(), $connections);
     }
 }

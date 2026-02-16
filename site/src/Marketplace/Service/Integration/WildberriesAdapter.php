@@ -17,8 +17,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        private readonly MarketplaceConnectionRepository $connectionRepository
-    ) {}
+        private readonly MarketplaceConnectionRepository $connectionRepository,
+    ) {
+    }
 
     public function authenticate(Company $company): bool
     {
@@ -30,7 +31,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         try {
             // Проверка API ключа через запрос за последние 7 дней
-            $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+            $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
                 'headers' => [
                     'Authorization' => $connection->getApiKey(),
                 ],
@@ -42,7 +43,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 ],
             ]);
 
-            return $response->getStatusCode() === 200;
+            return 200 === $response->getStatusCode();
         } catch (\Exception $e) {
             return false;
         }
@@ -51,7 +52,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function fetchRawSales(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         $connection = $this->getConnection($company);
 
@@ -59,7 +60,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Wildberries connection not found');
         }
 
-        $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
@@ -78,7 +79,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function fetchSales(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         $connection = $this->getConnection($company);
 
@@ -86,7 +87,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Wildberries connection not found');
         }
 
-        $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
@@ -103,12 +104,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         foreach ($data as $item) {
             // Фильтрация: только продажи (doc_type_name = "Продажа")
-            if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Продажа') {
+            if (!isset($item['doc_type_name']) || 'Продажа' !== $item['doc_type_name']) {
                 continue;
             }
 
             // Пропускаем строки с нулевой или отрицательной выручкой
-            $retailAmount = (float)($item['retail_amount'] ?? 0);
+            $retailAmount = (float) ($item['retail_amount'] ?? 0);
             if ($retailAmount <= 0) {
                 continue;
             }
@@ -117,12 +118,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             // rawData будет только в MarketplaceRawDocument
             $sales[] = new SaleData(
                 marketplace: MarketplaceType::WILDBERRIES,
-                externalOrderId: (string)$item['realizationreport_id'],
+                externalOrderId: (string) $item['realizationreport_id'],
                 saleDate: new \DateTimeImmutable($item['rr_dt']),
                 marketplaceSku: $item['sa_name'],
-                quantity: abs((int)$item['quantity']),
-                pricePerUnit: (string)$item['retail_price'],
-                totalRevenue: (string)abs($retailAmount),
+                quantity: abs((int) $item['quantity']),
+                pricePerUnit: (string) $item['retail_price'],
+                totalRevenue: (string) abs($retailAmount),
                 rawData: null // Не дублируем данные
             );
         }
@@ -133,7 +134,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function fetchCosts(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         $connection = $this->getConnection($company);
 
@@ -141,7 +142,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Wildberries connection not found');
         }
 
-        $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
@@ -157,118 +158,118 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $costs = [];
 
         foreach ($data as $item) {
-            $realizationId = (string)$item['realizationreport_id'];
+            $realizationId = (string) $item['realizationreport_id'];
             $saName = $item['sa_name']; // Артикул поставщика
             $rrDt = new \DateTimeImmutable($item['rr_dt']);
 
             // Комиссия WB (commission_percent)
-            if (isset($item['commission_percent']) && abs((float)$item['commission_percent']) > 0) {
+            if (isset($item['commission_percent']) && abs((float) $item['commission_percent']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_commission',
-                    amount: (string)abs((float)$item['commission_percent']),
+                    amount: (string) abs((float) $item['commission_percent']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Комиссия Wildberries',
-                    externalId: $realizationId . '_commission',
+                    externalId: $realizationId.'_commission',
                     rawData: $item
                 );
             }
 
             // Логистика (delivery_rub)
-            if (isset($item['delivery_rub']) && abs((float)$item['delivery_rub']) > 0) {
+            if (isset($item['delivery_rub']) && abs((float) $item['delivery_rub']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_logistics',
-                    amount: (string)abs((float)$item['delivery_rub']),
+                    amount: (string) abs((float) $item['delivery_rub']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Логистика WB',
-                    externalId: $realizationId . '_logistics',
+                    externalId: $realizationId.'_logistics',
                     rawData: $item
                 );
             }
 
             // Возврат логистики (return_amount)
-            if (isset($item['return_amount']) && abs((float)$item['return_amount']) > 0) {
+            if (isset($item['return_amount']) && abs((float) $item['return_amount']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_return_logistics',
-                    amount: (string)abs((float)$item['return_amount']),
+                    amount: (string) abs((float) $item['return_amount']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Логистика возврата WB',
-                    externalId: $realizationId . '_return_logistics',
+                    externalId: $realizationId.'_return_logistics',
                     rawData: $item
                 );
             }
 
             // Хранение (storage_fee)
-            if (isset($item['storage_fee']) && abs((float)$item['storage_fee']) > 0) {
+            if (isset($item['storage_fee']) && abs((float) $item['storage_fee']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_storage',
-                    amount: (string)abs((float)$item['storage_fee']),
+                    amount: (string) abs((float) $item['storage_fee']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Хранение на складе WB',
-                    externalId: $realizationId . '_storage',
+                    externalId: $realizationId.'_storage',
                     rawData: $item
                 );
             }
 
             // Платная приёмка (acceptance)
-            if (isset($item['acceptance']) && abs((float)$item['acceptance']) > 0) {
+            if (isset($item['acceptance']) && abs((float) $item['acceptance']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_acceptance',
-                    amount: (string)abs((float)$item['acceptance']),
+                    amount: (string) abs((float) $item['acceptance']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Платная приёмка WB',
-                    externalId: $realizationId . '_acceptance',
+                    externalId: $realizationId.'_acceptance',
                     rawData: $item
                 );
             }
 
             // Прочие удержания (deduction)
-            if (isset($item['deduction']) && abs((float)$item['deduction']) > 0) {
+            if (isset($item['deduction']) && abs((float) $item['deduction']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_deduction',
-                    amount: (string)abs((float)$item['deduction']),
+                    amount: (string) abs((float) $item['deduction']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Прочие удержания WB',
-                    externalId: $realizationId . '_deduction',
+                    externalId: $realizationId.'_deduction',
                     rawData: $item
                 );
             }
 
             // Штрафы (penalty)
-            if (isset($item['penalty']) && abs((float)$item['penalty']) > 0) {
+            if (isset($item['penalty']) && abs((float) $item['penalty']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_penalty',
-                    amount: (string)abs((float)$item['penalty']),
+                    amount: (string) abs((float) $item['penalty']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Штрафы WB',
-                    externalId: $realizationId . '_penalty',
+                    externalId: $realizationId.'_penalty',
                     rawData: $item
                 );
             }
 
             // Доплаты (additional_payment)
-            if (isset($item['additional_payment']) && abs((float)$item['additional_payment']) > 0) {
+            if (isset($item['additional_payment']) && abs((float) $item['additional_payment']) > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_additional_payment',
-                    amount: (string)abs((float)$item['additional_payment']),
+                    amount: (string) abs((float) $item['additional_payment']),
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Доплаты WB',
-                    externalId: $realizationId . '_additional_payment',
+                    externalId: $realizationId.'_additional_payment',
                     rawData: $item
                 );
             }
@@ -280,7 +281,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function fetchReturns(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         $connection = $this->getConnection($company);
 
@@ -288,7 +289,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Wildberries connection not found');
         }
 
-        $response = $this->httpClient->request('GET', self::BASE_URL . '/api/v5/supplier/reportDetailByPeriod', [
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
@@ -305,7 +306,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         foreach ($data as $item) {
             // Фильтрация: только возвраты (doc_type_name = "Возврат")
-            if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Возврат') {
+            if (!isset($item['doc_type_name']) || 'Возврат' !== $item['doc_type_name']) {
                 continue;
             }
 
@@ -313,11 +314,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 marketplace: MarketplaceType::WILDBERRIES,
                 marketplaceSku: $item['sa_name'],
                 returnDate: new \DateTimeImmutable($item['rr_dt']),
-                quantity: abs((int)$item['quantity']),
-                refundAmount: (string)abs((float)($item['retail_amount'] ?? 0)),
+                quantity: abs((int) $item['quantity']),
+                refundAmount: (string) abs((float) ($item['retail_amount'] ?? 0)),
                 returnReason: $item['supplier_oper_name'] ?? null,
-                returnLogisticsCost: isset($item['return_amount']) ? (string)abs((float)$item['return_amount']) : null,
-                externalReturnId: (string)$item['realizationreport_id'],
+                returnLogisticsCost: isset($item['return_amount']) ? (string) abs((float) $item['return_amount']) : null,
+                externalReturnId: (string) $item['realizationreport_id'],
                 rawData: $item
             );
         }

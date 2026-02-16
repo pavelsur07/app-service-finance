@@ -11,7 +11,6 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
-use App\Entity\Counterparty;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
@@ -109,7 +108,7 @@ final class ClientBank1CImportServiceSoftDeleteTest extends IntegrationTestCase
         ));
         self::assertCount(1, $deletedTransactions);
         self::assertSame($originalTransaction->getId(), $deletedTransactions[0]->getId());
-        self::assertSame($originalDeletedAt?->format(DATE_ATOM), $deletedTransactions[0]->getDeletedAt()?->format(DATE_ATOM));
+        self::assertSame($originalDeletedAt?->format(\DATE_ATOM), $deletedTransactions[0]->getDeletedAt()?->format(\DATE_ATOM));
         self::assertSame('Первичное назначение', $deletedTransactions[0]->getDescription());
 
         $activeTransactions = array_values(array_filter(

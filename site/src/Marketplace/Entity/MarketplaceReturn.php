@@ -65,7 +65,7 @@ class MarketplaceReturn
         string $id,
         Company $company,
         Product $product,
-        MarketplaceType $marketplace
+        MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
         $this->id = $id;

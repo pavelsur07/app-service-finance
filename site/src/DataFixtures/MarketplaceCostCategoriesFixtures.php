@@ -41,7 +41,7 @@ class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixt
             $existing = $manager->getRepository(MarketplaceCostCategory::class)
                 ->findOneBy([
                     'company' => $company,
-                    'code' => $cat['code']
+                    'code' => $cat['code'],
                 ]);
 
             if ($existing) {

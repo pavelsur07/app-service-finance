@@ -68,7 +68,7 @@ class MarketplaceCost
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        MarketplaceCostCategory $category
+        MarketplaceCostCategory $category,
     ) {
         Assert::uuid($id);
         $this->id = $id;

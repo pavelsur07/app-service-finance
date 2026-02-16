@@ -54,4 +54,3 @@ final class PlRecalcFormType extends AbstractType
         ]);
     }
 }
-

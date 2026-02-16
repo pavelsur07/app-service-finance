@@ -130,7 +130,7 @@ final readonly class ProfitWidgetBuilder
     }
 
     /**
-     * @param list<string>                      $categoryIds
+     * @param list<string> $categoryIds
      * @param array<string,array<string,float>> $rawValues
      */
     private function sumByCategoryIds(array $categoryIds, array $rawValues): float
