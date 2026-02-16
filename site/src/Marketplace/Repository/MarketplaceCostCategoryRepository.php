@@ -4,6 +4,7 @@ namespace App\Marketplace\Repository;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCostCategory;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -29,12 +30,17 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findByCode(Company $company, string $code): ?MarketplaceCostCategory
-    {
+    public function findByCode(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $code
+    ): ?MarketplaceCostCategory {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
+            ->andWhere('c.marketplace = :marketplace')
             ->andWhere('c.code = :code')
             ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
             ->setParameter('code', $code)
             ->getQuery()
             ->getOneOrNullResult();

@@ -10,9 +10,13 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
+use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
+use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
+use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -20,15 +24,26 @@ use Ramsey\Uuid\Uuid;
 
 class MarketplaceSyncService
 {
+    /** @var CostCalculatorInterface[] */
+    private array $costCalculators;
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly ProductRepository $productRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
+        private readonly MarketplaceCostRepository $costRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly LoggerInterface $logger
-    ) {}
+    ) {
+        // Регистрируем калькуляторы затрат
+        $this->costCalculators = [
+            new WbCommissionCalculator(),
+            new WbAcquiringCalculator(),
+            // Легко добавить новые: new WbPenaltyCalculator(),
+        ];
+    }
 
     public function processSalesFromRaw(
         Company $company,
@@ -336,6 +351,122 @@ class MarketplaceSyncService
         return $synced;
     }
 
+    public function processCostsFromRaw(
+        Company $company,
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+    ): int {
+        $rawData = $rawDoc->getRawData();
+        $synced = 0;
+
+        foreach ($rawData as $item) {
+            try {
+                // Проверяем все калькуляторы
+                foreach ($this->costCalculators as $calculator) {
+                    if (!$calculator->supports($item)) {
+                        continue;
+                    }
+
+                    // Получаем данные для поиска listing
+                    $nmId = (string)($item['nm_id'] ?? '');
+                    $tsName = trim($item['ts_name'] ?? '');
+                    $tsName = ($tsName === '') ? null : $tsName;
+
+                    // Ищем Listing
+                    $listing = $this->listingRepository->findByNmIdAndSize(
+                        $company,
+                        \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                        $nmId,
+                        $tsName
+                    );
+
+                    if (!$listing) {
+                        $this->logger->warning('Listing not found for cost calculation', [
+                            'nm_id' => $nmId,
+                            'ts_name' => $tsName,
+                            'calculator' => get_class($calculator)
+                        ]);
+                        continue;
+                    }
+
+                    // Рассчитываем затраты
+                    $costsData = $calculator->calculate($item, $listing);
+
+                    foreach ($costsData as $costData) {
+                        // Проверка дубликата
+                        $existing = $this->costRepository->findOneBy([
+                            'company' => $company,
+                            'externalId' => $costData['external_id']
+                        ]);
+
+                        if ($existing) {
+                            continue;
+                        }
+
+                        // Найти или создать категорию
+                        $category = $this->costCategoryRepository->findByCode(
+                            $company,
+                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                            $costData['category_code']
+                        );
+
+                        if (!$category) {
+                            // Создаём категорию автоматически
+                            $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                                Uuid::uuid4()->toString(),
+                                $company,
+                                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                            );
+                            $category->setCode($costData['category_code']);
+                            $category->setName($costData['description'] ?? $costData['category_code']);
+
+                            $this->em->persist($category);
+                            $this->em->flush(); // Сразу flush для категории
+
+                            $this->logger->info('Cost category auto-created', [
+                                'code' => $costData['category_code'],
+                                'marketplace' => 'wildberries'
+                            ]);
+                        }
+
+                        // Создать Cost
+                        $cost = new MarketplaceCost(
+                            Uuid::uuid4()->toString(),
+                            $company,
+                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                            $category
+                        );
+
+                        $cost->setExternalId($costData['external_id']);
+                        $cost->setCostDate($costData['cost_date']);
+                        $cost->setAmount($costData['amount']);
+                        $cost->setProduct($listing->getProduct());
+                        $cost->setDescription($costData['description']);
+
+                        $this->em->persist($cost);
+                        $synced++;
+                    }
+                }
+
+            } catch (\Exception $e) {
+                $this->logger->error('Failed to process cost item', [
+                    'srid' => $item['srid'] ?? 'unknown',
+                    'error' => $e->getMessage()
+                ]);
+                continue;
+            }
+        }
+
+        // Финальный flush для Costs
+        $this->em->flush();
+
+        $this->logger->info('Costs processing completed', [
+            'total_synced' => $synced,
+            'total_records' => count($rawData)
+        ]);
+
+        return $synced;
+    }
+
     public function syncSales(
         Company $company,
         MarketplaceAdapterInterface $adapter,
@@ -425,7 +556,11 @@ class MarketplaceSyncService
         $synced = 0;
 
         foreach ($costsData as $costData) {
-            $category = $this->costCategoryRepository->findByCode($company, $costData->categoryCode);
+            $category = $this->costCategoryRepository->findByCode(
+                $company,
+                $costData->marketplace,
+                $costData->categoryCode
+            );
 
             if (!$category) {
                 continue;

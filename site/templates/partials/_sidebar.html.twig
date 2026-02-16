@@ -245,6 +245,11 @@
                                 <span>Возвраты WB</span>
                             </a>
 
+                            {% set marketplace_costs_active = current_route starts with 'marketplace_costs_' %}
+                            <a class="dropdown-item {{ marketplace_costs_active ? 'active' : '' }}" href="{{ path('marketplace_costs_index') }}">
+                                <span>Затраты WB</span>
+                            </a>
+
                             {% set marketplace_products_active = current_route starts with 'marketplace_products_' %}
                             <a class="dropdown-item {{ marketplace_products_active ? 'active' : '' }}" href="{{ path('marketplace_products_index') }}">
                                 <span>Товары WB</span>

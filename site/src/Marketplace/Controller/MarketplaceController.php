@@ -3,7 +3,6 @@
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Entity\MarketplaceConnection;
-use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -244,6 +243,30 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_index');
     }
 
+    #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
+    public function processCosts(
+        string $id,
+        MarketplaceSyncService $syncService
+    ): Response {
+        $company = $this->companyContext->getCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        try {
+            $count = $syncService->processCostsFromRaw($company, $rawDoc);
+
+            $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ошибка обработки затрат: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
     #[Route('/sales', name: 'marketplace_sales_index')]
     public function salesIndex(Request $request): Response
     {
@@ -280,6 +303,26 @@ class MarketplaceController extends AbstractController
         );
 
         return $this->render('marketplace/returns.html.twig', [
+            'pager' => $pagerfanta,
+        ]);
+    }
+
+    #[Route('/costs', name: 'marketplace_costs_index')]
+    public function costsIndex(Request $request): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
+            ->getByCompanyQueryBuilder($company);
+
+        $adapter = new QueryAdapter($queryBuilder);
+        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            $adapter,
+            $request->query->get('page', 1),
+            50
+        );
+
+        return $this->render('marketplace/costs.html.twig', [
             'pager' => $pagerfanta,
         ]);
     }

@@ -1,0 +1,130 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Затраты{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Затраты Wildberries</h2>
+                </div>
+                <div class="col-auto">
+                    <a href="{{ path('marketplace_index') }}" class="btn">
+                        ← Назад к интеграциям
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Дата</th>
+                            <th>Категория</th>
+                            <th>Товар</th>
+                            <th class="text-end">Сумма</th>
+                            <th>Описание</th>
+                            <th>ID</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% if pager.nbResults == 0 %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted">
+                                    <div class="empty">
+                                        <div class="empty-icon">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></svg>
+                                        </div>
+                                        <p class="empty-title">Нет данных о затратах</p>
+                                        <p class="empty-subtitle text-muted">
+                                            Затраты появятся после обработки данных
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% else %}
+                            {% for cost in pager.currentPageResults %}
+                                <tr>
+                                    <td>
+                                        {{ cost.costDate|date('d.m.Y') }}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-purple-lt">{{ cost.category.name }}</span>
+                                    </td>
+                                    <td>
+                                        {% if cost.product %}
+                                            <strong>{{ cost.product.name }}</strong>
+                                        {% else %}
+                                            <span class="text-muted">Общие затраты</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end text-danger">
+                                        <strong>-{{ cost.amount|number_format(2, '.', ' ') }} ₽</strong>
+                                    </td>
+                                    <td>
+                                        {% if cost.description %}
+                                            <small class="text-muted">{{ cost.description }}</small>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cost.externalId %}
+                                            <small class="text-muted">{{ cost.externalId|slice(0, 15) }}...</small>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        {% endif %}
+                        </tbody>
+                        {% if pager.nbResults > 0 %}
+                            <tfoot>
+                            <tr>
+                                <th colspan="3">На странице:</th>
+                                <th class="text-end text-danger">
+                                    <strong>-{{ pager.currentPageResults|reduce((carry, c) => carry + c.amount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                                </th>
+                                <th colspan="2"></th>
+                            </tr>
+                            </tfoot>
+                        {% endif %}
+                    </table>
+                </div>
+
+                {% if pager.haveToPaginate %}
+                    <div class="card-footer d-flex align-items-center">
+                        {% include '_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_costs_index'} %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if pager.nbResults > 0 %}
+                <div class="card mt-3">
+                    <div class="card-body">
+                        <h3 class="card-title">Статистика</h3>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="text-muted">Всего затрат</div>
+                                <div class="h2 mb-0">{{ pager.nbResults }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="text-muted">На текущей странице</div>
+                                <div class="h2 mb-0 text-danger">
+                                    -{{ pager.currentPageResults|reduce((carry, c) => carry + c.amount, 0)|number_format(2, '.', ' ') }} ₽
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}

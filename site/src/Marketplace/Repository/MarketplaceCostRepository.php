@@ -6,6 +6,7 @@ use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MarketplaceCostRepository extends ServiceEntityRepository
@@ -13,6 +14,14 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, MarketplaceCost::class);
+    }
+
+    public function getByCompanyQueryBuilder(Company $company): QueryBuilder
+    {
+        return $this->createQueryBuilder('c')
+            ->where('c.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('c.costDate', 'DESC');
     }
 
     /**

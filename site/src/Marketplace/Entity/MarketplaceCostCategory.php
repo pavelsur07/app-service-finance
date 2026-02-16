@@ -4,6 +4,7 @@ namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -11,7 +12,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MarketplaceCostCategoryRepository::class)]
 #[ORM\Table(name: 'marketplace_cost_categories')]
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_category_company')]
-#[ORM\UniqueConstraint(name: 'uniq_company_code', columns: ['company_id', 'code'])]
+#[ORM\UniqueConstraint(name: 'uniq_company_marketplace_code', columns: ['company_id', 'marketplace', 'code'])]
 class MarketplaceCostCategory
 {
     #[ORM\Id]
@@ -22,11 +23,14 @@ class MarketplaceCostCategory
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private Company $company;
 
+    #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
+    private MarketplaceType $marketplace;
+
     #[ORM\Column(length: 100)]
     private string $name; // "Комиссия Wildberries", "Логистика до клиента"
 
     #[ORM\Column(length: 50)]
-    private string $code; // "commission_wb", "logistics", "advertising"
+    private string $code; // "commission", "logistics", "advertising"
 
     #[ORM\ManyToOne(targetEntity: PLCategory::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -44,11 +48,12 @@ class MarketplaceCostCategory
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    public function __construct(string $id, Company $company)
+    public function __construct(string $id, Company $company, MarketplaceType $marketplace)
     {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
+        $this->marketplace = $marketplace;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -61,6 +66,11 @@ class MarketplaceCostCategory
     public function getCompany(): Company
     {
         return $this->company;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
     }
 
     public function getName(): string
