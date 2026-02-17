@@ -1,0 +1,184 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'cost_categories' %}
+
+{% block tab_content %}
+    <div class="card-header">
+        <div class="col">
+            <h3 class="card-title">Справочник категорий затрат</h3>
+        </div>
+        <div class="card-actions">
+            <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-category">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                Добавить категорию
+            </a>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+            <tr>
+                <th>Название</th>
+                <th>Код</th>
+                <th>Маркетплейс</th>
+                <th>Описание</th>
+                <th>Статус</th>
+                <th>Создан</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if categories is empty %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted py-4">
+                        <div class="empty">
+                            <div class="empty-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="9" y1="6" x2="20" y2="6" /><line x1="9" y1="12" x2="20" y2="12" /><line x1="9" y1="18" x2="20" y2="18" /><line x1="4" y1="6" x2="4" y2="6.01" /><line x1="4" y1="12" x2="4" y2="12.01" /><line x1="4" y1="18" x2="4" y2="18.01" /></svg>
+                            </div>
+                            <p class="empty-title">Нет категорий затрат</p>
+                            <p class="empty-subtitle text-muted">Категории создаются автоматически при обработке затрат или вручную</p>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                {% for category in categories %}
+                    <tr>
+                        <td><strong>{{ category.name }}</strong></td>
+                        <td><code class="text-muted">{{ category.code }}</code></td>
+                        <td><span class="badge bg-azure">{{ category.marketplace.displayName }}</span></td>
+                        <td>
+                            {% if category.description %}
+                                <small class="text-muted">{{ category.description }}</small>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if category.isActive %}
+                                <span class="badge bg-success">Активна</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Неактивна</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ category.createdAt|date('d.m.Y') }}</small></td>
+                        <td class="text-end">
+                            <div class="btn-list">
+                                <a href="#"
+                                   class="btn btn-sm btn-ghost-secondary"
+                                   data-bs-toggle="modal"
+                                   data-bs-target="#modal-edit-category"
+                                   data-id="{{ category.id }}"
+                                   data-name="{{ category.name }}"
+                                   data-code="{{ category.code }}"
+                                   data-description="{{ category.description }}"
+                                   data-is-active="{{ category.isActive ? '1' : '0' }}">
+                                    Редактировать
+                                </a>
+                                <a href="{{ path('marketplace_cost_categories_toggle', {id: category.id}) }}"
+                                   class="btn btn-sm btn-ghost-{{ category.isActive ? 'warning' : 'success' }}">
+                                    {{ category.isActive ? 'Деактивировать' : 'Активировать' }}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if categories is not empty %}
+        <div class="card-footer text-muted">
+            Всего: {{ categories|length }} |
+            Активных: <strong class="text-success">{{ categories|filter(c => c.isActive)|length }}</strong> |
+            Неактивных: <strong class="text-secondary">{{ categories|filter(c => not c.isActive)|length }}</strong>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% block modals %}
+    {# Modal: Добавить категорию #}
+    <div class="modal modal-blur fade" id="modal-add-category" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('marketplace_cost_categories_create') }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Новая категория затрат</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Маркетплейс</label>
+                            <select name="marketplace" class="form-select" required>
+                                {% for marketplace in availableMarketplaces %}
+                                    <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Название</label>
+                            <input type="text" name="name" class="form-control" placeholder="Например: Комиссия маркетплейса" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Код</label>
+                            <input type="text" name="code" class="form-control" placeholder="Например: commission" required>
+                            <small class="form-hint">Латиница, без пробелов. Используется в коде для привязки затрат.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Описание</label>
+                            <textarea name="description" class="form-control" rows="2" placeholder="Необязательно"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Редактировать категорию #}
+    <div class="modal modal-blur fade" id="modal-edit-category" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="form-edit-category" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Редактировать категорию</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Название</label>
+                            <input type="text" name="name" id="edit-name" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Код</label>
+                            <input type="text" name="code" id="edit-code" class="form-control" required>
+                            <small class="form-hint">Изменение кода может сломать автообработку затрат.</small>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Описание</label>
+                            <textarea name="description" id="edit-description" class="form-control" rows="2"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('modal-edit-category').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('edit-name').value = btn.getAttribute('data-name');
+            document.getElementById('edit-code').value = btn.getAttribute('data-code');
+            document.getElementById('edit-description').value = btn.getAttribute('data-description') || '';
+            document.getElementById('form-edit-category').action = '/marketplace/cost-categories/' + btn.getAttribute('data-id') + '/edit';
+        });
+    </script>
+{% endblock %}
