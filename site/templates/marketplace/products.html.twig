@@ -1,118 +1,80 @@
-{% extends 'base.html.twig' %}
+{% extends 'marketplace/layout.html.twig' %}
 
-{% block title %}Товары на маркетплейсах{% endblock %}
+{% set active_tab = 'listings' %}
 
-{% block body %}
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Товары на маркетплейсах</h2>
+{% block tab_content %}
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+            <tr>
+                <th>Маркетплейс</th>
+                <th>Артикул (SKU)</th>
+                <th>Название товара</th>
+                <th class="text-end">Цена продажи</th>
+                <th>Статус</th>
+                <th>Создан</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if listings is empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">
+                        <div class="empty">
+                            <div class="empty-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>
+                            </div>
+                            <p class="empty-title">Нет товаров</p>
+                            <p class="empty-subtitle text-muted">Товары создаются автоматически при обработке продаж</p>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                {% for listing in listings %}
+                    <tr>
+                        <td><span class="badge bg-azure">{{ listing.marketplace.displayName }}</span></td>
+                        <td><span class="badge bg-azure-lt">{{ listing.marketplaceSku }}</span></td>
+                        <td>
+                            <strong>{{ listing.product.name }}</strong>
+                            <div class="text-muted small">SKU: {{ listing.product.sku }}</div>
+                        </td>
+                        <td class="text-end">
+                            {% if listing.price %}
+                                {{ listing.price|number_format(2, '.', ' ') }} ₽
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if listing.isActive %}
+                                <span class="badge bg-success">Активен</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Неактивен</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ listing.createdAt|date('d.m.Y H:i') }}</small></td>
+                    </tr>
+                {% endfor %}
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if listings is not empty %}
+        <div class="card-footer">
+            <div class="row">
+                <div class="col-auto">
+                    <span class="text-muted">Всего:</span>
+                    <strong>{{ listings|length }}</strong>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ path('marketplace_index') }}" class="btn">
-                        ← Назад к интеграциям
-                    </a>
+                    <span class="text-muted">Активных:</span>
+                    <strong class="text-success">{{ listings|filter(l => l.isActive)|length }}</strong>
+                </div>
+                <div class="col-auto">
+                    <span class="text-muted">Неактивных:</span>
+                    <strong class="text-secondary">{{ listings|filter(l => not l.isActive)|length }}</strong>
                 </div>
             </div>
         </div>
-    </div>
-
-    <div class="page-body">
-        <div class="container-xl">
-            <div class="card">
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
-                        <thead>
-                        <tr>
-                            <th>Маркетплейс</th>
-                            <th>Артикул (SKU)</th>
-                            <th>Название товара</th>
-                            <th class="text-end">Цена продажи</th>
-                            <th>Статус</th>
-                            <th>Создан</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% if listings is empty %}
-                            <tr>
-                                <td colspan="6" class="text-center text-muted py-4">
-                                    <div class="empty">
-                                        <div class="empty-icon">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="6" cy="19" r="2" /><circle cx="17" cy="19" r="2" /><path d="M17 17h-11v-14h-2" /><path d="M6 5l14 1l-1 7h-13" /></svg>
-                                        </div>
-                                        <p class="empty-title">Нет товаров</p>
-                                        <p class="empty-subtitle text-muted">
-                                            Товары создаются автоматически при обработке продаж
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% else %}
-                            {% for listing in listings %}
-                                <tr>
-                                    <td>
-                                        <span class="badge bg-azure">{{ listing.marketplace.displayName }}</span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-azure-lt">{{ listing.marketplaceSku }}</span>
-                                    </td>
-                                    <td>
-                                        <strong>{{ listing.product.name }}</strong>
-                                        <div class="text-muted small">
-                                            Internal SKU: {{ listing.product.sku }}
-                                        </div>
-                                    </td>
-                                    <td class="text-end">
-                                        {% if listing.price %}
-                                            {{ listing.price|number_format(2, '.', ' ') }} ₽
-                                        {% else %}
-                                            <span class="text-muted">—</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if listing.isActive %}
-                                            <span class="badge bg-success">Активен</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">Неактивен</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <small class="text-muted">{{ listing.createdAt|date('d.m.Y H:i') }}</small>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                        {% endif %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            {% if listings is not empty %}
-                <div class="card mt-3">
-                    <div class="card-body">
-                        <h3 class="card-title">Статистика</h3>
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="text-muted">Всего товаров</div>
-                                <div class="h2 mb-0">{{ listings|length }}</div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-muted">Активных</div>
-                                <div class="h2 mb-0 text-success">
-                                    {{ listings|filter(l => l.isActive)|length }}
-                                </div>
-                            </div>
-                            <div class="col-md-4">
-                                <div class="text-muted">Неактивных</div>
-                                <div class="h2 mb-0 text-secondary">
-                                    {{ listings|filter(l => not l.isActive)|length }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-        </div>
-    </div>
+    {% endif %}
 {% endblock %}

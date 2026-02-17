@@ -235,26 +235,6 @@
                                 <span>Маркетплейсы</span>
                             </a>
 
-                            {% set marketplace_sales_active = current_route starts with 'marketplace_sales_' %}
-                            <a class="dropdown-item {{ marketplace_sales_active ? 'active' : '' }}" href="{{ path('marketplace_sales_index') }}">
-                                <span>Продажи WB</span>
-                            </a>
-
-                            {% set marketplace_returns_active = current_route starts with 'marketplace_returns_' %}
-                            <a class="dropdown-item {{ marketplace_returns_active ? 'active' : '' }}" href="{{ path('marketplace_returns_index') }}">
-                                <span>Возвраты WB</span>
-                            </a>
-
-                            {% set marketplace_costs_active = current_route starts with 'marketplace_costs_' %}
-                            <a class="dropdown-item {{ marketplace_costs_active ? 'active' : '' }}" href="{{ path('marketplace_costs_index') }}">
-                                <span>Затраты WB</span>
-                            </a>
-
-                            {% set marketplace_products_active = current_route starts with 'marketplace_products_' %}
-                            <a class="dropdown-item {{ marketplace_products_active ? 'active' : '' }}" href="{{ path('marketplace_products_index') }}">
-                                <span>Товары WB</span>
-                            </a>
-
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
                             <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('integrations_marketplace_index') }}">
                                 <span>Маркетплейс интеграций</span>
