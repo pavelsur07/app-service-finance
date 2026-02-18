@@ -102,6 +102,7 @@ jobs:
                     DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                     POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
                     SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}" \
+                    SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
                     echo "🧹 Очистка старых слоев Docker"
@@ -133,6 +134,7 @@ jobs:
                     DATABASE_URL="${{ secrets.DATABASE_URL }}" \
                     POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
                     SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}" \
+                    SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
                     docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"
                   EOF
