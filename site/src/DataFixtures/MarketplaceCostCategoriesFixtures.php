@@ -15,7 +15,7 @@ class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixt
     public function load(ObjectManager $manager): void
     {
         /** @var Company $company */
-        $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA, Company::class);
+        $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA);
 
         $categories = [
             // Wildberries
@@ -60,6 +60,24 @@ class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixt
                 'code' => 'advertising',
                 'name' => 'Реклама',
                 'description' => 'Расходы на рекламу на WB',
+            ],
+            [
+                'marketplace' => MarketplaceType::WILDBERRIES,
+                'code' => 'pvz_processing',
+                'name' => 'Логистика обработка на ПВЗ',
+                'description' => 'Возмещение за выдачу и возврат товаров на ПВЗ',
+            ],
+            [
+                'marketplace' => MarketplaceType::WILDBERRIES,
+                'code' => 'warehouse_logistics',
+                'name' => 'Логистика складские операции',
+                'description' => 'Возмещение издержек по перевозке/по складским операциям',
+            ],
+            [
+                'marketplace' => MarketplaceType::WILDBERRIES,
+                'code' => 'wb_loyalty_discount_compensation',
+                'name' => 'Компенсация скидки по программе лояльности WB',
+                'description' => 'Компенсация скидки по программе лояльности',
             ],
         ];
 

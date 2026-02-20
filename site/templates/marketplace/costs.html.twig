@@ -3,6 +3,32 @@
 {% set active_tab = 'costs' %}
 
 {% block tab_content %}
+    <div class="card-header">
+        <h3 class="card-title">Фильтр</h3>
+    </div>
+    <div class="card-body border-bottom">
+        <form method="get" action="{{ path('marketplace_costs_index') }}" class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Категория</label>
+                <select name="category" class="form-select" onchange="this.form.submit()">
+                    <option value="">Все категории</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}" {{ selectedCategoryId == category.id ? 'selected' : '' }}>
+                            {{ category.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                {% if selectedCategoryId %}
+                    <a href="{{ path('marketplace_costs_index') }}" class="btn btn-outline-secondary">
+                        Сбросить
+                    </a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
     <div class="table-responsive">
         <table class="table card-table table-vcenter">
             <thead>

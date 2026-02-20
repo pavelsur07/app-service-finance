@@ -17,12 +17,16 @@ use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
 use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
+use App\Marketplace\Service\CostCalculator\WbDeductionCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
+use App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator;
+use App\Marketplace\Service\CostCalculator\WbPenaltyCalculator;
 use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
+use App\Shared\Service\SlugifyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -40,7 +44,8 @@ class MarketplaceSyncService
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly MarketplaceCostRepository $costRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
-        private readonly LoggerInterface $logger
+        private readonly LoggerInterface $logger,
+        private readonly SlugifyService $slugify
     ) {
         // Регистрируем калькуляторы затрат
         $this->costCalculators = [
@@ -51,7 +56,9 @@ class MarketplaceSyncService
             new WbStorageCalculator(),
             new WbPvzProcessingCalculator(),
             new WbWarehouseLogisticsCalculator(),
-            // Легко добавить новые: new WbPenaltyCalculator(),
+            new WbPenaltyCalculator(),
+            new WbDeductionCalculator($this->slugify),
+            new WbLoyaltyDiscountCalculator(),
         ];
     }
 
@@ -428,13 +435,19 @@ class MarketplaceSyncService
                                 \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
                             );
                             $category->setCode($costData['category_code']);
-                            $category->setName($costData['description'] ?? $costData['category_code']);
+
+                            // Используем category_name если есть, иначе description или code
+                            $categoryName = $costData['category_name']
+                                ?? $costData['description']
+                                ?? $costData['category_code'];
+                            $category->setName($categoryName);
 
                             $this->em->persist($category);
                             $this->em->flush();
 
                             $this->logger->info('Cost category auto-created', [
                                 'code' => $costData['category_code'],
+                                'name' => $categoryName,
                                 'marketplace' => 'wildberries'
                             ]);
                         }

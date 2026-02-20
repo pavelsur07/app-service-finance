@@ -55,11 +55,17 @@ class MarketplaceRawDocument
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $syncNotes = null; // Заметки о синхронизации (ошибки, предупреждения)
 
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $unprocessedCostsCount = 0; // Количество нераспознанных затрат
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $unprocessedCostTypes = null; // {"Платная приёмка": 3, "Доплата": 2}
+
     public function __construct(
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        string $documentType,
+        string $documentType
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -163,7 +169,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsCreated(): self
     {
-        ++$this->recordsCreated;
+        $this->recordsCreated++;
 
         return $this;
     }
@@ -182,7 +188,7 @@ class MarketplaceRawDocument
 
     public function incrementRecordsSkipped(): self
     {
-        ++$this->recordsSkipped;
+        $this->recordsSkipped++;
 
         return $this;
     }
@@ -207,10 +213,34 @@ class MarketplaceRawDocument
     public function addSyncNote(string $note): self
     {
         if ($this->syncNotes) {
-            $this->syncNotes .= "\n".$note;
+            $this->syncNotes .= "\n" . $note;
         } else {
             $this->syncNotes = $note;
         }
+
+        return $this;
+    }
+
+    public function getUnprocessedCostsCount(): int
+    {
+        return $this->unprocessedCostsCount;
+    }
+
+    public function setUnprocessedCostsCount(int $count): self
+    {
+        $this->unprocessedCostsCount = $count;
+
+        return $this;
+    }
+
+    public function getUnprocessedCostTypes(): ?array
+    {
+        return $this->unprocessedCostTypes;
+    }
+
+    public function setUnprocessedCostTypes(?array $types): self
+    {
+        $this->unprocessedCostTypes = $types;
 
         return $this;
     }

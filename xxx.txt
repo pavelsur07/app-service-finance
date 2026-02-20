@@ -1,0 +1,11 @@
+https://e1c6c983cfb747d39adce711d889d352@glitchtip.staging.vashfindir.ru/1
+curl https://e1c6c983cfb747d39adce711d889d352@glitchtip.staging.vashfindir.ru/1 \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -H "X-Sentry-Auth: Sentry sentry_version=7, sentry_key=abc123, sentry_client=test/1.0" \
+  -d '{
+        "event_id": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "message": "GlitchTip test event",
+        "level": "error",
+        "platform": "other"
+      }'

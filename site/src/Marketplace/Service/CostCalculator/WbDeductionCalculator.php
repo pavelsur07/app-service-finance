@@ -1,0 +1,64 @@
+<?php
+
+namespace App\Marketplace\Service\CostCalculator;
+
+use App\Marketplace\Entity\MarketplaceListing;
+use App\Shared\Service\SlugifyService;
+
+class WbDeductionCalculator implements CostCalculatorInterface
+{
+    public function __construct(
+        private readonly SlugifyService $slugify
+    ) {}
+
+    public function supports(array $item): bool
+    {
+        return ($item['supplier_oper_name'] ?? '') === 'Удержание';
+    }
+
+    public function requiresListing(): bool
+    {
+        return false; // Не блокируем — listing опционален
+    }
+
+    public function calculate(array $item, ?MarketplaceListing $listing): array
+    {
+        $deduction = (float)($item['deduction'] ?? 0);
+        $srid = (string)$item['srid'];
+        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+
+        // Обработка bonus_type_name
+        $bonusTypeName = (string)($item['bonus_type_name'] ?? '');
+
+        // Удаляем всё после запятой (включительно)
+        $commaPos = strpos($bonusTypeName, ',');
+        if ($commaPos !== false) {
+            $categoryName = trim(substr($bonusTypeName, 0, $commaPos));
+        } else {
+            $categoryName = trim($bonusTypeName);
+        }
+
+        // Если пусто - используем дефолт
+        if ($categoryName === '') {
+            $categoryName = 'Удержание';
+        }
+
+        // Генерируем code через SlugifyService: wb_ + slug
+        $categoryCode = $this->slugify->slugify($categoryName, 'wb_');
+
+        // Привязываем к товару только если listing найден
+        $product = $listing?->getProduct();
+
+        return [
+            [
+                'category_code' => $categoryCode,
+                'category_name' => $categoryName, // Передаём name для автосоздания
+                'amount' => (string)abs($deduction),
+                'external_id' => $srid . '_deduction',
+                'cost_date' => $saleDate,
+                'description' => $categoryName,
+                'product' => $product,
+            ],
+        ];
+    }
+}

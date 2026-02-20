@@ -392,8 +392,16 @@ class MarketplaceController extends AbstractController
     {
         $company = $this->companyContext->getCompany();
 
+        $categoryId = $request->query->get('category');
+
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
             ->getByCompanyQueryBuilder($company);
+
+        // Фильтр по категории
+        if ($categoryId) {
+            $queryBuilder->andWhere('c.category = :category')
+                ->setParameter('category', $categoryId);
+        }
 
         $adapter = new QueryAdapter($queryBuilder);
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
@@ -402,8 +410,14 @@ class MarketplaceController extends AbstractController
             50
         );
 
+        // Получаем все категории для фильтра
+        $categories = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCostCategory::class)
+            ->findByCompany($company);
+
         return $this->render('marketplace/costs.html.twig', [
             'pager' => $pagerfanta,
+            'categories' => $categories,
+            'selectedCategoryId' => $categoryId,
         ]);
     }
 
