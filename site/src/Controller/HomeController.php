@@ -34,7 +34,7 @@ class HomeController extends AbstractController
         $this->logger->info('Test INFO log for GlitchTip');
 
         // Ошибка
-        $this->logger->error('Test ERROR log for GlitchTip');
+        $this->logger->error('Test ERROR ERROR log for GlitchTip My');
 
         $startTime = microtime(true);
 
