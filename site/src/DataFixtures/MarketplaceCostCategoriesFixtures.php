@@ -15,7 +15,7 @@ class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixt
     public function load(ObjectManager $manager): void
     {
         /** @var Company $company */
-        $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA);
+        $company = $this->getReference(AppFixtures::REF_COMPANY_ROMASHKA, Company::class);
 
         $categories = [
             // Wildberries
@@ -101,6 +101,7 @@ class MarketplaceCostCategoriesFixtures extends Fixture implements DependentFixt
             $category->setCode($cat['code']);
             $category->setName($cat['name']);
             $category->setDescription($cat['description'] ?? null);
+            $category->setIsSystem(true); // Системная категория - нельзя удалить
 
             $manager->persist($category);
         }

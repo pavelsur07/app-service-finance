@@ -22,6 +22,7 @@
                 <th>Название</th>
                 <th>Код</th>
                 <th>Маркетплейс</th>
+                <th>Тип</th>
                 <th>Описание</th>
                 <th>Статус</th>
                 <th>Создан</th>
@@ -47,6 +48,16 @@
                         <td><strong>{{ category.name }}</strong></td>
                         <td><code class="text-muted">{{ category.code }}</code></td>
                         <td><span class="badge bg-azure">{{ category.marketplace.displayName }}</span></td>
+                        <td>
+                            {% if category.isSystem %}
+                                <span class="badge bg-blue-lt">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-shield-check" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3" /><path d="M9 12l2 2l4 -4" /></svg>
+                                    Системная
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">Автоматическая</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if category.description %}
                                 <small class="text-muted">{{ category.description }}</small>
@@ -79,6 +90,16 @@
                                    class="btn btn-sm btn-ghost-{{ category.isActive ? 'warning' : 'success' }}">
                                     {{ category.isActive ? 'Деактивировать' : 'Активировать' }}
                                 </a>
+                                {% if not category.isSystem %}
+                                    <a href="#"
+                                       class="btn btn-sm btn-ghost-danger"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#modal-delete-category"
+                                       data-id="{{ category.id }}"
+                                       data-name="{{ category.name }}">
+                                        Удалить
+                                    </a>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -172,6 +193,42 @@
         </div>
     </div>
 
+    {# Modal: Удалить категорию #}
+    <div class="modal modal-blur fade" id="modal-delete-category" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="form-delete-category">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Удалить категорию</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning" role="alert">
+                            <div class="d-flex">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" /><path d="M12 16h.01" /></svg>
+                                </div>
+                                <div>
+                                    <h4 class="alert-title">Внимание!</h4>
+                                    <div class="text-muted">
+                                        Вы действительно хотите удалить категорию <strong id="delete-category-name"></strong>?
+                                        <br><br>
+                                        <strong>Важно:</strong> Удаление возможно только если категория не содержит затрат.
+                                        Если категория содержит затраты, сначала удалите их или переназначьте на другую категорию.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger">Удалить категорию</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.getElementById('modal-edit-category').addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;
@@ -179,6 +236,15 @@
             document.getElementById('edit-code').value = btn.getAttribute('data-code');
             document.getElementById('edit-description').value = btn.getAttribute('data-description') || '';
             document.getElementById('form-edit-category').action = '/marketplace/cost-categories/' + btn.getAttribute('data-id') + '/edit';
+        });
+
+        document.getElementById('modal-delete-category').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            var categoryName = btn.getAttribute('data-name');
+            var categoryId = btn.getAttribute('data-id');
+
+            document.getElementById('delete-category-name').textContent = categoryName;
+            document.getElementById('form-delete-category').action = '/marketplace/cost-categories/' + categoryId + '/delete';
         });
     </script>
 {% endblock %}

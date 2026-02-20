@@ -5,6 +5,7 @@ namespace App\Marketplace\Controller;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -21,6 +22,7 @@ class MarketplaceCostCategoryController extends AbstractController
     public function __construct(
         private readonly CompanyContextService $companyContext,
         private readonly MarketplaceCostCategoryRepository $repository,
+        private readonly MarketplaceCostRepository $costRepository,
         private readonly EntityManagerInterface $em
     ) {}
 
@@ -137,6 +139,45 @@ class MarketplaceCostCategoryController extends AbstractController
 
         $status = $category->isActive() ? 'активирована' : 'деактивирована';
         $this->addFlash('success', sprintf('Категория "%s" %s', $category->getName(), $status));
+
+        return $this->redirectToRoute('marketplace_cost_categories_index');
+    }
+
+    #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'])]
+    public function delete(string $id): Response
+    {
+        $company = $this->companyContext->getCompany();
+
+        $category = $this->repository->find($id);
+
+        if (!$category || $category->getCompany()->getId() !== $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        // Проверка: системная категория
+        if ($category->isSystem()) {
+            $this->addFlash('error', 'Невозможно удалить системную категорию');
+            return $this->redirectToRoute('marketplace_cost_categories_index');
+        }
+
+        // Проверка: есть ли затраты
+        $costsCount = $this->costRepository->count(['category' => $category]);
+
+        if ($costsCount > 0) {
+            $this->addFlash('error', sprintf(
+                'Невозможно удалить категорию "%s". Она содержит %d затрат(ы). ' .
+                'Сначала удалите затраты или переназначьте их на другую категорию.',
+                $category->getName(),
+                $costsCount
+            ));
+            return $this->redirectToRoute('marketplace_cost_categories_index');
+        }
+
+        // Soft delete
+        $category->softDelete();
+        $this->em->flush();
+
+        $this->addFlash('success', sprintf('Категория "%s" удалена', $category->getName()));
 
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }

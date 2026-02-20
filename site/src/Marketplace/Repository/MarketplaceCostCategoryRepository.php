@@ -23,6 +23,7 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
             ->andWhere('c.isActive = :active')
+            ->andWhere('c.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('active', true)
             ->orderBy('c.name', 'ASC')
@@ -33,12 +34,13 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
     public function findByCode(
         Company $company,
         MarketplaceType $marketplace,
-        string $code,
+        string $code
     ): ?MarketplaceCostCategory {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
             ->andWhere('c.marketplace = :marketplace')
             ->andWhere('c.code = :code')
+            ->andWhere('c.deletedAt IS NULL')
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('code', $code)
