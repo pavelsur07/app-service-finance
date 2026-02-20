@@ -39,6 +39,12 @@ class MarketplaceCostCategory
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isSystem = false; // Системная категория (нельзя удалить)
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $deletedAt = null; // Soft delete
+
     #[ORM\Column(type: 'boolean')]
     private bool $isActive = true;
 
@@ -146,5 +152,37 @@ class MarketplaceCostCategory
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function isSystem(): bool
+    {
+        return $this->isSystem;
+    }
+
+    public function setIsSystem(bool $isSystem): self
+    {
+        $this->isSystem = $isSystem;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getDeletedAt(): ?\DateTimeImmutable
+    {
+        return $this->deletedAt;
+    }
+
+    public function softDelete(): self
+    {
+        $this->deletedAt = new \DateTimeImmutable();
+        $this->isActive = false;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function isDeleted(): bool
+    {
+        return $this->deletedAt !== null;
     }
 }
