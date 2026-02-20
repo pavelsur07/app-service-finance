@@ -374,8 +374,11 @@ class MarketplaceSyncService
     ): int {
         $rawData = $rawDoc->getRawData();
         $synced = 0;
-        $unprocessedTypes = []; // Собираем нераспознанные типы
-        $newCategories = []; // Категории для создания после цикла
+        $unprocessedTypes = [];
+        $newCategories = [];
+
+        $batchSize = 100; // Обрабатываем по 100 записей за раз
+        $counter = 0;
 
         foreach ($rawData as $item) {
             try {
@@ -385,16 +388,15 @@ class MarketplaceSyncService
                     continue;
                 }
 
-                $processed = false; // Флаг обработки
+                $processed = false;
 
                 foreach ($this->costCalculators as $calculator) {
                     if (!$calculator->supports($item)) {
                         continue;
                     }
 
-                    $processed = true; // Нашли калькулятор
+                    $processed = true;
 
-                    // Всегда пытаемся найти listing если есть nm_id
                     $listing = null;
                     $nmId = (string)($item['nm_id'] ?? '');
                     $tsName = trim($item['ts_name'] ?? '');
@@ -409,21 +411,13 @@ class MarketplaceSyncService
                         );
                     }
 
-                    // Если калькулятор требует listing — пропускаем при его отсутствии
                     if ($calculator->requiresListing() && !$listing) {
-                        $this->logger->warning('Listing not found for cost calculation', [
-                            'nm_id' => $nmId,
-                            'ts_name' => $tsName,
-                            'calculator' => get_class($calculator)
-                        ]);
                         continue;
                     }
 
-                    // Калькулятор сам решает что делать с $listing (может быть null)
                     $costsData = $calculator->calculate($item, $listing);
 
                     foreach ($costsData as $costData) {
-                        // Проверка дубликата
                         $existing = $this->costRepository->findOneBy([
                             'company' => $company,
                             'externalId' => $costData['external_id']
@@ -433,7 +427,6 @@ class MarketplaceSyncService
                             continue;
                         }
 
-                        // Найти или создать категорию
                         $categoryCode = $costData['category_code'];
                         $category = $this->costCategoryRepository->findByCode(
                             $company,
@@ -442,7 +435,6 @@ class MarketplaceSyncService
                         );
 
                         if (!$category) {
-                            // Проверяем не создали ли мы уже в этой сессии
                             if (!isset($newCategories[$categoryCode])) {
                                 $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
                                     Uuid::uuid4()->toString(),
@@ -451,7 +443,6 @@ class MarketplaceSyncService
                                 );
                                 $category->setCode($categoryCode);
 
-                                // Используем category_name если есть, иначе description или code
                                 $categoryName = $costData['category_name']
                                     ?? $costData['description']
                                     ?? $categoryCode;
@@ -459,17 +450,11 @@ class MarketplaceSyncService
 
                                 $this->em->persist($category);
                                 $newCategories[$categoryCode] = $category;
-
-                                $this->logger->info('Cost category queued for creation', [
-                                    'code' => $categoryCode,
-                                    'name' => $categoryName,
-                                ]);
                             } else {
                                 $category = $newCategories[$categoryCode];
                             }
                         }
 
-                        // Создать Cost
                         $cost = new MarketplaceCost(
                             Uuid::uuid4()->toString(),
                             $company,
@@ -482,17 +467,35 @@ class MarketplaceSyncService
                         $cost->setAmount($costData['amount']);
                         $cost->setDescription($costData['description']);
 
-                        // Product берём из costData (калькулятор сам решил)
                         if (isset($costData['product'])) {
                             $cost->setProduct($costData['product']);
                         }
 
                         $this->em->persist($cost);
                         $synced++;
+                        $counter++;
+
+                        // Batch flush и clear для освобождения памяти
+                        if ($counter % $batchSize === 0) {
+                            $this->em->flush();
+                            $this->em->clear(); // Очищаем UnitOfWork
+
+                            // Перезагружаем компанию (была detached после clear)
+                            $company = $this->em->merge($company);
+
+                            // Очищаем кеш новых категорий и перезагружаем их
+                            foreach ($newCategories as $code => $cat) {
+                                $newCategories[$code] = $this->em->merge($cat);
+                            }
+
+                            $this->logger->info("Batch processed", [
+                                'processed' => $counter,
+                                'synced' => $synced
+                            ]);
+                        }
                     }
                 }
 
-                // Если не обработано — добавляем в список нераспознанных
                 if (!$processed && isset($item['supplier_oper_name'])) {
                     $operName = (string)$item['supplier_oper_name'];
                     if (!isset($unprocessedTypes[$operName])) {
@@ -510,13 +513,12 @@ class MarketplaceSyncService
             }
         }
 
-        // Проверяем что EM открыт перед flush
+        // Финальный flush для оставшихся данных
         if (!$this->em->isOpen()) {
             $this->logger->error('EntityManager is closed, cannot save costs');
             throw new \RuntimeException('EntityManager is closed. Processing aborted.');
         }
 
-        // Единый flush всех данных
         try {
             $this->em->flush();
         } catch (\Exception $e) {
@@ -528,6 +530,9 @@ class MarketplaceSyncService
 
         // Сохраняем статистику нераспознанных
         $unprocessedCount = array_sum($unprocessedTypes);
+
+        // Перезагружаем rawDoc если был detached
+        $rawDoc = $this->em->merge($rawDoc);
         $rawDoc->setUnprocessedCostsCount($unprocessedCount);
         $rawDoc->setUnprocessedCostTypes($unprocessedTypes ?: null);
 
@@ -537,14 +542,12 @@ class MarketplaceSyncService
             $this->logger->error('Failed to save unprocessed stats', [
                 'error' => $e->getMessage()
             ]);
-            // Не бросаем исключение - статистика не критична
         }
 
         $this->logger->info('Costs processing completed', [
             'total_synced' => $synced,
             'total_records' => count($rawData),
             'unprocessed_count' => $unprocessedCount,
-            'unprocessed_types' => $unprocessedTypes,
             'new_categories_created' => count($newCategories)
         ]);
 
