@@ -374,25 +374,13 @@ class MarketplaceSyncService
     ): int {
         $rawData = $rawDoc->getRawData();
         $synced = 0;
-        $unprocessedTypes = []; // Собираем нераспознанные типы
-        $newCategories = []; // Категории для создания после цикла
 
         foreach ($rawData as $item) {
             try {
-                // Пропускаем возвраты и продажи - они обрабатываются отдельными методами
-                $docType = $item['doc_type_name'] ?? '';
-                if ($docType === 'Возврат' || $docType === 'Продажа') {
-                    continue;
-                }
-
-                $processed = false; // Флаг обработки
-
                 foreach ($this->costCalculators as $calculator) {
                     if (!$calculator->supports($item)) {
                         continue;
                     }
-
-                    $processed = true; // Нашли калькулятор
 
                     // Всегда пытаемся найти listing если есть nm_id
                     $listing = null;
@@ -434,39 +422,34 @@ class MarketplaceSyncService
                         }
 
                         // Найти или создать категорию
-                        $categoryCode = $costData['category_code'];
                         $category = $this->costCategoryRepository->findByCode(
                             $company,
                             \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $categoryCode
+                            $costData['category_code']
                         );
 
                         if (!$category) {
-                            // Проверяем не создали ли мы уже в этой сессии
-                            if (!isset($newCategories[$categoryCode])) {
-                                $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
-                                    Uuid::uuid4()->toString(),
-                                    $company,
-                                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
-                                );
-                                $category->setCode($categoryCode);
+                            $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                                Uuid::uuid4()->toString(),
+                                $company,
+                                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                            );
+                            $category->setCode($costData['category_code']);
 
-                                // Используем category_name если есть, иначе description или code
-                                $categoryName = $costData['category_name']
-                                    ?? $costData['description']
-                                    ?? $categoryCode;
-                                $category->setName($categoryName);
+                            // Используем category_name если есть, иначе description или code
+                            $categoryName = $costData['category_name']
+                                ?? $costData['description']
+                                ?? $costData['category_code'];
+                            $category->setName($categoryName);
 
-                                $this->em->persist($category);
-                                $newCategories[$categoryCode] = $category;
+                            $this->em->persist($category);
+                            $this->em->flush();
 
-                                $this->logger->info('Cost category queued for creation', [
-                                    'code' => $categoryCode,
-                                    'name' => $categoryName,
-                                ]);
-                            } else {
-                                $category = $newCategories[$categoryCode];
-                            }
+                            $this->logger->info('Cost category auto-created', [
+                                'code' => $costData['category_code'],
+                                'name' => $categoryName,
+                                'marketplace' => 'wildberries'
+                            ]);
                         }
 
                         // Создать Cost
@@ -492,15 +475,6 @@ class MarketplaceSyncService
                     }
                 }
 
-                // Если не обработано — добавляем в список нераспознанных
-                if (!$processed && isset($item['supplier_oper_name'])) {
-                    $operName = (string)$item['supplier_oper_name'];
-                    if (!isset($unprocessedTypes[$operName])) {
-                        $unprocessedTypes[$operName] = 0;
-                    }
-                    $unprocessedTypes[$operName]++;
-                }
-
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process cost item', [
                     'srid' => $item['srid'] ?? 'unknown',
@@ -510,42 +484,11 @@ class MarketplaceSyncService
             }
         }
 
-        // Проверяем что EM открыт перед flush
-        if (!$this->em->isOpen()) {
-            $this->logger->error('EntityManager is closed, cannot save costs');
-            throw new \RuntimeException('EntityManager is closed. Processing aborted.');
-        }
-
-        // Единый flush всех данных
-        try {
-            $this->em->flush();
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to flush costs', [
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
-        }
-
-        // Сохраняем статистику нераспознанных
-        $unprocessedCount = array_sum($unprocessedTypes);
-        $rawDoc->setUnprocessedCostsCount($unprocessedCount);
-        $rawDoc->setUnprocessedCostTypes($unprocessedTypes ?: null);
-
-        try {
-            $this->em->flush();
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to save unprocessed stats', [
-                'error' => $e->getMessage()
-            ]);
-            // Не бросаем исключение - статистика не критична
-        }
+        $this->em->flush();
 
         $this->logger->info('Costs processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData),
-            'unprocessed_count' => $unprocessedCount,
-            'unprocessed_types' => $unprocessedTypes,
-            'new_categories_created' => count($newCategories)
+            'total_records' => count($rawData)
         ]);
 
         return $synced;

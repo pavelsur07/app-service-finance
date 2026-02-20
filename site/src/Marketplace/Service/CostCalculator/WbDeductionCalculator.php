@@ -46,6 +46,12 @@ class WbDeductionCalculator implements CostCalculatorInterface
         // Генерируем code через SlugifyService: wb_ + slug
         $categoryCode = $this->slugify->slugify($categoryName, 'wb_');
 
+        // Обрезаем до 50 символов (лимит поля code в БД)
+        if (strlen($categoryCode) > 50) {
+            $categoryCode = substr($categoryCode, 0, 50);
+            $categoryCode = rtrim($categoryCode, '_'); // Убираем завершающее подчеркивание
+        }
+
         // Привязываем к товару только если listing найден
         $product = $listing?->getProduct();
 
