@@ -7,6 +7,7 @@
 node_modules/
 dist/
 /XXX
+xxx
 # Compiled Java class files
 *.class
 /site/.ready

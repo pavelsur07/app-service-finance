@@ -58,6 +58,12 @@ analytics_controllers:
         namespace: App\Analytics\Controller
     type: attribute
 
+shared_controllers:
+    resource:
+        path: ../src/Shared/Controller/
+        namespace: App\Shared\Controller
+    type: attribute
+
 telegram_integration_controllers:
     # Импортируем все контроллеры Telegram (вебхук, workspace, admin)
     resource:

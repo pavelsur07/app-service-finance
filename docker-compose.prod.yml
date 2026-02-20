@@ -123,6 +123,7 @@ services:
             MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
             MAILER_DSN: ${SITE_MAILER_DSN}
             SENTRY_DSN: ${SENTRY_DSN}
+            HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
             APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
             APP_MAIL_REPLY_TO: "support@vashfindir.ru"
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
