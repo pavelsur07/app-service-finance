@@ -23,7 +23,8 @@ class HealthController extends AbstractController
         LoggerInterface $logger
     ): JsonResponse {
         // 1. ЗАЩИТА ОТ БОТОВ: Проверяем секретный токен
-        $expectedToken = $_ENV['HEALTH_CHECK_TOKEN'] ?? null;
+        // Используем getenv() — это самый надежный способ в Docker/FPM
+        $expectedToken = getenv('HEALTH_CHECK_TOKEN') ?: ($_ENV['HEALTH_CHECK_TOKEN'] ?? $_SERVER['HEALTH_CHECK_TOKEN'] ?? null);
         $providedToken = $request->query->get('token');
 
         if (!$expectedToken || !hash_equals($expectedToken, (string) $providedToken)) {
