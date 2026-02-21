@@ -1,1 +1,1 @@
-export { DashboardGrid } from './DashboardGrid.js';
+export { DashboardGrid } from './DashboardGrid';

@@ -2,6 +2,17 @@
 
 {% block title %}Главная{% endblock %}
 
+{% block importmap %}
+    {# 1. Выводим глобальный код из base.html.twig (AssetMapper) #}
+    {{ parent() }}
+
+    {# 2. Добавляем наш собранный Vite React-бандл #}
+    {{ vite_entry_script_tags('dashboard') }}
+
+    {# Опционально: если у дашборда появятся свои CSS файлы, раскомментируй строку ниже #}
+    {# {{ vite_entry_link_tags('dashboard') }} #}
+{% endblock %}
+
 {% block stylesheets %}
   {{ parent() }}
   <style>

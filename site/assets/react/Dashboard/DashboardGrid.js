@@ -1,8 +1,8 @@
 import React, { useCallback, useState } from 'react';
-import { formatAmount } from './utils/formatters';
-import { PRESETS, MapsToDrilldown, resolveDrilldown } from './utils/routing';
-import { showToast } from './utils/toast';
-import { useDashboardSnapshot } from './api/useDashboardSnapshot';
+import { formatAmount } from './utils/formatters.ts';
+import { PRESETS, MapsToDrilldown, resolveDrilldown } from './utils/routing.ts';
+import { showToast } from './utils/toast.ts';
+import { useDashboardSnapshot } from './api/useDashboardSnapshot.ts';
 
 function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   const { key, params } = resolveDrilldown(payload);

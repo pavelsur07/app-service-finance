@@ -66,6 +66,15 @@ services:
         volumes:
             - ./site:/app
         command: php bin/console
+    site-frontend:
+        image: node:20-alpine
+        container_name: symfony-frontend
+        working_dir: /app
+        volumes:
+            - ./site:/app
+        ports:
+            - "5173:5173" # <-- ДОБАВИТЬ ЭТО (проброс порта Vite)
+        command: sh -c "yarn install && yarn dev"
     site-php-cli-worker:
       build:
         context: site/docker

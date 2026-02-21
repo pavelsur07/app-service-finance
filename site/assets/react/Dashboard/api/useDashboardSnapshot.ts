@@ -1,63 +1,32 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { DashboardSnapshotResponse } from '../types';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
-interface UseDashboardSnapshotResult {
-  data: DashboardSnapshotResponse | null;
-  loading: boolean;
-  error: string | null;
-  retry: () => void;
-}
+export function useDashboardSnapshot(preset: string, customFrom: string, customTo: string) {
+    const [data, setData] = useState<any>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [retryTick, setRetryTick] = useState(0);
 
-export function useDashboardSnapshot(
-  preset: string,
-  customFrom: string,
-  customTo: string,
-): UseDashboardSnapshotResult {
-  const [data, setData] = useState<DashboardSnapshotResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [retryTick, setRetryTick] = useState<number>(0);
+    const queryString = useMemo(() => {
+        return (customFrom && customTo)
+            ? `from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`
+            : `preset=${encodeURIComponent(preset)}`;
+    }, [customFrom, customTo, preset]);
 
-  const isCustom = customFrom !== '' && customTo !== '';
+    const fetchSnapshot = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const response = await fetch(`/api/dashboard/v1/snapshot?${queryString}`);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            setData(await response.json());
+        } catch (err: any) {
+            setError(err.message || 'Ошибка загрузки');
+        } finally {
+            setLoading(false);
+        }
+    }, [queryString]);
 
-  const queryString = useMemo(() => {
-    if (isCustom) {
-      return `from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`;
-    }
+    useEffect(() => { fetchSnapshot(); }, [fetchSnapshot, retryTick]);
 
-    return `preset=${encodeURIComponent(preset)}`;
-  }, [isCustom, customFrom, customTo, preset]);
-
-  const fetchSnapshot = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/dashboard/v1/snapshot?${queryString}`, {
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload: DashboardSnapshotResponse = await response.json();
-      setData(payload);
-    } catch (fetchError: unknown) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Не удалось загрузить dashboard snapshot');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [queryString]);
-
-  useEffect(() => {
-    fetchSnapshot();
-  }, [fetchSnapshot, retryTick]);
-
-  const retry = useCallback(() => {
-    setRetryTick((previousTick) => previousTick + 1);
-  }, []);
-
-  return { data, loading, error, retry };
+    return { data, loading, error, retry: () => setRetryTick(t => t + 1) };
 }
