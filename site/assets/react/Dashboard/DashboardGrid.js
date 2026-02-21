@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { formatAmount } from './utils/formatters';
 import { PRESETS, MapsToDrilldown, resolveDrilldown } from './utils/routing';
 import { showToast } from './utils/toast';
+import { useDashboardSnapshot } from './api/useDashboardSnapshot';
 
 function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   const { key, params } = resolveDrilldown(payload);
@@ -71,10 +72,6 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
   const [preset, setPreset] = useState(PRESETS.includes(defaultPreset) ? defaultPreset : 'month');
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [retryTick, setRetryTick] = useState(0);
 
   const openDrilldown = useCallback((drilldown) => {
     if (!drilldown?.key) {
@@ -84,42 +81,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
     MapsToDrilldown(drilldown);
   }, []);
 
-  const isCustom = customFrom !== '' && customTo !== '';
-
-  const queryString = useMemo(() => {
-    if (isCustom) {
-      return `from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`;
-    }
-
-    return `preset=${encodeURIComponent(preset)}`;
-  }, [isCustom, customFrom, customTo, preset]);
-
-  const fetchSnapshot = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`/api/dashboard/v1/snapshot?${queryString}`, {
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = await response.json();
-      setData(payload);
-    } catch (fetchError) {
-      setError(fetchError instanceof Error ? fetchError.message : 'Не удалось загрузить dashboard snapshot');
-      setData(null);
-    } finally {
-      setLoading(false);
-    }
-  }, [queryString]);
-
-  useEffect(() => {
-    fetchSnapshot();
-  }, [fetchSnapshot, retryTick]);
+  const { data, loading, error, retry } = useDashboardSnapshot(preset, customFrom, customTo);
 
   const widgets = data?.widgets ?? null;
 
@@ -136,7 +98,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
       React.createElement('button', {
         type: 'button',
         className: 'btn btn-danger',
-        onClick: () => setRetryTick((prev) => prev + 1),
+        onClick: retry,
       }, 'Повторить'),
     );
   }
