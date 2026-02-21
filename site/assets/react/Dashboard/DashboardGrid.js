@@ -1,82 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-
-const PRESETS = ['day', 'week', 'month'];
-const DRILLDOWN_ROUTES = {
-  'cash.transactions': '/finance/cash-transactions/',
-  'cash.balances': '/cash/balances',
-  'funds.reserved': '/funds/reserved',
-  'pl.documents': '/pl/documents',
-  'pl.report': '/pl/report',
-};
-
-function formatAmount(value) {
-  const numericValue = Number(value ?? 0);
-
-  return `${new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(numericValue)} ₽`;
-}
-
-function resolveDrilldown(payload) {
-  const key = payload?.drilldown?.key ?? payload?.key;
-  const params = payload?.drilldown?.params ?? payload?.params;
-
-  return { key, params };
-}
-
-function showToast(message) {
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    return;
-  }
-
-  let container = document.getElementById('dashboard-toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'dashboard-toast-container';
-    container.className = 'toast-container position-fixed top-0 end-0 p-3';
-    container.style.zIndex = '1080';
-    document.body.appendChild(container);
-  }
-
-  const toast = document.createElement('div');
-  toast.className = 'toast show';
-  toast.setAttribute('role', 'alert');
-  toast.innerHTML = `<div class="toast-body">${message}</div>`;
-  container.appendChild(toast);
-
-  window.setTimeout(() => {
-    toast.remove();
-  }, 2500);
-}
-
-function DrilldownRouter({ key, params }) {
-  if (!key) {
-    return;
-  }
-
-  const basePath = DRILLDOWN_ROUTES[key];
-  if (!basePath) {
-    showToast('Раздел в разработке');
-    return;
-  }
-
-  const url = new URL(basePath, window.location.origin);
-  if (params && typeof params === 'object') {
-    Object.entries(params).forEach(([paramKey, value]) => {
-      if (value === null || value === undefined || value === '') {
-        return;
-      }
-
-      url.searchParams.set(paramKey, String(value));
-    });
-  }
-
-  if (window.location.origin === url.origin) {
-    window.location.assign(`${url.pathname}${url.search}`);
-    return;
-  }
-
-  // TODO: переключить на Symfony route paths, когда drilldown-страницы будут доступны во всех окружениях.
-  console.log('Drilldown target is not in current origin', key, params ?? {});
-}
+import { formatAmount } from './utils/formatters';
+import { PRESETS, MapsToDrilldown, resolveDrilldown } from './utils/routing';
+import { showToast } from './utils/toast';
 
 function DrilldownButton({ payload, label = 'Подробнее', onOpen }) {
   const { key, params } = resolveDrilldown(payload);
@@ -156,7 +81,7 @@ export function DashboardGrid({ defaultPreset = 'month' }) {
       return;
     }
 
-    DrilldownRouter(drilldown);
+    MapsToDrilldown(drilldown);
   }, []);
 
   const isCustom = customFrom !== '' && customTo !== '';
