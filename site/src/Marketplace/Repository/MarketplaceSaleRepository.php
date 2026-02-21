@@ -28,7 +28,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findByMarketplaceOrder(
         Company $company,
         MarketplaceType $marketplace,
-        string $externalOrderId,
+        string $externalOrderId
     ): ?MarketplaceSale {
         return $this->createQueryBuilder('s')
             ->where('s.company = :company')
@@ -47,7 +47,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('s')
             ->where('s.product = :product')
@@ -67,7 +67,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
     public function findProductsWithSales(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         $qb = $this->createQueryBuilder('s');
 
@@ -82,5 +82,32 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->setParameter('to', $toDate)
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Массовая проверка существующих SRID (для bulk import)
+     * Возвращает массив для isset() проверок: ['srid1' => true, 'srid2' => true]
+     *
+     * @param string $companyId
+     * @param array $srids
+     * @return array
+     */
+    public function getExistingExternalIds(string $companyId, array $srids): array
+    {
+        if (empty($srids)) {
+            return [];
+        }
+
+        $result = $this->createQueryBuilder('s')
+            ->select('s.externalOrderId')
+            ->where('s.company = :company')
+            ->andWhere('s.externalOrderId IN (:srids)')
+            ->setParameter('company', $companyId)
+            ->setParameter('srids', $srids)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        // Возвращаем как map для быстрого isset()
+        return array_fill_keys($result, true);
     }
 }

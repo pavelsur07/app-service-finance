@@ -19,7 +19,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     public function findByMarketplaceSku(
         Company $company,
         MarketplaceType $marketplace,
-        string $marketplaceSku,
+        string $marketplaceSku
     ): ?MarketplaceListing {
         return $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -36,7 +36,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         Company $company,
         MarketplaceType $marketplace,
         string $nmId,
-        ?string $size,
+        ?string $size
     ): ?MarketplaceListing {
         $qb = $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -46,7 +46,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('marketplace', $marketplace)
             ->setParameter('nmId', $nmId);
 
-        if (null === $size) {
+        if ($size === null) {
             $qb->andWhere('l.size IS NULL');
         } else {
             $qb->andWhere('l.size = :size')
@@ -83,5 +83,46 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->orderBy('l.product', 'ASC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Массовая загрузка листингов по nm_id с индексацией по ключу "nmId_size"
+     * Для bulk import - одним запросом вместо тысяч
+     *
+     * @param Company $company
+     * @param MarketplaceType $marketplace
+     * @param array $nmIds
+     * @return array Индексированный массив: ['nmId_size' => Listing, 'nmId_null' => Listing]
+     */
+    public function findListingsByNmIdsIndexed(
+        Company $company,
+        MarketplaceType $marketplace,
+        array $nmIds
+    ): array {
+        if (empty($nmIds)) {
+            return [];
+        }
+
+        // Загружаем все листинги + продукты одним запросом
+        $listings = $this->createQueryBuilder('l')
+            ->leftJoin('l.product', 'p')
+            ->addSelect('p')
+            ->where('l.company = :company')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceSku IN (:nmIds)')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('nmIds', $nmIds)
+            ->getQuery()
+            ->getResult();
+
+        // Индексируем по ключу: nmId_size (или nmId_null если size пуст)
+        $indexed = [];
+        foreach ($listings as $listing) {
+            $key = $listing->getMarketplaceSku() . '_' . ($listing->getSize() ?? 'null');
+            $indexed[$key] = $listing;
+        }
+
+        return $indexed;
     }
 }

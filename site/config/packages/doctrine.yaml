@@ -101,6 +101,9 @@ when@test:
 
 when@prod:
     doctrine:
+        dbal:
+            logging: false           # ← ДОБАВИТЬ ЭТО
+            profiling: false         # ← И ЭТО
         orm:
             auto_generate_proxy_classes: false
             proxy_dir: '%kernel.build_dir%/doctrine/orm/Proxies'

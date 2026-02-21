@@ -30,7 +30,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.product = :product')
@@ -45,14 +45,13 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Общие затраты (не привязанные к товару, например реклама).
-     *
+     * Общие затраты (не привязанные к товару, например реклама)
      * @return MarketplaceCost[]
      */
     public function findGeneralCosts(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
@@ -65,5 +64,32 @@ class MarketplaceCostRepository extends ServiceEntityRepository
             ->orderBy('c.costDate', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Массовая проверка существующих external_id затрат (для bulk import)
+     * Возвращает массив для isset() проверок: ['id1' => true, 'id2' => true]
+     *
+     * @param string $companyId
+     * @param array $externalIds
+     * @return array
+     */
+    public function getExistingExternalIds(string $companyId, array $externalIds): array
+    {
+        if (empty($externalIds)) {
+            return [];
+        }
+
+        $result = $this->createQueryBuilder('c')
+            ->select('c.externalId')
+            ->where('c.company = :company')
+            ->andWhere('c.externalId IN (:ids)')
+            ->setParameter('company', $companyId)
+            ->setParameter('ids', $externalIds)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        // Возвращаем как map для быстрого isset()
+        return array_fill_keys($result, true);
     }
 }

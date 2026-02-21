@@ -30,7 +30,33 @@ class WbDeductionCalculator implements CostCalculatorInterface
         // Обработка bonus_type_name
         $bonusTypeName = (string)($item['bonus_type_name'] ?? '');
 
-        // Удаляем всё после запятой (включительно)
+        // Шаг 1: Удаляем ID-паттерн
+        // Паттерн: "Списание за отзыв 1xTgKBfVf6AAWKuVZ1ql: акция №1392833"
+        // Нужно получить: "Списание за отзыв"
+
+        // Находим последнее двоеточие
+        $colonPos = strrpos($bonusTypeName, ':');
+
+        if ($colonPos !== false) {
+            // Есть двоеточие - проверяем что перед ним ID (примерно 20 символов латиницы/цифр)
+            $beforeColon = substr($bonusTypeName, 0, $colonPos);
+
+            // Находим последний пробел перед двоеточием
+            $lastSpacePos = strrpos($beforeColon, ' ');
+
+            if ($lastSpacePos !== false) {
+                // Проверяем что между последним пробелом и двоеточием примерно 15-25 символов
+                $potentialId = substr($beforeColon, $lastSpacePos + 1);
+                $idLength = strlen($potentialId);
+
+                // Если это похоже на ID (15-25 латиницы/цифр) - удаляем его вместе с тем что после двоеточия
+                if ($idLength >= 15 && $idLength <= 25 && ctype_alnum($potentialId)) {
+                    $bonusTypeName = substr($bonusTypeName, 0, $lastSpacePos);
+                }
+            }
+        }
+
+        // Шаг 2: Удаляем всё после запятой (например: ", документ №123")
         $commaPos = strpos($bonusTypeName, ',');
         if ($commaPos !== false) {
             $categoryName = trim(substr($bonusTypeName, 0, $commaPos));

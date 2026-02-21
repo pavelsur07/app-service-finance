@@ -198,6 +198,13 @@ services:
             - site-redis
         volumes:
             - site_storage:/app/var/storage
+        healthcheck:
+            # Проверяем, запущен ли процесс воркера внутри контейнера
+            test: [ "CMD-SHELL", "ps aux | grep 'messenger:consume' | grep -v grep" ]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s # Даем время на запуск контейнера
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres

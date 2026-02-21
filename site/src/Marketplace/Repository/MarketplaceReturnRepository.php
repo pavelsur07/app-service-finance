@@ -30,7 +30,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('r')
             ->where('r.product = :product')
@@ -50,7 +50,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByCompany(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
+        \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('r')
             ->where('r.company = :company')
@@ -62,5 +62,32 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->orderBy('r.returnDate', 'DESC')
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Массовая проверка существующих SRID возвратов (для bulk import)
+     * Возвращает массив для isset() проверок: ['srid1' => true, 'srid2' => true]
+     *
+     * @param string $companyId
+     * @param array $srids
+     * @return array
+     */
+    public function getExistingExternalIds(string $companyId, array $srids): array
+    {
+        if (empty($srids)) {
+            return [];
+        }
+
+        $result = $this->createQueryBuilder('r')
+            ->select('r.externalReturnId')
+            ->where('r.company = :company')
+            ->andWhere('r.externalReturnId IN (:srids)')
+            ->setParameter('company', $companyId)
+            ->setParameter('srids', $srids)
+            ->getQuery()
+            ->getSingleColumnResult();
+
+        // Возвращаем как map для быстрого isset()
+        return array_fill_keys($result, true);
     }
 }

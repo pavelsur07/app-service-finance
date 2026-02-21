@@ -22,6 +22,7 @@ use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
 use App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator;
 use App\Marketplace\Service\CostCalculator\WbPenaltyCalculator;
+use App\Marketplace\Service\CostCalculator\WbProductProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
@@ -57,6 +58,7 @@ class MarketplaceSyncService
             new WbPvzProcessingCalculator(),
             new WbWarehouseLogisticsCalculator(),
             new WbPenaltyCalculator(),
+            new WbProductProcessingCalculator(),
             new WbDeductionCalculator($this->slugify),
             new WbLoyaltyDiscountCalculator(),
         ];
@@ -67,109 +69,112 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
         $synced = 0;
+        $batchSize = 250; // Уменьшено для 512MB лимита
 
-        foreach ($rawData as $item) {
-            try {
-                // Фильтрация: только продажи
-                if (!isset($item['doc_type_name']) || $item['doc_type_name'] !== 'Продажа') {
-                    continue;
-                }
+        // --- ФАЗА 1: ПОДГОТОВКА И ПРЕДЗАГРУЗКА ---
 
-                $retailAmount = (float)($item['retail_amount'] ?? 0);
-                if ($retailAmount <= 0) {
-                    continue;
-                }
+        // 1. Фильтруем только продажи с положительной суммой
+        $salesData = array_filter($rawData, function($item) {
+            return ($item['doc_type_name'] ?? '') === 'Продажа'
+                && (float)($item['retail_amount'] ?? 0) > 0;
+        });
 
-                $externalOrderId = (string)$item['srid'];
+        if (empty($salesData)) {
+            $this->logger->info('No sales to process');
+            return 0;
+        }
 
-                // Проверка дубликата по srid
-                $existing = $this->saleRepository->findOneBy([
-                    'company' => $company,
-                    'externalOrderId' => $externalOrderId
-                ]);
+        $this->logger->info('Starting bulk sales processing', [
+            'total_filtered' => count($salesData),
+            'batch_size' => $batchSize
+        ]);
 
-                if ($existing) {
-                    continue;
-                }
+        // 2. Собираем все SRID для массовой проверки
+        $allSrids = array_column($salesData, 'srid');
 
-                // Данные из WB
-                $nmId = (string)($item['nm_id'] ?? '');   // Артикул WB (строго string)
-                $tsName = trim($item['ts_name'] ?? '');   // Размер (trim!)
-                $saName = $item['sa_name'];               // Артикул производителя
-                $brandName = $item['brand_name'] ?? '';
-                $subjectName = $item['subject_name'] ?? '';
+        // 3. Массово получаем существующие продажи (ОДИН запрос вместо тысяч!)
+        $existingSridsMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
 
-                // Нормализуем: пустая строка → NULL
-                $tsName = ($tsName === '') ? null : $tsName;
+        $this->logger->info('Loaded existing sales', [
+            'existing_count' => count($existingSridsMap)
+        ]);
 
-                // DEBUG: логируем что ищем
-                $this->logger->info('Looking for listing', [
+        // 4. Собираем все уникальные nm_id
+        $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
+
+        // 5. Массово получаем листинги (ОДИН запрос вместо тысяч!)
+        $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            $allNmIds
+        );
+
+        $this->logger->info('Loaded existing listings', [
+            'listings_count' => count($listingsCache),
+            'unique_nm_ids' => count($allNmIds)
+        ]);
+
+        // --- ФАЗА 2: СОЗДАНИЕ ОТСУТСТВУЮЩИХ ЛИСТИНГОВ ---
+        $newListingsCreated = 0;
+
+        foreach ($salesData as $item) {
+            $nmId = (string)($item['nm_id'] ?? '');
+            $tsName = trim($item['ts_name'] ?? '');
+            $tsName = ($tsName === '') ? null : $tsName;
+            $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+
+            if (!isset($listingsCache[$cacheKey])) {
+                // Создаем в памяти, но пока НЕ делаем flush
+                $listing = $this->createListingFromWbData($company, [
                     'nm_id' => $nmId,
                     'ts_name' => $tsName,
-                    'company_id' => $company->getId()
+                    'sa_name' => $item['sa_name'],
+                    'brand_name' => $item['brand_name'] ?? '',
+                    'subject_name' => $item['subject_name'] ?? '',
+                    'retail_price' => $item['retail_price'] ?? 0,
                 ]);
 
-                // Ищем Listing по nm_id + size
-                $listing = $this->listingRepository->findByNmIdAndSize(
-                    $company,
-                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                    $nmId,
-                    $tsName
-                );
+                $listingsCache[$cacheKey] = $listing;
+                $newListingsCreated++;
+            }
+        }
 
-                if ($listing) {
-                    $this->logger->info('Listing found', ['listing_id' => $listing->getId()]);
-                } else {
-                    $this->logger->info('Listing NOT found, creating new');
+        // Сохраняем все новые листинги ОДНИМ flush до обработки продаж
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->logger->info('Created missing listings in bulk', [
+                'new_listings' => $newListingsCreated
+            ]);
+        }
+
+        // --- ФАЗА 3: ОБРАБОТКА ПРОДАЖ (ОСНОВНОЙ ЦИКЛ БЕЗ БД ЗАПРОСОВ) ---
+        $counter = 0;
+
+        foreach ($salesData as $item) {
+            try {
+                $externalOrderId = (string)$item['srid'];
+
+                // Мгновенная проверка в памяти (НЕ БД!)
+                if (isset($existingSridsMap[$externalOrderId])) {
+                    continue;
                 }
 
+                $nmId = (string)($item['nm_id'] ?? '');
+                $tsName = trim($item['ts_name'] ?? '');
+                $tsName = ($tsName === '') ? null : $tsName;
+                $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+
+                // Берем листинг из кэша (100% гарантия что есть - создали в Фазе 2)
+                $listing = $listingsCache[$cacheKey] ?? null;
+
                 if (!$listing) {
-                    // Создаём новый Product + Listing
-                    try {
-                        $listing = $this->createListingFromWbData($company, [
-                            'nm_id' => $nmId,
-                            'ts_name' => $tsName,
-                            'sa_name' => $saName,
-                            'brand_name' => $brandName,
-                            'subject_name' => $subjectName,
-                            'retail_price' => $item['retail_price'],
-                        ]);
-
-                        // ВАЖНО: flush сразу, чтобы следующая запись видела listing в БД
-                        $this->em->flush();
-
-                        $this->logger->info('Listing created and flushed', [
-                            'listing_id' => $listing->getId(),
-                            'nm_id' => $nmId,
-                            'ts_name' => $tsName
-                        ]);
-
-                    } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
-                        // Товар уже создан (race condition или параллельный запрос)
-                        $this->logger->warning('Duplicate listing on creation, searching again', [
-                            'nm_id' => $nmId,
-                            'ts_name' => $tsName
-                        ]);
-
-                        // Очищаем EM и ищем ещё раз
-                        $this->em->clear();
-
-                        $listing = $this->listingRepository->findByNmIdAndSize(
-                            $company,
-                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $nmId,
-                            $tsName
-                        );
-
-                        if (!$listing) {
-                            $this->logger->error('Listing still not found after duplicate error', [
-                                'nm_id' => $nmId,
-                                'ts_name' => $tsName
-                            ]);
-                            continue; // Пропускаем эту продажу
-                        }
-                    }
+                    $this->logger->error('Listing missing from cache (logic error)', [
+                        'nm_id' => $nmId,
+                        'ts_name' => $tsName
+                    ]);
+                    continue;
                 }
 
                 // Создать Sale
@@ -185,29 +190,59 @@ class MarketplaceSyncService
                 $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
                 $sale->setQuantity(abs((int)$item['quantity']));
                 $sale->setPricePerUnit((string)$item['retail_price']);
-                $sale->setTotalRevenue((string)abs($retailAmount));
+                $sale->setTotalRevenue((string)abs((float)$item['retail_amount']));
                 $sale->setRawDocumentId($rawDoc->getId());
 
                 $this->em->persist($sale);
+                $existingSridsMap[$externalOrderId] = true; // Защита от дублей внутри файла
+
                 $synced++;
+                $counter++;
+
+                // Batch flush каждые 500 записей
+                if ($counter % $batchSize === 0) {
+                    $this->em->flush();
+                    $this->em->clear();
+
+                    // Восстанавливаем Company
+                    $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+
+                    // Восстанавливаем Listings через getReference (оптимизация памяти)
+                    foreach ($listingsCache as $k => $cachedListing) {
+                        $listingsCache[$k] = $this->em->getReference(
+                            \App\Marketplace\Entity\MarketplaceListing::class,
+                            $cachedListing->getId()
+                        );
+                    }
+
+                    gc_collect_cycles();
+
+                    $this->logger->info('Sales batch processed', [
+                        'processed' => $counter,
+                        'synced' => $synced,
+                        'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
+                    ]);
+                }
 
             } catch (\Exception $e) {
-                // Логируем ошибку и продолжаем
                 $this->logger->error('Failed to process sale item', [
                     'srid' => $item['srid'] ?? 'unknown',
-                    'nm_id' => $item['nm_id'] ?? 'unknown',
                     'error' => $e->getMessage()
                 ]);
                 continue;
             }
         }
 
-        // Финальный flush для Sales (listings уже flush-нуты после создания)
-        $this->em->flush();
+        // Финальный flush для остатка
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
 
         $this->logger->info('Sales processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData)
+            'total_records' => count($rawData),
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB'
         ]);
 
         return $synced;
@@ -218,114 +253,117 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
         $synced = 0;
+        $batchSize = 250; // Уменьшено для 512MB лимита
 
-        // Подсчёт всех типов документов для диагностики
-        $docTypes = [];
-        foreach ($rawData as $item) {
-            $docType = $item['doc_type_name'] ?? 'NULL';
-            $docTypes[$docType] = ($docTypes[$docType] ?? 0) + 1;
+        // --- ФАЗА 1: ПОДГОТОВКА И ПРЕДЗАГРУЗКА ---
+
+        // 1. Фильтруем только возвраты с положительной ценой
+        $returnsData = array_filter($rawData, function($item) {
+            $docType = $item['doc_type_name'] ?? '';
+            return in_array($docType, ['Возврат', 'возврат', 'Return'])
+                && (float)($item['retail_price'] ?? 0) > 0;
+        });
+
+        if (empty($returnsData)) {
+            $this->logger->info('No returns to process');
+            return 0;
         }
 
-        $this->logger->info('Processing returns - doc_type_name distribution', $docTypes);
+        $this->logger->info('Starting bulk returns processing', [
+            'total_filtered' => count($returnsData),
+            'batch_size' => $batchSize
+        ]);
 
-        foreach ($rawData as $item) {
-            try {
-                // Логируем что пришло
-                if (!isset($item['doc_type_name'])) {
-                    $this->logger->warning('Item has no doc_type_name field', [
-                        'srid' => $item['srid'] ?? 'unknown'
-                    ]);
-                }
+        // 2. Собираем все SRID для массовой проверки
+        $allSrids = array_column($returnsData, 'srid');
 
-                // Фильтрация: только возвраты
-                $docTypeName = $item['doc_type_name'] ?? '';
+        // 3. Массово получаем существующие возвраты (ОДИН запрос!)
+        $existingSridsMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
-                // Попробуем разные варианты
-                if ($docTypeName !== 'Возврат' && $docTypeName !== 'возврат' && $docTypeName !== 'Return') {
-                    continue;
-                }
+        $this->logger->info('Loaded existing returns', [
+            'existing_count' => count($existingSridsMap)
+        ]);
 
-                $this->logger->info('Found return item', [
-                    'doc_type_name' => $docTypeName,
-                    'srid' => $item['srid'] ?? 'unknown'
+        // 4. Собираем все уникальные nm_id
+        $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
+
+        // 5. Массово получаем листинги (ОДИН запрос!)
+        $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            $allNmIds
+        );
+
+        $this->logger->info('Loaded existing listings', [
+            'listings_count' => count($listingsCache),
+            'unique_nm_ids' => count($allNmIds)
+        ]);
+
+        // --- ФАЗА 2: СОЗДАНИЕ ОТСУТСТВУЮЩИХ ЛИСТИНГОВ ---
+        $newListingsCreated = 0;
+
+        foreach ($returnsData as $item) {
+            $nmId = (string)($item['nm_id'] ?? '');
+            $tsName = trim($item['ts_name'] ?? '');
+            $tsName = ($tsName === '') ? null : $tsName;
+            $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+
+            if (!isset($listingsCache[$cacheKey])) {
+                // Создаем в памяти, НЕ делаем flush
+                $listing = $this->createListingFromWbData($company, [
+                    'nm_id' => $nmId,
+                    'ts_name' => $tsName,
+                    'sa_name' => $item['sa_name'],
+                    'brand_name' => $item['brand_name'] ?? '',
+                    'subject_name' => $item['subject_name'] ?? '',
+                    'retail_price' => $item['retail_price'] ?? 0,
                 ]);
 
-                // Для возвратов используем retail_price (цена за единицу)
-                $retailPrice = (float)($item['retail_price'] ?? 0);
-                if ($retailPrice <= 0) {
-                    $this->logger->info('Retail price is zero, skipping', [
-                        'retail_price' => $retailPrice
-                    ]);
-                    continue;
-                }
+                $listingsCache[$cacheKey] = $listing;
+                $newListingsCreated++;
+            }
+        }
 
+        // Сохраняем все новые листинги ОДНИМ flush
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->logger->info('Created missing listings in bulk', [
+                'new_listings' => $newListingsCreated
+            ]);
+        }
+
+        // --- ФАЗА 3: ОБРАБОТКА ВОЗВРАТОВ (БЕЗ БД ЗАПРОСОВ) ---
+        $counter = 0;
+
+        foreach ($returnsData as $item) {
+            try {
                 $externalReturnId = (string)$item['srid'];
 
-                // Проверка дубликата по srid
-                $existing = $this->returnRepository->findOneBy([
-                    'company' => $company,
-                    'externalReturnId' => $externalReturnId
-                ]);
-
-                if ($existing) {
+                // Мгновенная проверка в памяти
+                if (isset($existingSridsMap[$externalReturnId])) {
                     continue;
                 }
 
-                // Данные из WB
                 $nmId = (string)($item['nm_id'] ?? '');
                 $tsName = trim($item['ts_name'] ?? '');
-                $saName = $item['sa_name'];
-                $brandName = $item['brand_name'] ?? '';
-                $subjectName = $item['subject_name'] ?? '';
-
-                // Нормализуем: пустая строка → NULL
                 $tsName = ($tsName === '') ? null : $tsName;
+                $cacheKey = $nmId . '_' . ($tsName ?? 'null');
 
-                // Ищем Listing
-                $listing = $this->listingRepository->findByNmIdAndSize(
-                    $company,
-                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                    $nmId,
-                    $tsName
-                );
+                // Берем листинг из кэша (100% гарантия - создали в Фазе 2)
+                $listing = $listingsCache[$cacheKey] ?? null;
 
                 if (!$listing) {
-                    // Создаём listing (если его ещё нет)
-                    try {
-                        $listing = $this->createListingFromWbData($company, [
-                            'nm_id' => $nmId,
-                            'ts_name' => $tsName,
-                            'sa_name' => $saName,
-                            'brand_name' => $brandName,
-                            'subject_name' => $subjectName,
-                            'retail_price' => $item['retail_price'] ?? '0',
-                        ]);
-
-                        $this->em->flush();
-
-                    } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
-                        $this->em->clear();
-
-                        $listing = $this->listingRepository->findByNmIdAndSize(
-                            $company,
-                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $nmId,
-                            $tsName
-                        );
-
-                        if (!$listing) {
-                            $this->logger->error('Listing not found for return', [
-                                'nm_id' => $nmId,
-                                'ts_name' => $tsName
-                            ]);
-                            continue;
-                        }
-                    }
+                    $this->logger->error('Listing missing from cache (logic error)', [
+                        'nm_id' => $nmId,
+                        'ts_name' => $tsName
+                    ]);
+                    continue;
                 }
 
                 // Создать Return
-                $return = new MarketplaceReturn(
+                $return = new \App\Marketplace\Entity\MarketplaceReturn(
                     Uuid::uuid4()->toString(),
                     $company,
                     $listing->getProduct(),
@@ -335,34 +373,59 @@ class MarketplaceSyncService
                 $return->setExternalReturnId($externalReturnId);
                 $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
                 $return->setQuantity(abs((int)$item['quantity']));
-                $return->setRefundAmount((string)$retailPrice); // retail_price
+                $return->setRefundAmount((string)$item['retail_price']);
                 $return->setReturnReason($item['supplier_oper_name'] ?? '');
 
                 $this->em->persist($return);
-                $synced++;
+                $existingSridsMap[$externalReturnId] = true; // Защита от дублей внутри файла
 
-                $this->logger->info('Return created', [
-                    'srid' => $externalReturnId,
-                    'retail_price' => $retailPrice,
-                    'quantity' => $item['quantity']
-                ]);
+                $synced++;
+                $counter++;
+
+                // Batch flush каждые 500 записей
+                if ($counter % $batchSize === 0) {
+                    $this->em->flush();
+                    $this->em->clear();
+
+                    // Восстанавливаем Company
+                    $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+
+                    // Восстанавливаем Listings через getReference
+                    foreach ($listingsCache as $k => $cachedListing) {
+                        $listingsCache[$k] = $this->em->getReference(
+                            \App\Marketplace\Entity\MarketplaceListing::class,
+                            $cachedListing->getId()
+                        );
+                    }
+
+                    gc_collect_cycles();
+
+                    $this->logger->info('Returns batch processed', [
+                        'processed' => $counter,
+                        'synced' => $synced,
+                        'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
+                    ]);
+                }
 
             } catch (\Exception $e) {
                 $this->logger->error('Failed to process return item', [
                     'srid' => $item['srid'] ?? 'unknown',
-                    'nm_id' => $item['nm_id'] ?? 'unknown',
                     'error' => $e->getMessage()
                 ]);
                 continue;
             }
         }
 
-        // Финальный flush для Returns
-        $this->em->flush();
+        // Финальный flush для остатка
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
 
         $this->logger->info('Returns processing completed', [
             'total_synced' => $synced,
-            'total_records' => count($rawData)
+            'total_records' => count($rawData),
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB'
         ]);
 
         return $synced;
@@ -373,21 +436,72 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
         $synced = 0;
         $unprocessedTypes = [];
-        $newCategories = [];
+        $batchSize = 100; // Маленький для 512MB лимита
 
-        $batchSize = 100; // Обрабатываем по 100 записей за раз
+        // DBAL для быстрых проверок
+        $conn = $this->em->getConnection();
+
+        // --- ФАЗА 1: ПРЕДЗАГРУЗКА (только легкие данные) ---
+
+        // 1. Фильтруем только затраты
+        $costsData = array_filter($rawData, function($item) {
+            $docType = $item['doc_type_name'] ?? '';
+            return !in_array($docType, ['Возврат', 'Продажа']);
+        });
+
+        if (empty($costsData)) {
+            $this->logger->info('No costs to process');
+            return 0;
+        }
+
+        $this->logger->info('Starting bulk costs processing', [
+            'total_filtered' => count($costsData),
+            'batch_size' => $batchSize
+        ]);
+
+        // 2. Массово загружаем listings (их немного)
+        $allNmIds = array_values(array_unique(
+            array_filter(array_column($costsData, 'nm_id'))
+        ));
+
+        $listingsCache = [];
+        if (!empty($allNmIds)) {
+            $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+                $company,
+                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                $allNmIds
+            );
+
+            $this->logger->info('Loaded listings', [
+                'count' => count($listingsCache)
+            ]);
+        }
+
+        // 3. Загружаем ВСЕ категории компании (их 10-30 штук)
+        $categoriesCache = [];
+        $allCategories = $this->costCategoryRepository->findBy([
+            'company' => $company,
+            'marketplace' => \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            'deletedAt' => null
+        ]);
+
+        foreach ($allCategories as $cat) {
+            $categoriesCache[$cat->getCode()] = $cat;
+        }
+
+        $this->logger->info('Loaded categories', [
+            'count' => count($categoriesCache)
+        ]);
+
+        // --- ФАЗА 2: ОБРАБОТКА (ОДИН ПРОХОД) ---
         $counter = 0;
+        $newCategoriesCreated = 0;
 
-        foreach ($rawData as $item) {
+        foreach ($costsData as $item) {
             try {
-                // Пропускаем возвраты и продажи - они обрабатываются отдельными методами
-                $docType = $item['doc_type_name'] ?? '';
-                if ($docType === 'Возврат' || $docType === 'Продажа') {
-                    continue;
-                }
-
                 $processed = false;
 
                 foreach ($this->costCalculators as $calculator) {
@@ -397,100 +511,115 @@ class MarketplaceSyncService
 
                     $processed = true;
 
+                    // Получаем listing из кэша
                     $listing = null;
+                    $product = null;
+
                     $nmId = (string)($item['nm_id'] ?? '');
                     $tsName = trim($item['ts_name'] ?? '');
                     $tsName = ($tsName === '') ? null : $tsName;
 
                     if ($nmId !== '') {
-                        $listing = $this->listingRepository->findByNmIdAndSize(
-                            $company,
-                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $nmId,
-                            $tsName
-                        );
+                        $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+                        $listing = $listingsCache[$cacheKey] ?? null;
+
+                        if ($listing) {
+                            $product = $listing->getProduct();
+                        }
                     }
 
                     if ($calculator->requiresListing() && !$listing) {
                         continue;
                     }
 
-                    $costsData = $calculator->calculate($item, $listing);
+                    $calculatedCosts = $calculator->calculate($item, $listing);
 
-                    foreach ($costsData as $costData) {
-                        $existing = $this->costRepository->findOneBy([
-                            'company' => $company,
-                            'externalId' => $costData['external_id']
-                        ]);
+                    foreach ($calculatedCosts as $costData) {
+                        $externalId = $costData['external_id'];
 
-                        if ($existing) {
+                        // DBAL проверка дубликата (быстро, БЕЗ загрузки объекта)
+                        $exists = $conn->fetchOne(
+                            "SELECT 1 FROM marketplace_costs WHERE company_id = ? AND external_id = ? LIMIT 1",
+                            [$companyId, $externalId]
+                        );
+
+                        if ($exists) {
                             continue;
                         }
 
                         $categoryCode = $costData['category_code'];
-                        $category = $this->costCategoryRepository->findByCode(
-                            $company,
-                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $categoryCode
-                        );
+                        $category = $categoriesCache[$categoryCode] ?? null;
 
+                        // Создаём категорию если её нет
                         if (!$category) {
-                            if (!isset($newCategories[$categoryCode])) {
-                                $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
-                                    Uuid::uuid4()->toString(),
-                                    $company,
-                                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
-                                );
-                                $category->setCode($categoryCode);
+                            $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                                Uuid::uuid4()->toString(),
+                                $company,
+                                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                            );
+                            $category->setCode($categoryCode);
 
-                                $categoryName = $costData['category_name']
-                                    ?? $costData['description']
-                                    ?? $categoryCode;
-                                $category->setName($categoryName);
+                            $categoryName = $costData['category_name']
+                                ?? $costData['description']
+                                ?? $categoryCode;
+                            $category->setName($categoryName);
 
-                                $this->em->persist($category);
-                                $newCategories[$categoryCode] = $category;
-                            } else {
-                                $category = $newCategories[$categoryCode];
-                            }
+                            $this->em->persist($category);
+                            $categoriesCache[$categoryCode] = $category;
+                            $newCategoriesCreated++;
                         }
 
-                        $cost = new MarketplaceCost(
+                        // Создать Cost
+                        $cost = new \App\Marketplace\Entity\MarketplaceCost(
                             Uuid::uuid4()->toString(),
                             $company,
                             \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
                             $category
                         );
 
-                        $cost->setExternalId($costData['external_id']);
+                        $cost->setExternalId($externalId);
                         $cost->setCostDate($costData['cost_date']);
                         $cost->setAmount($costData['amount']);
                         $cost->setDescription($costData['description']);
 
-                        if (isset($costData['product'])) {
-                            $cost->setProduct($costData['product']);
+                        if ($product) {
+                            $cost->setProduct($product);
                         }
 
                         $this->em->persist($cost);
                         $synced++;
                         $counter++;
 
-                        // Batch flush и clear для освобождения памяти
+                        // Batch flush каждые 100 записей
                         if ($counter % $batchSize === 0) {
                             $this->em->flush();
-                            $this->em->clear(); // Очищаем UnitOfWork
+                            $this->em->clear();
 
-                            // Перезагружаем компанию (была detached после clear)
-                            $company = $this->em->merge($company);
+                            // Восстанавливаем Company
+                            $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
 
-                            // Очищаем кеш новых категорий и перезагружаем их
-                            foreach ($newCategories as $code => $cat) {
-                                $newCategories[$code] = $this->em->merge($cat);
+                            // Восстанавливаем Categories через getReference
+                            foreach ($categoriesCache as $code => $cat) {
+                                $categoriesCache[$code] = $this->em->getReference(
+                                    \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                                    $cat->getId()
+                                );
                             }
 
-                            $this->logger->info("Batch processed", [
+                            // Восстанавливаем Listings через getReference (если были)
+                            foreach ($listingsCache as $k => $cachedListing) {
+                                $listingsCache[$k] = $this->em->getReference(
+                                    \App\Marketplace\Entity\MarketplaceListing::class,
+                                    $cachedListing->getId()
+                                );
+                            }
+
+                            gc_collect_cycles();
+
+                            $this->logger->info('Costs batch processed', [
                                 'processed' => $counter,
-                                'synced' => $synced
+                                'synced' => $synced,
+                                'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
                             ]);
                         }
                     }
@@ -513,42 +642,28 @@ class MarketplaceSyncService
             }
         }
 
-        // Финальный flush для оставшихся данных
-        if (!$this->em->isOpen()) {
-            $this->logger->error('EntityManager is closed, cannot save costs');
-            throw new \RuntimeException('EntityManager is closed. Processing aborted.');
-        }
-
-        try {
+        // Финальный flush для остатка
+        if ($counter % $batchSize !== 0) {
             $this->em->flush();
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to flush costs', [
-                'error' => $e->getMessage()
-            ]);
-            throw $e;
+            $this->em->clear();
         }
 
-        // Сохраняем статистику нераспознанных
+        // Сохраняем статистику
         $unprocessedCount = array_sum($unprocessedTypes);
+        $rawDoc = $this->em->find(\App\Marketplace\Entity\MarketplaceRawDocument::class, $rawDoc->getId());
 
-        // Перезагружаем rawDoc если был detached
-        $rawDoc = $this->em->merge($rawDoc);
-        $rawDoc->setUnprocessedCostsCount($unprocessedCount);
-        $rawDoc->setUnprocessedCostTypes($unprocessedTypes ?: null);
-
-        try {
+        if ($rawDoc) {
+            $rawDoc->setUnprocessedCostsCount($unprocessedCount);
+            $rawDoc->setUnprocessedCostTypes($unprocessedTypes ?: null);
             $this->em->flush();
-        } catch (\Exception $e) {
-            $this->logger->error('Failed to save unprocessed stats', [
-                'error' => $e->getMessage()
-            ]);
         }
 
         $this->logger->info('Costs processing completed', [
             'total_synced' => $synced,
             'total_records' => count($rawData),
             'unprocessed_count' => $unprocessedCount,
-            'new_categories_created' => count($newCategories)
+            'new_categories_created' => $newCategoriesCreated,
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB'
         ]);
 
         return $synced;
