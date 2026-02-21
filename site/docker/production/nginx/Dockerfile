@@ -27,6 +27,10 @@ RUN apk add --no-cache curl
 COPY ./docker/common/nginx/conf.d /etc/nginx/conf.d
 WORKDIR /app
 
+# Эта команда копирует всё из твоей локальной папки public
+# (включая public/static, public/favicon.svg и т.д.) в образ
+COPY ./public ./public
+
 # Копируем только то, что нужно для отдачи статики и работы PHP
 # COPY ./public/index.php ./public/index.php
 COPY --from=builder /app/public/build ./public/build
