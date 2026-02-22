@@ -86,9 +86,12 @@ final class ProductEditTest extends WebTestCaseBase
         $crawler = $client->request('GET', '/catalog/products/'.$product->getId().'/edit');
         self::assertResponseIsSuccessful();
 
+        $skuInput = $crawler->filter('input[name="product[sku]"]');
+        self::assertCount(1, $skuInput);
+        self::assertSame('disabled', $skuInput->attr('disabled'));
+
         $client->submit($crawler->selectButton('Save')->form([
             'product[name]' => 'Updated Product Name',
-            'product[sku]' => 'SKU-NEW',
             'product[status]' => ProductStatus::DISCONTINUED->value,
             'product[description]' => 'Updated description',
             'product[purchasePrice]' => '42.50',
@@ -101,7 +104,7 @@ final class ProductEditTest extends WebTestCaseBase
 
         self::assertInstanceOf(Product::class, $updatedProduct);
         self::assertSame('Updated Product Name', $updatedProduct->getName());
-        self::assertSame('SKU-NEW', $updatedProduct->getSku());
+        self::assertSame('SKU-OLD', $updatedProduct->getSku());
         self::assertSame(ProductStatus::DISCONTINUED, $updatedProduct->getStatus());
         self::assertSame('Updated description', $updatedProduct->getDescription());
         self::assertSame('42.50', $updatedProduct->getPurchasePrice());
