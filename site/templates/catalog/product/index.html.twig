@@ -57,7 +57,7 @@
                     <td><span class="badge bg-azure-lt">{{ product.status.value }}</span></td>
                     <td>{{ product.updatedAt|date('d.m.Y H:i') }}</td>
                     <td class="text-end">
-                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Открыть</button>
+                        <a href="{{ path('catalog_products_show', {id: product.id}) }}" class="btn btn-outline-secondary btn-sm">Открыть</a>
                     </td>
                 </tr>
             {% else %}

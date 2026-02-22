@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <div>
+        <h2 class="page-title mb-1">{{ product.name }}</h2>
+        <span class="badge bg-azure-lt text-uppercase">{{ product.status.value }}</span>
+    </div>
+    <div class="ms-auto d-flex gap-2 d-print-none">
+        {% if canEditProduct %}
+            <a href="{{ path('catalog_products_edit', {id: product.id}) }}" class="btn btn-primary">Редактировать</a>
+        {% else %}
+            <button type="button" class="btn btn-primary" disabled>Редактировать</button>
+        {% endif %}
+        <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Сводка</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-4">SKU</dt>
+                    <dd class="col-8">{{ product.sku }}</dd>
+                    <dt class="col-4">Создан</dt>
+                    <dd class="col-8">{{ product.createdAt|date('d.m.Y H:i') }}</dd>
+                    <dt class="col-4">Обновлен</dt>
+                    <dd class="col-8">{{ product.updatedAt|date('d.m.Y H:i') }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Цена</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">Закупочная цена</dt>
+                    <dd class="col-6">{{ product.purchasePrice }}</dd>
+                    {% if product.weightKg is not null %}
+                        <dt class="col-6">Вес, кг</dt>
+                        <dd class="col-6">{{ product.weightKg }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Описание</h3>
+            </div>
+            <div class="card-body">
+                {% if product.description %}
+                    <p class="mb-0">{{ product.description|nl2br }}</p>
+                {% else %}
+                    <p class="text-muted mb-0">Описание отсутствует.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
