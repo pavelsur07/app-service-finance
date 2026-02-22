@@ -53,6 +53,22 @@ final class ProductRepository
         return $pager;
     }
 
+
+    public function existsSkuForCompany(string $sku, Company $company): bool
+    {
+        $count = (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(Product::class, 'p')
+            ->andWhere('p.company = :company')
+            ->andWhere('p.sku = :sku')
+            ->setParameter('company', $company)
+            ->setParameter('sku', $sku)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
     public function getOneForCompanyOrNull(string $id, Company $company): ?Product
     {
         return $this->entityManager->createQueryBuilder()
