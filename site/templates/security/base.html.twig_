@@ -8,8 +8,9 @@
     {% block stylesheets %}
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
-        {# Подключаем CSS, который Vite собрал для точки входа 'app' #}
-        {{ vite_entry_link_tags('app') }}
+    {% endblock %}
+    {% block importmap %}
+        {{ importmap('app')|replace({'<script type="importmap"': '<script type="importmap" data-turbo-track="reload"'})|raw }}
     {% endblock %}
 </head>
 <body>
@@ -26,8 +27,5 @@
 <script
     src="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/js/tabler.min.js">
 </script>
-{% block javascripts %}
-    {# Подключаем JS от Vite #}
-    {{ vite_entry_script_tags('app') }}
-{% endblock %}
+{% block javascripts %}{% endblock %}
 </html>
