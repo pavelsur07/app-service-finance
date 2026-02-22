@@ -28,7 +28,9 @@ final class ProductEditController extends AbstractController
         $command->description = $product->getDescription();
         $command->purchasePrice = $product->getPurchasePrice();
 
-        $form = $this->createForm(ProductType::class, $command);
+        $form = $this->createForm(ProductType::class, $command, [
+            'sku_disabled' => true,
+        ]);
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
