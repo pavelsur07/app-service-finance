@@ -87,6 +87,21 @@ final class ProductRepository
         return $count > 0;
     }
 
+
+    public function getOneForCompanyByIdsOrNull(string $companyId, string $productId): ?Product
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.id = :productId')
+            ->andWhere('IDENTITY(p.company) = :companyId')
+            ->setParameter('productId', $productId)
+            ->setParameter('companyId', $companyId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function getOneForCompanyOrNull(string $id, Company $company): ?Product
     {
         return $this->entityManager->createQueryBuilder()
