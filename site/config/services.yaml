@@ -65,6 +65,8 @@ services:
 
     App\Finance\Facts\FactsProviderInterface: '@App\Finance\Facts\PLDailyTotalFactsProvider'
 
+    App\Catalog\Domain\ProductSkuUniquenessChecker: '@App\Catalog\Infrastructure\ProductSkuUniquenessCheckerDoctrine'
+
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:
         resource: '../src/Balance/Provider/'
