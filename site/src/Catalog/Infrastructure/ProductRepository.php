@@ -6,6 +6,7 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\DTO\ProductListFilter;
 use App\Catalog\Entity\Product;
+use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -50,5 +51,19 @@ final class ProductRepository
         $pager->setMaxPerPage(max(1, $perPage));
 
         return $pager;
+    }
+
+    public function getOneForCompanyOrNull(string $id, Company $company): ?Product
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.id = :id')
+            ->andWhere('p.company = :company')
+            ->setParameter('id', $id)
+            ->setParameter('company', $company)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 }
