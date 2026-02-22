@@ -54,14 +54,14 @@ final class ProductRepository
     }
 
 
-    public function existsSkuForCompany(string $sku, Company $company): bool
+    public function existsSkuForCompany(string $sku, string $companyId): bool
     {
         $count = (int) $this->entityManager->createQueryBuilder()
             ->select('COUNT(p.id)')
             ->from(Product::class, 'p')
-            ->andWhere('p.company = :company')
+            ->andWhere('IDENTITY(p.company) = :companyId')
             ->andWhere('p.sku = :sku')
-            ->setParameter('company', $company)
+            ->setParameter('companyId', $companyId)
             ->setParameter('sku', $sku)
             ->getQuery()
             ->getSingleScalarResult();
@@ -70,15 +70,15 @@ final class ProductRepository
     }
 
 
-    public function existsSkuForCompanyExcludingProductId(string $sku, Company $company, string $productId): bool
+    public function existsSkuForCompanyExcludingProductId(string $sku, string $companyId, string $productId): bool
     {
         $count = (int) $this->entityManager->createQueryBuilder()
             ->select('COUNT(p.id)')
             ->from(Product::class, 'p')
-            ->andWhere('p.company = :company')
+            ->andWhere('IDENTITY(p.company) = :companyId')
             ->andWhere('p.sku = :sku')
             ->andWhere('p.id != :productId')
-            ->setParameter('company', $company)
+            ->setParameter('companyId', $companyId)
             ->setParameter('sku', $sku)
             ->setParameter('productId', $productId)
             ->getQuery()

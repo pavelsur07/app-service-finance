@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Catalog\Application;
 
 use App\Catalog\DTO\UpdateProductCommand;
+use App\Catalog\Domain\ProductSkuPolicy;
 use App\Catalog\Infrastructure\ProductRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
@@ -15,6 +16,7 @@ final class UpdateProductAction
 {
     public function __construct(
         private readonly ProductRepository $productRepository,
+        private readonly ProductSkuPolicy $productSkuPolicy,
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly EntityManagerInterface $entityManager,
     ) {
@@ -23,6 +25,7 @@ final class UpdateProductAction
     public function __invoke(string $id, UpdateProductCommand $cmd): void
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        $companyId = $company->getId();
         $product = $this->productRepository->getOneForCompanyOrNull($id, $company);
 
         if (null === $product) {
@@ -36,9 +39,7 @@ final class UpdateProductAction
 
         $sku = trim((string) $cmd->sku);
         if ($sku !== $product->getSku()) {
-            if ($this->productRepository->existsSkuForCompanyExcludingProductId($sku, $company, $product->getId())) {
-                throw new \DomainException('Товар с таким SKU уже существует в активной компании.');
-            }
+            $this->productSkuPolicy->assertSkuIsUniqueExcludingProductId($sku, $companyId, $product->getId());
 
             $product->setSku($sku);
         }

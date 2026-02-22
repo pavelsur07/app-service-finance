@@ -25,9 +25,10 @@ final class CreateProductAction
     public function __invoke(CreateProductCommand $cmd): string
     {
         $company = $this->activeCompanyService->getActiveCompany();
+        $companyId = $company->getId();
 
         $sku = trim((string) $cmd->sku);
-        $this->productSkuPolicy->assertSkuIsUnique($sku, $company);
+        $this->productSkuPolicy->assertSkuIsUnique($sku, $companyId);
 
         $product = new Product(Uuid::v7()->toRfc4122(), $company);
         $product
