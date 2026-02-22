@@ -1,0 +1,75 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Товары{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Товары</h2>
+    <div class="ms-auto d-print-none">
+        {% if canCreateProduct %}
+            <a href="{{ path('catalog_products_new') }}" class="btn btn-primary">Создать товар</a>
+        {% else %}
+            <button type="button" class="btn btn-primary" disabled>Создать товар</button>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label" for="catalog-products-search">Поиск</label>
+                <input id="catalog-products-search" type="text" name="q" value="{{ filters.q }}" class="form-control" placeholder="Название или SKU">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label" for="catalog-products-status">Статус</label>
+                <select id="catalog-products-status" name="status" class="form-select">
+                    <option value="">Все</option>
+                    <option value="active" {% if filters.status == 'active' %}selected{% endif %}>Активный</option>
+                    <option value="inactive" {% if filters.status == 'inactive' %}selected{% endif %}>Неактивный</option>
+                    <option value="discontinued" {% if filters.status == 'discontinued' %}selected{% endif %}>Снят с продажи</option>
+                </select>
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-outline-primary">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+            <tr>
+                <th>Name</th>
+                <th>SKU</th>
+                <th>Status</th>
+                <th>UpdatedAt</th>
+                <th class="text-end">Actions</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for product in products %}
+                <tr>
+                    <td>{{ product.name }}</td>
+                    <td>{{ product.sku }}</td>
+                    <td><span class="badge bg-azure-lt">{{ product.status.value }}</span></td>
+                    <td>{{ product.updatedAt|date('d.m.Y H:i') }}</td>
+                    <td class="text-end">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Открыть</button>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted">Товаров пока нет.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer d-flex align-items-center">
+        {% include 'partials/_pagerfanta.html.twig' with {pager: pager, params: app.request.query.all|merge({'perPage': filters.perPage})} %}
+    </div>
+</div>
+{% endblock %}
