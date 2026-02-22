@@ -156,6 +156,8 @@
                             <a class="dropdown-item" href="{{ path('money_account_index') }}">Счета и кассы</a>
                             <a class="dropdown-item" href="{{ path('counterparty_index') }}">Контрагенты</a>
                             <a class="dropdown-item" href="{{ path('project_direction_index') }}">Проекты</a>
+                            {% set catalog_products_active = current_route starts with 'catalog_products_' %}
+                            <a class="dropdown-item {{ catalog_products_active ? 'active' : '' }}" href="{{ path('catalog_products_index') }}">Каталог / Товары</a>
                             <a class="dropdown-item" href="{{ path('cash_transaction_auto_rule_index') }}">Автоправила ДДС</a>
                         </div>
                     </div>
@@ -171,6 +173,7 @@
                 or current_route == 'money_account_index'
                 or current_route == 'counterparty_index'
                 or current_route == 'project_direction_index'
+                or current_route starts with 'catalog_products_'
                 or current_route == 'cash_transaction_auto_rule_index'
             %}
 
