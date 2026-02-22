@@ -122,8 +122,8 @@ class MarketplaceSyncService
         foreach ($salesData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
             $tsName = trim($item['ts_name'] ?? '');
-            $tsName = ($tsName === '') ? null : $tsName;
-            $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+            $cacheKey = $nmId . '_' . $tsName;
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, но пока НЕ делаем flush
@@ -163,8 +163,8 @@ class MarketplaceSyncService
 
                 $nmId = (string)($item['nm_id'] ?? '');
                 $tsName = trim($item['ts_name'] ?? '');
-                $tsName = ($tsName === '') ? null : $tsName;
-                $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+                $cacheKey = $nmId . '_' . $tsName;
 
                 // Берем листинг из кэша (100% гарантия что есть - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -307,8 +307,8 @@ class MarketplaceSyncService
         foreach ($returnsData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
             $tsName = trim($item['ts_name'] ?? '');
-            $tsName = ($tsName === '') ? null : $tsName;
-            $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+            $cacheKey = $nmId . '_' . $tsName;
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, НЕ делаем flush
@@ -348,8 +348,8 @@ class MarketplaceSyncService
 
                 $nmId = (string)($item['nm_id'] ?? '');
                 $tsName = trim($item['ts_name'] ?? '');
-                $tsName = ($tsName === '') ? null : $tsName;
-                $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+                $cacheKey = $nmId . '_' . $tsName;
 
                 // Берем листинг из кэша (100% гарантия - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -517,10 +517,10 @@ class MarketplaceSyncService
 
                     $nmId = (string)($item['nm_id'] ?? '');
                     $tsName = trim($item['ts_name'] ?? '');
-                    $tsName = ($tsName === '') ? null : $tsName;
+                    $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
 
                     if ($nmId !== '') {
-                        $cacheKey = $nmId . '_' . ($tsName ?? 'null');
+                        $cacheKey = $nmId . '_' . $tsName;
                         $listing = $listingsCache[$cacheKey] ?? null;
 
                         if ($listing) {
@@ -870,11 +870,12 @@ class MarketplaceSyncService
         $price = $wbData['retail_price'];
 
         // Формируем название: {brand} {subject} {sa_name} {ts_name если есть}
+        // Не включаем 'UNKNOWN' в название
         $nameParts = array_filter([
             $brandName,
             $subjectName,
             $saName,
-            $tsName
+            ($tsName !== 'UNKNOWN') ? $tsName : null
         ]);
         $productName = implode(' ', $nameParts);
 

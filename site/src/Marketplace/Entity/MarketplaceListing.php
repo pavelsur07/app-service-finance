@@ -17,6 +17,7 @@ use Webmozart\Assert\Assert;
     name: 'uniq_company_marketplace_sku_size',
     columns: ['company_id', 'marketplace', 'marketplace_sku', 'size']
 )]
+#[ORM\HasLifecycleCallbacks]
 class MarketplaceListing
 {
     #[ORM\Id]
@@ -40,8 +41,8 @@ class MarketplaceListing
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $supplierSku = null; // sa_name от WB (артикул производителя)
 
-    #[ORM\Column(length: 50, nullable: true)]
-    private ?string $size = null; // ts_name от WB (размер)
+    #[ORM\Column(length: 50, nullable: false)]
+    private string $size = 'UNKNOWN'; // ts_name от WB (размер, 'UNKNOWN' если не указан)
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $price;
@@ -68,8 +69,6 @@ class MarketplaceListing
         $this->company = $company;
         $this->product = $product;
         $this->marketplace = $marketplace;
-        $this->createdAt = new \DateTimeImmutable();
-        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function getId(): string
@@ -100,7 +99,6 @@ class MarketplaceListing
     public function setMarketplaceSku(string $marketplaceSku): self
     {
         $this->marketplaceSku = $marketplaceSku;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -113,7 +111,6 @@ class MarketplaceListing
     public function setPrice(string $price): self
     {
         $this->price = $price;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -126,7 +123,6 @@ class MarketplaceListing
     public function setDiscountPrice(?string $discountPrice): self
     {
         $this->discountPrice = $discountPrice;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -139,7 +135,6 @@ class MarketplaceListing
     public function setIsActive(bool $isActive): self
     {
         $this->isActive = $isActive;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -152,7 +147,6 @@ class MarketplaceListing
     public function setMarketplaceData(?array $marketplaceData): self
     {
         $this->marketplaceData = $marketplaceData;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
@@ -165,20 +159,19 @@ class MarketplaceListing
     public function setSupplierSku(?string $supplierSku): self
     {
         $this->supplierSku = $supplierSku;
-        $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
 
-    public function getSize(): ?string
+    public function getSize(): string
     {
         return $this->size;
     }
 
     public function setSize(?string $size): self
     {
-        $this->size = $size;
-        $this->updatedAt = new \DateTimeImmutable();
+        // Если size пустой или null - устанавливаем 'UNKNOWN'
+        $this->size = ($size === null || trim($size) === '') ? 'UNKNOWN' : trim($size);
 
         return $this;
     }
@@ -191,5 +184,24 @@ class MarketplaceListing
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    /**
+     * Lifecycle callback: вызывается перед первым сохранением entity в БД
+     */
+    #[ORM\PrePersist]
+    public function onPrePersist(): void
+    {
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Lifecycle callback: вызывается перед каждым обновлением entity в БД
+     */
+    #[ORM\PreUpdate]
+    public function onPreUpdate(): void
+    {
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }

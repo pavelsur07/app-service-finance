@@ -36,24 +36,19 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         Company $company,
         MarketplaceType $marketplace,
         string $nmId,
-        ?string $size
+        string $size  // Теперь ВСЕГДА строка ('UNKNOWN' если размера нет)
     ): ?MarketplaceListing {
-        $qb = $this->createQueryBuilder('l')
+        return $this->createQueryBuilder('l')
             ->where('l.company = :company')
             ->andWhere('l.marketplace = :marketplace')
             ->andWhere('l.marketplaceSku = :nmId')
+            ->andWhere('l.size = :size')
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
-            ->setParameter('nmId', $nmId);
-
-        if ($size === null) {
-            $qb->andWhere('l.size IS NULL');
-        } else {
-            $qb->andWhere('l.size = :size')
-                ->setParameter('size', $size);
-        }
-
-        return $qb->getQuery()->getOneOrNullResult();
+            ->setParameter('nmId', $nmId)
+            ->setParameter('size', $size)
+            ->getQuery()
+            ->getOneOrNullResult();
     }
 
     /**
@@ -92,7 +87,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
      * @param Company $company
      * @param MarketplaceType $marketplace
      * @param array $nmIds
-     * @return array Индексированный массив: ['nmId_size' => Listing, 'nmId_null' => Listing]
+     * @return array Индексированный массив: ['nmId_size' => Listing, 'nmId_UNKNOWN' => Listing]
      */
     public function findListingsByNmIdsIndexed(
         Company $company,
@@ -116,10 +111,10 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        // Индексируем по ключу: nmId_size (или nmId_null если size пуст)
+        // Индексируем по ключу: nmId_size (size всегда строка, 'UNKNOWN' если размера нет)
         $indexed = [];
         foreach ($listings as $listing) {
-            $key = $listing->getMarketplaceSku() . '_' . ($listing->getSize() ?? 'null');
+            $key = $listing->getMarketplaceSku() . '_' . $listing->getSize();
             $indexed[$key] = $listing;
         }
 
