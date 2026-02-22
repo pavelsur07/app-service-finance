@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Редактирование товара{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Редактирование товара</h2>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {{ form_start(form) }}
+            {{ form_errors(form) }}
+
+            <div class="row g-3">
+                <div class="col-md-6">
+                    {{ form_row(form.name) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.sku) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.status) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.purchasePrice) }}
+                </div>
+                <div class="col-12">
+                    {{ form_row(form.description) }}
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary">Save</button>
+                <a href="{{ path('catalog_products_show', {id: product.id}) }}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        {{ form_end(form) }}
+    </div>
+</div>
+{% endblock %}

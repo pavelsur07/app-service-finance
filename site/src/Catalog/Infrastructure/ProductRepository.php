@@ -69,6 +69,24 @@ final class ProductRepository
         return $count > 0;
     }
 
+
+    public function existsSkuForCompanyExcludingProductId(string $sku, Company $company, string $productId): bool
+    {
+        $count = (int) $this->entityManager->createQueryBuilder()
+            ->select('COUNT(p.id)')
+            ->from(Product::class, 'p')
+            ->andWhere('p.company = :company')
+            ->andWhere('p.sku = :sku')
+            ->andWhere('p.id != :productId')
+            ->setParameter('company', $company)
+            ->setParameter('sku', $sku)
+            ->setParameter('productId', $productId)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
     public function getOneForCompanyOrNull(string $id, Company $company): ?Product
     {
         return $this->entityManager->createQueryBuilder()
