@@ -13,7 +13,6 @@ final class ProductListFilter
         public readonly ?string $companyId = null,
         public readonly ?string $search = null,
         public readonly ?ProductStatus $status = null,
-        public readonly bool $includeArchived = false,
     ) {
     }
 
@@ -25,7 +24,6 @@ final class ProductListFilter
         return new self(
             search: '' !== $search ? $search : null,
             status: $status,
-            includeArchived: filter_var($request->query->get('includeArchived', false), FILTER_VALIDATE_BOOL),
         );
     }
 
@@ -35,7 +33,6 @@ final class ProductListFilter
             companyId: $companyId,
             search: $this->search,
             status: $this->status,
-            includeArchived: $this->includeArchived,
         );
     }
 }
