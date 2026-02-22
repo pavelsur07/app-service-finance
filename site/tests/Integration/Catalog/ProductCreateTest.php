@@ -10,6 +10,7 @@ use App\Company\Entity\Company;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final class ProductCreateTest extends WebTestCaseBase
 {
@@ -96,6 +97,78 @@ final class ProductCreateTest extends WebTestCaseBase
             'Товар с таким SKU уже существует в активной компании.',
             (string) $client->getResponse()->getContent()
         );
+    }
+
+
+    public function testSkuMustBeUniquePerCompanyAtDatabaseLevel(): void
+    {
+        $this->resetDb();
+
+        $em = $this->em();
+        $owner = UserBuilder::aUser()->withEmail('owner-db-unique@example.test')->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-1111-1111-111111111152')
+            ->withOwner($owner)
+            ->withName('DB Unique Company')
+            ->build();
+
+        $firstProduct = (new Product('33333333-3333-3333-3333-333333333336', $company))
+            ->setName('First Product')
+            ->setSku('SKU-DB-001')
+            ->setPurchasePrice('10.00');
+
+        $duplicateProduct = (new Product('33333333-3333-3333-3333-333333333337', $company))
+            ->setName('Duplicate Product')
+            ->setSku('SKU-DB-001')
+            ->setPurchasePrice('11.00');
+
+        $em->persist($owner);
+        $em->persist($company);
+        $em->persist($firstProduct);
+        $em->flush();
+
+        $em->persist($duplicateProduct);
+
+        $this->expectException(UniqueConstraintViolationException::class);
+        $em->flush();
+    }
+
+    public function testSameSkuForDifferentCompaniesIsAllowedAtDatabaseLevel(): void
+    {
+        $this->resetDb();
+
+        $em = $this->em();
+        $owner = UserBuilder::aUser()->withEmail('owner-db-cross-company@example.test')->build();
+        $companyA = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-1111-1111-111111111153')
+            ->withOwner($owner)
+            ->withName('Company A')
+            ->build();
+        $companyB = CompanyBuilder::aCompany()
+            ->withId('11111111-1111-1111-1111-111111111154')
+            ->withOwner($owner)
+            ->withName('Company B')
+            ->build();
+
+        $productA = (new Product('33333333-3333-3333-3333-333333333338', $companyA))
+            ->setName('Product A')
+            ->setSku('SKU-SHARED-001')
+            ->setPurchasePrice('10.00');
+
+        $productB = (new Product('33333333-3333-3333-3333-333333333339', $companyB))
+            ->setName('Product B')
+            ->setSku('SKU-SHARED-001')
+            ->setPurchasePrice('12.00');
+
+        $em->persist($owner);
+        $em->persist($companyA);
+        $em->persist($companyB);
+        $em->persist($productA);
+        $em->persist($productB);
+        $em->flush();
+
+        self::assertNotNull($productA->getId());
+        self::assertNotNull($productB->getId());
     }
 
     private function loginWithActiveCompany($client, object $owner, Company $company): void

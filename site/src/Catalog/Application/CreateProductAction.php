@@ -9,6 +9,7 @@ use App\Catalog\Domain\ProductSkuPolicy;
 use App\Catalog\Entity\Product;
 use App\Catalog\Enum\ProductStatus;
 use App\Shared\Service\ActiveCompanyService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Uid\Uuid;
 
@@ -37,7 +38,11 @@ final class CreateProductAction
             ->setPurchasePrice(trim((string) $cmd->purchasePrice));
 
         $this->entityManager->persist($product);
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            throw new \DomainException('Товар с таким SKU уже существует в активной компании.');
+        }
 
         return $product->getId();
     }

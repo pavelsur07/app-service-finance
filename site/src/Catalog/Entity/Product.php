@@ -9,8 +9,12 @@ use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: ProductRepository::class)]
-#[ORM\Table(name: '`products`')]
-#[ORM\Index(columns: ['company_id', 'sku'], name: 'idx_company_sku')]
+#[ORM\Table(
+    name: '`products`',
+    uniqueConstraints: [
+        new ORM\UniqueConstraint(name: 'uniq_company_sku', columns: ['company_id', 'sku']),
+    ],
+)]
 class Product
 {
     #[ORM\Id]
