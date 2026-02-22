@@ -58,6 +58,12 @@ analytics_controllers:
         namespace: App\Analytics\Controller
     type: attribute
 
+catalog_controllers:
+    resource:
+        path: ../src/Catalog/Controller/
+        namespace: App\Catalog\Controller
+    type: attribute
+
 shared_controllers:
     resource:
         path: ../src/Shared/Controller/
