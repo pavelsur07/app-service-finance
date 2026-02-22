@@ -7,6 +7,7 @@ namespace App\Catalog\Application;
 use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Infrastructure\ProductRepository;
 use App\Shared\Service\ActiveCompanyService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
@@ -56,6 +57,10 @@ final class UpdateProductAction
         }
 
         // TODO: If product-specific audit integration is introduced, call it from here.
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->flush();
+        } catch (UniqueConstraintViolationException) {
+            throw new \DomainException('Товар с таким SKU уже существует в активной компании.');
+        }
     }
 }
