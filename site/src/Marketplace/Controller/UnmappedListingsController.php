@@ -37,6 +37,7 @@ class UnmappedListingsController extends AbstractController
         return $this->render('marketplace/unmapped/index.html.twig', [
             'listings' => $listings,
             'unmapped_count' => $unmappedCount,
+            'active_tab' => 'unmapped',
         ]);
     }
 }

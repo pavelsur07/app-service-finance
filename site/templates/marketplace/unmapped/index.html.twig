@@ -1,109 +1,212 @@
-{% extends 'base.html.twig' %}
+{% extends 'marketplace/layout.html.twig' %}
 
-{% block title %}Маркетплейсы{% endblock %}
-
-{% block body %}
-    {% set active_tab = active_tab|default('') %}
-
-    <div class="page-header d-print-none">
-        <div class="container-xl">
-            <div class="row g-2 align-items-center">
-                <div class="col">
-                    <h2 class="page-title">Маркетплейсы</h2>
+{% block tab_content %}
+    <div class="container-xl py-4">
+        {% if unmapped_count == 0 %}
+            <div class="empty">
+                <div class="empty-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-check" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                        <path d="M5 12l5 5l10 -10"></path>
+                    </svg>
+                </div>
+                <p class="empty-title">Все листинги привязаны!</p>
+                <p class="empty-subtitle text-muted">
+                    У вас нет листингов без привязки к продуктам.
+                </p>
+                <div class="empty-action">
+                    <a href="{{ path('marketplace_products_index') }}" class="btn btn-primary">
+                        Перейти к листингам
+                    </a>
                 </div>
             </div>
-        </div>
-    </div>
-
-    <div class="page-body">
-        <div class="container-xl">
-
-            {# Flash messages #}
-            {% for label, messages in app.flashes %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
-                        <div class="d-flex">
-                            <div>{{ message }}</div>
-                        </div>
-                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
-                    </div>
-                {% endfor %}
-            {% endfor %}
-
-            {# Tabs #}
+        {% else %}
             <div class="card">
                 <div class="card-header">
-                    <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_index') }}"
-                               class="nav-link {{ active_tab == 'marketplace' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="7" cy="18" r="2" /><circle cx="7" cy="6" r="2" /><circle cx="17" cy="12" r="2" /><line x1="7" y1="8" x2="7" y2="16" /><path d="M7 8a4 4 0 0 0 4 4h4" /></svg>
-                                Интеграции
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_sales_index') }}"
-                               class="nav-link {{ active_tab == 'sales' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><polyline points="22 12 18 12 15 21 9 3 6 12 2 12" /></svg>
-                                Продажи
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_returns_index') }}"
-                               class="nav-link {{ active_tab == 'returns' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
-                                Возвраты
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_costs_index') }}"
-                               class="nav-link {{ active_tab == 'costs' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></svg>
-                                Затраты
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_products_index') }}"
-                               class="nav-link {{ active_tab == 'listings' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>
-                                Листинг
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_unmapped_listings_index') }}"
-                               class="nav-link {{ active_tab == 'unmapped' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                                Unmapped
-                                {% if unmapped_count is defined and unmapped_count > 0 %}
-                                    <span class="badge badge-sm bg-yellow ms-2">{{ unmapped_count }}</span>
-                                {% endif %}
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_cost_categories_index') }}"
-                               class="nav-link {{ active_tab == 'cost_categories' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="9" y1="6" x2="20" y2="6" /><line x1="9" y1="12" x2="20" y2="12" /><line x1="9" y1="18" x2="20" y2="18" /><line x1="4" y1="6" x2="4" y2="6.01" /><line x1="4" y1="12" x2="4" y2="12.01" /><line x1="4" y1="18" x2="4" y2="18.01" /></svg>
-                                Справочник
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_analytics_index') }}"
-                               class="nav-link {{ active_tab == 'analytics' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 19l16 0" /><path d="M4 15l4 -6l4 2l4 -5l4 4" /></svg>
-                                Аналитика
-                            </a>
-                        </li>
-                    </ul>
+                    <h3 class="card-title">{{ unmapped_count }} листингов без привязки</h3>
+                    <div class="card-actions">
+                        <div class="input-icon">
+                            <input type="text" class="form-control" placeholder="Поиск..." id="search-input">
+                            <span class="input-icon-addon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                    <circle cx="10" cy="10" r="7"></circle>
+                                    <line x1="21" y1="21" x2="15" y2="15"></line>
+                                </svg>
+                            </span>
+                        </div>
+                    </div>
                 </div>
-
-                <div class="card-body p-0">
-                    {% block tab_content %}{% endblock %}
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap">
+                        <thead>
+                        <tr>
+                            <th>Маркетплейс</th>
+                            <th>Marketplace SKU</th>
+                            <th>Supplier SKU</th>
+                            <th>Размер</th>
+                            <th>Цена</th>
+                            <th>Создан</th>
+                            <th class="w-1">Действия</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for listing in listings %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-azure-lt">{{ listing.marketplace|upper }}</span>
+                                </td>
+                                <td>
+                                    <strong>{{ listing.marketplace_sku }}</strong>
+                                </td>
+                                <td>
+                                    {% if listing.supplier_sku %}
+                                        <code>{{ listing.supplier_sku }}</code>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ listing.size }}</td>
+                                <td>{{ listing.price }} ₽</td>
+                                <td>
+                                    <span class="text-muted">{{ listing.created_at|date('d.m.Y H:i') }}</span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-primary btn-sm map-listing-btn"
+                                            data-listing-id="{{ listing.id }}"
+                                            data-listing-sku="{{ listing.marketplace_sku }}">
+                                        Привязать
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
             </div>
+        {% endif %}
+    </div>
+{% endblock %}
 
+{% block modals %}
+    <div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Привязать листинг к продукту</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Листинг</label>
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-auto">
+                                        <span class="badge bg-azure-lt">WB</span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="text-muted small">
+                                            Marketplace SKU: <code id="modal-listing-sku"></code>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Выберите продукт</label>
+                        <select class="form-select" id="product-select">
+                            <option value="">Загрузка...</option>
+                        </select>
+                    </div>
+
+                    <div id="mapping-error" class="alert alert-danger d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="confirm-mapping-btn">Привязать</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    {% block modals %}{% endblock %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const mapModal = new bootstrap.Modal(document.getElementById('mapListingModal'));
+            let currentListingId = null;
 
+            document.querySelectorAll('.map-listing-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    currentListingId = this.dataset.listingId;
+                    document.getElementById('modal-listing-sku').textContent = this.dataset.listingSku;
+                    loadProducts();
+                    mapModal.show();
+                });
+            });
+
+            async function loadProducts() {
+                const select = document.getElementById('product-select');
+                select.innerHTML = '<option value="">Загрузка...</option>';
+                try {
+                    const response = await fetch('/api/products');
+                    const products = await response.json();
+                    select.innerHTML = '<option value="">-- Выберите продукт --</option>';
+                    products.forEach(product => {
+                        const option = document.createElement('option');
+                        option.value = product.id;
+                        option.textContent = `${product.sku} - ${product.name}`;
+                        select.appendChild(option);
+                    });
+                } catch (error) {
+                    select.innerHTML = '<option value="">Ошибка загрузки</option>';
+                }
+            }
+
+            document.getElementById('confirm-mapping-btn').addEventListener('click', async function() {
+                const productId = document.getElementById('product-select').value;
+                const errorDiv = document.getElementById('mapping-error');
+                errorDiv.classList.add('d-none');
+                if (!productId) {
+                    errorDiv.textContent = 'Выберите продукт';
+                    errorDiv.classList.remove('d-none');
+                    return;
+                }
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Привязка...';
+                try {
+                    const response = await fetch(`/api/marketplace/listings/${currentListingId}/map`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ productId })
+                    });
+                    const data = await response.json();
+                    if (response.ok) {
+                        window.location.reload();
+                    } else {
+                        errorDiv.textContent = data.error || 'Не удалось привязать листинг';
+                        errorDiv.classList.remove('d-none');
+                        this.disabled = false;
+                        this.textContent = 'Привязать';
+                    }
+                } catch (error) {
+                    errorDiv.textContent = 'Ошибка сети';
+                    errorDiv.classList.remove('d-none');
+                    this.disabled = false;
+                    this.textContent = 'Привязать';
+                }
+            });
+
+            const searchInput = document.getElementById('search-input');
+            if (searchInput) {
+                searchInput.addEventListener('input', function() {
+                    const searchTerm = this.value.toLowerCase();
+                    document.querySelectorAll('tbody tr').forEach(row => {
+                        row.style.display = row.textContent.toLowerCase().includes(searchTerm) ? '' : 'none';
+                    });
+                });
+            }
+        });
+    </script>
 {% endblock %}
