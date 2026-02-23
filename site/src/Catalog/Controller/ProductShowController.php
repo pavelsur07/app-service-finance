@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Catalog\Controller;
 
+use App\Catalog\Form\ProductPurchasePriceType;
 use App\Catalog\Infrastructure\Query\ProductPurchasePriceQuery;
 use App\Catalog\Infrastructure\Query\ProductQuery;
 use App\Shared\Service\ActiveCompanyService;
@@ -54,11 +55,17 @@ final class ProductShowController extends AbstractController
             }
         }
 
+        $purchasePriceForm = $this->createForm(ProductPurchasePriceType::class, null, [
+            'action' => $this->generateUrl('catalog_products_purchase_price_create', ['id' => $id]),
+            'method' => 'POST',
+        ]);
+
         return $this->render('catalog/product/show.html.twig', [
             'product' => $product,
             'todayPurchasePrice' => $todayPurchasePrice,
             'priceAtDate' => $priceAtDate,
             'priceAtPurchasePrice' => $priceAtPurchasePrice,
+            'purchasePriceForm' => $purchasePriceForm->createView(),
             'canEditProduct' => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
         ]);
     }

@@ -55,13 +55,13 @@
         </div>
     </div>
 
-    <div class="col-12 col-lg-6">
+    <div class="col-12 col-lg-6" id="purchase-price">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">Закупочная цена</h3>
             </div>
             <div class="card-body">
-                <dl class="row mb-0">
+                <dl class="row">
                     <dt class="col-6">На сегодня</dt>
                     <dd class="col-6">
                         {% if todayPurchasePrice %}
@@ -82,6 +82,50 @@
                         </dd>
                     {% endif %}
                 </dl>
+
+                {{ form_start(purchasePriceForm, {attr: {class: 'mt-3'}}) }}
+                    {% if form_errors(purchasePriceForm) %}
+                        <div class="alert alert-danger">{{ form_errors(purchasePriceForm) }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        {{ form_label(purchasePriceForm.effectiveFrom, null, {label_attr: {class: 'form-label'}}) }}
+                        {{ form_widget(purchasePriceForm.effectiveFrom, {attr: {class: 'form-control'}}) }}
+                        {% if form_errors(purchasePriceForm.effectiveFrom) %}
+                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.effectiveFrom) }}</div>
+                        {% endif %}
+                        {{ form_help(purchasePriceForm.effectiveFrom) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_label(purchasePriceForm.priceAmount, null, {label_attr: {class: 'form-label'}}) }}
+                        {{ form_widget(purchasePriceForm.priceAmount, {attr: {class: 'form-control'}}) }}
+                        {% if form_errors(purchasePriceForm.priceAmount) %}
+                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.priceAmount) }}</div>
+                        {% endif %}
+                        {{ form_help(purchasePriceForm.priceAmount) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_label(purchasePriceForm.currency, null, {label_attr: {class: 'form-label'}}) }}
+                        {{ form_widget(purchasePriceForm.currency, {attr: {class: 'form-select'}}) }}
+                        {% if form_errors(purchasePriceForm.currency) %}
+                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.currency) }}</div>
+                        {% endif %}
+                        {{ form_help(purchasePriceForm.currency) }}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form_label(purchasePriceForm.note, null, {label_attr: {class: 'form-label'}}) }}
+                        {{ form_widget(purchasePriceForm.note, {attr: {class: 'form-control'}}) }}
+                        {% if form_errors(purchasePriceForm.note) %}
+                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.note) }}</div>
+                        {% endif %}
+                        {{ form_help(purchasePriceForm.note) }}
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Добавить цену</button>
+                {{ form_end(purchasePriceForm) }}
             </div>
         </div>
     </div>
