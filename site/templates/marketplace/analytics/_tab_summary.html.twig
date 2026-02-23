@@ -1,0 +1,69 @@
+{# Вкладка: Сводный отчёт #}
+
+{# A. Таблица выручки #}
+<div class="mb-4">
+    <h3 class="mb-3">Выручка и маржинальность</h3>
+    <div class="table-responsive">
+        <table class="table table-vcenter">
+            <thead>
+            <tr>
+                <th>Показатель</th>
+                <th class="text-end">Значение, ₽</th>
+                <th class="text-end">%</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td><strong>GMV (валовая выручка)</strong></td>
+                <td class="text-end"><strong>{{ summary.revenue_breakdown.gmv|number_format(0, '.', ' ') }}</strong></td>
+                <td class="text-end">100.0%</td>
+            </tr>
+            <tr class="text-danger">
+                <td>Комиссия маркетплейса</td>
+                <td class="text-end">{{ summary.revenue_breakdown.commission|number_format(0, '.', ' ') }}</td>
+                <td class="text-end">{{ ((summary.revenue_breakdown.commission / summary.revenue_breakdown.gmv) * 100)|number_format(1) }}%</td>
+            </tr>
+            <tr class="text-danger">
+                <td>Логистика</td>
+                <td class="text-end">{{ summary.revenue_breakdown.logistics|number_format(0, '.', ' ') }}</td>
+                <td class="text-end">{{ ((summary.revenue_breakdown.logistics / summary.revenue_breakdown.gmv) * 100)|number_format(1) }}%</td>
+            </tr>
+            <tr class="text-danger">
+                <td>Реклама</td>
+                <td class="text-end">{{ summary.revenue_breakdown.advertising|number_format(0, '.', ' ') }}</td>
+                <td class="text-end">{{ ((summary.revenue_breakdown.advertising / summary.revenue_breakdown.gmv) * 100)|number_format(1) }}%</td>
+            </tr>
+            <tr class="text-danger">
+                <td>Возвраты</td>
+                <td class="text-end">{{ summary.revenue_breakdown.returns|number_format(0, '.', ' ') }}</td>
+                <td class="text-end">{{ ((summary.revenue_breakdown.returns / summary.revenue_breakdown.gmv) * 100)|number_format(1) }}%</td>
+            </tr>
+            <tr class="text-success">
+                <td><strong>Contribution Margin</strong></td>
+                <td class="text-end"><strong>{{ summary.revenue_breakdown.contribution_margin|number_format(0, '.', ' ') }}</strong></td>
+                <td class="text-end"><strong>{{ ((summary.revenue_breakdown.contribution_margin / summary.revenue_breakdown.gmv) * 100)|number_format(1) }}%</strong></td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# B. График динамики #}
+<div class="mb-4">
+    <h3 class="mb-3">Динамика показателей</h3>
+    <div class="card">
+        <div class="card-body">
+            <div id="chart-dynamics" style="height: 300px;"></div>
+        </div>
+    </div>
+</div>
+
+{# C. График расходов по типам #}
+<div class="mb-4">
+    <h3 class="mb-3">Расходы по категориям</h3>
+    <div class="card">
+        <div class="card-body">
+            <div id="chart-expenses" style="height: 300px;"></div>
+        </div>
+    </div>
+</div>

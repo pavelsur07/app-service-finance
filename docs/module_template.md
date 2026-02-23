@@ -1,25 +1,28 @@
-# Module Development Standard (v2) — Symfony
+# Module Development Standard (v2.1) — Symfony
 
-**Цель:** Добавлять новую функциональность **только через изолированные модули**, без расползания legacy/shared и без “зоопарка” API/логики.
+**Цель:** Добавлять новую функциональность только через изолированные модули, с чётким разделением слоёв, высокой производительностью чтения и безопасной работой в HTTP + Worker/CLI окружении.
 
 ---
 
-## 0. Базовые принципы
+# 0. Базовые принципы
 
 1. **Модуль = граница ответственности**, а не просто папка.
 2. **React — острова**, основной UI — Twig + Tabler.
-3. **Контроллеры тонкие**, use-case в Application.
+3. **Контроллеры тонкие**, write — через Application, read — через Query.
 4. **Бизнес-правила живут в Domain**, инфраструктура отдельно.
-5. **Никаких массовых рефакторов** вне задачи.
+5. **Никаких массовых рефакторов вне задачи.**
+6. **Контекст компании передаётся явно.**
+7. **Application слой не зависит от HTTP/Session.**
+8. **Код должен корректно работать в Worker/CLI.**
 
 ---
 
-## 1. Где нельзя писать код
+# 1. Где нельзя писать код
 
 Запрещено добавлять новый код в:
 
 * `src/Service`
-* `src/Controller`
+* `src/Controller` (кроме модуля)
 * `src/Entity`
 * `src/Repository`
 * `templates/_partials`
@@ -28,240 +31,381 @@ Legacy/shared не расширяем.
 
 ---
 
-## 2. Где живёт модуль
+# 2. Где живёт модуль
 
-Весь код модуля — строго в:
+Весь код модуля:
 
-* `src/<ModuleName>/...`
+```
+src/<ModuleName>/
+```
 
 UI-шаблоны:
 
-* `templates/<module_name>/...`
-* общие элементы (разрешено): `templates/partials/...`
-
----
-
-## 3. Слои внутри модуля и структура папок
-
-Обязательная структура внутри `src/<ModuleName>/`:
-
-```text
-src/<ModuleName>/
-├── Application/        # [ОБЯЗАТЕЛЬНО] Оркестрация (Use-cases, Actions, Handlers)
-├── Controller/         # [ОБЯЗАТЕЛЬНО] Точки входа HTTP (Web UI, API)
-├── Domain/             # [ОБЯЗАТЕЛЬНО] Чистая бизнес-логика (Правила, Политики)
-├── Infrastructure/     # [ОБЯЗАТЕЛЬНО] Внешний мир (БД, API, Очереди)
-├── Entity/             # [ОБЯЗАТЕЛЬНО] Сущности и маппинг Doctrine
-├── Api/                # [Опционально] Контракты Request/Response для JSON API
-├── DTO/                # [Опционально] Внутренние структуры данных
-├── Enum/               # [Опционально] Перечисления (Статусы, Типы)
-├── Facade/             # [Опционально] Публичные сервисы для вызова из ДРУГИХ модулей
-└── Form/               # [Опционально] Классы Symfony Forms для Web UI
-
+```
+templates/<module_name>/
 ```
 
-**Правила слоев:**
+Разрешённые общие шаблоны:
 
-* **Controller:** Только принимает Request, мапит в DTO, вызывает Application, отдает Response. Без бизнес-логики и DQL.
-* **Application:** Классы одного действия (Action). Координируют доменные правила и инфраструктуру (БД, шину сообщений).
-* **Domain:** Чистый PHP. Policy, Validator, Calculator. Не знает про Symfony, Doctrine, HTTP.
-* **Infrastructure:** Doctrine Repositories (DQL), Query (чистый DBAL для сложных выборок), Clients (внешние API). Никаких бизнес-правил.
-* **Facade:** Единственный разрешенный способ для других модулей получить данные из этого модуля.
+```
+templates/partials/
+```
 
 ---
 
-## 4. Правило вызовов (поток)
+# 3. Структура модуля
 
-Поток выполнения строго однонаправленный:
-`Controller → Application → (Domain + Infrastructure)`
-
-* Контроллер **не содержит** бизнес-логики и запросов к БД.
-* Domain **не знает** про Symfony/Doctrine/HTTP.
-* Infrastructure **не содержит** бизнес-правил.
-
----
-
-## 5. Интеграция между модулями
-
-**Запрещено:**
-
-* Использовать `Repository` другого модуля напрямую.
-* Строить `QueryBuilder` на чужих таблицах “изнутри” модуля.
-
-**Разрешено:**
-
-* Вызывать публичные сервисы другого модуля через его фасад: `src/<OtherModule>/Facade/*` (или `Public/*`).
+```
+src/<ModuleName>/
+├── Application/
+├── Controller/
+├── Domain/
+├── Infrastructure/
+│   ├── Repository/
+│   ├── Query/
+│   └── Clients/
+├── Entity/
+├── Api/
+├── DTO/
+├── Enum/
+├── Facade/
+└── Form/
+```
 
 ---
 
-## 6. Entity и зависимости (важно)
+# 4. Поток данных (CQRS-light)
 
-* `Entity` и Doctrine mapping находятся строго в `src/<Module>/Entity/*`.
-* Связи с core-сущностями допустимы только с явно разрешенными: `Company`, `User`.
-* Доменные сущности других модулей **не тянуть** в логику (общаться только DTO через фасады).
+### WRITE
+
+```
+Controller → Command → Application Action → (Domain + Repository)
+```
+
+### READ
+
+```
+Controller → Infrastructure/Query → DTO/array
+```
+
+Контроллер не содержит бизнес-логики.
+Domain не знает про Symfony.
+Application не знает про HTTP/Session.
 
 ---
 
-## 7. Роутинг (разделение зон)
+# 5. Интеграция между модулями
 
-Строго через атрибуты Symfony (Attributes):
+Запрещено:
+
+* Использовать Repository/Query другого модуля напрямую
+* Строить SQL на чужих таблицах
+
+Разрешено:
+
+* Только через `Facade` другого модуля
+
+---
+
+# 6. Entity и зависимости
+
+* Entity строго внутри модуля
+* Разрешённые core-сущности: `Company`, `User`
+* Нельзя тянуть Entity другого модуля в доменную логику
+* Межмодульная интеграция — через DTO и Facade
+
+---
+
+# 7. Роутинг
 
 * Web UI: `/<module_name>/...`
 * API: `/api/<module_name>/...`
-* Backoffice: `/backoffice/...` (отдельная зона/ACL)
+* Backoffice: `/backoffice/...`
 
 ---
 
-## 8. Безопасность и мульти-тенантность
+# 8. Безопасность и мульти-тенантность
 
-* Все операции выполняются **в контексте активной компании**.
-* Доступы/права проверяет backend (Role/Policy/Lock-period).
-* Фронт **никогда** не является источником истины для прав.
-
----
-
-## 9. API контракт (если модуль отдаёт JSON)
-
-* Обязательно соблюдать: `docs/api/CONTRACT.md` (единые правила money/date/errors).
-* **Запрещено** возвращать Doctrine Entity в JSON.
-* Использование Request/Response DTO обязательно (папка `Api/`).
+* Все операции выполняются в контексте `company_id`
+* Backend проверяет роли, lock-period, политики
+* Фронт не источник истины
 
 ---
 
-## 10. Логирование и аудит
+# 9. Company Context — ОБЯЗАТЕЛЬНОЕ ПРАВИЛО
 
-* Изменения финансовых данных и статусов документов должны попадать в audit log по принятому в проекте механизму.
-* Логика аудита инкапсулируется в `Application` или `Infrastructure`, но **не в контроллере**.
+## 9.1 Единственный способ получить активную компанию
 
----
+Используется только:
 
-## 11. Тесты (минимальный DoD)
+```php
+App\Shared\Service\ActiveCompanyService
+$company = $companyService->getActiveCompany();
+```
 
-Добавлять тесты в:
+Разрешено ТОЛЬКО в:
 
-* `tests/Unit/<ModuleName>/...`
-* `tests/Integration/<ModuleName>/...`
+* `src/<Module>/Controller/*`
 
-Минимум для нового use-case:
+Запрещено в:
 
-* 1 Unit test на policy/validator/калькулятор (доменную логику).
-* 1 Integration test на репозиторий (если есть сложные выборки/сохранения).
-
----
-
-## 12. Миграции / фикстуры
-
-Если добавлены новые Entity/поля:
-
-* Создать миграцию Doctrine.
-* Миграции должны применяться без ручных шагов (автоматически).
+* Application
+* MessageHandler
+* Worker
+* CLI Command
+* Domain
+* Infrastructure
 
 ---
 
-## 13. Что запрещено
+## 9.2 Запрещено в Application
 
-* Массовые правки вне модуля.
-* Перенос файлов из других модулей “по пути”.
-* Изменение существующего API/контрактов без отдельной задачи.
-* Добавление “общих утилит” в shared/legacy ради удобства.
+Нельзя писать:
 
----
+```php
+$this->activeCompanyService->getActiveCompany();
+```
 
-## 14. Definition of Done (DoD) для новой фичи в модуле
+Почему:
 
-* `composer test:smoke` проходит.
-* Нет новых файлов в legacy/shared директориях.
-* Контроллеры тонкие, use-case в Application.
-* Бизнес-правила вынесены в Domain.
-* Repos/интеграции — в Infrastructure.
-* Если есть Entity — создана миграция.
-* Если API — соблюден `docs/api/CONTRACT.md`.
+* В worker/CLI нет HTTP-сессии
+* Код становится невалидным вне web-запроса
+* Ломается асинхронная обработка
 
 ---
 
-## 15. Эталонный пример кода (Controller & Application Action)
+## 9.3 Контекст компании передаётся в Command
 
-### Пример: Controller (Тонкий HTTP-слой)
+Контроллер:
 
-Отвечает только за прием, валидацию и передачу данных в Action.
+1. Получает компанию через ActiveCompanyService
+2. Создаёт `<Name>Command`
+3. Передаёт в Application
+
+---
+
+## 9.4 КРИТИЧНО: companyId хранится как scalar (string UUID)
+
+### В Command/Message запрещено:
+
+```php
+public Company $company;
+```
+
+### Разрешено только:
+
+```php
+public string $companyId;
+```
+
+Причины:
+
+* Безопасная сериализация в очередь
+* Нет lazy-loading в worker
+* Нет ORM зависимостей
+* Нет утечек persistence context
+* Упрощается тестирование
+
+---
+
+## 9.5 actorUserId также scalar
+
+```php
+public string $actorUserId;
+```
+
+Никогда не передаём User entity в Command/Message.
+
+---
+
+# 10. Работа с БД — Fast Read
+
+1. Запрещено `findAll()` для списков
+2. Запрещено гидрировать Entity ради 2–3 полей
+3. Используем DBAL + select конкретных колонок
+4. Никакого N+1
+
+---
+
+# 11. API контракт
+
+* Нельзя возвращать Doctrine Entity
+* Только DTO или массивы
+* Соблюдать единый формат money/date/errors
+
+---
+
+# 12. Аудит
+
+* Финансовые изменения логируются
+* Аудит не в контроллере
+* Реализуется в Application или Infrastructure
+
+---
+
+# 13. Тесты
+
+Минимум:
+
+* 1 Unit test на Domain
+* 1 Integration test на Query или сохранение
+
+---
+
+# 14. Запрещено
+
+* Массовые правки вне модуля
+* Перенос чужих файлов
+* Логика в Controller
+* Использование ActiveCompanyService вне Controller
+* Передача Entity в Command/Message
+
+---
+
+# 15. Definition of Done
+
+* [ ] Контроллер тонкий
+* [ ] Write через Application
+* [ ] Read через Query
+* [ ] companyId передан через Command
+* [ ] В Command companyId scalar string
+* [ ] Нет ActiveCompanyService в Application
+* [ ] Нет Entity в Message/Command
+* [ ] Query слой без ORM гидрации
+* [ ] Smoke tests проходят
+
+---
+
+# 16. Эталонные примеры
+
+---
+
+## 16.1 Command
+
+```php
+namespace App\Sales\Application\Command;
+
+final class CreateOrderCommand
+{
+    public function __construct(
+        public readonly string $companyId,
+        public readonly string $actorUserId,
+        public readonly int $customerId,
+        public readonly int $amount,
+    ) {}
+}
+```
+
+---
+
+## 16.2 Controller (единственное место ActiveCompanyService)
 
 ```php
 namespace App\Sales\Controller;
 
-use App\Sales\Api\Request\CreateOrderRequest;
+use App\Sales\Application\Command\CreateOrderCommand;
 use App\Sales\Application\CreateOrderAction;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpKernel\Attribute\MapRequestPayload;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\HttpFoundation\JsonResponse;
 
-class CreateOrderController extends AbstractController
+final class CreateOrderController extends AbstractController
 {
     public function __construct(
-        private readonly CreateOrderAction $createOrderAction
+        private readonly CreateOrderAction $action,
+        private readonly ActiveCompanyService $companyService
     ) {}
 
-    #[Route('/api/sales/orders', name: 'api_sales_order_create', methods: ['POST'])]
-    public function __invoke(
-        #[MapRequestPayload] CreateOrderRequest $request
-    ): JsonResponse {
-        // Контроллер не знает про БД. Вся оркестрация делегируется в Action.
-        $orderId = ($this->createOrderAction)($request);
+    #[Route('/api/sales/orders', methods: ['POST'])]
+    public function __invoke(): JsonResponse
+    {
+        $company = $this->companyService->getActiveCompany();
+        $user = $this->getUser();
+
+        $command = new CreateOrderCommand(
+            companyId: (string) $company->getId(),
+            actorUserId: (string) $user->getId(),
+            customerId: 123,
+            amount: 10000
+        );
+
+        $orderId = ($this->action)($command);
 
         return $this->json(['id' => $orderId], 201);
     }
 }
-
 ```
 
-### Пример: Application Action (Слой оркестрации / Use-Case)
+---
 
-Один класс — одна бизнес-транзакция. Инкапсулирует вызовы фабрик, БД и шины событий.
+## 16.3 Application Action
 
 ```php
 namespace App\Sales\Application;
 
-use App\Sales\Api\Request\CreateOrderRequest;
-use App\Sales\Domain\OrderPolicy;
+use App\Sales\Application\Command\CreateOrderCommand;
 use App\Sales\Entity\Order;
-use App\Sales\Infrastructure\OrderRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
-class CreateOrderAction
+final class CreateOrderAction
 {
     public function __construct(
-        private readonly OrderRepository $orderRepository,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly OrderPolicy $orderPolicy,
-        private readonly MessageBusInterface $messageBus
+        private readonly EntityManagerInterface $em,
     ) {}
 
-    public function __invoke(CreateOrderRequest $request): int
+    public function __invoke(CreateOrderCommand $cmd): int
     {
-        // 1. Проверка доменных правил (Domain)
-        if (!$this->orderPolicy->canCreateOrder($request->amount)) {
-            throw new \DomainException('Order amount exceeds the allowed limit.');
-        }
-
-        // 2. Создание Entity
         $order = new Order(
-            $request->customerId,
-            $request->amount,
-            $request->currency
+            companyId: $cmd->companyId,
+            customerId: $cmd->customerId,
+            amount: $cmd->amount,
+            createdByUserId: $cmd->actorUserId,
         );
 
-        // 3. Сохранение (Infrastructure)
-        $this->entityManager->persist($order);
-        $this->entityManager->flush();
-
-        // 4. Отправка фонового события (Application / Infrastructure)
-        // $this->messageBus->dispatch(new OrderCreatedMessage($order->getId()));
+        $this->em->persist($order);
+        $this->em->flush();
 
         return $order->getId();
     }
 }
-
 ```
 
 ---
+
+## 16.4 Worker-safe Message
+
+```php
+final class RecalculateOrdersMessage
+{
+    public function __construct(
+        public readonly string $companyId,
+        public readonly string $actorUserId
+    ) {}
+}
+```
+
+---
+
+# Итог
+
+Теперь стандарт:
+
+* Безопасен для worker
+* Предсказуем
+* Без скрытого HTTP-контекста
+* Без ORM утечек в очередь
+* Чётко разделён по слоям
+
+---
+Подумать
+??????????????????
+Если хочешь, могу следующим шагом сделать отдельный **"Company Context Contract (v1)"** — короткий документ-надстройку, который стандартизирует:
+
+* как называть поля
+* где валидировать
+* как логировать
+* как тестировать
+* как обрабатывать cross-company попытки доступа
+
+Это уже уровень production-hardening.

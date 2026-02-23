@@ -1,0 +1,301 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'analytics' %}
+
+{% block title %}Аналитика - {{ parent() }}{% endblock %}
+
+{% block tab_content %}
+    <div class="p-4">
+        {# Фильтры #}
+        <div class="mb-3">
+            <form method="get" class="row g-2">
+                <div class="col-md-3">
+                    <label class="form-label">Период</label>
+                    <select name="period" class="form-select">
+                        <option value="week" {{ period == 'week' ? 'selected' : '' }}>Неделя</option>
+                        <option value="month" {{ period == 'month' ? 'selected' : '' }}>Месяц</option>
+                        <option value="rolling30" {{ period == 'rolling30' ? 'selected' : '' }}>Rolling 30</option>
+                        <option value="custom" {{ period == 'custom' ? 'selected' : '' }}>Кастом</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Маркетплейс</label>
+                    <select name="marketplace" class="form-select">
+                        <option value="all" {{ marketplace == 'all' ? 'selected' : '' }}>Все</option>
+                        <option value="wildberries" {{ marketplace == 'wildberries' ? 'selected' : '' }}>Wildberries</option>
+                        <option value="ozon" {{ marketplace == 'ozon' ? 'selected' : '' }}>Ozon</option>
+                    </select>
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4" /><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4" /></svg>
+                        Обновить
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        {# KPI Карточки #}
+        {% include 'marketplace/analytics/_kpi_cards.html.twig' %}
+
+        {# Табы внутренние #}
+        <div class="card mt-3">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <a href="?tab=summary&period={{ period }}&marketplace={{ marketplace }}"
+                           class="nav-link {{ active_tab_inner == 'summary' ? 'active' : '' }}"
+                           role="tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v6a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M9 8m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v10a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /><path d="M15 4m0 1a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v14a1 1 0 0 1 -1 1h-4a1 1 0 0 1 -1 -1z" /></svg>
+                            Сводный
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="?tab=sku&period={{ period }}&marketplace={{ marketplace }}"
+                           class="nav-link {{ active_tab_inner == 'sku' ? 'active' : '' }}"
+                           role="tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><path d="M9 3m0 2a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2v0a2 2 0 0 1 -2 2h-2a2 2 0 0 1 -2 -2z" /><path d="M9 12h6" /><path d="M9 16h6" /></svg>
+                            По SKU
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="?tab=abc&period={{ period }}&marketplace={{ marketplace }}"
+                           class="nav-link {{ active_tab_inner == 'abc' ? 'active' : '' }}"
+                           role="tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5l0 9l-8 4.5l-8 -4.5l0 -9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12l0 9" /><path d="M12 12l-8 -4.5" /></svg>
+                            ABC
+                        </a>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <a href="?tab=cashflow&period={{ period }}&marketplace={{ marketplace }}"
+                           class="nav-link {{ active_tab_inner == 'cashflow' ? 'active' : '' }}"
+                           role="tab">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-2" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M17 8v-3a1 1 0 0 0 -1 -1h-10a2 2 0 0 0 0 4h12a1 1 0 0 1 1 1v3m0 4v3a1 1 0 0 1 -1 1h-12a2 2 0 0 1 -2 -2v-12" /><path d="M20 12v4h-4a2 2 0 0 1 0 -4h4" /></svg>
+                            Денежный поток
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card-body">
+                {# Контент табов #}
+                {% if active_tab_inner == 'summary' %}
+                    {% include 'marketplace/analytics/_tab_summary.html.twig' %}
+                {% elseif active_tab_inner == 'sku' %}
+                    {% include 'marketplace/analytics/_tab_sku.html.twig' %}
+                {% elseif active_tab_inner == 'abc' %}
+                    {% include 'marketplace/analytics/_tab_abc.html.twig' %}
+                {% elseif active_tab_inner == 'cashflow' %}
+                    {% include 'marketplace/analytics/_tab_cashflow.html.twig' %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+
+    {# ApexCharts CDN #}
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+
+    {# Скрипты для таба "Сводный" #}
+    {% if active_tab_inner == 'summary' %}
+        <script>
+            // График динамики
+            document.addEventListener("DOMContentLoaded", function () {
+                window.ApexCharts && (new ApexCharts(document.getElementById('chart-dynamics'), {
+                    chart: {
+                        type: "line",
+                        fontFamily: 'inherit',
+                        height: 300,
+                        parentHeightOffset: 0,
+                        toolbar: {
+                            show: false,
+                        },
+                    },
+                    fill: {
+                        opacity: 1,
+                    },
+                    stroke: {
+                        width: 2,
+                        lineCap: "round",
+                        curve: "smooth",
+                    },
+                    series: [{
+                        name: "Выручка",
+                        data: {{ summary.dynamics_chart.revenue|json_encode|raw }}
+                    }, {
+                        name: "Маржа",
+                        data: {{ summary.dynamics_chart.margin|json_encode|raw }}
+                    }, {
+                        name: "Расходы",
+                        data: {{ summary.dynamics_chart.expenses|json_encode|raw }}
+                    }],
+                    grid: {
+                        padding: {
+                            top: -20,
+                            right: 0,
+                            left: 4,
+                            bottom: -4
+                        },
+                        strokeDashArray: 4,
+                    },
+                    xaxis: {
+                        labels: {
+                            padding: 0,
+                        },
+                        tooltip: {
+                            enabled: false
+                        },
+                        type: 'category',
+                        categories: {{ summary.dynamics_chart.labels|json_encode|raw }},
+                    },
+                    yaxis: {
+                        labels: {
+                            padding: 4,
+                            formatter: function(val) {
+                                return (val / 1000) + 'K';
+                            }
+                        },
+                    },
+                    colors: ['#206bc4', '#28a745', '#dc3545'],
+                    legend: {
+                        show: true,
+                        position: 'bottom',
+                    },
+                })).render();
+            });
+
+            // График расходов
+            document.addEventListener("DOMContentLoaded", function () {
+                window.ApexCharts && (new ApexCharts(document.getElementById('chart-expenses'), {
+                    chart: {
+                        type: "bar",
+                        fontFamily: 'inherit',
+                        height: 300,
+                        parentHeightOffset: 0,
+                        toolbar: {
+                            show: false,
+                        },
+                    },
+                    plotOptions: {
+                        bar: {
+                            columnWidth: '50%',
+                        }
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    fill: {
+                        opacity: 1,
+                    },
+                    series: [{
+                        name: "Сумма",
+                        data: [
+                            {{ summary.expenses_by_type.commission }},
+                            {{ summary.expenses_by_type.logistics }},
+                            {{ summary.expenses_by_type.advertising }},
+                            {{ summary.expenses_by_type.penalties }}
+                        ]
+                    }],
+                    grid: {
+                        padding: {
+                            top: -20,
+                            right: 0,
+                            left: -4,
+                            bottom: -4
+                        },
+                        strokeDashArray: 4,
+                    },
+                    xaxis: {
+                        labels: {
+                            padding: 0,
+                        },
+                        tooltip: {
+                            enabled: false
+                        },
+                        categories: ['Комиссия', 'Логистика', 'Реклама', 'Штрафы'],
+                    },
+                    yaxis: {
+                        labels: {
+                            padding: 4,
+                            formatter: function(val) {
+                                return (val / 1000) + 'K ₽';
+                            }
+                        },
+                    },
+                    colors: ['#dc3545'],
+                })).render();
+            });
+        </script>
+    {% endif %}
+
+    {# Скрипты для таба "Денежный поток" #}
+    {% if active_tab_inner == 'cashflow' %}
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                window.ApexCharts && (new ApexCharts(document.getElementById('chart-cashflow'), {
+                    chart: {
+                        type: "bar",
+                        fontFamily: 'inherit',
+                        height: 300,
+                        parentHeightOffset: 0,
+                        toolbar: {
+                            show: false,
+                        },
+                    },
+                    plotOptions: {
+                        bar: {
+                            columnWidth: '50%',
+                        }
+                    },
+                    dataLabels: {
+                        enabled: false,
+                    },
+                    fill: {
+                        opacity: 1,
+                    },
+                    series: [{
+                        name: "Начислено",
+                        data: {{ cash_flow.chart.accrued|json_encode|raw }}
+                    }, {
+                        name: "Выплачено",
+                        data: {{ cash_flow.chart.paid|json_encode|raw }}
+                    }],
+                    grid: {
+                        padding: {
+                            top: -20,
+                            right: 0,
+                            left: -4,
+                            bottom: -4
+                        },
+                        strokeDashArray: 4,
+                    },
+                    xaxis: {
+                        labels: {
+                            padding: 0,
+                        },
+                        tooltip: {
+                            enabled: false
+                        },
+                        categories: {{ cash_flow.chart.labels|json_encode|raw }},
+                    },
+                    yaxis: {
+                        labels: {
+                            padding: 4,
+                            formatter: function(val) {
+                                return (val / 1000) + 'K ₽';
+                            }
+                        },
+                    },
+                    colors: ['#206bc4', '#28a745'],
+                    legend: {
+                        show: true,
+                        position: 'bottom',
+                    },
+                })).render();
+            });
+        </script>
+    {% endif %}
+{% endblock %}

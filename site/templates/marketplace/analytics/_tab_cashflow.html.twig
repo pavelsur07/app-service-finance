@@ -1,0 +1,94 @@
+{# Вкладка: Денежный поток #}
+
+{# Сводка #}
+<div class="row row-cards mb-4">
+    <div class="col">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="text-muted small">Начислено</div>
+                <div class="h2 mb-0">{{ (cash_flow.summary.accrued / 1000000)|number_format(2) }} млн ₽</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="text-muted small">Удержано</div>
+                <div class="h2 mb-0 text-danger">{{ (cash_flow.summary.withheld / 1000000)|number_format(2) }} млн ₽</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="text-muted small">К выплате</div>
+                <div class="h2 mb-0 text-primary">{{ (cash_flow.summary.payable / 1000000)|number_format(2) }} млн ₽</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="text-muted small">Получено</div>
+                <div class="h2 mb-0 text-success">{{ (cash_flow.summary.received / 1000000)|number_format(2) }} млн ₽</div>
+            </div>
+        </div>
+    </div>
+    <div class="col">
+        <div class="card">
+            <div class="card-body text-center">
+                <div class="text-muted small">Разница</div>
+                <div class="h2 mb-0 {{ cash_flow.summary.difference >= 0 ? 'text-warning' : 'text-danger' }}">
+                    {{ (cash_flow.summary.difference / 1000)|number_format(0) }} тыс ₽
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# График выплат #}
+<div class="card mb-4">
+    <div class="card-header">
+        <h3 class="card-title">График начислений и выплат</h3>
+    </div>
+    <div class="card-body">
+        <div id="chart-cashflow" style="height: 300px;"></div>
+    </div>
+</div>
+
+{# Таблица транзакций #}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">История выплат</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>Дата</th>
+                <th>Тип</th>
+                <th class="text-end">Сумма</th>
+                <th>Статус</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for tx in cash_flow.transactions %}
+                <tr>
+                    <td>{{ tx.date }}</td>
+                    <td>{{ tx.type }}</td>
+                    <td class="text-end"><strong>{{ tx.amount|number_format(0, '.', ' ') }} ₽</strong></td>
+                    <td>
+                        {% if tx.status == 'completed' %}
+                            <span class="badge bg-green">Выполнено</span>
+                        {% elseif tx.status == 'pending' %}
+                            <span class="badge bg-yellow">Ожидается</span>
+                        {% else %}
+                            <span class="badge bg-secondary">{{ tx.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

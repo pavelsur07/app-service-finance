@@ -1,0 +1,103 @@
+{# KPI Карточки #}
+
+{# Подключаем React бандл для KPI виджетов #}
+{{ vite_entry_script_tags('marketplace_analytics_kpi') }}
+
+<div class="row row-deck row-cards mb-3">
+    {# Виджет 1: Выручка (React) #}
+    <div
+        id="react-kpi-revenue"
+        data-marketplace="{{ marketplace|default('all') }}"
+        data-locale="{{ app.request.locale|default('ru') }}"
+    ></div>
+
+    {# Выручка #}
+   {# <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Выручка</div>
+                </div>
+                <div class="h1 mb-0">{{ (kpi.revenue / 1000000)|number_format(1, '.', ' ') }} млн ₽</div>
+                <div class="text-muted mt-2">
+                    <span class="text-green">{{ kpi.revenue|number_format(0, '.', ' ') }} ₽</span>
+                </div>
+            </div>
+        </div>
+    </div>#}
+
+    {# Маржинальный доход #}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Маржинальный доход</div>
+                </div>
+                <div class="h1 mb-0">{{ (kpi.margin / 1000000)|number_format(1, '.', ' ') }} млн ₽</div>
+                <div class="text-muted mt-2">
+                    <span class="text-green">{{ kpi.margin|number_format(0, '.', ' ') }} ₽</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Продано шт #}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Продано шт</div>
+                </div>
+                <div class="h1 mb-0">{{ kpi.units_sold|number_format(0, '.', ' ') }}</div>
+                <div class="text-muted mt-2">
+                    единиц товара
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# ROI рекламы #}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">ROI рекламы</div>
+                </div>
+                <div class="h1 mb-0">{{ kpi.roi }}%</div>
+                <div class="text-muted mt-2">
+                    <span class="text-green">высокая эффективность</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Возвраты % #}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Возвраты %</div>
+                </div>
+                <div class="h1 mb-0">{{ kpi.return_rate }}%</div>
+                <div class="text-muted mt-2">
+                    <span class="text-yellow">в норме</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Оборачиваемость #}
+    <div class="col-sm-6 col-lg-4">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex align-items-center">
+                    <div class="subheader">Оборачиваемость</div>
+                </div>
+                <div class="h1 mb-0">{{ kpi.turnover_days }} дней</div>
+                <div class="text-muted mt-2">
+                    средний период
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

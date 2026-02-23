@@ -1,0 +1,126 @@
+{# Вкладка: ABC анализ #}
+
+{# Карточки A/B/C #}
+<div class="row row-cards mb-4">
+    <div class="col-md-4">
+        <div class="card bg-primary-lt">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h3 class="mb-0">A</h3>
+                        <div class="text-muted">{{ abc_data.summary.a.percent }}% прибыли</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="h2 mb-0">{{ abc_data.summary.a.count }} SKU</div>
+                        <div class="text-muted small">{{ (abc_data.summary.a.profit / 1000)|number_format(0) }}K ₽</div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 6px;">
+                    <div class="progress-bar bg-primary" style="width: {{ abc_data.summary.a.percent }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-yellow-lt">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h3 class="mb-0">B</h3>
+                        <div class="text-muted">{{ abc_data.summary.b.percent }}% прибыли</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="h2 mb-0">{{ abc_data.summary.b.count }} SKU</div>
+                        <div class="text-muted small">{{ (abc_data.summary.b.profit / 1000)|number_format(0) }}K ₽</div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 6px;">
+                    <div class="progress-bar bg-yellow" style="width: {{ abc_data.summary.b.percent }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4">
+        <div class="card bg-secondary-lt">
+            <div class="card-body">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <h3 class="mb-0">C</h3>
+                        <div class="text-muted">{{ abc_data.summary.c.percent }}% прибыли</div>
+                    </div>
+                    <div class="text-end">
+                        <div class="h2 mb-0">{{ abc_data.summary.c.count }} SKU</div>
+                        <div class="text-muted small">{{ (abc_data.summary.c.profit / 1000)|number_format(0) }}K ₽</div>
+                    </div>
+                </div>
+                <div class="progress mt-3" style="height: 6px;">
+                    <div class="progress-bar bg-secondary" style="width: {{ abc_data.summary.c.percent }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Таблица детализации #}
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">Детализация по SKU</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>SKU</th>
+                <th>Категория ABC</th>
+                <th class="text-end">Доля прибыли, %</th>
+                <th class="text-end">Оборачиваемость, дн</th>
+                <th class="text-end">Рекомендация</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for item in abc_data.items %}
+                <tr>
+                    <td><strong>{{ item.sku }}</strong></td>
+                    <td>
+                        {% if item.category == 'A' %}
+                            <span class="badge bg-primary">A</span>
+                        {% elseif item.category == 'B' %}
+                            <span class="badge bg-yellow">B</span>
+                        {% else %}
+                            <span class="badge bg-secondary">C</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">{{ item.profit_share }}%</td>
+                    <td class="text-end">{{ item.turnover }}</td>
+                    <td class="text-end">
+                        {% if item.category == 'A' %}
+                            <span class="badge bg-green-lt">Приоритет 1</span>
+                        {% elseif item.category == 'B' %}
+                            <span class="badge bg-yellow-lt">Оптимизация</span>
+                        {% else %}
+                            <span class="badge bg-red-lt">Ревизия</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# Рекомендации #}
+<div class="alert alert-info mt-3">
+    <h4 class="alert-title">
+        <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" /><path d="M12 16h.01" /></svg>
+        Рекомендации по ABC анализу
+    </h4>
+    <div class="text-muted">
+        <ul class="mb-0">
+            <li><strong>Категория A</strong> (70% прибыли): Фокус на этих SKU. Обеспечить наличие, оптимизировать рекламу.</li>
+            <li><strong>Категория B</strong> (20% прибыли): Потенциал роста. Тестировать улучшения, следить за трендами.</li>
+            <li><strong>Категория C</strong> (10% прибыли): Ревизия. Рассмотреть снятие с продаж или работу над маржинальностью.</li>
+        </ul>
+    </div>
+</div>

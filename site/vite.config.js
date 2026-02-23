@@ -14,6 +14,7 @@ export default defineConfig({
             input: {
                 app: "./assets/app.js",
                 dashboard: "./assets/react/dashboard_started.tsx", // Точка ./ обязательна!
+                marketplace_analytics_kpi: "./assets/react/marketplace_analytics_kpi.tsx",
             },
         }
     },

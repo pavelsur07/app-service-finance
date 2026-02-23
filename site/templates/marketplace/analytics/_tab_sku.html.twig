@@ -1,0 +1,165 @@
+{# Вкладка: По SKU #}
+
+{# Фильтры #}
+<div class="mb-3">
+    <form class="row g-2">
+        <input type="hidden" name="tab" value="sku">
+        <input type="hidden" name="period" value="{{ period }}">
+        <input type="hidden" name="marketplace" value="{{ marketplace }}">
+
+        <div class="col-md-3">
+            <input type="text" class="form-control" placeholder="Поиск SKU..." name="search">
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" name="category">
+                <option value="">Все категории</option>
+                <option>Одежда</option>
+                <option>Обувь</option>
+                <option>Аксессуары</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <select class="form-select" name="sort">
+                <option value="revenue">По выручке</option>
+                <option value="margin">По марже</option>
+                <option value="roi">По ROI</option>
+                <option value="turnover">По обороту</option>
+            </select>
+        </div>
+        <div class="col-md-1">
+            <button type="submit" class="btn btn-primary w-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" /><path d="M21 21l-6 -6" /></svg>
+            </button>
+        </div>
+    </form>
+</div>
+
+{# Таблица #}
+<div class="table-responsive">
+    <table class="table table-vcenter card-table table-striped">
+        <thead>
+        <tr>
+            <th>SKU</th>
+            <th class="text-end">Продано</th>
+            <th class="text-end">Выручка</th>
+            <th class="text-end">Себес.</th>
+            <th class="text-end">Комиссия</th>
+            <th class="text-end">Логистика</th>
+            <th class="text-end">Реклама</th>
+            <th class="text-end">CM ₽</th>
+            <th class="text-end">CM %</th>
+            <th class="text-end">Оборач.</th>
+            <th class="text-end">ROI</th>
+            <th></th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for item in sku_data %}
+            <tr class="
+                {% if item.status == 'danger' %}table-danger
+                {% elseif item.status == 'warning' %}table-warning
+                {% else %}table-success{% endif %}
+            ">
+                <td>
+                    <div class="d-flex align-items-center">
+                        {% if item.status == 'danger' %}
+                            <span class="badge bg-red me-2">🔴</span>
+                        {% elseif item.status == 'warning' %}
+                            <span class="badge bg-yellow me-2">🟡</span>
+                        {% else %}
+                            <span class="badge bg-green me-2">🟢</span>
+                        {% endif %}
+                        <strong>{{ item.sku }}</strong>
+                    </div>
+                </td>
+                <td class="text-end">{{ item.sold }}</td>
+                <td class="text-end">{{ item.revenue|number_format(0, '.', ' ') }}</td>
+                <td class="text-end">{{ item.cogs|number_format(0, '.', ' ') }}</td>
+                <td class="text-end text-danger">{{ item.commission|number_format(0, '.', ' ') }}</td>
+                <td class="text-end text-danger">{{ item.logistics|number_format(0, '.', ' ') }}</td>
+                <td class="text-end text-danger">{{ item.advertising|number_format(0, '.', ' ') }}</td>
+                <td class="text-end"><strong>{{ item.cm_rub|number_format(0, '.', ' ') }}</strong></td>
+                <td class="text-end"><strong>{{ item.cm_percent }}%</strong></td>
+                <td class="text-end">{{ item.turnover }} дн</td>
+                <td class="text-end">{{ item.roi }}%</td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-ghost-primary" data-bs-toggle="offcanvas" data-bs-target="#sku-details-{{ loop.index }}">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" /><path d="M21 12c-2.4 4 -5.4 6 -9 6c-3.6 0 -6.6 -2 -9 -6c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6" /></svg>
+                    </button>
+                </td>
+            </tr>
+
+            {# Drill-down боковая панель #}
+            <div class="offcanvas offcanvas-end" tabindex="-1" id="sku-details-{{ loop.index }}">
+                <div class="offcanvas-header">
+                    <h3 class="offcanvas-title">{{ item.sku }}</h3>
+                    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+                </div>
+                <div class="offcanvas-body">
+                    <h4 class="mb-3">Unit-экономика</h4>
+                    <div class="list-group list-group-flush mb-4">
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span>Цена продажи</span>
+                            <strong>{{ (item.revenue / item.sold)|number_format(0) }} ₽</strong>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span>Себестоимость</span>
+                            <span>{{ (item.cogs / item.sold)|number_format(0) }} ₽</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span>Комиссия/шт</span>
+                            <span>{{ (item.commission / item.sold)|number_format(0) }} ₽</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span>Логистика/шт</span>
+                            <span>{{ (item.logistics / item.sold)|number_format(0) }} ₽</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span>Реклама/шт</span>
+                            <span>{{ (item.advertising / item.sold)|number_format(0) }} ₽</span>
+                        </div>
+                        <div class="list-group-item d-flex justify-content-between">
+                            <span><strong>Маржа/шт</strong></span>
+                            <strong class="text-success">{{ (item.cm_rub / item.sold)|number_format(0) }} ₽</strong>
+                        </div>
+                    </div>
+
+                    <h4 class="mb-3">Динамика продаж (демо)</h4>
+                    <div class="placeholder-glow mb-4">
+                        <div class="placeholder col-12" style="height: 200px;"></div>
+                    </div>
+
+                    <h4 class="mb-3">Метрики</h4>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">Оборачиваемость</div>
+                                    <div class="h3 mb-0">{{ item.turnover }} дн</div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <div class="text-muted small">ROI</div>
+                                    <div class="h3 mb-0">{{ item.roi }}%</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{# Легенда #}
+<div class="mt-3">
+    <small class="text-muted">
+        <span class="badge bg-green me-2">🟢</span> CM > 25% |
+        <span class="badge bg-yellow me-2">🟡</span> CM 15-25% |
+        <span class="badge bg-red me-2">🔴</span> CM < 15%
+    </small>
+</div>
