@@ -10,8 +10,8 @@ use App\Catalog\Entity\ProductPurchasePrice;
 use App\Catalog\Infrastructure\ProductRepository;
 use App\Catalog\Infrastructure\Repository\ProductPurchasePriceRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
-use Symfony\Component\Uid\Uuid;
 
 final class SetPurchasePriceAction
 {
@@ -55,7 +55,7 @@ final class SetPurchasePriceAction
         }
 
         $newPrice = new ProductPurchasePrice(
-            id: Uuid::v7()->toRfc4122(),
+            id: Uuid::uuid7()->toString(),
             company: $product->getCompany(),
             product: $product,
             effectiveFrom: $command->effectiveFrom,

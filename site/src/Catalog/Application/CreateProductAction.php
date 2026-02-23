@@ -11,7 +11,7 @@ use App\Catalog\Enum\ProductStatus;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\Uid\Uuid;
+use Ramsey\Uuid\Uuid;
 
 final class CreateProductAction
 {
@@ -30,7 +30,7 @@ final class CreateProductAction
         $sku = trim((string) $cmd->sku);
         $this->productSkuPolicy->assertSkuIsUnique($sku, $companyId);
 
-        $product = new Product(Uuid::v7()->toRfc4122(), $company);
+        $product = new Product(Uuid::uuid7()->toString(), $company);
         $product
             ->setName(trim((string) $cmd->name))
             ->setSku($sku)
