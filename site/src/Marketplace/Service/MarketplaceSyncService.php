@@ -367,7 +367,7 @@ class MarketplaceSyncService
                 $return = new \App\Marketplace\Entity\MarketplaceReturn(
                     Uuid::uuid4()->toString(),
                     $company,
-                    $listing->getProduct(),
+                    null,
                     \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
                 );
 
@@ -728,7 +728,7 @@ class MarketplaceSyncService
                 Uuid::uuid4()->toString(),
                 $company,
                 $listing,
-                $listing->getProduct(),
+                null,
                 $saleData->marketplace
             );
 
@@ -892,6 +892,7 @@ class MarketplaceSyncService
         $listing->setSupplierSku($saName);            // sa_name
         $listing->setSize($tsName);                   // ts_name (может быть null)
         $listing->setPrice((string)$price);
+        $listing->setName($productName);
 
         $this->em->persist($listing);
 

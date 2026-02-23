@@ -34,8 +34,8 @@
                         <td><span class="badge bg-azure">{{ listing.marketplace.displayName }}</span></td>
                         <td><span class="badge bg-azure-lt">{{ listing.marketplaceSku }}</span></td>
                         <td>
-                            <strong>{{ listing.product.name }}</strong>
-                            <div class="text-muted small">SKU: {{ listing.product.sku }}</div>
+                            <strong>{{ listing.name }}</strong>
+                            {#<div class="text-muted small">SKU: {{ listing.product.sku }}</div>#}
                         </td>
                         <td class="text-end">
                             {% if listing.price %}

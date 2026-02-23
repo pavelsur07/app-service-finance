@@ -28,8 +28,8 @@ class MarketplaceReturn
     private ?MarketplaceSale $sale = null; // Может быть null если не смогли связать
 
     #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private Product $product;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Product $product = null;
 
     #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
@@ -64,7 +64,7 @@ class MarketplaceReturn
     public function __construct(
         string $id,
         Company $company,
-        Product $product,
+        ?Product $product,
         MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
@@ -99,7 +99,7 @@ class MarketplaceReturn
         return $this;
     }
 
-    public function getProduct(): Product
+    public function getProduct(): ?Product
     {
         return $this->product;
     }
