@@ -6,7 +6,7 @@
 <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
     <div>
         <h2 class="page-title mb-1">{{ product.name }}</h2>
-        <span class="badge bg-azure-lt text-uppercase">{{ product.status.value }}</span>
+        <span class="badge bg-azure-lt text-uppercase">{{ product.status }}</span>
     </div>
     <div class="ms-auto d-flex gap-2 d-print-none">
         {% if canEditProduct %}
@@ -49,6 +49,37 @@
                     {% if product.weightKg is not null %}
                         <dt class="col-6">Вес, кг</dt>
                         <dd class="col-6">{{ product.weightKg }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">Закупочная цена</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-6">На сегодня</dt>
+                    <dd class="col-6">
+                        {% if todayPurchasePrice %}
+                            {{ todayPurchasePrice.priceAmount }} {{ todayPurchasePrice.priceCurrency }}
+                        {% else %}
+                            Не задано
+                        {% endif %}
+                    </dd>
+
+                    {% if priceAtDate is not null %}
+                        <dt class="col-6">Цена на дату ({{ priceAtDate|date('d.m.Y') }})</dt>
+                        <dd class="col-6">
+                            {% if priceAtPurchasePrice %}
+                                {{ priceAtPurchasePrice.priceAmount }} {{ priceAtPurchasePrice.priceCurrency }}
+                            {% else %}
+                                Не задано
+                            {% endif %}
+                        </dd>
                     {% endif %}
                 </dl>
             </div>
