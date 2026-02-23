@@ -29,8 +29,8 @@ class MarketplaceListing
     private Company $company;
 
     #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private Product $product;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Product $product = null;
 
     #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
@@ -81,9 +81,17 @@ class MarketplaceListing
         return $this->company;
     }
 
-    public function getProduct(): Product
+    public function getProduct(): ?Product
     {
         return $this->product;
+    }
+
+    /**
+     * Проверка: смаппен ли листинг на продукт
+     */
+    public function isMapped(): bool
+    {
+        return $this->product !== null;
     }
 
     public function getMarketplace(): MarketplaceType
