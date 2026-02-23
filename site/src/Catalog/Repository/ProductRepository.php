@@ -16,6 +16,26 @@ class ProductRepository extends ServiceEntityRepository
     }
 
     /**
+     * Найти продукт по ID с проверкой принадлежности к компании
+     *
+     * КРИТИЧНО: ВСЕГДА проверяем company_id для безопасности!
+     *
+     * @param string $productId UUID продукта
+     * @param string $companyId UUID компании
+     * @return Product|null
+     */
+    public function findByIdAndCompany(string $productId, string $companyId): ?Product
+    {
+        return $this->createQueryBuilder('p')
+            ->where('p.id = :id')
+            ->andWhere('p.company = :company')  // ← КРИТИЧНО для безопасности!
+            ->setParameter('id', $productId)
+            ->setParameter('company', $companyId)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return Product[]
      */
     public function findByCompany(Company $company): array

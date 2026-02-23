@@ -16,6 +16,15 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceListing::class);
     }
 
+    /**
+     * Сохранить листинг
+     */
+    public function save(MarketplaceListing $listing): void
+    {
+        $this->getEntityManager()->persist($listing);
+        $this->getEntityManager()->flush();
+    }
+
     public function findByMarketplaceSku(
         Company $company,
         MarketplaceType $marketplace,

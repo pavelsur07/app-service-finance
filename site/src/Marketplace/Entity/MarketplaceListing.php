@@ -62,7 +62,7 @@ class MarketplaceListing
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
-    public function __construct(string $id, Company $company, Product $product, MarketplaceType $marketplace)
+    public function __construct(string $id, Company $company, ?Product $product, MarketplaceType $marketplace)
     {
         Assert::uuid($id);
         $this->id = $id;

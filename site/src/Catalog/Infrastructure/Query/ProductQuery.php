@@ -43,5 +43,41 @@ SQL;
             'updatedAt' => new \DateTimeImmutable((string) $row['updated_at']),
         ];
     }
+
+    /**
+     * Получить список продуктов компании (для select в UI)
+     *
+     * @return array<int, array{id: string, sku: string, name: string}>
+     */
+    public function fetchAllForCompany(string $companyId): array
+    {
+        return $this->connection->createQueryBuilder()
+            ->select('p.id', 'p.sku', 'p.name')
+            ->from('products', 'p')
+            ->where('p.company_id = :company')
+            ->orderBy('p.name', 'ASC')
+            ->setParameter('company', $companyId)
+            ->setMaxResults(500)  // Ограничение для производительности
+            ->executeQuery()
+            ->fetchAllAssociative();
+    }
+
+    /**
+     * Найти продукт по ID (с проверкой принадлежности к компании!)
+     */
+    public function findByIdAndCompany(string $productId, string $companyId): ?array
+    {
+        $result = $this->connection->createQueryBuilder()
+            ->select('p.id', 'p.sku', 'p.name', 'p.company_id')
+            ->from('products', 'p')
+            ->where('p.id = :id')
+            ->andWhere('p.company_id = :company')  // ← КРИТИЧНО!
+            ->setParameter('id', $productId)
+            ->setParameter('company', $companyId)
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return $result ?: null;
+    }
 }
 

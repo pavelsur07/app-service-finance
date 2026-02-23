@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -182,7 +183,7 @@ class MarketplaceSyncService
                     Uuid::uuid4()->toString(),
                     $company,
                     $listing,
-                    $listing->getProduct(),
+                    null,
                     \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
                 );
 
@@ -879,19 +880,13 @@ class MarketplaceSyncService
         ]);
         $productName = implode(' ', $nameParts);
 
-        // Создаём Product
-        $product = new Product(Uuid::uuid4()->toString(), $company);
-        $product->setSku($saName); // Internal SKU = артикул производителя
-        $product->setName($productName);
-        $product->setPurchasePrice('0.00'); // Требует заполнения вручную
-        $this->em->persist($product);
 
         // Создаём Listing
         $listing = new MarketplaceListing(
             Uuid::uuid4()->toString(),
             $company,
-            $product,
-            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+            null,
+            MarketplaceType::WILDBERRIES
         );
         $listing->setMarketplaceSku($nmId);           // nm_id
         $listing->setSupplierSku($saName);            // sa_name

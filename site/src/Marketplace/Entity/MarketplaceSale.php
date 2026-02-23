@@ -30,8 +30,8 @@ class MarketplaceSale
     private MarketplaceListing $listing;
 
     #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private Product $product; // Денормализация для скорости запросов
+    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
+    private ?Product $product = null; // Денормализация для скорости запросов
 
     #[ORM\ManyToOne(targetEntity: Document::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -71,7 +71,7 @@ class MarketplaceSale
         string $id,
         Company $company,
         MarketplaceListing $listing,
-        Product $product,
+        ?Product $product,
         MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
@@ -99,7 +99,7 @@ class MarketplaceSale
         return $this->listing;
     }
 
-    public function getProduct(): Product
+    public function getProduct(): ?Product
     {
         return $this->product;
     }

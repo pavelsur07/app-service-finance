@@ -3,6 +3,8 @@
 {% block title %}Маркетплейсы{% endblock %}
 
 {% block body %}
+    {% set active_tab = active_tab|default('') %}
+
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">

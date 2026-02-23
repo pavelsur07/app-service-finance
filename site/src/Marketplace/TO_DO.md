@@ -1,14 +1,4 @@
 ## Отчет Комиссионера WB
-### Убрать автоматическое создание Product при импорте данных из маркетплейсов
-1. MarketplaceSyncService::createListingFromWbData()
-882 строка явное создание удалить маппинг осуществлять через другой инструмент
-   // Создаём Product  
-   $product = new Product(Uuid::uuid4()->toString(), $company);
-   $product->setSku($saName); // Internal SKU = артикул производителя
-   $product->setName($productName);
-   $product->setPurchasePrice('0.00'); // Требует заполнения вручную
-   $this->em->persist($product);
-
 ### Продажи и возвраты
 - [x] Продажи
 - [x] Возврат
