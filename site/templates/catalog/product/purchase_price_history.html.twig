@@ -1,0 +1,50 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}История закупочных цен — {{ product.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <div>
+        <h2 class="page-title mb-1">История закупочных цен</h2>
+        <div class="text-muted">{{ product.name }}</div>
+    </div>
+    <div class="ms-auto d-flex gap-2 d-print-none">
+        <a href="{{ path('catalog_products_show', {id: product.id}) }}" class="btn btn-outline-secondary">К товару</a>
+    </div>
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>Период</th>
+                    <th>Цена</th>
+                    <th>Комментарий</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in history %}
+                    <tr>
+                        <td>
+                            {{ item.effectiveFrom|date('d.m.Y') }}
+                            —
+                            {% if item.effectiveTo %}
+                                {{ item.effectiveTo|date('d.m.Y') }}
+                            {% else %}
+                                по н.в.
+                            {% endif %}
+                        </td>
+                        <td>{{ item.priceAmount }} {{ item.priceCurrency }}</td>
+                        <td>{{ item.note ?: '—' }}</td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-muted">История закупочных цен пуста.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

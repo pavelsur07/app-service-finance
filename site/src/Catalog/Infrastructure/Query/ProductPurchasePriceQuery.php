@@ -42,5 +42,36 @@ SQL;
             'effectiveTo' => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
         ];
     }
-}
 
+    /**
+     * @return list<array{effectiveFrom:string,effectiveTo:?string,priceAmount:int,priceCurrency:string,note:?string}>
+     */
+    public function fetchHistory(string $companyId, string $productId, int $limit = 100): array
+    {
+        $sql = <<<'SQL'
+SELECT effective_from, effective_to, price_amount, price_currency, note
+FROM product_purchase_prices
+WHERE company_id = :companyId
+  AND product_id = :productId
+ORDER BY effective_from DESC, created_at DESC
+LIMIT :limit
+SQL;
+
+        // Историю читаем через DBAL без ORM-гидратации, с явным scope по компании.
+        $rows = $this->connection->fetchAllAssociative($sql, [
+            'companyId' => $companyId,
+            'productId' => $productId,
+            'limit' => max(1, $limit),
+        ], [
+            'limit' => \PDO::PARAM_INT,
+        ]);
+
+        return array_map(static fn (array $row): array => [
+            'effectiveFrom' => (string) $row['effective_from'],
+            'effectiveTo' => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
+            'priceAmount' => (int) $row['price_amount'],
+            'priceCurrency' => (string) $row['price_currency'],
+            'note' => null !== $row['note'] ? (string) $row['note'] : null,
+        ], $rows);
+    }
+}
