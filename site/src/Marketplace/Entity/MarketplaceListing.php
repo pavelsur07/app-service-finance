@@ -62,6 +62,9 @@ class MarketplaceListing
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
+    #[ORM\Column(length: 500, nullable: true)]
+    private ?string $name = null;
+
     public function __construct(string $id, Company $company, ?Product $product, MarketplaceType $marketplace)
     {
         Assert::uuid($id);
@@ -192,6 +195,17 @@ class MarketplaceListing
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getName(): ?string
+    {
+        return $this->name;
+    }
+
+    public function setName(?string $name): self
+    {
+        $this->name = $name;
+        return $this;
     }
 
     /**
