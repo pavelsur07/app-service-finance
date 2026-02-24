@@ -514,7 +514,6 @@ class MarketplaceSyncService
 
                     // Получаем listing из кэша
                     $listing = null;
-                    $product = null;
 
                     $nmId = (string)($item['nm_id'] ?? '');
                     $tsName = trim($item['ts_name'] ?? '');
@@ -523,10 +522,6 @@ class MarketplaceSyncService
                     if ($nmId !== '') {
                         $cacheKey = $nmId . '_' . $tsName;
                         $listing = $listingsCache[$cacheKey] ?? null;
-
-                        if ($listing) {
-                            $product = $listing->getProduct();
-                        }
                     }
 
                     if ($calculator->requiresListing() && !$listing) {
@@ -583,8 +578,8 @@ class MarketplaceSyncService
                         $cost->setAmount($costData['amount']);
                         $cost->setDescription($costData['description']);
 
-                        if ($product) {
-                            $cost->setProduct($product);
+                        if ($listing) {
+                            $cost->setListing($listing);
                         }
 
                         $this->em->persist($cost);
@@ -769,14 +764,13 @@ class MarketplaceSyncService
                 continue;
             }
 
-            $product = null;
+            $listing = null;
             if ($costData->marketplaceSku) {
                 $listing = $this->listingRepository->findByMarketplaceSku(
                     $company,
                     $costData->marketplace,
                     $costData->marketplaceSku
                 );
-                $product = $listing?->getProduct();
             }
 
             if ($costData->externalId) {
@@ -795,7 +789,7 @@ class MarketplaceSyncService
                 $category
             );
 
-            $cost->setProduct($product);
+            $cost->setListing($listing);
             $cost->setAmount($costData->amount);
             $cost->setCostDate($costData->costDate);
             $cost->setDescription($costData->description);
@@ -819,15 +813,7 @@ class MarketplaceSyncService
         $synced = 0;
 
         foreach ($returnsData as $returnData) {
-            $listing = $this->listingRepository->findByMarketplaceSku(
-                $company,
-                $returnData->marketplace,
-                $returnData->marketplaceSku
-            );
-
-            if (!$listing) {
-                continue;
-            }
+            $listing = $this->findOrCreateListing($company, $returnData);
 
             if ($returnData->externalReturnId) {
                 $existing = $this->returnRepository->findOneBy([
@@ -899,7 +885,7 @@ class MarketplaceSyncService
         return $listing;
     }
 
-    private function findOrCreateListing(Company $company, $saleData, array $productInfo = []): MarketplaceListing
+    private function findOrCreateListing(Company $company, $saleData): MarketplaceListing
     {
         $listing = $this->listingRepository->findByMarketplaceSku(
             $company,
@@ -911,36 +897,11 @@ class MarketplaceSyncService
             return $listing;
         }
 
-        // Попытка найти Product по SKU
-        $product = $this->productRepository->findBySku($company, $saleData->marketplaceSku);
-
-        if (!$product) {
-            // Создаём новый Product с данными из WB
-            $product = new Product(Uuid::uuid4()->toString(), $company);
-            $product->setSku($saleData->marketplaceSku);
-
-            // Формируем название из данных WB
-            if (!empty($productInfo)) {
-                $brand = $productInfo['brand'] ?? '';
-                $subject = $productInfo['subject'] ?? '';
-                $sku = $productInfo['sku'] ?? $saleData->marketplaceSku;
-
-                // Название: "{brand} {subject} ({sku})"
-                $name = trim(sprintf('%s %s (%s)', $brand, $subject, $sku));
-                $product->setName($name ?: 'Auto-created from ' . $saleData->marketplace->value);
-            } else {
-                $product->setName('Auto-created from ' . $saleData->marketplace->value);
-            }
-
-            $product->setPurchasePrice('0.00'); // Требует заполнения
-            $this->em->persist($product);
-        }
-
-        // Создаём Listing
+        // Создаём Listing без Product — продукт привязывается вручную
         $listing = new MarketplaceListing(
             Uuid::uuid4()->toString(),
             $company,
-            $product,
+            null,
             $saleData->marketplace
         );
         $listing->setMarketplaceSku($saleData->marketplaceSku);

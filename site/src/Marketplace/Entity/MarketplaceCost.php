@@ -13,6 +13,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_costs')]
 #[ORM\Index(columns: ['company_id', 'cost_date'], name: 'idx_company_cost_date')]
 #[ORM\Index(columns: ['category_id'], name: 'idx_cost_category')]
+#[ORM\Index(columns: ['listing_id'], name: 'idx_cost_listing')]
 #[ORM\Index(columns: ['product_id'], name: 'idx_cost_product')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_cost_sale')]
 class MarketplaceCost
@@ -32,13 +33,17 @@ class MarketplaceCost
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private MarketplaceCostCategory $category;
 
+    #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MarketplaceListing $listing = null;
+
     #[ORM\ManyToOne(targetEntity: Product::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    private ?Product $product = null; // Nullable для общих затрат (например, реклама)
+    private ?Product $product = null; // Денормализация из listing
 
     #[ORM\ManyToOne(targetEntity: MarketplaceSale::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    private ?MarketplaceSale $sale = null; // Nullable, если затрата не привязана к конкретной продаже
+    private ?MarketplaceSale $sale = null;
 
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $amount;
@@ -50,13 +55,13 @@ class MarketplaceCost
     private ?string $description = null;
 
     #[ORM\Column(length: 100, nullable: true)]
-    private ?string $externalId = null; // ID из отчёта маркетплейса (если есть)
+    private ?string $externalId = null;
 
     #[ORM\Column(type: 'guid', nullable: true)]
-    private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
+    private ?string $rawDocumentId = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $rawData = null; // Только эта строка (опционально)
+    private ?array $rawData = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -107,17 +112,23 @@ class MarketplaceCost
         return $this;
     }
 
-    public function getProduct(): ?Product
+    public function getListing(): ?MarketplaceListing
     {
-        return $this->product;
+        return $this->listing;
     }
 
-    public function setProduct(?Product $product): self
+    public function setListing(?MarketplaceListing $listing): self
     {
-        $this->product = $product;
+        $this->listing = $listing;
+        $this->product = $listing?->getProduct();
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
+    }
+
+    public function getProduct(): ?Product
+    {
+        return $this->product;
     }
 
     public function getSale(): ?MarketplaceSale
