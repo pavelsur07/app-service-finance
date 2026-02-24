@@ -23,9 +23,13 @@ class MarketplaceReturn
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private Company $company;
 
+    #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
+    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
+    private MarketplaceListing $listing;
+
     #[ORM\ManyToOne(targetEntity: MarketplaceSale::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    private ?MarketplaceSale $sale = null; // Может быть null если не смогли связать
+    private ?MarketplaceSale $sale = null;
 
     #[ORM\ManyToOne(targetEntity: Product::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
@@ -47,10 +51,10 @@ class MarketplaceReturn
     private string $refundAmount;
 
     #[ORM\Column(length: 100, nullable: true)]
-    private ?string $returnReason = null; // "defect", "wrong_size", "customer_request"
+    private ?string $returnReason = null;
 
     #[ORM\Column(type: 'guid', nullable: true)]
-    private ?string $rawDocumentId = null; // Ссылка на MarketplaceRawDocument
+    private ?string $rawDocumentId = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $rawData = null;
@@ -64,13 +68,14 @@ class MarketplaceReturn
     public function __construct(
         string $id,
         Company $company,
-        ?Product $product,
+        MarketplaceListing $listing,
         MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
-        $this->product = $product;
+        $this->listing = $listing;
+        $this->product = $listing->getProduct();
         $this->marketplace = $marketplace;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -84,6 +89,11 @@ class MarketplaceReturn
     public function getCompany(): Company
     {
         return $this->company;
+    }
+
+    public function getListing(): MarketplaceListing
+    {
+        return $this->listing;
     }
 
     public function getSale(): ?MarketplaceSale

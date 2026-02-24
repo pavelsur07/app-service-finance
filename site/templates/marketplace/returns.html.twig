@@ -32,7 +32,7 @@
                 {% for return in pager.currentPageResults %}
                     <tr>
                         <td>{{ return.returnDate|date('d.m.Y H:i') }}</td>
-                        <td><strong>{{ return.product.name }}</strong></td>
+                        <td><strong>{{ return.listing.name }}</strong></td>
                         <td class="text-end">{{ return.quantity }}</td>
                         <td class="text-end text-danger">
                             <strong>-{{ return.refundAmount|number_format(2, '.', ' ') }} ₽</strong>

@@ -364,10 +364,10 @@ class MarketplaceSyncService
                 }
 
                 // Создать Return
-                $return = new \App\Marketplace\Entity\MarketplaceReturn(
+                $return = new MarketplaceReturn(
                     Uuid::uuid4()->toString(),
                     $company,
-                    null,
+                    $listing,
                     \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
                 );
 
@@ -843,7 +843,7 @@ class MarketplaceSyncService
             $return = new MarketplaceReturn(
                 Uuid::uuid4()->toString(),
                 $company,
-                $listing->getProduct(),
+                $listing,
                 $returnData->marketplace
             );
 
