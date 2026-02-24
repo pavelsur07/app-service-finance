@@ -52,6 +52,9 @@ class MarketplaceSale
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $pricePerUnit;
 
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2, nullable: true)]
+    private ?string $costPrice = null; // Себестоимость за единицу
+
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $totalRevenue; // quantity * pricePerUnit
 
@@ -169,6 +172,19 @@ class MarketplaceSale
     public function setPricePerUnit(string $pricePerUnit): self
     {
         $this->pricePerUnit = $pricePerUnit;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getCostPrice(): ?string
+    {
+        return $this->costPrice;
+    }
+
+    public function setCostPrice(?string $costPrice): self
+    {
+        $this->costPrice = $costPrice;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
