@@ -70,7 +70,8 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
-        $companyId = $company->getId();
+        $companyId = (string) $company->getId();
+        $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
         $batchSize = 250; // Уменьшено для 512MB лимита
 
@@ -192,7 +193,7 @@ class MarketplaceSyncService
                 $sale->setQuantity(abs((int)$item['quantity']));
                 $sale->setPricePerUnit((string)$item['retail_price']);
                 $sale->setTotalRevenue((string)abs((float)$item['retail_amount']));
-                $sale->setRawDocumentId($rawDoc->getId());
+                $sale->setRawDocumentId($rawDocId);
 
                 $this->em->persist($sale);
                 $existingSridsMap[$externalOrderId] = true; // Защита от дублей внутри файла
@@ -254,7 +255,8 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
-        $companyId = $company->getId();
+        $companyId = (string) $company->getId();
+        $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
         $batchSize = 250; // Уменьшено для 512MB лимита
 
@@ -437,7 +439,8 @@ class MarketplaceSyncService
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
         $rawData = $rawDoc->getRawData();
-        $companyId = $company->getId();
+        $companyId = (string) $company->getId();
+        $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
         $unprocessedTypes = [];
         $batchSize = 100; // Маленький для 512MB лимита
@@ -646,7 +649,7 @@ class MarketplaceSyncService
 
         // Сохраняем статистику
         $unprocessedCount = array_sum($unprocessedTypes);
-        $rawDoc = $this->em->find(\App\Marketplace\Entity\MarketplaceRawDocument::class, $rawDoc->getId());
+        $rawDoc = $this->em->find(\App\Marketplace\Entity\MarketplaceRawDocument::class, $rawDocId);
 
         if ($rawDoc) {
             $rawDoc->setUnprocessedCostsCount($unprocessedCount);
