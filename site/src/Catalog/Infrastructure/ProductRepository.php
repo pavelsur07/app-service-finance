@@ -6,6 +6,7 @@ namespace App\Catalog\Infrastructure;
 
 use App\Catalog\DTO\ProductListFilter;
 use App\Catalog\Entity\Product;
+use App\Catalog\Enum\ProductStatus;
 use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -114,5 +115,65 @@ final class ProductRepository
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function findByIdAndCompany(string $productId, string $companyId): ?Product
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.id = :id')
+            ->andWhere('IDENTITY(p.company) = :companyId')
+            ->setParameter('id', $productId)
+            ->setParameter('companyId', $companyId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @return Product[]
+     */
+    public function findByCompany(Company $company): array
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.company = :company')
+            ->setParameter('company', $company)
+            ->orderBy('p.name', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findBySku(Company $company, string $sku): ?Product
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.company = :company')
+            ->andWhere('p.sku = :sku')
+            ->setParameter('company', $company)
+            ->setParameter('sku', $sku)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * @return Product[]
+     */
+    public function findActiveProducts(Company $company): array
+    {
+        return $this->entityManager->createQueryBuilder()
+            ->select('p')
+            ->from(Product::class, 'p')
+            ->andWhere('p.company = :company')
+            ->andWhere('p.status = :status')
+            ->setParameter('company', $company)
+            ->setParameter('status', ProductStatus::ACTIVE)
+            ->orderBy('p.name', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 }

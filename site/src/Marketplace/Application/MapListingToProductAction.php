@@ -2,7 +2,7 @@
 
 namespace App\Marketplace\Application;
 
-use App\Catalog\Repository\ProductRepository;
+use App\Catalog\Infrastructure\ProductRepository;
 use App\Marketplace\DTO\MapListingToProductCommand;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Psr\Log\LoggerInterface;
