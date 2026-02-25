@@ -1291,36 +1291,54 @@ class MarketplaceSyncService
         // --- ФАЗА 3: Обработка ---
         $counter = 0;
         $newCategoriesCreated = 0;
+        $lastFlushedCounter = 0;
+        $knownExternalIdsMap = [];
+        $pending = [];
+        $pendingIds = [];
+        $dedupBatchSize = $batchSize;
 
-        foreach ($rawData as $op) {
-            $operationId = (string)($op['operation_id'] ?? '');
-            $operationDate = new \DateTimeImmutable($op['operation_date']);
-
-            // Определяем listing (из первого item)
-            $listing = null;
-            $firstItem = ($op['items'] ?? [])[0] ?? null;
-            if ($firstItem) {
-                $sku = (string)($firstItem['sku'] ?? '');
-                $listing = $listingsCache[$sku] ?? null;
+        $processPendingBatch = function () use (
+            &$pending,
+            &$pendingIds,
+            &$knownExternalIdsMap,
+            &$counter,
+            &$synced,
+            &$newCategoriesCreated,
+            &$lastFlushedCounter,
+            &$categoriesCache,
+            &$listingsCache,
+            &$company,
+            $companyId,
+            $conn,
+            $batchSize
+        ): void {
+            if (empty($pendingIds)) {
+                return;
             }
 
-            // Собираем все затраты из одной операции
-            $costEntries = $this->extractOzonCostEntries($op, $operationId, $operationDate);
+            $placeholders = implode(',', array_fill(0, count($pendingIds), '?'));
+            $dbExistingIds = $conn->fetchFirstColumn(
+                "SELECT external_id FROM marketplace_costs WHERE company_id = ? AND external_id IN ($placeholders)",
+                array_merge([$companyId], $pendingIds)
+            );
 
-            foreach ($costEntries as $entry) {
+            $dbExistingMap = [];
+            foreach ($dbExistingIds as $existingId) {
+                $dbExistingMap[(string) $existingId] = true;
+            }
+
+            $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
+
+            foreach ($pending as $pendingItem) {
                 try {
+                    $entry = $pendingItem['entry'];
                     $externalId = $entry['external_id'];
 
-                    // Проверка дубликата через DBAL
-                    $exists = $conn->fetchOne(
-                        "SELECT 1 FROM marketplace_costs WHERE company_id = ? AND external_id = ? LIMIT 1",
-                        [$companyId, $externalId]
-                    );
-
-                    if ($exists) {
+                    if (isset($knownExternalIdsMap[$externalId])) {
                         continue;
                     }
 
+                    $listing = $pendingItem['listing'];
                     $categoryCode = $entry['category_code'];
                     $category = $categoriesCache[$categoryCode] ?? null;
 
@@ -1356,39 +1374,81 @@ class MarketplaceSyncService
                     }
 
                     $this->em->persist($cost);
+                    $knownExternalIdsMap[$externalId] = true;
                     $synced++;
                     $counter++;
-
-                    if ($counter % $batchSize === 0) {
-                        $this->em->flush();
-                        $this->em->clear();
-
-                        $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
-                        foreach ($categoriesCache as $code => $cat) {
-                            $categoriesCache[$code] = $this->em->getReference(
-                                \App\Marketplace\Entity\MarketplaceCostCategory::class,
-                                $cat->getId()
-                            );
-                        }
-                        foreach ($listingsCache as $k => $cachedListing) {
-                            $listingsCache[$k] = $this->em->getReference(
-                                MarketplaceListing::class,
-                                $cachedListing->getId()
-                            );
-                        }
-
-                        gc_collect_cycles();
-                        $this->logger->info('[Ozon] Costs batch', ['processed' => $counter, 'synced' => $synced]);
-                    }
-
                 } catch (\Exception $e) {
                     $this->logger->error('[Ozon] Failed to process cost', [
-                        'external_id' => $entry['external_id'] ?? 'unknown',
+                        'external_id' => $pendingItem['entry']['external_id'] ?? 'unknown',
                         'error' => $e->getMessage(),
                     ]);
                     continue;
                 }
             }
+
+            if (($counter - $lastFlushedCounter) >= $batchSize) {
+                $this->em->flush();
+                $this->em->clear();
+                $lastFlushedCounter = $counter;
+
+                $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                foreach ($categoriesCache as $code => $cat) {
+                    $categoriesCache[$code] = $this->em->getReference(
+                        \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                        $cat->getId()
+                    );
+                }
+                foreach ($listingsCache as $k => $cachedListing) {
+                    $listingsCache[$k] = $this->em->getReference(
+                        MarketplaceListing::class,
+                        $cachedListing->getId()
+                    );
+                }
+
+                gc_collect_cycles();
+                $this->logger->info('[Ozon] Costs batch', ['processed' => $counter, 'synced' => $synced]);
+            }
+
+            $pending = [];
+            $pendingIds = [];
+        };
+
+        foreach ($rawData as $op) {
+            $operationId = (string)($op['operation_id'] ?? '');
+            $operationDate = new \DateTimeImmutable($op['operation_date']);
+
+            // Определяем listing (из первого item)
+            $listing = null;
+            $firstItem = ($op['items'] ?? [])[0] ?? null;
+            if ($firstItem) {
+                $sku = (string)($firstItem['sku'] ?? '');
+                $listing = $listingsCache[$sku] ?? null;
+            }
+
+            // Собираем все затраты из одной операции
+            $costEntries = $this->extractOzonCostEntries($op, $operationId, $operationDate);
+
+            foreach ($costEntries as $entry) {
+                $externalId = $entry['external_id'];
+
+                if (isset($knownExternalIdsMap[$externalId])) {
+                    continue;
+                }
+
+                $pending[] = [
+                    'entry' => $entry,
+                    'listing' => $listing,
+                ];
+                $pendingIds[] = $externalId;
+
+                if (count($pendingIds) >= $dedupBatchSize) {
+                    $processPendingBatch();
+                }
+            }
+        }
+
+        if (!empty($pendingIds)) {
+            $processPendingBatch();
         }
 
         if ($counter % $batchSize !== 0) {
