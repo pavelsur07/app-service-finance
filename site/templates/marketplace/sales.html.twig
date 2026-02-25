@@ -13,6 +13,7 @@
                 <th class="text-end">Кол-во</th>
                 <th class="text-end">Цена</th>
                 <th class="text-end">Выручка</th>
+                <th class="text-end">Себес.</th>
                 <th>ID заказа</th>
             </tr>
             </thead>
@@ -24,12 +25,13 @@
             {% else %}
                 {% for sale in pager.currentPageResults %}
                     <tr>
-                        <td>{{ sale.saleDate|date('d.m.Y H:i') }}</td>
+                        <td>{{ sale.saleDate|date('d.m.Y') }}</td>
                         <td><span class="badge bg-azure-lt">{{ sale.listing.marketplaceSku }}</span></td>
                         <td>{{ sale.listing.name }}</td>
                         <td class="text-end">{{ sale.quantity }}</td>
                         <td class="text-end">{{ sale.pricePerUnit|number_format(2, '.', ' ') }} ₽</td>
                         <td class="text-end"><strong>{{ sale.totalRevenue|number_format(2, '.', ' ') }} ₽</strong></td>
+                        <td class="text-end">00.0 ₽</td>
                         <td><small class="text-muted">{{ sale.externalOrderId|slice(0, 20) }}...</small></td>
                     </tr>
                 {% endfor %}
