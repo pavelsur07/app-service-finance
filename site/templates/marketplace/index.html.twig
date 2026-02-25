@@ -36,6 +36,9 @@
                                     <div class="col text-truncate">
                                         <div class="text-reset d-block">{{ connection.marketplace.displayName }}</div>
                                         <div class="d-block text-muted text-truncate mt-n1">
+                                            {% if connection.clientId %}
+                                                Client-Id: {{ connection.clientId }} &middot;
+                                            {% endif %}
                                             API Key: {{ connection.apiKey|slice(0, 20) }}***
                                         </div>
                                         <div class="d-block text-muted mt-1">
@@ -170,12 +173,17 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label required">Маркетплейс</label>
-                            <select name="marketplace" class="form-select" required>
+                            <select name="marketplace" id="connection-marketplace" class="form-select" required>
                                 <option value="">Выберите маркетплейс</option>
                                 {% for marketplace in availableMarketplaces %}
                                     <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                        <div class="mb-3" id="field-client-id" style="display: none;">
+                            <label class="form-label required">Client-Id</label>
+                            <input type="text" name="client_id" id="input-client-id" class="form-control" placeholder="Например: 123456">
+                            <small class="form-hint">Найдите Client-Id в личном кабинете Ozon → Настройки → API ключи</small>
                         </div>
                         <div class="mb-3">
                             <label class="form-label required">API ключ</label>
@@ -212,7 +220,7 @@
                             <input type="date" name="date_to" class="form-control" required
                                    value="{{ 'now'|date('Y-m-d') }}">
                         </div>
-                        <div class="text-muted small">Максимальный период запроса WB — 31 день.</div>
+                        <div class="text-muted small">Максимальный период — 31 день.</div>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
@@ -224,6 +232,21 @@
     </div>
 
     <script>
+        // Показ/скрытие поля Client-Id в зависимости от маркетплейса
+        document.getElementById('connection-marketplace').addEventListener('change', function () {
+            var clientIdField = document.getElementById('field-client-id');
+            var clientIdInput = document.getElementById('input-client-id');
+            if (this.value === 'ozon') {
+                clientIdField.style.display = '';
+                clientIdInput.required = true;
+            } else {
+                clientIdField.style.display = 'none';
+                clientIdInput.required = false;
+                clientIdInput.value = '';
+            }
+        });
+
+        // Sync period modal
         document.getElementById('modal-sync-period').addEventListener('show.bs.modal', function (event) {
             var connectionId = event.relatedTarget.getAttribute('data-connection-id');
             document.getElementById('form-sync-period').action = '/marketplace/connection/' + connectionId + '/sync-period';

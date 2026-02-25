@@ -143,6 +143,42 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     /**
+     * Массовая загрузка листингов по marketplace_sku с индексацией по SKU.
+     * Для Ozon и других маркетплейсов где нет размерной сетки.
+     *
+     * @param string[] $skus
+     * @return array<string, MarketplaceListing> ['sku' => Listing]
+     */
+    public function findListingsBySkusIndexed(
+        Company $company,
+        MarketplaceType $marketplace,
+        array $skus
+    ): array {
+        if (empty($skus)) {
+            return [];
+        }
+
+        $listings = $this->createQueryBuilder('l')
+            ->leftJoin('l.product', 'p')
+            ->addSelect('p')
+            ->where('l.company = :company')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceSku IN (:skus)')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('skus', $skus)
+            ->getQuery()
+            ->getResult();
+
+        $indexed = [];
+        foreach ($listings as $listing) {
+            $indexed[$listing->getMarketplaceSku()] = $listing;
+        }
+
+        return $indexed;
+    }
+
+    /**
      * Массовая загрузка листингов по nm_id с индексацией по ключу "nmId_size"
      * Для bulk import - одним запросом вместо тысяч
      *

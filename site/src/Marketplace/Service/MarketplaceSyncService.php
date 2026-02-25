@@ -69,6 +69,11 @@ class MarketplaceSyncService
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
+        // Диспатч по маркетплейсу
+        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
+            return $this->processOzonSalesFromRaw($company, $rawDoc);
+        }
+
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -252,6 +257,11 @@ class MarketplaceSyncService
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
+        // Диспатч по маркетплейсу
+        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
+            return $this->processOzonCostsFromRaw($company, $rawDoc);
+        }
+
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -434,6 +444,11 @@ class MarketplaceSyncService
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
+        // Диспатч по маркетплейсу
+        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
+            return $this->processOzonReturnsFromRaw($company, $rawDoc);
+        }
+
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -859,7 +874,49 @@ class MarketplaceSyncService
             $synced++;
         }
 
-        $this->em->flush();
+                    if ($counter % $batchSize === 0) {
+                        $this->em->flush();
+                        $this->em->clear();
+
+                        $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                        foreach ($categoriesCache as $code => $cat) {
+                            $categoriesCache[$code] = $this->em->getReference(
+                                \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                                $cat->getId()
+                            );
+                        }
+                        foreach ($listingsCache as $k => $cachedListing) {
+                            $listingsCache[$k] = $this->em->getReference(
+                                MarketplaceListing::class,
+                                $cachedListing->getId()
+                            );
+                        }
+
+                        gc_collect_cycles();
+                        $this->logger->info('[Ozon] Costs batch', ['processed' => $counter, 'synced' => $synced]);
+                    }
+
+                } catch (\Exception $e) {
+                    $this->logger->error('[Ozon] Failed to process cost', [
+                        'external_id' => $entry['external_id'] ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+            }
+        }
+
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        $this->logger->info('[Ozon] Costs processing completed', [
+            'total_synced' => $synced,
+            'new_categories' => $newCategoriesCreated,
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
+        ]);
+
         return $synced;
     }
 
@@ -906,6 +963,623 @@ class MarketplaceSyncService
         $this->em->flush();
         return $synced;
     }
+
+    // ========================================================================
+    // OZON: Обработка сырых данных из /v3/finance/transaction/list
+    // ========================================================================
+
+    /**
+     * Ozon: обработка продаж из RawDocument.
+     *
+     * Структура Ozon: operations[].type === "orders" && accruals_for_sale > 0
+     * items[]: [{name, sku}], posting: {posting_number}
+     */
+    private function processOzonSalesFromRaw(
+        Company $company,
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+    ): int {
+        $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
+        $synced = 0;
+        $batchSize = 250;
+
+        // --- ФАЗА 1: Фильтрация продаж ---
+        $salesData = array_filter($rawData, function ($op) {
+            return ($op['type'] ?? '') === 'orders'
+                && (float)($op['accruals_for_sale'] ?? 0) > 0;
+        });
+
+        if (empty($salesData)) {
+            $this->logger->info('[Ozon] No sales to process');
+            return 0;
+        }
+
+        $this->logger->info('[Ozon] Starting sales processing', [
+            'total_filtered' => count($salesData),
+        ]);
+
+        // --- ФАЗА 2: Предзагрузка ---
+
+        // Собираем externalIds (operation_id) для проверки дублей
+        $allExternalIds = array_map(fn($op) => (string)$op['operation_id'], $salesData);
+        $existingIdsMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
+
+        // Собираем все SKU для листингов
+        $allSkus = [];
+        foreach ($salesData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string)($item['sku'] ?? '');
+                if ($sku !== '') {
+                    $allSkus[$sku] = true;
+                }
+            }
+        }
+        $allSkus = array_keys($allSkus);
+
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+            $company,
+            MarketplaceType::OZON,
+            $allSkus
+        );
+
+        // --- ФАЗА 3: Создание отсутствующих листингов ---
+        $newListingsCreated = 0;
+
+        foreach ($salesData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string)($item['sku'] ?? '');
+                if ($sku === '' || isset($listingsCache[$sku])) {
+                    continue;
+                }
+
+                $listing = $this->createListingFromOzonData($company, [
+                    'sku' => $sku,
+                    'name' => $item['name'] ?? '',
+                ]);
+
+                $listingsCache[$sku] = $listing;
+                $newListingsCreated++;
+            }
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->logger->info('[Ozon] Created missing listings', ['count' => $newListingsCreated]);
+        }
+
+        // --- ФАЗА 4: Обработка продаж ---
+        $counter = 0;
+
+        foreach ($salesData as $op) {
+            try {
+                $externalOrderId = (string)$op['operation_id'];
+
+                if (isset($existingIdsMap[$externalOrderId])) {
+                    continue;
+                }
+
+                $items = $op['items'] ?? [];
+                $firstItem = $items[0] ?? null;
+                $sku = $firstItem ? (string)($firstItem['sku'] ?? '') : '';
+
+                $listing = $listingsCache[$sku] ?? null;
+                if (!$listing) {
+                    $this->logger->warning('[Ozon] No listing for sale', ['sku' => $sku]);
+                    continue;
+                }
+
+                $accrual = (float)($op['accruals_for_sale'] ?? 0);
+                $quantity = count($items) > 0 ? 1 : 0; // Ozon: 1 операция = 1 единица
+
+                $sale = new MarketplaceSale(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $listing,
+                    null,
+                    MarketplaceType::OZON
+                );
+
+                $sale->setExternalOrderId($externalOrderId);
+                $sale->setSaleDate(new \DateTimeImmutable($op['operation_date']));
+                $sale->setQuantity($quantity);
+                $sale->setPricePerUnit((string)$accrual);
+                $sale->setTotalRevenue((string)abs($accrual));
+                $sale->setRawDocumentId($rawDoc->getId());
+
+                $this->em->persist($sale);
+                $existingIdsMap[$externalOrderId] = true;
+
+                $synced++;
+                $counter++;
+
+                if ($counter % $batchSize === 0) {
+                    $this->em->flush();
+                    $this->em->clear();
+
+                    $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                    foreach ($listingsCache as $k => $cachedListing) {
+                        $listingsCache[$k] = $this->em->getReference(
+                            MarketplaceListing::class,
+                            $cachedListing->getId()
+                        );
+                    }
+
+                    gc_collect_cycles();
+                    $this->logger->info('[Ozon] Sales batch', ['processed' => $counter, 'synced' => $synced]);
+                }
+
+            } catch (\Exception $e) {
+                $this->logger->error('[Ozon] Failed to process sale', [
+                    'operation_id' => $op['operation_id'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+        }
+
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        $this->logger->info('[Ozon] Sales processing completed', ['total_synced' => $synced]);
+        return $synced;
+    }
+
+    /**
+     * Ozon: обработка возвратов из RawDocument.
+     *
+     * Структура Ozon: operations[].type === "returns"
+     */
+    private function processOzonReturnsFromRaw(
+        Company $company,
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+    ): int {
+        $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
+        $synced = 0;
+        $batchSize = 250;
+
+        // --- ФАЗА 1: Фильтрация возвратов ---
+        $returnsData = array_filter($rawData, function ($op) {
+            return ($op['type'] ?? '') === 'returns';
+        });
+
+        if (empty($returnsData)) {
+            $this->logger->info('[Ozon] No returns to process');
+            return 0;
+        }
+
+        $this->logger->info('[Ozon] Starting returns processing', [
+            'total_filtered' => count($returnsData),
+        ]);
+
+        // --- ФАЗА 2: Предзагрузка ---
+        $allExternalIds = array_map(fn($op) => (string)$op['operation_id'], $returnsData);
+        $existingIdsMap = $this->returnRepository->getExistingExternalIds($companyId, $allExternalIds);
+
+        $allSkus = [];
+        foreach ($returnsData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string)($item['sku'] ?? '');
+                if ($sku !== '') {
+                    $allSkus[$sku] = true;
+                }
+            }
+        }
+        $allSkus = array_keys($allSkus);
+
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+            $company,
+            MarketplaceType::OZON,
+            $allSkus
+        );
+
+        // --- ФАЗА 3: Создание отсутствующих листингов ---
+        $newListingsCreated = 0;
+
+        foreach ($returnsData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string)($item['sku'] ?? '');
+                if ($sku === '' || isset($listingsCache[$sku])) {
+                    continue;
+                }
+
+                $listing = $this->createListingFromOzonData($company, [
+                    'sku' => $sku,
+                    'name' => $item['name'] ?? '',
+                ]);
+
+                $listingsCache[$sku] = $listing;
+                $newListingsCreated++;
+            }
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->logger->info('[Ozon] Created missing listings for returns', ['count' => $newListingsCreated]);
+        }
+
+        // --- ФАЗА 4: Обработка возвратов ---
+        $counter = 0;
+
+        foreach ($returnsData as $op) {
+            try {
+                $externalReturnId = (string)$op['operation_id'];
+
+                if (isset($existingIdsMap[$externalReturnId])) {
+                    continue;
+                }
+
+                $items = $op['items'] ?? [];
+                $firstItem = $items[0] ?? null;
+                $sku = $firstItem ? (string)($firstItem['sku'] ?? '') : '';
+
+                $listing = $listingsCache[$sku] ?? null;
+                if (!$listing) {
+                    $this->logger->warning('[Ozon] No listing for return', ['sku' => $sku]);
+                    continue;
+                }
+
+                $amount = abs((float)($op['amount'] ?? 0));
+                $returnDeliveryCharge = abs((float)($op['return_delivery_charge'] ?? 0));
+
+                $return = new MarketplaceReturn(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $listing,
+                    MarketplaceType::OZON
+                );
+
+                $return->setExternalReturnId($externalReturnId);
+                $return->setReturnDate(new \DateTimeImmutable($op['operation_date']));
+                $return->setQuantity(1);
+                $return->setRefundAmount((string)$amount);
+                $return->setReturnReason($op['operation_type_name'] ?? null);
+
+                $this->em->persist($return);
+                $existingIdsMap[$externalReturnId] = true;
+
+                $synced++;
+                $counter++;
+
+                if ($counter % $batchSize === 0) {
+                    $this->em->flush();
+                    $this->em->clear();
+
+                    $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                    foreach ($listingsCache as $k => $cachedListing) {
+                        $listingsCache[$k] = $this->em->getReference(
+                            MarketplaceListing::class,
+                            $cachedListing->getId()
+                        );
+                    }
+
+                    gc_collect_cycles();
+                    $this->logger->info('[Ozon] Returns batch', ['processed' => $counter, 'synced' => $synced]);
+                }
+
+            } catch (\Exception $e) {
+                $this->logger->error('[Ozon] Failed to process return', [
+                    'operation_id' => $op['operation_id'] ?? 'unknown',
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+        }
+
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        $this->logger->info('[Ozon] Returns processing completed', ['total_synced' => $synced]);
+        return $synced;
+    }
+
+    /**
+     * Ozon: обработка затрат из RawDocument.
+     *
+     * Извлекает: sale_commission, delivery_charge, return_delivery_charge, services[].
+     * Каждая операция может порождать несколько записей затрат.
+     */
+    private function processOzonCostsFromRaw(
+        Company $company,
+        \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
+    ): int {
+        $rawData = $rawDoc->getRawData();
+        $companyId = $company->getId();
+        $conn = $this->em->getConnection();
+        $synced = 0;
+        $batchSize = 100;
+        $unprocessedTypes = [];
+
+        $this->logger->info('[Ozon] Starting costs processing', ['total_records' => count($rawData)]);
+
+        // --- ФАЗА 1: Предзагрузка листингов ---
+        $allSkus = [];
+        foreach ($rawData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string)($item['sku'] ?? '');
+                if ($sku !== '') {
+                    $allSkus[$sku] = true;
+                }
+            }
+        }
+
+        $listingsCache = [];
+        if (!empty($allSkus)) {
+            $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+                $company,
+                MarketplaceType::OZON,
+                array_keys($allSkus)
+            );
+        }
+
+        // --- ФАЗА 2: Предзагрузка категорий ---
+        $categoriesCache = [];
+        $allCategories = $this->costCategoryRepository->findBy([
+            'company' => $company,
+            'marketplace' => MarketplaceType::OZON,
+            'deletedAt' => null,
+        ]);
+
+        foreach ($allCategories as $cat) {
+            $categoriesCache[$cat->getCode()] = $cat;
+        }
+
+        // --- ФАЗА 3: Обработка ---
+        $counter = 0;
+        $newCategoriesCreated = 0;
+
+        foreach ($rawData as $op) {
+            $operationId = (string)($op['operation_id'] ?? '');
+            $operationDate = new \DateTimeImmutable($op['operation_date']);
+
+            // Определяем listing (из первого item)
+            $listing = null;
+            $firstItem = ($op['items'] ?? [])[0] ?? null;
+            if ($firstItem) {
+                $sku = (string)($firstItem['sku'] ?? '');
+                $listing = $listingsCache[$sku] ?? null;
+            }
+
+            // Собираем все затраты из одной операции
+            $costEntries = $this->extractOzonCostEntries($op, $operationId, $operationDate);
+
+            foreach ($costEntries as $entry) {
+                try {
+                    $externalId = $entry['external_id'];
+
+                    // Проверка дубликата через DBAL
+                    $exists = $conn->fetchOne(
+                        "SELECT 1 FROM marketplace_costs WHERE company_id = ? AND external_id = ? LIMIT 1",
+                        [$companyId, $externalId]
+                    );
+
+                    if ($exists) {
+                        continue;
+                    }
+
+                    $categoryCode = $entry['category_code'];
+                    $category = $categoriesCache[$categoryCode] ?? null;
+
+                    // Создаём категорию если не существует
+                    if (!$category) {
+                        $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                            Uuid::uuid4()->toString(),
+                            $company,
+                            MarketplaceType::OZON
+                        );
+                        $category->setCode($categoryCode);
+                        $category->setName($entry['category_name']);
+
+                        $this->em->persist($category);
+                        $categoriesCache[$categoryCode] = $category;
+                        $newCategoriesCreated++;
+                    }
+
+                    $cost = new MarketplaceCost(
+                        Uuid::uuid4()->toString(),
+                        $company,
+                        MarketplaceType::OZON,
+                        $category
+                    );
+
+                    $cost->setExternalId($externalId);
+                    $cost->setCostDate($entry['cost_date']);
+                    $cost->setAmount($entry['amount']);
+                    $cost->setDescription($entry['description']);
+
+                    if ($listing) {
+                        $cost->setListing($listing);
+                    }
+
+                    $this->em->persist($cost);
+                    $synced++;
+                    $counter++;
+
+        $this->em->flush();
+        return $synced;
+    }
+
+    /**
+     * Извлекает все записи затрат из одной Ozon-операции.
+     *
+     * @return array[] Массив записей [{external_id, category_code, category_name, amount, cost_date, description}]
+     */
+    private function extractOzonCostEntries(array $op, string $operationId, \DateTimeImmutable $operationDate): array
+    {
+        $entries = [];
+
+        // 1. Комиссия за продажу
+        $commission = abs((float)($op['sale_commission'] ?? 0));
+        if ($commission > 0) {
+            $entries[] = [
+                'external_id' => $operationId . '_commission',
+                'category_code' => 'ozon_sale_commission',
+                'category_name' => 'Комиссия Ozon за продажу',
+                'amount' => (string)$commission,
+                'cost_date' => $operationDate,
+                'description' => 'Комиссия за продажу',
+            ];
+        }
+
+        // 2. Доставка
+        $delivery = abs((float)($op['delivery_charge'] ?? 0));
+        if ($delivery > 0) {
+            $entries[] = [
+                'external_id' => $operationId . '_delivery',
+                'category_code' => 'ozon_delivery',
+                'category_name' => 'Доставка Ozon',
+                'amount' => (string)$delivery,
+                'cost_date' => $operationDate,
+                'description' => 'Стоимость доставки',
+            ];
+        }
+
+        // 3. Обратная доставка (возврат)
+        $returnDelivery = abs((float)($op['return_delivery_charge'] ?? 0));
+        if ($returnDelivery > 0) {
+            $entries[] = [
+                'external_id' => $operationId . '_return_delivery',
+                'category_code' => 'ozon_return_delivery',
+                'category_name' => 'Обратная доставка Ozon',
+                'amount' => (string)$returnDelivery,
+                'cost_date' => $operationDate,
+                'description' => 'Обратная доставка',
+            ];
+        }
+
+        // 4. Services — массив дополнительных услуг
+        $services = $op['services'] ?? [];
+        foreach ($services as $idx => $service) {
+            $serviceAmount = abs((float)($service['price'] ?? 0));
+            if ($serviceAmount <= 0) {
+                continue;
+            }
+
+            $serviceName = $service['name'] ?? 'Неизвестная услуга';
+            $categoryCode = $this->resolveOzonServiceCategoryCode($serviceName);
+
+            $entries[] = [
+                'external_id' => $operationId . '_svc_' . $idx,
+                'category_code' => $categoryCode,
+                'category_name' => $this->resolveOzonServiceCategoryName($categoryCode),
+                'amount' => (string)$serviceAmount,
+                'cost_date' => $operationDate,
+                'description' => $serviceName,
+            ];
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Определяет код категории затрат по названию услуги Ozon.
+     */
+    private function resolveOzonServiceCategoryCode(string $serviceName): string
+    {
+        $lower = mb_strtolower($serviceName);
+
+        // Логистика
+        if (str_contains($lower, 'логистик') || str_contains($lower, 'logistic')
+            || str_contains($lower, 'магистраль') || str_contains($lower, 'last mile')) {
+            return 'ozon_logistics';
+        }
+
+        // Обработка
+        if (str_contains($lower, 'обработк') || str_contains($lower, 'processing')
+            || str_contains($lower, 'сборк')) {
+            return 'ozon_processing';
+        }
+
+        // Хранение
+        if (str_contains($lower, 'хранени') || str_contains($lower, 'storage')
+            || str_contains($lower, 'размещени')) {
+            return 'ozon_storage';
+        }
+
+        // Эквайринг
+        if (str_contains($lower, 'эквайринг') || str_contains($lower, 'acquiring')
+            || str_contains($lower, 'приём платеж')) {
+            return 'ozon_acquiring';
+        }
+
+        // Продвижение / реклама
+        if (str_contains($lower, 'продвижени') || str_contains($lower, 'реклам')
+            || str_contains($lower, 'promotion') || str_contains($lower, 'трафик')) {
+            return 'ozon_promotion';
+        }
+
+        // Подписка Premium
+        if (str_contains($lower, 'подписк') || str_contains($lower, 'premium')
+            || str_contains($lower, 'subscription')) {
+            return 'ozon_subscription';
+        }
+
+        // Штрафы
+        if (str_contains($lower, 'штраф') || str_contains($lower, 'penalty')
+            || str_contains($lower, 'неустойк')) {
+            return 'ozon_penalty';
+        }
+
+        // Компенсации
+        if (str_contains($lower, 'компенсац') || str_contains($lower, 'compensation')
+            || str_contains($lower, 'возмещени')) {
+            return 'ozon_compensation';
+        }
+
+        return 'ozon_other_service';
+    }
+
+    /**
+     * Человекочитаемое название категории Ozon.
+     */
+    private function resolveOzonServiceCategoryName(string $categoryCode): string
+    {
+        return match ($categoryCode) {
+            'ozon_sale_commission' => 'Комиссия Ozon за продажу',
+            'ozon_delivery' => 'Доставка Ozon',
+            'ozon_return_delivery' => 'Обратная доставка Ozon',
+            'ozon_logistics' => 'Логистика Ozon',
+            'ozon_processing' => 'Обработка отправления Ozon',
+            'ozon_storage' => 'Хранение на складе Ozon',
+            'ozon_acquiring' => 'Эквайринг Ozon',
+            'ozon_promotion' => 'Продвижение / реклама Ozon',
+            'ozon_subscription' => 'Подписка Premium Ozon',
+            'ozon_penalty' => 'Штрафы Ozon',
+            'ozon_compensation' => 'Компенсации Ozon',
+            default => 'Прочие услуги Ozon',
+        };
+    }
+
+    // ========================================================================
+    // Ozon: создание листинга
+    // ========================================================================
+
+    private function createListingFromOzonData(Company $company, array $ozonData): MarketplaceListing
+    {
+        $sku = (string)$ozonData['sku'];
+        $name = $ozonData['name'] ?? $sku;
+
+        $listing = new MarketplaceListing(
+            Uuid::uuid4()->toString(),
+            $company,
+            null,
+            MarketplaceType::OZON
+        );
+        $listing->setMarketplaceSku($sku);
+        $listing->setName($name ?: $sku);
+
+        $this->em->persist($listing);
+
+        return $listing;
+    }
+
+    // ========================================================================
+    // WB: создание листинга
+    // ========================================================================
 
     private function createListingFromWbData(Company $company, array $wbData): MarketplaceListing
     {
