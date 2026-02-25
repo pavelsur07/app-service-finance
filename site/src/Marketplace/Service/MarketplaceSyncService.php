@@ -1134,6 +1134,8 @@ class MarketplaceSyncService
         $newListingsCreated = 0;
 
         foreach ($salesData as $op) {
+            $price = (float)($op['accruals_for_sale'] ?? 0);
+
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string)($item['sku'] ?? '');
                 if ($sku === '' || isset($listingsCache[$sku])) {
@@ -1143,6 +1145,7 @@ class MarketplaceSyncService
                 $listing = $this->createListingFromOzonData($company, [
                     'sku' => $sku,
                     'name' => $item['name'] ?? '',
+                    'price' => $price,
                 ]);
 
                 $listingsCache[$sku] = $listing;
@@ -1288,6 +1291,8 @@ class MarketplaceSyncService
         $newListingsCreated = 0;
 
         foreach ($returnsData as $op) {
+            $price = abs((float)($op['amount'] ?? 0));
+
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string)($item['sku'] ?? '');
                 if ($sku === '' || isset($listingsCache[$sku])) {
@@ -1297,6 +1302,7 @@ class MarketplaceSyncService
                 $listing = $this->createListingFromOzonData($company, [
                     'sku' => $sku,
                     'name' => $item['name'] ?? '',
+                    'price' => $price,
                 ]);
 
                 $listingsCache[$sku] = $listing;
@@ -1774,6 +1780,7 @@ class MarketplaceSyncService
     {
         $sku = (string)$ozonData['sku'];
         $name = $ozonData['name'] ?? $sku;
+        $price = $ozonData['price'] ?? '0';
 
         $listing = new MarketplaceListing(
             Uuid::uuid4()->toString(),
@@ -1783,6 +1790,7 @@ class MarketplaceSyncService
         );
         $listing->setMarketplaceSku($sku);
         $listing->setName($name ?: $sku);
+        $listing->setPrice((string)$price);
 
         $this->em->persist($listing);
 
