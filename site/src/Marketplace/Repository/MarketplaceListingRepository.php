@@ -111,7 +111,9 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         $marketplacesByProductId = [];
         foreach ($rows as $row) {
             $productId = (string) $row['productId'];
-            $marketplace = (string) $row['marketplace'];
+            $marketplace = $row['marketplace'] instanceof MarketplaceType
+                ? $row['marketplace']->value
+                : (string) $row['marketplace'];
 
             if (!isset($marketplacesByProductId[$productId])) {
                 $marketplacesByProductId[$productId] = [];
