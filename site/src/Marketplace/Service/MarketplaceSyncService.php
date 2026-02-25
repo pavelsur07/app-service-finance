@@ -930,19 +930,72 @@ class MarketplaceSyncService
         \DateTimeInterface $toDate
     ): int {
         $returnsData = $adapter->fetchReturns($company, $fromDate, $toDate);
+        $companyId = (string)$company->getId();
+        $marketplace = MarketplaceType::from($adapter->getMarketplaceType());
         $synced = 0;
 
+        $allExternalReturnIds = [];
         foreach ($returnsData as $returnData) {
-            $listing = $this->findOrCreateListing($company, $returnData);
+            $externalReturnId = trim((string)$returnData->externalReturnId);
+            if ($externalReturnId !== '') {
+                $allExternalReturnIds[$externalReturnId] = true;
+            }
+        }
+        $allExternalReturnIds = array_keys($allExternalReturnIds);
+        $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allExternalReturnIds);
 
-            if ($returnData->externalReturnId) {
-                $existing = $this->returnRepository->findOneBy([
-                    'company' => $company,
-                    'externalReturnId' => $returnData->externalReturnId
-                ]);
+        $allSkus = [];
+        foreach ($returnsData as $returnData) {
+            $sku = trim((string)$returnData->marketplaceSku);
+            if ($sku !== '') {
+                $allSkus[$sku] = true;
+            }
+        }
+        $allSkus = array_keys($allSkus);
 
-                if ($existing) {
-                    continue;
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $allSkus);
+
+        $newListingsCreated = 0;
+        foreach ($returnsData as $returnData) {
+            $sku = trim((string)$returnData->marketplaceSku);
+
+            if ($sku === '' || isset($listingsCache[$sku])) {
+                continue;
+            }
+
+            $listing = new MarketplaceListing(
+                Uuid::uuid4()->toString(),
+                $company,
+                null,
+                $marketplace
+            );
+            $listing->setMarketplaceSku($sku);
+            $listing->setPrice($returnData->refundAmount);
+
+            $this->em->persist($listing);
+            $listingsCache[$sku] = $listing;
+            $newListingsCreated++;
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+        }
+
+        foreach ($returnsData as $returnData) {
+            $externalReturnId = trim((string)$returnData->externalReturnId);
+
+            if ($externalReturnId !== '' && isset($existingMap[$externalReturnId])) {
+                continue;
+            }
+
+            $sku = trim((string)$returnData->marketplaceSku);
+            $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
+
+            if (!$listing) {
+                // Fallback для пустого SKU/непредвиденных кейсов: сохраняем текущую семантику.
+                $listing = $this->findOrCreateListing($company, $returnData);
+                if ($sku !== '') {
+                    $listingsCache[$sku] = $listing;
                 }
             }
 
@@ -960,6 +1013,11 @@ class MarketplaceSyncService
             $return->setReturnReason($returnData->returnReason);
 
             $this->em->persist($return);
+
+            if ($externalReturnId !== '') {
+                $existingMap[$externalReturnId] = true;
+            }
+
             $synced++;
         }
 
