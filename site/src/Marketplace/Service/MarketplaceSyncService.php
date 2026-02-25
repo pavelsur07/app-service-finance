@@ -499,6 +499,135 @@ class MarketplaceSyncService
         // --- ФАЗА 2: ОБРАБОТКА (ОДИН ПРОХОД) ---
         $counter = 0;
         $newCategoriesCreated = 0;
+        $knownExternalIdsMap = [];
+        $pending = [];
+        $pendingIds = [];
+        $dedupBatchSize = $batchSize;
+
+        $processPendingBatch = function () use (
+            &$pending,
+            &$pendingIds,
+            $conn,
+            $companyId,
+            &$knownExternalIdsMap,
+            &$categoriesCache,
+            &$newCategoriesCreated,
+            &$synced,
+            &$counter,
+            $batchSize,
+            &$company,
+            &$listingsCache
+        ): void {
+            if (empty($pendingIds)) {
+                return;
+            }
+
+            $placeholders = implode(',', array_fill(0, count($pendingIds), '?'));
+            $sql = sprintf(
+                'SELECT external_id FROM marketplace_costs WHERE company_id = ? AND external_id IN (%s)',
+                $placeholders
+            );
+
+            $existingExternalIds = $conn->fetchFirstColumn($sql, [$companyId, ...$pendingIds]);
+            $dbExistingMap = array_fill_keys($existingExternalIds, true);
+            $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
+
+            $shouldFlush = false;
+
+            foreach ($pending as $pendingItem) {
+                $externalId = $pendingItem['external_id'];
+
+                if (isset($knownExternalIdsMap[$externalId])) {
+                    continue;
+                }
+
+                $costData = $pendingItem['costData'];
+                $listing = $pendingItem['listing'];
+
+                $categoryCode = $costData['category_code'];
+                $category = $categoriesCache[$categoryCode] ?? null;
+
+                // Создаём категорию если её нет
+                if (!$category) {
+                    $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                        Uuid::uuid4()->toString(),
+                        $company,
+                        \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                    );
+                    $category->setCode($categoryCode);
+
+                    $categoryName = $costData['category_name']
+                        ?? $costData['description']
+                        ?? $categoryCode;
+                    $category->setName($categoryName);
+
+                    $this->em->persist($category);
+                    $categoriesCache[$categoryCode] = $category;
+                    $newCategoriesCreated++;
+                }
+
+                // Создать Cost
+                $cost = new \App\Marketplace\Entity\MarketplaceCost(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                    $category
+                );
+
+                $cost->setExternalId($externalId);
+                $cost->setCostDate($costData['cost_date']);
+                $cost->setAmount($costData['amount']);
+                $cost->setDescription($costData['description']);
+
+                if ($listing) {
+                    $cost->setListing($listing);
+                }
+
+                $this->em->persist($cost);
+                $knownExternalIdsMap[$externalId] = true;
+                $synced++;
+                $counter++;
+
+                if ($counter % $batchSize === 0) {
+                    $shouldFlush = true;
+                }
+            }
+
+            if ($shouldFlush) {
+                $this->em->flush();
+                $this->em->clear();
+
+                // Восстанавливаем Company
+                $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+
+                // Восстанавливаем Categories через getReference
+                foreach ($categoriesCache as $code => $cat) {
+                    $categoriesCache[$code] = $this->em->getReference(
+                        \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                        $cat->getId()
+                    );
+                }
+
+                // Восстанавливаем Listings через getReference (если были)
+                foreach ($listingsCache as $k => $cachedListing) {
+                    $listingsCache[$k] = $this->em->getReference(
+                        \App\Marketplace\Entity\MarketplaceListing::class,
+                        $cachedListing->getId()
+                    );
+                }
+
+                gc_collect_cycles();
+
+                $this->logger->info('Costs batch processed', [
+                    'processed' => $counter,
+                    'synced' => $synced,
+                    'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
+                ]);
+            }
+
+            $pending = [];
+            $pendingIds = [];
+        };
 
         foreach ($costsData as $item) {
             try {
@@ -531,90 +660,19 @@ class MarketplaceSyncService
                     foreach ($calculatedCosts as $costData) {
                         $externalId = $costData['external_id'];
 
-                        // DBAL проверка дубликата (быстро, БЕЗ загрузки объекта)
-                        $exists = $conn->fetchOne(
-                            "SELECT 1 FROM marketplace_costs WHERE company_id = ? AND external_id = ? LIMIT 1",
-                            [$companyId, $externalId]
-                        );
-
-                        if ($exists) {
+                        if (isset($knownExternalIdsMap[$externalId])) {
                             continue;
                         }
 
-                        $categoryCode = $costData['category_code'];
-                        $category = $categoriesCache[$categoryCode] ?? null;
+                        $pending[] = [
+                            'external_id' => $externalId,
+                            'costData' => $costData,
+                            'listing' => $listing,
+                        ];
+                        $pendingIds[] = $externalId;
 
-                        // Создаём категорию если её нет
-                        if (!$category) {
-                            $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
-                                Uuid::uuid4()->toString(),
-                                $company,
-                                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
-                            );
-                            $category->setCode($categoryCode);
-
-                            $categoryName = $costData['category_name']
-                                ?? $costData['description']
-                                ?? $categoryCode;
-                            $category->setName($categoryName);
-
-                            $this->em->persist($category);
-                            $categoriesCache[$categoryCode] = $category;
-                            $newCategoriesCreated++;
-                        }
-
-                        // Создать Cost
-                        $cost = new \App\Marketplace\Entity\MarketplaceCost(
-                            Uuid::uuid4()->toString(),
-                            $company,
-                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                            $category
-                        );
-
-                        $cost->setExternalId($externalId);
-                        $cost->setCostDate($costData['cost_date']);
-                        $cost->setAmount($costData['amount']);
-                        $cost->setDescription($costData['description']);
-
-                        if ($listing) {
-                            $cost->setListing($listing);
-                        }
-
-                        $this->em->persist($cost);
-                        $synced++;
-                        $counter++;
-
-                        // Batch flush каждые 100 записей
-                        if ($counter % $batchSize === 0) {
-                            $this->em->flush();
-                            $this->em->clear();
-
-                            // Восстанавливаем Company
-                            $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
-
-                            // Восстанавливаем Categories через getReference
-                            foreach ($categoriesCache as $code => $cat) {
-                                $categoriesCache[$code] = $this->em->getReference(
-                                    \App\Marketplace\Entity\MarketplaceCostCategory::class,
-                                    $cat->getId()
-                                );
-                            }
-
-                            // Восстанавливаем Listings через getReference (если были)
-                            foreach ($listingsCache as $k => $cachedListing) {
-                                $listingsCache[$k] = $this->em->getReference(
-                                    \App\Marketplace\Entity\MarketplaceListing::class,
-                                    $cachedListing->getId()
-                                );
-                            }
-
-                            gc_collect_cycles();
-
-                            $this->logger->info('Costs batch processed', [
-                                'processed' => $counter,
-                                'synced' => $synced,
-                                'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
-                            ]);
+                        if (count($pendingIds) >= $dedupBatchSize) {
+                            $processPendingBatch();
                         }
                     }
                 }
@@ -634,6 +692,10 @@ class MarketplaceSyncService
                 ]);
                 continue;
             }
+        }
+
+        if (!empty($pendingIds)) {
+            $processPendingBatch();
         }
 
         // Финальный flush для остатка
