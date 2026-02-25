@@ -29,6 +29,7 @@ use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use App\Shared\Service\SlugifyService;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -871,14 +872,63 @@ class MarketplaceSyncService
         \DateTimeInterface $toDate
     ): int {
         $costsData = $adapter->fetchCosts($company, $fromDate, $toDate);
+        $companyId = (string)$company->getId();
+        $marketplace = MarketplaceType::from($adapter->getMarketplaceType());
         $synced = 0;
 
+        $categoryCodesMap = [];
+        $skusMap = [];
+        $externalIdsMap = [];
+
         foreach ($costsData as $costData) {
-            $category = $this->costCategoryRepository->findByCode(
-                $company,
-                $costData->marketplace,
-                $costData->categoryCode
-            );
+            $categoryCode = trim((string)$costData->categoryCode);
+            if ($categoryCode !== '') {
+                $categoryCodesMap[$categoryCode] = true;
+            }
+
+            $sku = trim((string)$costData->marketplaceSku);
+            if ($sku !== '') {
+                $skusMap[$sku] = true;
+            }
+
+            $externalId = trim((string)$costData->externalId);
+            if ($externalId !== '') {
+                $externalIdsMap[$externalId] = true;
+            }
+        }
+
+        $categoryCodes = array_keys($categoryCodesMap);
+        $skus = array_keys($skusMap);
+        $externalIds = array_keys($externalIdsMap);
+
+        $categoriesMap = $this->costCategoryRepository->findByCodesIndexed($company, $marketplace, $categoryCodes);
+        $listingsMap = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $skus);
+
+        $existingExternalIdsMap = [];
+        if ($externalIds !== []) {
+            $connection = $this->em->getConnection();
+
+            foreach (array_chunk($externalIds, 1000) as $externalIdsChunk) {
+                $rows = $connection->executeQuery(
+                    'SELECT external_id FROM marketplace_costs WHERE company_id = :companyId AND external_id IN (:externalIds)',
+                    [
+                        'companyId' => $companyId,
+                        'externalIds' => $externalIdsChunk,
+                    ],
+                    [
+                        'externalIds' => ArrayParameterType::STRING,
+                    ]
+                )->fetchFirstColumn();
+
+                foreach ($rows as $existingExternalId) {
+                    $existingExternalIdsMap[(string)$existingExternalId] = true;
+                }
+            }
+        }
+
+        foreach ($costsData as $costData) {
+            $categoryCode = trim((string)$costData->categoryCode);
+            $category = $categoriesMap[$categoryCode] ?? null;
 
             if (!$category) {
                 continue;
@@ -886,26 +936,19 @@ class MarketplaceSyncService
 
             $listing = null;
             if ($costData->marketplaceSku) {
-                $listing = $this->listingRepository->findByMarketplaceSku(
-                    $company,
-                    $costData->marketplace,
-                    $costData->marketplaceSku
-                );
+                $sku = trim((string)$costData->marketplaceSku);
+                $listing = $listingsMap[$sku] ?? null;
             }
 
-            if ($costData->externalId) {
-                $existing = $this->em->getRepository(MarketplaceCost::class)
-                    ->findOneBy(['company' => $company, 'externalId' => $costData->externalId]);
-
-                if ($existing) {
-                    continue;
-                }
+            $externalId = trim((string)$costData->externalId);
+            if ($externalId !== '' && isset($existingExternalIdsMap[$externalId])) {
+                continue;
             }
 
             $cost = new MarketplaceCost(
                 Uuid::uuid4()->toString(),
                 $company,
-                $costData->marketplace,
+                $marketplace,
                 $category
             );
 
@@ -916,6 +959,9 @@ class MarketplaceSyncService
             $cost->setExternalId($costData->externalId);
 
             $this->em->persist($cost);
+            if ($externalId !== '') {
+                $existingExternalIdsMap[$externalId] = true;
+            }
             $synced++;
         }
 
