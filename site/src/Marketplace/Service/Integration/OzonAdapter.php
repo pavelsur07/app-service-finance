@@ -58,10 +58,23 @@ class OzonAdapter implements MarketplaceAdapterInterface
         }
     }
 
+    public function fetchRawReport(
+        Company $company,
+        \DateTimeInterface $fromDate,
+        \DateTimeInterface $toDate,
+    ): array {
+        return $this->fetchRawTransactions($company, $fromDate, $toDate);
+    }
+
+    public function getApiEndpointName(): string
+    {
+        return 'ozon::v3/finance/transaction/list';
+    }
+
     /**
-     * Получить все транзакции за период (сырые данные для RawDocument).
+     * Получить все транзакции за период (внутренний метод).
      */
-    public function fetchRawTransactions(
+    private function fetchRawTransactions(
         Company $company,
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,

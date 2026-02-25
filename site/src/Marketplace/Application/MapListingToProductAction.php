@@ -71,8 +71,8 @@ final class MapListingToProductAction
             'actor_user_id' => $cmd->actorUserId,
             'listing_id' => $cmd->listingId,
             'product_id' => $cmd->productId,
-            'nm_id' => $listing->getNmId(),
-            'sku' => $listing->getSku(),
+            'nm_id' => $listing->getMarketplaceSku(),
+            'sku' => $listing->getSupplierSku(),
         ]);
     }
 }

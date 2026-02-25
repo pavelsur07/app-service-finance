@@ -89,6 +89,11 @@ class MarketplaceListing
         return $this->product;
     }
 
+    public function setProduct(?Product $product): void
+    {
+        $this->product = $product;
+    }
+
     /**
      * Проверка: смаппен ли листинг на продукт
      */
