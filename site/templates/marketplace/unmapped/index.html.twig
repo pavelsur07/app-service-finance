@@ -134,15 +134,45 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            const mapModal = new bootstrap.Modal(document.getElementById('mapListingModal'));
+            const mapModalElement = document.getElementById('mapListingModal');
+            const BootstrapModal = window.bootstrap && typeof window.bootstrap.Modal === 'function'
+                ? window.bootstrap.Modal
+                : null;
             let currentListingId = null;
+
+            function showMapModal() {
+                if (!mapModalElement) {
+                    return;
+                }
+
+                if (!BootstrapModal) {
+                    mapModalElement.classList.add('show');
+                    mapModalElement.style.display = 'block';
+                    mapModalElement.removeAttribute('aria-hidden');
+                    mapModalElement.setAttribute('aria-modal', 'true');
+                    return;
+                }
+
+                BootstrapModal.getOrCreateInstance(mapModalElement).show();
+            }
+
+            if (mapModalElement && !BootstrapModal) {
+                mapModalElement.querySelectorAll('[data-bs-dismiss="modal"]').forEach(button => {
+                    button.addEventListener('click', function() {
+                        mapModalElement.classList.remove('show');
+                        mapModalElement.style.display = 'none';
+                        mapModalElement.setAttribute('aria-hidden', 'true');
+                        mapModalElement.removeAttribute('aria-modal');
+                    });
+                });
+            }
 
             document.querySelectorAll('.map-listing-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     currentListingId = this.dataset.listingId;
                     document.getElementById('modal-listing-sku').textContent = this.dataset.listingSku;
                     loadProducts();
-                    mapModal.show();
+                    showMapModal();
                 });
             });
 
