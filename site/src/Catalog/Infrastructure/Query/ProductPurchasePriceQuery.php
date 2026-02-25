@@ -15,7 +15,7 @@ final readonly class ProductPurchasePriceQuery
     public function findPriceAtDate(string $companyId, string $productId, \DateTimeImmutable $at): ?array
     {
         $sql = <<<'SQL'
-SELECT price_amount, price_currency, effective_from, effective_to
+SELECT price_amount, price_currency, effective_from, effective_to, note
 FROM product_purchase_prices
 WHERE company_id = :companyId
   AND product_id = :productId
@@ -40,6 +40,7 @@ SQL;
             'priceCurrency' => (string) $row['price_currency'],
             'effectiveFrom' => (string) $row['effective_from'],
             'effectiveTo' => null !== $row['effective_to'] ? (string) $row['effective_to'] : null,
+            'note' => null !== $row['note'] ? (string) $row['note'] : null,
         ];
     }
 
