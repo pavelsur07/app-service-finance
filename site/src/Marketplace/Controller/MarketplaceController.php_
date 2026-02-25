@@ -9,7 +9,7 @@ use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
 use App\Marketplace\Service\MarketplaceSyncService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,7 +30,6 @@ class MarketplaceController extends AbstractController
         private readonly CompanyContextService $companyContext,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly EntityManagerInterface $em
     ) {}
 
@@ -56,8 +55,8 @@ class MarketplaceController extends AbstractController
 
         $marketplace = MarketplaceType::from($request->request->get('marketplace'));
         $apiKey = $request->request->get('api_key');
-        $clientId = $request->request->get('client_id'); // Для Ozon
 
+        // Проверка существующего подключения
         $existing = $this->connectionRepository->findByMarketplace($company, $marketplace);
 
         if ($existing) {
@@ -72,10 +71,6 @@ class MarketplaceController extends AbstractController
         );
         $connection->setApiKey($apiKey);
 
-        if ($clientId) {
-            $connection->setClientId($clientId);
-        }
-
         $this->em->persist($connection);
         $this->em->flush();
 
@@ -85,8 +80,10 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/test', name: 'marketplace_connection_test')]
-    public function testConnection(string $id): Response
-    {
+    public function testConnection(
+        string $id,
+        WildberriesAdapter $wbAdapter
+    ): Response {
         $company = $this->companyContext->getCompany();
 
         $connection = $this->connectionRepository->find($id);
@@ -99,8 +96,9 @@ class MarketplaceController extends AbstractController
         $error = null;
 
         try {
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
-            $success = $adapter->authenticate($company);
+            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+                $success = $wbAdapter->authenticate($company);
+            }
         } catch (\Exception $e) {
             $error = $e->getMessage();
         }
@@ -115,8 +113,10 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync')]
-    public function syncConnection(string $id): Response
-    {
+    public function syncConnection(
+        string $id,
+        WildberriesAdapter $wbAdapter
+    ): Response {
         $company = $this->companyContext->getCompany();
 
         $connection = $this->connectionRepository->find($id);
@@ -129,35 +129,38 @@ class MarketplaceController extends AbstractController
         $this->em->flush();
 
         try {
+            // ТОЛЬКО загружаем raw данные
             $fromDate = new \DateTimeImmutable('-7 days');
             $toDate = new \DateTimeImmutable();
 
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
+            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+                // Получаем ОРИГИНАЛЬНЫЕ данные от WB API
+                $response = $wbAdapter->fetchRawSales($company, $fromDate, $toDate);
 
-            $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                $connection->getMarketplace(),
-                'sales_report'
-            );
-            $rawDoc->setPeriodFrom($fromDate);
-            $rawDoc->setPeriodTo($toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount(count($response));
+                // Создаём RawDocument с ОРИГИНАЛЬНЫМ JSON
+                $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
+                    \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    'sales_report'
+                );
+                $rawDoc->setPeriodFrom($fromDate);
+                $rawDoc->setPeriodTo($toDate);
+                $rawDoc->setApiEndpoint('wildberries::reportDetailByPeriod');
+                $rawDoc->setRawData($response); // Сохраняем КАК ЕСТЬ от WB
+                $rawDoc->setRecordsCount(count($response));
 
-            $this->em->persist($rawDoc);
-            $this->em->flush();
+                $this->em->persist($rawDoc);
+                $this->em->flush();
 
-            $connection->markSyncSuccess();
-            $this->em->flush();
+                $connection->markSyncSuccess();
+                $this->em->flush();
 
-            $this->addFlash('success', sprintf(
-                'Загружено %d записей от %s.',
-                count($response),
-                $connection->getMarketplace()->getDisplayName()
-            ));
+                $this->addFlash('success', sprintf(
+                    'Загружено %d записей от WB. Посмотрите JSON и обработайте.',
+                    count($response)
+                ));
+            }
         } catch (\Exception $e) {
             $connection->markSyncFailed($e->getMessage());
             $this->em->flush();
@@ -169,8 +172,11 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period')]
-    public function syncConnectionPeriod(string $id, Request $request): Response
-    {
+    public function syncConnectionPeriod(
+        string $id,
+        Request $request,
+        WildberriesAdapter $wbAdapter
+    ): Response {
         $company = $this->companyContext->getCompany();
 
         $connection = $this->connectionRepository->find($id);
@@ -195,6 +201,7 @@ class MarketplaceController extends AbstractController
             return $this->redirectToRoute('marketplace_index');
         }
 
+        // Проверяем что период не больше 31 дня
         $diff = $fromDate->diff($toDate)->days;
         if ($diff > 31) {
             $this->addFlash('error', 'Максимальный период — 31 день');
@@ -205,33 +212,34 @@ class MarketplaceController extends AbstractController
         $this->em->flush();
 
         try {
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
+            if ($connection->getMarketplace() === MarketplaceType::WILDBERRIES) {
+                $response = $wbAdapter->fetchRawSales($company, $fromDate, $toDate);
 
-            $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                $connection->getMarketplace(),
-                'sales_report'
-            );
-            $rawDoc->setPeriodFrom($fromDate);
-            $rawDoc->setPeriodTo($toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount(count($response));
+                $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
+                    \Ramsey\Uuid\Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    'sales_report'
+                );
+                $rawDoc->setPeriodFrom($fromDate);
+                $rawDoc->setPeriodTo($toDate);
+                $rawDoc->setApiEndpoint('wildberries::reportDetailByPeriod');
+                $rawDoc->setRawData($response);
+                $rawDoc->setRecordsCount(count($response));
 
-            $this->em->persist($rawDoc);
-            $this->em->flush();
+                $this->em->persist($rawDoc);
+                $this->em->flush();
 
-            $connection->markSyncSuccess();
-            $this->em->flush();
+                $connection->markSyncSuccess();
+                $this->em->flush();
 
-            $this->addFlash('success', sprintf(
-                'Загружено %d записей за период %s — %s.',
-                count($response),
-                $fromDate->format('d.m.Y'),
-                $toDate->format('d.m.Y')
-            ));
+                $this->addFlash('success', sprintf(
+                    'Загружено %d записей за период %s — %s.',
+                    count($response),
+                    $fromDate->format('d.m.Y'),
+                    $toDate->format('d.m.Y')
+                ));
+            }
         } catch (\Exception $e) {
             $connection->markSyncFailed($e->getMessage());
             $this->em->flush();
@@ -274,6 +282,7 @@ class MarketplaceController extends AbstractController
 
             $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
         } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+            // Детальная ошибка duplicate
             preg_match('/Key \((.*?)\)=\((.*?)\)/', $e->getMessage(), $matches);
             $keys = $matches[1] ?? 'unknown';
             $values = $matches[2] ?? 'unknown';
@@ -388,6 +397,7 @@ class MarketplaceController extends AbstractController
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
             ->getByCompanyQueryBuilder($company);
 
+        // Фильтр по категории
         if ($categoryId) {
             $queryBuilder->andWhere('c.category = :category')
                 ->setParameter('category', $categoryId);
@@ -400,6 +410,7 @@ class MarketplaceController extends AbstractController
             50
         );
 
+        // Получаем все категории для фильтра
         $categories = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCostCategory::class)
             ->findByCompany($company);
 

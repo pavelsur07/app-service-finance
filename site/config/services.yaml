@@ -21,8 +21,8 @@ services:
     App\:
         resource: '../src/'
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
+        # add more service definitions when explicit configuration is needed
+        # please note that last definitions always *replace* previous ones
         # Клиент Redis для сессий
     session.redis:
         class: Predis\Client
@@ -80,6 +80,17 @@ services:
     App\Balance\Provider\BalanceValueProviderRegistry:
         arguments:
             $providers: !tagged_iterator app.balance.value_provider
+
+    # ---------- Marketplace adapters ------------ #
+    App\Marketplace\Service\Integration\WildberriesAdapter:
+        tags: ['app.marketplace.adapter']
+
+    App\Marketplace\Service\Integration\OzonAdapter:
+        tags: ['app.marketplace.adapter']
+
+    App\Marketplace\Service\Integration\MarketplaceAdapterRegistry:
+        arguments:
+            $adapters: !tagged_iterator app.marketplace.adapter
 
     # ---------- Notification  ------------ #
     App\Notification\Channel\:

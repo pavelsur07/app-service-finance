@@ -15,15 +15,6 @@ interface MarketplaceAdapterInterface
     public function authenticate(Company $company): bool;
 
     /**
-     * Получить сырые данные отчёта (для сохранения в RawDocument).
-     */
-    public function fetchRawReport(
-        Company $company,
-        \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate,
-    ): array;
-
-    /**
      * Получить продажи за период.
      *
      * @return SaleData[]
@@ -60,9 +51,4 @@ interface MarketplaceAdapterInterface
      * Получить тип маркетплейса.
      */
     public function getMarketplaceType(): string;
-
-    /**
-     * Получить endpoint API для логирования.
-     */
-    public function getApiEndpointName(): string;
 }
