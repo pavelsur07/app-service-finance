@@ -3,7 +3,7 @@
 namespace App\Marketplace\Service;
 
 use App\Catalog\Entity\Product;
-use App\Catalog\Repository\ProductRepository;
+use App\Catalog\Infrastructure\ProductRepository;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
