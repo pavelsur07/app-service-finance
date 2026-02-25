@@ -37,6 +37,8 @@
     </div>
 </div>
 
+{% set marketplaceLabelMap = {'wildberries': 'wb', 'ozon': 'ozon', 'yandex_market': 'yandex market', 'sber_megamarket': 'sber megamarket'} %}
+
 <div class="card">
     <div class="table-responsive">
         <table class="table card-table table-vcenter">
@@ -45,6 +47,7 @@
                 <th>Name</th>
                 <th>SKU</th>
                 <th>Status</th>
+                <th>Маркетплейс</th>
                 <th>UpdatedAt</th>
                 <th class="text-end">Actions</th>
             </tr>
@@ -55,6 +58,13 @@
                     <td>{{ product.name }}</td>
                     <td>{{ product.sku }}</td>
                     <td><span class="badge bg-azure-lt">{{ product.status.value }}</span></td>
+                    <td>
+                        {% set marketplaces = marketplacesByProductId[product.id]|default([]) %}
+                        {% for marketplace in marketplaces %}
+                            {% set marketplaceLabel = marketplaceLabelMap[marketplace]|default(marketplace) %}
+                            <span class="badge bg-blue-lt">{{ marketplaceLabel }}</span>
+                        {% endfor %}
+                    </td>
                     <td>{{ product.updatedAt|date('d.m.Y H:i') }}</td>
                     <td class="text-end">
                         <a href="{{ path('catalog_products_show', {id: product.id}) }}" class="btn btn-outline-secondary btn-sm">Открыть</a>
@@ -62,7 +72,7 @@
                 </tr>
             {% else %}
                 <tr>
-                    <td colspan="5" class="text-center text-muted">Товаров пока нет.</td>
+                    <td colspan="6" class="text-center text-muted">Товаров пока нет.</td>
                 </tr>
             {% endfor %}
             </tbody>
