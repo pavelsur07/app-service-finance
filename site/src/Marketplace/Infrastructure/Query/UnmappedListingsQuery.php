@@ -96,4 +96,24 @@ class UnmappedListingsQuery
             ->executeQuery()
             ->fetchAllAssociative();
     }
+
+    /**
+     * Найти листинг по ID с проверкой принадлежности к компании
+     */
+    public function findByIdAndCompany(string $listingId, string $companyId): ?array
+    {
+        $result = $this->connection->createQueryBuilder()
+            ->select('l.id', 'l.company_id', 'l.product_id', 'l.marketplace_sku', 'l.supplier_sku')
+            ->from('marketplace_listings', 'l')
+            ->where('l.id = :id')
+            ->andWhere('l.company_id = :company')
+            ->setParameter('id', $listingId)
+            ->setParameter('company', $companyId)
+            ->setMaxResults(1)
+            ->executeQuery()
+            ->fetchAssociative();
+
+        return $result ?: null;
+    }
+
 }
