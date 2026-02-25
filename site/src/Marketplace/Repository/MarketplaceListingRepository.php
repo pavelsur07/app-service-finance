@@ -25,6 +25,18 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         $this->getEntityManager()->flush();
     }
 
+    public function findByIdAndCompany(string $listingId, string $companyId): ?MarketplaceListing
+    {
+        return $this->createQueryBuilder('l')
+            ->andWhere('l.id = :id')
+            ->andWhere('IDENTITY(l.company) = :companyId')
+            ->setParameter('id', $listingId)
+            ->setParameter('companyId', $companyId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findByMarketplaceSku(
         Company $company,
         MarketplaceType $marketplace,
