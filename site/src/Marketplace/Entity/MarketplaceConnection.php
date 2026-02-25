@@ -28,6 +28,9 @@ class MarketplaceConnection
     #[ORM\Column(type: 'text')]
     private string $apiKey; // TODO: Encrypt in production
 
+    #[ORM\Column(type: 'string', length: 100, nullable: true)]
+    private ?string $clientId = null; // Client-Id для Ozon
+
     #[ORM\Column(type: 'boolean')]
     private bool $isActive = true;
 
@@ -41,7 +44,7 @@ class MarketplaceConnection
     private ?string $lastSyncError = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $settings = null; // Дополнительные настройки
+    private ?array $settings = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -85,6 +88,19 @@ class MarketplaceConnection
     public function setApiKey(string $apiKey): self
     {
         $this->apiKey = $apiKey;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getClientId(): ?string
+    {
+        return $this->clientId;
+    }
+
+    public function setClientId(?string $clientId): self
+    {
+        $this->clientId = $clientId;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
