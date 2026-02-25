@@ -75,8 +75,7 @@ class MarketplaceSyncService
         }
 
         $rawData = $rawDoc->getRawData();
-        $companyId = (string) $company->getId();
-        $rawDocId = (string) $rawDoc->getId();
+        $companyId = $company->getId();
         $synced = 0;
         $batchSize = 250; // Уменьшено для 512MB лимита
 
@@ -128,8 +127,9 @@ class MarketplaceSyncService
 
         foreach ($salesData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
-            $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
-            $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+            $tsName = trim($item['ts_name'] ?? '');
+            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+            $cacheKey = $nmId . '_' . $tsName;
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, но пока НЕ делаем flush
@@ -168,8 +168,9 @@ class MarketplaceSyncService
                 }
 
                 $nmId = (string)($item['nm_id'] ?? '');
-                $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
-                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+                $tsName = trim($item['ts_name'] ?? '');
+                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+                $cacheKey = $nmId . '_' . $tsName;
 
                 // Берем листинг из кэша (100% гарантия что есть - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -196,7 +197,7 @@ class MarketplaceSyncService
                 $sale->setQuantity(abs((int)$item['quantity']));
                 $sale->setPricePerUnit((string)$item['retail_price']);
                 $sale->setTotalRevenue((string)abs((float)$item['retail_amount']));
-                $sale->setRawDocumentId($rawDocId);
+                $sale->setRawDocumentId($rawDoc->getId());
 
                 $this->em->persist($sale);
                 $existingSridsMap[$externalOrderId] = true; // Защита от дублей внутри файла
@@ -259,12 +260,11 @@ class MarketplaceSyncService
     ): int {
         // Диспатч по маркетплейсу
         if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
-            return $this->processOzonCostsFromRaw($company, $rawDoc);
+            return $this->processOzonReturnsFromRaw($company, $rawDoc);
         }
 
         $rawData = $rawDoc->getRawData();
-        $companyId = (string) $company->getId();
-        $rawDocId = (string) $rawDoc->getId();
+        $companyId = $company->getId();
         $synced = 0;
         $batchSize = 250; // Уменьшено для 512MB лимита
 
@@ -317,8 +317,9 @@ class MarketplaceSyncService
 
         foreach ($returnsData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
-            $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
-            $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+            $tsName = trim($item['ts_name'] ?? '');
+            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+            $cacheKey = $nmId . '_' . $tsName;
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, НЕ делаем flush
@@ -357,8 +358,9 @@ class MarketplaceSyncService
                 }
 
                 $nmId = (string)($item['nm_id'] ?? '');
-                $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
-                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+                $tsName = trim($item['ts_name'] ?? '');
+                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+                $cacheKey = $nmId . '_' . $tsName;
 
                 // Берем листинг из кэша (100% гарантия - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -446,12 +448,11 @@ class MarketplaceSyncService
     ): int {
         // Диспатч по маркетплейсу
         if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
-            return $this->processOzonReturnsFromRaw($company, $rawDoc);
+            return $this->processOzonCostsFromRaw($company, $rawDoc);
         }
 
         $rawData = $rawDoc->getRawData();
-        $companyId = (string) $company->getId();
-        $rawDocId = (string) $rawDoc->getId();
+        $companyId = $company->getId();
         $synced = 0;
         $unprocessedTypes = [];
         $batchSize = 100; // Маленький для 512MB лимита
@@ -514,135 +515,6 @@ class MarketplaceSyncService
         // --- ФАЗА 2: ОБРАБОТКА (ОДИН ПРОХОД) ---
         $counter = 0;
         $newCategoriesCreated = 0;
-        $knownExternalIdsMap = [];
-        $pending = [];
-        $pendingIds = [];
-        $dedupBatchSize = $batchSize;
-
-        $processPendingBatch = function () use (
-            &$pending,
-            &$pendingIds,
-            $conn,
-            $companyId,
-            &$knownExternalIdsMap,
-            &$categoriesCache,
-            &$newCategoriesCreated,
-            &$synced,
-            &$counter,
-            $batchSize,
-            &$company,
-            &$listingsCache
-        ): void {
-            if (empty($pendingIds)) {
-                return;
-            }
-
-            $placeholders = implode(',', array_fill(0, count($pendingIds), '?'));
-            $sql = sprintf(
-                'SELECT external_id FROM marketplace_costs WHERE company_id = ? AND external_id IN (%s)',
-                $placeholders
-            );
-
-            $existingExternalIds = $conn->fetchFirstColumn($sql, [$companyId, ...$pendingIds]);
-            $dbExistingMap = array_fill_keys($existingExternalIds, true);
-            $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
-
-            $shouldFlush = false;
-
-            foreach ($pending as $pendingItem) {
-                $externalId = $pendingItem['external_id'];
-
-                if (isset($knownExternalIdsMap[$externalId])) {
-                    continue;
-                }
-
-                $costData = $pendingItem['costData'];
-                $listing = $pendingItem['listing'];
-
-                $categoryCode = $costData['category_code'];
-                $category = $categoriesCache[$categoryCode] ?? null;
-
-                // Создаём категорию если её нет
-                if (!$category) {
-                    $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
-                        Uuid::uuid4()->toString(),
-                        $company,
-                        \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
-                    );
-                    $category->setCode($categoryCode);
-
-                    $categoryName = $costData['category_name']
-                        ?? $costData['description']
-                        ?? $categoryCode;
-                    $category->setName($categoryName);
-
-                    $this->em->persist($category);
-                    $categoriesCache[$categoryCode] = $category;
-                    $newCategoriesCreated++;
-                }
-
-                // Создать Cost
-                $cost = new \App\Marketplace\Entity\MarketplaceCost(
-                    Uuid::uuid4()->toString(),
-                    $company,
-                    \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
-                    $category
-                );
-
-                $cost->setExternalId($externalId);
-                $cost->setCostDate($costData['cost_date']);
-                $cost->setAmount($costData['amount']);
-                $cost->setDescription($costData['description']);
-
-                if ($listing) {
-                    $cost->setListing($listing);
-                }
-
-                $this->em->persist($cost);
-                $knownExternalIdsMap[$externalId] = true;
-                $synced++;
-                $counter++;
-
-                if ($counter % $batchSize === 0) {
-                    $shouldFlush = true;
-                }
-            }
-
-            if ($shouldFlush) {
-                $this->em->flush();
-                $this->em->clear();
-
-                // Восстанавливаем Company
-                $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
-
-                // Восстанавливаем Categories через getReference
-                foreach ($categoriesCache as $code => $cat) {
-                    $categoriesCache[$code] = $this->em->getReference(
-                        \App\Marketplace\Entity\MarketplaceCostCategory::class,
-                        $cat->getId()
-                    );
-                }
-
-                // Восстанавливаем Listings через getReference (если были)
-                foreach ($listingsCache as $k => $cachedListing) {
-                    $listingsCache[$k] = $this->em->getReference(
-                        \App\Marketplace\Entity\MarketplaceListing::class,
-                        $cachedListing->getId()
-                    );
-                }
-
-                gc_collect_cycles();
-
-                $this->logger->info('Costs batch processed', [
-                    'processed' => $counter,
-                    'synced' => $synced,
-                    'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
-                ]);
-            }
-
-            $pending = [];
-            $pendingIds = [];
-        };
 
         foreach ($costsData as $item) {
             try {
@@ -659,10 +531,11 @@ class MarketplaceSyncService
                     $listing = null;
 
                     $nmId = (string)($item['nm_id'] ?? '');
-                    $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+                    $tsName = trim($item['ts_name'] ?? '');
+                    $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
 
                     if ($nmId !== '') {
-                        $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+                        $cacheKey = $nmId . '_' . $tsName;
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
 
@@ -675,19 +548,90 @@ class MarketplaceSyncService
                     foreach ($calculatedCosts as $costData) {
                         $externalId = $costData['external_id'];
 
-                        if (isset($knownExternalIdsMap[$externalId])) {
+                        // DBAL проверка дубликата (быстро, БЕЗ загрузки объекта)
+                        $exists = $conn->fetchOne(
+                            "SELECT 1 FROM marketplace_costs WHERE company_id = ? AND external_id = ? LIMIT 1",
+                            [$companyId, $externalId]
+                        );
+
+                        if ($exists) {
                             continue;
                         }
 
-                        $pending[] = [
-                            'external_id' => $externalId,
-                            'costData' => $costData,
-                            'listing' => $listing,
-                        ];
-                        $pendingIds[] = $externalId;
+                        $categoryCode = $costData['category_code'];
+                        $category = $categoriesCache[$categoryCode] ?? null;
 
-                        if (count($pendingIds) >= $dedupBatchSize) {
-                            $processPendingBatch();
+                        // Создаём категорию если её нет
+                        if (!$category) {
+                            $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
+                                Uuid::uuid4()->toString(),
+                                $company,
+                                \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
+                            );
+                            $category->setCode($categoryCode);
+
+                            $categoryName = $costData['category_name']
+                                ?? $costData['description']
+                                ?? $categoryCode;
+                            $category->setName($categoryName);
+
+                            $this->em->persist($category);
+                            $categoriesCache[$categoryCode] = $category;
+                            $newCategoriesCreated++;
+                        }
+
+                        // Создать Cost
+                        $cost = new \App\Marketplace\Entity\MarketplaceCost(
+                            Uuid::uuid4()->toString(),
+                            $company,
+                            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+                            $category
+                        );
+
+                        $cost->setExternalId($externalId);
+                        $cost->setCostDate($costData['cost_date']);
+                        $cost->setAmount($costData['amount']);
+                        $cost->setDescription($costData['description']);
+
+                        if ($listing) {
+                            $cost->setListing($listing);
+                        }
+
+                        $this->em->persist($cost);
+                        $synced++;
+                        $counter++;
+
+                        // Batch flush каждые 100 записей
+                        if ($counter % $batchSize === 0) {
+                            $this->em->flush();
+                            $this->em->clear();
+
+                            // Восстанавливаем Company
+                            $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+
+                            // Восстанавливаем Categories через getReference
+                            foreach ($categoriesCache as $code => $cat) {
+                                $categoriesCache[$code] = $this->em->getReference(
+                                    \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                                    $cat->getId()
+                                );
+                            }
+
+                            // Восстанавливаем Listings через getReference (если были)
+                            foreach ($listingsCache as $k => $cachedListing) {
+                                $listingsCache[$k] = $this->em->getReference(
+                                    \App\Marketplace\Entity\MarketplaceListing::class,
+                                    $cachedListing->getId()
+                                );
+                            }
+
+                            gc_collect_cycles();
+
+                            $this->logger->info('Costs batch processed', [
+                                'processed' => $counter,
+                                'synced' => $synced,
+                                'memory' => round(memory_get_usage(true) / 1024 / 1024, 2) . ' MB'
+                            ]);
                         }
                     }
                 }
@@ -709,10 +653,6 @@ class MarketplaceSyncService
             }
         }
 
-        if (!empty($pendingIds)) {
-            $processPendingBatch();
-        }
-
         // Финальный flush для остатка
         if ($counter % $batchSize !== 0) {
             $this->em->flush();
@@ -721,7 +661,7 @@ class MarketplaceSyncService
 
         // Сохраняем статистику
         $unprocessedCount = array_sum($unprocessedTypes);
-        $rawDoc = $this->em->find(\App\Marketplace\Entity\MarketplaceRawDocument::class, $rawDocId);
+        $rawDoc = $this->em->find(\App\Marketplace\Entity\MarketplaceRawDocument::class, $rawDoc->getId());
 
         if ($rawDoc) {
             $rawDoc->setUnprocessedCostsCount($unprocessedCount);
@@ -874,49 +814,7 @@ class MarketplaceSyncService
             $synced++;
         }
 
-                    if ($counter % $batchSize === 0) {
-                        $this->em->flush();
-                        $this->em->clear();
-
-                        $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
-                        foreach ($categoriesCache as $code => $cat) {
-                            $categoriesCache[$code] = $this->em->getReference(
-                                \App\Marketplace\Entity\MarketplaceCostCategory::class,
-                                $cat->getId()
-                            );
-                        }
-                        foreach ($listingsCache as $k => $cachedListing) {
-                            $listingsCache[$k] = $this->em->getReference(
-                                MarketplaceListing::class,
-                                $cachedListing->getId()
-                            );
-                        }
-
-                        gc_collect_cycles();
-                        $this->logger->info('[Ozon] Costs batch', ['processed' => $counter, 'synced' => $synced]);
-                    }
-
-                } catch (\Exception $e) {
-                    $this->logger->error('[Ozon] Failed to process cost', [
-                        'external_id' => $entry['external_id'] ?? 'unknown',
-                        'error' => $e->getMessage(),
-                    ]);
-                    continue;
-                }
-            }
-        }
-
-        if ($counter % $batchSize !== 0) {
-            $this->em->flush();
-            $this->em->clear();
-        }
-
-        $this->logger->info('[Ozon] Costs processing completed', [
-            'total_synced' => $synced,
-            'new_categories' => $newCategoriesCreated,
-            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
-        ]);
-
+        $this->em->flush();
         return $synced;
     }
 
@@ -1399,7 +1297,49 @@ class MarketplaceSyncService
                     $synced++;
                     $counter++;
 
-        $this->em->flush();
+                    if ($counter % $batchSize === 0) {
+                        $this->em->flush();
+                        $this->em->clear();
+
+                        $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
+                        foreach ($categoriesCache as $code => $cat) {
+                            $categoriesCache[$code] = $this->em->getReference(
+                                \App\Marketplace\Entity\MarketplaceCostCategory::class,
+                                $cat->getId()
+                            );
+                        }
+                        foreach ($listingsCache as $k => $cachedListing) {
+                            $listingsCache[$k] = $this->em->getReference(
+                                MarketplaceListing::class,
+                                $cachedListing->getId()
+                            );
+                        }
+
+                        gc_collect_cycles();
+                        $this->logger->info('[Ozon] Costs batch', ['processed' => $counter, 'synced' => $synced]);
+                    }
+
+                } catch (\Exception $e) {
+                    $this->logger->error('[Ozon] Failed to process cost', [
+                        'external_id' => $entry['external_id'] ?? 'unknown',
+                        'error' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+            }
+        }
+
+        if ($counter % $batchSize !== 0) {
+            $this->em->flush();
+            $this->em->clear();
+        }
+
+        $this->logger->info('[Ozon] Costs processing completed', [
+            'total_synced' => $synced,
+            'new_categories' => $newCategoriesCreated,
+            'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
+        ]);
+
         return $synced;
     }
 
@@ -1617,18 +1557,6 @@ class MarketplaceSyncService
         $this->em->persist($listing);
 
         return $listing;
-    }
-
-    private function normalizeWbSize(?string $tsName): string
-    {
-        $tsName = trim($tsName ?? '');
-
-        return ($tsName === '') ? 'UNKNOWN' : $tsName;
-    }
-
-    private function wbListingCacheKey(string $nmId, string $tsName): string
-    {
-        return "{$nmId}_{$tsName}";
     }
 
     private function findOrCreateListing(Company $company, $saleData): MarketplaceListing
