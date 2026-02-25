@@ -773,24 +773,69 @@ class MarketplaceSyncService
         $this->em->persist($rawDoc);
         $this->em->flush();
 
+        $companyId = (string)$company->getId();
+        $marketplace = MarketplaceType::from($adapter->getMarketplaceType());
         $rawDocId = $rawDoc->getId();
         $synced = 0;
 
-        // Обрабатываем по одной
-        foreach ($salesData as $saleData) {
-            // Проверка дубликата
-            $existing = $this->saleRepository->findByMarketplaceOrder(
-                $company,
-                $saleData->marketplace,
-                $saleData->externalOrderId
-            );
+        $allExternalIds = array_map(fn($s) => (string)$s->externalOrderId, $salesData);
+        $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
 
-            if ($existing) {
+        $allSkus = [];
+        foreach ($salesData as $saleData) {
+            $sku = (string)$saleData->marketplaceSku;
+            if ($sku !== '') {
+                $allSkus[$sku] = true;
+            }
+        }
+        $allSkus = array_keys($allSkus);
+
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $allSkus);
+
+        $newListingsCreated = 0;
+        foreach ($salesData as $saleData) {
+            $sku = (string)$saleData->marketplaceSku;
+
+            if ($sku === '' || isset($listingsCache[$sku])) {
                 continue;
             }
 
-            // Найти или создать Product и Listing
-            $listing = $this->findOrCreateListing($company, $saleData);
+            $listing = new MarketplaceListing(
+                Uuid::uuid4()->toString(),
+                $company,
+                null,
+                $marketplace
+            );
+            $listing->setMarketplaceSku($sku);
+            $listing->setPrice($saleData->pricePerUnit);
+
+            $this->em->persist($listing);
+            $listingsCache[$sku] = $listing;
+            $newListingsCreated++;
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+        }
+
+        // Обрабатываем по одной
+        foreach ($salesData as $saleData) {
+            $externalId = (string)$saleData->externalOrderId;
+
+            if (isset($existingMap[$externalId])) {
+                continue;
+            }
+
+            $sku = (string)$saleData->marketplaceSku;
+            $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
+
+            if (!$listing) {
+                // Fallback для пустого SKU/непредвиденных кейсов: сохраняем текущую семантику.
+                $listing = $this->findOrCreateListing($company, $saleData);
+                if ($sku !== '') {
+                    $listingsCache[$sku] = $listing;
+                }
+            }
 
             // Создать Sale
             $sale = new MarketplaceSale(
@@ -809,6 +854,7 @@ class MarketplaceSyncService
             $sale->setRawDocumentId($rawDocId);
 
             $this->em->persist($sale);
+            $existingMap[$externalId] = true;
             $synced++;
         }
 
