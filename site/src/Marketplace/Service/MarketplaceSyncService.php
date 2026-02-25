@@ -128,9 +128,8 @@ class MarketplaceSyncService
 
         foreach ($salesData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
-            $tsName = trim($item['ts_name'] ?? '');
-            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
-            $cacheKey = $nmId . '_' . $tsName;
+            $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+            $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, но пока НЕ делаем flush
@@ -169,9 +168,8 @@ class MarketplaceSyncService
                 }
 
                 $nmId = (string)($item['nm_id'] ?? '');
-                $tsName = trim($item['ts_name'] ?? '');
-                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
-                $cacheKey = $nmId . '_' . $tsName;
+                $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
                 // Берем листинг из кэша (100% гарантия что есть - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -319,9 +317,8 @@ class MarketplaceSyncService
 
         foreach ($returnsData as $item) {
             $nmId = (string)($item['nm_id'] ?? '');
-            $tsName = trim($item['ts_name'] ?? '');
-            $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
-            $cacheKey = $nmId . '_' . $tsName;
+            $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+            $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
             if (!isset($listingsCache[$cacheKey])) {
                 // Создаем в памяти, НЕ делаем flush
@@ -360,9 +357,8 @@ class MarketplaceSyncService
                 }
 
                 $nmId = (string)($item['nm_id'] ?? '');
-                $tsName = trim($item['ts_name'] ?? '');
-                $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
-                $cacheKey = $nmId . '_' . $tsName;
+                $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
                 // Берем листинг из кэша (100% гарантия - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -534,11 +530,10 @@ class MarketplaceSyncService
                     $listing = null;
 
                     $nmId = (string)($item['nm_id'] ?? '');
-                    $tsName = trim($item['ts_name'] ?? '');
-                    $tsName = ($tsName === '') ? 'UNKNOWN' : $tsName;
+                    $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
 
                     if ($nmId !== '') {
-                        $cacheKey = $nmId . '_' . $tsName;
+                        $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
 
@@ -1530,7 +1525,7 @@ class MarketplaceSyncService
     private function createListingFromWbData(Company $company, array $wbData): MarketplaceListing
     {
         $nmId = $wbData['nm_id'];
-        $tsName = $wbData['ts_name'];
+        $tsName = $this->normalizeWbSize($wbData['ts_name'] ?? null);
         $saName = $wbData['sa_name'];
         $brandName = $wbData['brand_name'];
         $subjectName = $wbData['subject_name'];
@@ -1563,6 +1558,18 @@ class MarketplaceSyncService
         $this->em->persist($listing);
 
         return $listing;
+    }
+
+    private function normalizeWbSize(?string $tsName): string
+    {
+        $normalizedTsName = trim((string)$tsName);
+
+        return ($normalizedTsName === '') ? 'UNKNOWN' : $normalizedTsName;
+    }
+
+    private function wbListingCacheKey(string $nmId, string $tsName): string
+    {
+        return "{$nmId}_{$tsName}";
     }
 
     private function findOrCreateListing(Company $company, $saleData): MarketplaceListing
