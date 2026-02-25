@@ -211,6 +211,7 @@
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
+                    <span class="nav-link-icon"><i class="ti ti-plug-connected"></i></span>
                     <span class="nav-link-title">Интеграции</span>
                 </a>
                 {% set integrations_show = (
@@ -254,7 +255,8 @@
             {% set company_active = current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or company_users_active %}
             <li class="nav-item dropdown {{ company_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ company_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ company_active ? 'true' : 'false' }}">
-                    <span class="nav-link-title">Компания и доступ</span>
+                    <span class="nav-link-icon"><i class="ti ti-building-community"></i></span>
+                    <span class="nav-link-title">Компания и доступы</span>
                 </a>
                 {% set company_show = (company_active or current_route starts with 'company_' or current_route starts with 'settings_report_api_key_' or company_users_active) ? 'show' : '' %}
                 <div class="dropdown-menu {{ company_show }}">
