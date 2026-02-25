@@ -15,6 +15,8 @@ use Webmozart\Assert\Assert;
 
 final class ProductPurchasePriceHistoryController extends AbstractController
 {
+    private const HISTORY_LIMIT = 500;
+
     #[Route('/catalog/products/{id}/purchase-price/history', name: 'catalog_products_purchase_price_history', methods: ['GET'])]
     public function __invoke(
         string $id,
@@ -33,7 +35,8 @@ final class ProductPurchasePriceHistoryController extends AbstractController
             throw new NotFoundHttpException();
         }
 
-        $history = $purchasePriceQuery->fetchHistory($companyId, $id, 500);
+        // Ограничение истории фиксируем в контроллере страницы.
+        $history = $purchasePriceQuery->fetchHistory($companyId, $id, self::HISTORY_LIMIT);
 
         return $this->render('catalog/product/purchase_price_history.html.twig', [
             'product' => $product,
