@@ -87,6 +87,45 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     /**
+     * @param string[] $productIds
+     *
+     * @return array<string, string[]>
+     */
+    public function findMarketplaceNamesByProductIds(string $companyId, array $productIds): array
+    {
+        if ([] === $productIds) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('l')
+            ->select('IDENTITY(l.product) AS productId, l.marketplace AS marketplace')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('IDENTITY(l.product) IN (:productIds)')
+            ->andWhere('l.isActive = :active')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('productIds', $productIds)
+            ->setParameter('active', true)
+            ->getQuery()
+            ->getArrayResult();
+
+        $marketplacesByProductId = [];
+        foreach ($rows as $row) {
+            $productId = (string) $row['productId'];
+            $marketplace = (string) $row['marketplace'];
+
+            if (!isset($marketplacesByProductId[$productId])) {
+                $marketplacesByProductId[$productId] = [];
+            }
+
+            if (!in_array($marketplace, $marketplacesByProductId[$productId], true)) {
+                $marketplacesByProductId[$productId][] = $marketplace;
+            }
+        }
+
+        return $marketplacesByProductId;
+    }
+
+    /**
      * @return MarketplaceListing[]
      */
     public function findByCompany(Company $company): array

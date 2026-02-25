@@ -6,6 +6,8 @@ namespace App\Catalog\Controller;
 
 use App\Catalog\Application\ListProductsAction;
 use App\Catalog\DTO\ProductListFilter;
+use App\Catalog\Entity\Product;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,6 +19,7 @@ final class ProductIndexController extends AbstractController
 {
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
+        private readonly MarketplaceListingRepository $marketplaceListingRepository,
         private readonly RouterInterface $router,
     ) {
     }
@@ -31,10 +34,18 @@ final class ProductIndexController extends AbstractController
 
         $filter = ProductListFilter::fromRequest($request)->withCompanyId($company->getId());
         $pager = $listProductsAction($filter, $page, $perPage);
+        $products = iterator_to_array($pager->getCurrentPageResults());
+
+        $marketplacesByProductId = $this->marketplaceListingRepository
+            ->findMarketplaceNamesByProductIds($company->getId(), array_map(
+                static fn (Product $product): string => $product->getId(),
+                $products,
+            ));
 
         return $this->render('catalog/product/index.html.twig', [
             'pager' => $pager,
-            'products' => iterator_to_array($pager->getCurrentPageResults()),
+            'products' => $products,
+            'marketplacesByProductId' => $marketplacesByProductId,
             'filters' => [
                 'q' => $request->query->get('q'),
                 'status' => $request->query->get('status'),
