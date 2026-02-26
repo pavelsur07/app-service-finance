@@ -79,7 +79,7 @@ class MarketplaceSyncService
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
-        $batchSize = 250; // Уменьшено для 512MB лимита
+        $batchSize = 250;
 
         // --- ФАЗА 1: ПОДГОТОВКА И ПРЕДЗАГРУЗКА ---
 
@@ -102,7 +102,7 @@ class MarketplaceSyncService
         // 2. Собираем все SRID для массовой проверки
         $allSrids = array_column($salesData, 'srid');
 
-        // 3. Массово получаем существующие продажи (ОДИН запрос вместо тысяч!)
+        // 3. Массово получаем существующие продажи
         $existingSridsMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
 
         $this->logger->info('Loaded existing sales', [
@@ -112,7 +112,7 @@ class MarketplaceSyncService
         // 4. Собираем все уникальные nm_id
         $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
 
-        // 5. Массово получаем листинги (ОДИН запрос вместо тысяч!)
+        // 5. Массово получаем листинги
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
@@ -133,7 +133,6 @@ class MarketplaceSyncService
             $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
             if (!isset($listingsCache[$cacheKey])) {
-                // Создаем в памяти, но пока НЕ делаем flush
                 $listing = $this->createListingFromWbData($company, [
                     'nm_id' => $nmId,
                     'ts_name' => $tsName,
@@ -148,7 +147,6 @@ class MarketplaceSyncService
             }
         }
 
-        // Сохраняем все новые листинги ОДНИМ flush до обработки продаж
         if ($newListingsCreated > 0) {
             $this->em->flush();
             $this->logger->info('Created missing listings in bulk', [
@@ -156,14 +154,13 @@ class MarketplaceSyncService
             ]);
         }
 
-        // --- ФАЗА 3: ОБРАБОТКА ПРОДАЖ (ОСНОВНОЙ ЦИКЛ БЕЗ БД ЗАПРОСОВ) ---
+        // --- ФАЗА 3: ОБРАБОТКА ПРОДАЖ ---
         $counter = 0;
 
         foreach ($salesData as $item) {
             try {
                 $externalOrderId = (string)$item['srid'];
 
-                // Мгновенная проверка в памяти (НЕ БД!)
                 if (isset($existingSridsMap[$externalOrderId])) {
                     continue;
                 }
@@ -172,7 +169,6 @@ class MarketplaceSyncService
                 $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
                 $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
-                // Берем листинг из кэша (100% гарантия что есть - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
 
                 if (!$listing) {
@@ -183,7 +179,6 @@ class MarketplaceSyncService
                     continue;
                 }
 
-                // Создать Sale
                 $sale = new MarketplaceSale(
                     Uuid::uuid4()->toString(),
                     $company,
@@ -200,20 +195,17 @@ class MarketplaceSyncService
                 $sale->setRawDocumentId($rawDocId);
 
                 $this->em->persist($sale);
-                $existingSridsMap[$externalOrderId] = true; // Защита от дублей внутри файла
+                $existingSridsMap[$externalOrderId] = true;
 
                 $synced++;
                 $counter++;
 
-                // Batch flush каждые 500 записей
                 if ($counter % $batchSize === 0) {
                     $this->em->flush();
                     $this->em->clear();
 
-                    // Восстанавливаем Company
                     $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
 
-                    // Восстанавливаем Listings через getReference (оптимизация памяти)
                     foreach ($listingsCache as $k => $cachedListing) {
                         $listingsCache[$k] = $this->em->getReference(
                             \App\Marketplace\Entity\MarketplaceListing::class,
@@ -239,7 +231,6 @@ class MarketplaceSyncService
             }
         }
 
-        // Финальный flush для остатка
         if ($counter % $batchSize !== 0) {
             $this->em->flush();
             $this->em->clear();
@@ -267,7 +258,7 @@ class MarketplaceSyncService
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
-        $batchSize = 250; // Уменьшено для 512MB лимита
+        $batchSize = 250;
 
         // --- ФАЗА 1: ПОДГОТОВКА И ПРЕДЗАГРУЗКА ---
 
@@ -291,7 +282,7 @@ class MarketplaceSyncService
         // 2. Собираем все SRID для массовой проверки
         $allSrids = array_column($returnsData, 'srid');
 
-        // 3. Массово получаем существующие возвраты (ОДИН запрос!)
+        // 3. Массово получаем существующие возвраты
         $existingSridsMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
         $this->logger->info('Loaded existing returns', [
@@ -301,7 +292,7 @@ class MarketplaceSyncService
         // 4. Собираем все уникальные nm_id
         $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
 
-        // 5. Массово получаем листинги (ОДИН запрос!)
+        // 5. Массово получаем листинги
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
@@ -322,7 +313,6 @@ class MarketplaceSyncService
             $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
             if (!isset($listingsCache[$cacheKey])) {
-                // Создаем в памяти, НЕ делаем flush
                 $listing = $this->createListingFromWbData($company, [
                     'nm_id' => $nmId,
                     'ts_name' => $tsName,
@@ -337,7 +327,6 @@ class MarketplaceSyncService
             }
         }
 
-        // Сохраняем все новые листинги ОДНИМ flush
         if ($newListingsCreated > 0) {
             $this->em->flush();
             $this->logger->info('Created missing listings in bulk', [
@@ -345,14 +334,13 @@ class MarketplaceSyncService
             ]);
         }
 
-        // --- ФАЗА 3: ОБРАБОТКА ВОЗВРАТОВ (БЕЗ БД ЗАПРОСОВ) ---
+        // --- ФАЗА 3: ОБРАБОТКА ВОЗВРАТОВ ---
         $counter = 0;
 
         foreach ($returnsData as $item) {
             try {
                 $externalReturnId = (string)$item['srid'];
 
-                // Мгновенная проверка в памяти
                 if (isset($existingSridsMap[$externalReturnId])) {
                     continue;
                 }
@@ -361,7 +349,6 @@ class MarketplaceSyncService
                 $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
                 $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
 
-                // Берем листинг из кэша (100% гарантия - создали в Фазе 2)
                 $listing = $listingsCache[$cacheKey] ?? null;
 
                 if (!$listing) {
@@ -372,7 +359,6 @@ class MarketplaceSyncService
                     continue;
                 }
 
-                // Создать Return
                 $return = new MarketplaceReturn(
                     Uuid::uuid4()->toString(),
                     $company,
@@ -387,20 +373,17 @@ class MarketplaceSyncService
                 $return->setReturnReason($item['supplier_oper_name'] ?? '');
 
                 $this->em->persist($return);
-                $existingSridsMap[$externalReturnId] = true; // Защита от дублей внутри файла
+                $existingSridsMap[$externalReturnId] = true;
 
                 $synced++;
                 $counter++;
 
-                // Batch flush каждые 500 записей
                 if ($counter % $batchSize === 0) {
                     $this->em->flush();
                     $this->em->clear();
 
-                    // Восстанавливаем Company
                     $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
 
-                    // Восстанавливаем Listings через getReference
                     foreach ($listingsCache as $k => $cachedListing) {
                         $listingsCache[$k] = $this->em->getReference(
                             \App\Marketplace\Entity\MarketplaceListing::class,
@@ -426,7 +409,6 @@ class MarketplaceSyncService
             }
         }
 
-        // Финальный flush для остатка
         if ($counter % $batchSize !== 0) {
             $this->em->flush();
             $this->em->clear();
@@ -455,12 +437,11 @@ class MarketplaceSyncService
         $rawDocId = (string) $rawDoc->getId();
         $synced = 0;
         $unprocessedTypes = [];
-        $batchSize = 100; // Маленький для 512MB лимита
+        $batchSize = 100;
 
-        // DBAL для быстрых проверок
         $conn = $this->em->getConnection();
 
-        // --- ФАЗА 1: ПРЕДЗАГРУЗКА (только легкие данные) ---
+        // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
 
         // 1. Фильтруем только затраты
         $costsData = array_filter($rawData, function($item) {
@@ -478,25 +459,26 @@ class MarketplaceSyncService
             'batch_size' => $batchSize
         ]);
 
-        // 2. Массово загружаем listings (их немного)
+        // 2. Массово загружаем listings (ПО ТОЙ ЖЕ ЛОГИКЕ ЧТО И ПРОДАЖИ!)
         $allNmIds = array_values(array_unique(
             array_filter(array_column($costsData, 'nm_id'))
         ));
 
         $listingsCache = [];
         if (!empty($allNmIds)) {
+            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: используем ту же логику индексации что и для продаж/возвратов
             $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
                 $company,
                 \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
                 $allNmIds
             );
 
-            $this->logger->info('Loaded listings', [
+            $this->logger->info('Loaded listings for costs', [
                 'count' => count($listingsCache)
             ]);
         }
 
-        // 3. Загружаем ВСЕ категории компании (их 10-30 штук)
+        // 3. Загружаем ВСЕ категории компании
         $categoriesCache = [];
         $allCategories = $this->costCategoryRepository->findBy([
             'company' => $company,
@@ -512,12 +494,12 @@ class MarketplaceSyncService
             'count' => count($categoriesCache)
         ]);
 
-        // --- ФАЗА 2: ОБРАБОТКА (ОДИН ПРОХОД) ---
+        // --- ФАЗА 2: ОБРАБОТКА ---
         $counter = 0;
         $newCategoriesCreated = 0;
         $lastFlushedCounter = 0;
-        $knownExternalIdsMap = []; // [externalId => true]
-        $pending = []; // ['external_id' => string, 'costData' => array, 'listing' => ?MarketplaceListing]
+        $knownExternalIdsMap = [];
+        $pending = [];
         $pendingIds = [];
         $dedupBatchSize = $batchSize;
 
@@ -560,12 +542,11 @@ class MarketplaceSyncService
                 }
 
                 $costData = $pendingItem['costData'];
-                $listing = $pendingItem['listing'];
+                $listing = $pendingItem['listing']; // ← Теперь это MarketplaceListing (или null)
 
                 $categoryCode = $costData['category_code'];
                 $category = $categoriesCache[$categoryCode] ?? null;
 
-                // Создаём категорию если её нет
                 if (!$category) {
                     $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
                         Uuid::uuid4()->toString(),
@@ -584,7 +565,6 @@ class MarketplaceSyncService
                     $newCategoriesCreated++;
                 }
 
-                // Создать Cost
                 $cost = new \App\Marketplace\Entity\MarketplaceCost(
                     Uuid::uuid4()->toString(),
                     $company,
@@ -597,6 +577,7 @@ class MarketplaceSyncService
                 $cost->setAmount($costData['amount']);
                 $cost->setDescription($costData['description']);
 
+                // ПРИВЯЗКА К LISTING (если есть)
                 if ($listing) {
                     $cost->setListing($listing);
                 }
@@ -612,10 +593,8 @@ class MarketplaceSyncService
                 $this->em->clear();
                 $lastFlushedCounter = $counter;
 
-                // Восстанавливаем Company
                 $company = $this->em->find(\App\Company\Entity\Company::class, $companyId);
 
-                // Восстанавливаем Categories через getReference
                 foreach ($categoriesCache as $code => $cat) {
                     $categoriesCache[$code] = $this->em->getReference(
                         \App\Marketplace\Entity\MarketplaceCostCategory::class,
@@ -623,7 +602,6 @@ class MarketplaceSyncService
                     );
                 }
 
-                // Восстанавливаем Listings через getReference (если были)
                 foreach ($listingsCache as $k => $cachedListing) {
                     $listingsCache[$k] = $this->em->getReference(
                         \App\Marketplace\Entity\MarketplaceListing::class,
@@ -655,9 +633,8 @@ class MarketplaceSyncService
 
                     $processed = true;
 
-                    // Получаем listing из кэша
+                    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: получаем listing из кэша по nm_id + ts_name
                     $listing = null;
-
                     $nmId = (string)($item['nm_id'] ?? '');
                     $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
 
@@ -666,6 +643,7 @@ class MarketplaceSyncService
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
 
+                    // Если калькулятор требует листинг, но его нет - пропускаем
                     if ($calculator->requiresListing() && !$listing) {
                         continue;
                     }
@@ -682,7 +660,7 @@ class MarketplaceSyncService
                         $pending[] = [
                             'external_id' => $externalId,
                             'costData' => $costData,
-                            'listing' => $listing,
+                            'listing' => $listing, // ← Передаем найденный listing (или null)
                         ];
                         $pendingIds[] = $externalId;
 
@@ -713,7 +691,6 @@ class MarketplaceSyncService
             $processPendingBatch();
         }
 
-        // Финальный flush для остатка
         if ($counter % $batchSize !== 0) {
             $this->em->flush();
             $this->em->clear();
@@ -746,10 +723,8 @@ class MarketplaceSyncService
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate
     ): int {
-        // Получаем данные от API
         $salesData = $adapter->fetchSales($company, $fromDate, $toDate);
 
-        // Создаём RawDocument
         $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
             Uuid::uuid4()->toString(),
             $company,
@@ -819,7 +794,6 @@ class MarketplaceSyncService
             $this->em->flush();
         }
 
-        // Обрабатываем по одной
         foreach ($salesData as $saleData) {
             $externalId = (string)$saleData->externalOrderId;
 
@@ -831,14 +805,12 @@ class MarketplaceSyncService
             $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
 
             if (!$listing) {
-                // Fallback для пустого SKU/непредвиденных кейсов: сохраняем текущую семантику.
                 $listing = $this->findOrCreateListing($company, $saleData);
                 if ($sku !== '') {
                     $listingsCache[$sku] = $listing;
                 }
             }
 
-            // Создать Sale
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
                 $company,
@@ -859,7 +831,6 @@ class MarketplaceSyncService
             $synced++;
         }
 
-        // Один flush в конце
         $this->em->flush();
 
         return $synced;
@@ -902,6 +873,8 @@ class MarketplaceSyncService
         $externalIds = array_keys($externalIdsMap);
 
         $categoriesMap = $this->costCategoryRepository->findByCodesIndexed($company, $marketplace, $categoryCodes);
+
+        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: загружаем listings по SKU (как для продаж/возвратов)
         $listingsMap = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $skus);
 
         $existingExternalIdsMap = [];
@@ -934,6 +907,7 @@ class MarketplaceSyncService
                 continue;
             }
 
+            // ПРИВЯЗКА К LISTING (если есть SKU)
             $listing = null;
             if ($costData->marketplaceSku) {
                 $sku = trim((string)$costData->marketplaceSku);
@@ -952,7 +926,7 @@ class MarketplaceSyncService
                 $category
             );
 
-            $cost->setListing($listing);
+            $cost->setListing($listing); // ← Привязываем к listing (или null)
             $cost->setAmount($costData->amount);
             $cost->setCostDate($costData->costDate);
             $cost->setDescription($costData->description);
@@ -1038,7 +1012,6 @@ class MarketplaceSyncService
             $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
 
             if (!$listing) {
-                // Fallback для пустого SKU/непредвиденных кейсов: сохраняем текущую семантику.
                 $listing = $this->findOrCreateListing($company, $returnData);
                 if ($sku !== '') {
                     $listingsCache[$sku] = $listing;
@@ -1075,12 +1048,6 @@ class MarketplaceSyncService
     // OZON: Обработка сырых данных из /v3/finance/transaction/list
     // ========================================================================
 
-    /**
-     * Ozon: обработка продаж из RawDocument.
-     *
-     * Структура Ozon: operations[].type === "orders" && accruals_for_sale > 0
-     * items[]: [{name, sku}], posting: {posting_number}
-     */
     private function processOzonSalesFromRaw(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
@@ -1091,7 +1058,6 @@ class MarketplaceSyncService
         $synced = 0;
         $batchSize = 250;
 
-        // --- ФАЗА 1: Фильтрация продаж ---
         $salesData = array_filter($rawData, function ($op) {
             return ($op['type'] ?? '') === 'orders'
                 && (float)($op['accruals_for_sale'] ?? 0) > 0;
@@ -1106,13 +1072,9 @@ class MarketplaceSyncService
             'total_filtered' => count($salesData),
         ]);
 
-        // --- ФАЗА 2: Предзагрузка ---
-
-        // Собираем externalIds (operation_id) для проверки дублей
         $allExternalIds = array_map(fn($op) => (string)$op['operation_id'], $salesData);
         $existingIdsMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
 
-        // Собираем все SKU для листингов
         $allSkus = [];
         foreach ($salesData as $op) {
             foreach ($op['items'] ?? [] as $item) {
@@ -1130,7 +1092,6 @@ class MarketplaceSyncService
             $allSkus
         );
 
-        // --- ФАЗА 3: Создание отсутствующих листингов ---
         $newListingsCreated = 0;
 
         foreach ($salesData as $op) {
@@ -1158,7 +1119,6 @@ class MarketplaceSyncService
             $this->logger->info('[Ozon] Created missing listings', ['count' => $newListingsCreated]);
         }
 
-        // --- ФАЗА 4: Обработка продаж ---
         $counter = 0;
 
         foreach ($salesData as $op) {
@@ -1180,7 +1140,7 @@ class MarketplaceSyncService
                 }
 
                 $accrual = (float)($op['accruals_for_sale'] ?? 0);
-                $quantity = count($items) > 0 ? 1 : 0; // Ozon: 1 операция = 1 единица
+                $quantity = count($items) > 0 ? 1 : 0;
 
                 $sale = new MarketplaceSale(
                     Uuid::uuid4()->toString(),
@@ -1237,11 +1197,6 @@ class MarketplaceSyncService
         return $synced;
     }
 
-    /**
-     * Ozon: обработка возвратов из RawDocument.
-     *
-     * Структура Ozon: operations[].type === "returns"
-     */
     private function processOzonReturnsFromRaw(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
@@ -1252,7 +1207,6 @@ class MarketplaceSyncService
         $synced = 0;
         $batchSize = 250;
 
-        // --- ФАЗА 1: Фильтрация возвратов ---
         $returnsData = array_filter($rawData, function ($op) {
             return ($op['type'] ?? '') === 'returns';
         });
@@ -1266,7 +1220,6 @@ class MarketplaceSyncService
             'total_filtered' => count($returnsData),
         ]);
 
-        // --- ФАЗА 2: Предзагрузка ---
         $allExternalIds = array_map(fn($op) => (string)$op['operation_id'], $returnsData);
         $existingIdsMap = $this->returnRepository->getExistingExternalIds($companyId, $allExternalIds);
 
@@ -1287,7 +1240,6 @@ class MarketplaceSyncService
             $allSkus
         );
 
-        // --- ФАЗА 3: Создание отсутствующих листингов ---
         $newListingsCreated = 0;
 
         foreach ($returnsData as $op) {
@@ -1315,7 +1267,6 @@ class MarketplaceSyncService
             $this->logger->info('[Ozon] Created missing listings for returns', ['count' => $newListingsCreated]);
         }
 
-        // --- ФАЗА 4: Обработка возвратов ---
         $counter = 0;
 
         foreach ($returnsData as $op) {
@@ -1337,7 +1288,6 @@ class MarketplaceSyncService
                 }
 
                 $amount = abs((float)($op['amount'] ?? 0));
-                $returnDeliveryCharge = abs((float)($op['return_delivery_charge'] ?? 0));
 
                 $return = new MarketplaceReturn(
                     Uuid::uuid4()->toString(),
@@ -1392,12 +1342,6 @@ class MarketplaceSyncService
         return $synced;
     }
 
-    /**
-     * Ozon: обработка затрат из RawDocument.
-     *
-     * Извлекает: sale_commission, delivery_charge, return_delivery_charge, services[].
-     * Каждая операция может порождать несколько записей затрат.
-     */
     private function processOzonCostsFromRaw(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
@@ -1408,11 +1352,10 @@ class MarketplaceSyncService
         $conn = $this->em->getConnection();
         $synced = 0;
         $batchSize = 100;
-        $unprocessedTypes = [];
 
         $this->logger->info('[Ozon] Starting costs processing', ['total_records' => count($rawData)]);
 
-        // --- ФАЗА 1: Предзагрузка листингов ---
+        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: предзагрузка листингов по SKU
         $allSkus = [];
         foreach ($rawData as $op) {
             foreach ($op['items'] ?? [] as $item) {
@@ -1425,14 +1368,18 @@ class MarketplaceSyncService
 
         $listingsCache = [];
         if (!empty($allSkus)) {
+            // Загружаем listings по SKU (как для продаж/возвратов)
             $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
                 $company,
                 MarketplaceType::OZON,
                 array_keys($allSkus)
             );
+
+            $this->logger->info('[Ozon] Loaded listings for costs', [
+                'count' => count($listingsCache)
+            ]);
         }
 
-        // --- ФАЗА 2: Предзагрузка категорий ---
         $categoriesCache = [];
         $allCategories = $this->costCategoryRepository->findBy([
             'company' => $company,
@@ -1444,7 +1391,6 @@ class MarketplaceSyncService
             $categoriesCache[$cat->getCode()] = $cat;
         }
 
-        // --- ФАЗА 3: Обработка ---
         $counter = 0;
         $newCategoriesCreated = 0;
         $lastFlushedCounter = 0;
@@ -1494,11 +1440,10 @@ class MarketplaceSyncService
                         continue;
                     }
 
-                    $listing = $pendingItem['listing'];
+                    $listing = $pendingItem['listing']; // ← MarketplaceListing (или null)
                     $categoryCode = $entry['category_code'];
                     $category = $categoriesCache[$categoryCode] ?? null;
 
-                    // Создаём категорию если не существует
                     if (!$category) {
                         $category = new \App\Marketplace\Entity\MarketplaceCostCategory(
                             Uuid::uuid4()->toString(),
@@ -1525,6 +1470,7 @@ class MarketplaceSyncService
                     $cost->setAmount($entry['amount']);
                     $cost->setDescription($entry['description']);
 
+                    // ПРИВЯЗКА К LISTING
                     if ($listing) {
                         $cost->setListing($listing);
                     }
@@ -1573,15 +1519,14 @@ class MarketplaceSyncService
             $operationId = (string)($op['operation_id'] ?? '');
             $operationDate = new \DateTimeImmutable($op['operation_date']);
 
-            // Определяем listing (из первого item)
+            // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: определяем listing из items (по SKU)
             $listing = null;
             $firstItem = ($op['items'] ?? [])[0] ?? null;
             if ($firstItem) {
                 $sku = (string)($firstItem['sku'] ?? '');
-                $listing = $listingsCache[$sku] ?? null;
+                $listing = $listingsCache[$sku] ?? null; // ← Привязка к listing
             }
 
-            // Собираем все затраты из одной операции
             $costEntries = $this->extractOzonCostEntries($op, $operationId, $operationDate);
 
             foreach ($costEntries as $entry) {
@@ -1593,7 +1538,7 @@ class MarketplaceSyncService
 
                 $pending[] = [
                     'entry' => $entry,
-                    'listing' => $listing,
+                    'listing' => $listing, // ← Передаем найденный listing
                 ];
                 $pendingIds[] = $externalId;
 
@@ -1621,16 +1566,10 @@ class MarketplaceSyncService
         return $synced;
     }
 
-    /**
-     * Извлекает все записи затрат из одной Ozon-операции.
-     *
-     * @return array[] Массив записей [{external_id, category_code, category_name, amount, cost_date, description}]
-     */
     private function extractOzonCostEntries(array $op, string $operationId, \DateTimeImmutable $operationDate): array
     {
         $entries = [];
 
-        // 1. Комиссия за продажу
         $commission = abs((float)($op['sale_commission'] ?? 0));
         if ($commission > 0) {
             $entries[] = [
@@ -1643,7 +1582,6 @@ class MarketplaceSyncService
             ];
         }
 
-        // 2. Доставка
         $delivery = abs((float)($op['delivery_charge'] ?? 0));
         if ($delivery > 0) {
             $entries[] = [
@@ -1656,7 +1594,6 @@ class MarketplaceSyncService
             ];
         }
 
-        // 3. Обратная доставка (возврат)
         $returnDelivery = abs((float)($op['return_delivery_charge'] ?? 0));
         if ($returnDelivery > 0) {
             $entries[] = [
@@ -1669,7 +1606,6 @@ class MarketplaceSyncService
             ];
         }
 
-        // 4. Services — массив дополнительных услуг
         $services = $op['services'] ?? [];
         foreach ($services as $idx => $service) {
             $serviceAmount = abs((float)($service['price'] ?? 0));
@@ -1693,56 +1629,45 @@ class MarketplaceSyncService
         return $entries;
     }
 
-    /**
-     * Определяет код категории затрат по названию услуги Ozon.
-     */
     private function resolveOzonServiceCategoryCode(string $serviceName): string
     {
         $lower = mb_strtolower($serviceName);
 
-        // Логистика
         if (str_contains($lower, 'логистик') || str_contains($lower, 'logistic')
             || str_contains($lower, 'магистраль') || str_contains($lower, 'last mile')) {
             return 'ozon_logistics';
         }
 
-        // Обработка
         if (str_contains($lower, 'обработк') || str_contains($lower, 'processing')
             || str_contains($lower, 'сборк')) {
             return 'ozon_processing';
         }
 
-        // Хранение
         if (str_contains($lower, 'хранени') || str_contains($lower, 'storage')
             || str_contains($lower, 'размещени')) {
             return 'ozon_storage';
         }
 
-        // Эквайринг
         if (str_contains($lower, 'эквайринг') || str_contains($lower, 'acquiring')
             || str_contains($lower, 'приём платеж')) {
             return 'ozon_acquiring';
         }
 
-        // Продвижение / реклама
         if (str_contains($lower, 'продвижени') || str_contains($lower, 'реклам')
             || str_contains($lower, 'promotion') || str_contains($lower, 'трафик')) {
             return 'ozon_promotion';
         }
 
-        // Подписка Premium
         if (str_contains($lower, 'подписк') || str_contains($lower, 'premium')
             || str_contains($lower, 'subscription')) {
             return 'ozon_subscription';
         }
 
-        // Штрафы
         if (str_contains($lower, 'штраф') || str_contains($lower, 'penalty')
             || str_contains($lower, 'неустойк')) {
             return 'ozon_penalty';
         }
 
-        // Компенсации
         if (str_contains($lower, 'компенсац') || str_contains($lower, 'compensation')
             || str_contains($lower, 'возмещени')) {
             return 'ozon_compensation';
@@ -1751,9 +1676,6 @@ class MarketplaceSyncService
         return 'ozon_other_service';
     }
 
-    /**
-     * Человекочитаемое название категории Ozon.
-     */
     private function resolveOzonServiceCategoryName(string $categoryCode): string
     {
         return match ($categoryCode) {
@@ -1773,7 +1695,7 @@ class MarketplaceSyncService
     }
 
     // ========================================================================
-    // Ozon: создание листинга
+    // Создание листингов
     // ========================================================================
 
     private function createListingFromOzonData(Company $company, array $ozonData): MarketplaceListing
@@ -1797,10 +1719,6 @@ class MarketplaceSyncService
         return $listing;
     }
 
-    // ========================================================================
-    // WB: создание листинга
-    // ========================================================================
-
     private function createListingFromWbData(Company $company, array $wbData): MarketplaceListing
     {
         $nmId = $wbData['nm_id'];
@@ -1810,8 +1728,6 @@ class MarketplaceSyncService
         $subjectName = $wbData['subject_name'];
         $price = $wbData['retail_price'];
 
-        // Формируем название: {brand} {subject} {sa_name} {ts_name если есть}
-        // Не включаем 'UNKNOWN' в название
         $nameParts = array_filter([
             $brandName,
             $subjectName,
@@ -1820,17 +1736,15 @@ class MarketplaceSyncService
         ]);
         $productName = implode(' ', $nameParts);
 
-
-        // Создаём Listing
         $listing = new MarketplaceListing(
             Uuid::uuid4()->toString(),
             $company,
             null,
             MarketplaceType::WILDBERRIES
         );
-        $listing->setMarketplaceSku($nmId);           // nm_id
-        $listing->setSupplierSku($saName);            // sa_name
-        $listing->setSize($tsName);                   // ts_name (может быть null)
+        $listing->setMarketplaceSku($nmId);
+        $listing->setSupplierSku($saName);
+        $listing->setSize($tsName);
         $listing->setPrice((string)$price);
         $listing->setName($productName);
 
@@ -1842,7 +1756,6 @@ class MarketplaceSyncService
     private function normalizeWbSize(?string $tsName): string
     {
         $normalizedTsName = trim((string)$tsName);
-
         return ($normalizedTsName === '') ? 'UNKNOWN' : $normalizedTsName;
     }
 
@@ -1863,7 +1776,6 @@ class MarketplaceSyncService
             return $listing;
         }
 
-        // Создаём Listing без Product — продукт привязывается вручную
         $listing = new MarketplaceListing(
             Uuid::uuid4()->toString(),
             $company,
