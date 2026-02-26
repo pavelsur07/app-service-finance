@@ -1,0 +1,193 @@
+{% set page_title = page_title|default('Новая строка P&L') %}
+{% set submit_label = submit_label|default('Сохранить') %}
+{% set available_codes = available_codes|default([]) %}
+
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{{ path('pl_category_index') }}" class="btn btn-outline-secondary">Отмена</a>
+                    <button type="submit" form="pl-category-form" class="btn btn-primary">{{ submit_label }}</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-xl">
+    <div class="row row-cards">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-body">
+                    {{ form_start(form, { attr: { id: 'pl-category-form' } }) }}
+
+                    <h3 class="card-title mb-3">Основное</h3>
+                    <div class="row g-3">
+                        <div class="col-md-8">{{ form_row(form.name) }}</div>
+                        <div class="col-md-4">
+                            {{ form_row(form.sortOrder) }}
+                            <div class="form-hint">Меньше — выше в списке</div>
+                        </div>
+                        <div class="col-md-8">{{ form_row(form.parent) }}</div>
+                        <div class="col-md-4">
+                            {{ form_label(form.code) }}
+                            <div class="input-group">
+                                {{ form_widget(form.code, { attr: { class: 'form-control font-monospace' } }) }}
+                                <button
+                                    type="button"
+                                    class="btn btn-outline-secondary"
+                                    data-copy-target="#{{ form.code.vars.id }}"
+                                    data-copy-feedback="copy-code-feedback"
+                                    title="Скопировать код"
+                                >📋</button>
+                            </div>
+                            <div id="copy-code-feedback" class="text-success small mt-1 d-none">Код скопирован</div>
+                            {{ form_errors(form.code) }}
+                            <div class="form-hint">Уникален в компании, используется в формулах</div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+                    <h3 class="card-title mb-3">Поведение строки</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">{{ form_row(form.type) }}</div>
+                        <div class="col-md-6">{{ form_row(form.flow) }}</div>
+                        <div class="col-md-6">{{ form_row(form.expenseType) }}</div>
+                    </div>
+
+                    <hr class="my-4">
+                    <h3 class="card-title mb-3">Формат и веса</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">{{ form_row(form.format) }}</div>
+                        <div class="col-md-6">
+                            {{ form_row(form.weightInParent) }}
+                            <div class="form-hint">Множитель для расчётов в родителе</div>
+                        </div>
+                        <div class="col-md-6">
+                            {{ form_row(form.calcOrder) }}
+                            <div class="form-hint">Порядок вычисления, если есть формулы/итоги</div>
+                        </div>
+                        <div class="col-12">
+                            {{ form_label(form.isVisible, null, { label_attr: { class: 'd-block mb-2' } }) }}
+                            <label class="form-check form-switch">
+                                {{ form_widget(form.isVisible, { attr: { class: 'form-check-input' } }) }}
+                                <span class="form-check-label">Показывать</span>
+                            </label>
+                            {{ form_errors(form.isVisible) }}
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
+                    <h3 class="card-title mb-3">Расчёт</h3>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            {{ form_label(form.formula) }}
+                            {{ form_widget(form.formula, { attr: { class: 'form-control font-monospace', rows: 5 } }) }}
+                            {{ form_errors(form.formula) }}
+                            <div class="form-hint">Пример: REV_TOTAL - VAR_COSTS_TOTAL</div>
+                            {% if available_codes is not empty %}
+                                <div class="mt-2">
+                                    <div class="text-secondary small mb-1">Доступные коды:</div>
+                                    {% for code in available_codes %}
+                                        <span
+                                            class="badge bg-azure-lt me-1 mb-1"
+                                            style="cursor: pointer;"
+                                            data-insert-code="{{ code }}"
+                                            data-insert-target="#{{ form.formula.vars.id }}"
+                                        >{{ code }}</span>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {{ form_rest(form) }}
+                    {{ form_end(form, { render_rest: false }) }}
+                </div>
+            </div>
+        </div>
+
+        {% set preview_type = form.type.vars.data ? form.type.vars.data.value : '—' %}
+        {% set preview_flow = form.flow.vars.data ? form.flow.vars.data.value : '—' %}
+        {% set preview_visible = form.isVisible.vars.data ? 'visible' : 'hidden' %}
+
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Предпросмотр</h3>
+                </div>
+                <div class="card-body">
+                    <div class="fw-medium">{{ form.name.vars.value ?: 'Без названия' }}</div>
+                    <div class="text-secondary font-monospace mt-1">{{ form.code.vars.value ?: 'NO_CODE' }}</div>
+                    <div class="mt-3 d-flex flex-wrap gap-1">
+                        <span class="badge bg-blue-lt">{{ preview_type }}</span>
+                        <span class="badge bg-azure-lt">{{ preview_flow }}</span>
+                        <span class="badge {{ form.isVisible.vars.data ? 'bg-green-lt' : 'bg-red-lt' }}">{{ preview_visible }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title mb-0">Подсказки</h3>
+                </div>
+                <div class="card-body">
+                    <ul class="mb-0 ps-3 text-secondary">
+                        <li>Код должен быть уникальным и лаконичным (например, <span class="font-monospace">REV_TOTAL</span>).</li>
+                        <li>Сортировка определяет позицию строки внутри родителя.</li>
+                        <li>В формуле используйте коды строк, разделяя операции пробелами для читаемости.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('click', async function (event) {
+        const copyButton = event.target.closest('[data-copy-target]');
+        if (copyButton) {
+            const input = document.querySelector(copyButton.dataset.copyTarget);
+            if (!input || !input.value) {
+                return;
+            }
+
+            try {
+                await navigator.clipboard.writeText(input.value);
+                const feedbackId = copyButton.dataset.copyFeedback;
+                const feedback = feedbackId ? document.getElementById(feedbackId) : null;
+                if (feedback) {
+                    feedback.classList.remove('d-none');
+                    setTimeout(() => feedback.classList.add('d-none'), 1400);
+                }
+            } catch (e) {
+                console.error('Copy failed', e);
+            }
+
+            return;
+        }
+
+        const codeBadge = event.target.closest('[data-insert-code]');
+        if (codeBadge) {
+            const textarea = document.querySelector(codeBadge.dataset.insertTarget);
+            if (!textarea) {
+                return;
+            }
+
+            const value = codeBadge.dataset.insertCode;
+            const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+            const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : textarea.value.length;
+
+            textarea.value = textarea.value.slice(0, start) + value + textarea.value.slice(end);
+            const cursor = start + value.length;
+            textarea.focus();
+            if (typeof textarea.setSelectionRange === 'function') {
+                textarea.setSelectionRange(cursor, cursor);
+            }
+        }
+    });
+</script>

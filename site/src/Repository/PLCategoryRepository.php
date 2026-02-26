@@ -52,6 +52,25 @@ class PLCategoryRepository extends ServiceEntityRepository
         }
     }
 
+
+    /**
+     * @return string[]
+     */
+    public function findCodesByCompany(Company $company): array
+    {
+        $rows = $this->createQueryBuilder('c')
+            ->select('DISTINCT c.code AS code')
+            ->andWhere('c.company = :company')
+            ->andWhere('c.code IS NOT NULL')
+            ->andWhere("c.code <> ''")
+            ->setParameter('company', $company)
+            ->orderBy('c.code', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(static fn (array $row): string => (string) $row['code'], $rows);
+    }
+
     public function getNextSortOrder(Company $company, ?PLCategory $parent): int
     {
         $qb = $this->createQueryBuilder('c')
