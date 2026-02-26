@@ -110,11 +110,11 @@
                     {% else %}
                         {% for doc in rawDocuments %}
                             <tr>
-                                <td><span class="badge bg-azure">{{ doc.marketplace.displayName }}</span></td>
+                                <td><span class="badge bg-azure text-azure-fg">{{ doc.marketplace.displayName }}</span></td>
                                 <td>{{ doc.documentType }}</td>
                                 <td><small>{{ doc.periodFrom|date('d.m.Y') }} — {{ doc.periodTo|date('d.m.Y') }}</small></td>
                                 <td>{{ doc.recordsCount }}</td>
-                                <td><span class="badge bg-success">{{ doc.recordsCreated }}</span></td>
+                                <td><span class="badge bg-success text-success-fg">{{ doc.recordsCreated }}</span></td>
                                 <td><span class="badge bg-secondary">{{ doc.recordsSkipped }}</span></td>
                                 <td><small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small></td>
                                 <td class="text-end">
