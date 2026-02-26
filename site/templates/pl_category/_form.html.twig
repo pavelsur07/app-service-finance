@@ -71,6 +71,17 @@
                             {{ form_row(form.calcOrder) }}
                             <div class="form-hint">Порядок вычисления, если есть формулы/итоги</div>
                         </div>
+                        <div class="col-md-6">
+                            <label class="form-label d-block mb-2">Расчёт</label>
+                            <label class="form-check form-switch">
+                                <input
+                                    id="calc-section-toggle"
+                                    class="form-check-input"
+                                    type="checkbox"
+                                >
+                                <span class="form-check-label">Показать</span>
+                            </label>
+                        </div>
                         <div class="col-12">
                             {{ form_label(form.isVisible, null, { label_attr: { class: 'd-block mb-2' } }) }}
                             <label class="form-check form-switch">
@@ -82,8 +93,9 @@
                     </div>
 
                     <hr class="my-4">
-                    <h3 class="card-title mb-3">Расчёт</h3>
-                    <div class="row g-3">
+                    <div id="calc-section" class="d-none">
+                        <h3 class="card-title mb-3">Расчёт</h3>
+                        <div class="row g-3">
                         <div class="col-12">
                             {{ form_label(form.formula) }}
                             {{ form_widget(form.formula, { attr: { class: 'form-control font-monospace', rows: 5 } }) }}
@@ -102,6 +114,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
+                        </div>
                         </div>
                     </div>
 
@@ -148,6 +161,22 @@
 </div>
 
 <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const toggle = document.getElementById('calc-section-toggle');
+        const calcSection = document.getElementById('calc-section');
+
+        if (!toggle || !calcSection) {
+            return;
+        }
+
+        const syncCalcSection = function () {
+            calcSection.classList.toggle('d-none', !toggle.checked);
+        };
+
+        syncCalcSection();
+        toggle.addEventListener('change', syncCalcSection);
+    });
+
     document.addEventListener('click', async function (event) {
         const copyButton = event.target.closest('[data-copy-target]');
         if (copyButton) {
