@@ -7,10 +7,10 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Marketplace\Service\MarketplaceSyncService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -259,7 +259,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
     public function processSales(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncFacade $syncFacade
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -270,7 +270,7 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncService->processSalesFromRaw($company, $rawDoc);
+            $count = $syncFacade->processSalesFromRaw((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
         } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
@@ -293,7 +293,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
     public function processReturns(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncFacade $syncFacade
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -304,7 +304,7 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncService->processReturnsFromRaw($company, $rawDoc);
+            $count = $syncFacade->processReturnsFromRaw((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
         } catch (\Exception $e) {
@@ -317,7 +317,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
     public function processCosts(
         string $id,
-        MarketplaceSyncService $syncService
+        MarketplaceSyncFacade $syncFacade
     ): Response {
         $company = $this->companyContext->getCompany();
 
@@ -328,7 +328,7 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncService->processCostsFromRaw($company, $rawDoc);
+            $count = $syncFacade->processCostsFromRaw((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {
