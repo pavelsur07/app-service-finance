@@ -73,6 +73,7 @@ class PLCategoryController extends AbstractController
 
         return $this->render('pl_category/new.html.twig', [
             'form' => $form->createView(),
+            'available_codes' => $repo->findCodesByCompany($company),
         ]);
     }
 
@@ -101,6 +102,7 @@ class PLCategoryController extends AbstractController
         return $this->render('pl_category/edit.html.twig', [
             'form' => $form->createView(),
             'item' => $category,
+            'available_codes' => $repo->findCodesByCompany($company),
         ]);
     }
 

@@ -28,6 +28,7 @@ class PLCategoryFormType extends AbstractType
             ])
             ->add('sortOrder', IntegerType::class, [
                 'label' => 'Сортировка',
+                'help' => 'Меньше — выше в списке',
             ])
             ->add('parent', EntityType::class, [
                 'class' => PLCategory::class,
@@ -41,6 +42,7 @@ class PLCategoryFormType extends AbstractType
             ->add('code', TextType::class, [
                 'label' => 'Код (уникален в компании)',
                 'required' => false,
+                'help' => 'Уникален в компании, используется в формулах',
                 'attr' => ['placeholder' => 'REV_WB, COGS, EBITDA ...'],
             ])
             ->add('type', ChoiceType::class, [
@@ -83,6 +85,7 @@ class PLCategoryFormType extends AbstractType
                 'html5' => true,
                 'scale' => 4,
                 'required' => false,
+                'help' => 'Множитель для расчётов в родителе',
             ])
             ->add('isVisible', CheckboxType::class, [
                 'label' => 'Показывать',
@@ -91,11 +94,13 @@ class PLCategoryFormType extends AbstractType
             ->add('formula', TextareaType::class, [
                 'label' => 'Формула (для KPI/особых итогов)',
                 'required' => false,
-                'attr' => ['rows' => 3, 'placeholder' => 'Напр.: REV_TOTAL - VAR_COSTS_TOTAL'],
+                'help' => 'Пример: REV_TOTAL - VAR_COSTS_TOTAL',
+                'attr' => ['rows' => 5, 'placeholder' => 'Напр.: REV_TOTAL - VAR_COSTS_TOTAL', 'class' => 'font-monospace'],
             ])
             ->add('calcOrder', IntegerType::class, [
                 'label' => 'Порядок расчёта',
                 'required' => false,
+                'help' => 'Порядок вычисления, если есть формулы/итоги',
             ]);
     }
 
