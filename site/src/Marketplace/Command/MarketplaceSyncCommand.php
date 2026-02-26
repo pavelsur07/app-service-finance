@@ -3,10 +3,9 @@
 namespace App\Marketplace\Command;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
-use App\Marketplace\Service\Integration\WildberriesAdapter;
-use App\Marketplace\Service\MarketplaceSyncService;
 use App\Repository\UserRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -24,8 +23,7 @@ class MarketplaceSyncCommand extends Command
 {
     public function __construct(
         private readonly MarketplaceConnectionRepository $connectionRepository,
-        private readonly WildberriesAdapter $wbAdapter,
-        private readonly MarketplaceSyncService $syncService,
+        private readonly MarketplaceSyncFacade $syncFacade,
         private readonly UserRepository $userRepository,
     ) {
         parent::__construct();
@@ -90,23 +88,18 @@ class MarketplaceSyncCommand extends Command
             }
 
             try {
-                $adapter = match ($marketplace) {
-                    MarketplaceType::WILDBERRIES => $this->wbAdapter,
-                    default => throw new \RuntimeException('Адаптер не реализован'),
-                };
-
                 $io->text('Синхронизация продаж...');
-                $salesCount = $this->syncService->syncSales($company, $adapter, $fromDate, $toDate);
+                $salesCount = $this->syncFacade->syncSales((string) $company->getId(), $marketplace, $fromDate, $toDate);
                 $totalSales += $salesCount;
                 $io->success("✓ Продаж: {$salesCount}");
 
                 $io->text('Синхронизация затрат...');
-                $costsCount = $this->syncService->syncCosts($company, $adapter, $fromDate, $toDate);
+                $costsCount = $this->syncFacade->syncCosts((string) $company->getId(), $marketplace, $fromDate, $toDate);
                 $totalCosts += $costsCount;
                 $io->success("✓ Затрат: {$costsCount}");
 
                 $io->text('Синхронизация возвратов...');
-                $returnsCount = $this->syncService->syncReturns($company, $adapter, $fromDate, $toDate);
+                $returnsCount = $this->syncFacade->syncReturns((string) $company->getId(), $marketplace, $fromDate, $toDate);
                 $totalReturns += $returnsCount;
                 $io->success("✓ Возвратов: {$returnsCount}");
             } catch (\Exception $e) {
