@@ -161,21 +161,31 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
-        const toggle = document.getElementById('calc-section-toggle');
-        const calcSection = document.getElementById('calc-section');
+    (function () {
+        const initCalcSectionToggle = function () {
+            const toggle = document.getElementById('calc-section-toggle');
+            const calcSection = document.getElementById('calc-section');
 
-        if (!toggle || !calcSection) {
-            return;
-        }
+            if (!toggle || !calcSection) {
+                return;
+            }
 
-        const syncCalcSection = function () {
-            calcSection.classList.toggle('d-none', !toggle.checked);
+            const syncCalcSection = function () {
+                calcSection.classList.toggle('d-none', !toggle.checked);
+            };
+
+            if (toggle.dataset.calcToggleBound !== '1') {
+                toggle.addEventListener('change', syncCalcSection);
+                toggle.dataset.calcToggleBound = '1';
+            }
+
+            syncCalcSection();
         };
 
-        syncCalcSection();
-        toggle.addEventListener('change', syncCalcSection);
-    });
+        initCalcSectionToggle();
+        document.addEventListener('DOMContentLoaded', initCalcSectionToggle);
+        document.addEventListener('turbo:load', initCalcSectionToggle);
+    })();
 
     document.addEventListener('click', async function (event) {
         const copyButton = event.target.closest('[data-copy-target]');
