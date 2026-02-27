@@ -1,0 +1,16 @@
+# config/pnl_template.yaml
+rows:
+    - code: REV_TOTAL
+      name: Выручка
+      type: subtotal
+      movement: income
+      formula: REV_SALES + REV_SALES_RETURN
+      sort: 5
+      is_system: true
+      children:
+          - code: REV_SALES
+            name: Продажи
+            type: row
+            movement: income
+            sort: 10
+            is_system: true
