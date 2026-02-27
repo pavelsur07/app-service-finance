@@ -384,9 +384,18 @@ class MarketplaceController extends AbstractController
         $company = $this->companyContext->getCompany();
 
         $categoryId = $request->query->get('category');
+        $mapped = (string) $request->query->get('mapped', 'all');
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
             ->getByCompanyQueryBuilder($company);
+
+        if ($mapped === 'linked') {
+            $queryBuilder->andWhere('c.listing IS NOT NULL');
+        } elseif ($mapped === 'general') {
+            $queryBuilder->andWhere('c.listing IS NULL');
+        } else {
+            $mapped = 'all';
+        }
 
         if ($categoryId) {
             $queryBuilder->andWhere('c.category = :category')
@@ -407,6 +416,7 @@ class MarketplaceController extends AbstractController
             'pager' => $pagerfanta,
             'categories' => $categories,
             'selectedCategoryId' => $categoryId,
+            'mapped' => $mapped,
         ]);
     }
 

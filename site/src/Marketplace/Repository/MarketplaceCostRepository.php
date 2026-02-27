@@ -19,6 +19,8 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     public function getByCompanyQueryBuilder(Company $company): QueryBuilder
     {
         return $this->createQueryBuilder('c')
+            ->leftJoin('c.category', 'cat')->addSelect('cat')
+            ->leftJoin('c.listing', 'l')->addSelect('l')
             ->where('c.company = :company')
             ->setParameter('company', $company)
             ->orderBy('c.costDate', 'DESC');
