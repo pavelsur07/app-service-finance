@@ -460,9 +460,15 @@ class MarketplaceSyncService
         ]);
 
         // 2. Массово загружаем listings (ПО ТОЙ ЖЕ ЛОГИКЕ ЧТО И ПРОДАЖИ!)
-        $allNmIds = array_values(array_unique(
-            array_filter(array_column($costsData, 'nm_id'))
-        ));
+        $allNmIdsMap = [];
+        foreach ($costsData as $item) {
+            $nmId = trim((string)($item['nm_id'] ?? ''));
+            if ($nmId === '' || $nmId === '0') {
+                continue;
+            }
+            $allNmIdsMap[$nmId] = true;
+        }
+        $allNmIds = array_keys($allNmIdsMap);
 
         $listingsCache = [];
         if (!empty($allNmIds)) {
@@ -480,8 +486,8 @@ class MarketplaceSyncService
 
         $newListingsCreated = 0;
         foreach ($costsData as $item) {
-            $nmId = (string)($item['nm_id'] ?? '');
-            if ($nmId === '') {
+            $nmId = trim((string)($item['nm_id'] ?? ''));
+            if ($nmId === '' || $nmId === '0') {
                 continue;
             }
 
@@ -668,11 +674,11 @@ class MarketplaceSyncService
                     $processed = true;
 
                     // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: получаем listing из кэша по nm_id + ts_name
-                    $listing = null;
-                    $nmId = (string)($item['nm_id'] ?? '');
-                    $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
-
-                    if ($nmId !== '') {
+                    $nmId = trim((string)($item['nm_id'] ?? ''));
+                    if ($nmId === '' || $nmId === '0') {
+                        $listing = null;
+                    } else {
+                        $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
                         $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
@@ -910,7 +916,12 @@ class MarketplaceSyncService
             $newListingsCreated = 0;
 
             foreach ($skus as $sku) {
-                if ($sku === '' || isset($listingsMap[$sku])) {
+                $sku = trim((string)$sku);
+                if ($sku === '' || $sku === '0') {
+                    continue;
+                }
+
+                if (isset($listingsMap[$sku])) {
                     continue;
                 }
 
@@ -964,9 +975,9 @@ class MarketplaceSyncService
             }
 
             // ПРИВЯЗКА К LISTING (если есть SKU)
+            $sku = trim((string)$costData->marketplaceSku);
             $listing = null;
-            if ($costData->marketplaceSku) {
-                $sku = trim((string)$costData->marketplaceSku);
+            if ($sku !== '' && $sku !== '0') {
                 $listing = $listingsMap[$sku] ?? null;
             }
 
