@@ -1,0 +1,1035 @@
+<!--
+  DEMO: Отчет ОПиУ (P&L) — Tabler + Tabler Icons
+  Требования (по вашему ТЗ):
+  - Шаг колонок: Месяц / Квартал (переключатель)
+  - Сравнить с: можно выбрать период (best practice), но "Изм." = % к предыдущему шагу (MoM / QoQ)
+  - Структура статей редактируемая (Каталог ОПиУ) → древо 3+ уровней
+  - Расходы отображаем положительными (без минусов)
+  - Валюта: ₽
+  - Drill-down по клику на строку → список операций/документов/контрагентов (в демо: drawer/offcanvas)
+  - Организацию убираем из шаблона
+  - Фильтры: Проект/направление, НДС (вкл/искл), Теги/Статьи/ЦЗ
+  - Экспорт: только Excel (xlsx)
+-->
+
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Отчет ОПиУ — DEMO (Tabler)</title>
+
+  <!-- Tabler CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/css/tabler.min.css">
+  <!-- Tabler Icons (webfont) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+  <style>
+    /* --- Локальные стили только для демо (минимально) --- */
+
+    /* Липкий заголовок и первая колонка */
+    .pl-table-wrap {
+      max-height: calc(100vh - 220px);
+      overflow: auto;
+      border-radius: var(--tblr-border-radius);
+    }
+
+    .pl-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--tblr-card-bg);
+      box-shadow: inset 0 -1px 0 var(--tblr-border-color);
+    }
+
+    .pl-table .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 9;
+      background: var(--tblr-card-bg);
+      box-shadow: inset -1px 0 0 var(--tblr-border-color);
+    }
+    .pl-table thead .sticky-col {
+      z-index: 11;
+    }
+
+    /* Выравнивание чисел */
+    .num {
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      white-space: nowrap;
+    }
+
+    /* Визуальные уровни дерева */
+    .pl-item {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      min-width: 360px;
+    }
+    .pl-indent {
+      width: 0;
+      flex: 0 0 auto;
+    }
+    .pl-indent[data-level="0"] { width: 0; }
+    .pl-indent[data-level="1"] { width: 18px; }
+    .pl-indent[data-level="2"] { width: 36px; }
+    .pl-indent[data-level="3"] { width: 54px; }
+    .pl-indent[data-level="4"] { width: 72px; }
+
+    .pl-toggle {
+      width: 22px;
+      height: 22px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pl-toggle:hover {
+      background: var(--tblr-bg-surface-secondary);
+    }
+
+    .pl-row-group {
+      font-weight: 600;
+    }
+
+    .pl-row-total {
+      font-weight: 600;
+      background: var(--tblr-bg-surface-secondary);
+    }
+
+    /* Кликабельность строк (drill-down) */
+    tr[data-drill="true"] td {
+      cursor: pointer;
+    }
+    tr[data-drill="true"]:hover td {
+      background: var(--tblr-bg-surface-secondary);
+    }
+
+    /* Мини-лейблы изменения */
+    .chg-badge {
+      min-width: 64px;
+      justify-content: center;
+    }
+
+    /* В демо — скрытие строк дерева */
+    tr[hidden] {
+      display: none !important;
+    }
+
+    /* Переключатель шага колонок (компакт) */
+    .segmented {
+      display: inline-flex;
+      border: 1px solid var(--tblr-border-color);
+      border-radius: var(--tblr-border-radius);
+      overflow: hidden;
+    }
+    .segmented button {
+      border: 0;
+      background: transparent;
+      padding: .35rem .6rem;
+      font-weight: 600;
+      color: var(--tblr-body-color);
+    }
+    .segmented button.active {
+      background: var(--tblr-primary);
+      color: #fff;
+    }
+
+    /* Мелкие подсказки в хедере */
+    .muted-hint {
+      color: var(--tblr-muted);
+      font-size: .8125rem;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="page">
+    <!-- Header -->
+    <header class="navbar navbar-expand-md d-print-none">
+      <div class="container-xl">
+        <div class="navbar-brand d-flex align-items-center gap-2">
+          <span class="avatar avatar-sm bg-blue-lt">
+            <i class="ti ti-chart-bar"></i>
+          </span>
+          <div>
+            <div class="fw-semibold">Отчет ОПиУ</div>
+            <div class="muted-hint">Древовидная структура статей · Drill-down · MoM/QoQ</div>
+          </div>
+        </div>
+
+        <div class="navbar-nav flex-row order-md-last">
+          <div class="nav-item me-2">
+            <button class="btn btn-outline-primary" id="btnExport">
+              <i class="ti ti-download me-2"></i>Экспорт (xlsx)
+            </button>
+          </div>
+          <div class="nav-item me-2">
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalSettings">
+              <i class="ti ti-settings me-2"></i>Настроить
+            </button>
+          </div>
+          <div class="nav-item">
+            <button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalFilters">
+              <i class="ti ti-filter me-2"></i>Фильтры
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Controls row -->
+    <div class="page-wrapper">
+      <div class="container-xl">
+        <div class="row row-cards mt-3">
+          <div class="col-12">
+            <div class="card">
+              <div class="card-body">
+                <div class="row g-3 align-items-end">
+                  <!-- Период -->
+                  <div class="col-12 col-md-4">
+                    <label class="form-label">Период</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="ti ti-calendar"></i></span>
+                      <input type="text" class="form-control" id="periodInput" value="01.01.2026 — 31.03.2026">
+                      <button class="btn btn-outline-secondary" type="button" id="btnPeriodPrev" title="Назад">
+                        <i class="ti ti-chevron-left"></i>
+                      </button>
+                      <button class="btn btn-outline-secondary" type="button" id="btnPeriodNext" title="Вперед">
+                        <i class="ti ti-chevron-right"></i>
+                      </button>
+                    </div>
+                    <div class="muted-hint mt-1">Best practice: быстрые стрелки + ручной выбор диапазона.</div>
+                  </div>
+
+                  <!-- Шаг: месяц/квартал -->
+                  <div class="col-12 col-md-2">
+                    <label class="form-label">Шаг</label>
+                    <div class="segmented" role="group" aria-label="Step toggle">
+                      <button type="button" class="active" id="stepMonth">Месяц</button>
+                      <button type="button" id="stepQuarter">Квартал</button>
+                    </div>
+                    <div class="muted-hint mt-1">Влияет на колонки и QoQ.</div>
+                  </div>
+
+                  <!-- Сравнить с -->
+                  <div class="col-12 col-md-3">
+                    <label class="form-label">Сравнить с</label>
+                    <div class="input-group">
+                      <span class="input-group-text"><i class="ti ti-arrows-left-right"></i></span>
+                      <select class="form-select" id="compareSelect">
+                        <option value="prev" selected>Предыдущий период (рекоменд.)</option>
+                        <option value="custom">Выбрать период…</option>
+                        <option value="yoy">Тот же период год назад</option>
+                      </select>
+                      <button class="btn btn-outline-secondary" type="button" id="btnComparePicker" disabled title="Выбрать период сравнения">
+                        <i class="ti ti-calendar-cog"></i>
+                      </button>
+                    </div>
+                    <div class="muted-hint mt-1">Важно: «Изм.» в колонках — % к предыдущему шагу.</div>
+                  </div>
+
+                  <!-- Пояснение -->
+                  <div class="col-12 col-md-3">
+                    <div class="alert alert-info mb-0">
+                      <div class="d-flex gap-2">
+                        <i class="ti ti-info-circle"></i>
+                        <div>
+                          <div class="fw-semibold">Логика изменений</div>
+                          <div class="small text-muted">
+                            «Изм.» = % к предыдущему периоду шага (MoM / QoQ). «Кв. изм.» = итого периода vs итого сравнения.
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div><!-- row -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="col-12">
+            <div class="card">
+              <div class="card-header">
+                <div class="card-title">Отчет</div>
+                <div class="ms-auto d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-secondary" id="btnExpandAll">
+                    <i class="ti ti-fold-down me-1"></i>Развернуть
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" id="btnCollapseAll">
+                    <i class="ti ti-fold-up me-1"></i>Свернуть
+                  </button>
+                </div>
+              </div>
+
+              <div class="pl-table-wrap">
+                <table class="table card-table table-vcenter pl-table" id="plTable">
+                  <thead>
+                    <tr>
+                      <th class="sticky-col">Статья</th>
+
+                      <!-- Колонки месяца (по умолчанию) -->
+                      <th class="num col-step col-month">Январь</th>
+                      <th class="num col-step col-month">Изм.</th>
+
+                      <th class="num col-step col-month">Февраль</th>
+                      <th class="num col-step col-month">Изм.</th>
+
+                      <th class="num col-step col-month">Март</th>
+                      <th class="num col-step col-month">Изм.</th>
+
+                      <th class="num">Кв. изм.</th>
+
+                      <!-- Колонки квартала (скрыты в режиме "Месяц") -->
+                      <th class="num col-step col-quarter" hidden>Q1 2026</th>
+                      <th class="num col-step col-quarter" hidden>Изм.</th>
+                      <th class="num col-quarter" hidden>Кв. изм.</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    <!-- Уровень 0 -->
+                    <tr class="pl-row-group" data-id="rev" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" data-toggle="tree" title="Свернуть/развернуть">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-folder text-blue"></i>
+                          <span>Выручка</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">1 800 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+16.1%</span></td>
+                      <td class="num col-month">1 950 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-azure-lt chg-badge">→</span></td>
+                      <td class="num col-month">2 100 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+7.7%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+23.4%</span></td>
+
+                      <td class="num col-quarter" hidden>5 850 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+23.4%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+23.4%</span></td>
+                    </tr>
+
+                    <!-- Уровень 1 -->
+                    <tr data-id="rev_goods" data-parent="rev" data-level="1" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="1"></span>
+                          <span class="pl-toggle" data-toggle="tree" title="Свернуть/развернуть">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-file-text text-muted"></i>
+                          <span>Продажи товаров</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">1 150 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+12.0%</span></td>
+                      <td class="num col-month">1 240 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+7.8%</span></td>
+                      <td class="num col-month">1 320 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.5%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+18.0%</span></td>
+
+                      <td class="num col-quarter" hidden>3 710 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+18.0%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+18.0%</span></td>
+                    </tr>
+
+                    <!-- Уровень 2 -->
+                    <tr data-id="rev_goods_wb" data-parent="rev_goods" data-level="2" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="2"></span>
+                          <span class="pl-toggle" style="opacity:.25" title="Нет вложенных">
+                            <i class="ti ti-point-filled"></i>
+                          </span>
+                          <i class="ti ti-tag text-muted"></i>
+                          <span>Wildberries</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">720 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+10.4%</span></td>
+                      <td class="num col-month">760 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+5.6%</span></td>
+                      <td class="num col-month">820 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+7.9%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+13.9%</span></td>
+
+                      <td class="num col-quarter" hidden>2 300 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+13.9%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+13.9%</span></td>
+                    </tr>
+
+                    <!-- Уровень 2 -->
+                    <tr data-id="rev_goods_ozon" data-parent="rev_goods" data-level="2" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="2"></span>
+                          <span class="pl-toggle" style="opacity:.25" title="Нет вложенных">
+                            <i class="ti ti-point-filled"></i>
+                          </span>
+                          <i class="ti ti-tag text-muted"></i>
+                          <span>Ozon</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">430 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+14.1%</span></td>
+                      <td class="num col-month">480 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+11.6%</span></td>
+                      <td class="num col-month">500 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+4.2%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+16.3%</span></td>
+
+                      <td class="num col-quarter" hidden>1 410 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+16.3%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+16.3%</span></td>
+                    </tr>
+
+                    <!-- Уровень 1 -->
+                    <tr data-id="rev_services" data-parent="rev" data-level="1" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="1"></span>
+                          <span class="pl-toggle" style="opacity:.25" title="Нет вложенных">
+                            <i class="ti ti-point-filled"></i>
+                          </span>
+                          <i class="ti ti-file-text text-muted"></i>
+                          <span>Оказание услуг</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">650 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+8.3%</span></td>
+                      <td class="num col-month">700 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+7.7%</span></td>
+                      <td class="num col-month">720 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+2.8%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+10.8%</span></td>
+
+                      <td class="num col-quarter" hidden>2 070 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+10.8%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+10.8%</span></td>
+                    </tr>
+
+                    <!-- Итоги -->
+                    <tr class="pl-row-total" data-id="rev_total" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" style="opacity:.0"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-sum text-muted"></i>
+                          <span>Итого выручка</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">2 450 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+8.2%</span></td>
+                      <td class="num col-month">2 650 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+8.2%</span></td>
+                      <td class="num col-month">2 820 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.4%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+15.4%</span></td>
+
+                      <td class="num col-quarter" hidden>7 920 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+15.4%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+15.4%</span></td>
+                    </tr>
+
+                    <!-- Себестоимость -->
+                    <tr class="pl-row-group" data-id="cogs" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" data-toggle="tree">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-folder text-orange"></i>
+                          <span>Себестоимость</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">1 170 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.6%</span></td>
+                      <td class="num col-month">1 240 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.0%</span></td>
+                      <td class="num col-month">1 290 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+4.0%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+10.3%</span></td>
+
+                      <td class="num col-quarter" hidden>3 700 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+10.3%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+10.3%</span></td>
+                    </tr>
+
+                    <tr data-id="cogs_buy" data-parent="cogs" data-level="1" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="1"></span>
+                          <span class="pl-toggle" style="opacity:.25"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-file-text text-muted"></i>
+                          <span>Закупка товаров</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">870 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+11.5%</span></td>
+                      <td class="num col-month">920 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+5.7%</span></td>
+                      <td class="num col-month">980 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.5%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+12.6%</span></td>
+
+                      <td class="num col-quarter" hidden>2 770 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+12.6%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+12.6%</span></td>
+                    </tr>
+
+                    <tr data-id="cogs_srv" data-parent="cogs" data-level="1" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="1"></span>
+                          <span class="pl-toggle" style="opacity:.25"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-file-text text-muted"></i>
+                          <span>Затраты на услуги</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">300 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+11.1%</span></td>
+                      <td class="num col-month">320 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.7%</span></td>
+                      <td class="num col-month">310 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−3.1%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+3.3%</span></td>
+
+                      <td class="num col-quarter" hidden>930 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+3.3%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+3.3%</span></td>
+                    </tr>
+
+                    <!-- Валовая прибыль -->
+                    <tr class="pl-row-total" data-id="gp" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" style="opacity:.0"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-sum text-muted"></i>
+                          <span>Валовая прибыль</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">1 280 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+6.3%</span></td>
+                      <td class="num col-month">1 410 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+10.2%</span></td>
+                      <td class="num col-month">1 530 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+8.5%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+19.5%</span></td>
+
+                      <td class="num col-quarter" hidden>4 220 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+19.5%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+19.5%</span></td>
+                    </tr>
+
+                    <!-- Операционные расходы -->
+                    <tr class="pl-row-group" data-id="opex" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" data-toggle="tree">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-folder text-purple"></i>
+                          <span>Операционные расходы</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">320 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+28.3%</span></td>
+                      <td class="num col-month">410 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+28.1%</span></td>
+                      <td class="num col-month">350 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−14.6%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+
+                      <td class="num col-quarter" hidden>1 080 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+                    </tr>
+
+                    <!-- Вложенность 3+ (пример) -->
+                    <tr data-id="opex_marketing" data-parent="opex" data-level="1" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="1"></span>
+                          <span class="pl-toggle" data-toggle="tree">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-folder text-muted"></i>
+                          <span>Маркетинг и реклама</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">120 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+16.7%</span></td>
+                      <td class="num col-month">100 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−16.7%</span></td>
+                      <td class="num col-month">100 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-azure-lt chg-badge">→</span></td>
+                      <td class="num"><span class="badge bg-red-lt chg-badge">−16.9%</span></td>
+
+                      <td class="num col-quarter" hidden>320 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−16.9%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−16.9%</span></td>
+                    </tr>
+
+                    <tr data-id="opex_marketing_ads" data-parent="opex_marketing" data-level="2" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="2"></span>
+                          <span class="pl-toggle" data-toggle="tree">
+                            <i class="ti ti-chevron-down"></i>
+                          </span>
+                          <i class="ti ti-folder text-muted"></i>
+                          <span>Реклама</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">70 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+9.4%</span></td>
+                      <td class="num col-month">60 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−14.3%</span></td>
+                      <td class="num col-month">60 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-azure-lt chg-badge">→</span></td>
+                      <td class="num"><span class="badge bg-red-lt chg-badge">−8.7%</span></td>
+
+                      <td class="num col-quarter" hidden>190 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−8.7%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−8.7%</span></td>
+                    </tr>
+
+                    <tr data-id="opex_marketing_ads_tg" data-parent="opex_marketing_ads" data-level="3" data-expanded="true" data-drill="true">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="3"></span>
+                          <span class="pl-toggle" style="opacity:.25"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-file-text text-muted"></i>
+                          <span>Telegram Ads</span>
+                        </div>
+                      </td>
+                      <td class="num col-month">30 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+7.1%</span></td>
+                      <td class="num col-month">25 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−16.7%</span></td>
+                      <td class="num col-month">25 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-azure-lt chg-badge">→</span></td>
+                      <td class="num"><span class="badge bg-red-lt chg-badge">−10.0%</span></td>
+
+                      <td class="num col-quarter" hidden>80 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−10.0%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-red-lt chg-badge">−10.0%</span></td>
+                    </tr>
+
+                    <!-- Чистая прибыль -->
+                    <tr class="pl-row-total" data-id="net" data-parent="" data-level="0" data-expanded="true" data-drill="false">
+                      <td class="sticky-col">
+                        <div class="pl-item">
+                          <span class="pl-indent" data-level="0"></span>
+                          <span class="pl-toggle" style="opacity:.0"><i class="ti ti-point-filled"></i></span>
+                          <i class="ti ti-sum text-muted"></i>
+                          <span>Чистая прибыль</span>
+                        </div>
+                      </td>
+                      <td class="num col-month text-green">320 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+                      <td class="num col-month text-green">410 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-green-lt chg-badge">+28.1%</span></td>
+                      <td class="num col-month text-green">350 000 ₽</td>
+                      <td class="num col-month"><span class="badge bg-red-lt chg-badge">−14.6%</span></td>
+                      <td class="num"><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+
+                      <td class="num col-quarter text-green" hidden>1 080 000 ₽</td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+                      <td class="num col-quarter" hidden><span class="badge bg-green-lt chg-badge">+56.0%</span></td>
+                    </tr>
+
+                  </tbody>
+                </table>
+              </div><!-- wrap -->
+
+              <div class="card-footer d-flex justify-content-between align-items-center">
+                <div class="text-muted small">
+                  Подсказка: клик по строкам деталей открывает drill-down (операции/документы/контрагенты).
+                </div>
+                <div class="text-muted small">
+                  Демо-данные · Валюта: ₽ · Экспорт: xlsx
+                </div>
+              </div>
+            </div>
+          </div>
+        </div><!-- row -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Drill-down Offcanvas (drawer) -->
+  <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasDrill" aria-labelledby="offcanvasDrillLabel">
+    <div class="offcanvas-header">
+      <div>
+        <h2 class="offcanvas-title h4" id="offcanvasDrillLabel">Детализация</h2>
+        <div class="text-muted" id="drillMeta">Статья · Период</div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+    </div>
+
+    <div class="offcanvas-body">
+      <div class="card mb-3">
+        <div class="card-body">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="text-muted small">Сумма (выбранный период)</div>
+              <div class="h3 mb-0" id="drillAmount">—</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted small">Изм. к предыдущему</div>
+              <div class="h3 mb-0" id="drillChange">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="fw-semibold">Операции</div>
+        <div class="btn-list">
+          <button class="btn btn-sm btn-outline-secondary">
+            <i class="ti ti-search me-1"></i>Поиск
+          </button>
+          <button class="btn btn-sm btn-outline-secondary">
+            <i class="ti ti-filter me-1"></i>Фильтр
+          </button>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table table-vcenter">
+          <thead>
+            <tr>
+              <th>Дата</th>
+              <th>Документ</th>
+              <th>Контрагент</th>
+              <th class="text-end">Сумма</th>
+            </tr>
+          </thead>
+          <tbody id="drillRows">
+            <!-- Заполняем JS-ом -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="text-muted small mt-2">
+        В реальной системе тут будет пагинация и выгрузка операций по статье/периоду/фильтрам.
+      </div>
+    </div>
+  </div>
+
+  <!-- Filters Modal -->
+  <div class="modal modal-blur fade" id="modalFilters" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Фильтры</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Проект / направление</label>
+              <select class="form-select">
+                <option>Все</option>
+                <option>Проект A</option>
+                <option>Проект B</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">НДС</label>
+              <select class="form-select">
+                <option>Исключать (рекоменд. для управленки)</option>
+                <option>Включать</option>
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label class="form-label">Центр затрат</label>
+              <select class="form-select">
+                <option>Все</option>
+                <option>Маркетинг</option>
+                <option>Операции</option>
+                <option>Разработка</option>
+              </select>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Теги</label>
+              <input class="form-control" placeholder="Напр: WB, Ozon, Influencer">
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label">Статьи (фильтр по каталогу)</label>
+              <input class="form-control" placeholder="Напр: Маркетинг, Закупка, Логистика">
+            </div>
+
+            <div class="col-12">
+              <div class="alert alert-warning mb-0">
+                Best practice: сохранять наборы фильтров (presets) и показывать активные фильтры чипами над таблицей.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button class="btn btn-primary" data-bs-dismiss="modal">
+            <i class="ti ti-check me-1"></i>Применить
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal modal-blur fade" id="modalSettings" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md modal-dialog-centered">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Настройки отчета</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Колонки</label>
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" checked disabled>
+              <span class="form-check-label">Показать «Изм.» (MoM/QoQ)</span>
+              <span class="form-check-description">В MVP лучше оставить всегда включенным.</span>
+            </label>
+
+            <label class="form-check mt-2">
+              <input class="form-check-input" type="checkbox" checked>
+              <span class="form-check-label">Показать «Кв. изм.»</span>
+            </label>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Вид</label>
+            <label class="form-check">
+              <input class="form-check-input" type="checkbox" checked>
+              <span class="form-check-label">Липкая первая колонка</span>
+            </label>
+            <label class="form-check mt-2">
+              <input class="form-check-input" type="checkbox">
+              <span class="form-check-label">Компактный режим</span>
+            </label>
+          </div>
+
+          <div class="alert alert-info mb-0">
+            Best practice: «Настроить» не смешивать с редактированием каталога ОПиУ. Каталог — отдельный экран.
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Закрыть</button>
+          <button class="btn btn-primary" data-bs-dismiss="modal">Сохранить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabler JS (includes Bootstrap bundle) -->
+  <script src="https://cdn.jsdelivr.net/npm/@tabler/core@latest/dist/js/tabler.min.js"></script>
+
+  <script>
+    // --------------------------------------------
+    // DEMO LOGIC (дерево + переключение шага + drill-down)
+    // --------------------------------------------
+
+    const table = document.getElementById('plTable');
+    const stepMonthBtn = document.getElementById('stepMonth');
+    const stepQuarterBtn = document.getElementById('stepQuarter');
+    const compareSelect = document.getElementById('compareSelect');
+    const btnComparePicker = document.getElementById('btnComparePicker');
+    const btnExpandAll = document.getElementById('btnExpandAll');
+    const btnCollapseAll = document.getElementById('btnCollapseAll');
+    const btnExport = document.getElementById('btnExport');
+
+    // Best practice: "Сравнить с" — даем выбор, но по умолчанию previous period.
+    compareSelect.addEventListener('change', () => {
+      btnComparePicker.disabled = (compareSelect.value !== 'custom');
+    });
+
+    // Переключение шага: Месяц / Квартал
+    function setStep(step) {
+      const isMonth = step === 'month';
+      stepMonthBtn.classList.toggle('active', isMonth);
+      stepQuarterBtn.classList.toggle('active', !isMonth);
+
+      // Переключаем видимость колонок (демо-реализация)
+      document.querySelectorAll('.col-month').forEach(el => el.hidden = !isMonth);
+      document.querySelectorAll('.col-quarter').forEach(el => el.hidden = isMonth);
+    }
+    stepMonthBtn.addEventListener('click', () => setStep('month'));
+    stepQuarterBtn.addEventListener('click', () => setStep('quarter'));
+
+    // Дерево: показать/скрыть дочерние строки
+    function getRowById(id) {
+      return table.querySelector(`tbody tr[data-id="${id}"]`);
+    }
+    function getChildrenRows(parentId) {
+      return Array.from(table.querySelectorAll(`tbody tr[data-parent="${parentId}"]`));
+    }
+    function setExpanded(row, expanded) {
+      row.dataset.expanded = expanded ? 'true' : 'false';
+      const icon = row.querySelector('[data-toggle="tree"] i');
+      if (icon) {
+        icon.classList.toggle('ti-chevron-down', expanded);
+        icon.classList.toggle('ti-chevron-right', !expanded);
+      }
+
+      // Управляем видимостью детей (и рекурсивно скрываем поддерево)
+      const children = getChildrenRows(row.dataset.id);
+      children.forEach(child => {
+        child.hidden = !expanded;
+        if (!expanded) {
+          // если сворачиваем — скрываем всё поддерево
+          collapseSubtree(child);
+        }
+      });
+    }
+    function collapseSubtree(row) {
+      const children = getChildrenRows(row.dataset.id);
+      children.forEach(ch => {
+        ch.hidden = true;
+        collapseSubtree(ch);
+      });
+      // При скрытии subtree можно не менять expanded, но лучше — для UX
+      if (row.querySelector('[data-toggle="tree"]')) {
+        row.dataset.expanded = 'false';
+        const icon = row.querySelector('[data-toggle="tree"] i');
+        if (icon) {
+          icon.classList.remove('ti-chevron-down');
+          icon.classList.add('ti-chevron-right');
+        }
+      }
+    }
+
+    // Клик по toggle
+    table.addEventListener('click', (e) => {
+      const toggle = e.target.closest('[data-toggle="tree"]');
+      if (!toggle) return;
+
+      // Запрещаем уход в drill-down если нажали на toggle
+      e.stopPropagation();
+
+      const row = e.target.closest('tr');
+      if (!row) return;
+
+      const expanded = row.dataset.expanded === 'true';
+      setExpanded(row, !expanded);
+    });
+
+    // Expand/collapse all (best practice для больших деревьев)
+    btnExpandAll.addEventListener('click', () => {
+      const rows = Array.from(table.querySelectorAll('tbody tr[data-toggleable="false"]'));
+      // Упростим: развернем только узлы которые имеют toggle
+      Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
+        const hasToggle = row.querySelector('[data-toggle="tree"]');
+        if (hasToggle) setExpanded(row, true);
+        // Показываем детей для верхнего уровня
+        if (row.dataset.parent && getRowById(row.dataset.parent)?.dataset.expanded === 'true') {
+          row.hidden = false;
+        }
+      });
+    });
+
+    btnCollapseAll.addEventListener('click', () => {
+      // Сворачиваем все узлы и скрываем всё кроме root (parent="")
+      Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
+        const hasToggle = row.querySelector('[data-toggle="tree"]');
+        if (hasToggle) {
+          row.dataset.expanded = 'false';
+          const icon = row.querySelector('[data-toggle="tree"] i');
+          if (icon) {
+            icon.classList.remove('ti-chevron-down');
+            icon.classList.add('ti-chevron-right');
+          }
+        }
+        if (row.dataset.parent) row.hidden = true;
+      });
+    });
+
+    // Drill-down: клик по строке (кроме групп/итогов)
+    const offcanvasEl = document.getElementById('offcanvasDrill');
+    const offcanvas = new bootstrap.Offcanvas(offcanvasEl);
+
+    function formatRub(v) {
+      return v;
+    }
+
+    function openDrill(row) {
+      const name = row.querySelector('.pl-item span:last-child')?.textContent?.trim() || 'Статья';
+      const amountCell = row.querySelector('.col-month:not([hidden]), .col-quarter:not([hidden])');
+      const chgCell = row.querySelectorAll('.col-month:not([hidden]), .col-quarter:not([hidden])')[1];
+
+      document.getElementById('offcanvasDrillLabel').textContent = name;
+      document.getElementById('drillMeta').textContent = `${document.getElementById('periodInput').value} · Шаг: ${stepMonthBtn.classList.contains('active') ? 'месяц' : 'квартал'}`;
+      document.getElementById('drillAmount').textContent = amountCell ? amountCell.textContent.trim() : '—';
+      document.getElementById('drillChange').textContent = chgCell ? chgCell.textContent.trim() : '—';
+
+      // Демо-операции (заглушка)
+      const rows = [
+        { d: '2026-01-05', doc: 'Платеж №1021', c: 'ООО Рекламный кабинет', a: '10 000 ₽' },
+        { d: '2026-01-12', doc: 'Акт №33',     c: 'ИП Иванов',             a: '7 500 ₽' },
+        { d: '2026-01-20', doc: 'Счет №88',    c: 'ООО Площадка',          a: '12 000 ₽' },
+        { d: '2026-01-28', doc: 'Платеж №1099',c: 'ООО Рекламный кабинет', a: '5 000 ₽' },
+      ];
+      const tbody = document.getElementById('drillRows');
+      tbody.innerHTML = rows.map(r => `
+        <tr>
+          <td class="text-muted">${r.d}</td>
+          <td>${r.doc}</td>
+          <td>${r.c}</td>
+          <td class="text-end">${r.a}</td>
+        </tr>
+      `).join('');
+
+      offcanvas.show();
+    }
+
+    table.addEventListener('click', (e) => {
+      const row = e.target.closest('tr');
+      if (!row) return;
+
+      // Если кликнули по toggle — drill-down не открываем
+      if (e.target.closest('[data-toggle="tree"]')) return;
+
+      // Открываем drill-down только для строк с data-drill="true"
+      if (row.dataset.drill === 'true') {
+        openDrill(row);
+      }
+    });
+
+    // Экспорт (xlsx) — заглушка
+    btnExport.addEventListener('click', () => {
+      // В реальном приложении:
+      // - собираем текущие параметры: период, шаг, сравнение, фильтры, раскрытия
+      // - GET /export/pl?from=...&to=...&step=month|quarter...
+      alert('DEMO: экспорт в xlsx (заглушка). Здесь будет запрос на бэкенд и скачивание файла.');
+    });
+
+    // Инициализация: по умолчанию "месяц"
+    setStep('month');
+
+    // Дополнительно: скрыть детей, если родитель свернут (на старте все развернуто — оставляем)
+  </script>
+</body>
+</html>
