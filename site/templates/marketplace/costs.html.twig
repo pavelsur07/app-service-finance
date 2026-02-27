@@ -3,11 +3,27 @@
 {% set active_tab = 'costs' %}
 
 {% block tab_content %}
+    <ul class="nav nav-tabs mb-3">
+        <li class="nav-item">
+            <a class="nav-link {{ mapped == 'all' ? 'active' : '' }}"
+               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'all'}) }}">Все</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ mapped == 'linked' ? 'active' : '' }}"
+               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'linked'}) }}">С листингом</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {{ mapped == 'general' ? 'active' : '' }}"
+               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'general'}) }}">Общие</a>
+        </li>
+    </ul>
+
     <div class="card-header">
         <h3 class="card-title">Фильтр</h3>
     </div>
     <div class="card-body border-bottom">
         <form method="get" action="{{ path('marketplace_costs_index') }}" class="row g-3">
+            <input type="hidden" name="mapped" value="{{ mapped }}">
             <div class="col-md-4">
                 <label class="form-label">Категория</label>
                 <select name="category" class="form-select" onchange="this.form.submit()">
@@ -60,10 +76,21 @@
                         <td>{{ cost.costDate|date('d.m.Y') }}</td>
                         <td><span class="badge bg-purple-lt">{{ cost.category.name }}</span></td>
                         <td>
-                            {% if cost.product %}
-                                <strong>{{ cost.product.name }}</strong>
+                            {% if cost.listing %}
+                                <div class="fw-semibold">{{ cost.listing.name ?? ('WB #' ~ cost.listing.marketplaceSku) }}</div>
+                                <div class="text-muted small">
+                                    nm_id: {{ cost.listing.marketplaceSku }},
+                                    size: {{ cost.listing.size }}
+                                </div>
                             {% else %}
                                 <span class="text-muted">Общие затраты</span>
+                            {% endif %}
+
+                            {% set sync = cost.rawData._sync ?? null %}
+                            {% if sync %}
+                                <div class="text-muted small">
+                                    sync: nm_id={{ sync.nm_id ?? '-' }}, ts_name={{ sync.ts_name ?? '-' }}, barcode={{ sync.barcode ?? '-' }}
+                                </div>
                             {% endif %}
                         </td>
                         <td class="text-end text-danger">
@@ -102,7 +129,14 @@
     </div>
     {% if pager.haveToPaginate %}
         <div class="card-footer d-flex align-items-center">
-            {% include 'partials/_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_costs_index'} %}
+            {% include 'partials/_pagerfanta.html.twig' with {
+                'pager': pager,
+                'route': 'marketplace_costs_index',
+                'params': {
+                    'category': selectedCategoryId,
+                    'mapped': mapped
+                }
+            } %}
         </div>
     {% endif %}
 {% endblock %}
