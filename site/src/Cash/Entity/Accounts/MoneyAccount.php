@@ -46,6 +46,10 @@ class MoneyAccount
     #[ORM\Column(type: 'decimal', precision: 18, scale: 2)]
     private string $currentBalance = '0.00';
 
+    #Коментарий: Неснижаемый остаток (ватерлиния) для конкретного счёта.
+    #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
+    private string $minimumSafeBalance = '0.00';
+
     #[ORM\Column(type: 'integer')]
     private int $sortOrder = 100;
 
@@ -210,6 +214,18 @@ class MoneyAccount
     public function setCurrentBalance(string $currentBalance): self
     {
         $this->currentBalance = $currentBalance;
+
+        return $this;
+    }
+
+    public function getMinimumSafeBalance(): string
+    {
+        return $this->minimumSafeBalance;
+    }
+
+    public function setMinimumSafeBalance(string $minimumSafeBalance): self
+    {
+        $this->minimumSafeBalance = $minimumSafeBalance;
 
         return $this;
     }
