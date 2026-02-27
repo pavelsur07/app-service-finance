@@ -478,6 +478,40 @@ class MarketplaceSyncService
             ]);
         }
 
+        $newListingsCreated = 0;
+        foreach ($costsData as $item) {
+            $nmId = (string)($item['nm_id'] ?? '');
+            if ($nmId === '') {
+                continue;
+            }
+
+            $tsName = $this->normalizeWbSize($item['ts_name'] ?? null);
+            $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+
+            if (isset($listingsCache[$cacheKey])) {
+                continue;
+            }
+
+            $listing = $this->createListingFromWbData($company, [
+                'nm_id' => $nmId,
+                'ts_name' => $tsName,
+                'sa_name' => (string)($item['sa_name'] ?? ''),
+                'brand_name' => (string)($item['brand_name'] ?? ''),
+                'subject_name' => (string)($item['subject_name'] ?? ''),
+                'retail_price' => (string)($item['retail_price'] ?? '0'),
+            ]);
+
+            $listingsCache[$cacheKey] = $listing;
+            $newListingsCreated++;
+        }
+
+        if ($newListingsCreated > 0) {
+            $this->em->flush();
+            $this->logger->info('Created missing listings for costs in bulk', [
+                'new_listings' => $newListingsCreated
+            ]);
+        }
+
         // 3. Загружаем ВСЕ категории компании
         $categoriesCache = [];
         $allCategories = $this->costCategoryRepository->findBy([
@@ -641,11 +675,6 @@ class MarketplaceSyncService
                     if ($nmId !== '') {
                         $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
                         $listing = $listingsCache[$cacheKey] ?? null;
-                    }
-
-                    // Если калькулятор требует листинг, но его нет - пропускаем
-                    if ($calculator->requiresListing() && !$listing) {
-                        continue;
                     }
 
                     $calculatedCosts = $calculator->calculate($item, $listing);
