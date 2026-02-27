@@ -15,6 +15,9 @@ readonly class CostData
         public ?string $description = null,
         public ?string $externalId = null,
         public ?array $rawData = null,
+        public ?string $nmId = null,
+        public ?string $tsName = null,
+        public ?string $barcode = null,
     ) {
     }
 }

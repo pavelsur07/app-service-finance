@@ -119,6 +119,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $realizationId = (string) $item['realizationreport_id'];
             $saName = $item['sa_name'];
             $rrDt = new \DateTimeImmutable($item['rr_dt']);
+            $nmId = trim((string) ($item['nm_id'] ?? ''));
+            $tsName = isset($item['ts_name']) ? (string) $item['ts_name'] : null;
+            $barcode = isset($item['barcode']) ? (string) $item['barcode'] : null;
 
             if (isset($item['commission_percent']) && abs((float) $item['commission_percent']) > 0) {
                 $costs[] = new CostData(
@@ -129,6 +132,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Комиссия Wildberries',
                     externalId: $realizationId.'_commission',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -141,6 +147,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Логистика WB',
                     externalId: $realizationId.'_logistics',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -153,6 +162,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Логистика возврата WB',
                     externalId: $realizationId.'_return_logistics',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -165,6 +177,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Хранение на складе WB',
                     externalId: $realizationId.'_storage',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -177,6 +192,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Платная приёмка WB',
                     externalId: $realizationId.'_acceptance',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -189,6 +207,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Прочие удержания WB',
                     externalId: $realizationId.'_deduction',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -201,6 +222,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Штрафы WB',
                     externalId: $realizationId.'_penalty',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
 
@@ -213,6 +237,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     marketplaceSku: $saName,
                     description: 'Доплаты WB',
                     externalId: $realizationId.'_additional_payment',
+                    nmId: $nmId,
+                    tsName: $tsName,
+                    barcode: $barcode,
                 );
             }
         }
