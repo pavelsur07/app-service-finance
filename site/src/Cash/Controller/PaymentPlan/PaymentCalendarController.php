@@ -95,6 +95,9 @@ final class PaymentCalendarController extends AbstractController
         $dto->counterparty = $plan->getCounterparty();
         $dto->comment = $plan->getComment();
         $dto->status = $plan->getStatus()->value;
+        $dto->probability = $plan->getProbability();
+        $dto->isFrozen = $plan->isFrozen();
+        $dto->expectedAt = $plan->getExpectedAt();
 
         $form = $this->createForm(PaymentPlanType::class, $dto, [
             'company' => $company,

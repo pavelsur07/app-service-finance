@@ -13,6 +13,7 @@ use App\Enum\PaymentPlanStatus;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
+use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
 use Symfony\Component\Form\Extension\Core\Type\NumberType;
@@ -95,6 +96,24 @@ final class PaymentPlanType extends AbstractType
                 'required' => false,
                 'placeholder' => 'По умолчанию (PLANNED)',
                 'choices' => $this->buildStatusChoices(),
+            ])
+            ->add('probability', ChoiceType::class, [
+                'label' => 'Вероятность',
+                'choices' => [
+                    '100%' => 100,
+                    '90%' => 90,
+                    '50%' => 50,
+                    '10%' => 10,
+                ],
+            ])
+            ->add('isFrozen', CheckboxType::class, [
+                'label' => 'Зафиксировать платёж',
+                'required' => false,
+            ])
+            ->add('expectedAt', DateType::class, [
+                'widget' => 'single_text',
+                'required' => false,
+                'label' => 'Ожидаемая дата',
             ])
             ->add('comment', TextareaType::class, [
                 'label' => 'Комментарий',
