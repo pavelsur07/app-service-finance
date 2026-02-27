@@ -677,11 +677,6 @@ class MarketplaceSyncService
                         $listing = $listingsCache[$cacheKey] ?? null;
                     }
 
-                    // Если калькулятор требует листинг, но его нет - пропускаем
-                    if ($calculator->requiresListing() && !$listing) {
-                        continue;
-                    }
-
                     $calculatedCosts = $calculator->calculate($item, $listing);
 
                     foreach ($calculatedCosts as $costData) {
