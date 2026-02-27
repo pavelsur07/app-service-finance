@@ -916,7 +916,12 @@ class MarketplaceSyncService
             $newListingsCreated = 0;
 
             foreach ($skus as $sku) {
-                if ($sku === '' || isset($listingsMap[$sku])) {
+                $sku = trim((string)$sku);
+                if ($sku === '' || $sku === '0') {
+                    continue;
+                }
+
+                if (isset($listingsMap[$sku])) {
                     continue;
                 }
 
@@ -970,9 +975,9 @@ class MarketplaceSyncService
             }
 
             // ПРИВЯЗКА К LISTING (если есть SKU)
+            $sku = trim((string)$costData->marketplaceSku);
             $listing = null;
-            if ($costData->marketplaceSku) {
-                $sku = trim((string)$costData->marketplaceSku);
+            if ($sku !== '' && $sku !== '0') {
                 $listing = $listingsMap[$sku] ?? null;
             }
 
