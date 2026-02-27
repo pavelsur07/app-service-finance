@@ -1024,6 +1024,23 @@ class MarketplaceSyncService
             $cost->setDescription($costData->description);
             $cost->setExternalId($costData->externalId);
 
+            $raw = $costData->rawData ?? [];
+            if (!is_array($raw)) {
+                $raw = [];
+            }
+
+            $raw['_sync'] = [
+                'marketplace' => $marketplace->value,
+                'marketplaceSku' => $costData->marketplaceSku,
+                'nm_id' => $costData->nmId ?? null,
+                'ts_name' => $costData->tsName ?? null,
+                'barcode' => $costData->barcode ?? null,
+            ];
+
+            $raw['_sync'] = array_filter($raw['_sync'], static fn($v) => $v !== null && $v !== '');
+
+            $cost->setRawData($raw);
+
             $this->em->persist($cost);
             if ($externalId !== '') {
                 $existingExternalIdsMap[$externalId] = true;
