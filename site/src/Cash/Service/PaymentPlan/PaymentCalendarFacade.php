@@ -67,10 +67,14 @@ final class PaymentCalendarFacade
         $this->paymentPlanService->applyCompanyScope($plan, $company);
         $plan->setCashflowCategory($dto->cashflowCategory);
         $plan->setPlannedAt(\DateTimeImmutable::createFromInterface($dto->plannedAt));
+        $expectedAt = $dto->expectedAt ?? $dto->plannedAt;
+        $plan->setExpectedAt(\DateTimeImmutable::createFromInterface($expectedAt));
         $plan->setAmount((string) $dto->amount);
         $plan->setMoneyAccount($dto->moneyAccount);
         $plan->setCounterparty($dto->counterparty);
         $plan->setComment($dto->comment);
+        $plan->setProbability($dto->probability);
+        $plan->setIsFrozen($dto->isFrozen);
 
         $resolvedType = $this->paymentPlanService->resolveTypeByCategory($dto->cashflowCategory);
         $plan->setType(PaymentPlanTypeEnum::from($resolvedType));
