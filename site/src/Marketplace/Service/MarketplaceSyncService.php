@@ -906,6 +906,33 @@ class MarketplaceSyncService
         // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: загружаем listings по SKU (как для продаж/возвратов)
         $listingsMap = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $skus);
 
+        if ($marketplace === MarketplaceType::WILDBERRIES) {
+            $newListingsCreated = 0;
+
+            foreach ($skus as $sku) {
+                if ($sku === '' || isset($listingsMap[$sku])) {
+                    continue;
+                }
+
+                $listing = new MarketplaceListing(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    null,
+                    $marketplace
+                );
+                $listing->setMarketplaceSku($sku);
+                $listing->setPrice('0');
+
+                $this->em->persist($listing);
+                $listingsMap[$sku] = $listing;
+                $newListingsCreated++;
+            }
+
+            if ($newListingsCreated > 0) {
+                $this->em->flush();
+            }
+        }
+
         $existingExternalIdsMap = [];
         if ($externalIds !== []) {
             $connection = $this->em->getConnection();
