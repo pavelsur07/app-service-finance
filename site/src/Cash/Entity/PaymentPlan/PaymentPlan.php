@@ -8,16 +8,18 @@ use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;
 use App\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus;
+use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
 use App\Enum\PaymentPlanType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: PaymentPlanRepository::class)]
 #[ORM\Table(name: 'payment_plan')]
-#[ORM\Index(name: 'idx_payment_plan_company_planned_at', columns: ['company_id', 'planned_at'])]
+#[ORM\Index(name: 'idx_payment_plan_company_expected_at', columns: ['company_id', 'expected_at'])]
 #[ORM\Index(name: 'idx_payment_plan_company_status', columns: ['company_id', 'status'])]
 #[ORM\Index(name: 'idx_payment_plan_company_category', columns: ['company_id', 'cashflow_category_id'])]
 #[ORM\Index(name: 'idx_payment_plan_company_account', columns: ['company_id', 'money_account_id'])]
+#[ORM\Index(name: 'idx_payment_plan_external_sync', columns: ['company_id', 'source', 'external_id'])]
 #[ORM\HasLifecycleCallbacks]
 class PaymentPlan
 {
@@ -41,8 +43,25 @@ class PaymentPlan
     #[ORM\JoinColumn(onDelete: 'SET NULL')]
     private ?Counterparty $counterparty = null;
 
-    #[ORM\Column(type: 'date_immutable')]
+    # Комментарий: ожидаемая дата оплаты, которую рассчитывает прогноз.
+    #[ORM\Column(name: 'expected_at', type: 'date_immutable')]
     private \DateTimeImmutable $plannedAt;
+
+    # Комментарий: жесткая дата из документа (счет/договор), не меняется алгоритмами.
+    #[ORM\Column(type: 'date_immutable')]
+    private \DateTimeImmutable $documentDate;
+
+    # Комментарий: вероятность поступления денег в процентах (0-100).
+    #[ORM\Column(type: 'smallint')]
+    private int $probability = 100;
+
+    # Комментарий: источник создания плана (ручной ввод, API, импорт).
+    #[ORM\Column(enumType: PaymentPlanSource::class)]
+    private PaymentPlanSource $source = PaymentPlanSource::MANUAL;
+
+    # Комментарий: идентификатор внешнего документа для дедупликации при синхронизации.
+    #[ORM\Column(type: 'string', length: 255, nullable: true)]
+    private ?string $externalId = null;
 
     #[ORM\Column(type: 'decimal', precision: 14, scale: 2)]
     private string $amount;
@@ -73,6 +92,7 @@ class PaymentPlan
         $this->company = $company;
         $this->cashflowCategory = $category;
         $this->plannedAt = $plannedAt;
+        $this->documentDate = $plannedAt;
         $this->amount = $amount;
         $this->status = PaymentPlanStatus::DRAFT;
         $this->type = PaymentPlanType::OUTFLOW;
@@ -139,6 +159,67 @@ class PaymentPlan
     public function setPlannedAt(\DateTimeImmutable $plannedAt): self
     {
         $this->plannedAt = $plannedAt;
+
+        return $this;
+    }
+
+    public function getExpectedAt(): \DateTimeImmutable
+    {
+        return $this->plannedAt;
+    }
+
+    public function setExpectedAt(\DateTimeImmutable $expectedAt): self
+    {
+        $this->plannedAt = $expectedAt;
+
+        return $this;
+    }
+
+    public function getDocumentDate(): \DateTimeImmutable
+    {
+        return $this->documentDate;
+    }
+
+    public function setDocumentDate(\DateTimeImmutable $documentDate): self
+    {
+        $this->documentDate = $documentDate;
+
+        return $this;
+    }
+
+    public function getProbability(): int
+    {
+        return $this->probability;
+    }
+
+    public function setProbability(int $probability): self
+    {
+        Assert::range($probability, 0, 100);
+        $this->probability = $probability;
+
+        return $this;
+    }
+
+    public function getSource(): PaymentPlanSource
+    {
+        return $this->source;
+    }
+
+    public function setSource(PaymentPlanSource $source): self
+    {
+        $this->source = $source;
+
+        return $this;
+    }
+
+    public function getExternalId(): ?string
+    {
+        return $this->externalId;
+    }
+
+    public function setExternalId(?string $externalId): self
+    {
+        $this->externalId = $externalId;
 
         return $this;
     }
