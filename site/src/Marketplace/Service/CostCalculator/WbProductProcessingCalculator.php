@@ -25,6 +25,10 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
         // Сумма затраты - приёмка товара
         $amount = (float)($item['acceptance'] ?? 0);
 
+        if (abs($amount) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

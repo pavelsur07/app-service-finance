@@ -19,6 +19,11 @@ class WbAcquiringCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $acquiringFee = (float)($item['acquiring_fee'] ?? 0);
+
+        if (abs($acquiringFee) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

@@ -19,6 +19,11 @@ class WbPvzProcessingCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $ppvzReward = (float)($item['ppvz_reward'] ?? 0);
+
+        if (abs($ppvzReward) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

@@ -443,12 +443,10 @@ class MarketplaceSyncService
 
         // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
 
-        // 1. Фильтруем: убираем только возвраты (их обрабатывает processReturnsFromRaw).
-        //    ВАЖНО: 'Продажа' НЕ исключаем — калькуляторы комиссии, эквайринга,
-        //    лояльности и др. работают именно по записям с doc_type_name = 'Продажа'.
+        // 1. Фильтруем только затраты
         $costsData = array_filter($rawData, function($item) {
             $docType = $item['doc_type_name'] ?? '';
-            return $docType !== 'Возврат';
+            return !in_array($docType, ['Возврат', 'Продажа']);
         });
 
         if (empty($costsData)) {

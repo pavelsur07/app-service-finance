@@ -20,6 +20,11 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $rebillLogisticCost = (float)($item['rebill_logistic_cost'] ?? 0);
+
+        if (abs($rebillLogisticCost) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

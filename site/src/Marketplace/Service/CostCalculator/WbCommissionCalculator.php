@@ -23,6 +23,11 @@ class WbCommissionCalculator implements CostCalculatorInterface
         $ppvzForPay = (float)($item['ppvz_for_pay'] ?? 0);
         $commission = $retailPrice - $acquiringFee - $ppvzForPay;
 
+        // Пропускаем нулевые комиссии
+        if (abs($commission) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

@@ -24,6 +24,11 @@ class WbDeductionCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $deduction = (float)($item['deduction'] ?? 0);
+
+        if (abs($deduction) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

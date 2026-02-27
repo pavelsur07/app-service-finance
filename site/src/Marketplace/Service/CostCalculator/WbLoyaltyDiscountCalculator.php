@@ -19,6 +19,11 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $cashbackDiscount = (float)($item['cashback_discount'] ?? 0);
+
+        if (abs($cashbackDiscount) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

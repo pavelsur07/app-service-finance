@@ -20,6 +20,11 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $deliveryRub = (float)($item['delivery_rub'] ?? 0);
+
+        if (abs($deliveryRub) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 
