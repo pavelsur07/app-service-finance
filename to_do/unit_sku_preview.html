@@ -1,0 +1,809 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Unit-экономика товаров — Demo (Tabler)</title>
+
+  <!-- Tabler CSS (CDN) -->
+  <link rel="stylesheet" href="https://unpkg.com/@tabler/core@latest/dist/css/tabler.min.css">
+  <!-- Tabler Icons (optional) -->
+  <link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+  <style>
+    :root { --vf-sticky-bg: var(--tblr-bg-surface); }
+
+    /* Sticky header */
+    .table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--vf-sticky-bg);
+    }
+
+    /* Sticky left columns */
+    .sticky-col {
+      position: sticky;
+      left: 0;
+      z-index: 6;
+      background: var(--vf-sticky-bg);
+    }
+    .sticky-col-2 { left: 52px;  z-index: 6; }
+    .sticky-col-3 { left: 180px; z-index: 6; }
+    .sticky-col-4 { left: 340px; z-index: 6; }
+    .sticky-col-5 { left: 520px; z-index: 6; }
+
+    /* Header second row should stick under first row */
+    .table thead tr:nth-child(2) th { top: 44px; z-index: 4; }
+
+    /* Compact option */
+    .table-compact td, .table-compact th { padding-top: .35rem; padding-bottom: .35rem; }
+
+    /* Light conditional cells */
+    .cell-good { background: rgba(47, 179, 68, 0.08); }
+    .cell-bad  { background: rgba(214, 57, 57, 0.10); }
+
+    /* Nice horizontal scroll wrapper */
+    .table-scroll {
+      overflow: auto;
+      border-radius: var(--tblr-border-radius-lg);
+      border: 1px solid var(--tblr-border-color);
+    }
+
+    /* Keep row hover visible under sticky cols */
+    .table-hover tbody tr:hover td { background-color: rgba(32, 107, 196, 0.06); }
+    .table-hover tbody tr:hover td.sticky-col,
+    .table-hover tbody tr:hover td.sticky-col-2,
+    .table-hover tbody tr:hover td.sticky-col-3,
+    .table-hover tbody tr:hover td.sticky-col-4,
+    .table-hover tbody tr:hover td.sticky-col-5 { background-color: rgba(32, 107, 196, 0.06); }
+
+    /* Demo widths for sticky columns */
+    .w-52 { width: 52px; min-width: 52px; max-width: 52px; }
+    .w-128 { width: 128px; min-width: 128px; }
+    .w-160 { width: 160px; min-width: 160px; }
+    .w-180 { width: 180px; min-width: 180px; }
+    .w-200 { width: 200px; min-width: 200px; }
+
+    /* Make the sticky offsets match widths (adjust if you change widths) */
+    /* left offsets calculated: 52 + 128 + 160 + 180 = 520 */
+  </style>
+</head>
+
+<body>
+<div class="page">
+  <!-- Topbar -->
+  <header class="navbar navbar-expand-md d-print-none">
+    <div class="container-xl">
+      <a class="navbar-brand navbar-brand-autodark" href="#">
+        <span class="avatar avatar-sm me-2" style="background: #0A1548;"></span>
+        Unit-экономика
+      </a>
+
+      <div class="navbar-nav flex-row order-md-last">
+        <div class="nav-item me-2">
+          <button class="btn btn-outline-primary" data-bs-toggle="offcanvas" data-bs-target="#offcanvasColumns" aria-controls="offcanvasColumns">
+            <i class="ti ti-adjustments-horizontal me-1"></i> Настроить столбцы
+          </button>
+        </div>
+        <div class="nav-item dropdown me-2">
+          <a class="btn btn-outline-secondary dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <i class="ti ti-bookmark me-1"></i> Вид: Ключевые
+          </a>
+          <div class="dropdown-menu dropdown-menu-end">
+            <a class="dropdown-item" href="#"><i class="ti ti-layout-dashboard me-2"></i> По умолчанию</a>
+            <a class="dropdown-item active" href="#"><i class="ti ti-stars me-2"></i> Ключевые</a>
+            <a class="dropdown-item" href="#"><i class="ti ti-truck me-2"></i> Логистика</a>
+            <a class="dropdown-item" href="#"><i class="ti ti-ad me-2"></i> Маркетинг</a>
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item" href="#"><i class="ti ti-device-floppy me-2"></i> Сохранить текущий…</a>
+            <a class="dropdown-item" href="#"><i class="ti ti-pencil me-2"></i> Переименовать…</a>
+            <a class="dropdown-item text-danger" href="#"><i class="ti ti-trash me-2"></i> Удалить</a>
+          </div>
+        </div>
+
+        <div class="nav-item dropdown">
+          <a class="btn btn-outline-secondary dropdown-toggle" href="#" data-bs-toggle="dropdown">
+            <i class="ti ti-download me-1"></i> Экспорт
+          </a>
+          <div class="dropdown-menu dropdown-menu-end">
+            <a class="dropdown-item" href="#"><i class="ti ti-file-type-csv me-2"></i> CSV</a>
+            <a class="dropdown-item" href="#"><i class="ti ti-file-spreadsheet me-2"></i> XLSX</a>
+            <a class="dropdown-item" href="#"><i class="ti ti-file-type-pdf me-2"></i> PDF</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Page body -->
+  <div class="page-wrapper">
+    <div class="container-xl">
+
+      <!-- Title -->
+      <div class="page-header d-print-none">
+        <div class="row g-2 align-items-center">
+          <div class="col">
+            <div class="page-pretitle">Отчёты</div>
+            <h2 class="page-title">Unit-экономика товаров / эффективность SKU</h2>
+            <div class="text-secondary mt-1">
+              Период: <span class="badge bg-blue-lt">01.09.25 — 30.09.25</span>
+              <span class="ms-2">Дата отчёта: <span class="text-muted">02.11.25</span></span>
+            </div>
+          </div>
+
+          <div class="col-auto">
+            <button class="btn btn-primary">
+              <i class="ti ti-filter me-1"></i> Применить
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Filters card -->
+      <div class="card mb-3">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="ti ti-filter me-2"></i> Фильтры
+          </h3>
+          <div class="card-actions">
+            <a class="btn btn-sm btn-ghost-secondary" data-bs-toggle="collapse" href="#filtersBody" role="button" aria-expanded="true" aria-controls="filtersBody">
+              <i class="ti ti-chevron-up"></i>
+            </a>
+          </div>
+        </div>
+
+        <div class="collapse show" id="filtersBody">
+          <div class="card-body">
+            <div class="row g-3">
+              <div class="col-12 col-md-3">
+                <label class="form-label">Период</label>
+                <div class="input-group">
+                  <input class="form-control" type="date" value="2025-09-01">
+                  <span class="input-group-text">—</span>
+                  <input class="form-control" type="date" value="2025-09-30">
+                </div>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <label class="form-label">Маркетплейс</label>
+                <select class="form-select" multiple>
+                  <option selected>Wildberries</option>
+                  <option>Ozon</option>
+                  <option>Яндекс Маркет</option>
+                </select>
+                <div class="form-hint">Можно выбрать несколько</div>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <label class="form-label">Бренд / Категория</label>
+                <div class="row g-2">
+                  <div class="col-6">
+                    <select class="form-select">
+                      <option selected>womjoy</option>
+                      <option>other</option>
+                    </select>
+                  </div>
+                  <div class="col-6">
+                    <select class="form-select">
+                      <option selected>Все категории</option>
+                      <option>Леггинсы</option>
+                      <option>Велосипедки</option>
+                      <option>Брюки</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-md-3">
+                <label class="form-label">Поиск</label>
+                <div class="input-icon">
+                  <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                  <input class="form-control" placeholder="SKU, артикул, название">
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="row g-2 align-items-center">
+                  <div class="col-auto">
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" checked>
+                      <span class="form-check-label">Только активные SKU</span>
+                    </label>
+                  </div>
+                  <div class="col-auto">
+                    <label class="form-check">
+                      <input class="form-check-input" type="checkbox" checked>
+                      <span class="form-check-label">Скрыть строки с нулевой выручкой</span>
+                    </label>
+                  </div>
+
+                  <div class="col-auto ms-md-auto">
+                    <div class="btn-group" role="group" aria-label="Group by">
+                      <input type="radio" class="btn-check" name="groupBy" id="g1" checked>
+                      <label class="btn btn-outline-secondary" for="g1">Без группировки</label>
+
+                      <input type="radio" class="btn-check" name="groupBy" id="g2">
+                      <label class="btn btn-outline-secondary" for="g2">По тегу</label>
+
+                      <input type="radio" class="btn-check" name="groupBy" id="g3">
+                      <label class="btn btn-outline-secondary" for="g3">По категории</label>
+
+                      <input type="radio" class="btn-check" name="groupBy" id="g4">
+                      <label class="btn btn-outline-secondary" for="g4">По артикулу</label>
+                    </div>
+                  </div>
+
+                  <div class="col-auto">
+                    <select class="form-select">
+                      <option selected>Сортировка: Чистая прибыль ↓</option>
+                      <option>Выручка ↓</option>
+                      <option>ROI ↓</option>
+                      <option>ROS ↓</option>
+                    </select>
+                  </div>
+
+                  <div class="col-auto">
+                    <button class="btn btn-outline-secondary">
+                      <i class="ti ti-refresh me-1"></i> Сбросить
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div><!-- row -->
+          </div><!-- card-body -->
+        </div><!-- collapse -->
+      </div>
+
+      <!-- Summary -->
+      <div class="row row-cards mb-3">
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Выручка</div>
+              <div class="h2 m-0">1 576 079 ₽</div>
+              <div class="text-secondary mt-1">
+                <span class="badge bg-green-lt">+8.4%</span> к пред. мес.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Итого расходы</div>
+              <div class="h2 m-0">655 889 ₽</div>
+              <div class="text-secondary mt-1"><span class="badge bg-red-lt">+3.1%</span> к пред. мес.</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Чистая прибыль</div>
+              <div class="h2 m-0">229 807 ₽</div>
+              <div class="text-secondary mt-1"><span class="badge bg-green-lt">+12.6%</span> к пред. мес.</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">ROS</div>
+              <div class="h2 m-0">14.6%</div>
+              <div class="text-secondary mt-1"><span class="badge bg-green-lt">+0.9 п.п.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">ROI</div>
+              <div class="h2 m-0">56.5%</div>
+              <div class="text-secondary mt-1"><span class="badge bg-green-lt">+4.2 п.п.</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3 col-xl-2">
+          <div class="card">
+            <div class="card-body">
+              <div class="subheader">Налог</div>
+              <div class="h2 m-0">19 397 ₽</div>
+              <div class="text-secondary mt-1">оценка</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="ti ti-table me-2"></i> Таблица
+          </h3>
+          <div class="card-actions">
+            <div class="btn-group">
+              <button class="btn btn-sm btn-outline-secondary" id="btnCompact">
+                <i class="ti ti-adjustments me-1"></i> Компактно
+              </button>
+              <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#metricsHelp">
+                <i class="ti ti-info-circle me-1"></i> Метрики
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-body p-0">
+          <div class="table-scroll">
+            <table class="table table-vcenter table-hover mb-0" id="reportTable">
+              <thead>
+                <tr>
+                  <th class="sticky-col w-52 text-muted">#</th>
+                  <th class="sticky-col-2 w-128">Тег</th>
+                  <th class="sticky-col-3 w-160">Бренд</th>
+                  <th class="sticky-col-4 w-180">Категория</th>
+                  <th class="sticky-col-5 w-200">SKU</th>
+
+                  <th colspan="3" class="text-center text-muted">Продажи</th>
+                  <th colspan="6" class="text-center text-muted">Переменные расходы</th>
+                  <th colspan="1" class="text-center text-muted">Себестоимость</th>
+                  <th colspan="2" class="text-center text-muted">Маркетинг</th>
+                  <th colspan="6" class="text-center text-muted">Итоги</th>
+                </tr>
+
+                <tr>
+                  <th class="sticky-col w-52 text-muted"></th>
+                  <th class="sticky-col-2 w-128"></th>
+                  <th class="sticky-col-3 w-160"></th>
+                  <th class="sticky-col-4 w-180"></th>
+                  <th class="sticky-col-5 w-200"></th>
+
+                  <th data-col="col-buyouts">Выкупы</th>
+                  <th data-col="col-returns">Возвраты</th>
+                  <th data-col="col-revenue">Выручка</th>
+
+                  <th data-col="col-logistics">Логистика</th>
+                  <th data-col="col-storage">Хранение</th>
+                  <th data-col="col-receiving">Приёмка</th>
+                  <th data-col="col-fines">Штрафы</th>
+                  <th data-col="col-acq">Эквайринг</th>
+                  <th data-col="col-commission">Комиссия</th>
+
+                  <th data-col="col-cogs">Себес</th>
+
+                  <th data-col="col-ads-ext">Внешн. реклама</th>
+                  <th data-col="col-ads-int">Внутр. реклама</th>
+
+                  <th data-col="col-expenses-total">Итого расходы</th>
+                  <th data-col="col-tax">Налог</th>
+                  <th data-col="col-profit-before-fixed">Доход до пост.</th>
+                  <th data-col="col-ros">ROS</th>
+                  <th data-col="col-roi">ROI</th>
+                  <th data-col="col-profit-net">Чистая прибыль</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                <tr>
+                  <td class="sticky-col w-52 text-muted">1</td>
+                  <td class="sticky-col-2 w-128"><span class="badge bg-blue-lt">Top</span></td>
+                  <td class="sticky-col-3 w-160">womjoy</td>
+                  <td class="sticky-col-4 w-180">Леггинсы</td>
+                  <td class="sticky-col-5 w-200">
+                    <div class="d-flex align-items-center justify-content-between">
+                      <span>23509611</span>
+                      <a href="#" class="text-secondary" title="Детализация (demo)">
+                        <i class="ti ti-chevron-right"></i>
+                      </a>
+                    </div>
+                    <div class="text-secondary small">WJ1021104211 / чёрный</div>
+                  </td>
+
+                  <td data-col="col-buyouts">359</td>
+                  <td data-col="col-returns">56 395 ₽</td>
+                  <td data-col="col-revenue">799 355 ₽</td>
+
+                  <td data-col="col-logistics">108 658 ₽</td>
+                  <td data-col="col-storage">5 971 ₽</td>
+                  <td data-col="col-receiving">0 ₽</td>
+                  <td data-col="col-fines">0 ₽</td>
+                  <td data-col="col-acq">9 248 ₽</td>
+                  <td data-col="col-commission">213 600 ₽</td>
+
+                  <td data-col="col-cogs">200 911 ₽</td>
+
+                  <td data-col="col-ads-ext">0 ₽</td>
+                  <td data-col="col-ads-int" class="cell-bad">62 068 ₽</td>
+
+                  <td data-col="col-expenses-total">344 889 ₽</td>
+                  <td data-col="col-tax">9 765 ₽</td>
+                  <td data-col="col-profit-before-fixed" class="cell-good">134 213 ₽</td>
+                  <td data-col="col-ros" class="cell-good">16.8%</td>
+                  <td data-col="col-roi" class="cell-good">66.8%</td>
+                  <td data-col="col-profit-net" class="cell-good">134 213 ₽</td>
+                </tr>
+
+                <tr>
+                  <td class="sticky-col w-52 text-muted">2</td>
+                  <td class="sticky-col-2 w-128"><span class="badge bg-blue-lt">Top</span></td>
+                  <td class="sticky-col-3 w-160">womjoy</td>
+                  <td class="sticky-col-4 w-180">Велосипедки</td>
+                  <td class="sticky-col-5 w-200">
+                    <div class="d-flex align-items-center justify-content-between">
+                      <span>24864183</span>
+                      <a href="#" class="text-secondary" title="Детализация (demo)">
+                        <i class="ti ti-chevron-right"></i>
+                      </a>
+                    </div>
+                    <div class="text-secondary small">WJ1121104211 / чёрный</div>
+                  </td>
+
+                  <td data-col="col-buyouts">138</td>
+                  <td data-col="col-returns">13 177 ₽</td>
+                  <td data-col="col-revenue">259 073 ₽</td>
+
+                  <td data-col="col-logistics">41 434 ₽</td>
+                  <td data-col="col-storage">2 999 ₽</td>
+                  <td data-col="col-receiving">0 ₽</td>
+                  <td data-col="col-fines">0 ₽</td>
+                  <td data-col="col-acq">3 125 ₽</td>
+                  <td data-col="col-commission">70 694 ₽</td>
+
+                  <td data-col="col-cogs">64 646 ₽</td>
+
+                  <td data-col="col-ads-ext">0 ₽</td>
+                  <td data-col="col-ads-int" class="cell-bad">26 034 ₽</td>
+
+                  <td data-col="col-expenses-total">103 090 ₽</td>
+                  <td data-col="col-tax">3 406 ₽</td>
+                  <td data-col="col-profit-before-fixed" class="cell-good">35 039 ₽</td>
+                  <td data-col="col-ros" class="cell-good">13.5%</td>
+                  <td data-col="col-roi" class="cell-good">49.4%</td>
+                  <td data-col="col-profit-net" class="cell-good">35 039 ₽</td>
+                </tr>
+
+                <tr>
+                  <td class="sticky-col w-52 text-muted">3</td>
+                  <td class="sticky-col-2 w-128"><span class="badge bg-purple-lt">Новинка</span></td>
+                  <td class="sticky-col-3 w-160">womjoy</td>
+                  <td class="sticky-col-4 w-180">Брюки спортивные</td>
+                  <td class="sticky-col-5 w-200">
+                    <div class="d-flex align-items-center justify-content-between">
+                      <span>303410209</span>
+                      <a href="#" class="text-secondary" title="Детализация (demo)">
+                        <i class="ti ti-chevron-right"></i>
+                      </a>
+                    </div>
+                    <div class="text-secondary small">WJ1124... / демо</div>
+                  </td>
+
+                  <td data-col="col-buyouts">2</td>
+                  <td data-col="col-returns">0 ₽</td>
+                  <td data-col="col-revenue">4 434 ₽</td>
+
+                  <td data-col="col-logistics" class="cell-bad">1 544 ₽</td>
+                  <td data-col="col-storage" class="cell-bad">2 272 ₽</td>
+                  <td data-col="col-receiving">0 ₽</td>
+                  <td data-col="col-fines">0 ₽</td>
+                  <td data-col="col-acq">52 ₽</td>
+                  <td data-col="col-commission">1 408 ₽</td>
+
+                  <td data-col="col-cogs">2 105 ₽</td>
+
+                  <td data-col="col-ads-ext">0 ₽</td>
+                  <td data-col="col-ads-int">118 ₽</td>
+
+                  <td data-col="col-expenses-total" class="cell-bad">3 960 ₽</td>
+                  <td data-col="col-tax">55 ₽</td>
+                  <td data-col="col-profit-before-fixed" class="cell-bad">-6 120 ₽</td>
+                  <td data-col="col-ros" class="cell-bad">-138.0%</td>
+                  <td data-col="col-roi" class="cell-bad">-290.7%</td>
+                  <td data-col="col-profit-net" class="cell-bad">-6 120 ₽</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card-footer d-flex align-items-center">
+          <div class="text-secondary">
+            Показано <strong>3</strong> из <strong>120</strong> (demo)
+          </div>
+          <ul class="pagination m-0 ms-auto">
+            <li class="page-item disabled"><a class="page-link" href="#" tabindex="-1"><i class="ti ti-chevron-left"></i></a></li>
+            <li class="page-item active"><a class="page-link" href="#">1</a></li>
+            <li class="page-item"><a class="page-link" href="#">2</a></li>
+            <li class="page-item"><a class="page-link" href="#">3</a></li>
+            <li class="page-item"><a class="page-link" href="#"><i class="ti ti-chevron-right"></i></a></li>
+          </ul>
+        </div>
+      </div>
+
+    </div><!-- container -->
+  </div><!-- page-wrapper -->
+</div><!-- page -->
+
+<!-- Offcanvas: Columns -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasColumns" aria-labelledby="offcanvasColumnsLabel">
+  <div class="offcanvas-header">
+    <h2 class="offcanvas-title" id="offcanvasColumnsLabel">
+      <i class="ti ti-adjustments-horizontal me-2"></i> Столбцы
+    </h2>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+
+  <div class="offcanvas-body">
+    <div class="input-icon mb-3">
+      <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+      <input class="form-control" id="colSearch" placeholder="Найти столбец…">
+    </div>
+
+    <div class="accordion" id="colsAccordion">
+
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hSales">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cSales" aria-expanded="true" aria-controls="cSales">
+            Продажи
+          </button>
+        </h2>
+        <div id="cSales" class="accordion-collapse collapse show" aria-labelledby="hSales" data-bs-parent="#colsAccordion">
+          <div class="accordion-body">
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-buyouts" checked>
+              <span class="form-check-label">Выкупы</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-returns" checked>
+              <span class="form-check-label">Возвраты</span>
+            </label>
+            <label class="form-check">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-revenue" checked>
+              <span class="form-check-label">Выручка</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hVar">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cVar" aria-expanded="false" aria-controls="cVar">
+            Переменные расходы
+          </button>
+        </h2>
+        <div id="cVar" class="accordion-collapse collapse" aria-labelledby="hVar" data-bs-parent="#colsAccordion">
+          <div class="accordion-body">
+            <div class="row g-2">
+              <div class="col-12">
+                <label class="form-check mb-2">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-logistics" checked>
+                  <span class="form-check-label">Логистика</span>
+                </label>
+                <label class="form-check mb-2">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-storage" checked>
+                  <span class="form-check-label">Хранение</span>
+                </label>
+                <label class="form-check mb-2">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-receiving" checked>
+                  <span class="form-check-label">Приёмка</span>
+                </label>
+                <label class="form-check mb-2">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-fines" checked>
+                  <span class="form-check-label">Штрафы</span>
+                </label>
+                <label class="form-check mb-2">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-acq" checked>
+                  <span class="form-check-label">Эквайринг</span>
+                </label>
+                <label class="form-check">
+                  <input class="form-check-input col-toggle" type="checkbox" data-target="col-commission" checked>
+                  <span class="form-check-label">Комиссия</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hCogs">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cCogs" aria-expanded="false" aria-controls="cCogs">
+            Себестоимость
+          </button>
+        </h2>
+        <div id="cCogs" class="accordion-collapse collapse" aria-labelledby="hCogs" data-bs-parent="#colsAccordion">
+          <div class="accordion-body">
+            <label class="form-check">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-cogs" checked>
+              <span class="form-check-label">Себес</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hAds">
+          <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#cAds" aria-expanded="false" aria-controls="cAds">
+            Маркетинг
+          </button>
+        </h2>
+        <div id="cAds" class="accordion-collapse collapse" aria-labelledby="hAds" data-bs-parent="#colsAccordion">
+          <div class="accordion-body">
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-ads-ext" checked>
+              <span class="form-check-label">Внешняя реклама</span>
+            </label>
+            <label class="form-check">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-ads-int" checked>
+              <span class="form-check-label">Внутренняя реклама</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div class="accordion-item">
+        <h2 class="accordion-header" id="hTotals">
+          <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#cTotals" aria-expanded="true" aria-controls="cTotals">
+            Итоги
+          </button>
+        </h2>
+        <div id="cTotals" class="accordion-collapse collapse show" aria-labelledby="hTotals" data-bs-parent="#colsAccordion">
+          <div class="accordion-body">
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-expenses-total" checked>
+              <span class="form-check-label">Итого расходы</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-tax" checked>
+              <span class="form-check-label">Налог</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-profit-before-fixed" checked>
+              <span class="form-check-label">Доход до пост. расходов</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-ros" checked>
+              <span class="form-check-label">ROS</span>
+            </label>
+            <label class="form-check mb-2">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-roi" checked>
+              <span class="form-check-label">ROI</span>
+            </label>
+            <label class="form-check">
+              <input class="form-check-input col-toggle" type="checkbox" data-target="col-profit-net" checked>
+              <span class="form-check-label">Чистая прибыль</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- accordion -->
+
+    <div class="mt-4 d-flex gap-2">
+      <button class="btn btn-outline-secondary w-50" id="btnResetCols">
+        <i class="ti ti-rotate me-1"></i> Дефолт
+      </button>
+      <button class="btn btn-primary w-50">
+        <i class="ti ti-check me-1"></i> Применить
+      </button>
+    </div>
+
+    <div class="text-secondary small mt-3">
+      Demo: настройки сохраняются в <code>localStorage</code>.
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Metrics help -->
+<div class="modal modal-blur fade" id="metricsHelp" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="ti ti-info-circle me-2"></i> Справка по метрикам (demo)</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="alert alert-info">
+          Это демо-окно. В реальном продукте сюда можно положить короткие определения и формулы.
+        </div>
+        <ul class="list-unstyled">
+          <li class="mb-2"><strong>ROS</strong> — прибыль / выручка.</li>
+          <li class="mb-2"><strong>ROI</strong> — прибыль / себестоимость (или инвестиции) — зависит от вашей методологии.</li>
+          <li class="mb-2"><strong>Доход до пост. расходов</strong> — выручка минус переменные расходы и налоги.</li>
+        </ul>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Понял</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabler JS (Bootstrap bundle inside) -->
+<script src="https://unpkg.com/@tabler/core@latest/dist/js/tabler.min.js"></script>
+
+<script>
+  // ===== Demo JS: column toggle + search + compact + localStorage =====
+
+  const STORAGE_KEY = 'ue_demo_visible_cols_v1';
+  const table = document.getElementById('reportTable');
+
+  function allColumnKeys() {
+    return Array.from(document.querySelectorAll('input.col-toggle'))
+      .map(i => i.getAttribute('data-target'));
+  }
+
+  function setColVisible(colKey, visible) {
+    // Hide header cells with data-col
+    table.querySelectorAll('[data-col="' + colKey + '"]').forEach(el => {
+      el.style.display = visible ? '' : 'none';
+    });
+  }
+
+  function readState() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch { return {}; }
+  }
+
+  function writeState(state) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function applyFromCheckboxes() {
+    const state = {};
+    document.querySelectorAll('input.col-toggle').forEach(chk => {
+      const key = chk.getAttribute('data-target');
+      state[key] = !!chk.checked;
+      setColVisible(key, chk.checked);
+    });
+    writeState(state);
+  }
+
+  function applySavedState() {
+    const state = readState();
+    const keys = allColumnKeys();
+
+    // default all visible if empty
+    const hasAny = keys.some(k => Object.prototype.hasOwnProperty.call(state, k));
+
+    document.querySelectorAll('input.col-toggle').forEach(chk => {
+      const key = chk.getAttribute('data-target');
+      const visible = hasAny ? (state[key] !== false) : true;
+      chk.checked = visible;
+      setColVisible(key, visible);
+    });
+  }
+
+  // Checkbox toggles
+  document.querySelectorAll('input.col-toggle').forEach(chk => {
+    chk.addEventListener('change', applyFromCheckboxes);
+  });
+
+  // Search columns inside offcanvas
+  const colSearch = document.getElementById('colSearch');
+  colSearch.addEventListener('input', (e) => {
+    const q = (e.target.value || '').toLowerCase().trim();
+    document.querySelectorAll('#offcanvasColumns .form-check').forEach(row => {
+      const label = (row.innerText || '').toLowerCase();
+      row.style.display = (!q || label.includes(q)) ? '' : 'none';
+    });
+  });
+
+  // Reset columns
+  document.getElementById('btnResetCols').addEventListener('click', () => {
+    const state = {};
+    allColumnKeys().forEach(k => state[k] = true);
+    writeState(state);
+    applySavedState();
+  });
+
+  // Compact toggle
+  document.getElementById('btnCompact').addEventListener('click', () => {
+    table.classList.toggle('table-compact');
+  });
+
+  // Init
+  applySavedState();
+</script>
+</body>
+</html>
