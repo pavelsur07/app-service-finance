@@ -3,8 +3,8 @@
 namespace App\Shared\Service;
 
 use App\Company\Entity\Company;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Company\Repository\CompanyMemberRepository;
-use App\Repository\CompanyRepository;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;

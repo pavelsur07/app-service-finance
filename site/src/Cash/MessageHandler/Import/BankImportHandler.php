@@ -6,7 +6,7 @@ use App\Cash\Message\Import\BankImportMessage;
 use App\Cash\Repository\Bank\BankConnectionRepository;
 use App\Cash\Service\Import\Bank\BankImportService;
 use App\Cash\Service\Import\Bank\Provider\Alfa\AlfaStatementsProvider;
-use App\Repository\CompanyRepository;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 #[AsMessageHandler]

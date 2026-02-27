@@ -8,7 +8,7 @@ use App\Analytics\Api\Request\SnapshotQuery;
 use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\PeriodResolver;
 use App\Company\Entity\Company;
-use App\Repository\CompanyRepository;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Repository\PLDailyTotalRepository;
 use App\Service\PLRegisterUpdater;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

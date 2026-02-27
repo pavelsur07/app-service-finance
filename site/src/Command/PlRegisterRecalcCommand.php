@@ -2,7 +2,7 @@
 
 namespace App\Command;
 
-use App\Repository\CompanyRepository;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Service\PLRegisterUpdater;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

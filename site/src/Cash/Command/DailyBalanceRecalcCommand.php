@@ -2,7 +2,7 @@
 
 namespace App\Cash\Command;
 
-use App\Repository\CompanyRepository;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Service\DailyBalanceRecalculator;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;

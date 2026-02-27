@@ -4,10 +4,10 @@ namespace App\MessageHandler;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
+use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Message\SendRegistrationEmailMessage;
 use App\Notification\DTO\EmailMessage;
 use App\Notification\Service\NotificationRouter;
-use App\Repository\CompanyRepository;
 use App\Repository\UserRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
