@@ -44,20 +44,23 @@ class PaymentPlan
     private ?Counterparty $counterparty = null;
 
     # Комментарий: ожидаемая дата оплаты, которую рассчитывает прогноз.
-    #[ORM\Column(name: 'expected_at', type: 'date_immutable')]
-    private \DateTimeImmutable $plannedAt;
+    #[ORM\Column(name: 'expected_at', type: 'date_immutable', nullable: true)]
+    private ?\DateTimeImmutable $plannedAt;
 
     # Комментарий: жесткая дата из документа (счет/договор), не меняется алгоритмами.
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $documentDate;
 
     # Комментарий: вероятность поступления денег в процентах (0-100).
-    #[ORM\Column(type: 'smallint')]
+    #[ORM\Column(type: 'smallint', options: ['default' => 100])]
     private int $probability = 100;
 
     # Комментарий: источник создания плана (ручной ввод, API, импорт).
-    #[ORM\Column(enumType: PaymentPlanSource::class)]
+    #[ORM\Column(enumType: PaymentPlanSource::class, options: ['default' => PaymentPlanSource::MANUAL->value])]
     private PaymentPlanSource $source = PaymentPlanSource::MANUAL;
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isFrozen = false;
 
     # Комментарий: идентификатор внешнего документа для дедупликации при синхронизации.
     #[ORM\Column(type: 'string', length: 255, nullable: true)]
@@ -151,7 +154,7 @@ class PaymentPlan
         return $this;
     }
 
-    public function getPlannedAt(): \DateTimeImmutable
+    public function getPlannedAt(): ?\DateTimeImmutable
     {
         return $this->plannedAt;
     }
@@ -163,12 +166,12 @@ class PaymentPlan
         return $this;
     }
 
-    public function getExpectedAt(): \DateTimeImmutable
+    public function getExpectedAt(): ?\DateTimeImmutable
     {
         return $this->plannedAt;
     }
 
-    public function setExpectedAt(\DateTimeImmutable $expectedAt): self
+    public function setExpectedAt(?\DateTimeImmutable $expectedAt): self
     {
         $this->plannedAt = $expectedAt;
 
@@ -208,6 +211,18 @@ class PaymentPlan
     public function setSource(PaymentPlanSource $source): self
     {
         $this->source = $source;
+
+        return $this;
+    }
+
+    public function isFrozen(): bool
+    {
+        return $this->isFrozen;
+    }
+
+    public function setIsFrozen(bool $isFrozen): self
+    {
+        $this->isFrozen = $isFrozen;
 
         return $this;
     }
