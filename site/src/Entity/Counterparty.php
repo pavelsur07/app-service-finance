@@ -44,6 +44,15 @@ class Counterparty
     #[ORM\Column(type: 'boolean')]
     private bool $isArchived = false;
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $averageDelayDays = null;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 100])]
+    private int $reliabilityScore = 100;
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $lastScoredAt = null;
+
     public function __construct(string $id, Company $company, string $name, CounterpartyType $type)
     {
         WebAssert::uuid($id);
@@ -133,6 +142,42 @@ class Counterparty
     public function setIsArchived(bool $isArchived): self
     {
         $this->isArchived = $isArchived;
+
+        return $this;
+    }
+
+    public function getAverageDelayDays(): ?int
+    {
+        return $this->averageDelayDays;
+    }
+
+    public function setAverageDelayDays(?int $averageDelayDays): self
+    {
+        $this->averageDelayDays = $averageDelayDays;
+
+        return $this;
+    }
+
+    public function getReliabilityScore(): int
+    {
+        return $this->reliabilityScore;
+    }
+
+    public function setReliabilityScore(int $reliabilityScore): self
+    {
+        $this->reliabilityScore = $reliabilityScore;
+
+        return $this;
+    }
+
+    public function getLastScoredAt(): ?\DateTimeImmutable
+    {
+        return $this->lastScoredAt;
+    }
+
+    public function setLastScoredAt(?\DateTimeImmutable $lastScoredAt): self
+    {
+        $this->lastScoredAt = $lastScoredAt;
 
         return $this;
     }
