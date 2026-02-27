@@ -884,6 +884,7 @@ class MarketplaceSyncService
 
         $categoryCodesMap = [];
         $skusMap = [];
+        $nmIdsMap = [];
         $externalIdsMap = [];
 
         foreach ($costsData as $costData) {
@@ -897,6 +898,13 @@ class MarketplaceSyncService
                 $skusMap[$sku] = true;
             }
 
+            if ($marketplace === MarketplaceType::WILDBERRIES) {
+                $nmId = trim((string)($costData->nmId ?? ''));
+                if ($nmId !== '' && $nmId !== '0') {
+                    $nmIdsMap[$nmId] = true;
+                }
+            }
+
             $externalId = trim((string)$costData->externalId);
             if ($externalId !== '') {
                 $externalIdsMap[$externalId] = true;
@@ -905,23 +913,30 @@ class MarketplaceSyncService
 
         $categoryCodes = array_keys($categoryCodesMap);
         $skus = array_keys($skusMap);
+        $nmIds = array_keys($nmIdsMap);
         $externalIds = array_keys($externalIdsMap);
 
         $categoriesMap = $this->costCategoryRepository->findByCodesIndexed($company, $marketplace, $categoryCodes);
 
-        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: загружаем listings по SKU (как для продаж/возвратов)
-        $listingsMap = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $skus);
+        if ($marketplace === MarketplaceType::WILDBERRIES) {
+            $listingsMap = $this->listingRepository->findListingsByNmIdsIndexed($company, $marketplace, $nmIds);
+        } else {
+            $listingsMap = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $skus);
+        }
 
         if ($marketplace === MarketplaceType::WILDBERRIES) {
             $newListingsCreated = 0;
 
-            foreach ($skus as $sku) {
-                $sku = trim((string)$sku);
-                if ($sku === '' || $sku === '0') {
+            foreach ($costsData as $costData) {
+                $nmId = trim((string)($costData->nmId ?? ''));
+                if ($nmId === '' || $nmId === '0') {
                     continue;
                 }
 
-                if (isset($listingsMap[$sku])) {
+                $size = $this->normalizeWbSize($costData->tsName ?? null);
+                $key = $this->wbListingCacheKey($nmId, $size);
+
+                if (isset($listingsMap[$key])) {
                     continue;
                 }
 
@@ -931,11 +946,12 @@ class MarketplaceSyncService
                     null,
                     $marketplace
                 );
-                $listing->setMarketplaceSku($sku);
+                $listing->setMarketplaceSku($nmId);
+                $listing->setSize($size);
                 $listing->setPrice('0');
 
                 $this->em->persist($listing);
-                $listingsMap[$sku] = $listing;
+                $listingsMap[$key] = $listing;
                 $newListingsCreated++;
             }
 
@@ -974,11 +990,20 @@ class MarketplaceSyncService
                 continue;
             }
 
-            // ПРИВЯЗКА К LISTING (если есть SKU)
-            $sku = trim((string)$costData->marketplaceSku);
             $listing = null;
-            if ($sku !== '' && $sku !== '0') {
-                $listing = $listingsMap[$sku] ?? null;
+
+            if ($marketplace === MarketplaceType::WILDBERRIES) {
+                $nmId = trim((string)($costData->nmId ?? ''));
+                if ($nmId !== '' && $nmId !== '0') {
+                    $size = $this->normalizeWbSize($costData->tsName ?? null);
+                    $key = $this->wbListingCacheKey($nmId, $size);
+                    $listing = $listingsMap[$key] ?? null;
+                }
+            } else {
+                $sku = trim((string)($costData->marketplaceSku ?? ''));
+                if ($sku !== '') {
+                    $listing = $listingsMap[$sku] ?? null;
+                }
             }
 
             $externalId = trim((string)$costData->externalId);
