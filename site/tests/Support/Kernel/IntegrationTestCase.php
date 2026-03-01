@@ -36,6 +36,7 @@ abstract class IntegrationTestCase extends KernelTestCase
     {
         $conn = $this->em->getConnection();
         $platform = $conn->getDatabasePlatform();
+        $schemaManager = $conn->createSchemaManager();
 
         $metadata = $this->em->getMetadataFactory()->getAllMetadata();
 
@@ -49,6 +50,18 @@ abstract class IntegrationTestCase extends KernelTestCase
         }
 
         $tables = array_values(array_unique($tables));
+        if ([] === $tables) {
+            return;
+        }
+
+        $existingTables = array_map('strtolower', $schemaManager->listTableNames());
+        $existingLookup = array_fill_keys($existingTables, true);
+
+        $tables = array_values(array_filter(
+            $tables,
+            static fn (string $table): bool => isset($existingLookup[strtolower($table)])
+        ));
+
         if ([] === $tables) {
             return;
         }
