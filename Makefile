@@ -57,7 +57,7 @@ site-test: site-test-init
 	docker-compose run --rm site-php-cli composer test
 
 # ---- подготовка окружения тестов (smoke) ----
-site-test-smoke-init: site-composer-install site-test-env site-test-wait-db site-test-db site-test-migrations
+site-test-smoke-init: site-test-env site-test-wait-db site-test-db site-test-migrations
 
 site-test-smoke: site-test-smoke-init
 	docker-compose run --rm -T site-php-cli php bin/phpunit -c phpunit.xml --testsuite=integration --filter SmokePersistenceTest
