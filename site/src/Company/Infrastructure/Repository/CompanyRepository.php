@@ -25,6 +25,11 @@ class CompanyRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    function findById(string $companyId): ?Company
+    {
+        return $this->find($companyId);
+    }
+
     public function findOneByName(string $name): ?Company
     {
         return $this->findOneBy(['name' => $name]);
