@@ -23,6 +23,7 @@ framework:
         routing:
             'App\Message\ApplyAutoRulesForTransaction': async
             'App\Message\EnqueueAutoRulesForRange': async
+            'App\Marketplace\Message\SyncWbReportMessage': async
             #App\Message\ApplyAutoRulesForTransaction: async
             #App\Message\EnqueueAutoRulesForRange: async
             App\Message\SendRegistrationEmailMessage: async

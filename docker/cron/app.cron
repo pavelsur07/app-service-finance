@@ -4,6 +4,9 @@
 # Каждые 5 минут: авто-правила ДДС
 #*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction >> /var/log/cron/app.log 2>&1
 
+# Ночная синхронизация отчётов WB по реализации.
+0 3 * * * php bin/console app:marketplace:nightly-sync --no-interaction >> /var/log/cron/app.log 2>&1
+
 # Раз в час: пересчёт оперативных P&L-агрегатов
 #5 * * * * php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
 
