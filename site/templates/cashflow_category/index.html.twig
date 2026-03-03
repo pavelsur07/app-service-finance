@@ -107,7 +107,10 @@
                     <h2 class="page-title">Статьи ДДС</h2>
                 </div>
                 <div class="col-auto ms-auto d-print-none">
-                    <a href="{{ path('cashflow_category_new') }}" class="btn btn-primary">+ Добавить статью</a>
+                    <div class="d-flex gap-2">
+                        <a href="{{ path('cashflow_category_export_json') }}" class="btn btn-outline-primary">Выгрузить справочник ДДС (JSON)</a>
+                        <a href="{{ path('cashflow_category_new') }}" class="btn btn-primary">+ Добавить статью</a>
+                    </div>
                 </div>
             </div>
         </div>

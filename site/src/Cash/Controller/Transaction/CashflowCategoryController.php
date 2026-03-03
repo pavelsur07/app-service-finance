@@ -10,6 +10,7 @@ use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -28,6 +29,32 @@ class CashflowCategoryController extends AbstractController
         return $this->render('cashflow_category/index.html.twig', [
             'items' => $items,
         ]);
+    }
+
+    #[Route('/export/json', name: 'cashflow_category_export_json', methods: ['GET'])]
+    public function exportJson(
+        CashflowCategoryRepository $repo,
+        ActiveCompanyService $companyService,
+    ): Response {
+        $company = $companyService->getActiveCompany();
+        $items = $repo->findRootByCompany($company);
+
+        $payload = array_map(
+            fn (CashflowCategory $category): array => $this->serializeCategory($category),
+            $items,
+        );
+
+        $response = new Response(json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+        $response->headers->set('Content-Type', 'application/json; charset=utf-8');
+        $response->headers->set(
+            'Content-Disposition',
+            $response->headers->makeDisposition(
+                ResponseHeaderBag::DISPOSITION_ATTACHMENT,
+                sprintf('cashflow-categories-%s.json', (new \DateTimeImmutable())->format('Y-m-d')),
+            ),
+        );
+
+        return $response;
     }
 
     #[Route('/new', name: 'cashflow_category_new', methods: ['GET', 'POST'])]
@@ -123,5 +150,27 @@ class CashflowCategoryController extends AbstractController
         }
 
         return $this->redirectToRoute('cashflow_category_index');
+    }
+
+    private function serializeCategory(CashflowCategory $category): array
+    {
+        return [
+            'id' => $category->getId(),
+            'name' => $category->getName(),
+            'description' => $category->getDescription(),
+            'status' => $category->getStatus()->value,
+            'sort' => $category->getSort(),
+            'parentId' => $category->getParent()?->getId(),
+            'operationType' => $category->getOperationType()?->value,
+            'allowPlDocument' => $category->isAllowPlDocument(),
+            'plCategoryId' => $category->getPlCategory()?->getId(),
+            'systemCode' => $category->getSystemCode(),
+            'flowKind' => $category->getFlowKind()->value,
+            'isSystem' => $category->isSystem(),
+            'children' => array_map(
+                fn (CashflowCategory $child): array => $this->serializeCategory($child),
+                $category->getChildren()->toArray(),
+            ),
+        ];
     }
 }
