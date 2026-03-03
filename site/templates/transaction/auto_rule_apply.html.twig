@@ -1,0 +1,51 @@
+{% extends 'base.html.twig' %}
+{% block title %}Авто-правило прим.{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+    <h2 class="page-title mb-0">Авто-правило прим.</h2>
+    <div class="ms-auto d-print-none">
+        <a class="btn btn-outline-secondary" href="{{ path('cash_transaction_index') }}">
+            <i class="ti ti-arrow-left me-1"></i>
+            К операциям ДДС
+        </a>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3">
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_index') }}">Все</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_audit_index') }}">История</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" href="{{ path('cash_transaction_deleted_index') }}">Удалённые</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link active" href="{{ path('cash_transaction_auto_rule_apply_page') }}">Авто-правило прим.</a>
+    </li>
+</ul>
+
+<div class="card">
+    <div class="card-body">
+        <p class="mb-3">
+            Запуск ставит в очередь применение автоправил ДДС (аналог команды
+            <code>app:cash:auto-rules:enqueue</code>) по всем счетам активной компании
+            за последние 6 месяцев.
+        </p>
+
+        <div class="alert alert-info mb-4" role="alert">
+            Период запуска: <strong>{{ from|date('d.m.Y') }}</strong> — <strong>{{ to|date('d.m.Y') }}</strong>.
+        </div>
+
+        <form method="post" action="{{ path('cash_transaction_auto_rule_apply_enqueue') }}">
+            <input type="hidden" name="_token" value="{{ csrf_token('cash_transaction_auto_rule_apply_enqueue') }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-settings-automation me-1"></i>
+                Запустить
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
