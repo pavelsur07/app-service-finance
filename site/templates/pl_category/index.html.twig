@@ -17,7 +17,7 @@
     {% for item in items %}
         {% set has_children = item.children|length > 0 %}
         <li class="pl-category-node">
-            <div class="pl-category-item d-flex align-items-center">
+            <div class="pl-category-item d-flex align-items-center{{ item.type.value == 'KPI' ? ' pl-category-item--kpi' : '' }}">
                 {% if has_children %}
                     <button class="pl-category-toggle btn btn-link btn-sm p-0 me-2 collapsed" type="button" aria-expanded="false">
                         <span class="visually-hidden">Переключить вложенные категории</span>
@@ -56,6 +56,15 @@
         .pl-category-item:hover,
         .pl-category-item:focus-within {
             background-color: rgba(24, 144, 255, 0.12);
+        }
+
+        .pl-category-item--kpi {
+            background-color: #d0d7eb;
+        }
+
+        .pl-category-item--kpi:hover,
+        .pl-category-item--kpi:focus-within {
+            background-color: #d0d7eb;
         }
 
         .pl-category-link {
