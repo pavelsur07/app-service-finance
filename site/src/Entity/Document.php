@@ -6,6 +6,8 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Enum\DocumentType;
 use App\Finance\Enum\DocumentStatus;
+use App\Finance\Enum\PLDocumentSource;
+use App\Finance\Enum\PLDocumentStream;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -53,6 +55,12 @@ class Document
 
     #[ORM\OneToMany(mappedBy: 'document', targetEntity: DocumentOperation::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $operations;
+
+    #[ORM\Column(enumType: PLDocumentSource::class, nullable: true)]
+    private ?PLDocumentSource $source = null;
+
+    #[ORM\Column(enumType: PLDocumentStream::class, nullable: true)]
+    private ?PLDocumentStream $stream = null;
 
     public function __construct(string $id, Company $company)
     {
@@ -214,5 +222,20 @@ class Document
         }
 
         return $total;
+    }
+
+    // + геттеры/сеттеры
+    public function getSource(): ?PLDocumentSource { return $this->source; }
+    public function setSource(?PLDocumentSource $source): self
+    {
+        $this->source = $source;
+        return $this;
+    }
+
+    public function getStream(): ?PLDocumentStream { return $this->stream; }
+    public function setStream(?PLDocumentStream $stream): self
+    {
+        $this->stream = $stream;
+        return $this;
     }
 }

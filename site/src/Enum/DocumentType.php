@@ -14,6 +14,8 @@ enum DocumentType: string
     case CASHFLOW_EXPENSE = 'CASHFLOW_EXPENSE';
     case OTHER = 'OTHER';
 
+    case MARKETPLACE_PL = 'marketplace_pl';
+
     public function label(): string
     {
         return match ($this) {
@@ -26,6 +28,7 @@ enum DocumentType: string
             self::CASH => '7. Касса',
             self::CASHFLOW_EXPENSE => '8. Расход из ДДС',
             self::OTHER => '9. Прочие',
+            self::MARKETPLACE_PL => 'ОПиУ маркетплейса',
         };
     }
 }

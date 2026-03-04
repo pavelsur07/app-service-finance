@@ -4,6 +4,7 @@ namespace App\Marketplace\Entity;
 
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
+use App\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -68,6 +69,10 @@ class MarketplaceCost
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
+
+    #[ORM\ManyToOne(targetEntity: Document::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Document $document = null;
 
     public function __construct(
         string $id,
@@ -230,5 +235,17 @@ class MarketplaceCost
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getDocument(): ?Document
+    {
+        return $this->document;
+    }
+
+    public function setDocument(?Document $document): self
+    {
+        $this->document = $document;
+        $this->updatedAt = new \DateTimeImmutable();
+        return $this;
     }
 }

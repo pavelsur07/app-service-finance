@@ -6,6 +6,8 @@ namespace App\Finance\Application\Command;
 
 use App\Finance\Enum\DocumentStatus;
 use App\Enum\DocumentType;
+use App\Finance\Enum\PLDocumentSource;
+use App\Finance\Enum\PLDocumentStream;
 
 final readonly class CreatePLDocumentCommand
 {
@@ -22,6 +24,8 @@ final readonly class CreatePLDocumentCommand
         public ?string $counterpartyId = null,
         public ?string $projectDirectionId = null,
         public array $operations = [],
+        public ?PLDocumentSource $source = null,      // ← НОВОЕ
+        public ?PLDocumentStream $stream = null,      // ← НОВОЕ
     ) {
     }
 }

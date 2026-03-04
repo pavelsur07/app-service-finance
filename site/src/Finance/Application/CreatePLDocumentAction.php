@@ -51,7 +51,9 @@ final readonly class CreatePLDocumentAction
             ->setNumber($command->number)
             ->setDescription($command->description)
             ->setCounterparty($this->resolveCounterparty($command->counterpartyId, $company))
-            ->setProjectDirection($this->resolveProjectDirection($command->projectDirectionId, $company));
+            ->setProjectDirection($this->resolveProjectDirection($command->projectDirectionId, $company))
+            ->setSource($command->source)       // ← НОВОЕ
+            ->setStream($command->stream);      // ← НОВОЕ
 
         foreach ($command->operations as $operationCommand) {
             $operation = $this->createOperation($operationCommand, $company);
