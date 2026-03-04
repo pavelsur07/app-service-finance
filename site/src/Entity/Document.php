@@ -4,8 +4,8 @@ namespace App\Entity;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
-use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentStatus;
 use App\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
