@@ -68,6 +68,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 'dateTo' => $toDate->format('Y-m-d'),
                 'limit' => 100000,
                 'rrdid' => 0,
+                'period' => 'daily',    // ← добавить
             ],
         ]);
 
