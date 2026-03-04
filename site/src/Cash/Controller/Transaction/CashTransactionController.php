@@ -12,14 +12,17 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Document;
+use App\Message\EnqueueAutoRulesForRange;
 use App\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 #[Route('/finance/cash-transactions')]
@@ -70,6 +73,50 @@ class CashTransactionController extends AbstractController
             'counterparties' => $counterparties,
             'pager' => $pager,
         ]);
+    }
+
+    #[Route('/auto-rule-apply', name: 'cash_transaction_auto_rule_apply_page', methods: ['GET'])]
+    public function autoRuleApplyPage(): Response
+    {
+        $today = new \DateTimeImmutable('today');
+        $from = $today->modify('-6 months');
+
+        return $this->render('transaction/auto_rule_apply.html.twig', [
+            'from' => $from,
+            'to' => $today,
+        ]);
+    }
+
+    #[Route('/auto-rule-apply', name: 'cash_transaction_auto_rule_apply_enqueue', methods: ['POST'])]
+    public function autoRuleApplyEnqueue(
+        Request $request,
+        MessageBusInterface $bus,
+    ): RedirectResponse {
+        $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('cash_transaction_auto_rule_apply_enqueue', (string) $request->request->get('_token'))) {
+            $this->addFlash('danger', 'Неверный CSRF токен.');
+
+            return $this->redirectToRoute('cash_transaction_auto_rule_apply_page');
+        }
+
+        $today = new \DateTimeImmutable('today');
+        $from = $today->modify('-6 months');
+
+        $bus->dispatch(new EnqueueAutoRulesForRange(
+            $company->getId(),
+            $from,
+            $today,
+            null,
+        ));
+
+        $this->addFlash('success', sprintf(
+            'Автоправила поставлены в очередь за период %s — %s.',
+            $from->format('d.m.Y'),
+            $today->format('d.m.Y'),
+        ));
+
+        return $this->redirectToRoute('cash_transaction_auto_rule_apply_page');
     }
 
     #[Route('/deleted', name: 'cash_transaction_deleted_index', methods: ['GET'])]
