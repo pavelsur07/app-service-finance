@@ -1075,36 +1075,77 @@ class MarketplaceSyncService
         $allExternalReturnIds = array_keys($allExternalReturnIds);
         $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allExternalReturnIds);
 
+        // Собираем nm_id (для WB) или SKU (для остальных МП)
+        $allNmIds = [];
         $allSkus = [];
         foreach ($returnsData as $returnData) {
-            $sku = trim((string)$returnData->marketplaceSku);
-            if ($sku !== '') {
+            $nmId = trim((string) ($returnData->nmId ?? ''));
+            $sku = trim((string) $returnData->marketplaceSku);
+
+            if ($nmId !== '' && $nmId !== '0') {
+                $allNmIds[$nmId] = true;
+            } elseif ($sku !== '') {
                 $allSkus[$sku] = true;
             }
         }
-        $allSkus = array_keys($allSkus);
 
-        $listingsCache = $this->listingRepository->findListingsBySkusIndexed($company, $marketplace, $allSkus);
+        // Загружаем листинги по nm_id (WB) или по SKU (остальные)
+        $listingsCache = [];
+        if (!empty($allNmIds)) {
+            $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+                $company, $marketplace, array_keys($allNmIds)
+            );
+        }
+        if (!empty($allSkus)) {
+            $skuListings = $this->listingRepository->findListingsBySkusIndexed(
+                $company, $marketplace, array_keys($allSkus)
+            );
+            foreach ($skuListings as $k => $v) {
+                $listingsCache[$k] = $v;
+            }
+        }
 
+        // Создаём недостающие листинги
         $newListingsCreated = 0;
         foreach ($returnsData as $returnData) {
-            $sku = trim((string)$returnData->marketplaceSku);
+            $nmId = trim((string) ($returnData->nmId ?? ''));
+            $tsName = $this->normalizeWbSize($returnData->tsName ?? null);
+            $sku = trim((string) $returnData->marketplaceSku);
 
-            if ($sku === '' || isset($listingsCache[$sku])) {
+            // Определяем ключ кэша
+            if ($nmId !== '' && $nmId !== '0') {
+                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+            } else {
+                $cacheKey = $sku;
+            }
+
+            if ($cacheKey === '' || isset($listingsCache[$cacheKey])) {
                 continue;
             }
 
-            $listing = new MarketplaceListing(
-                Uuid::uuid4()->toString(),
-                $company,
-                null,
-                $marketplace
-            );
-            $listing->setMarketplaceSku($sku);
-            $listing->setPrice($returnData->refundAmount);
+            // Создаём листинг с полными данными
+            if ($nmId !== '' && $nmId !== '0') {
+                $listing = $this->createListingFromWbData($company, [
+                    'nm_id' => $nmId,
+                    'ts_name' => $tsName,
+                    'sa_name' => $sku,
+                    'brand_name' => '',
+                    'subject_name' => '',
+                    'retail_price' => $returnData->refundAmount,
+                ]);
+            } else {
+                $listing = new MarketplaceListing(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    null,
+                    $marketplace
+                );
+                $listing->setMarketplaceSku($sku);
+                $listing->setPrice($returnData->refundAmount);
+                $this->em->persist($listing);
+            }
 
-            $this->em->persist($listing);
-            $listingsCache[$sku] = $listing;
+            $listingsCache[$cacheKey] = $listing;
             $newListingsCreated++;
         }
 
@@ -1119,13 +1160,21 @@ class MarketplaceSyncService
                 continue;
             }
 
-            $sku = trim((string)$returnData->marketplaceSku);
-            $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
+            $nmId = trim((string) ($returnData->nmId ?? ''));
+            $tsName = $this->normalizeWbSize($returnData->tsName ?? null);
+            $sku = trim((string) $returnData->marketplaceSku);
+
+            if ($nmId !== '' && $nmId !== '0') {
+                $cacheKey = $this->wbListingCacheKey($nmId, $tsName);
+            } else {
+                $cacheKey = $sku;
+            }
+            $listing = $cacheKey !== '' ? ($listingsCache[$cacheKey] ?? null) : null;
 
             if (!$listing) {
                 $listing = $this->findOrCreateListing($company, $returnData);
-                if ($sku !== '') {
-                    $listingsCache[$sku] = $listing;
+                if ($cacheKey !== '') {
+                    $listingsCache[$cacheKey] = $listing;
                 }
             }
 
@@ -1875,12 +1924,43 @@ class MarketplaceSyncService
         return "{$nmId}_{$tsName}";
     }
 
-    private function findOrCreateListing(Company $company, $saleData): MarketplaceListing
+    private function findOrCreateListing(Company $company, $data): MarketplaceListing
     {
+        // Пробуем найти по nm_id + size (WB)
+        $nmId = $data->nmId ?? null;
+        $tsName = $data->tsName ?? null;
+
+        if ($nmId !== null && trim($nmId) !== '' && trim($nmId) !== '0') {
+            $size = $this->normalizeWbSize($tsName);
+            $listing = $this->listingRepository->findOneBy([
+                'company' => $company,
+                'marketplace' => $data->marketplace,
+                'marketplaceSku' => trim($nmId),
+                'size' => $size,
+            ]);
+
+            if ($listing) {
+                return $listing;
+            }
+
+            // Создаём с полными данными через createListingFromWbData
+            return $this->createListingFromWbData($company, [
+                'nm_id' => trim($nmId),
+                'ts_name' => $size,
+                'sa_name' => $data->marketplaceSku ?? '',
+                'brand_name' => '',
+                'subject_name' => '',
+                'retail_price' => property_exists($data, 'pricePerUnit')
+                    ? $data->pricePerUnit
+                    : ($data->refundAmount ?? '0'),
+            ]);
+        }
+
+        // Fallback — поиск по SKU (для не-WB маркетплейсов или если nmId нет)
         $listing = $this->listingRepository->findByMarketplaceSku(
             $company,
-            $saleData->marketplace,
-            $saleData->marketplaceSku
+            $data->marketplace,
+            $data->marketplaceSku
         );
 
         if ($listing) {
@@ -1891,10 +1971,14 @@ class MarketplaceSyncService
             Uuid::uuid4()->toString(),
             $company,
             null,
-            $saleData->marketplace
+            $data->marketplace
         );
-        $listing->setMarketplaceSku($saleData->marketplaceSku);
-        $listing->setPrice($saleData->pricePerUnit);
+        $listing->setMarketplaceSku($data->marketplaceSku);
+        $listing->setPrice(
+            property_exists($data, 'pricePerUnit')
+                ? $data->pricePerUnit
+                : ($data->refundAmount ?? '0')
+        );
 
         $this->em->persist($listing);
 

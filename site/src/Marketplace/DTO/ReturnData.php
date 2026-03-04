@@ -16,6 +16,9 @@ readonly class ReturnData
         public ?string $returnLogisticsCost = null,
         public ?string $externalReturnId = null,
         public ?array $rawData = null,
+        public ?string $nmId = null,        // ← НОВОЕ: nm_id от WB
+        public ?string $tsName = null,      // ← НОВОЕ: ts_name (размер) от WB
+        public ?string $barcode = null,     // ← НОВОЕ: barcode от WB
     ) {
     }
 }

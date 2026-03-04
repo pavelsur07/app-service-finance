@@ -270,6 +270,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 returnReason: $item['supplier_oper_name'] ?? null,
                 returnLogisticsCost: isset($item['return_amount']) ? (string) abs((float) $item['return_amount']) : null,
                 externalReturnId: (string) $item['realizationreport_id'],
+                nmId: isset($item['nm_id']) ? (string) $item['nm_id'] : null,
+                tsName: isset($item['ts_name']) ? (string) $item['ts_name'] : null,
+                barcode: isset($item['barcode']) ? (string) $item['barcode'] : null,
             );
         }
 
