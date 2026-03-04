@@ -32,7 +32,6 @@
                             <th>Название</th>
                             <th>Действие</th>
                             <th>Тип операции</th>
-                            <th>Категория</th>
                             <th>Направление / проект</th>
                             <th>Контрагент</th>
                             <th></th>
@@ -40,13 +39,23 @@
                     </thead>
                     <tbody>
                     {% for item in items %}
+                        {% set titleParts = [] %}
+                        {% if item.cashflowCategory %}
+                            {% set titleParts = titleParts|merge([item.cashflowCategory.name]) %}
+                        {% endif %}
+                        {% if item.counterparty %}
+                            {% set titleParts = titleParts|merge([item.counterparty.name]) %}
+                        {% endif %}
                         <tr>
-                            <td>{{ item.name }}</td>
+                            <td>{{ titleParts|join(' + ') }}</td>
                             <td>{{ item.action.name }}</td>
                             <td>{{ item.operationType.name }}</td>
-                            <td>{{ item.cashflowCategory.name }}</td>
                             <td>{{ item.projectDirection ? item.projectDirection.name : '' }}</td>
-                            <td>{{ item.counterparty ? item.counterparty.name : '' }}</td>
+                            <td>
+                                {% if item.counterparty %}
+                                    {{ item.counterparty.name|length > 30 ? item.counterparty.name|slice(0, 30) ~ '…' : item.counterparty.name }}
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 <a href="{{ path('cash_transaction_auto_rule_check', {id: item.id}) }}" class="btn btn-sm btn-secondary">пров.</a>
                                 <a href="{{ path('cash_transaction_auto_rule_edit', {id: item.id}) }}" class="btn btn-sm btn-warning">✏️</a>
@@ -57,7 +66,7 @@
                             </td>
                         </tr>
                     {% else %}
-                        <tr><td colspan="7" class="text-center">Нет данных</td></tr>
+                        <tr><td colspan="6" class="text-center">Нет данных</td></tr>
                     {% endfor %}
                     </tbody>
                 </table>
