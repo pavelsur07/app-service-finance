@@ -199,7 +199,7 @@ final class GeneratePLFromMarketplaceAction
             MarketplaceType::WILDBERRIES => PLDocumentSource::MARKETPLACE_WB,
             MarketplaceType::OZON => PLDocumentSource::MARKETPLACE_OZON,
             MarketplaceType::YANDEX_MARKET => PLDocumentSource::MARKETPLACE_YANDEX,
-            MarketplaceType::SBER_MEGA_MARKET => PLDocumentSource::MARKETPLACE_SBER,
+            MarketplaceType::SBER_MEGAMARKET => PLDocumentSource::MARKETPLACE_SBER,
         };
     }
 }
