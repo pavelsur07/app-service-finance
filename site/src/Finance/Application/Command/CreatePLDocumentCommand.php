@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Application\Command;
 
-use App\Enum\DocumentStatus;
+use App\Finance\Enum\DocumentStatus;
 use App\Enum\DocumentType;
 
 final readonly class CreatePLDocumentCommand
