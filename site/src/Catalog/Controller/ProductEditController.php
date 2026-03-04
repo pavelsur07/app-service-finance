@@ -8,6 +8,7 @@ use App\Catalog\Application\GetProductAction;
 use App\Catalog\Application\UpdateProductAction;
 use App\Catalog\DTO\UpdateProductCommand;
 use App\Catalog\Form\ProductType;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,9 +18,10 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ProductEditController extends AbstractController
 {
     #[Route('/catalog/products/{id}/edit', name: 'catalog_products_edit', methods: ['GET', 'POST'])]
-    public function __invoke(string $id, Request $request, GetProductAction $getProductAction, UpdateProductAction $updateProductAction): Response
+    public function __invoke(string $id, Request $request, GetProductAction $getProductAction, UpdateProductAction $updateProductAction, ActiveCompanyService $activeCompanyService): Response
     {
-        $product = $getProductAction($id);
+        $companyId = $activeCompanyService->getActiveCompany()->getId();
+        $product = $getProductAction($companyId, $id);
 
         $command = new UpdateProductCommand();
         $command->name = $product->getName();
@@ -36,7 +38,7 @@ final class ProductEditController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $updateProductAction($id, $command);
+                $updateProductAction($companyId, $id, $command);
 
                 $this->addFlash('success', 'Товар успешно обновлен.');
 
