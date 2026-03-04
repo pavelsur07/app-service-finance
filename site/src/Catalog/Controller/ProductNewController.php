@@ -8,6 +8,7 @@ use App\Catalog\Application\CreateProductAction;
 use App\Catalog\DTO\CreateProductCommand;
 use App\Catalog\Enum\ProductStatus;
 use App\Catalog\Form\ProductType;
+use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
@@ -17,8 +18,10 @@ use Symfony\Component\Routing\Attribute\Route;
 final class ProductNewController extends AbstractController
 {
     #[Route('/catalog/products/new', name: 'catalog_products_new', methods: ['GET', 'POST'])]
-    public function __invoke(Request $request, CreateProductAction $createProductAction): Response
+    public function __invoke(Request $request, CreateProductAction $createProductAction, ActiveCompanyService $activeCompanyService): Response
     {
+        $companyId = $activeCompanyService->getActiveCompany()->getId();
+
         $command = new CreateProductCommand();
         $command->status = ProductStatus::ACTIVE;
 
@@ -27,7 +30,7 @@ final class ProductNewController extends AbstractController
 
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $productId = $createProductAction($command);
+                $productId = $createProductAction($companyId, $command);
 
                 $this->addFlash('success', 'Товар успешно создан.');
 

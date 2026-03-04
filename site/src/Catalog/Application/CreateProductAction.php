@@ -8,7 +8,7 @@ use App\Catalog\DTO\CreateProductCommand;
 use App\Catalog\Domain\ProductSkuPolicy;
 use App\Catalog\Entity\Product;
 use App\Catalog\Enum\ProductStatus;
-use App\Shared\Service\ActiveCompanyService;
+use App\Company\Entity\Company;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -16,16 +16,14 @@ use Ramsey\Uuid\Uuid;
 final class CreateProductAction
 {
     public function __construct(
-        private readonly ActiveCompanyService $activeCompanyService,
         private readonly ProductSkuPolicy $productSkuPolicy,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
-    public function __invoke(CreateProductCommand $cmd): string
+    public function __invoke(string $companyId, CreateProductCommand $cmd): string
     {
-        $company = $this->activeCompanyService->getActiveCompany();
-        $companyId = $company->getId();
+        $company = $this->entityManager->getReference(Company::class, $companyId);
 
         $sku = trim((string) $cmd->sku);
         $this->productSkuPolicy->assertSkuIsUnique($sku, $companyId);

@@ -6,21 +6,18 @@ namespace App\Catalog\Application;
 
 use App\Catalog\Entity\Product;
 use App\Catalog\Infrastructure\ProductRepository;
-use App\Shared\Service\ActiveCompanyService;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 final class GetProductAction
 {
     public function __construct(
         private readonly ProductRepository $productRepository,
-        private readonly ActiveCompanyService $activeCompanyService,
     ) {
     }
 
-    public function __invoke(string $id): Product
+    public function __invoke(string $companyId, string $id): Product
     {
-        $company = $this->activeCompanyService->getActiveCompany();
-        $product = $this->productRepository->getOneForCompanyOrNull($id, $company);
+        $product = $this->productRepository->findByIdAndCompany($id, $companyId);
 
         if (null === $product) {
             throw new NotFoundHttpException();
@@ -29,4 +26,3 @@ final class GetProductAction
         return $product;
     }
 }
-
