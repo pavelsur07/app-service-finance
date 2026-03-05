@@ -9,6 +9,7 @@ use App\Entity\ProjectDirection;
 use App\Entity\PLCategory;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Repository\MarketplaceSaleMappingRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -22,7 +23,7 @@ use Webmozart\Assert\Assert;
  *
  * isNegative — инвертирует знак суммы (для расходных строк и возвратов).
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: MarketplaceSaleMappingRepository::class)]
 #[ORM\Table(name: 'marketplace_sale_mappings')]
 #[ORM\UniqueConstraint(
     name: 'uniq_sale_mapping',

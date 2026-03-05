@@ -53,6 +53,14 @@
                                 Возвраты
                             </a>
                         </li>
+
+                        <li class="nav-item">
+                            <a href="{{ path('marketplace_pl_mappings_index') }}"
+                               class="nav-link {{ active_tab == 'pl_mappings' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 7h10" /><path d="M7 12h10" /><path d="M7 17h10" /><path d="M5 7l0 .01" /><path d="M5 12l0 .01" /><path d="M5 17l0 .01" /></svg>
+                                Маппинг ОПиУ
+                            </a>
+                        </li>
                         <li class="nav-item">
                             <a href="{{ path('marketplace_costs_index') }}"
                                class="nav-link {{ active_tab == 'costs' ? 'active' : '' }}">
