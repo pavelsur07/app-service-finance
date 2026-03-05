@@ -2,7 +2,7 @@
 
 namespace App\Marketplace\Application;
 
-use App\Catalog\Infrastructure\ProductRepository;
+use App\Catalog\Facade\ProductFacade;
 use App\Marketplace\DTO\MapListingToProductCommand;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Psr\Log\LoggerInterface;
@@ -20,7 +20,7 @@ final class MapListingToProductAction
 {
     public function __construct(
         private readonly MarketplaceListingRepository $listingRepository,
-        private readonly ProductRepository $productRepository,
+        private readonly ProductFacade $productFacade,
         private readonly LoggerInterface $logger
     ) {
     }
@@ -50,7 +50,7 @@ final class MapListingToProductAction
         }
 
         // ✅ БЕЗОПАСНО: findByIdAndCompany проверяет company_id!
-        $product = $this->productRepository->findByIdAndCompany(
+        $product = $this->productFacade->findByIdAndCompany(
             $cmd->productId,
             $cmd->companyId
         );

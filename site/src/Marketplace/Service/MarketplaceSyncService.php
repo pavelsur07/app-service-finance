@@ -2,8 +2,6 @@
 
 namespace App\Marketplace\Service;
 
-use App\Catalog\Entity\Product;
-use App\Catalog\Infrastructure\ProductRepository;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -12,7 +10,6 @@ use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
-use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -41,11 +38,9 @@ class MarketplaceSyncService
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly ProductRepository $productRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
-        private readonly MarketplaceCostRepository $costRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly LoggerInterface $logger,
