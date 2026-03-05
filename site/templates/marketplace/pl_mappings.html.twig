@@ -1,0 +1,344 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'pl_mappings' %}
+
+{% block tab_content %}
+    <div class="card-header">
+        <div class="row align-items-center w-100">
+            <div class="col">
+                <h3 class="card-title">Маппинг ОПиУ ({{ operationType == 'sale' ? 'Продажи' : 'Возвраты' }})</h3>
+                <div class="text-muted small">
+                    Настройка правил AmountSource → Категория ОПиУ. Важно: активным может быть только одно правило на источник суммы.
+                </div>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-mapping">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                    Добавить правило
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card-body border-bottom">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label">Операция</label>
+                <div class="btn-group w-100">
+                    <a class="btn {{ operationType == 'sale' ? 'btn-primary' : 'btn-outline-primary' }}"
+                       href="{{ path('marketplace_pl_mappings_index', { op: 'sale', marketplace: marketplaceFilterValue }) }}">
+                        Продажи
+                    </a>
+                    <a class="btn {{ operationType == 'return' ? 'btn-primary' : 'btn-outline-primary' }}"
+                       href="{{ path('marketplace_pl_mappings_index', { op: 'return', marketplace: marketplaceFilterValue }) }}">
+                        Возвраты
+                    </a>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <form method="get" action="{{ path('marketplace_pl_mappings_index') }}">
+                    <input type="hidden" name="op" value="{{ operationType }}">
+                    <label class="form-label">Маркетплейс</label>
+                    <select name="marketplace" class="form-select" onchange="this.form.submit()">
+                        <option value="all" {{ marketplaceFilterValue == 'all' ? 'selected' : '' }}>Все</option>
+                        {% for mp in availableMarketplaces %}
+                            <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
+                                {{ mp.displayName }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </form>
+            </div>
+
+            <div class="col-md-4 text-end">
+                {% if marketplaceFilterValue != 'all' and missingAmountSources is not empty %}
+                    <span class="badge bg-yellow-lt">
+                        Не настроено: {{ missingAmountSources|length }}
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if marketplaceFilterValue != 'all' and missingAmountSources is not empty %}
+            <div class="alert alert-warning mt-3 mb-0">
+                <div class="d-flex">
+                    <div>
+                        <strong>Есть ненастроенные источники суммы:</strong>
+                        <div class="mt-1">
+                            {% for src in missingAmountSources %}
+                                <span class="badge bg-orange-lt me-1">{{ src.displayName }}</span>
+                            {% endfor %}
+                        </div>
+                        <div class="text-muted small mt-2">
+                            Пока активного правила нет — генерация ОПиУ по этому источнику не сформирует строку.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter">
+            <thead>
+            <tr>
+                {% if marketplaceFilterValue == 'all' %}
+                    <th>Маркетплейс</th>
+                {% endif %}
+                <th>Источник суммы</th>
+                <th>Категория ОПиУ</th>
+                <th>Проект</th>
+                <th>Знак</th>
+                <th>Статус</th>
+                <th class="w-1"></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% if mappings is empty %}
+                <tr>
+                    <td colspan="{{ marketplaceFilterValue == 'all' ? 7 : 6 }}" class="text-center text-muted py-4">
+                        <div class="empty">
+                            <div class="empty-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 3l8 4.5v9l-8 4.5l-8 -4.5v-9l8 -4.5" /><path d="M12 12l8 -4.5" /><path d="M12 12v9" /><path d="M12 12l-8 -4.5" /></svg>
+                            </div>
+                            <p class="empty-title">Правила маппинга не настроены</p>
+                            <p class="empty-subtitle text-muted">Добавьте правило, чтобы генерация ОПиУ начала формировать строки по продажам/возвратам</p>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                {% for m in mappings %}
+                    <tr>
+                        {% if marketplaceFilterValue == 'all' %}
+                            <td><span class="badge bg-azure">{{ m.marketplace.displayName }}</span></td>
+                        {% endif %}
+
+                        <td>
+                            <div class="fw-bold">{{ m.amountSource.displayName }}</div>
+                            <div class="text-muted small"><code>{{ m.amountSource.value }}</code></div>
+                        </td>
+
+                        <td>
+                            <div class="fw-bold">{{ m.plCategory.name }}</div>
+                            <div class="text-muted small">
+                                {% if m.plCategory.code %}
+                                    <code>{{ m.plCategory.code }}</code>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if m.projectDirection %}
+                                <span class="badge bg-blue-lt">{{ m.projectDirection.name }}</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if m.isNegative %}
+                                <span class="badge bg-danger-lt">Отрицательная</span>
+                            {% else %}
+                                <span class="badge bg-success-lt">Положительная</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if m.isActive %}
+                                <span class="badge bg-success">Активно</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Неактивно</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end">
+                            <div class="btn-list flex-nowrap">
+                                <a href="#" class="btn btn-sm btn-ghost-secondary"
+                                   data-bs-toggle="modal" data-bs-target="#modal-edit-mapping-{{ m.id }}">
+                                    Редактировать
+                                </a>
+
+                                <a href="{{ path('marketplace_pl_mappings_toggle', {id: m.id, op: operationType, marketplace: marketplaceFilterValue}) }}"
+                                   class="btn btn-sm {{ m.isActive ? 'btn-ghost-warning' : 'btn-ghost-success' }}">
+                                    {{ m.isActive ? 'Выключить' : 'Включить' }}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+
+                    <div class="modal modal-blur fade" id="modal-edit-mapping-{{ m.id }}" tabindex="-1" role="dialog" aria-hidden="true">
+                        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+                            <div class="modal-content">
+                                <form method="post" action="{{ path('marketplace_pl_mappings_edit', {id: m.id}) }}">
+                                    <input type="hidden" name="redirect_op" value="{{ operationType }}">
+                                    <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
+
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">Редактировать правило</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+
+                                    <div class="modal-body">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label">Маркетплейс</label>
+                                                <input class="form-control" value="{{ m.marketplace.displayName }}" disabled>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <label class="form-label">Источник суммы</label>
+                                                <input class="form-control" value="{{ m.amountSource.displayName }}" disabled>
+                                            </div>
+
+                                            <div class="col-md-12">
+                                                <label class="form-label">Категория ОПиУ</label>
+                                                <select name="pl_category_id" class="form-select" required>
+                                                    {% for c in plCategories %}
+                                                        {% set indent = '' %}
+                                                        {% for i in 1..(c.level - 1) %}{% set indent = indent ~ '— ' %}{% endfor %}
+                                                        <option value="{{ c.id }}" {{ c.id == m.plCategory.id ? 'selected' : '' }}>
+                                                            {{ indent }}{{ c.name }}
+                                                        </option>
+                                                    {% endfor %}
+                                                </select>
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="is_negative" value="1" {{ m.isNegative ? 'checked' : '' }}>
+                                                    <span class="form-check-label">Инвертировать знак (делать отрицательной)</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="col-md-6">
+                                                <label class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="is_active" value="1" {{ m.isActive ? 'checked' : '' }}>
+                                                    <span class="form-check-label">Активное правило</span>
+                                                </label>
+                                            </div>
+
+                                            <div class="col-md-12">
+                                                <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#collapse-advanced-{{ m.id }}" role="button" aria-expanded="false">
+                                                    Доп. параметры (опционально)
+                                                </a>
+
+                                                <div class="collapse mt-3" id="collapse-advanced-{{ m.id }}">
+                                                    <label class="form-label">Проект</label>
+                                                    <select name="project_direction_id" class="form-select">
+                                                        <option value="" {{ m.projectDirection ? '' : 'selected' }}>— Не выбран —</option>
+                                                        {% for pd in projectDirections %}
+                                                            <option value="{{ pd.id }}" {{ m.projectDirection and pd.id == m.projectDirection.id ? 'selected' : '' }}>
+                                                                {{ pd.name }}
+                                                            </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                    <div class="text-muted small mt-2">
+                                                        В MVP проект можно не заполнять — поле не влияет на отображение маппинга, но попадёт в строки ОПиУ.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn me-auto" data-bs-dismiss="modal">Отмена</button>
+                                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <div class="modal modal-blur fade" id="modal-add-mapping" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('marketplace_pl_mappings_create') }}">
+                    <input type="hidden" name="redirect_op" value="{{ operationType }}">
+                    <input type="hidden" name="redirect_marketplace" value="{{ marketplaceFilterValue }}">
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">Добавить правило маппинга</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Маркетплейс</label>
+                                <select name="marketplace" class="form-select" required>
+                                    {% for mp in availableMarketplaces %}
+                                        <option value="{{ mp.value }}" {{ marketplaceFilterValue == mp.value ? 'selected' : '' }}>
+                                            {{ mp.displayName }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-label">Источник суммы</label>
+                                <select name="amount_source" class="form-select" required>
+                                    {% for src in amountSources %}
+                                        <option value="{{ src.value }}">{{ src.displayName }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-12">
+                                <label class="form-label">Категория ОПиУ</label>
+                                <select name="pl_category_id" class="form-select" required>
+                                    {% for c in plCategories %}
+                                        {% set indent = '' %}
+                                        {% for i in 1..(c.level - 1) %}{% set indent = indent ~ '— ' %}{% endfor %}
+                                        <option value="{{ c.id }}">{{ indent }}{{ c.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="is_negative" value="1">
+                                    <span class="form-check-label">Инвертировать знак (делать отрицательной)</span>
+                                </label>
+                            </div>
+
+                            <div class="col-md-6">
+                                <label class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="is_active" value="1" checked>
+                                    <span class="form-check-label">Активное правило</span>
+                                </label>
+                            </div>
+
+                            <div class="col-md-12">
+                                <a class="btn btn-sm btn-outline-secondary" data-bs-toggle="collapse" href="#collapse-advanced-create" role="button" aria-expanded="false">
+                                    Доп. параметры (опционально)
+                                </a>
+                                <div class="collapse mt-3" id="collapse-advanced-create">
+                                    <label class="form-label">Проект</label>
+                                    <select name="project_direction_id" class="form-select">
+                                        <option value="" selected>— Не выбран —</option>
+                                        {% for pd in projectDirections %}
+                                            <option value="{{ pd.id }}">{{ pd.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn me-auto" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">Создать</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}
