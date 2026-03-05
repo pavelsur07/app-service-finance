@@ -6,7 +6,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
-use App\Repository\UserRepository;
+use App\Company\Facade\CompanyFacade;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
@@ -24,7 +24,7 @@ class MarketplaceSyncCommand extends Command
     public function __construct(
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceSyncFacade $syncFacade,
-        private readonly UserRepository $userRepository,
+        private readonly CompanyFacade $companyFacade,
     ) {
         parent::__construct();
     }
@@ -119,10 +119,12 @@ class MarketplaceSyncCommand extends Command
 
     private function getCompanyById(string $id): Company
     {
-        // Simplified - в реальности нужен CompanyRepository
-        $user = $this->userRepository->findOneBy(['id' => $id]);
+        $company = $this->companyFacade->findById($id);
+        if (null === $company) {
+            throw new \InvalidArgumentException("Company not found: {$id}");
+        }
 
-        return $user->getCompanies()->first();
+        return $company;
     }
 
     private function getAllCompaniesWithConnection(MarketplaceType $marketplace): array
