@@ -92,6 +92,29 @@ services:
         arguments:
             $adapters: !tagged_iterator app.marketplace.adapter
 
+    # ---------- Marketplace raw processors ------------ #
+    App\Marketplace\Application\Processor\WbSalesRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\WbReturnsRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\WbCostsRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\OzonSalesRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\OzonReturnsRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\OzonCostsRawProcessor:
+        tags: ['app.marketplace.raw_processor']
+
+    App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry:
+        arguments:
+            $processors: !tagged_iterator app.marketplace.raw_processor
+
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'
