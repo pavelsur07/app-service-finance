@@ -5,12 +5,14 @@ namespace App\Marketplace\Controller;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Facade\MarketplaceSyncFacade;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -28,6 +30,7 @@ class MarketplaceController extends AbstractController
 {
     public function __construct(
         private readonly CompanyContextService $companyContext,
+        private readonly ActiveCompanyService $companyService,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
@@ -259,9 +262,9 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
     public function processSales(
         string $id,
-        MarketplaceSyncFacade $syncFacade
+        ProcessMarketplaceRawDocumentAction $action
     ): Response {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
 
@@ -270,7 +273,8 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncFacade->processSalesFromRaw((string) $company->getId(), (string) $rawDoc->getId());
+            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'sales');
+            $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
         } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
@@ -293,9 +297,9 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
     public function processReturns(
         string $id,
-        MarketplaceSyncFacade $syncFacade
+        ProcessMarketplaceRawDocumentAction $action
     ): Response {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
 
@@ -304,7 +308,8 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncFacade->processReturnsFromRaw((string) $company->getId(), (string) $rawDoc->getId());
+            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
+            $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
         } catch (\Exception $e) {
@@ -317,9 +322,9 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
     public function processCosts(
         string $id,
-        MarketplaceSyncFacade $syncFacade
+        ProcessMarketplaceRawDocumentAction $action
     ): Response {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
 
@@ -328,7 +333,8 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $count = $syncFacade->processCostsFromRaw((string) $company->getId(), (string) $rawDoc->getId());
+            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
+            $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {
