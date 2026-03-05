@@ -20,9 +20,8 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * Генерация документа ОПиУ из данных маркетплейса.
  *
  * Примеры:
- *   php bin/console app:marketplace:generate-pl <companyId> wildberries revenue 2024-01-01 2024-01-31
- *   php bin/console app:marketplace:generate-pl <companyId> ozon costs 2024-01-01 2024-01-31
- *   php bin/console app:marketplace:generate-pl <companyId> wildberries --all-streams 2024-01-01 2024-01-31
+ *   php bin/console app:marketplace:generate-pl <companyId> wildberries revenue --from=2024-01-01 --to=2024-01-31
+ *   php bin/console app:marketplace:generate-pl <companyId> wildberries --all-streams --from=2024-01-01 --to=2024-01-31
  */
 #[AsCommand(
     name: 'app:marketplace:generate-pl',
@@ -45,8 +44,8 @@ final class GenerateMarketplacePLConsoleCommand extends Command
             ->addArgument('companyId', InputArgument::REQUIRED, 'UUID компании')
             ->addArgument('marketplace', InputArgument::REQUIRED, "Маркетплейс: {$marketplaces}")
             ->addArgument('stream', InputArgument::OPTIONAL, "Поток: {$streams}")
-            ->addArgument('periodFrom', InputArgument::REQUIRED, 'Начало периода (Y-m-d)')
-            ->addArgument('periodTo', InputArgument::REQUIRED, 'Конец периода (Y-m-d)')
+            ->addOption('from', null, InputOption::VALUE_REQUIRED, 'Начало периода (Y-m-d)')
+            ->addOption('to', null, InputOption::VALUE_REQUIRED, 'Конец периода (Y-m-d)')
             ->addOption('all-streams', null, InputOption::VALUE_NONE, 'Генерировать для всех потоков (revenue + costs)')
             ->addOption('actor', null, InputOption::VALUE_REQUIRED, 'UUID пользователя', 'system');
     }
@@ -57,9 +56,16 @@ final class GenerateMarketplacePLConsoleCommand extends Command
 
         $companyId = $input->getArgument('companyId');
         $marketplace = $input->getArgument('marketplace');
-        $periodFrom = $input->getArgument('periodFrom');
-        $periodTo = $input->getArgument('periodTo');
+        $periodFrom = $input->getOption('from');
+        $periodTo = $input->getOption('to');
         $actorUserId = $input->getOption('actor');
+
+        // Валидация периода
+        if (!$periodFrom || !$periodTo) {
+            $io->error('Укажите период: --from=2026-02-01 --to=2026-03-31');
+
+            return Command::FAILURE;
+        }
 
         // Валидация marketplace
         $marketplaceEnum = MarketplaceType::tryFrom($marketplace);
@@ -80,7 +86,7 @@ final class GenerateMarketplacePLConsoleCommand extends Command
         } else {
             $streamArg = $input->getArgument('stream');
             if (!$streamArg) {
-                $io->error('Укажите stream или используйте --all-streams');
+                $io->error('Укажите stream (revenue/costs) или используйте --all-streams');
 
                 return Command::FAILURE;
             }
@@ -130,6 +136,9 @@ final class GenerateMarketplacePLConsoleCommand extends Command
                 }
             } catch (\Throwable $e) {
                 $io->error(sprintf('Ошибка: %s', $e->getMessage()));
+                if ($output->isVerbose()) {
+                    $io->error($e->getTraceAsString());
+                }
 
                 return Command::FAILURE;
             }
