@@ -15,27 +15,15 @@ use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
-use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
-use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
-use App\Marketplace\Service\CostCalculator\WbDeductionCalculator;
-use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
-use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
-use App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator;
-use App\Marketplace\Service\CostCalculator\WbPenaltyCalculator;
-use App\Marketplace\Service\CostCalculator\WbProductProcessingCalculator;
-use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
-use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
-use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
-use App\Shared\Service\SlugifyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 class MarketplaceSyncService
 {
-    /** @var CostCalculatorInterface[] */
-    private array $costCalculators;
+    /** @var iterable<CostCalculatorInterface> */
+    private iterable $costCalculators;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -45,22 +33,9 @@ class MarketplaceSyncService
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly LoggerInterface $logger,
-        private readonly SlugifyService $slugify
+        iterable $costCalculators,
     ) {
-        // Регистрируем калькуляторы затрат
-        $this->costCalculators = [
-            new WbCommissionCalculator(),
-            new WbAcquiringCalculator(),
-            new WbLogisticsDeliveryCalculator(),
-            new WbLogisticsReturnCalculator(),
-            new WbStorageCalculator(),
-            new WbPvzProcessingCalculator(),
-            new WbWarehouseLogisticsCalculator(),
-            new WbPenaltyCalculator(),
-            new WbProductProcessingCalculator(),
-            new WbDeductionCalculator($this->slugify),
-            new WbLoyaltyDiscountCalculator(),
-        ];
+        $this->costCalculators = $costCalculators;
     }
 
     public function processWbSalesFromRaw(string $companyId, string $rawDocId): int
