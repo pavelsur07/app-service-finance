@@ -92,6 +92,55 @@ services:
         arguments:
             $adapters: !tagged_iterator app.marketplace.adapter
 
+    # ---------- Marketplace cost calculators ------------ #
+    App\Marketplace\Service\CostCalculator\WbCommissionCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 110 }
+
+    App\Marketplace\Service\CostCalculator\WbAcquiringCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 109 }
+
+    App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 108 }
+
+    App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 107 }
+
+    App\Marketplace\Service\CostCalculator\WbStorageCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 106 }
+
+    App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 105 }
+
+    App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 104 }
+
+    App\Marketplace\Service\CostCalculator\WbPenaltyCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 103 }
+
+    App\Marketplace\Service\CostCalculator\WbProductProcessingCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 102 }
+
+    App\Marketplace\Service\CostCalculator\WbDeductionCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 101 }
+
+    App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator:
+        tags:
+            - { name: 'app.marketplace.cost_calculator', priority: 100 }
+
+    App\Marketplace\Service\MarketplaceSyncService:
+        arguments:
+            $costCalculators: !tagged_iterator app.marketplace.cost_calculator
+
     # ---------- Marketplace raw processors ------------ #
     App\Marketplace\Application\Processor\WbSalesRawProcessor:
         tags: ['app.marketplace.raw_processor']
