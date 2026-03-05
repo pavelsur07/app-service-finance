@@ -3,8 +3,9 @@
 namespace App\Marketplace\Facade;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Marketplace\Service\MarketplaceSyncService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,6 +16,7 @@ final class MarketplaceSyncFacade
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceSyncService $syncService,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
+        private readonly ProcessRawDocumentAction $processRawDocumentAction,
     ) {
     }
 
@@ -56,50 +58,17 @@ final class MarketplaceSyncFacade
 
     public function processSalesFromRaw(string $companyId, string $rawDocId): int
     {
-        $company = $this->requireCompany($companyId);
-
-        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-        if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: '.$rawDocId);
-        }
-
-        if ((string) $rawDoc->getCompany()->getId() !== $companyId) {
-            throw new \RuntimeException('Raw document does not belong to company');
-        }
-
-        return $this->syncService->processSalesFromRaw($company, $rawDoc);
+        return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'sales'));
     }
 
     public function processReturnsFromRaw(string $companyId, string $rawDocId): int
     {
-        $company = $this->requireCompany($companyId);
-
-        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-        if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: '.$rawDocId);
-        }
-
-        if ((string) $rawDoc->getCompany()->getId() !== $companyId) {
-            throw new \RuntimeException('Raw document does not belong to company');
-        }
-
-        return $this->syncService->processReturnsFromRaw($company, $rawDoc);
+        return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'returns'));
     }
 
     public function processCostsFromRaw(string $companyId, string $rawDocId): int
     {
-        $company = $this->requireCompany($companyId);
-
-        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-        if (!$rawDoc instanceof MarketplaceRawDocument) {
-            throw new \RuntimeException('Raw document not found: '.$rawDocId);
-        }
-
-        if ((string) $rawDoc->getCompany()->getId() !== $companyId) {
-            throw new \RuntimeException('Raw document does not belong to company');
-        }
-
-        return $this->syncService->processCostsFromRaw($company, $rawDoc);
+        return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'costs'));
     }
 
     private function requireCompany(string $companyId): Company

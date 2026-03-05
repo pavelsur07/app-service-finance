@@ -6,6 +6,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
@@ -62,15 +63,60 @@ class MarketplaceSyncService
         ];
     }
 
+    public function processWbSalesFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processSalesFromRaw($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    public function processOzonSalesFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processOzonSalesFromRawDocument($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    public function processWbReturnsFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processReturnsFromRaw($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    public function processOzonReturnsFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processOzonReturnsFromRawDocument($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    public function processWbCostsFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processCostsFromRaw($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    public function processOzonCostsFromRaw(string $companyId, string $rawDocId): int
+    {
+        return $this->processOzonCostsFromRawDocument($this->requireCompany($companyId), $this->requireRawDocument($rawDocId));
+    }
+
+    private function requireCompany(string $companyId): Company
+    {
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: '.$companyId);
+        }
+
+        return $company;
+    }
+
+    private function requireRawDocument(string $rawDocId): MarketplaceRawDocument
+    {
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            throw new \RuntimeException('Raw document not found: '.$rawDocId);
+        }
+
+        return $rawDoc;
+    }
+
     public function processSalesFromRaw(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
-        // Диспатч по маркетплейсу
-        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
-            return $this->processOzonSalesFromRaw($company, $rawDoc);
-        }
-
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -245,11 +291,6 @@ class MarketplaceSyncService
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
-        // Диспатч по маркетплейсу
-        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
-            return $this->processOzonReturnsFromRaw($company, $rawDoc);
-        }
-
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -423,11 +464,6 @@ class MarketplaceSyncService
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
-        // Диспатч по маркетплейсу
-        if ($rawDoc->getMarketplace() === MarketplaceType::OZON) {
-            return $this->processOzonCostsFromRaw($company, $rawDoc);
-        }
-
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
@@ -1172,7 +1208,7 @@ class MarketplaceSyncService
     // OZON: Обработка сырых данных из /v3/finance/transaction/list
     // ========================================================================
 
-    private function processOzonSalesFromRaw(
+    private function processOzonSalesFromRawDocument(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
@@ -1321,7 +1357,7 @@ class MarketplaceSyncService
         return $synced;
     }
 
-    private function processOzonReturnsFromRaw(
+    private function processOzonReturnsFromRawDocument(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
@@ -1466,7 +1502,7 @@ class MarketplaceSyncService
         return $synced;
     }
 
-    private function processOzonCostsFromRaw(
+    private function processOzonCostsFromRawDocument(
         Company $company,
         \App\Marketplace\Entity\MarketplaceRawDocument $rawDoc
     ): int {
