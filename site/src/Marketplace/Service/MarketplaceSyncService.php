@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -29,7 +30,6 @@ use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use App\Shared\Service\SlugifyService;
-use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -47,6 +47,7 @@ class MarketplaceSyncService
         private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly MarketplaceCostRepository $costRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
+        private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly LoggerInterface $logger,
         private readonly SlugifyService $slugify
     ) {
@@ -439,8 +440,6 @@ class MarketplaceSyncService
         $unprocessedTypes = [];
         $batchSize = 100;
 
-        $conn = $this->em->getConnection();
-
         // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
 
         // 1. Фильтруем: убираем только возвраты (их обрабатывает processReturnsFromRaw).
@@ -557,23 +556,13 @@ class MarketplaceSyncService
             &$listingsCache,
             &$company,
             $companyId,
-            $conn,
             $batchSize
         ): void {
             if (empty($pendingIds)) {
                 return;
             }
 
-            $placeholders = implode(',', array_fill(0, count($pendingIds), '?'));
-            $dbExistingIds = $conn->fetchFirstColumn(
-                "SELECT external_id FROM marketplace_costs WHERE company_id = ? AND external_id IN ($placeholders)",
-                array_merge([$companyId], $pendingIds)
-            );
-
-            $dbExistingMap = [];
-            foreach ($dbExistingIds as $existingId) {
-                $dbExistingMap[(string) $existingId] = true;
-            }
+            $dbExistingMap = $this->costExistingExternalIdsQuery->execute($companyId, $pendingIds);
 
             $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
 
@@ -962,27 +951,7 @@ class MarketplaceSyncService
             }
         }
 
-        $existingExternalIdsMap = [];
-        if ($externalIds !== []) {
-            $connection = $this->em->getConnection();
-
-            foreach (array_chunk($externalIds, 1000) as $externalIdsChunk) {
-                $rows = $connection->executeQuery(
-                    'SELECT external_id FROM marketplace_costs WHERE company_id = :companyId AND external_id IN (:externalIds)',
-                    [
-                        'companyId' => $companyId,
-                        'externalIds' => $externalIdsChunk,
-                    ],
-                    [
-                        'externalIds' => ArrayParameterType::STRING,
-                    ]
-                )->fetchFirstColumn();
-
-                foreach ($rows as $existingExternalId) {
-                    $existingExternalIdsMap[(string)$existingExternalId] = true;
-                }
-            }
-        }
+        $existingExternalIdsMap = $this->costExistingExternalIdsQuery->execute($companyId, $externalIds);
 
         foreach ($costsData as $costData) {
             $categoryCode = trim((string)$costData->categoryCode);
@@ -1509,7 +1478,6 @@ class MarketplaceSyncService
         $rawData = $rawDoc->getRawData();
         $companyId = (string) $company->getId();
         $rawDocId = (string) $rawDoc->getId();
-        $conn = $this->em->getConnection();
         $synced = 0;
         $batchSize = 100;
 
@@ -1571,23 +1539,13 @@ class MarketplaceSyncService
             &$listingsCache,
             &$company,
             $companyId,
-            $conn,
             $batchSize
         ): void {
             if (empty($pendingIds)) {
                 return;
             }
 
-            $placeholders = implode(',', array_fill(0, count($pendingIds), '?'));
-            $dbExistingIds = $conn->fetchFirstColumn(
-                "SELECT external_id FROM marketplace_costs WHERE company_id = ? AND external_id IN ($placeholders)",
-                array_merge([$companyId], $pendingIds)
-            );
-
-            $dbExistingMap = [];
-            foreach ($dbExistingIds as $existingId) {
-                $dbExistingMap[(string) $existingId] = true;
-            }
+            $dbExistingMap = $this->costExistingExternalIdsQuery->execute($companyId, $pendingIds);
 
             $knownExternalIdsMap = $knownExternalIdsMap + $dbExistingMap;
 
