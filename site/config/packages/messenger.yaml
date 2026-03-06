@@ -25,6 +25,7 @@ framework:
             'App\Message\EnqueueAutoRulesForRange': async
             'App\Marketplace\Message\SyncWbReportMessage': async
             'App\Marketplace\Message\GenerateMarketplacePLMessage': async    # ← НОВОЕ
+            'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
             #App\Message\ApplyAutoRulesForTransaction: async
             #App\Message\EnqueueAutoRulesForRange: async
             App\Message\SendRegistrationEmailMessage: async
