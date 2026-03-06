@@ -11,14 +11,15 @@ final class MarketplaceRawProcessorRegistry
     {
     }
 
-    public function get(string $marketplaceValue, string $kind): MarketplaceRawProcessorInterface
+    public function get(string|\App\Marketplace\Enum\StagingRecordType $type, string $kind = ''): MarketplaceRawProcessorInterface
     {
         foreach ($this->processors as $processor) {
-            if ($processor->supports($marketplaceValue, $kind)) {
+            if ($processor->supports($type, $kind)) {
                 return $processor;
             }
         }
 
-        throw new \RuntimeException("No processor for marketplace={$marketplaceValue}, kind={$kind}");
+        $typeName = $type instanceof \App\Marketplace\Enum\StagingRecordType ? $type->value : $type;
+        throw new \RuntimeException(sprintf('Processor not found for type "%s" and kind "%s"', $typeName, $kind));
     }
 }
