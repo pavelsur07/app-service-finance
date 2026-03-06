@@ -28,6 +28,11 @@ enum StagingRecordType: string
     case STORNO = 'storno';
 
     /**
+     * Прочие/неопознанные операции
+     */
+    case OTHER = 'other';
+
+    /**
      * Получить человекочитаемое название
      */
     public function getLabel(): string
@@ -37,6 +42,7 @@ enum StagingRecordType: string
             self::RETURN => 'Возврат',
             self::COST => 'Расход',
             self::STORNO => 'Сторно',
+            self::OTHER => 'Прочее',
         };
     }
 
@@ -50,6 +56,7 @@ enum StagingRecordType: string
             self::RETURN => '↩️',
             self::COST => '💸',
             self::STORNO => '❌',
+            self::OTHER => '📦',
         };
     }
 
@@ -63,6 +70,7 @@ enum StagingRecordType: string
             self::RETURN => 'badge-warning',
             self::COST => 'badge-info',
             self::STORNO => 'badge-danger',
+            self::OTHER => 'badge-secondary',
         };
     }
 
@@ -76,6 +84,7 @@ enum StagingRecordType: string
             self::RETURN => 'MarketplaceReturn',
             self::COST => 'MarketplaceCost',
             self::STORNO => 'MarketplaceSale', // Сторно тоже как продажа, но с отрицательной суммой
+            self::OTHER => 'MarketplaceStaging',
         };
     }
 
