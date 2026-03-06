@@ -12,8 +12,6 @@ use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceSaleExistingExternalIdsQuery;
-use App\Marketplace\Repository\MarketplaceCostRepository;
-use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -21,8 +19,6 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
 {
     public function __construct(
         private MarketplaceSaleExistingExternalIdsQuery $existingIdsQuery,
-        private MarketplaceSaleRepository $saleRepository,
-        private MarketplaceCostRepository $costRepository,
         private EntityManagerInterface $entityManager,
     ) {
     }
@@ -41,10 +37,13 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
      */
     public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
     {
-        $externalIds = array_values(array_filter(array_map(
-            static fn (array $row): string => (string) ($row['srid'] ?? ''),
-            $rawRows,
-        )));
+        $externalIds = array_values(array_filter(
+            array_map(
+                static fn (array $row): string => (string) ($row['rrd_id'] ?? $row['srid'] ?? ''),
+                $rawRows,
+            ),
+            static fn (string $id): bool => $id !== '',
+        ));
 
         if ($externalIds === []) {
             return;
@@ -54,21 +53,21 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
         $company = $this->entityManager->getReference(Company::class, $companyId);
 
         foreach ($rawRows as $row) {
-            $srid = (string) ($row['srid'] ?? '');
-            if ($srid === '' || in_array($srid, $existingIds, true)) {
+            $transactionId = (string) ($row['rrd_id'] ?? $row['srid'] ?? '');
+            if ($transactionId === '' || in_array($transactionId, $existingIds, true)) {
                 continue;
             }
 
-            $existingIds[] = $srid;
+            $existingIds[] = $transactionId;
 
             $listingId = (string) ($row['listing_id'] ?? '');
             $listing = $listingId !== ''
                 ? $this->entityManager->getReference(MarketplaceListing::class, $listingId)
                 : null;
 
-            $pricePerUnit = (string) ((float) ($row['price'] ?? $row['retail_price'] ?? 0));
+            $pricePerUnit = (string) ((float) ($row['retail_price'] ?? $row['price'] ?? 0));
             $quantity = (int) ($row['quantity'] ?? 1);
-            $totalRevenue = (string) ((float) ($row['total_price'] ?? ((float) $pricePerUnit * $quantity)));
+            $totalRevenue = (string) ((float) ($row['retail_amount'] ?? $row['total_price'] ?? ((float) $pricePerUnit * $quantity)));
 
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
@@ -78,7 +77,8 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
                 $marketplace,
             );
 
-            $sale->setExternalOrderId($srid);
+            $sale->setExternalId($transactionId);
+            $sale->setExternalOrderId((string) ($row['srid'] ?? ''));
             $sale->setSaleDate($this->resolveSaleDate($row));
             $sale->setQuantity($quantity);
             $sale->setPricePerUnit($pricePerUnit);
@@ -100,7 +100,7 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
                         $marketplace,
                         $category,
                     );
-                    $cost->setExternalId($srid . '_commission');
+                    $cost->setExternalId($transactionId . '_commission');
                     $cost->setSale($sale);
                     $cost->setListing($listing);
                     $cost->setCostDate($this->resolveSaleDate($row));
@@ -126,7 +126,7 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
      */
     private function resolveSaleDate(array $row): \DateTimeImmutable
     {
-        $date = (string) ($row['sale_dt'] ?? $row['date'] ?? 'now');
+        $date = (string) ($row['rr_dt'] ?? $row['sale_dt'] ?? $row['date'] ?? 'now');
 
         try {
             return new \DateTimeImmutable($date);

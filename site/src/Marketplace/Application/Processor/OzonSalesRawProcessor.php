@@ -34,10 +34,13 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
      */
     public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
     {
-        $externalIds = array_values(array_filter(array_map(
-            static fn (array $row): string => (string) ($row['operation_id'] ?? ''),
-            $rawRows,
-        )));
+        $externalIds = array_values(array_filter(
+            array_map(
+                static fn (array $row): string => (string) ($row['operation_id'] ?? ''),
+                $rawRows,
+            ),
+            static fn (string $id): bool => $id !== '',
+        ));
 
         if ($externalIds === []) {
             return;
@@ -63,6 +66,7 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
                 $marketplace,
             );
 
+            $sale->setExternalId($operationId);
             $sale->setExternalOrderId($operationId);
             $sale->setSaleDate($this->resolveSaleDate($row));
             $sale->setQuantity(1);
