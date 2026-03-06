@@ -6,7 +6,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
-use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -34,6 +34,7 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
+        private readonly MarketplaceRawProcessorRegistry $processorRegistry,
         private readonly EntityManagerInterface $em
     ) {}
 
@@ -295,10 +296,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
-    public function processReturns(
-        string $id,
-        ProcessMarketplaceRawDocumentAction $action
-    ): Response {
+    public function processReturns(string $id): Response {
         $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
@@ -308,8 +306,9 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
-            $count = ($action)($cmd);
+            $marketplace = $rawDoc->getMarketplace();
+            $processor = $this->processorRegistry->get($marketplace->value, 'returns');
+            $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
         } catch (\Exception $e) {
@@ -320,10 +319,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
-    public function processCosts(
-        string $id,
-        ProcessMarketplaceRawDocumentAction $action
-    ): Response {
+    public function processCosts(string $id): Response {
         $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
@@ -333,8 +329,9 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
-            $count = ($action)($cmd);
+            $marketplace = $rawDoc->getMarketplace();
+            $processor = $this->processorRegistry->get($marketplace->value, 'costs');
+            $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {
