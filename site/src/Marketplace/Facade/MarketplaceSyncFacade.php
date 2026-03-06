@@ -3,20 +3,19 @@
 namespace App\Marketplace\Facade;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Marketplace\Service\MarketplaceSyncService;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class MarketplaceSyncFacade
 {
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly MarketplaceSyncService $syncService,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly ProcessRawDocumentAction $processRawDocumentAction,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
@@ -26,10 +25,16 @@ final class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
-        $company = $this->requireCompany($companyId);
-        $adapter = $this->adapterRegistry->get($marketplace);
+        $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
+        $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
+            $companyId,
+            $marketplace,
+            $immutableFrom,
+            'sales_report',
+            'sales',
+        ));
 
-        return $this->syncService->syncSales($company, $adapter, $fromDate, $toDate);
+        return 0;
     }
 
     public function syncCosts(
@@ -38,10 +43,16 @@ final class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
-        $company = $this->requireCompany($companyId);
-        $adapter = $this->adapterRegistry->get($marketplace);
+        $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
+        $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
+            $companyId,
+            $marketplace,
+            $immutableFrom,
+            'sales_report',
+            'costs',
+        ));
 
-        return $this->syncService->syncCosts($company, $adapter, $fromDate, $toDate);
+        return 0;
     }
 
     public function syncReturns(
@@ -50,10 +61,16 @@ final class MarketplaceSyncFacade
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate,
     ): int {
-        $company = $this->requireCompany($companyId);
-        $adapter = $this->adapterRegistry->get($marketplace);
+        $immutableFrom = $fromDate instanceof \DateTimeImmutable ? $fromDate : \DateTimeImmutable::createFromInterface($fromDate);
+        $this->messageBus->dispatch(new FetchMarketplaceDataCommand(
+            $companyId,
+            $marketplace,
+            $immutableFrom,
+            'sales_report',
+            'returns',
+        ));
 
-        return $this->syncService->syncReturns($company, $adapter, $fromDate, $toDate);
+        return 0;
     }
 
     public function processSalesFromRaw(string $companyId, string $rawDocId): int

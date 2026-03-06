@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Processor;
 
+use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Service\MarketplaceSyncService;
 
 final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
@@ -12,9 +13,13 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
     {
     }
 
-    public function supports(string $marketplaceValue, string $kind): bool
+    public function supports(string|StagingRecordType $type, string $kind = ''): bool
     {
-        return $marketplaceValue === 'wildberries' && $kind === 'costs';
+        if ($type instanceof StagingRecordType) {
+            return $type === StagingRecordType::COST;
+        }
+
+        return $type === 'wildberries' && $kind === 'costs';
     }
 
     public function process(string $companyId, string $rawDocId): int
