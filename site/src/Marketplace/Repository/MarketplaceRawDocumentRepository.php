@@ -15,6 +15,12 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceRawDocument::class);
     }
 
+    public function save(MarketplaceRawDocument $document): void
+    {
+        $this->getEntityManager()->persist($document);
+        $this->getEntityManager()->flush();
+    }
+
     /**
      * @return MarketplaceRawDocument[]
      */
