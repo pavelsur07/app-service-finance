@@ -58,7 +58,7 @@ final readonly class ListingKey
      */
     public static function fromString(string $key): self
     {
-        [$marketplaceSku, $size] = array_pad(explode(':', $key, 2), 2, null);
+        [$marketplaceSku, $size] = array_pad(explode(':', $key), 2, null);
 
         return new self($marketplaceSku, $size);
     }
