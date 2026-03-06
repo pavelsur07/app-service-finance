@@ -11,9 +11,7 @@ use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceSaleExistingExternalIdsQuery;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
-#[AutoconfigureTag('marketplace.raw_processor')]
 final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
     public function __construct(
