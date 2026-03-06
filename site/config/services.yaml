@@ -160,9 +160,9 @@ services:
     App\Marketplace\Application\Processor\OzonCostsRawProcessor:
         tags: ['app.marketplace.raw_processor']
 
-    App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry:
-        arguments:
-            $processors: !tagged_iterator app.marketplace.raw_processor
+    #App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry:
+    #    arguments:
+    #        $processors: !tagged_iterator app.marketplace.raw_processor
 
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
