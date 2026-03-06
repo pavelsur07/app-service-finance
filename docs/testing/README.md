@@ -30,3 +30,4 @@ composer test:unit
 composer test:integration
 composer test:functional
 ```
+
