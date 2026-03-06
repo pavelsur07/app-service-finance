@@ -14,6 +14,7 @@ final readonly class ListingSeedDTO
 {
     /**
      * @param ListingKey   $key             Уникальный ключ листинга
+     * @param string       $marketplaceSku  Артикул маркетплейса
      * @param string|null  $supplierSku     SKU поставщика
      * @param string|null  $name            Наименование листинга
      * @param string|null  $price           Базовая цена
@@ -23,6 +24,7 @@ final readonly class ListingSeedDTO
      */
     public function __construct(
         public ListingKey $key,
+        public readonly string $marketplaceSku,
         public ?string $supplierSku,
         public ?string $name,
         public ?string $price,
