@@ -24,12 +24,26 @@ final readonly class ProcessMarketplaceRawDocumentAction
     ) {
     }
 
-    public function __invoke(ProcessMarketplaceRawDocumentCommand $command): void
+    public function __invoke(ProcessMarketplaceRawDocumentCommand $command): int
     {
         $document = $this->repository->find($command->rawDocId);
 
         if ($document === null) {
             throw new \RuntimeException(sprintf('Raw document not found: %s', $command->rawDocId));
+        }
+
+        $kindToBucketKey = [
+            'sales' => StagingRecordType::SALE->value,
+            'returns' => StagingRecordType::RETURN->value,
+            'costs' => StagingRecordType::COST->value,
+        ];
+
+        $targetBucketKey = $kindToBucketKey[$command->kind] ?? null;
+
+        if ($targetBucketKey === null) {
+            throw new \InvalidArgumentException(
+                sprintf('Unknown kind "%s". Allowed: sales, returns, costs.', $command->kind)
+            );
         }
 
         $buckets = [
@@ -50,6 +64,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $classifier = $this->classifierRegistry->get($document->getMarketplace());
         $marketplace = $document->getMarketplace();
+        $totalProcessed = 0;
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
@@ -61,14 +76,22 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $buckets[$bucketKey][] = $row;
 
             if (count($buckets[$bucketKey]) >= 500) {
-                $processor = $this->processorRegistry->get($type);
-                $processor->processBatch($command->companyId, $marketplace, $buckets[$bucketKey]);
+                if ($bucketKey === $targetBucketKey) {
+                    $processor = $this->processorRegistry->get($type);
+                    $processor->processBatch($command->companyId, $marketplace, $buckets[$bucketKey]);
+                    $totalProcessed += count($buckets[$bucketKey]);
+                    $this->entityManager->clear();
+                }
+
                 $buckets[$bucketKey] = [];
-                $this->entityManager->clear();
             }
         }
 
         foreach ($buckets as $bucketKey => $bucketRows) {
+            if ($bucketKey !== $targetBucketKey) {
+                continue;
+            }
+
             if ($bucketRows === []) {
                 continue;
             }
@@ -76,7 +99,10 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $type = StagingRecordType::from($bucketKey);
             $processor = $this->processorRegistry->get($type);
             $processor->processBatch($command->companyId, $marketplace, $bucketRows);
+            $totalProcessed += count($bucketRows);
             $this->entityManager->clear();
         }
+
+        return $totalProcessed;
     }
 }
