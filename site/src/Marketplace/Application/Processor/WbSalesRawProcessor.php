@@ -16,9 +16,7 @@ use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
-#[AutoconfigureTag('marketplace.raw_processor')]
 final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
     public function __construct(

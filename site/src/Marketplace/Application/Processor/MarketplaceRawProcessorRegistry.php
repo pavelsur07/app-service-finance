@@ -16,7 +16,7 @@ final readonly class MarketplaceRawProcessorRegistry
      * @param iterable<MarketplaceRawProcessorInterface> $processors
      */
     public function __construct(
-        #[TaggedIterator('marketplace.raw_processor')] iterable $processors
+        #[TaggedIterator('app.marketplace.raw_processor')] iterable $processors
     ) {
         $this->processors = $processors instanceof \Traversable ? iterator_to_array($processors, false) : (array) $processors;
     }

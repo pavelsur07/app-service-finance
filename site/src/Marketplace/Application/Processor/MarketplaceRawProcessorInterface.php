@@ -6,7 +6,9 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 
+#[AutoconfigureTag('app.marketplace.raw_processor')]
 interface MarketplaceRawProcessorInterface
 {
     public function supports(string|StagingRecordType $type, string $kind = ''): bool;
