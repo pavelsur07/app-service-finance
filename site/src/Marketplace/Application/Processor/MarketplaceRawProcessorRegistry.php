@@ -4,14 +4,24 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Processor;
 
-final class MarketplaceRawProcessorRegistry
+use App\Marketplace\Enum\StagingRecordType;
+use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
+
+final readonly class MarketplaceRawProcessorRegistry
 {
-    /** @param iterable<MarketplaceRawProcessorInterface> $processors */
-    public function __construct(private readonly iterable $processors)
-    {
+    /** @var MarketplaceRawProcessorInterface[] */
+    private array $processors;
+
+    /**
+     * @param iterable<MarketplaceRawProcessorInterface> $processors
+     */
+    public function __construct(
+        #[TaggedIterator('marketplace.raw_processor')] iterable $processors
+    ) {
+        $this->processors = $processors instanceof \Traversable ? iterator_to_array($processors, false) : (array) $processors;
     }
 
-    public function get(string|\App\Marketplace\Enum\StagingRecordType $type, string $kind = ''): MarketplaceRawProcessorInterface
+    public function get(string|StagingRecordType $type, string $kind = ''): MarketplaceRawProcessorInterface
     {
         foreach ($this->processors as $processor) {
             if ($processor->supports($type, $kind)) {
@@ -19,7 +29,7 @@ final class MarketplaceRawProcessorRegistry
             }
         }
 
-        $typeName = $type instanceof \App\Marketplace\Enum\StagingRecordType ? $type->value : $type;
+        $typeName = $type instanceof StagingRecordType ? $type->value : $type;
         throw new \RuntimeException(sprintf('Processor not found for type "%s" and kind "%s"', $typeName, $kind));
     }
 }
