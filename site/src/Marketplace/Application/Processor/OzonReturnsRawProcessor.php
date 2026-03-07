@@ -14,13 +14,14 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     {
     }
 
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::RETURN;
+            return $type === StagingRecordType::RETURN
+            && $marketplace === MarketplaceType::OZON;
         }
 
-        return $type === 'ozon' && $kind === 'returns';
+        return $type === MarketplaceType::OZON->value && $kind === 'returns';
     }
 
     public function process(string $companyId, string $rawDocId): int

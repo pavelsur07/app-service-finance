@@ -20,10 +20,11 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
     ) {
     }
 
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::SALE;
+            return $type === StagingRecordType::SALE
+            && $marketplace === MarketplaceType::OZON;
         }
 
         return false;
