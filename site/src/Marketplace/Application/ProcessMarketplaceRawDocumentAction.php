@@ -77,7 +77,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
             if (count($buckets[$bucketKey]) >= 500) {
                 if ($bucketKey === $targetBucketKey) {
-                    $processor = $this->processorRegistry->get($type);
+                    $processor = $this->processorRegistry->get($type, $marketplace);
                     $processor->processBatch($command->companyId, $marketplace, $buckets[$bucketKey]);
                     $totalProcessed += count($buckets[$bucketKey]);
                     $this->entityManager->clear();
@@ -97,7 +97,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
             }
 
             $type = StagingRecordType::from($bucketKey);
-            $processor = $this->processorRegistry->get($type);
+            $processor = $this->processorRegistry->get($type, $marketplace);
             $processor->processBatch($command->companyId, $marketplace, $bucketRows);
             $totalProcessed += count($bucketRows);
             $this->entityManager->clear();

@@ -307,7 +307,7 @@ class MarketplaceController extends AbstractController
 
         try {
             $marketplace = $rawDoc->getMarketplace();
-            $processor = $this->processorRegistry->get($marketplace->value, 'returns');
+            $processor = $this->processorRegistry->get($marketplace->value, $marketplace, 'returns');
             $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
@@ -330,7 +330,7 @@ class MarketplaceController extends AbstractController
 
         try {
             $marketplace = $rawDoc->getMarketplace();
-            $processor = $this->processorRegistry->get($marketplace->value, 'costs');
+            $processor = $this->processorRegistry->get($marketplace->value, $marketplace, 'costs');
             $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));

@@ -23,10 +23,11 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
     ) {
     }
 
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::SALE;
+            return $type === StagingRecordType::SALE
+            && $marketplace === MarketplaceType::WILDBERRIES;
         }
 
         return $type === MarketplaceType::WILDBERRIES->value && $kind === StagingRecordType::SALE->value;

@@ -14,13 +14,14 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
     {
     }
 
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
-            return $type === StagingRecordType::RETURN;
+            return $type === StagingRecordType::RETURN
+            && $marketplace === MarketplaceType::WILDBERRIES;
         }
 
-        return $type === 'wildberries' && $kind === 'returns';
+        return $type === MarketplaceType::WILDBERRIES->value && $kind === 'returns';
     }
 
     public function process(string $companyId, string $rawDocId): int

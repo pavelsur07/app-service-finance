@@ -11,7 +11,7 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.marketplace.raw_processor')]
 interface MarketplaceRawProcessorInterface
 {
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool;
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool;
 
     public function process(string $companyId, string $rawDocId): int;
 

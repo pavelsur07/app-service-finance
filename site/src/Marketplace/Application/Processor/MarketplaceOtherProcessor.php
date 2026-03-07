@@ -9,14 +9,13 @@ use App\Marketplace\Enum\StagingRecordType;
 
 final readonly class MarketplaceOtherProcessor implements MarketplaceRawProcessorInterface
 {
-    public function supports(string|StagingRecordType $type, string $kind = ''): bool
+    public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::OTHER;
         }
 
-        return $kind === StagingRecordType::OTHER->value
-            && in_array($type, [MarketplaceType::WILDBERRIES->value, MarketplaceType::OZON->value], true);
+        return $kind === StagingRecordType::OTHER->value;
     }
 
     /**
