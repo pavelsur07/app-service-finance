@@ -2,7 +2,6 @@
 
 namespace App\Marketplace\Entity;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
@@ -28,10 +27,6 @@ class MarketplaceSale
     #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
     #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
     private MarketplaceListing $listing;
-
-    #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
-    private ?Product $product = null; // Денормализация для скорости запросов
 
     #[ORM\ManyToOne(targetEntity: Document::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -74,14 +69,12 @@ class MarketplaceSale
         string $id,
         Company $company,
         MarketplaceListing $listing,
-        ?Product $product,
         MarketplaceType $marketplace,
     ) {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
         $this->listing = $listing;
-        $this->product = $product;
         $this->marketplace = $marketplace;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -100,11 +93,6 @@ class MarketplaceSale
     public function getListing(): MarketplaceListing
     {
         return $this->listing;
-    }
-
-    public function getProduct(): ?Product
-    {
-        return $this->product;
     }
 
     public function getDocument(): ?Document
