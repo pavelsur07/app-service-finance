@@ -200,7 +200,6 @@ class MarketplaceSyncService
                     Uuid::uuid4()->toString(),
                     $company,
                     $listing,
-                    null,
                     \App\Marketplace\Enum\MarketplaceType::WILDBERRIES
                 );
 
@@ -847,7 +846,6 @@ class MarketplaceSyncService
                 Uuid::uuid4()->toString(),
                 $company,
                 $listing,
-                null,
                 $saleData->marketplace
             );
 
@@ -1281,7 +1279,6 @@ class MarketplaceSyncService
                     Uuid::uuid4()->toString(),
                     $company,
                     $listing,
-                    null,
                     MarketplaceType::OZON
                 );
 
