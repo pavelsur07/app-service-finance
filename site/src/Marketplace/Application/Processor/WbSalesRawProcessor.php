@@ -74,7 +74,6 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
                 Uuid::uuid4()->toString(),
                 $company,
                 $listing,
-                null,
                 $marketplace,
             );
 
