@@ -114,11 +114,9 @@ final class ProcessWbCostsAction
                 continue;
             }
 
-            $listing = $this->listingResolver->resolve($company, $nmId, $size, [
-                'nm_id' => $nmId,
-                'ts_name' => $size,
-                'sa_name' => (string) ($item['sa_name'] ?? ''),
-                'brand_name' => (string) ($item['brand_name'] ?? ''),
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name'      => (string) ($item['sa_name'] ?? ''),
+                'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
             ]);
