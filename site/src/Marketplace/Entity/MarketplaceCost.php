@@ -2,7 +2,6 @@
 
 namespace App\Marketplace\Entity;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
@@ -15,7 +14,6 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id', 'cost_date'], name: 'idx_company_cost_date')]
 #[ORM\Index(columns: ['category_id'], name: 'idx_cost_category')]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_cost_listing')]
-#[ORM\Index(columns: ['product_id'], name: 'idx_cost_product')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_cost_sale')]
 class MarketplaceCost
 {
@@ -37,10 +35,6 @@ class MarketplaceCost
     #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?MarketplaceListing $listing = null;
-
-    #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
-    private ?Product $product = null; // Денормализация из listing
 
     #[ORM\ManyToOne(targetEntity: MarketplaceSale::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -125,15 +119,9 @@ class MarketplaceCost
     public function setListing(?MarketplaceListing $listing): self
     {
         $this->listing = $listing;
-        $this->product = $listing?->getProduct();
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
-    }
-
-    public function getProduct(): ?Product
-    {
-        return $this->product;
     }
 
     public function getSale(): ?MarketplaceSale
