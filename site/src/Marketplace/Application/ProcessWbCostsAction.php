@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
-use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,10 +25,10 @@ final class ProcessWbCostsAction
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -135,25 +134,11 @@ final class ProcessWbCostsAction
             ]);
         }
 
-        // 3. Загружаем ВСЕ категории компании
-        $categoriesCache = [];
-        $allCategories = $this->costCategoryRepository->findBy([
-            'company' => $company,
-            'marketplace' => MarketplaceType::WILDBERRIES,
-            'deletedAt' => null,
-        ]);
-
-        foreach ($allCategories as $cat) {
-            $categoriesCache[$cat->getCode()] = $cat;
-        }
-
-        $this->logger->info('Loaded categories', [
-            'count' => count($categoriesCache),
-        ]);
+        // 3. Прогреваем категории компании
+        $this->categoryResolver->preload($company, MarketplaceType::WILDBERRIES);
 
         // --- ФАЗА 2: ОБРАБОТКА ---
         $counter = 0;
-        $newCategoriesCreated = 0;
         $lastFlushedCounter = 0;
         $knownExternalIdsMap = [];
         $pending = [];
@@ -166,9 +151,7 @@ final class ProcessWbCostsAction
             &$knownExternalIdsMap,
             &$counter,
             &$synced,
-            &$newCategoriesCreated,
             &$lastFlushedCounter,
-            &$categoriesCache,
             &$listingsCache,
             &$company,
             $companyId,
@@ -192,25 +175,15 @@ final class ProcessWbCostsAction
                 $listing = $pendingItem['listing']; // ← Теперь это MarketplaceListing (или null)
 
                 $categoryCode = $costData['category_code'];
-                $category = $categoriesCache[$categoryCode] ?? null;
-
-                if (!$category) {
-                    $category = new MarketplaceCostCategory(
-                        Uuid::uuid4()->toString(),
-                        $company,
-                        MarketplaceType::WILDBERRIES,
-                    );
-                    $category->setCode($categoryCode);
-
-                    $categoryName = $costData['category_name']
-                        ?? $costData['description']
-                        ?? $categoryCode;
-                    $category->setName($categoryName);
-
-                    $this->em->persist($category);
-                    $categoriesCache[$categoryCode] = $category;
-                    $newCategoriesCreated++;
-                }
+                $categoryName = $costData['category_name']
+                    ?? $costData['description']
+                    ?? $categoryCode;
+                $category = $this->categoryResolver->resolve(
+                    $company,
+                    MarketplaceType::WILDBERRIES,
+                    $categoryCode,
+                    $categoryName,
+                );
 
                 $cost = new MarketplaceCost(
                     Uuid::uuid4()->toString(),
@@ -241,13 +214,7 @@ final class ProcessWbCostsAction
                 $lastFlushedCounter = $counter;
 
                 $company = $this->em->find(Company::class, $companyId);
-
-                foreach ($categoriesCache as $code => $cat) {
-                    $categoriesCache[$code] = $this->em->getReference(
-                        MarketplaceCostCategory::class,
-                        $cat->getId(),
-                    );
-                }
+                $this->categoryResolver->resetCache();
 
                 foreach ($listingsCache as $k => $cachedListing) {
                     $listingsCache[$k] = $this->em->getReference(
@@ -352,7 +319,6 @@ final class ProcessWbCostsAction
             'total_synced' => $synced,
             'total_records' => count($rawData),
             'unprocessed_count' => $unprocessedCount,
-            'new_categories_created' => $newCategoriesCreated,
             'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
         ]);
 
