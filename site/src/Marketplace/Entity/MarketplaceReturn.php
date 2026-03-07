@@ -2,7 +2,6 @@
 
 namespace App\Marketplace\Entity;
 
-use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
@@ -31,10 +30,6 @@ class MarketplaceReturn
     #[ORM\ManyToOne(targetEntity: MarketplaceSale::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?MarketplaceSale $sale = null;
-
-    #[ORM\ManyToOne(targetEntity: Product::class)]
-    #[ORM\JoinColumn(nullable: true, onDelete: 'RESTRICT')]
-    private ?Product $product = null;
 
     #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
@@ -80,7 +75,6 @@ class MarketplaceReturn
         $this->id = $id;
         $this->company = $company;
         $this->listing = $listing;
-        $this->product = $listing->getProduct();
         $this->marketplace = $marketplace;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
@@ -112,11 +106,6 @@ class MarketplaceReturn
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
-    }
-
-    public function getProduct(): ?Product
-    {
-        return $this->product;
     }
 
     public function getMarketplace(): MarketplaceType
