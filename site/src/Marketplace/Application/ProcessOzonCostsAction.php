@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
-use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -23,9 +22,9 @@ final class ProcessOzonCostsAction
 
     public function __construct(
         private readonly EntityManagerInterface $em,
-        private readonly MarketplaceCostCategoryRepository $costCategoryRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
+        private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -99,19 +98,9 @@ final class ProcessOzonCostsAction
             $this->logger->info('[Ozon] Created missing listings for costs', ['count' => $newListingsCreated]);
         }
 
-        $categoriesCache = [];
-        $allCategories = $this->costCategoryRepository->findBy([
-            'company' => $company,
-            'marketplace' => MarketplaceType::OZON,
-            'deletedAt' => null,
-        ]);
-
-        foreach ($allCategories as $cat) {
-            $categoriesCache[$cat->getCode()] = $cat;
-        }
+        $this->categoryResolver->preload($company, MarketplaceType::OZON);
 
         $counter = 0;
-        $newCategoriesCreated = 0;
         $lastFlushedCounter = 0;
         $knownExternalIdsMap = [];
         $pending = [];
@@ -124,9 +113,7 @@ final class ProcessOzonCostsAction
             &$knownExternalIdsMap,
             &$counter,
             &$synced,
-            &$newCategoriesCreated,
             &$lastFlushedCounter,
-            &$categoriesCache,
             &$listingsCache,
             &$company,
             $companyId,
@@ -150,21 +137,12 @@ final class ProcessOzonCostsAction
 
                     $listing = $pendingItem['listing'];
                     $categoryCode = $entry['category_code'];
-                    $category = $categoriesCache[$categoryCode] ?? null;
-
-                    if (!$category) {
-                        $category = new MarketplaceCostCategory(
-                            Uuid::uuid4()->toString(),
-                            $company,
-                            MarketplaceType::OZON,
-                        );
-                        $category->setCode($categoryCode);
-                        $category->setName($entry['category_name']);
-
-                        $this->em->persist($category);
-                        $categoriesCache[$categoryCode] = $category;
-                        $newCategoriesCreated++;
-                    }
+                    $category = $this->categoryResolver->resolve(
+                        $company,
+                        MarketplaceType::OZON,
+                        $categoryCode,
+                        $entry['category_name'],
+                    );
 
                     $cost = new MarketplaceCost(
                         Uuid::uuid4()->toString(),
@@ -201,12 +179,7 @@ final class ProcessOzonCostsAction
                 $lastFlushedCounter = $counter;
 
                 $company = $this->em->find(Company::class, $companyId);
-                foreach ($categoriesCache as $code => $cat) {
-                    $categoriesCache[$code] = $this->em->getReference(
-                        MarketplaceCostCategory::class,
-                        $cat->getId(),
-                    );
-                }
+                $this->categoryResolver->resetCache();
                 foreach ($listingsCache as $k => $cachedListing) {
                     $listingsCache[$k] = $this->em->getReference(
                         MarketplaceListing::class,
@@ -273,7 +246,6 @@ final class ProcessOzonCostsAction
 
         $this->logger->info('[Ozon] Costs processing completed', [
             'total_synced' => $synced,
-            'new_categories' => $newCategoriesCreated,
             'peak_memory' => round(memory_get_peak_usage(true) / 1024 / 1024, 2) . ' MB',
         ]);
 
