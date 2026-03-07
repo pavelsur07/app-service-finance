@@ -6,11 +6,11 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Service\MarketplaceSyncService;
+use App\Marketplace\Application\ProcessWbReturnsAction;
 
 final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 {
-    public function __construct(private readonly MarketplaceSyncService $syncService)
+    public function __construct(private readonly ProcessWbReturnsAction $action)
     {
     }
 
@@ -26,7 +26,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
     public function process(string $companyId, string $rawDocId): int
     {
-        return $this->syncService->processWbReturnsFromRaw($companyId, $rawDocId);
+        return ($this->action)($companyId, $rawDocId);
     }
 
     /**
