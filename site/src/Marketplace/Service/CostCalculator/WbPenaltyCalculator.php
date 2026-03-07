@@ -19,6 +19,10 @@ class WbPenaltyCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         $penalty = (float)($item['penalty'] ?? 0);
+        if (abs($penalty) < 0.01) {
+            return [];
+        }
+
         $srid = (string)$item['srid'];
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 

@@ -6,6 +6,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -13,7 +14,6 @@ use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Shared\Service\ActiveCompanyService;
-use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -29,7 +29,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MarketplaceController extends AbstractController
 {
     public function __construct(
-        private readonly CompanyContextService $companyContext,
         private readonly ActiveCompanyService $companyService,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
@@ -41,7 +40,7 @@ class MarketplaceController extends AbstractController
     #[Route('', name: 'marketplace_index')]
     public function index(): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connections = $this->connectionRepository->findByCompany($company);
         $rawDocuments = $this->rawDocumentRepository->findByCompany($company, 20);
@@ -56,7 +55,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/create', name: 'marketplace_connection_create', methods: ['POST'])]
     public function createConnection(Request $request): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $marketplace = MarketplaceType::from($request->request->get('marketplace'));
         $apiKey = $request->request->get('api_key');
@@ -91,7 +90,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/test', name: 'marketplace_connection_test')]
     public function testConnection(string $id): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connection = $this->connectionRepository->find($id);
 
@@ -121,7 +120,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync', name: 'marketplace_connection_sync')]
     public function syncConnection(string $id): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connection = $this->connectionRepository->find($id);
 
@@ -175,7 +174,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period')]
     public function syncConnectionPeriod(string $id, Request $request): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connection = $this->connectionRepository->find($id);
 
@@ -249,7 +248,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/view', name: 'marketplace_raw_view')]
     public function viewRaw(string $id): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
 
@@ -344,7 +343,7 @@ class MarketplaceController extends AbstractController
     #[Route('/sales', name: 'marketplace_sales_index')]
     public function salesIndex(Request $request): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $queryBuilder = $this->em->getRepository(MarketplaceSale::class)
             ->getByCompanyQueryBuilder($company);
@@ -364,7 +363,7 @@ class MarketplaceController extends AbstractController
     #[Route('/returns', name: 'marketplace_returns_index')]
     public function returnsIndex(Request $request): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $queryBuilder = $this->em->getRepository(MarketplaceReturn::class)
             ->getByCompanyQueryBuilder($company);
@@ -384,7 +383,7 @@ class MarketplaceController extends AbstractController
     #[Route('/costs', name: 'marketplace_costs_index')]
     public function costsIndex(Request $request): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $categoryId = $request->query->get('category');
         $mapped = (string) $request->query->get('mapped', 'all');
@@ -426,7 +425,7 @@ class MarketplaceController extends AbstractController
     #[Route('/products', name: 'marketplace_products_index')]
     public function productsIndex(): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $listings = $this->em->getRepository(MarketplaceListing::class)
             ->createQueryBuilder('l')
@@ -445,7 +444,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/toggle', name: 'marketplace_connection_toggle')]
     public function toggleConnection(string $id): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connection = $this->connectionRepository->find($id);
 
@@ -465,7 +464,7 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/delete', name: 'marketplace_connection_delete', methods: ['POST'])]
     public function deleteConnection(string $id): Response
     {
-        $company = $this->companyContext->getCompany();
+        $company = $this->companyService->getActiveCompany();
 
         $connection = $this->connectionRepository->find($id);
 
