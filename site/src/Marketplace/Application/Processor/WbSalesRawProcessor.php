@@ -77,8 +77,7 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
                 $marketplace,
             );
 
-            $sale->setExternalId($transactionId);
-            $sale->setExternalOrderId((string) ($row['srid'] ?? ''));
+            $sale->setExternalOrderId($transactionId);
             $sale->setSaleDate($this->resolveSaleDate($row));
             $sale->setQuantity($quantity);
             $sale->setPricePerUnit($pricePerUnit);

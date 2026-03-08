@@ -67,7 +67,6 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
                 $marketplace,
             );
 
-            $sale->setExternalId($operationId);
             $sale->setExternalOrderId($operationId);
             $sale->setSaleDate($this->resolveSaleDate($row));
             $sale->setQuantity(1);
