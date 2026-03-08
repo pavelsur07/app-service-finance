@@ -19,20 +19,28 @@ final readonly class OzonReportRowClassifier implements RowClassifierInterface
 
     public function classify(array $rawRow): StagingRecordType
     {
-        $operationType = (string) ($rawRow['operation_type'] ?? '');
+        $type = $rawRow['type'] ?? '';
+        $operationType = $rawRow['operation_type'] ?? '';
 
-        if (in_array($operationType, ['OperationItemReturn', 'Return'], true)) {
-            return StagingRecordType::RETURN;
-        }
-
-        if (in_array($operationType, ['OperationItemDelivered', 'ClientReturnStorno'], true)) {
+        // orders → продажи
+        if ($type === 'orders') {
             return StagingRecordType::SALE;
         }
 
-        foreach (['Service', 'Logistics', 'Penalty', 'Fulfillment'] as $keyword) {
-            if (str_contains($operationType, $keyword)) {
-                return StagingRecordType::COST;
+        // returns:
+        // ClientReturnAgentOperation = реальный возврат товара покупателем → RETURN
+        // OperationItemReturn = затраты на обработку возврата (логистика) → COST
+        if ($type === 'returns') {
+            if ($operationType === 'ClientReturnAgentOperation') {
+                return StagingRecordType::RETURN;
             }
+
+            return StagingRecordType::COST;
+        }
+
+        // services, other, compensation → затраты
+        if (in_array($type, ['services', 'other', 'compensation'], true)) {
+            return StagingRecordType::COST;
         }
 
         return StagingRecordType::OTHER;

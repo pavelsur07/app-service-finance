@@ -58,6 +58,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
+        // Собираем все SKU из всех операций
         $allSkus = [];
         foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
@@ -68,18 +69,25 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             }
         }
 
-        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
-            $company,
-            MarketplaceType::OZON,
-            array_keys($allSkus),
-        );
+        // Предзагрузка листингов — храним ID чтобы избежать detached proxy
+        $listingsIdCache = [];
+        if (!empty($allSkus)) {
+            $listings = $this->listingRepository->findListingsBySkusIndexed(
+                $company,
+                MarketplaceType::OZON,
+                array_keys($allSkus),
+            );
+            foreach ($listings as $sku => $listing) {
+                $listingsIdCache[$sku] = $listing->getId();
+            }
+        }
 
+        // Создаём отсутствующие листинги
         $newListings = 0;
         foreach ($rawRows as $op) {
-            $price = abs((float) ($op['amount'] ?? 0));
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsCache[$sku])) {
+                if ($sku === '' || isset($listingsIdCache[$sku])) {
                     continue;
                 }
 
@@ -90,11 +98,10 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     MarketplaceType::OZON,
                 );
                 $listing->setMarketplaceSku($sku);
-                $listing->setPrice((string) $price);
                 $listing->setName($item['name'] ?? null);
                 $this->em->persist($listing);
 
-                $listingsCache[$sku] = $listing;
+                $listingsIdCache[$sku] = $listing->getId();
                 $newListings++;
             }
         }
@@ -103,9 +110,10 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $this->em->flush();
         }
 
+        // Прогрев категорий
         $this->categoryResolver->preload($company, MarketplaceType::OZON);
 
-        // Собираем все cost entries
+        // Генерируем все cost entries из всех операций (логика из OzonAdapter::fetchCosts)
         $allEntries = [];
         foreach ($rawRows as $op) {
             $operationId = (string) ($op['operation_id'] ?? '');
@@ -121,10 +129,10 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
             $firstItem = ($op['items'] ?? [])[0] ?? null;
             $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
-            $listing = $listingsCache[$sku] ?? null;
+            $listingId = $listingsIdCache[$sku] ?? null;
 
             foreach ($this->extractCostEntries($op, $operationId, $operationDate) as $entry) {
-                $allEntries[] = ['entry' => $entry, 'listing' => $listing];
+                $allEntries[] = ['entry' => $entry, 'listingId' => $listingId];
             }
         }
 
@@ -132,6 +140,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
+        // Дедупликация
         $allExternalIds = array_unique(array_map(
             static fn (array $row): string => $row['entry']['external_id'],
             $allEntries,
@@ -165,8 +174,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $cost->setAmount($entry['amount']);
             $cost->setDescription($entry['description']);
 
-            if ($row['listing']) {
-                $cost->setListing($row['listing']);
+            if ($row['listingId']) {
+                $listingRef = $this->em->getReference(MarketplaceListing::class, $row['listingId']);
+                $cost->setListing($listingRef);
             }
 
             $this->em->persist($cost);
@@ -177,110 +187,173 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     }
 
     /**
+     * Извлекает затраты из операции — логика идентична OzonAdapter::fetchCosts.
+     * Обрабатывает ВСЕ типы операций: orders, returns, services, other, compensation.
+     *
      * @return array<int, array<string, mixed>>
      */
     private function extractCostEntries(array $op, string $operationId, \DateTimeImmutable $operationDate): array
     {
         $entries = [];
 
-        $commission = abs((float) ($op['sale_commission'] ?? 0));
-        if ($commission > 0) {
+        // Комиссия за продажу
+        $saleCommission = abs((float) ($op['sale_commission'] ?? 0));
+        if ($saleCommission > 0) {
             $entries[] = [
                 'external_id'   => $operationId . '_commission',
                 'category_code' => 'ozon_sale_commission',
                 'category_name' => 'Комиссия Ozon за продажу',
-                'amount'        => (string) $commission,
+                'amount'        => (string) $saleCommission,
                 'cost_date'     => $operationDate,
-                'description'   => 'Комиссия за продажу',
+                'description'   => 'Комиссия за продажу Ozon',
             ];
         }
 
-        $delivery = abs((float) ($op['delivery_charge'] ?? 0));
-        if ($delivery > 0) {
+        // Стоимость доставки
+        $deliveryCharge = abs((float) ($op['delivery_charge'] ?? 0));
+        if ($deliveryCharge > 0) {
             $entries[] = [
                 'external_id'   => $operationId . '_delivery',
                 'category_code' => 'ozon_delivery',
                 'category_name' => 'Доставка Ozon',
-                'amount'        => (string) $delivery,
+                'amount'        => (string) $deliveryCharge,
                 'cost_date'     => $operationDate,
-                'description'   => 'Стоимость доставки',
+                'description'   => 'Доставка Ozon',
             ];
         }
 
-        $returnDelivery = abs((float) ($op['return_delivery_charge'] ?? 0));
-        if ($returnDelivery > 0) {
+        // Обратная доставка
+        $returnDeliveryCharge = abs((float) ($op['return_delivery_charge'] ?? 0));
+        if ($returnDeliveryCharge > 0) {
             $entries[] = [
                 'external_id'   => $operationId . '_return_delivery',
                 'category_code' => 'ozon_return_delivery',
                 'category_name' => 'Обратная доставка Ozon',
-                'amount'        => (string) $returnDelivery,
+                'amount'        => (string) $returnDeliveryCharge,
                 'cost_date'     => $operationDate,
-                'description'   => 'Обратная доставка',
+                'description'   => 'Обратная доставка Ozon',
             ];
         }
 
+        // Сервисы внутри операции (логистика, хранение и т.д.)
         foreach ($op['services'] ?? [] as $idx => $service) {
-            $serviceAmount = abs((float) ($service['price'] ?? 0));
-            if ($serviceAmount <= 0) {
+            $servicePrice = abs((float) ($service['price'] ?? 0));
+            if ($servicePrice <= 0) {
                 continue;
             }
 
-            $serviceName = $service['name'] ?? 'Неизвестная услуга';
+            $serviceName = $service['name'] ?? 'Услуга Ozon';
             $categoryCode = $this->resolveServiceCategoryCode($serviceName);
 
             $entries[] = [
                 'external_id'   => $operationId . '_svc_' . $idx,
                 'category_code' => $categoryCode,
-                'category_name' => $this->resolveServiceCategoryName($categoryCode),
-                'amount'        => (string) $serviceAmount,
+                'category_name' => $this->resolveCategoryName($categoryCode),
+                'amount'        => (string) $servicePrice,
                 'cost_date'     => $operationDate,
                 'description'   => $serviceName,
             ];
         }
 
+        // Прямые затраты для type=services, other, compensation
+        // (операции где amount — сама затрата, и она не отражена в полях выше)
+        $opType = $op['type'] ?? '';
+        if (in_array($opType, ['services', 'other', 'compensation'], true)) {
+            $amount = abs((float) ($op['amount'] ?? 0));
+            // Только если нет services[] (иначе уже учтено выше)
+            if ($amount > 0 && empty($op['services'])) {
+                $operationType = $op['operation_type'] ?? '';
+                $operationTypeName = $op['operation_type_name'] ?? 'Прочие услуги Ozon';
+                $categoryCode = $this->resolveOperationTypeCategoryCode($operationType, $opType);
+
+                $entries[] = [
+                    'external_id'   => $operationId . '_main',
+                    'category_code' => $categoryCode,
+                    'category_name' => $this->resolveCategoryName($categoryCode, $operationTypeName),
+                    'amount'        => (string) $amount,
+                    'cost_date'     => $operationDate,
+                    'description'   => $operationTypeName,
+                ];
+            }
+        }
+
         return $entries;
     }
 
+    /**
+     * Маппинг названий услуг Ozon → коды категорий (из OzonAdapter).
+     */
     private function resolveServiceCategoryCode(string $serviceName): string
     {
         $lower = mb_strtolower($serviceName);
 
-        return match (true) {
-            str_contains($lower, 'логистик') || str_contains($lower, 'logistic')
-            || str_contains($lower, 'магистраль') || str_contains($lower, 'last mile') => 'ozon_logistics',
-            str_contains($lower, 'обработк') || str_contains($lower, 'processing')
-            || str_contains($lower, 'сборк') => 'ozon_processing',
-            str_contains($lower, 'хранени') || str_contains($lower, 'storage')
-            || str_contains($lower, 'размещени') => 'ozon_storage',
-            str_contains($lower, 'эквайринг') || str_contains($lower, 'acquiring')
-            || str_contains($lower, 'приём платеж') => 'ozon_acquiring',
-            str_contains($lower, 'продвижени') || str_contains($lower, 'реклам')
-            || str_contains($lower, 'promotion') || str_contains($lower, 'трафик') => 'ozon_promotion',
-            str_contains($lower, 'подписк') || str_contains($lower, 'premium')
-            || str_contains($lower, 'subscription') => 'ozon_subscription',
-            str_contains($lower, 'штраф') || str_contains($lower, 'penalty')
-            || str_contains($lower, 'неустойк') => 'ozon_penalty',
-            str_contains($lower, 'компенсац') || str_contains($lower, 'compensation')
-            || str_contains($lower, 'возмещени') => 'ozon_compensation',
-            default => 'ozon_other_service',
-        };
+        if (str_contains($lower, 'логистик') || str_contains($lower, 'магистраль')
+            || str_contains($lower, 'last mile') || str_contains($lower, 'last_mile')
+            || str_contains($lower, 'logistic') || str_contains($lower, 'crossdocking')) {
+            return 'ozon_logistics';
+        }
+
+        if (str_contains($lower, 'сборка') || str_contains($lower, 'обработк')
+            || str_contains($lower, 'processing') || str_contains($lower, 'supply')) {
+            return 'ozon_processing';
+        }
+
+        if (str_contains($lower, 'хранени') || str_contains($lower, 'storage')
+            || str_contains($lower, 'размещени')) {
+            return 'ozon_storage';
+        }
+
+        if (str_contains($lower, 'эквайринг') || str_contains($lower, 'acquiring')
+            || str_contains($lower, 'redistribution')) {
+            return 'ozon_acquiring';
+        }
+
+        if (str_contains($lower, 'продвижени') || str_contains($lower, 'реклам')
+            || str_contains($lower, 'promotion') || str_contains($lower, 'costperclick')) {
+            return 'ozon_promotion';
+        }
+
+        if (str_contains($lower, 'подписк') || str_contains($lower, 'premium')
+            || str_contains($lower, 'subscription') || str_contains($lower, 'earlypayment')) {
+            return 'ozon_subscription';
+        }
+
+        if (str_contains($lower, 'штраф') || str_contains($lower, 'penalty')) {
+            return 'ozon_penalty';
+        }
+
+        if (str_contains($lower, 'компенсац') || str_contains($lower, 'возмещ')
+            || str_contains($lower, 'compensation')) {
+            return 'ozon_compensation';
+        }
+
+        return 'ozon_other_service';
     }
 
-    private function resolveServiceCategoryName(string $categoryCode): string
+    private function resolveOperationTypeCategoryCode(string $operationType, string $opType): string
+    {
+        if ($opType === 'compensation') {
+            return 'ozon_compensation';
+        }
+
+        return $this->resolveServiceCategoryCode($operationType);
+    }
+
+    private function resolveCategoryName(string $categoryCode, string $fallback = ''): string
     {
         return match ($categoryCode) {
-            'ozon_sale_commission' => 'Комиссия Ozon за продажу',
-            'ozon_delivery'        => 'Доставка Ozon',
-            'ozon_return_delivery' => 'Обратная доставка Ozon',
-            'ozon_logistics'       => 'Логистика Ozon',
-            'ozon_processing'      => 'Обработка отправления Ozon',
-            'ozon_storage'         => 'Хранение на складе Ozon',
-            'ozon_acquiring'       => 'Эквайринг Ozon',
-            'ozon_promotion'       => 'Продвижение / реклама Ozon',
-            'ozon_subscription'    => 'Подписка Ozon',
-            'ozon_penalty'         => 'Штрафы Ozon',
-            'ozon_compensation'    => 'Компенсации Ozon',
-            default                => 'Прочие услуги Ozon',
+            'ozon_sale_commission'  => 'Комиссия Ozon за продажу',
+            'ozon_delivery'         => 'Доставка Ozon',
+            'ozon_return_delivery'  => 'Обратная доставка Ozon',
+            'ozon_logistics'        => 'Логистика Ozon',
+            'ozon_processing'       => 'Обработка отправления Ozon',
+            'ozon_storage'          => 'Хранение на складе Ozon',
+            'ozon_acquiring'        => 'Эквайринг Ozon',
+            'ozon_promotion'        => 'Продвижение / реклама Ozon',
+            'ozon_subscription'     => 'Подписка Ozon',
+            'ozon_penalty'          => 'Штрафы Ozon',
+            'ozon_compensation'     => 'Компенсации Ozon',
+            default                 => $fallback ?: 'Прочие услуги Ozon',
         };
     }
 }

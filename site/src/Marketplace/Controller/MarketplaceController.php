@@ -295,7 +295,10 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
-    public function processReturns(string $id): Response {
+    public function processReturns(
+        string $id,
+        ProcessMarketplaceRawDocumentAction $action
+    ): Response {
         $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
@@ -305,9 +308,8 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $marketplace = $rawDoc->getMarketplace();
-            $processor = $this->processorRegistry->get($marketplace->value, $marketplace, 'returns');
-            $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
+            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
+            $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
         } catch (\Exception $e) {
@@ -318,7 +320,10 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
-    public function processCosts(string $id): Response {
+    public function processCosts(
+        string $id,
+        ProcessMarketplaceRawDocumentAction $action
+    ): Response {
         $company = $this->companyService->getActiveCompany();
 
         $rawDoc = $this->rawDocumentRepository->find($id);
@@ -328,9 +333,8 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $marketplace = $rawDoc->getMarketplace();
-            $processor = $this->processorRegistry->get($marketplace->value, $marketplace, 'costs');
-            $count = $processor->process((string) $company->getId(), (string) $rawDoc->getId());
+            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
+            $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {

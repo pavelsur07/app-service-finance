@@ -56,16 +56,12 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $returnsData = array_filter($rawRows, static function (array $op): bool {
-            return ($op['type'] ?? '') === 'returns';
-        });
+        // $rawRows уже содержит только ClientReturnAgentOperation (классифицировано как RETURN)
+        // Фильтрация по type=returns здесь не нужна — доверяем классификатору
 
-        if (empty($returnsData)) {
-            return;
-        }
-
+        // Собираем все SKU
         $allSkus = [];
-        foreach ($returnsData as $op) {
+        foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
                 if ($sku !== '') {
@@ -74,18 +70,25 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             }
         }
 
-        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
-            $company,
-            MarketplaceType::OZON,
-            array_keys($allSkus),
-        );
+        // Предзагрузка листингов — храним ID чтобы избежать detached proxy
+        $listingsIdCache = [];
+        if (!empty($allSkus)) {
+            $listings = $this->listingRepository->findListingsBySkusIndexed(
+                $company,
+                MarketplaceType::OZON,
+                array_keys($allSkus),
+            );
+            foreach ($listings as $sku => $listing) {
+                $listingsIdCache[$sku] = $listing->getId();
+            }
+        }
 
+        // Создаём отсутствующие листинги
         $newListings = 0;
-        foreach ($returnsData as $op) {
-            $price = abs((float) ($op['amount'] ?? 0));
+        foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsCache[$sku])) {
+                if ($sku === '' || isset($listingsIdCache[$sku])) {
                     continue;
                 }
 
@@ -96,11 +99,10 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                     MarketplaceType::OZON,
                 );
                 $listing->setMarketplaceSku($sku);
-                $listing->setPrice((string) $price);
                 $listing->setName($item['name'] ?? null);
                 $this->em->persist($listing);
 
-                $listingsCache[$sku] = $listing;
+                $listingsIdCache[$sku] = $listing->getId();
                 $newListings++;
             }
         }
@@ -109,25 +111,43 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $this->em->flush();
         }
 
-        $allOperationIds = array_values(array_filter(array_map(
-            static fn (array $op): string => (string) ($op['operation_id'] ?? ''),
-            $returnsData,
-        )));
-        $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allOperationIds);
+        // Дедупликация — ключ: posting_number ?: operation_id
+        $allExternalIds = array_values(array_map(
+            static function (array $op): string {
+                $postingNumber = $op['posting']['posting_number'] ?? '';
+                return $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+            },
+            $rawRows,
+        ));
+        $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allExternalIds);
 
-        foreach ($returnsData as $op) {
-            $operationId = (string) ($op['operation_id'] ?? '');
-            if ($operationId === '' || isset($existingMap[$operationId])) {
+        foreach ($rawRows as $op) {
+            $postingNumber = $op['posting']['posting_number'] ?? '';
+            $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+
+            if ($externalId === '' || isset($existingMap[$externalId])) {
                 continue;
             }
 
             $firstItem = ($op['items'] ?? [])[0] ?? null;
             $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
-            $listing = $listingsCache[$sku] ?? null;
+            $listingId = $listingsIdCache[$sku] ?? null;
 
-            if (!$listing) {
-                $this->logger->warning('[Ozon] processBatch returns: listing not found', ['sku' => $sku]);
+            if (!$listingId) {
+                $this->logger->warning('[Ozon] processBatch returns: listing not found', [
+                    'external_id'    => $externalId,
+                    'operation_type' => $op['operation_type'] ?? '',
+                    'sku'            => $sku,
+                ]);
                 continue;
+            }
+
+            $listing = $this->em->getReference(MarketplaceListing::class, $listingId);
+
+            // Сумма возврата: accruals_for_sale (отрицательный при возврате) ?: amount
+            $refundAmount = abs((float) ($op['accruals_for_sale'] ?? 0));
+            if ($refundAmount <= 0) {
+                $refundAmount = abs((float) ($op['amount'] ?? 0));
             }
 
             $return = new MarketplaceReturn(
@@ -137,15 +157,15 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 MarketplaceType::OZON,
             );
 
-            $return->setExternalReturnId($operationId);
+            $return->setExternalReturnId($externalId);
             $return->setReturnDate(new \DateTimeImmutable($op['operation_date']));
-            $return->setQuantity(1);
-            $return->setRefundAmount((string) abs((float) ($op['amount'] ?? 0)));
+            $return->setQuantity(count($op['items'] ?? []) ?: 1);
+            $return->setRefundAmount((string) $refundAmount);
             $return->setReturnReason($op['operation_type_name'] ?? null);
             $return->setRawData($op);
 
             $this->em->persist($return);
-            $existingMap[$operationId] = true;
+            $existingMap[$externalId] = true;
         }
 
         $this->em->flush();
