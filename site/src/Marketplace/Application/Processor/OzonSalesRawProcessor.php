@@ -5,18 +5,25 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\ProcessOzonSalesAction;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceSaleExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
-final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
+final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
     public function __construct(
-        private MarketplaceSaleExistingExternalIdsQuery $existingIdsQuery,
-        private EntityManagerInterface $entityManager,
+        private readonly ProcessOzonSalesAction $action,
+        private readonly EntityManagerInterface $em,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly MarketplaceSaleExistingExternalIdsQuery $existingIdsQuery,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -24,10 +31,15 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::SALE
-            && $marketplace === MarketplaceType::OZON;
+                && $marketplace === MarketplaceType::OZON;
         }
 
-        return false;
+        return $type === MarketplaceType::OZON->value && $kind === 'sales';
+    }
+
+    public function process(string $companyId, string $rawDocId): int
+    {
+        return ($this->action)($companyId, $rawDocId);
     }
 
     /**
@@ -35,67 +47,115 @@ final readonly class OzonSalesRawProcessor implements MarketplaceRawProcessorInt
      */
     public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
     {
-        $externalIds = array_values(array_filter(
-            array_map(
-                static fn (array $row): string => (string) ($row['operation_id'] ?? ''),
-                $rawRows,
-            ),
-            static fn (string $id): bool => $id !== '',
-        ));
-
-        if ($externalIds === []) {
+        if (empty($rawRows)) {
             return;
         }
 
-        $existingIds = $this->existingIdsQuery->findExisting($companyId, $marketplace, $externalIds);
-        $company = $this->entityManager->getReference(Company::class, $companyId);
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: ' . $companyId);
+        }
 
-        foreach ($rawRows as $row) {
-            $operationId = (string) ($row['operation_id'] ?? '');
-            if ($operationId === '' || in_array($operationId, $existingIds, true)) {
+        $salesData = array_filter($rawRows, static function (array $op): bool {
+            return ($op['type'] ?? '') === 'orders'
+                && (float) ($op['accruals_for_sale'] ?? 0) > 0;
+        });
+
+        if (empty($salesData)) {
+            return;
+        }
+
+        // Предзагрузка листингов по sku
+        $allSkus = [];
+        foreach ($salesData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string) ($item['sku'] ?? '');
+                if ($sku !== '') {
+                    $allSkus[$sku] = true;
+                }
+            }
+        }
+
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+            $company,
+            MarketplaceType::OZON,
+            array_keys($allSkus),
+        );
+
+        $newListings = 0;
+        foreach ($salesData as $op) {
+            $price = (float) ($op['accruals_for_sale'] ?? 0);
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string) ($item['sku'] ?? '');
+                if ($sku === '' || isset($listingsCache[$sku])) {
+                    continue;
+                }
+
+                $listing = new MarketplaceListing(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    null,
+                    MarketplaceType::OZON,
+                );
+                $listing->setMarketplaceSku($sku);
+                $listing->setPrice((string) $price);
+                $listing->setName($item['name'] ?? null);
+                $this->em->persist($listing);
+
+                $listingsCache[$sku] = $listing;
+                $newListings++;
+            }
+        }
+
+        if ($newListings > 0) {
+            $this->em->flush();
+        }
+
+        // Дедупликация
+        $allOperationIds = array_values(array_filter(array_map(
+            static fn (array $op): string => (string) ($op['operation_id'] ?? ''),
+            $salesData,
+        )));
+        $existingMap = array_fill_keys(
+            $this->existingIdsQuery->findExisting($companyId, MarketplaceType::OZON, $allOperationIds),
+            true,
+        );
+
+        foreach ($salesData as $op) {
+            $operationId = (string) ($op['operation_id'] ?? '');
+            if ($operationId === '' || isset($existingMap[$operationId])) {
                 continue;
             }
 
-            $existingIds[] = $operationId;
+            $firstItem = ($op['items'] ?? [])[0] ?? null;
+            $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
+            $listing = $listingsCache[$sku] ?? null;
 
-            $amount = (string) ((float) ($row['amount'] ?? 0));
+            if (!$listing) {
+                $this->logger->warning('[Ozon] processBatch sales: listing not found', ['sku' => $sku]);
+                continue;
+            }
+
+            $accrual = (float) ($op['accruals_for_sale'] ?? 0);
+
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
                 $company,
-                null,
-                null,
-                $marketplace,
+                $listing,
+                MarketplaceType::OZON,
             );
 
             $sale->setExternalOrderId($operationId);
-            $sale->setSaleDate($this->resolveSaleDate($row));
+            $sale->setSaleDate(new \DateTimeImmutable($op['operation_date']));
             $sale->setQuantity(1);
-            $sale->setPricePerUnit($amount);
-            $sale->setTotalRevenue($amount);
-            $sale->setRawData($row);
+            $sale->setPricePerUnit((string) $accrual);
+            $sale->setTotalRevenue((string) abs($accrual));
+            $sale->setRawData($op);
 
-            $this->entityManager->persist($sale);
+            $this->em->persist($sale);
+            $existingMap[$operationId] = true;
         }
 
-        $this->entityManager->flush();
-    }
-
-    public function process(string $companyId, string $rawDocId): int
-    {
-        return 0;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function resolveSaleDate(array $row): \DateTimeImmutable
-    {
-        $date = (string) ($row['operation_date'] ?? 'now');
-
-        try {
-            return new \DateTimeImmutable($date);
-        } catch (\Throwable) {
-            return new \DateTimeImmutable();
-        }
+        $this->em->flush();
     }
 }

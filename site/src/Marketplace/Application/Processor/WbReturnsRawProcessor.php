@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Application\ProcessWbReturnsAction;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -26,13 +26,14 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::RETURN
-            && $marketplace === MarketplaceType::WILDBERRIES;
+                && $marketplace === MarketplaceType::WILDBERRIES;
         }
 
         return $type === MarketplaceType::WILDBERRIES->value && $kind === 'returns';
@@ -58,9 +59,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $returnsData = array_filter($rawRows, static function (array $item): bool {
-            $docType = $item['doc_type_name'] ?? '';
-
-            return in_array($docType, ['Возврат', 'возврат', 'Return'], true)
+            return in_array($item['doc_type_name'] ?? '', ['Возврат', 'возврат', 'Return'], true)
                 && (float) ($item['retail_price'] ?? 0) > 0;
         });
 
@@ -69,8 +68,6 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
-
-        /** @var array<string, MarketplaceListing> $listingsCache */
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             MarketplaceType::WILDBERRIES,
@@ -94,7 +91,6 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
             ]);
-
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
         }
@@ -103,7 +99,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $this->em->flush();
         }
 
-        $allSrids = array_column($returnsData, 'srid');
+        $allSrids = array_values(array_filter(array_column($returnsData, 'srid')));
         $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
         foreach ($returnsData as $item) {
@@ -119,10 +115,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $listing = $listingsCache[$cacheKey] ?? null;
 
             if (!$listing) {
-                $this->logger->warning('[WB] processBatch: listing not found', [
-                    'nm_id' => $nmId,
-                ]);
-
+                $this->logger->warning('[WB] processBatch returns: listing not found', ['nm_id' => $nmId]);
                 continue;
             }
 
@@ -134,10 +127,11 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $return->setExternalReturnId($srid);
-            $return->setReturnDate(new \DateTimeImmutable((string) $item['rr_dt']));
-            $return->setQuantity(abs((int) $item['quantity']));
-            $return->setRefundAmount((string) $item['retail_price']);
-            $return->setReturnReason((string) ($item['supplier_oper_name'] ?? ''));
+            $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
+            $return->setQuantity(abs((int) ($item['quantity'] ?? 1)));
+            $return->setRefundAmount((string) ($item['retail_price'] ?? '0'));
+            $return->setReturnReason($item['supplier_oper_name'] ?? '');
+            $return->setRawData($item);
 
             $this->em->persist($return);
             $existingMap[$srid] = true;

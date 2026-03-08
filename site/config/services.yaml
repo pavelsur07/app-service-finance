@@ -137,10 +137,6 @@ services:
         tags:
             - { name: 'app.marketplace.cost_calculator', priority: 100 }
 
-    App\Marketplace\Service\MarketplaceSyncService:
-        arguments:
-            $costCalculators: !tagged_iterator app.marketplace.cost_calculator
-
     App\Marketplace\Application\ProcessWbCostsAction:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
@@ -150,10 +146,6 @@ services:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
 
     App\Marketplace\Application\Processor\WbCostsRawProcessor:
-        arguments:
-            $costCalculators: !tagged_iterator app.marketplace.cost_calculator
-
-    App\Marketplace\Application\Processor\OzonCostsRawProcessor:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
 

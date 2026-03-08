@@ -5,21 +5,27 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceCostCategory;
+use App\Marketplace\Application\ProcessWbSalesAction;
+use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Infrastructure\Query\MarketplaceSaleExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
-final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
+final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
     public function __construct(
-        private MarketplaceSaleExistingExternalIdsQuery $existingIdsQuery,
-        private EntityManagerInterface $entityManager,
+        private readonly ProcessWbSalesAction $action,
+        private readonly EntityManagerInterface $em,
+        private readonly MarketplaceSaleRepository $saleRepository,
+        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly WbListingResolverService $listingResolver,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -27,10 +33,15 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::SALE
-            && $marketplace === MarketplaceType::WILDBERRIES;
+                && $marketplace === MarketplaceType::WILDBERRIES;
         }
 
-        return $type === MarketplaceType::WILDBERRIES->value && $kind === StagingRecordType::SALE->value;
+        return $type === MarketplaceType::WILDBERRIES->value && $kind === 'sales';
+    }
+
+    public function process(string $companyId, string $rawDocId): int
+    {
+        return ($this->action)($companyId, $rawDocId);
     }
 
     /**
@@ -38,99 +49,100 @@ final readonly class WbSalesRawProcessor implements MarketplaceRawProcessorInter
      */
     public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
     {
-        $externalIds = array_values(array_filter(
-            array_map(
-                static fn (array $row): string => (string) ($row['rrd_id'] ?? $row['srid'] ?? ''),
-                $rawRows,
-            ),
-            static fn (string $id): bool => $id !== '',
-        ));
-
-        if ($externalIds === []) {
+        if (empty($rawRows)) {
             return;
         }
 
-        $existingIds = $this->existingIdsQuery->findExisting($companyId, $marketplace, $externalIds);
-        $company = $this->entityManager->getReference(Company::class, $companyId);
+        $company = $this->em->find(Company::class, $companyId);
+        if (!$company instanceof Company) {
+            throw new \RuntimeException('Company not found: ' . $companyId);
+        }
 
-        foreach ($rawRows as $row) {
-            $transactionId = (string) ($row['rrd_id'] ?? $row['srid'] ?? '');
-            if ($transactionId === '' || in_array($transactionId, $existingIds, true)) {
+        // Фильтруем только продажи
+        $salesData = array_filter($rawRows, static function (array $item): bool {
+            return ($item['doc_type_name'] ?? '') === 'Продажа'
+                && (float) ($item['retail_amount'] ?? 0) > 0;
+        });
+
+        if (empty($salesData)) {
+            return;
+        }
+
+        // Предзагрузка листингов
+        $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
+        $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+            $company,
+            MarketplaceType::WILDBERRIES,
+            $allNmIds,
+        );
+
+        // Создаём отсутствующие листинги
+        $newListings = 0;
+        foreach ($salesData as $item) {
+            $nmId = (string) ($item['nm_id'] ?? '');
+            $tsName = $item['ts_name'] ?? null;
+            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId . '_' . $size;
+
+            if (isset($listingsCache[$cacheKey])) {
                 continue;
             }
 
-            $existingIds[] = $transactionId;
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name'      => (string) ($item['sa_name'] ?? ''),
+                'brand_name'   => (string) ($item['brand_name'] ?? ''),
+                'subject_name' => (string) ($item['subject_name'] ?? ''),
+                'retail_price' => (string) ($item['retail_price'] ?? '0'),
+            ]);
+            $listingsCache[$cacheKey] = $listing;
+            $newListings++;
+        }
 
-            $listingId = (string) ($row['listing_id'] ?? '');
-            $listing = $listingId !== ''
-                ? $this->entityManager->getReference(MarketplaceListing::class, $listingId)
-                : null;
+        if ($newListings > 0) {
+            $this->em->flush();
+        }
 
-            $pricePerUnit = (string) ((float) ($row['retail_price'] ?? $row['price'] ?? 0));
-            $quantity = (int) ($row['quantity'] ?? 1);
-            $totalRevenue = (string) ((float) ($row['retail_amount'] ?? $row['total_price'] ?? ((float) $pricePerUnit * $quantity)));
+        // Дедупликация — проверяем все srid одним запросом
+        $allSrids = array_values(array_filter(array_column($salesData, 'srid')));
+        $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
+
+        // Сохраняем
+        foreach ($salesData as $item) {
+            $srid = (string) ($item['srid'] ?? '');
+            if ($srid === '' || isset($existingMap[$srid])) {
+                continue;
+            }
+
+            $nmId = (string) ($item['nm_id'] ?? '');
+            $tsName = $item['ts_name'] ?? null;
+            $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
+            $cacheKey = $nmId . '_' . $size;
+            $listing = $listingsCache[$cacheKey] ?? null;
+
+            if (!$listing) {
+                $this->logger->warning('[WB] processBatch sales: listing not found', ['nm_id' => $nmId]);
+                continue;
+            }
 
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
                 $company,
                 $listing,
-                $marketplace,
+                MarketplaceType::WILDBERRIES,
             );
 
-            $sale->setExternalOrderId($transactionId);
-            $sale->setSaleDate($this->resolveSaleDate($row));
-            $sale->setQuantity($quantity);
-            $sale->setPricePerUnit($pricePerUnit);
-            $sale->setTotalRevenue($totalRevenue);
-            $sale->setRawData($row);
+            $sale->setExternalOrderId($srid);
+            $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
+            $sale->setQuantity(abs((int) ($item['quantity'] ?? 1)));
+            $sale->setPricePerUnit((string) ($item['retail_price'] ?? '0'));
+            $sale->setTotalRevenue((string) abs((float) ($item['retail_amount'] ?? 0)));
+            $sale->setRawData($item);
 
-            $this->entityManager->persist($sale);
-
-            $commission = (float) ($row['commission_percent'] ?? 0);
-            if ($commission !== 0.0) {
-                // TODO: В будущем маппить категорию через сервис/словари. Пока берем из массива, если есть.
-                $categoryId = (string) ($row['commission_category_id'] ?? '');
-                $category = $categoryId !== '' ? $this->entityManager->getReference(MarketplaceCostCategory::class, $categoryId) : null;
-
-                if ($category !== null) {
-                    $cost = new MarketplaceCost(
-                        Uuid::uuid4()->toString(),
-                        $company,
-                        $marketplace,
-                        $category,
-                    );
-                    $cost->setExternalId($transactionId . '_commission');
-                    $cost->setSale($sale);
-                    $cost->setListing($listing);
-                    $cost->setCostDate($this->resolveSaleDate($row));
-                    $cost->setAmount((string) abs($commission));
-                    $cost->setDescription('WB commission');
-                    $cost->setRawData($row);
-
-                    $this->entityManager->persist($cost);
-                }
-            }
+            $this->em->persist($sale);
+            // Добавляем в карту чтобы не задваивать внутри одного батча
+            $existingMap[$srid] = true;
         }
 
-        $this->entityManager->flush();
-    }
-
-    public function process(string $companyId, string $rawDocId): int
-    {
-        return 0;
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     */
-    private function resolveSaleDate(array $row): \DateTimeImmutable
-    {
-        $date = (string) ($row['rr_dt'] ?? $row['sale_dt'] ?? $row['date'] ?? 'now');
-
-        try {
-            return new \DateTimeImmutable($date);
-        } catch (\Throwable) {
-            return new \DateTimeImmutable();
-        }
+        $this->em->flush();
     }
 }

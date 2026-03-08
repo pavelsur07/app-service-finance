@@ -28,8 +28,8 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly ProcessWbCostsAction $action,
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceListingRepository $listingRepository,
-        private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
@@ -41,7 +41,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::COST
-            && $marketplace === MarketplaceType::WILDBERRIES;
+                && $marketplace === MarketplaceType::WILDBERRIES;
         }
 
         return $type === MarketplaceType::WILDBERRIES->value && $kind === 'costs';
@@ -66,28 +66,34 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $costsData = array_filter($rawRows, static fn (array $item): bool => ($item['doc_type_name'] ?? '') !== 'Возврат');
+        $costsData = array_filter($rawRows, static function (array $item): bool {
+            return ($item['doc_type_name'] ?? '') !== 'Возврат';
+        });
+
         if (empty($costsData)) {
             return;
         }
 
-        $allNmIds = [];
+        // Предзагрузка листингов
+        $allNmIdsMap = [];
         foreach ($costsData as $item) {
             $nmId = trim((string) ($item['nm_id'] ?? ''));
-            if ($nmId === '' || $nmId === '0') {
-                continue;
+            if ($nmId !== '' && $nmId !== '0') {
+                $allNmIdsMap[$nmId] = true;
             }
-
-            $allNmIds[$nmId] = true;
         }
 
-        /** @var array<string, MarketplaceListing> $listingsCache */
-        $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
-            $company,
-            MarketplaceType::WILDBERRIES,
-            array_keys($allNmIds),
-        );
+        $listingsCache = [];
+        if (!empty($allNmIdsMap)) {
+            $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                array_keys($allNmIdsMap),
+            );
+        }
 
+        // Создаём отсутствующие листинги
+        $newListings = 0;
         foreach ($costsData as $item) {
             $nmId = trim((string) ($item['nm_id'] ?? ''));
             if ($nmId === '' || $nmId === '0') {
@@ -102,71 +108,66 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $listingsCache[$cacheKey] = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name' => (string) ($item['sa_name'] ?? ''),
-                'brand_name' => (string) ($item['brand_name'] ?? ''),
+            $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
+                'sa_name'      => (string) ($item['sa_name'] ?? ''),
+                'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
             ]);
+            $listingsCache[$cacheKey] = $listing;
+            $newListings++;
         }
 
+        if ($newListings > 0) {
+            $this->em->flush();
+        }
+
+        // Прогрев категорий
         $this->categoryResolver->preload($company, MarketplaceType::WILDBERRIES);
 
-        $pendingCosts = [];
-        $externalIds = [];
-
+        // Собираем все cost entries
+        $allEntries = [];
         foreach ($costsData as $item) {
-            try {
-                $nmId = trim((string) ($item['nm_id'] ?? ''));
-                $listing = null;
+            $nmId = trim((string) ($item['nm_id'] ?? ''));
+            $listing = null;
+            if ($nmId !== '' && $nmId !== '0') {
+                $tsName = $item['ts_name'] ?? null;
+                $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
+                $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+            }
 
-                if ($nmId !== '' && $nmId !== '0') {
-                    $tsName = $item['ts_name'] ?? null;
-                    $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-                    $cacheKey = $nmId . '_' . $size;
-                    $listing = $listingsCache[$cacheKey] ?? null;
+            foreach ($this->costCalculators as $calculator) {
+                if (!$calculator->supports($item)) {
+                    continue;
                 }
-
-                foreach ($this->costCalculators as $calculator) {
-                    if (!$calculator->supports($item)) {
-                        continue;
-                    }
-
-                    foreach ($calculator->calculate($item, $listing) as $costData) {
-                        $externalId = (string) ($costData['external_id'] ?? '');
-                        if ($externalId === '') {
-                            continue;
-                        }
-
-                        $pendingCosts[] = [
-                            'external_id' => $externalId,
-                            'cost_data' => $costData,
-                            'listing' => $listing,
-                        ];
-                        $externalIds[] = $externalId;
-                    }
+                foreach ($calculator->calculate($item, $listing) as $costData) {
+                    $allEntries[] = ['costData' => $costData, 'listing' => $listing];
                 }
-            } catch (\Throwable $exception) {
-                $this->logger->error('Failed to process WB cost row in batch mode', [
-                    'company_id' => $companyId,
-                    'srid' => $item['srid'] ?? null,
-                    'error' => $exception->getMessage(),
-                ]);
             }
         }
 
-        $existingExternalIds = $this->costExistingIdsQuery->execute($companyId, $externalIds);
+        if (empty($allEntries)) {
+            return;
+        }
 
-        foreach ($pendingCosts as $pendingCost) {
-            $externalId = $pendingCost['external_id'];
-            if (isset($existingExternalIds[$externalId])) {
+        // Дедупликация
+        $allExternalIds = array_unique(array_map(
+            static fn (array $row): string => $row['costData']['external_id'],
+            $allEntries,
+        ));
+        $existingMap = $this->costExistingIdsQuery->execute($companyId, $allExternalIds);
+
+        // Сохраняем
+        foreach ($allEntries as $row) {
+            $costData = $row['costData'];
+            $externalId = $costData['external_id'];
+
+            if (isset($existingMap[$externalId])) {
                 continue;
             }
 
-            $costData = $pendingCost['cost_data'];
-            $categoryCode = (string) ($costData['category_code'] ?? 'unknown');
-            $categoryName = (string) ($costData['category_name'] ?? $costData['description'] ?? $categoryCode);
-
+            $categoryCode = $costData['category_code'];
+            $categoryName = $costData['category_name'] ?? $costData['description'] ?? $categoryCode;
             $category = $this->categoryResolver->resolve(
                 $company,
                 MarketplaceType::WILDBERRIES,
@@ -183,15 +184,15 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
 
             $cost->setExternalId($externalId);
             $cost->setCostDate($costData['cost_date']);
-            $cost->setAmount((string) $costData['amount']);
-            $cost->setDescription((string) ($costData['description'] ?? null));
+            $cost->setAmount($costData['amount']);
+            $cost->setDescription($costData['description']);
 
-            if ($pendingCost['listing'] instanceof MarketplaceListing) {
-                $cost->setListing($pendingCost['listing']);
+            if ($row['listing']) {
+                $cost->setListing($row['listing']);
             }
 
             $this->em->persist($cost);
-            $existingExternalIds[$externalId] = true;
+            $existingMap[$externalId] = true;
         }
 
         $this->em->flush();

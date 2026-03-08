@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\ProcessOzonReturnsAction;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Application\ProcessOzonReturnsAction;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,13 +24,14 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
         if ($type instanceof StagingRecordType) {
             return $type === StagingRecordType::RETURN
-            && $marketplace === MarketplaceType::OZON;
+                && $marketplace === MarketplaceType::OZON;
         }
 
         return $type === MarketplaceType::OZON->value && $kind === 'returns';
@@ -55,53 +56,77 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $returnsData = array_filter($rawRows, static fn (array $item): bool => ($item['type'] ?? null) === 'returns');
+        $returnsData = array_filter($rawRows, static function (array $op): bool {
+            return ($op['type'] ?? '') === 'returns';
+        });
+
         if (empty($returnsData)) {
             return;
         }
 
-        $allSkus = array_values(array_unique(array_filter(array_map(
-            static fn (array $item): string => (string) ($item['sku'] ?? ''),
-            $returnsData,
-        ))));
-
-        /** @var array<string, MarketplaceListing> $listingsCache */
-        $listingsCache = $this->listingRepository->findListingsBySkusIndexed($company, MarketplaceType::OZON, $allSkus);
-
-        foreach ($returnsData as $item) {
-            $sku = (string) ($item['sku'] ?? '');
-            if ($sku === '' || isset($listingsCache[$sku])) {
-                continue;
+        $allSkus = [];
+        foreach ($returnsData as $op) {
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string) ($item['sku'] ?? '');
+                if ($sku !== '') {
+                    $allSkus[$sku] = true;
+                }
             }
-
-            $listing = new MarketplaceListing(Uuid::uuid4()->toString(), $company, null, MarketplaceType::OZON);
-            $listing->setMarketplaceSku($sku);
-            $listing->setPrice((string) abs((float) ($item['amount'] ?? 0)));
-            $listing->setName($item['items'][0]['name'] ?? null);
-
-            $this->em->persist($listing);
-            $listingsCache[$sku] = $listing;
         }
 
-        $this->em->flush();
+        $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
+            $company,
+            MarketplaceType::OZON,
+            array_keys($allSkus),
+        );
+
+        $newListings = 0;
+        foreach ($returnsData as $op) {
+            $price = abs((float) ($op['amount'] ?? 0));
+            foreach ($op['items'] ?? [] as $item) {
+                $sku = (string) ($item['sku'] ?? '');
+                if ($sku === '' || isset($listingsCache[$sku])) {
+                    continue;
+                }
+
+                $listing = new MarketplaceListing(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    null,
+                    MarketplaceType::OZON,
+                );
+                $listing->setMarketplaceSku($sku);
+                $listing->setPrice((string) $price);
+                $listing->setName($item['name'] ?? null);
+                $this->em->persist($listing);
+
+                $listingsCache[$sku] = $listing;
+                $newListings++;
+            }
+        }
+
+        if ($newListings > 0) {
+            $this->em->flush();
+        }
 
         $allOperationIds = array_values(array_filter(array_map(
-            static fn (array $item): string => (string) ($item['operation_id'] ?? ''),
+            static fn (array $op): string => (string) ($op['operation_id'] ?? ''),
             $returnsData,
         )));
         $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allOperationIds);
 
-        foreach ($returnsData as $item) {
-            $operationId = (string) ($item['operation_id'] ?? '');
+        foreach ($returnsData as $op) {
+            $operationId = (string) ($op['operation_id'] ?? '');
             if ($operationId === '' || isset($existingMap[$operationId])) {
                 continue;
             }
 
-            $sku = (string) ($item['sku'] ?? '');
-            $listing = $sku !== '' ? ($listingsCache[$sku] ?? null) : null;
-            if (!$listing instanceof MarketplaceListing) {
-                $this->logger->warning('[Ozon] processBatch: listing not found', ['sku' => $sku]);
+            $firstItem = ($op['items'] ?? [])[0] ?? null;
+            $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
+            $listing = $listingsCache[$sku] ?? null;
 
+            if (!$listing) {
+                $this->logger->warning('[Ozon] processBatch returns: listing not found', ['sku' => $sku]);
                 continue;
             }
 
@@ -112,11 +137,12 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 MarketplaceType::OZON,
             );
 
-            $return->setExternalReturnId((string) $item['operation_id']);
-            $return->setReturnDate(new \DateTimeImmutable((string) $item['operation_date']));
+            $return->setExternalReturnId($operationId);
+            $return->setReturnDate(new \DateTimeImmutable($op['operation_date']));
             $return->setQuantity(1);
-            $return->setRefundAmount((string) abs((float) ($item['amount'] ?? 0)));
-            $return->setReturnReason($item['operation_type_name'] ?? null);
+            $return->setRefundAmount((string) abs((float) ($op['amount'] ?? 0)));
+            $return->setReturnReason($op['operation_type_name'] ?? null);
+            $return->setRawData($op);
 
             $this->em->persist($return);
             $existingMap[$operationId] = true;

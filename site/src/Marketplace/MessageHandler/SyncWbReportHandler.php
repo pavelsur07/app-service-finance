@@ -1,14 +1,18 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\ProcessWbCostsAction;
+use App\Marketplace\Application\ProcessWbReturnsAction;
+use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\SyncWbReportMessage;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
-use App\Marketplace\Service\MarketplaceSyncService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -24,10 +28,13 @@ final class SyncWbReportHandler
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
-        private readonly MarketplaceSyncService $syncService,
+        private readonly ProcessWbSalesAction $processSales,
+        private readonly ProcessWbReturnsAction $processReturns,
+        private readonly ProcessWbCostsAction $processCosts,
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(SyncWbReportMessage $message): void
     {
@@ -36,14 +43,15 @@ final class SyncWbReportHandler
 
         $lock = $this->lockFactory->createLock(
             'marketplace_sync_' . $companyId . '_wildberries',
-            self::LOCK_TTL_SECONDS
+            self::LOCK_TTL_SECONDS,
         );
 
         if (!$lock->acquire()) {
             $this->logger->warning('WB sync already in progress, skipping', [
-                'company_id' => $companyId,
+                'company_id'    => $companyId,
                 'connection_id' => $connectionId,
             ]);
+
             return;
         }
 
@@ -59,17 +67,20 @@ final class SyncWbReportHandler
         $company = $this->em->find(Company::class, $companyId);
         if (!$company) {
             $this->logger->error('Company not found for WB sync', ['company_id' => $companyId]);
+
             return;
         }
 
         $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
         if (!$connection) {
             $this->logger->error('MarketplaceConnection not found', ['connection_id' => $connectionId]);
+
             return;
         }
 
         if (!$connection->isActive()) {
             $this->logger->info('Connection is inactive, skipping', ['connection_id' => $connectionId]);
+
             return;
         }
 
@@ -86,10 +97,11 @@ final class SyncWbReportHandler
             if (empty($rawData)) {
                 $this->logger->info('WB API returned empty report', [
                     'company_id' => $companyId,
-                    'period' => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                    'period'     => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
                 ]);
                 $connection->markSyncSuccess();
                 $this->em->flush();
+
                 return;
             }
 
@@ -97,7 +109,7 @@ final class SyncWbReportHandler
                 Uuid::uuid4()->toString(),
                 $company,
                 MarketplaceType::WILDBERRIES,
-                'sales_report'
+                'sales_report',
             );
             $rawDoc->setPeriodFrom($fromDate);
             $rawDoc->setPeriodTo($toDate);
@@ -111,48 +123,39 @@ final class SyncWbReportHandler
             $rawDocId = $rawDoc->getId();
 
             $this->logger->info('WB raw report saved', [
-                'company_id' => $companyId,
-                'raw_doc_id' => $rawDocId,
+                'company_id'    => $companyId,
+                'raw_doc_id'    => $rawDocId,
                 'records_count' => count($rawData),
             ]);
 
-            // Sales
-            $salesCount = $this->syncService->processSalesFromRaw($company, $rawDoc);
+            // Sales — Action сам делает em->clear() внутри батчей
+            $salesCount = ($this->processSales)($companyId, $rawDocId);
             $this->logger->info('WB sales processed', ['count' => $salesCount]);
 
-            // Reload after em->clear inside processSalesFromRaw
-            $company = $this->em->find(Company::class, $companyId);
-            $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-
             // Returns
-            $returnsCount = $this->syncService->processReturnsFromRaw($company, $rawDoc);
+            $returnsCount = ($this->processReturns)($companyId, $rawDocId);
             $this->logger->info('WB returns processed', ['count' => $returnsCount]);
 
-            // Reload after em->clear inside processReturnsFromRaw
-            $company = $this->em->find(Company::class, $companyId);
-            $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
-
             // Costs
-            $costsCount = $this->syncService->processCostsFromRaw($company, $rawDoc);
+            $costsCount = ($this->processCosts)($companyId, $rawDocId);
             $this->logger->info('WB costs processed', ['count' => $costsCount]);
 
-            // Success
+            // Success — перечитываем connection после em->clear() внутри Action-ов
             $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
             $connection->markSyncSuccess();
             $this->em->flush();
 
             $this->logger->info('WB nightly sync completed', [
                 'company_id' => $companyId,
-                'sales' => $salesCount,
-                'returns' => $returnsCount,
-                'costs' => $costsCount,
+                'sales'      => $salesCount,
+                'returns'    => $returnsCount,
+                'costs'      => $costsCount,
             ]);
-
         } catch (\Throwable $e) {
             $this->logger->error('WB nightly sync failed', [
-                'company_id' => $companyId,
+                'company_id'    => $companyId,
                 'connection_id' => $connectionId,
-                'error' => $e->getMessage(),
+                'error'         => $e->getMessage(),
             ]);
 
             try {
