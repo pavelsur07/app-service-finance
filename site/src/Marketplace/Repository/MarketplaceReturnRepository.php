@@ -33,7 +33,8 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
         \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('r')
-            ->where('r.product = :product')
+            ->join('r.listing', 'l')
+            ->where('l.product = :product')
             ->andWhere('r.returnDate >= :from')
             ->andWhere('r.returnDate <= :to')
             ->setParameter('product', $product)
@@ -87,7 +88,6 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        // Возвращаем как map для быстрого isset()
         return array_fill_keys($result, true);
     }
 }

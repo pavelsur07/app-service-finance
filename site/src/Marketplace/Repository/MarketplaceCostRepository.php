@@ -35,7 +35,8 @@ class MarketplaceCostRepository extends ServiceEntityRepository
         \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('c')
-            ->where('c.product = :product')
+            ->join('c.listing', 'l')
+            ->where('l.product = :product')
             ->andWhere('c.costDate >= :from')
             ->andWhere('c.costDate <= :to')
             ->setParameter('product', $product)
@@ -47,7 +48,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     }
 
     /**
-     * Общие затраты (не привязанные к товару, например реклама)
+     * Общие затраты (не привязанные к листингу, например реклама)
      * @return MarketplaceCost[]
      */
     public function findGeneralCosts(
@@ -57,7 +58,7 @@ class MarketplaceCostRepository extends ServiceEntityRepository
     ): array {
         return $this->createQueryBuilder('c')
             ->where('c.company = :company')
-            ->andWhere('c.product IS NULL')
+            ->andWhere('c.listing IS NULL')
             ->andWhere('c.costDate >= :from')
             ->andWhere('c.costDate <= :to')
             ->setParameter('company', $company)
@@ -91,7 +92,6 @@ class MarketplaceCostRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        // Возвращаем как map для быстрого isset()
         return array_fill_keys($result, true);
     }
 }

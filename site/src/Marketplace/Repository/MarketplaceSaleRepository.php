@@ -50,7 +50,8 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         \DateTimeInterface $toDate
     ): array {
         return $this->createQueryBuilder('s')
-            ->where('s.product = :product')
+            ->join('s.listing', 'l')
+            ->where('l.product = :product')
             ->andWhere('s.saleDate >= :from')
             ->andWhere('s.saleDate <= :to')
             ->setParameter('product', $product)
@@ -69,11 +70,10 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         \DateTimeInterface $fromDate,
         \DateTimeInterface $toDate
     ): array {
-        $qb = $this->createQueryBuilder('s');
-
-        return $qb
+        return $this->createQueryBuilder('s')
             ->select('DISTINCT p')
-            ->join('s.product', 'p')
+            ->join('s.listing', 'l')
+            ->join('l.product', 'p')
             ->where('s.company = :company')
             ->andWhere('s.saleDate >= :from')
             ->andWhere('s.saleDate <= :to')
@@ -107,7 +107,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->getQuery()
             ->getSingleColumnResult();
 
-        // Возвращаем как map для быстрого isset()
         return array_fill_keys($result, true);
     }
 }
