@@ -37,7 +37,7 @@ final readonly class MarketplaceSaleExistingExternalIdsQuery
         return array_map(
             static fn (mixed $externalId): string => (string) $externalId,
             $this->connection->executeQuery(
-                'SELECT external_id FROM marketplace_sales WHERE company_id = :companyId AND marketplace = :marketplace AND external_id IN (:ids)',
+                'SELECT external_order_id FROM marketplace_sales WHERE company_id = :companyId AND marketplace = :marketplace AND external_order_id IN (:ids)',
                 [
                     'companyId' => $companyId,
                     'marketplace' => $marketplace->value,
