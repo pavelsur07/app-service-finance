@@ -6,8 +6,8 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbReturnsAction;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\WbListingResolverService;
-use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -25,6 +25,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -67,6 +68,9 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
+        // Заполняем каталог barcodes из возвратов (barcode+ts_name известны)
+        $this->barcodeCatalog->fillFromWbRows($companyId, array_values($returnsData));
+
         $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
@@ -85,12 +89,13 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
+            $barcode = (string) ($item['barcode'] ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
                 'sa_name'      => (string) ($item['sa_name'] ?? ''),
                 'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
-            ]);
+            ], $barcode);
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
         }
@@ -111,8 +116,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $nmId = (string) ($item['nm_id'] ?? '');
             $tsName = $item['ts_name'] ?? null;
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
-            $listing = $listingsCache[$cacheKey] ?? null;
+            $listing = $listingsCache[$nmId . '_' . $size] ?? null;
 
             if (!$listing) {
                 $this->logger->warning('[WB] processBatch returns: listing not found', ['nm_id' => $nmId]);

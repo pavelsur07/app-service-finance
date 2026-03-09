@@ -6,10 +6,10 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbCostsAction;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
-use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
@@ -31,6 +31,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -74,6 +75,22 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
+        // Собираем все barcodes из затрат для массового поиска в каталоге
+        $allBarcodes = [];
+        foreach ($costsData as $item) {
+            $barcode = trim((string) ($item['barcode'] ?? ''));
+            if ($barcode !== '') {
+                $allBarcodes[$barcode] = true;
+            }
+        }
+
+        // Массовый поиск size из каталога по barcodes
+        $barcodeSizeMap = $this->barcodeCatalog->findSizesByBarcodes(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            array_keys($allBarcodes),
+        );
+
         // Предзагрузка листингов
         $allNmIdsMap = [];
         foreach ($costsData as $item) {
@@ -101,6 +118,13 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             }
 
             $tsName = $item['ts_name'] ?? null;
+            $barcode = trim((string) ($item['barcode'] ?? ''));
+
+            // Если ts_name пустой — ищем size в каталоге по barcode
+            if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                $tsName = $barcodeSizeMap[$barcode];
+            }
+
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
@@ -113,7 +137,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
                 'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
-            ]);
+            ], $barcode);
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
         }
@@ -130,8 +154,15 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($costsData as $item) {
             $nmId = trim((string) ($item['nm_id'] ?? ''));
             $listing = null;
+
             if ($nmId !== '' && $nmId !== '0') {
                 $tsName = $item['ts_name'] ?? null;
+                $barcode = trim((string) ($item['barcode'] ?? ''));
+
+                if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                    $tsName = $barcodeSizeMap[$barcode];
+                }
+
                 $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                 $listing = $listingsCache[$nmId . '_' . $size] ?? null;
             }

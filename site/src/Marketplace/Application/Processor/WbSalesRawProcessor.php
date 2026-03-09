@@ -6,8 +6,8 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbSalesAction;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\WbListingResolverService;
-use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -25,6 +25,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -58,7 +59,6 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        // Фильтруем только продажи
         $salesData = array_filter($rawRows, static function (array $item): bool {
             return ($item['doc_type_name'] ?? '') === 'Продажа'
                 && (float) ($item['retail_amount'] ?? 0) > 0;
@@ -68,7 +68,9 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
-        // Предзагрузка листингов
+        // Заполняем каталог barcodes из продаж (barcode+ts_name известны)
+        $this->barcodeCatalog->fillFromWbRows($companyId, array_values($salesData));
+
         $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
@@ -76,7 +78,6 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $allNmIds,
         );
 
-        // Создаём отсутствующие листинги
         $newListings = 0;
         foreach ($salesData as $item) {
             $nmId = (string) ($item['nm_id'] ?? '');
@@ -88,12 +89,13 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
+            $barcode = (string) ($item['barcode'] ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
                 'sa_name'      => (string) ($item['sa_name'] ?? ''),
                 'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
-            ]);
+            ], $barcode);
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
         }
@@ -102,11 +104,9 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $this->em->flush();
         }
 
-        // Дедупликация — проверяем все srid одним запросом
         $allSrids = array_values(array_filter(array_column($salesData, 'srid')));
         $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
 
-        // Сохраняем
         foreach ($salesData as $item) {
             $srid = (string) ($item['srid'] ?? '');
             if ($srid === '' || isset($existingMap[$srid])) {
@@ -116,8 +116,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $nmId = (string) ($item['nm_id'] ?? '');
             $tsName = $item['ts_name'] ?? null;
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
-            $cacheKey = $nmId . '_' . $size;
-            $listing = $listingsCache[$cacheKey] ?? null;
+            $listing = $listingsCache[$nmId . '_' . $size] ?? null;
 
             if (!$listing) {
                 $this->logger->warning('[WB] processBatch sales: listing not found', ['nm_id' => $nmId]);
@@ -139,7 +138,6 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $sale->setRawData($item);
 
             $this->em->persist($sale);
-            // Добавляем в карту чтобы не задваивать внутри одного батча
             $existingMap[$srid] = true;
         }
 
