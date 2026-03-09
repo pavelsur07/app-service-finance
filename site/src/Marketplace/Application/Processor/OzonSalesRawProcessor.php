@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessOzonSalesAction;
+use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -23,6 +24,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceListingRepository $listingRepository,
+        private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -56,7 +58,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        // Продажи: type=orders + accruals_for_sale > 0
         $salesData = array_filter($rawRows, static function (array $op): bool {
             return ($op['type'] ?? '') === 'orders'
                 && (float) ($op['accruals_for_sale'] ?? 0) > 0;
@@ -77,17 +78,15 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             }
         }
 
-        // Предзагрузка листингов — храним ID чтобы избежать detached proxy
-        $listingsIdCache = [];
+        // Предзагрузка листингов — храним объекты для costPriceResolver
+        /** @var array<string, MarketplaceListing> $listingsCache */
+        $listingsCache = [];
         if (!empty($allSkus)) {
-            $listings = $this->listingRepository->findListingsBySkusIndexed(
+            $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
                 $company,
                 MarketplaceType::OZON,
                 array_keys($allSkus),
             );
-            foreach ($listings as $sku => $listing) {
-                $listingsIdCache[$sku] = $listing->getId();
-            }
         }
 
         // Создаём отсутствующие листинги
@@ -95,7 +94,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($salesData as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsIdCache[$sku])) {
+                if ($sku === '' || isset($listingsCache[$sku])) {
                     continue;
                 }
 
@@ -107,9 +106,10 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 );
                 $listing->setMarketplaceSku($sku);
                 $listing->setName($item['name'] ?? null);
+                $listing->setPrice('0.00');
                 $this->em->persist($listing);
 
-                $listingsIdCache[$sku] = $listing->getId();
+                $listingsCache[$sku] = $listing;
                 $newListings++;
             }
         }
@@ -118,7 +118,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             $this->em->flush();
         }
 
-        // Дедупликация — ключ: posting_number ?: operation_id (как в OzonAdapter)
         $allExternalIds = array_values(array_map(
             static function (array $op): string {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
@@ -138,9 +137,9 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
             $firstItem = ($op['items'] ?? [])[0] ?? null;
             $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
-            $listingId = $listingsIdCache[$sku] ?? null;
+            $listing = $listingsCache[$sku] ?? null;
 
-            if (!$listingId) {
+            if (!$listing) {
                 $this->logger->warning('[Ozon] processBatch sales: listing not found', [
                     'external_id' => $externalId,
                     'sku'         => $sku,
@@ -148,8 +147,8 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $listing = $this->em->getReference(MarketplaceListing::class, $listingId);
-            $accrual = (float) ($op['accruals_for_sale'] ?? 0);
+            $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
+            $saleDate = new \DateTimeImmutable($op['operation_date']);
 
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
@@ -159,10 +158,11 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $sale->setExternalOrderId($externalId);
-            $sale->setSaleDate(new \DateTimeImmutable($op['operation_date']));
+            $sale->setSaleDate($saleDate);
             $sale->setQuantity(count($op['items'] ?? []) ?: 1);
             $sale->setPricePerUnit((string) $accrual);
             $sale->setTotalRevenue((string) $accrual);
+            $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($op);
 
             $this->em->persist($sale);

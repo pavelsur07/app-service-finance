@@ -1,0 +1,50 @@
+Название услуги:
+
+MarketplaceNotDeliveredCostItem — возврат невостребованного товара от покупателя на склад.
+MarketplaceReturnAfterDeliveryCostItem — возврат от покупателя на склад после доставки.
+MarketplaceDeliveryCostItem — доставка товара до покупателя.
+MarketplaceSaleReviewsItem — приобретение отзывов на платформе.
+ItemAdvertisementForSupplierLogistic — доставка товаров на склад Ozon — кросс-докинг.
+OperationMarketplaceServiceStorage — размещения товаров.
+MarketplaceMarketingActionCostItem — продвижение товаров.
+MarketplaceServiceItemInstallment — продвижениe и продажа в рассрочку.
+MarketplaceServiceItemMarkingItems — обязательная маркировка товаров.
+MarketplaceServiceItemFlexiblePaymentSchedule — гибкий график выплат.
+MarketplaceServiceItemReturnFromStock — комплектация товаров для вывоза продавцом.
+ItemAdvertisementForSupplierLogisticSeller — транспортно-экспедиционные услуги.
+ItemAgentServiceStarsMembership — вознаграждение за услугу «Звёздные товары».
+MarketplaceServiceItemDelivToCustomer — последняя миля.
+MarketplaceServiceItemDirectFlowTrans — магистраль.
+MarketplaceServiceItemDropoffFF — обработка отправления.
+MarketplaceServiceItemDropoffPVZ — обработка отправления.
+MarketplaceServiceItemDropoffSC — обработка отправления.
+MarketplaceServiceItemFulfillment — сборка заказа.
+MarketplaceServiceItemPickup — выезд транспортного средства по адресу продавца для забора отправлений — Pick-up.
+MarketplaceServiceItemReturnAfterDelivToCustomer — обработка возврата.
+MarketplaceServiceItemReturnFlowTrans — обратная магистраль.
+MarketplaceServiceItemReturnNotDelivToCustomer — обработка отмен.
+MarketplaceServiceItemReturnPartGoodsCustomer — обработка невыкупа.
+MarketplaceRedistributionOfAcquiringOperation — оплата эквайринга.
+MarketplaceReturnStorageServiceAtThePickupPointFbsItem — краткосрочное размещение возврата FBS.
+MarketplaceReturnStorageServiceInTheWarehouseFbsItem — долгосрочное размещение возврата FBS.
+MarketplaceServiceItemDeliveryKGT — доставка крупногабаритного товара (КГТ).
+MarketplaceServiceItemDirectFlowLogistic — логистика.
+MarketplaceServiceItemReturnFlowLogistic — обратная логистика.
+MarketplaceServicePremiumCashbackIndividualPoints — услуга продвижения «Бонусы продавца».
+MarketplaceServicePremiumPromotion — услуга продвижение Premium, фиксированная комиссия.
+OperationMarketplaceWithHoldingForUndeliverableGoods — удержание за недовложение товара.
+MarketplaceServiceItemDropoffPPZ — услуга drop-off в пункте приёма заказов.
+MarketplaceServiceItemRedistributionReturnsPVZ — перевыставление возвратов на ПВЗ.
+OperationMarketplaceAgencyFeeAggregator3PLGlobal — тарификация агентской услуги Agregator 3PL Global.
+MarketplaceServiceItemDirectFlowLogisticVDC — логистика вРЦ.
+
+
+-------------
+type -
+    all — все,
+    orders — заказы,
+    returns — возвраты и отмены,
+    services — сервисные сборы,
+    compensation — компенсация,
+    transferDelivery — стоимость доставки,
+    other — прочее.
