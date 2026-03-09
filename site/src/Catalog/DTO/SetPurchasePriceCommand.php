@@ -9,7 +9,7 @@ final class SetPurchasePriceCommand
     public string $companyId;
     public string $productId;
     public \DateTimeImmutable $effectiveFrom;
-    public int $priceAmount;
+    public string $priceAmount;       // decimal string, например '199.99'
     public string $currency = 'RUB';
     public ?string $note = null;
     public ?string $userId = null;

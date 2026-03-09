@@ -30,17 +30,15 @@ class ProductPurchasePrice
     #[ORM\JoinColumn(name: 'product_id', referencedColumnName: 'id', nullable: false, onDelete: 'RESTRICT')]
     private Product $product;
 
-    // Дата начала действия закупочной цены.
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $effectiveFrom;
 
-    // Дата окончания действия цены; NULL означает, что цена актуальна сейчас.
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $effectiveTo = null;
 
-    // Цена в минимальных единицах валюты (например, копейки для RUB).
-    #[ORM\Column(type: 'bigint')]
-    private int $priceAmount;
+    /** Закупочная цена в рублях (decimal 10,2) */
+    #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
+    private string $priceAmount;
 
     #[ORM\Column(length: 3, options: ['default' => 'RUB'])]
     private string $priceCurrency = 'RUB';
@@ -56,12 +54,13 @@ class ProductPurchasePrice
         Company $company,
         Product $product,
         \DateTimeImmutable $effectiveFrom,
-        int $priceAmount,
+        string $priceAmount,
         string $priceCurrency = 'RUB',
         ?string $note = null,
     ) {
         Assert::uuid($id);
-        Assert::greaterThanEq($priceAmount, 0);
+        Assert::numeric($priceAmount);
+        Assert::greaterThanEq((float) $priceAmount, 0.0);
         Assert::length($priceCurrency, 3);
 
         $this->id = $id;
@@ -99,7 +98,7 @@ class ProductPurchasePrice
         return $this->effectiveTo;
     }
 
-    public function getPriceAmount(): int
+    public function getPriceAmount(): string
     {
         return $this->priceAmount;
     }

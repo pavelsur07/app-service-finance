@@ -35,7 +35,6 @@ final class ProductPurchasePriceCreateController extends AbstractController
     ): Response {
         Assert::uuid($id);
 
-        // Определяем активную компанию только в контроллере и передаём id в команду.
         $companyId = $activeCompanyService->getActiveCompany()->getId();
         $product = $productQuery->findOneForCompany($companyId, $id);
         if (null === $product) {
@@ -49,18 +48,19 @@ final class ProductPurchasePriceCreateController extends AbstractController
         $form->handleRequest($request);
 
         if ($form->isSubmitted() && $form->isValid()) {
-            /** @var array{effectiveFrom:\DateTimeInterface, priceAmount:int, currency:string, note?:?string} $data */
+            /** @var array{effectiveFrom:\DateTimeInterface, priceAmount:string, currency:string, note?:?string} $data */
             $data = $form->getData();
 
             $command = new SetPurchasePriceCommand();
-            $command->companyId = $companyId;
-            $command->productId = $id;
+            $command->companyId   = $companyId;
+            $command->productId   = $id;
             $command->effectiveFrom = \DateTimeImmutable::createFromInterface($data['effectiveFrom']);
-            $command->priceAmount = (int) $data['priceAmount'];
-            $command->currency = (string) $data['currency'];
-            $command->note = isset($data['note']) && '' !== trim((string) $data['note']) ? (string) $data['note'] : null;
+            $command->priceAmount = (string) $data['priceAmount'];
+            $command->currency    = (string) $data['currency'];
+            $command->note        = isset($data['note']) && '' !== trim((string) $data['note'])
+                ? (string) $data['note']
+                : null;
 
-            // userId в текущем сценарии не требуется, поэтому оставляем null.
             $setPurchasePriceAction($command);
 
             $this->addFlash('success', 'Закупочная цена успешно добавлена.');
@@ -71,12 +71,12 @@ final class ProductPurchasePriceCreateController extends AbstractController
         $today = new \DateTimeImmutable('today');
 
         return $this->render('catalog/product/show.html.twig', [
-            'product' => $product,
+            'product'            => $product,
             'todayPurchasePrice' => $purchasePriceQuery->findPriceAtDate($companyId, $id, $today),
-            'priceAtDate' => null,
+            'priceAtDate'        => null,
             'priceAtPurchasePrice' => null,
-            'purchasePriceForm' => $form->createView(),
-            'canEditProduct' => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
+            'purchasePriceForm'  => $form->createView(),
+            'canEditProduct'     => null !== $this->router->getRouteCollection()->get('catalog_products_edit'),
         ]);
     }
 }

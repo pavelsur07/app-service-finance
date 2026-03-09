@@ -13,9 +13,14 @@ final readonly class ProductPurchasePriceFacade
     {
     }
 
+    /**
+     * Получить закупочную цену на дату (nearest neighbor):
+     * - если дата раньше всех записей — вернёт первую известную цену
+     * - если дата позже — вернёт последнюю до даты
+     * - если записей нет — вернёт null
+     */
     public function getPurchasePriceAt(string $companyId, string $productId, \DateTimeImmutable $at): ?PurchasePriceAtDto
     {
-        // Всегда читаем цену в границах компании, companyId передаётся явно.
         $row = $this->productPurchasePriceQuery->findPriceAtDate($companyId, $productId, $at);
         if (null === $row) {
             return null;
@@ -23,10 +28,10 @@ final readonly class ProductPurchasePriceFacade
 
         return new PurchasePriceAtDto(
             effectiveFrom: (string) $row['effectiveFrom'],
-            effectiveTo: isset($row['effectiveTo']) ? (null !== $row['effectiveTo'] ? (string) $row['effectiveTo'] : null) : null,
-            amount: (int) $row['priceAmount'],
-            currency: (string) $row['priceCurrency'],
-            note: isset($row['note']) ? (null !== $row['note'] ? (string) $row['note'] : null) : null,
+            effectiveTo:   isset($row['effectiveTo']) ? ($row['effectiveTo'] !== null ? (string) $row['effectiveTo'] : null) : null,
+            amount:        (string) $row['priceAmount'],
+            currency:      (string) $row['priceCurrency'],
+            note:          isset($row['note']) ? ($row['note'] !== null ? (string) $row['note'] : null) : null,
         );
     }
 }

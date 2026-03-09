@@ -50,7 +50,6 @@ final class SetPurchasePriceAction
         );
 
         if (null !== $activePrice) {
-            // Закрываем предыдущий активный интервал на день раньше новой цены.
             $activePrice->closeAt($command->effectiveFrom->sub(new \DateInterval('P1D')));
         }
 
@@ -80,8 +79,8 @@ final class SetPurchasePriceAction
             throw new \DomainException('productId обязателен.');
         }
 
-        if ($command->priceAmount < 0) {
-            throw new \DomainException('priceAmount не может быть отрицательным.');
+        if (!is_numeric($command->priceAmount) || (float) $command->priceAmount < 0) {
+            throw new \DomainException('priceAmount должен быть неотрицательным числом.');
         }
 
         if (3 !== mb_strlen(trim($command->currency ?? ''))) {
