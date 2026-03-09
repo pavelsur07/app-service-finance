@@ -1,0 +1,323 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% block tab_content %}
+    <div class="container-xl py-4">
+
+        {# Счётчики-фильтры #}
+        <div class="row g-3 mb-4">
+            <div class="col-auto">
+                <a href="{{ path('marketplace_listings_index', {filter: 'all'}) }}"
+                   class="card card-sm text-decoration-none {{ filter == 'all' ? 'border-primary' : '' }}" style="min-width:130px">
+                    <div class="card-body text-center">
+                        <div class="h2 mb-0">{{ count_all }}</div>
+                        <div class="text-muted small">Всего</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-auto">
+                <a href="{{ path('marketplace_listings_index', {filter: 'mapped'}) }}"
+                   class="card card-sm text-decoration-none {{ filter == 'mapped' ? 'border-success' : '' }}" style="min-width:130px">
+                    <div class="card-body text-center">
+                        <div class="h2 mb-0 text-success">{{ count_mapped }}</div>
+                        <div class="text-muted small">Привязаны</div>
+                    </div>
+                </a>
+            </div>
+            <div class="col-auto">
+                <a href="{{ path('marketplace_listings_index', {filter: 'unmapped'}) }}"
+                   class="card card-sm text-decoration-none {{ filter == 'unmapped' ? 'border-warning' : '' }}" style="min-width:130px">
+                    <div class="card-body text-center">
+                        <div class="h2 mb-0 text-warning">{{ count_unmapped }}</div>
+                        <div class="text-muted small">Без привязки</div>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header d-flex align-items-center gap-3 flex-wrap">
+                <h3 class="card-title me-auto mb-0">
+                    {% if filter == 'mapped' %}Привязанные листинги
+                    {% elseif filter == 'unmapped' %}Листинги без привязки
+                    {% else %}Все листинги{% endif %}
+                </h3>
+                <select class="form-select w-auto" id="marketplace-filter"
+                        onchange="window.location.href = this.value">
+                    <option value="{{ path('marketplace_listings_index', {filter: filter}) }}"
+                        {{ marketplace is null ? 'selected' : '' }}>Все маркетплейсы</option>
+                    {% for mp in available_marketplaces %}
+                        <option value="{{ path('marketplace_listings_index', {filter: filter, marketplace: mp.value}) }}"
+                            {{ marketplace == mp.value ? 'selected' : '' }}>{{ mp.value|upper }}</option>
+                    {% endfor %}
+                </select>
+                <div class="input-icon">
+                    <input type="text" class="form-control" placeholder="Поиск на странице..." id="search-input">
+                    <span class="input-icon-addon">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                             stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                            <circle cx="10" cy="10" r="7"></circle>
+                            <line x1="21" y1="21" x2="15" y2="15"></line>
+                        </svg>
+                    </span>
+                </div>
+            </div>
+
+            {% if pager.nbResults == 0 %}
+                <div class="card-body">
+                    <div class="empty">
+                        <p class="empty-title">Нет листингов</p>
+                        <p class="empty-subtitle text-muted">Измените фильтр или загрузите данные из маркетплейса.</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Маркетплейс</th>
+                            <th>Marketplace SKU</th>
+                            <th>Supplier SKU</th>
+                            <th>Размер</th>
+                            <th>Цена</th>
+                            <th>Товар</th>
+                            <th>Создан</th>
+                            <th class="w-1"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for listing in pager %}
+                            <tr>
+                                <td><span class="badge bg-azure-lt">{{ listing.marketplace.value|upper }}</span></td>
+                                <td><strong>{{ listing.marketplaceSku }}</strong></td>
+                                <td>
+                                    {% if listing.supplierSku %}
+                                        <code>{{ listing.supplierSku }}</code>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ listing.size }}</td>
+                                <td>{{ listing.price }} ₽</td>
+                                <td>
+                                    {% if listing.product %}
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-success-lt">{{ listing.product.sku }}</span>
+                                            <span class="text-muted small text-truncate" style="max-width:180px">
+                                    {{ listing.product.name }}
+                                </span>
+                                        </div>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-warning map-listing-btn"
+                                                data-listing-id="{{ listing.id }}"
+                                                data-listing-sku="{{ listing.marketplaceSku }}">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="16" height="16"
+                                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                                            </svg>
+                                            Привязать
+                                        </button>
+                                    {% endif %}
+                                </td>
+                                <td><span class="text-muted">{{ listing.createdAt|date('d.m.Y') }}</span></td>
+                                <td>
+                                    {% if listing.product %}
+                                        <button class="btn btn-sm btn-ghost-secondary map-listing-btn"
+                                                data-listing-id="{{ listing.id }}"
+                                                data-listing-sku="{{ listing.marketplaceSku }}"
+                                                title="Изменить привязку">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16"
+                                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"></path>
+                                                <path d="M4 20h4l10.5 -10.5a1.5 1.5 0 0 0 -4 -4l-10.5 10.5v4"></path>
+                                            </svg>
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="card-footer d-flex align-items-center">
+                    <p class="m-0 text-muted">
+                        Показано <strong>{{ pager.currentPageOffsetStart }}–{{ pager.currentPageOffsetEnd }}</strong>
+                        из <strong>{{ pager.nbResults }}</strong>
+                    </p>
+                    {% if pager.nbPages > 1 %}
+                        <div class="ms-auto">
+                            {% include 'partials/_pagerfanta.html.twig' with {
+                                pager: pager,
+                                route: 'marketplace_listings_index',
+                                params: {filter: filter, marketplace: marketplace}
+                            } %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <div class="modal modal-blur fade" id="mapListingModal" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Привязать листинг к товару</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Листинг</label>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-azure-lt">WB</span>
+                            <code id="modal-listing-sku"></code>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label" for="product-select">
+                            Товар <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select" id="product-select">
+                            <option value="">— выберите товар —</option>
+                        </select>
+                    </div>
+                    <div id="mapping-error" class="alert alert-danger d-none" role="alert"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="confirm-mapping-btn">Привязать</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            let currentListingId = null;
+            const modalEl = document.getElementById('mapListingModal');
+
+            // Ищем Bootstrap в разных местах где Tabler его размещает
+            function getBootstrapModal() {
+                if (window.bootstrap && window.bootstrap.Modal) {
+                    return window.bootstrap.Modal;
+                }
+                if (window.Modal) {
+                    return window.Modal;
+                }
+                return null;
+            }
+
+            function openModal(listingId, listingSku) {
+                currentListingId = listingId;
+                document.getElementById('modal-listing-sku').textContent = listingSku;
+                document.getElementById('mapping-error').classList.add('d-none');
+                loadProducts();
+
+                const BootstrapModal = getBootstrapModal();
+                if (BootstrapModal) {
+                    BootstrapModal.getOrCreateInstance(modalEl).show();
+                } else {
+                    // Fallback без Bootstrap
+                    modalEl.style.display = 'block';
+                    modalEl.classList.add('show');
+                    document.body.classList.add('modal-open');
+                }
+            }
+
+            function closeModal() {
+                const BootstrapModal = getBootstrapModal();
+                if (BootstrapModal) {
+                    BootstrapModal.getOrCreateInstance(modalEl).hide();
+                } else {
+                    modalEl.style.display = 'none';
+                    modalEl.classList.remove('show');
+                    document.body.classList.remove('modal-open');
+                }
+                const btn = document.getElementById('confirm-mapping-btn');
+                btn.disabled = false;
+                btn.textContent = 'Привязать';
+            }
+
+            document.querySelectorAll('.map-listing-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    openModal(this.dataset.listingId, this.dataset.listingSku);
+                });
+            });
+
+            document.querySelectorAll('[data-bs-dismiss="modal"]').forEach(btn => {
+                btn.addEventListener('click', closeModal);
+            });
+
+            async function loadProducts() {
+                const select = document.getElementById('product-select');
+                select.innerHTML = '<option value="">Загрузка...</option>';
+                select.disabled = true;
+                try {
+                    const res = await fetch('/api/products');
+                    const products = await res.json();
+                    select.innerHTML = '<option value="">— выберите товар —</option>';
+                    products.forEach(p => {
+                        const opt = document.createElement('option');
+                        opt.value = p.id;
+                        opt.textContent = `${p.sku} — ${p.name}`;
+                        select.appendChild(opt);
+                    });
+                } catch {
+                    select.innerHTML = '<option value="">Ошибка загрузки</option>';
+                } finally {
+                    select.disabled = false;
+                }
+            }
+
+            document.getElementById('confirm-mapping-btn').addEventListener('click', async function () {
+                const productId = document.getElementById('product-select').value;
+                const errorDiv = document.getElementById('mapping-error');
+                errorDiv.classList.add('d-none');
+
+                if (!productId) {
+                    errorDiv.textContent = 'Выберите товар';
+                    errorDiv.classList.remove('d-none');
+                    return;
+                }
+
+                this.disabled = true;
+                this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Сохранение...';
+
+                try {
+                    const res = await fetch(`/api/marketplace/listings/${currentListingId}/map`, {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({productId}),
+                    });
+                    const data = await res.json();
+
+                    if (res.ok) {
+                        window.location.reload();
+                    } else {
+                        errorDiv.textContent = data.error || 'Не удалось привязать';
+                        errorDiv.classList.remove('d-none');
+                        this.disabled = false;
+                        this.textContent = 'Привязать';
+                    }
+                } catch {
+                    errorDiv.textContent = 'Ошибка сети';
+                    errorDiv.classList.remove('d-none');
+                    this.disabled = false;
+                    this.textContent = 'Привязать';
+                }
+            });
+
+            document.getElementById('search-input')?.addEventListener('input', function () {
+                const term = this.value.toLowerCase();
+                document.querySelectorAll('tbody tr').forEach(row => {
+                    row.style.display = row.textContent.toLowerCase().includes(term) ? '' : 'none';
+                });
+            });
+        });
+    </script>
+{% endblock %}

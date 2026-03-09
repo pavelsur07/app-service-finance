@@ -16,7 +16,6 @@
     <div class="page-body">
         <div class="container-xl">
 
-            {# Flash messages #}
             {% for label, messages in app.flashes %}
                 {% for message in messages %}
                     <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
@@ -28,7 +27,6 @@
                 {% endfor %}
             {% endfor %}
 
-            {# Tabs #}
             <div class="card">
                 <div class="card-header">
                     <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
@@ -53,7 +51,6 @@
                                 Возвраты
                             </a>
                         </li>
-
                         <li class="nav-item">
                             <a href="{{ path('marketplace_pl_mappings_index') }}"
                                class="nav-link {{ active_tab == 'pl_mappings' ? 'active' : '' }}">
@@ -69,19 +66,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a href="{{ path('marketplace_products_index') }}"
+                            <a href="{{ path('marketplace_listings_index') }}"
                                class="nav-link {{ active_tab == 'listings' ? 'active' : '' }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>
-                                Листинг
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a href="{{ path('marketplace_unmapped_listings_index') }}"
-                               class="nav-link {{ active_tab == 'unmapped' ? 'active' : '' }}">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                                Unmapped
-                                {% if unmapped_count is defined and unmapped_count > 0 %}
-                                    <span class="badge badge-sm bg-yellow ms-2">{{ unmapped_count }}</span>
+                                Листинги
+                                {% if count_unmapped is defined and count_unmapped > 0 %}
+                                    <span class="badge badge-sm bg-yellow ms-2">{{ count_unmapped }}</span>
                                 {% endif %}
                             </a>
                         </li>

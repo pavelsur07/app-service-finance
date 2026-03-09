@@ -7,6 +7,7 @@ namespace App\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
@@ -26,6 +27,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -68,7 +70,6 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
-        // Заполняем каталог barcodes из продаж (barcode+ts_name известны)
         $this->barcodeCatalog->fillFromWbRows($companyId, array_values($salesData));
 
         $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
@@ -123,6 +124,8 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
+            $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
                 $company,
@@ -131,10 +134,11 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $sale->setExternalOrderId($srid);
-            $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
+            $sale->setSaleDate($saleDate);
             $sale->setQuantity(abs((int) ($item['quantity'] ?? 1)));
             $sale->setPricePerUnit((string) ($item['retail_price'] ?? '0'));
             $sale->setTotalRevenue((string) abs((float) ($item['retail_amount'] ?? 0)));
+            $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($item);
 
             $this->em->persist($sale);

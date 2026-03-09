@@ -3,93 +3,183 @@
 {% block title %}{{ product.name }}{% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-2 flex-wrap mb-3">
-    <div>
-        <h2 class="page-title mb-1">{{ product.name }}</h2>
-        <span class="badge bg-azure-lt text-uppercase">{{ product.status }}</span>
-    </div>
-    <div class="ms-auto d-flex gap-2 d-print-none">
-        {% if canEditProduct %}
-            <a href="{{ path('catalog_products_edit', {id: product.id}) }}" class="btn btn-primary">Редактировать</a>
-        {% else %}
-            <button type="button" class="btn btn-primary" disabled>Редактировать</button>
-        {% endif %}
-        <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
-    </div>
-</div>
-
-<div class="row row-cards">
-    <div class="col-12 col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Сводка</h3>
-            </div>
-            <div class="card-body">
-                <dl class="row mb-0">
-                    <dt class="col-4">SKU</dt>
-                    <dd class="col-8">{{ product.sku }}</dd>
-                    <dt class="col-4">Создан</dt>
-                    <dd class="col-8">{{ product.createdAt|date('d.m.Y H:i') }}</dd>
-                    <dt class="col-4">Обновлен</dt>
-                    <dd class="col-8">{{ product.updatedAt|date('d.m.Y H:i') }}</dd>
-                </dl>
-            </div>
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <div>
+            <h2 class="page-title mb-1">{{ product.name }}</h2>
+            <span class="badge bg-azure-lt text-uppercase">{{ product.status }}</span>
+        </div>
+        <div class="ms-auto d-flex gap-2 d-print-none">
+            {% if canEditProduct %}
+                <a href="{{ path('catalog_products_edit', {id: product.id}) }}" class="btn btn-outline-secondary">Редактировать</a>
+            {% endif %}
+            <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">Назад к списку</a>
         </div>
     </div>
 
-    <div class="col-12 col-lg-6">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Цена</h3>
-            </div>
-            <div class="card-body">
-                <dl class="row mb-0">
-                    <dt class="col-6">Закупочная цена</dt>
-                    <dd class="col-6">{{ product.purchasePrice }}</dd>
-                    {% if product.weightKg is not null %}
-                        <dt class="col-6">Вес, кг</dt>
-                        <dd class="col-6">{{ product.weightKg }}</dd>
-                    {% endif %}
-                </dl>
+    <div class="row row-cards">
+
+        {# Сводка #}
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Сводка</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-4">SKU</dt>
+                        <dd class="col-8"><code>{{ product.sku }}</code></dd>
+                        <dt class="col-4">Создан</dt>
+                        <dd class="col-8">{{ product.createdAt|date('d.m.Y H:i') }}</dd>
+                        <dt class="col-4">Обновлен</dt>
+                        <dd class="col-8">{{ product.updatedAt|date('d.m.Y H:i') }}</dd>
+                    </dl>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="col-12 col-lg-6" id="purchase-price">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Закупочная цена</h3>
-            </div>
-            <div class="card-body">
-                <dl class="row">
-                    <dt class="col-6">На сегодня</dt>
-                    <dd class="col-6">
-                        {% if todayPurchasePrice %}
-                            {{ todayPurchasePrice.priceAmount }} {{ todayPurchasePrice.priceCurrency }}
-                        {% else %}
-                            Не задано
-                        {% endif %}
-                    </dd>
-
-                    {% if priceAtDate is not null %}
-                        <dt class="col-6">Цена на дату ({{ priceAtDate|date('d.m.Y') }})</dt>
-                        <dd class="col-6">
-                            {% if priceAtPurchasePrice %}
-                                {{ priceAtPurchasePrice.priceAmount }} {{ priceAtPurchasePrice.priceCurrency }}
+        {# Текущая себестоимость #}
+        <div class="col-12 col-lg-6">
+            <div class="card">
+                <div class="card-header d-flex align-items-center">
+                    <h3 class="card-title me-auto mb-0">Закупочная цена</h3>
+                    <button class="btn btn-sm btn-primary" onclick="openAddPriceModal()">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                             viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                            <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                        </svg>
+                        Добавить
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center gap-3">
+                        <div>
+                            <div class="text-muted small mb-1">На сегодня</div>
+                            {% if todayPurchasePrice %}
+                                <div class="h2 mb-0">
+                                    {{ todayPurchasePrice.priceAmount|number_format(2, '.', ' ') }}
+                                    <small class="text-muted fs-4">{{ todayPurchasePrice.priceCurrency }}</small>
+                                </div>
+                                <div class="text-muted small mt-1">
+                                    с {{ todayPurchasePrice.effectiveFrom|date('d.m.Y') }}
+                                    {% if todayPurchasePrice.effectiveTo %}
+                                        по {{ todayPurchasePrice.effectiveTo|date('d.m.Y') }}
+                                    {% endif %}
+                                </div>
+                                {% if todayPurchasePrice.note %}
+                                    <div class="text-muted small mt-1 fst-italic">{{ todayPurchasePrice.note }}</div>
+                                {% endif %}
                             {% else %}
-                                Не задано
+                                <div class="text-muted">Не задано</div>
                             {% endif %}
-                        </dd>
-                    {% endif %}
-                </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                {{ form_start(purchasePriceForm, {attr: {class: 'mt-3'}}) }}
+        {# Описание #}
+        {% if product.description %}
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Описание</h3>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0">{{ product.description|nl2br }}</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {# История себестоимости #}
+        <div class="col-12" id="purchase-price">
+            <div class="card">
+                <div class="card-header d-flex align-items-center">
+                    <h3 class="card-title me-auto mb-0">История закупочных цен</h3>
+                    <span class="badge bg-secondary ms-2">{{ priceHistory|length }}</span>
+                </div>
+                {% if priceHistory is empty %}
+                    <div class="card-body">
+                        <div class="empty">
+                            <p class="empty-title">Нет записей</p>
+                            <p class="empty-subtitle text-muted">Добавьте первую закупочную цену</p>
+                            <button class="btn btn-primary" onclick="openAddPriceModal()">
+                                Добавить цену
+                            </button>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter">
+                            <thead>
+                            <tr>
+                                <th>Действует с</th>
+                                <th>Действует по</th>
+                                <th class="text-end">Цена</th>
+                                <th>Примечание</th>
+                                <th>Статус</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% set today = 'now'|date('Y-m-d') %}
+                            {% for price in priceHistory %}
+                                <tr>
+                                    <td><strong>{{ price.effectiveFrom|date('d.m.Y') }}</strong></td>
+                                    <td>
+                                        {% if price.effectiveTo %}
+                                            {{ price.effectiveTo|date('d.m.Y') }}
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        <strong>{{ price.priceAmount|number_format(2, '.', ' ') }}</strong>
+                                        <span class="text-muted">{{ price.priceCurrency }}</span>
+                                    </td>
+                                    <td>
+                                        {% if price.note %}
+                                            <span class="text-muted small">{{ price.note }}</span>
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if price.effectiveFrom <= today and (price.effectiveTo is null or price.effectiveTo >= today) %}
+                                            <span class="badge bg-success-lt">Текущая</span>
+                                        {% elseif price.effectiveFrom > today %}
+                                            <span class="badge bg-azure-lt">Будущая</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary-lt">Архив</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    {# Модальное окно добавления закупочной цены #}
+    <div class="modal modal-blur fade" id="modal-add-price" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                {{ form_start(purchasePriceForm) }}
+                <div class="modal-header">
+                    <h5 class="modal-title">Добавить закупочную цену</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                </div>
+                <div class="modal-body">
                     {% if form_errors(purchasePriceForm) %}
                         <div class="alert alert-danger">{{ form_errors(purchasePriceForm) }}</div>
                     {% endif %}
 
                     <div class="mb-3">
-                        {{ form_label(purchasePriceForm.effectiveFrom, null, {label_attr: {class: 'form-label'}}) }}
+                        {{ form_label(purchasePriceForm.effectiveFrom, null, {label_attr: {class: 'form-label required'}}) }}
                         {{ form_widget(purchasePriceForm.effectiveFrom, {attr: {class: 'form-control'}}) }}
                         {% if form_errors(purchasePriceForm.effectiveFrom) %}
                             <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.effectiveFrom) }}</div>
@@ -98,8 +188,11 @@
                     </div>
 
                     <div class="mb-3">
-                        {{ form_label(purchasePriceForm.priceAmount, null, {label_attr: {class: 'form-label'}}) }}
-                        {{ form_widget(purchasePriceForm.priceAmount, {attr: {class: 'form-control'}}) }}
+                        {{ form_label(purchasePriceForm.priceAmount, null, {label_attr: {class: 'form-label required'}}) }}
+                        <div class="input-group">
+                            {{ form_widget(purchasePriceForm.priceAmount, {attr: {class: 'form-control'}}) }}
+                            <span class="input-group-text">₽</span>
+                        </div>
                         {% if form_errors(purchasePriceForm.priceAmount) %}
                             <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.priceAmount) }}</div>
                         {% endif %}
@@ -107,42 +200,34 @@
                     </div>
 
                     <div class="mb-3">
-                        {{ form_label(purchasePriceForm.currency, null, {label_attr: {class: 'form-label'}}) }}
-                        {{ form_widget(purchasePriceForm.currency, {attr: {class: 'form-select'}}) }}
-                        {% if form_errors(purchasePriceForm.currency) %}
-                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.currency) }}</div>
-                        {% endif %}
-                        {{ form_help(purchasePriceForm.currency) }}
-                    </div>
-
-                    <div class="mb-3">
                         {{ form_label(purchasePriceForm.note, null, {label_attr: {class: 'form-label'}}) }}
-                        {{ form_widget(purchasePriceForm.note, {attr: {class: 'form-control'}}) }}
-                        {% if form_errors(purchasePriceForm.note) %}
-                            <div class="invalid-feedback d-block">{{ form_errors(purchasePriceForm.note) }}</div>
-                        {% endif %}
-                        {{ form_help(purchasePriceForm.note) }}
+                        {{ form_widget(purchasePriceForm.note, {attr: {class: 'form-control', placeholder: 'Необязательно'}}) }}
                     </div>
-
-                    <button type="submit" class="btn btn-primary">Добавить цену</button>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                </div>
                 {{ form_end(purchasePriceForm) }}
             </div>
         </div>
     </div>
+{% endblock %}
 
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">Описание</h3>
-            </div>
-            <div class="card-body">
-                {% if product.description %}
-                    <p class="mb-0">{{ product.description|nl2br }}</p>
-                {% else %}
-                    <p class="text-muted mb-0">Описание отсутствует.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-</div>
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        function openAddPriceModal() {
+            const modalEl = document.getElementById('modal-add-price');
+            if (!modalEl) return;
+            const Modal = window.bootstrap?.Modal ?? window.Modal;
+            if (Modal) {
+                Modal.getOrCreateInstance(modalEl).show();
+            } else {
+                modalEl.style.display = 'block';
+                modalEl.classList.add('show');
+                document.body.classList.add('modal-open');
+            }
+        }
+    </script>
 {% endblock %}

@@ -3,6 +3,19 @@
 {% set active_tab = 'returns' %}
 
 {% block tab_content %}
+    <div class="card-header d-flex align-items-center">
+        <h3 class="card-title me-auto mb-0">Возвраты</h3>
+        <button class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#modal-recalculate-cost">
+            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24"
+                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
+                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+            </svg>
+            Пересчитать себестоимость
+        </button>
+    </div>
     <div class="table-responsive">
         <table class="table card-table table-vcenter">
             <thead>
@@ -68,4 +81,59 @@
             {% include 'partials/_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_returns_index'} %}
         </div>
     {% endif %}
+{% endblock %}
+
+{% block modals %}
+    <div class="modal modal-blur fade" id="modal-recalculate-cost" tabindex="-1" role="dialog">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" action="{{ path('marketplace_recalculate_sales_cost_price') }}">
+                    <input type="hidden" name="redirect_to" value="marketplace_returns_index">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Пересчитать себестоимость</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Маркетплейс</label>
+                            <select name="marketplace" class="form-select" required>
+                                <option value="">— выберите —</option>
+                                {% for mp in available_marketplaces %}
+                                    <option value="{{ mp.value }}">{{ mp.value|upper }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Период — начало</label>
+                            <input type="date" name="date_from" class="form-control" required
+                                   value="{{ 'now'|date_modify('first day of this month')|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Период — конец</label>
+                            <input type="date" name="date_to" class="form-control" required
+                                   value="{{ 'now'|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-check">
+                                <input type="checkbox" name="only_zero_cost" value="1" class="form-check-input">
+                                <span class="form-check-label">Только записи с себестоимостью = 0</span>
+                            </label>
+                            <div class="form-hint">Если отмечено — пересчитываются только записи где costPrice не заполнена</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24"
+                                 stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M5 12l5 5l10 -10"/>
+                            </svg>
+                            Пересчитать
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 {% endblock %}

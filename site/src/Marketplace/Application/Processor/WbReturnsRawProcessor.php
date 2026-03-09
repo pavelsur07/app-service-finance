@@ -7,12 +7,14 @@ namespace App\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbReturnsAction;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -23,9 +25,11 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly ProcessWbReturnsAction $action,
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceReturnRepository $returnRepository,
+        private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -68,7 +72,6 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
-        // Заполняем каталог barcodes из возвратов (barcode+ts_name известны)
         $this->barcodeCatalog->fillFromWbRows($companyId, array_values($returnsData));
 
         $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
@@ -123,6 +126,13 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
+            // Ищем связанную продажу по srid для получения себестоимости
+            $sale = $this->saleRepository->findByMarketplaceOrder(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                $srid,
+            );
+
             $return = new MarketplaceReturn(
                 Uuid::uuid4()->toString(),
                 $company,
@@ -135,7 +145,12 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $return->setQuantity(abs((int) ($item['quantity'] ?? 1)));
             $return->setRefundAmount((string) ($item['retail_price'] ?? '0'));
             $return->setReturnReason($item['supplier_oper_name'] ?? '');
+            $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $item));
             $return->setRawData($item);
+
+            if ($sale !== null) {
+                $return->setSale($sale);
+            }
 
             $this->em->persist($return);
             $existingMap[$srid] = true;

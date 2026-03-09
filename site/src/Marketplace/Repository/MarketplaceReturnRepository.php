@@ -5,6 +5,7 @@ namespace App\Marketplace\Repository;
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceReturn;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -30,7 +31,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByProduct(
         Product $product,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('r')
             ->join('r.listing', 'l')
@@ -51,7 +52,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
     public function findByCompany(
         Company $company,
         \DateTimeInterface $fromDate,
-        \DateTimeInterface $toDate
+        \DateTimeInterface $toDate,
     ): array {
         return $this->createQueryBuilder('r')
             ->where('r.company = :company')
@@ -67,11 +68,9 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
 
     /**
      * Массовая проверка существующих SRID возвратов (для bulk import)
-     * Возвращает массив для isset() проверок: ['srid1' => true, 'srid2' => true]
      *
-     * @param string $companyId
-     * @param array $srids
-     * @return array
+     * @param string[] $srids
+     * @return array<string, true>
      */
     public function getExistingExternalIds(string $companyId, array $srids): array
     {
@@ -89,5 +88,37 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->getSingleColumnResult();
 
         return array_fill_keys($result, true);
+    }
+
+    /**
+     * Найти возвраты для пересчёта себестоимости.
+     * Только возвраты с привязанным продуктом (listing.product IS NOT NULL).
+     *
+     * @return MarketplaceReturn[]
+     */
+    public function findForCostRecalculation(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        bool $onlyZeroCost,
+    ): array {
+        $qb = $this->createQueryBuilder('r')
+            ->join('r.listing', 'l')
+            ->where('r.company = :companyId')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.returnDate >= :dateFrom')
+            ->andWhere('r.returnDate <= :dateTo')
+            ->andWhere('l.product IS NOT NULL')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('dateFrom', $dateFrom)
+            ->setParameter('dateTo', $dateTo);
+
+        if ($onlyZeroCost) {
+            $qb->andWhere('r.costPrice IS NULL OR r.costPrice = 0');
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }

@@ -360,7 +360,8 @@ class MarketplaceController extends AbstractController
         );
 
         return $this->render('marketplace/sales.html.twig', [
-            'pager' => $pagerfanta,
+            'pager'                  => $pagerfanta,
+            'available_marketplaces' => MarketplaceType::cases(),
         ]);
     }
 
@@ -380,7 +381,8 @@ class MarketplaceController extends AbstractController
         );
 
         return $this->render('marketplace/returns.html.twig', [
-            'pager' => $pagerfanta,
+            'pager'                  => $pagerfanta,
+            'available_marketplaces' => MarketplaceType::cases(),
         ]);
     }
 

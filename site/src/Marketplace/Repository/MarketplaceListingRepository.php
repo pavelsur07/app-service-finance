@@ -16,9 +16,6 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceListing::class);
     }
 
-    /**
-     * Сохранить листинг
-     */
     public function save(MarketplaceListing $listing): void
     {
         $this->getEntityManager()->persist($listing);
@@ -37,10 +34,38 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    /**
+     * Проверить: привязан ли уже этот товар к листингу данного маркетплейса в компании.
+     * Используется перед маппингом для соблюдения правила: один товар — один листинг на маркетплейс.
+     * Исключает текущий листинг чтобы разрешить повторную привязку к тому же товару.
+     */
+    public function findByProductAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $productId,
+        ?string $excludeListingId = null,
+    ): ?MarketplaceListing {
+        $qb = $this->createQueryBuilder('l')
+            ->andWhere('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('IDENTITY(l.product) = :productId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('productId', $productId)
+            ->setMaxResults(1);
+
+        if ($excludeListingId !== null) {
+            $qb->andWhere('l.id != :excludeId')
+                ->setParameter('excludeId', $excludeListingId);
+        }
+
+        return $qb->getQuery()->getOneOrNullResult();
+    }
+
     public function findByMarketplaceSku(
         Company $company,
         MarketplaceType $marketplace,
-        string $marketplaceSku
+        string $marketplaceSku,
     ): ?MarketplaceListing {
         return $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -57,7 +82,7 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         Company $company,
         MarketplaceType $marketplace,
         string $nmId,
-        string $size  // Теперь ВСЕГДА строка ('UNKNOWN' если размера нет)
+        string $size,
     ): ?MarketplaceListing {
         return $this->createQueryBuilder('l')
             ->where('l.company = :company')
@@ -88,7 +113,6 @@ class MarketplaceListingRepository extends ServiceEntityRepository
 
     /**
      * @param string[] $productIds
-     *
      * @return array<string, string[]>
      */
     public function findMarketplaceNamesByProductIds(string $companyId, array $productIds): array
@@ -143,16 +167,13 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     /**
-     * Массовая загрузка листингов по marketplace_sku с индексацией по SKU.
-     * Для Ozon и других маркетплейсов где нет размерной сетки.
-     *
      * @param string[] $skus
-     * @return array<string, MarketplaceListing> ['sku' => Listing]
+     * @return array<string, MarketplaceListing>
      */
     public function findListingsBySkusIndexed(
         Company $company,
         MarketplaceType $marketplace,
-        array $skus
+        array $skus,
     ): array {
         if (empty($skus)) {
             return [];
@@ -179,24 +200,18 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     /**
-     * Массовая загрузка листингов по nm_id с индексацией по ключу "nmId_size"
-     * Для bulk import - одним запросом вместо тысяч
-     *
-     * @param Company $company
-     * @param MarketplaceType $marketplace
-     * @param array $nmIds
-     * @return array Индексированный массив: ['nmId_size' => Listing, 'nmId_UNKNOWN' => Listing]
+     * @param string[] $nmIds
+     * @return array<string, MarketplaceListing> ['nmId_size' => Listing]
      */
     public function findListingsByNmIdsIndexed(
         Company $company,
         MarketplaceType $marketplace,
-        array $nmIds
+        array $nmIds,
     ): array {
         if (empty($nmIds)) {
             return [];
         }
 
-        // Загружаем все листинги + продукты одним запросом
         $listings = $this->createQueryBuilder('l')
             ->leftJoin('l.product', 'p')
             ->addSelect('p')
@@ -209,7 +224,6 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
 
-        // Индексируем по ключу: nmId_size (size всегда строка, 'UNKNOWN' если размера нет)
         $indexed = [];
         foreach ($listings as $listing) {
             $key = $listing->getMarketplaceSku() . '_' . $listing->getSize();
