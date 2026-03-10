@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Command;
 
-use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
-use App\Marketplace\Message\SyncWbReportMessage;
+use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
+use App\Marketplace\Message\SyncOzonReportMessage;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -15,23 +15,22 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Ежедневная загрузка сырых данных WB за последние 7 дней.
+ * Ежедневная загрузка сырых данных Ozon.
  *
- * Cron: 0 3 * * * php bin/console app:marketplace:wb-daily-sync
+ * Cron: 0 4 * * * php bin/console app:marketplace:ozon-daily-sync
  *
- * Команда тонкая: получает список активных WB-подключений через DBAL Query,
+ * Команда тонкая: получает список активных Ozon-подключений через DBAL Query,
  * для каждого отправляет Message в шину Messenger.
- * Вся логика загрузки — в SyncWbReportHandler (Worker).
- * Обработка данных — вручную через UI или отдельной командой.
+ * Вся логика загрузки — в SyncOzonReportHandler (Worker).
  */
 #[AsCommand(
-    name: 'app:marketplace:wb-daily-sync',
-    description: 'Ежедневная загрузка сырых данных WB за последние 7 дней',
+    name: 'app:marketplace:ozon-daily-sync',
+    description: 'Ежедневная загрузка сырых данных Ozon за последние 3 дня',
 )]
-final class MarketplaceNightlySyncCommand extends Command
+final class OzonDailySyncCommand extends Command
 {
     public function __construct(
-        private readonly ActiveWbConnectionsQuery $connectionsQuery,
+        private readonly ActiveOzonConnectionsQuery $connectionsQuery,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
     ) {
@@ -45,7 +44,7 @@ final class MarketplaceNightlySyncCommand extends Command
         $connections = $this->connectionsQuery->execute();
 
         if (empty($connections)) {
-            $io->info('Нет активных WB-подключений для синхронизации.');
+            $io->info('Нет активных Ozon-подключений для синхронизации.');
 
             return Command::SUCCESS;
         }
@@ -57,18 +56,18 @@ final class MarketplaceNightlySyncCommand extends Command
             $connectionId = (string) $row['id'];
 
             $this->messageBus->dispatch(
-                new SyncWbReportMessage($companyId, $connectionId),
+                new SyncOzonReportMessage($companyId, $connectionId),
             );
 
             $dispatched++;
 
-            $this->logger->info('Dispatched WB sync message', [
+            $this->logger->info('Dispatched Ozon sync message', [
                 'company_id'    => $companyId,
                 'connection_id' => $connectionId,
             ]);
         }
 
-        $io->success(sprintf('Отправлено %d задач на загрузку данных WB.', $dispatched));
+        $io->success(sprintf('Отправлено %d задач на загрузку данных Ozon.', $dispatched));
 
         return Command::SUCCESS;
     }
