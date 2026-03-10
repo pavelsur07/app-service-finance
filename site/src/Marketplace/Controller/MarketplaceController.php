@@ -20,6 +20,7 @@ use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -95,6 +96,33 @@ class MarketplaceController extends AbstractController
         $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
 
         return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/connection/{id}/status', name: 'marketplace_connection_status', methods: ['GET'])]
+    public function connectionStatus(string $id): JsonResponse
+    {
+        $company = $this->companyService->getActiveCompany();
+
+        $connection = $this->connectionRepository->find($id);
+
+        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+            return $this->json(['error' => 'Not found'], 404);
+        }
+
+        $lastSyncAt = $connection->getLastSyncAt();
+        $status = match (true) {
+            $connection->getLastSyncError() !== null => 'error',
+            $lastSyncAt !== null                    => 'synced',
+            default                                 => 'pending',
+        };
+
+        return $this->json([
+            'status'        => $status,
+            'lastSyncAt'    => $lastSyncAt?->format('d.m.Y H:i'),
+            'lastSyncError' => $connection->getLastSyncError()
+                ? mb_substr($connection->getLastSyncError(), 0, 100)
+                : null,
+        ]);
     }
 
     #[Route('/connection/{id}/test', name: 'marketplace_connection_test')]

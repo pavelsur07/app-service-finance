@@ -168,6 +168,7 @@ class MarketplaceConnection
 
     public function markSyncSuccess(): self
     {
+        $this->lastSyncAt = new \DateTimeImmutable();
         $this->lastSuccessfulSyncAt = new \DateTimeImmutable();
         $this->lastSyncError = null;
 

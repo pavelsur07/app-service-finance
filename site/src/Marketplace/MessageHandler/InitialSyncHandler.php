@@ -125,6 +125,13 @@ final class InitialSyncHandler
                     'date_to'     => $message->nextDateTo,
                 ]);
             } else {
+                // Последняя партия — обновляем статус подключения
+                $connection = $this->em->find(MarketplaceConnection::class, $message->connectionId);
+                if ($connection) {
+                    $connection->markSyncSuccess();
+                    $this->em->flush();
+                }
+
                 $this->logger->info('InitialSync: all batches completed', [
                     'company_id'  => $message->companyId,
                     'marketplace' => $message->marketplace,

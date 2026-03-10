@@ -41,11 +41,18 @@
                                             {% endif %}
                                             API Key: {{ connection.apiKey|slice(0, 20) }}***
                                         </div>
-                                        <div class="d-block text-muted mt-1">
+                                        <div class="d-block text-muted mt-1"
+                                             data-connection-id="{{ connection.id }}"
+                                             data-status-url="{{ path('marketplace_connection_status', {id: connection.id}) }}"
+                                             data-synced="{{ connection.lastSyncAt ? '1' : '0' }}"
+                                             id="connection-status-{{ connection.id }}">
                                             {% if connection.lastSyncAt %}
                                                 <small>Последняя синхронизация: {{ connection.lastSyncAt|date('d.m.Y H:i') }}</small>
                                             {% else %}
-                                                <small class="text-warning">Ещё не синхронизировалось</small>
+                                                <small class="text-warning">
+                                                    <span class="spinner-border spinner-border-sm me-1" style="width:.7rem;height:.7rem"></span>
+                                                    Первичная загрузка данных...
+                                                </small>
                                             {% endif %}
                                         </div>
                                         {% if connection.lastSyncError %}
@@ -394,5 +401,32 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Генерация...';
         });
+
+        // ============================================================
+        // Опрос статуса первичной загрузки
+        // ============================================================
+        (function () {
+            var pendingNodes = document.querySelectorAll('[data-status-url][data-synced="0"]');
+            if (pendingNodes.length === 0) return;
+
+            pendingNodes.forEach(function (node) {
+                var url      = node.dataset.statusUrl;
+                var interval = setInterval(function () {
+                    fetch(url, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (data.status === 'synced') {
+                                clearInterval(interval);
+                                node.innerHTML = '<small>Последняя синхронизация: ' + data.lastSyncAt + '</small>';
+                            } else if (data.status === 'error') {
+                                clearInterval(interval);
+                                node.innerHTML = '<small class="text-danger">Ошибка: ' + (data.lastSyncError ?? '') + '</small>';
+                            }
+                            // pending — ничего не меняем, ждём следующего тика
+                        })
+                        .catch(function () { /* сеть недоступна — продолжаем опрос */ });
+                }, 15000);
+            });
+        })();
     </script>
 {% endblock %}
