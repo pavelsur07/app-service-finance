@@ -10,6 +10,7 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
@@ -21,6 +22,7 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -34,8 +36,10 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly MarketplaceRawProcessorRegistry $processorRegistry,
-        private readonly EntityManagerInterface $em
-    ) {}
+        private readonly EntityManagerInterface $em,
+        private readonly MessageBusInterface $messageBus,
+    ) {
+    }
 
     #[Route('', name: 'marketplace_index')]
     public function index(): Response
@@ -81,6 +85,12 @@ class MarketplaceController extends AbstractController
 
         $this->em->persist($connection);
         $this->em->flush();
+
+        $this->messageBus->dispatch(new TriggerInitialSyncMessage(
+            companyId:    (string) $company->getId(),
+            connectionId: $connection->getId(),
+            marketplace:  $marketplace->value,
+        ));
 
         $this->addFlash('success', 'Подключение к ' . $marketplace->getDisplayName() . ' создано');
 

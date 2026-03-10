@@ -25,6 +25,8 @@ framework:
             'App\Message\EnqueueAutoRulesForRange': async
             'App\Marketplace\Message\SyncWbReportMessage': async
             'App\Marketplace\Message\SyncOzonReportMessage': async
+            'App\Marketplace\Message\InitialSyncMessage': async
+            'App\Marketplace\Message\TriggerInitialSyncMessage': async
             'App\Marketplace\Message\GenerateMarketplacePLMessage': async    # ← НОВОЕ
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
             #App\Message\ApplyAutoRulesForTransaction: async
