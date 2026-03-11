@@ -1,0 +1,134 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Импорт товаров{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <h2 class="page-title mb-0">Импорт товаров</h2>
+        <div class="ms-auto d-print-none">
+            <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">
+                Назад к списку
+            </a>
+        </div>
+    </div>
+
+    {% for message in app.flashes('error') %}
+        <div class="alert alert-danger alert-dismissible" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    {% endfor %}
+
+    <div class="row">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Загрузить файл</h3>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data" action="{{ path('catalog_products_import') }}" id="import-form">
+                        <div class="mb-3">
+                            <div class="form-label">Файл XLS / XLSX</div>
+                            <input type="file"
+                                   name="file"
+                                   id="import-file"
+                                   class="form-control"
+                                   accept=".xls,.xlsx"
+                                   required>
+                            <div class="form-hint">Максимальный размер файла: 10 МБ. Форматы: .xls, .xlsx</div>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary" id="import-submit">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24"
+                                     stroke-width="2" stroke="currentColor" fill="none">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
+                                    <polyline points="7 9 12 4 17 9"/>
+                                    <line x1="12" y1="4" x2="12" y2="16"/>
+                                </svg>
+                                Загрузить и импортировать
+                            </button>
+                            <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">Отмена</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Формат файла</h3>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted mb-3">Файл должен содержать следующие колонки (первая строка — заголовок):</p>
+                    <div class="table-responsive">
+                        <table class="table table-sm">
+                            <thead>
+                            <tr>
+                                <th>Колонка</th>
+                                <th>Поле</th>
+                                <th>Обязательно</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr>
+                                <td><span class="badge bg-blue-lt">A</span></td>
+                                <td>Наименование</td>
+                                <td><span class="badge bg-red-lt">Да</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-blue-lt">B</span></td>
+                                <td>Артикул продавца</td>
+                                <td><span class="badge bg-gray-lt">Нет</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-blue-lt">C</span></td>
+                                <td>Баркод(ы)</td>
+                                <td><span class="badge bg-gray-lt">Нет</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-blue-lt">D</span></td>
+                                <td>Закупочная цена</td>
+                                <td><span class="badge bg-gray-lt">Нет</span></td>
+                            </tr>
+                            <tr>
+                                <td><span class="badge bg-blue-lt">E</span></td>
+                                <td>Валюта</td>
+                                <td><span class="badge bg-gray-lt">Нет</span></td>
+                            </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="alert alert-info mt-2" role="alert">
+                        <div class="d-flex">
+                            <div>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24"
+                                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <circle cx="12" cy="12" r="9"/>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"/>
+                                    <polyline points="11 12 12 12 12 16 13 16"/>
+                                </svg>
+                            </div>
+                            <div>
+                                Несколько баркодов разделяйте через <code>;</code> или <code>,</code><br>
+                                Если артикул не указан — он будет сгенерирован автоматически<br>
+                                Валюта по умолчанию: <strong>RUB</strong>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('import-form').addEventListener('submit', function () {
+            const btn = document.getElementById('import-submit');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Загрузка...';
+        });
+    </script>
+{% endblock %}

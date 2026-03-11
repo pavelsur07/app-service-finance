@@ -174,3 +174,10 @@ services:
     App\Telegram\Service\BotLinkService:
         arguments:
             $appSecret: '%kernel.secret%'
+
+    # Генератор внутренних артикулов Catalog
+    App\Catalog\Domain\InternalArticleGenerator: '@App\Catalog\Infrastructure\InternalArticleGeneratorDoctrine'
+
+    App\Catalog\Infrastructure\InternalArticleGeneratorDoctrine:
+        arguments:
+            $connection: '@doctrine.dbal.default_connection'

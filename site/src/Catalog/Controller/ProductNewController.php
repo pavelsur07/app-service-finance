@@ -14,10 +14,12 @@ use Symfony\Component\Form\FormError;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 final class ProductNewController extends AbstractController
 {
     #[Route('/catalog/products/new', name: 'catalog_products_new', methods: ['GET', 'POST'])]
+    #[IsGranted('ROLE_USER')]
     public function __invoke(Request $request, CreateProductAction $createProductAction, ActiveCompanyService $activeCompanyService): Response
     {
         $companyId = $activeCompanyService->getActiveCompany()->getId();

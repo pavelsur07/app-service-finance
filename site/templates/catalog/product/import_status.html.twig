@@ -1,0 +1,187 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Статус импорта{% endblock %}
+
+{% block content %}
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-3">
+        <h2 class="page-title mb-0">Импорт товаров</h2>
+        <div class="ms-auto d-print-none">
+            <a href="{{ path('catalog_products_index') }}" class="btn btn-outline-secondary">
+                К списку товаров
+            </a>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">{{ import.originalName }}</h3>
+                    <div class="card-options">
+                    <span class="badge
+                        {% if import.status == 'done' %}bg-success
+                        {% elseif import.status == 'failed' %}bg-danger
+                        {% elseif import.status == 'processing' %}bg-warning
+                        {% else %}bg-secondary
+                        {% endif %}
+                    " id="status-badge">
+                        {% if import.status == 'done' %}Завершён
+                        {% elseif import.status == 'failed' %}Ошибка
+                        {% elseif import.status == 'processing' %}Обрабатывается
+                        {% else %}В очереди
+                        {% endif %}
+                    </span>
+                    </div>
+                </div>
+
+                <div class="card-body" id="import-body">
+                    {# Pending / Processing — показываем спиннер, будет заменено polling-ом #}
+                    {% if import.status in ['pending', 'processing'] %}
+                        <div class="text-center py-4" id="progress-block">
+                            <div class="spinner-border text-primary mb-3" role="status"></div>
+                            <p class="text-muted">Импорт обрабатывается, подождите...</p>
+                        </div>
+
+                        {# Done — показываем результат #}
+                    {% elseif import.status == 'done' %}
+                        {% include 'catalog/product/_import_result.html.twig' with {import: import} %}
+
+                        {# Failed #}
+                    {% elseif import.status == 'failed' %}
+                        <div class="alert alert-danger" role="alert">
+                            <h4 class="alert-title">Импорт завершился с ошибкой</h4>
+                            {% set errors = import.resultJson %}
+                            {% if errors %}
+                                <div class="text-muted">{{ errors[0].error|default('Неизвестная ошибка') }}</div>
+                            {% endif %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                {% if import.status in ['done', 'failed'] %}
+                    <div class="card-footer">
+                        <a href="{{ path('catalog_products_import') }}" class="btn btn-outline-primary btn-sm">
+                            Загрузить ещё один файл
+                        </a>
+                        <a href="{{ path('catalog_products_index') }}" class="btn btn-primary btn-sm ms-2">
+                            К списку товаров
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    {# Polling — только для незавершённых импортов #}
+    {% if import.status in ['pending', 'processing'] %}
+        <script>
+            (function () {
+                const statusUrl = '{{ path('api_catalog_products_import_status', {importId: import.id}) }}';
+                const intervalMs = 2000;
+                let timer;
+
+                const statusBadge   = document.getElementById('status-badge');
+                const importBody    = document.getElementById('import-body');
+
+                const labelMap = {
+                    pending:    { text: 'В очереди',       css: 'bg-secondary' },
+                    processing: { text: 'Обрабатывается',  css: 'bg-warning' },
+                    done:       { text: 'Завершён',         css: 'bg-success' },
+                    failed:     { text: 'Ошибка',           css: 'bg-danger' },
+                };
+
+                function updateBadge(status) {
+                    const map = labelMap[status] || { text: status, css: 'bg-secondary' };
+                    statusBadge.className = 'badge ' + map.css;
+                    statusBadge.textContent = map.text;
+                }
+
+                function renderDone(data) {
+                    const errors = data.errors || [];
+                    let errorsHtml = '';
+
+                    if (errors.length > 0) {
+                        const rows = errors.map(e =>
+                            `<tr><td>${e.row}</td><td><span class="badge ${e.reason === 'duplicate' ? 'bg-warning-lt' : 'bg-danger-lt'}">${e.reason === 'duplicate' ? 'Дубль' : 'Ошибка'}</span></td><td>${e.message}</td></tr>`
+                        ).join('');
+                        errorsHtml = `
+                    <div class="mt-3">
+                        <h4 class="mb-2">Пропущенные строки (${errors.length})</h4>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <thead><tr><th>Строка</th><th>Причина</th><th>Сообщение</th></tr></thead>
+                                <tbody>${rows}</tbody>
+                            </table>
+                        </div>
+                    </div>`;
+                    }
+
+                    importBody.innerHTML = `
+                <div class="row g-3 mb-3">
+                    <div class="col-4">
+                        <div class="card card-sm">
+                            <div class="card-body text-center">
+                                <div class="h1 text-success mb-0">${data.rowsCreated}</div>
+                                <div class="text-muted">Создано</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card card-sm">
+                            <div class="card-body text-center">
+                                <div class="h1 text-warning mb-0">${data.rowsSkipped}</div>
+                                <div class="text-muted">Пропущено</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="card card-sm">
+                            <div class="card-body text-center">
+                                <div class="h1 mb-0">${data.rowsTotal}</div>
+                                <div class="text-muted">Всего строк</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${errorsHtml}
+                <div class="d-flex gap-2 mt-3">
+                    <a href="{{ path('catalog_products_import') }}" class="btn btn-outline-primary btn-sm">Загрузить ещё один файл</a>
+                    <a href="{{ path('catalog_products_index') }}" class="btn btn-primary btn-sm">К списку товаров</a>
+                </div>`;
+                }
+
+                function renderFailed(data) {
+                    const errors = data.errors || [];
+                    const msg = errors[0]?.error || 'Неизвестная ошибка';
+                    importBody.innerHTML = `
+                <div class="alert alert-danger">
+                    <h4 class="alert-title">Импорт завершился с ошибкой</h4>
+                    <div class="text-muted">${msg}</div>
+                </div>
+                <a href="{{ path('catalog_products_import') }}" class="btn btn-outline-primary btn-sm mt-2">Попробовать снова</a>`;
+                }
+
+                function poll() {
+                    fetch(statusUrl, { headers: { 'Accept': 'application/json' } })
+                        .then(r => r.json())
+                        .then(data => {
+                            updateBadge(data.status);
+
+                            if (data.status === 'done') {
+                                clearInterval(timer);
+                                renderDone(data);
+                            } else if (data.status === 'failed') {
+                                clearInterval(timer);
+                                renderFailed(data);
+                            }
+                        })
+                        .catch(() => {
+                            // Сеть недоступна — продолжаем polling
+                        });
+                }
+
+                timer = setInterval(poll, intervalMs);
+            })();
+        </script>
+    {% endif %}
+{% endblock %}

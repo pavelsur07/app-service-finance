@@ -1,18 +1,22 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Catalog\Entity;
 
 use App\Catalog\Enum\ProductStatus;
-use App\Catalog\Repository\ProductRepository;
 use App\Company\Entity\Company;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity(repositoryClass: ProductRepository::class)]
+#[ORM\Entity]
 #[ORM\Table(
     name: '`products`',
     uniqueConstraints: [
         new ORM\UniqueConstraint(name: 'uniq_company_sku', columns: ['company_id', 'sku']),
+        new ORM\UniqueConstraint(name: 'uniq_company_internal_article', columns: ['company_id', 'internal_article']),
     ],
 )]
 class Product
@@ -34,17 +38,33 @@ class Product
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
-    #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
-    private string $purchasePrice;
+    /**
+     * Артикул продавца/поставщика (внешний).
+     * Необязателен, не уникален глобально.
+     */
+    #[ORM\Column(length: 150, nullable: true)]
+    private ?string $vendorSku = null;
+
+    /**
+     * Внутренний артикул системы формата PRD-{YYYY}-{NNNNNN}.
+     * Генерируется автоматически. Уникален в рамках компании.
+     * После присвоения не изменяется.
+     */
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $internalArticle = null;
 
     #[ORM\Column(type: 'decimal', precision: 8, scale: 3, nullable: true)]
     private ?string $weightKg = null;
 
     #[ORM\Column(type: 'json', nullable: true)]
-    private ?array $dimensions = null; // {length, width, height} in cm
+    private ?array $dimensions = null;
 
     #[ORM\Column(type: 'string', enumType: ProductStatus::class)]
     private ProductStatus $status;
+
+    /** @var Collection<int, ProductBarcode> */
+    #[ORM\OneToMany(targetEntity: ProductBarcode::class, mappedBy: 'product', cascade: ['persist', 'remove'], orphanRemoval: true)]
+    private Collection $barcodes;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -55,9 +75,10 @@ class Product
     public function __construct(string $id, Company $company)
     {
         Assert::uuid($id);
-        $this->id = $id;
-        $this->company = $company;
-        $this->status = ProductStatus::ACTIVE;
+        $this->id        = $id;
+        $this->company   = $company;
+        $this->status    = ProductStatus::ACTIVE;
+        $this->barcodes  = new ArrayCollection();
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -79,7 +100,7 @@ class Product
 
     public function setSku(string $sku): self
     {
-        $this->sku = $sku;
+        $this->sku       = $sku;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -92,7 +113,7 @@ class Product
 
     public function setName(string $name): self
     {
-        $this->name = $name;
+        $this->name      = $name;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -106,20 +127,40 @@ class Product
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+        $this->updatedAt   = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getVendorSku(): ?string
+    {
+        return $this->vendorSku;
+    }
+
+    public function setVendorSku(?string $vendorSku): self
+    {
+        $this->vendorSku = $vendorSku !== null ? trim($vendorSku) : null;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
     }
 
-    public function getPurchasePrice(): string
+    public function getInternalArticle(): ?string
     {
-        return $this->purchasePrice;
+        return $this->internalArticle;
     }
 
-    public function setPurchasePrice(string $purchasePrice): self
+    /**
+     * Присваивается один раз при создании товара. Повторное присвоение запрещено.
+     */
+    public function assignInternalArticle(string $internalArticle): self
     {
-        $this->purchasePrice = $purchasePrice;
-        $this->updatedAt = new \DateTimeImmutable();
+        if (null !== $this->internalArticle) {
+            throw new \LogicException('Internal article is already assigned and cannot be changed.');
+        }
+
+        $this->internalArticle = $internalArticle;
+        $this->updatedAt       = new \DateTimeImmutable();
 
         return $this;
     }
@@ -131,7 +172,7 @@ class Product
 
     public function setWeightKg(?string $weightKg): self
     {
-        $this->weightKg = $weightKg;
+        $this->weightKg  = $weightKg;
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
@@ -145,7 +186,7 @@ class Product
     public function setDimensions(?array $dimensions): self
     {
         $this->dimensions = $dimensions;
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt  = new \DateTimeImmutable();
 
         return $this;
     }
@@ -157,8 +198,23 @@ class Product
 
     public function setStatus(ProductStatus $status): self
     {
-        $this->status = $status;
+        $this->status    = $status;
         $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    /** @return Collection<int, ProductBarcode> */
+    public function getBarcodes(): Collection
+    {
+        return $this->barcodes;
+    }
+
+    public function addBarcode(ProductBarcode $barcode): self
+    {
+        if (!$this->barcodes->contains($barcode)) {
+            $this->barcodes->add($barcode);
+        }
 
         return $this;
     }

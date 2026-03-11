@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Catalog\Entity;
 
-use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
@@ -22,9 +21,12 @@ class ProductPurchasePrice
     #[ORM\Column(type: 'guid', unique: true)]
     private string $id;
 
-    #[ORM\ManyToOne(targetEntity: Company::class)]
-    #[ORM\JoinColumn(name: 'company_id', referencedColumnName: 'id', nullable: false, onDelete: 'RESTRICT')]
-    private Company $company;
+    /**
+     * Компания передаётся только как строковый UUID.
+     * Прямая связь с Company entity запрещена правилами разработки.
+     */
+    #[ORM\Column(name: 'company_id', type: 'guid')]
+    private string $companyId;
 
     #[ORM\ManyToOne(targetEntity: Product::class)]
     #[ORM\JoinColumn(name: 'product_id', referencedColumnName: 'id', nullable: false, onDelete: 'RESTRICT')]
@@ -36,7 +38,6 @@ class ProductPurchasePrice
     #[ORM\Column(type: 'date_immutable', nullable: true)]
     private ?\DateTimeImmutable $effectiveTo = null;
 
-    /** Закупочная цена в рублях (decimal 10,2) */
     #[ORM\Column(type: 'decimal', precision: 10, scale: 2)]
     private string $priceAmount;
 
@@ -51,7 +52,7 @@ class ProductPurchasePrice
 
     public function __construct(
         string $id,
-        Company $company,
+        string $companyId,
         Product $product,
         \DateTimeImmutable $effectiveFrom,
         string $priceAmount,
@@ -59,18 +60,19 @@ class ProductPurchasePrice
         ?string $note = null,
     ) {
         Assert::uuid($id);
+        Assert::uuid($companyId);
         Assert::numeric($priceAmount);
         Assert::greaterThanEq((float) $priceAmount, 0.0);
         Assert::length($priceCurrency, 3);
 
-        $this->id = $id;
-        $this->company = $company;
-        $this->product = $product;
+        $this->id            = $id;
+        $this->companyId     = $companyId;
+        $this->product       = $product;
         $this->effectiveFrom = $effectiveFrom;
-        $this->priceAmount = $priceAmount;
+        $this->priceAmount   = $priceAmount;
         $this->priceCurrency = strtoupper($priceCurrency);
-        $this->note = $note;
-        $this->createdAt = new \DateTimeImmutable();
+        $this->note          = $note;
+        $this->createdAt     = new \DateTimeImmutable();
     }
 
     public function getId(): string
@@ -78,9 +80,9 @@ class ProductPurchasePrice
         return $this->id;
     }
 
-    public function getCompany(): Company
+    public function getCompanyId(): string
     {
-        return $this->company;
+        return $this->companyId;
     }
 
     public function getProduct(): Product

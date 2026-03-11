@@ -18,7 +18,7 @@ final class ProductPurchasePriceRepository
         return $this->entityManager->createQueryBuilder()
             ->select('pp')
             ->from(ProductPurchasePrice::class, 'pp')
-            ->andWhere('IDENTITY(pp.company) = :companyId')
+            ->andWhere('pp.companyId = :companyId')
             ->andWhere('IDENTITY(pp.product) = :productId')
             ->andWhere('pp.effectiveFrom <= :at')
             ->andWhere('(pp.effectiveTo IS NULL OR pp.effectiveTo >= :at)')
@@ -36,7 +36,7 @@ final class ProductPurchasePriceRepository
         return $this->entityManager->createQueryBuilder()
             ->select('pp')
             ->from(ProductPurchasePrice::class, 'pp')
-            ->andWhere('IDENTITY(pp.company) = :companyId')
+            ->andWhere('pp.companyId = :companyId')
             ->andWhere('IDENTITY(pp.product) = :productId')
             ->andWhere('pp.effectiveFrom > :from')
             ->setParameter('companyId', $companyId)
@@ -48,4 +48,3 @@ final class ProductPurchasePriceRepository
             ->getOneOrNullResult();
     }
 }
-

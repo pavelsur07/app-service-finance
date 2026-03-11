@@ -36,7 +36,6 @@ final class UpdateProductAction
         $sku = trim((string) $cmd->sku);
         if ($sku !== $product->getSku()) {
             $this->productSkuPolicy->assertSkuIsUniqueExcludingProductId($sku, $companyId, $product->getId());
-
             $product->setSku($sku);
         }
 
@@ -48,12 +47,9 @@ final class UpdateProductAction
             $product->setDescription($cmd->description);
         }
 
-        $purchasePrice = trim((string) $cmd->purchasePrice);
-        if ($purchasePrice !== $product->getPurchasePrice()) {
-            $product->setPurchasePrice($purchasePrice);
-        }
+        // Цена управляется отдельно через SetPurchasePriceAction
+        // purchasePrice намеренно отсутствует здесь
 
-        // TODO: If product-specific audit integration is introduced, call it from here.
         try {
             $this->entityManager->flush();
         } catch (UniqueConstraintViolationException) {

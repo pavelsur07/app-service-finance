@@ -7,7 +7,6 @@ namespace App\Catalog\Infrastructure;
 use App\Catalog\DTO\ProductListFilter;
 use App\Catalog\Entity\Product;
 use App\Catalog\Enum\ProductStatus;
-use App\Company\Entity\Company;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
@@ -54,7 +53,6 @@ final class ProductRepository
         return $pager;
     }
 
-
     public function existsSkuForCompany(string $sku, string $companyId): bool
     {
         $count = (int) $this->entityManager->createQueryBuilder()
@@ -69,7 +67,6 @@ final class ProductRepository
 
         return $count > 0;
     }
-
 
     public function existsSkuForCompanyExcludingProductId(string $sku, string $companyId, string $productId): bool
     {
@@ -88,7 +85,6 @@ final class ProductRepository
         return $count > 0;
     }
 
-
     public function getOneForCompanyByIdsOrNull(string $companyId, string $productId): ?Product
     {
         return $this->entityManager->createQueryBuilder()
@@ -98,20 +94,6 @@ final class ProductRepository
             ->andWhere('IDENTITY(p.company) = :companyId')
             ->setParameter('productId', $productId)
             ->setParameter('companyId', $companyId)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
-    }
-
-    public function getOneForCompanyOrNull(string $id, Company $company): ?Product
-    {
-        return $this->entityManager->createQueryBuilder()
-            ->select('p')
-            ->from(Product::class, 'p')
-            ->andWhere('p.id = :id')
-            ->andWhere('p.company = :company')
-            ->setParameter('id', $id)
-            ->setParameter('company', $company)
             ->setMaxResults(1)
             ->getQuery()
             ->getOneOrNullResult();
@@ -132,28 +114,53 @@ final class ProductRepository
     }
 
     /**
+     * Возвращает Set vendorSku компании в нижнем регистре для дедубликации при импорте.
+     * Загружается одним запросом перед батчем — защита от N+1.
+     *
+     * @return array<string, true>
+     */
+    public function findVendorSkuSetByCompany(string $companyId): array
+    {
+        $rows = $this->entityManager->createQueryBuilder()
+            ->select('p.vendorSku')
+            ->from(Product::class, 'p')
+            ->andWhere('IDENTITY(p.company) = :companyId')
+            ->andWhere('p.vendorSku IS NOT NULL')
+            ->setParameter('companyId', $companyId)
+            ->getQuery()
+            ->getScalarResult();
+
+        $set = [];
+        foreach ($rows as $row) {
+            $set[strtolower($row['vendorSku'])] = true;
+        }
+
+        return $set;
+    }
+
+    /**
      * @return Product[]
      */
-    public function findByCompany(Company $company): array
+    public function findByCompanyId(string $companyId): array
     {
         return $this->entityManager->createQueryBuilder()
             ->select('p')
             ->from(Product::class, 'p')
-            ->andWhere('p.company = :company')
-            ->setParameter('company', $company)
+            ->andWhere('IDENTITY(p.company) = :companyId')
+            ->setParameter('companyId', $companyId)
             ->orderBy('p.name', 'ASC')
             ->getQuery()
             ->getResult();
     }
 
-    public function findBySku(Company $company, string $sku): ?Product
+    public function findBySkuAndCompanyId(string $sku, string $companyId): ?Product
     {
         return $this->entityManager->createQueryBuilder()
             ->select('p')
             ->from(Product::class, 'p')
-            ->andWhere('p.company = :company')
+            ->andWhere('IDENTITY(p.company) = :companyId')
             ->andWhere('p.sku = :sku')
-            ->setParameter('company', $company)
+            ->setParameter('companyId', $companyId)
             ->setParameter('sku', $sku)
             ->setMaxResults(1)
             ->getQuery()
@@ -163,14 +170,14 @@ final class ProductRepository
     /**
      * @return Product[]
      */
-    public function findActiveProducts(Company $company): array
+    public function findActiveByCompanyId(string $companyId): array
     {
         return $this->entityManager->createQueryBuilder()
             ->select('p')
             ->from(Product::class, 'p')
-            ->andWhere('p.company = :company')
+            ->andWhere('IDENTITY(p.company) = :companyId')
             ->andWhere('p.status = :status')
-            ->setParameter('company', $company)
+            ->setParameter('companyId', $companyId)
             ->setParameter('status', ProductStatus::ACTIVE)
             ->orderBy('p.name', 'ASC')
             ->getQuery()

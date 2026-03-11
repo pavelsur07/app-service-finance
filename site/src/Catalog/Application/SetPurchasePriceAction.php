@@ -53,14 +53,15 @@ final class SetPurchasePriceAction
             $activePrice->closeAt($command->effectiveFrom->sub(new \DateInterval('P1D')));
         }
 
+        // companyId передаётся как string — прямая связь с Company entity запрещена правилами разработки
         $newPrice = new ProductPurchasePrice(
-            id: Uuid::uuid7()->toString(),
-            company: $product->getCompany(),
-            product: $product,
+            id:           Uuid::uuid7()->toString(),
+            companyId:    $command->companyId,
+            product:      $product,
             effectiveFrom: $command->effectiveFrom,
-            priceAmount: $command->priceAmount,
+            priceAmount:  $command->priceAmount,
             priceCurrency: strtoupper($command->currency),
-            note: $command->note,
+            note:         $command->note,
         );
 
         $this->entityManager->persist($newPrice);
