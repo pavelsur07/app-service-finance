@@ -52,6 +52,13 @@ marketplace_controllers:
         namespace: App\Marketplace\Controller
     type: attribute
 
+
+moysklad_controllers:
+    resource:
+        path: ../src/MoySklad/Controller/
+        namespace: App\MoySklad\Controller
+    type: attribute
+
 analytics_controllers:
     resource:
         path: ../src/Analytics/Controller/

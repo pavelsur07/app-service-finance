@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}МойСклад{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">МойСклад</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {% for label, messages in app.flashes %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ label == 'error' ? 'danger' : label }} alert-dismissible mb-3" role="alert">
+                        <div class="d-flex">
+                            <div>{{ message }}</div>
+                        </div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="close"></a>
+                    </div>
+                {% endfor %}
+            {% endfor %}
+
+            <div class="card">
+                <div class="card-header">
+                    <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+                        <li class="nav-item">
+                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'overview' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M3 12l3 -3l4 4l8 -8l3 3" /><path d="M14 7l7 0l0 7" /></svg>
+                                Обзор
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'connections' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 15l6 -6" /><path d="M11 6l4 0l0 4" /><path d="M13 18l-4 0l0 -4" /></svg>
+                                Подключения
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'listings' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></svg>
+                                Листинги
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'sync' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 4v5h5" /><path d="M20 20v-5h-5" /><path d="M5 15a7 7 0 0 0 12 2l3 -3" /><path d="M19 9a7 7 0 0 0 -12 -2l-3 3" /></svg>
+                                Синхронизация
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a href="{{ path('moysklad_index') }}" class="nav-link {{ active_tab == 'raw_documents' ? 'active' : '' }}">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><line x1="9" y1="9" x2="10" y2="9" /><line x1="9" y1="13" x2="15" y2="13" /><line x1="9" y1="17" x2="15" y2="17" /></svg>
+                                Raw документы
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-body p-0">
+                    {% block tab_content %}{% endblock %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block modals %}{% endblock %}
+{% endblock %}
