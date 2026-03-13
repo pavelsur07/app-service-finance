@@ -1,0 +1,99 @@
+{% extends 'moy_sklad/layout.html.twig' %}
+
+{% set active_tab = 'connections' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">Подключения МойСклад</h3>
+                <div class="card-actions">
+                    <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-add-connection">
+                        <i class="ti ti-plus me-1"></i>
+                        Добавить подключение
+                    </a>
+                </div>
+            </div>
+
+            {% if connections is empty %}
+                <div class="card-body">
+                    <div class="empty">
+                        <p class="empty-title">Подключения пока не созданы</p>
+                        <p class="empty-subtitle text-muted">Добавьте первое подключение МойСклад для вашей компании.</p>
+                    </div>
+                </div>
+            {% else %}
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                        <tr>
+                            <th>Название</th>
+                            <th>Base URL</th>
+                            <th>Статус</th>
+                            <th>Последняя синхронизация</th>
+                            <th>Обновлено</th>
+                            <th class="w-1"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for connection in connections %}
+                            <tr>
+                                <td><strong>{{ connection.name }}</strong></td>
+                                <td><code>{{ connection.baseUrl }}</code></td>
+                                <td>
+                                    <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
+                                        {{ connection.isActive ? 'Активно' : 'Неактивно' }}
+                                    </span>
+                                </td>
+                                <td>{{ connection.lastSyncAt ? connection.lastSyncAt|date('d.m.Y H:i') : '—' }}</td>
+                                <td>{{ connection.updatedAt|date('d.m.Y H:i') }}</td>
+                                <td>
+                                    <div class="btn-list">
+                                        <a class="btn btn-sm btn-outline-primary" href="{{ path('moysklad_connections_edit', {id: connection.id}) }}">Редактировать</a>
+                                        <form method="post" action="{{ path('moysklad_connections_delete', {id: connection.id}) }}" onsubmit="return confirm('Удалить подключение?');">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endif %}
+        </div>
+
+        {% if isEdit and editForm %}
+            {% include 'moy_sklad/connections/_form.html.twig' with {form: editForm, isEdit: true} %}
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <div class="modal modal-blur fade" id="modal-add-connection" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                {{ form_start(createForm, {action: path('moysklad_connections_create')}) }}
+                <div class="modal-header">
+                    <h5 class="modal-title">Новое подключение</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">{{ form_row(createForm.name) }}</div>
+                    <div class="mb-3">{{ form_row(createForm.baseUrl) }}</div>
+                    <div class="mb-3">{{ form_row(createForm.login) }}</div>
+                    <div class="mb-3">{{ form_row(createForm.accessToken) }}</div>
+                    <div class="mb-3">{{ form_row(createForm.refreshToken) }}</div>
+                    <div class="mb-3">{{ form_row(createForm.tokenExpiresAt) }}</div>
+                    <div class="mb-0">{{ form_row(createForm.isActive) }}</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="submit" class="btn btn-primary">Добавить</button>
+                </div>
+                {{ form_end(createForm) }}
+            </div>
+        </div>
+    </div>
+{% endblock %}
