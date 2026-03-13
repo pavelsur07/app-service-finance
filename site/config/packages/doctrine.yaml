@@ -90,6 +90,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Marketplace/Entity'
                 prefix: 'App\Marketplace\Entity'
                 alias: Marketplace
+            MoySklad:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MoySklad/Entity'
+                prefix: 'App\MoySklad\Entity'
+                alias: MoySklad
         controller_resolver:
             auto_mapping: false
 

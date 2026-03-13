@@ -8,6 +8,7 @@ twig:
         '%kernel.project_dir%/templates/loan': Loan
         '%kernel.project_dir%/templates/telegram': Telegram
         '%kernel.project_dir%/templates/marketplace': Marketplace
+        '%kernel.project_dir%/templates/moy_sklad': MoySklad
         '%kernel.project_dir%/templates/finance': Finance
         '%kernel.project_dir%/templates/partials': Partials
 
