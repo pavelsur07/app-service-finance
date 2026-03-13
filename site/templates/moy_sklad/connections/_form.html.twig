@@ -1,0 +1,23 @@
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title mb-0">{{ isEdit ? 'Редактировать подключение' : 'Новое подключение' }}</h3>
+    </div>
+    <div class="card-body">
+        {{ form_start(form) }}
+        <div class="row g-3">
+            <div class="col-md-6">{{ form_row(form.name) }}</div>
+            <div class="col-md-6">{{ form_row(form.baseUrl) }}</div>
+            <div class="col-md-6">{{ form_row(form.login) }}</div>
+            <div class="col-md-6">{{ form_row(form.tokenExpiresAt) }}</div>
+            <div class="col-12">{{ form_row(form.accessToken) }}</div>
+            <div class="col-12">{{ form_row(form.refreshToken) }}</div>
+            <div class="col-12">{{ form_row(form.isActive) }}</div>
+        </div>
+
+        <div class="mt-3 d-flex gap-2">
+            <button type="submit" class="btn btn-primary">{{ isEdit ? 'Сохранить' : 'Создать' }}</button>
+            <a href="{{ path('moysklad_connections_index') }}" class="btn btn-outline-secondary">Отмена</a>
+        </div>
+        {{ form_end(form) }}
+    </div>
+</div>
