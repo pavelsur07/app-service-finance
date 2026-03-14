@@ -3,8 +3,20 @@
 {% set active_tab = 'returns' %}
 
 {% block tab_content %}
-    <div class="card-header d-flex align-items-center">
+    <div class="card-header d-flex align-items-center gap-3">
         <h3 class="card-title me-auto mb-0">Возвраты</h3>
+
+        <form method="get" action="{{ path('marketplace_returns_index') }}" class="d-flex align-items-center gap-2 mb-0">
+            <select name="marketplace" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                <option value="">Все площадки</option>
+                {% for mp in available_marketplaces %}
+                    <option value="{{ mp.value }}" {{ selected_marketplace == mp.value ? 'selected' : '' }}>
+                        {{ mp.value|upper }}
+                    </option>
+                {% endfor %}
+            </select>
+        </form>
+
         <button class="btn btn-sm btn-outline-secondary"
                 data-bs-toggle="modal" data-bs-target="#modal-recalculate-cost">
             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24"
@@ -16,25 +28,33 @@
             Пересчитать себестоимость
         </button>
     </div>
+
     <div class="table-responsive">
         <table class="table card-table table-vcenter">
             <thead>
             <tr>
                 <th>Дата возврата</th>
+                <th>Площадка</th>
+                <th>Артикул (SKU)</th>
                 <th>Товар</th>
                 <th class="text-end">Кол-во</th>
                 <th class="text-end">Возврат</th>
-                <th>Причина</th>
+                <th class="text-end">Себес.</th>
+                <th style="max-width: 180px">Причина</th>
                 <th>ID</th>
             </tr>
             </thead>
             <tbody>
             {% if pager.nbResults == 0 %}
                 <tr>
-                    <td colspan="6" class="text-center text-muted py-4">
+                    <td colspan="9" class="text-center text-muted py-4">
                         <div class="empty">
                             <div class="empty-icon">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 14l-4 -4l4 -4" /><path d="M5 10h11a4 4 0 1 1 0 8h-1" /></svg>
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                    <path d="M9 14l-4 -4l4 -4"/>
+                                    <path d="M5 10h11a4 4 0 1 1 0 8h-1"/>
+                                </svg>
                             </div>
                             <p class="empty-title">Нет данных о возвратах</p>
                             <p class="empty-subtitle text-muted">Обработайте данные с маркетплейса</p>
@@ -44,20 +64,32 @@
             {% else %}
                 {% for return in pager.currentPageResults %}
                     <tr>
-                        <td>{{ return.returnDate|date('d.m.Y H:i') }}</td>
-                        <td><strong>{{ return.listing.name }}</strong></td>
+                        <td>{{ return.return_date|date('d.m.Y') }}</td>
+                        <td><span class="badge bg-blue-lt">{{ return.marketplace|upper }}</span></td>
+                        <td><span class="badge bg-azure-lt">{{ return.marketplace_sku }}</span></td>
+                        <td><strong>{{ return.listing_name }}</strong></td>
                         <td class="text-end">{{ return.quantity }}</td>
                         <td class="text-end text-danger">
-                            <strong>-{{ return.refundAmount|number_format(2, '.', ' ') }} ₽</strong>
+                            <strong>-{{ return.refund_amount|number_format(2, '.', ' ') }} ₽</strong>
                         </td>
-                        <td>
-                            {% if return.returnReason %}
-                                <span class="badge bg-yellow-lt">{{ return.returnReason }}</span>
+                        <td class="text-end">
+                            {% if return.cost_price is not null and return.cost_price > 0 %}
+                                {{ return.cost_price|number_format(2, '.', ' ') }} ₽
                             {% else %}
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td><small class="text-muted">{{ return.externalReturnId|slice(0, 20) }}...</small></td>
+                        <td style="max-width: 180px">
+                            {% if return.return_reason %}
+                                <span class="badge bg-yellow-lt text-truncate d-inline-block" style="max-width: 100%"
+                                      title="{{ return.return_reason }}">
+                                        {{ return.return_reason }}
+                                    </span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td><small class="text-muted">{{ return.external_return_id|slice(0, 20) }}...</small></td>
                     </tr>
                 {% endfor %}
             {% endif %}
@@ -65,10 +97,13 @@
             {% if pager.nbResults > 0 %}
                 <tfoot>
                 <tr>
-                    <th colspan="2">На странице:</th>
+                    <th colspan="4">На странице:</th>
                     <th class="text-end">{{ pager.currentPageResults|reduce((carry, r) => carry + r.quantity, 0) }}</th>
                     <th class="text-end text-danger">
-                        <strong>-{{ pager.currentPageResults|reduce((carry, r) => carry + r.refundAmount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                        <strong>-{{ pager.currentPageResults|reduce((carry, r) => carry + r.refund_amount, 0)|number_format(2, '.', ' ') }} ₽</strong>
+                    </th>
+                    <th class="text-end">
+                        <strong>{{ pager.currentPageResults|reduce((carry, r) => carry + (r.cost_price ?? 0), 0)|number_format(2, '.', ' ') }} ₽</strong>
                     </th>
                     <th colspan="2"></th>
                 </tr>
@@ -76,9 +111,14 @@
             {% endif %}
         </table>
     </div>
+
     {% if pager.haveToPaginate %}
         <div class="card-footer d-flex align-items-center">
-            {% include 'partials/_pagerfanta.html.twig' with {'pager': pager, 'route_name': 'marketplace_returns_index'} %}
+            {% include 'partials/_pagerfanta.html.twig' with {
+                'pager': pager,
+                'route_name': 'marketplace_returns_index',
+                'route_params': selected_marketplace ? {'marketplace': selected_marketplace} : {}
+            } %}
         </div>
     {% endif %}
 {% endblock %}
@@ -99,7 +139,9 @@
                             <select name="marketplace" class="form-select" required>
                                 <option value="">— выберите —</option>
                                 {% for mp in available_marketplaces %}
-                                    <option value="{{ mp.value }}">{{ mp.value|upper }}</option>
+                                    <option value="{{ mp.value }}" {{ selected_marketplace == mp.value ? 'selected' : '' }}>
+                                        {{ mp.value|upper }}
+                                    </option>
                                 {% endfor %}
                             </select>
                         </div>
