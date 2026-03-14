@@ -98,6 +98,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     MarketplaceType::OZON,
                 );
                 $listing->setMarketplaceSku($sku);
+                $listing->setPrice('0.00');
                 $listing->setName($item['name'] ?? null);
                 $this->em->persist($listing);
 
@@ -256,11 +257,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         // Прямые затраты для type=services, other, compensation
-        // (операции где amount — сама затрата, и она не отражена в полях выше)
         $opType = $op['type'] ?? '';
         if (in_array($opType, ['services', 'other', 'compensation'], true)) {
             $amount = abs((float) ($op['amount'] ?? 0));
-            // Только если нет services[] (иначе уже учтено выше)
             if ($amount > 0 && empty($op['services'])) {
                 $operationType = $op['operation_type'] ?? '';
                 $operationTypeName = $op['operation_type_name'] ?? 'Прочие услуги Ozon';
