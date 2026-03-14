@@ -475,7 +475,7 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_index');
     }
 
-    #[Route('/sales', name: 'marketplace_sales_index')]
+   /* #[Route('/sales', name: 'marketplace_sales_index')]
     public function salesIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
@@ -494,7 +494,7 @@ class MarketplaceController extends AbstractController
             'pager'                  => $pagerfanta,
             'available_marketplaces' => MarketplaceType::cases(),
         ]);
-    }
+    }*/
 
     #[Route('/returns', name: 'marketplace_returns_index')]
     public function returnsIndex(Request $request): Response
