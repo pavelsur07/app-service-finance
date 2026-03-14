@@ -6,6 +6,8 @@
 parameters:
     feature_funds_and_widget: '%env(bool:FEATURE_FUNDS_AND_WIDGET)%'
     app.storage_root: '%kernel.project_dir%/var/storage'
+    app.encryption.key_file: '%env(string:APP_ENCRYPTION_KEY_FILE)%'
+    app.encryption.current_key_version: '%env(string:APP_ENCRYPTION_CURRENT_KEY_VERSION)%'
 
 services:
     # default configuration for services in *this* file
@@ -181,3 +183,13 @@ services:
     App\Catalog\Infrastructure\InternalArticleGeneratorDoctrine:
         arguments:
             $connection: '@doctrine.dbal.default_connection'
+
+    App\Shared\Security\Service\FileBasedSecretKeyProvider:
+        arguments:
+            $keyFile: '%app.encryption.key_file%'
+            $currentKeyVersion: '%app.encryption.current_key_version%'
+            $fallbackKeyFromEnv: '%env(default::APP_ENCRYPTION_FALLBACK_KEY)%'
+
+    App\Shared\Security\Contract\SecretKeyProviderInterface: '@App\Shared\Security\Service\FileBasedSecretKeyProvider'
+    App\Shared\Security\Contract\FieldEncryptionServiceInterface: '@App\Shared\Security\Service\SodiumFieldEncryptionService'
+    App\Shared\Security\Contract\SecretRotationServiceInterface: '@App\Shared\Security\Service\SecretRotationService'
