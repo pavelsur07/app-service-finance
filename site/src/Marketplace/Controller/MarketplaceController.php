@@ -474,26 +474,6 @@ class MarketplaceController extends AbstractController
 
         return $this->redirectToRoute('marketplace_index');
     }
-/*    #[Route('/returns', name: 'marketplace_returns_index')]
-    public function returnsIndex(Request $request): Response
-    {
-        $company = $this->companyService->getActiveCompany();
-
-        $queryBuilder = $this->em->getRepository(MarketplaceReturn::class)
-            ->getByCompanyQueryBuilder($company);
-
-        $adapter    = new QueryAdapter($queryBuilder);
-        $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
-            $adapter,
-            $request->query->get('page', 1),
-            50
-        );
-
-        return $this->render('marketplace/returns.html.twig', [
-            'pager'                  => $pagerfanta,
-            'available_marketplaces' => MarketplaceType::cases(),
-        ]);
-    }*/
 
     #[Route('/costs', name: 'marketplace_costs_index')]
     public function costsIndex(Request $request): Response
