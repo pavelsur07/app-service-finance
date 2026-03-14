@@ -92,7 +92,7 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
 
     /**
      * Найти возвраты для пересчёта себестоимости.
-     * Только возвраты с привязанным продуктом (listing.product IS NOT NULL).
+     * Себестоимость привязана к листингу (Inventory), привязка к продукту не требуется.
      *
      * @return MarketplaceReturn[]
      */
@@ -109,7 +109,6 @@ class MarketplaceReturnRepository extends ServiceEntityRepository
             ->andWhere('r.marketplace = :marketplace')
             ->andWhere('r.returnDate >= :dateFrom')
             ->andWhere('r.returnDate <= :dateTo')
-            ->andWhere('l.product IS NOT NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('dateFrom', $dateFrom)

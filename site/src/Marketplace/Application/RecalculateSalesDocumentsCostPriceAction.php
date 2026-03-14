@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application;
 
+use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\DTO\RecalculateSalesCostPriceCommand;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
-use App\Catalog\Facade\ProductPurchasePriceFacade;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class RecalculateSalesDocumentsCostPriceAction
@@ -15,7 +15,7 @@ final class RecalculateSalesDocumentsCostPriceAction
     public function __construct(
         private readonly MarketplaceSaleRepository   $saleRepository,
         private readonly MarketplaceReturnRepository $returnRepository,
-        private readonly ProductPurchasePriceFacade  $purchasePriceFacade,
+        private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly EntityManagerInterface      $em,
     ) {
     }
@@ -28,7 +28,7 @@ final class RecalculateSalesDocumentsCostPriceAction
         $salesCount   = 0;
         $returnsCount = 0;
 
-        // Пересчёт продаж
+        // --- Пересчёт продаж ---
         $sales = $this->saleRepository->findForCostRecalculation(
             $cmd->companyId,
             $cmd->marketplace,
@@ -39,23 +39,17 @@ final class RecalculateSalesDocumentsCostPriceAction
 
         foreach ($sales as $sale) {
             $listing = $sale->getListing();
-            $product = $listing->getProduct();
 
-            if ($product === null) {
-                continue;
-            }
-
-            $dto = $this->purchasePriceFacade->getPurchasePriceAt(
-                $cmd->companyId,
-                (string) $product->getId(),
+            $costPrice = $this->costPriceResolver->resolveForSale(
+                $listing,
                 $sale->getSaleDate(),
             );
 
-            $sale->setCostPrice($dto?->amount ?? '0.00');
+            $sale->setCostPrice($costPrice);
             ++$salesCount;
         }
 
-        // Пересчёт возвратов
+        // --- Пересчёт возвратов ---
         $returns = $this->returnRepository->findForCostRecalculation(
             $cmd->companyId,
             $cmd->marketplace,
@@ -65,26 +59,13 @@ final class RecalculateSalesDocumentsCostPriceAction
         );
 
         foreach ($returns as $return) {
-            $listing = $return->getListing();
-            $product = $listing->getProduct();
+            $costPrice = $this->costPriceResolver->resolveForReturn(
+                $return->getListing(),
+                $return->getSale(),
+                $return->getRawData(),
+            );
 
-            if ($product === null) {
-                continue;
-            }
-
-            // Берём себестоимость из связанной продажи если есть
-            $sale = $return->getSale();
-            if ($sale !== null && $sale->getCostPrice() !== null && $sale->getCostPrice() > '0.00') {
-                $return->setCostPrice($sale->getCostPrice());
-            } else {
-                $dto = $this->purchasePriceFacade->getPurchasePriceAt(
-                    $cmd->companyId,
-                    (string) $product->getId(),
-                    $return->getReturnDate(),
-                );
-                $return->setCostPrice($dto?->amount ?? '0.00');
-            }
-
+            $return->setCostPrice($costPrice);
             ++$returnsCount;
         }
 

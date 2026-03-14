@@ -17,7 +17,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceSale::class);
     }
 
-
     /**
      * Найти продажу по posting_number + SKU листинга.
      * Используется при обработке realization-документа Ozon
@@ -31,8 +30,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         MarketplaceType $marketplace,
         string          $externalOrderId,
         string          $marketplaceSku,
-    ): ?MarketplaceSale
-    {
+    ): ?MarketplaceSale {
         return $this->createQueryBuilder('s')
             ->join('s.listing', 'l')
             ->where('s.company = :company')
@@ -140,7 +138,7 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
 
     /**
      * Найти продажи для пересчёта себестоимости.
-     * Только продажи с привязанным продуктом (listing.product IS NOT NULL).
+     * Себестоимость привязана к листингу (Inventory), привязка к продукту не требуется.
      *
      * @return MarketplaceSale[]
      */
@@ -157,7 +155,6 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
             ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.saleDate >= :dateFrom')
             ->andWhere('s.saleDate <= :dateTo')
-            ->andWhere('l.product IS NOT NULL')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('dateFrom', $dateFrom)
