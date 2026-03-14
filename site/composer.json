@@ -8,12 +8,14 @@
         "ext-bcmath": "*",
         "ext-ctype": "*",
         "ext-iconv": "*",
+        "ext-sodium": "*",
         "babdev/pagerfanta-bundle": "^4.6",
         "doctrine/dbal": "^3.10.4",
         "doctrine/doctrine-bundle": "^2.18.2",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6.1",
         "openspout/openspout": "4.28.5",
+        "pagerfanta/doctrine-dbal-adapter": "^4.8",
         "pagerfanta/doctrine-orm-adapter": "^4.7.2",
         "pentatrion/vite-bundle": "^8.2",
         "phpdocumentor/reflection-docblock": "^5.6.6",
@@ -55,8 +57,7 @@
         "symfony/web-link": "7.3.*",
         "symfony/yaml": "7.3.*",
         "twig/extra-bundle": "^2.12|^3.22.2",
-        "twig/twig": "^2.12|^3.22.2",
-        "ext-sodium": "*"
+        "twig/twig": "^2.12|^3.22.2"
     },
     "config": {
         "allow-plugins": {

@@ -151,6 +151,9 @@ services:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
 
+    App\Marketplace\Inventory\CostPriceResolverInterface:
+        class: App\Marketplace\Inventory\Application\InventoryCostPriceResolver
+
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'

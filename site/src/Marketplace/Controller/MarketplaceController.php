@@ -2,6 +2,7 @@
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
@@ -10,6 +11,8 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
+use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -37,6 +40,7 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly MarketplaceRawProcessorRegistry $processorRegistry,
+        private readonly OzonRealizationStatusQuery $realizationStatusQuery,
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $messageBus,
     ) {
@@ -47,12 +51,12 @@ class MarketplaceController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
-        $connections = $this->connectionRepository->findByCompany($company);
+        $connections  = $this->connectionRepository->findByCompany($company);
         $rawDocuments = $this->rawDocumentRepository->findByCompany($company, 20);
 
         return $this->render('marketplace/index.html.twig', [
-            'connections' => $connections,
-            'rawDocuments' => $rawDocuments,
+            'connections'           => $connections,
+            'rawDocuments'          => $rawDocuments,
             'availableMarketplaces' => MarketplaceType::cases(),
         ]);
     }
@@ -63,13 +67,14 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
 
         $marketplace = MarketplaceType::from($request->request->get('marketplace'));
-        $apiKey = $request->request->get('api_key');
-        $clientId = $request->request->get('client_id'); // Для Ozon
+        $apiKey      = $request->request->get('api_key');
+        $clientId    = $request->request->get('client_id');
 
         $existing = $this->connectionRepository->findByMarketplace($company, $marketplace);
 
         if ($existing) {
             $this->addFlash('error', 'Подключение к ' . $marketplace->getDisplayName() . ' уже существует');
+
             return $this->redirectToRoute('marketplace_index');
         }
 
@@ -110,10 +115,10 @@ class MarketplaceController extends AbstractController
         }
 
         $lastSyncAt = $connection->getLastSyncAt();
-        $status = match (true) {
+        $status     = match (true) {
             $connection->getLastSyncError() !== null => 'error',
-            $lastSyncAt !== null                    => 'synced',
-            default                                 => 'pending',
+            $lastSyncAt !== null                     => 'synced',
+            default                                  => 'pending',
         };
 
         return $this->json([
@@ -137,7 +142,7 @@ class MarketplaceController extends AbstractController
         }
 
         $success = false;
-        $error = null;
+        $error   = null;
 
         try {
             $adapter = $this->adapterRegistry->get($connection->getMarketplace());
@@ -171,9 +176,9 @@ class MarketplaceController extends AbstractController
 
         try {
             $fromDate = new \DateTimeImmutable('-7 days');
-            $toDate = new \DateTimeImmutable();
+            $toDate   = new \DateTimeImmutable();
 
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
+            $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
             $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
             $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
@@ -221,24 +226,27 @@ class MarketplaceController extends AbstractController
         }
 
         $dateFromStr = $request->query->get('date_from');
-        $dateToStr = $request->query->get('date_to');
+        $dateToStr   = $request->query->get('date_to');
 
         if (!$dateFromStr || !$dateToStr) {
             $this->addFlash('error', 'Укажите период синхронизации');
+
             return $this->redirectToRoute('marketplace_index');
         }
 
         try {
             $fromDate = new \DateTimeImmutable($dateFromStr);
-            $toDate = new \DateTimeImmutable($dateToStr . ' 23:59:59');
+            $toDate   = new \DateTimeImmutable($dateToStr . ' 23:59:59');
         } catch (\Exception $e) {
             $this->addFlash('error', 'Неверный формат дат');
+
             return $this->redirectToRoute('marketplace_index');
         }
 
         $diff = $fromDate->diff($toDate)->days;
         if ($diff > 31) {
             $this->addFlash('error', 'Максимальный период — 31 день');
+
             return $this->redirectToRoute('marketplace_index');
         }
 
@@ -246,7 +254,7 @@ class MarketplaceController extends AbstractController
         $this->em->flush();
 
         try {
-            $adapter = $this->adapterRegistry->get($connection->getMarketplace());
+            $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
             $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
             $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
@@ -283,6 +291,56 @@ class MarketplaceController extends AbstractController
         return $this->redirectToRoute('marketplace_index');
     }
 
+    #[Route('/connection/{id}/sync-realization', name: 'marketplace_connection_sync_realization', methods: ['POST'])]
+    public function syncRealization(string $id): Response
+    {
+        $company   = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+
+        $connection = $this->connectionRepository->find($id);
+
+        if (!$connection || (string) $connection->getCompany()->getId() !== $companyId) {
+            throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if ($connection->getMarketplace() !== MarketplaceType::OZON) {
+            $this->addFlash('warning', 'Загрузка реализации доступна только для Ozon.');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        $connectionId = $connection->getId();
+        $now          = new \DateTimeImmutable();
+        $monthsToSync = $this->resolveRealizationMonths($companyId, $now);
+
+        if (empty($monthsToSync)) {
+            $this->addFlash('info', 'Нет месяцев для загрузки реализации.');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        foreach ($monthsToSync as [$year, $month]) {
+            $this->messageBus->dispatch(new SyncOzonRealizationMessage(
+                companyId:    $companyId,
+                connectionId: $connectionId,
+                year:         $year,
+                month:        $month,
+            ));
+        }
+
+        $count = count($monthsToSync);
+        $this->addFlash(
+            'success',
+            sprintf(
+                'Загрузка реализации запущена: %d %s поставлено в очередь.',
+                $count,
+                $count === 1 ? 'месяц' : ($count < 5 ? 'месяца' : 'месяцев'),
+            ),
+        );
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
     #[Route('/raw/{id}/view', name: 'marketplace_raw_view')]
     public function viewRaw(string $id): Response
     {
@@ -300,7 +358,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
     public function processSales(
         string $id,
-        ProcessMarketplaceRawDocumentAction $action
+        ProcessMarketplaceRawDocumentAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -311,13 +369,13 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'sales');
+            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'sales');
             $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
         } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
             preg_match('/Key \((.*?)\)=\((.*?)\)/', $e->getMessage(), $matches);
-            $keys = $matches[1] ?? 'unknown';
+            $keys   = $matches[1] ?? 'unknown';
             $values = $matches[2] ?? 'unknown';
 
             $this->addFlash('error', sprintf(
@@ -335,7 +393,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
     public function processReturns(
         string $id,
-        ProcessMarketplaceRawDocumentAction $action
+        ProcessMarketplaceRawDocumentAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -346,7 +404,7 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
+            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
             $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
@@ -360,7 +418,7 @@ class MarketplaceController extends AbstractController
     #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
     public function processCosts(
         string $id,
-        ProcessMarketplaceRawDocumentAction $action
+        ProcessMarketplaceRawDocumentAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
 
@@ -371,12 +429,47 @@ class MarketplaceController extends AbstractController
         }
 
         try {
-            $cmd = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
+            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
             $count = ($action)($cmd);
 
             $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки затрат: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/raw/{id}/process-realization', name: 'marketplace_raw_process_realization')]
+    public function processRealization(
+        string $id,
+        ProcessOzonRealizationAction $action,
+    ): Response {
+        $company = $this->companyService->getActiveCompany();
+
+        $rawDoc = $this->rawDocumentRepository->find($id);
+
+        if (!$rawDoc || (string) $rawDoc->getCompany()->getId() !== (string) $company->getId()) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($rawDoc->getDocumentType() !== 'realization') {
+            $this->addFlash('error', 'Документ не является реализацией.');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        try {
+            $result = ($action)((string) $company->getId(), (string) $rawDoc->getId());
+
+            $this->addFlash('success', sprintf(
+                'Реализация обработана: обновлено %d, пропущено %d, не найдено %d.',
+                $result['updated'],
+                $result['skipped'],
+                $result['not_found'],
+            ));
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');
@@ -390,7 +483,7 @@ class MarketplaceController extends AbstractController
         $queryBuilder = $this->em->getRepository(MarketplaceSale::class)
             ->getByCompanyQueryBuilder($company);
 
-        $adapter = new QueryAdapter($queryBuilder);
+        $adapter    = new QueryAdapter($queryBuilder);
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
             $request->query->get('page', 1),
@@ -411,7 +504,7 @@ class MarketplaceController extends AbstractController
         $queryBuilder = $this->em->getRepository(MarketplaceReturn::class)
             ->getByCompanyQueryBuilder($company);
 
-        $adapter = new QueryAdapter($queryBuilder);
+        $adapter    = new QueryAdapter($queryBuilder);
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
             $request->query->get('page', 1),
@@ -430,7 +523,7 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
 
         $categoryId = $request->query->get('category');
-        $mapped = (string) $request->query->get('mapped', 'all');
+        $mapped     = (string) $request->query->get('mapped', 'all');
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
             ->getByCompanyQueryBuilder($company);
@@ -448,7 +541,7 @@ class MarketplaceController extends AbstractController
                 ->setParameter('category', $categoryId);
         }
 
-        $adapter = new QueryAdapter($queryBuilder);
+        $adapter    = new QueryAdapter($queryBuilder);
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
             $request->query->get('page', 1),
@@ -459,10 +552,10 @@ class MarketplaceController extends AbstractController
             ->findByCompany($company);
 
         return $this->render('marketplace/costs.html.twig', [
-            'pager' => $pagerfanta,
-            'categories' => $categories,
+            'pager'              => $pagerfanta,
+            'categories'         => $categories,
             'selectedCategoryId' => $categoryId,
-            'mapped' => $mapped,
+            'mapped'             => $mapped,
         ]);
     }
 
@@ -522,5 +615,54 @@ class MarketplaceController extends AbstractController
         $this->addFlash('success', 'Подключение удалено');
 
         return $this->redirectToRoute('marketplace_index');
+    }
+
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
+    /**
+     * Определяет какие месяцы нужно загрузить для realization:
+     *   - нет документов → все закрытые месяцы с января текущего года
+     *   - есть документы → только прошлый месяц (обновление)
+     *
+     * @return array<int, array{0: int, 1: int}>  [[year, month], ...]
+     */
+    private function resolveRealizationMonths(string $companyId, \DateTimeImmutable $now): array
+    {
+        $lastMonth      = $now->modify('first day of last month');
+        $lastMonthYear  = (int) $lastMonth->format('Y');
+        $lastMonthMonth = (int) $lastMonth->format('n');
+
+        $hasAny = $this->realizationStatusQuery->hasAny($companyId);
+
+        if ($hasAny) {
+            return [[$lastMonthYear, $lastMonthMonth]];
+        }
+
+        $currentYear  = (int) $now->format('Y');
+        $loadedMonths = $this->realizationStatusQuery->loadedMonths($companyId);
+
+        $months = [];
+        $cursor = new \DateTimeImmutable(sprintf('%d-01-01', $currentYear));
+
+        while (true) {
+            $year  = (int) $cursor->format('Y');
+            $month = (int) $cursor->format('n');
+
+            if ($year > $lastMonthYear || ($year === $lastMonthYear && $month > $lastMonthMonth)) {
+                break;
+            }
+
+            $key = sprintf('%d-%02d', $year, $month);
+
+            if (!in_array($key, $loadedMonths, true)) {
+                $months[] = [$year, $month];
+            }
+
+            $cursor = $cursor->modify('+1 month');
+        }
+
+        return $months;
     }
 }

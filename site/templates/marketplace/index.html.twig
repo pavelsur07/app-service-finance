@@ -62,9 +62,9 @@
                                         {% endif %}
                                     </div>
                                     <div class="col-auto">
-                                    <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
-                                        {{ connection.isActive ? 'Активно' : 'Неактивно' }}
-                                    </span>
+                                        <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
+                                            {{ connection.isActive ? 'Активно' : 'Неактивно' }}
+                                        </span>
                                     </div>
                                     <div class="col-auto">
                                         <div class="btn-list">
@@ -74,12 +74,27 @@
                                                data-bs-toggle="modal"
                                                data-bs-target="#modal-sync-period"
                                                data-connection-id="{{ connection.id }}">За период</a>
+                                            {% if connection.marketplace.value == 'ozon' %}
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-teal"
+                                                        data-bs-toggle="modal"
+                                                        data-bs-target="#modal-sync-realization"
+                                                        data-connection-id="{{ connection.id }}"
+                                                        data-action="{{ path('marketplace_connection_sync_realization', {id: connection.id}) }}">
+                                                    Реализация
+                                                </button>
+                                            {% endif %}
                                             <a href="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">
                                                 {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
                                             </a>
-                                            <form method="post" action="{{ path('marketplace_connection_delete', {id: connection.id}) }}" style="display: inline;">
-                                                <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('Удалить подключение?')">Удалить</button>
-                                            </form>
+                                            <button type="button"
+                                                    class="btn btn-sm btn-outline-danger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modal-delete-connection"
+                                                    data-connection-id="{{ connection.id }}"
+                                                    data-action="{{ path('marketplace_connection_delete', {id: connection.id}) }}">
+                                                Удалить
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -90,9 +105,7 @@
             </div>
         </div>
 
-        {# ============================================================= #}
-        {# Генерация ОПиУ — НОВАЯ КАРТОЧКА                               #}
-        {# ============================================================= #}
+        {# Генерация ОПиУ #}
         <div class="card mb-3">
             <div class="card-header">
                 <h3 class="card-title">
@@ -165,11 +178,18 @@
                                             <a href="{{ path('marketplace_raw_process_sales', {id: doc.id}) }}" class="btn btn-sm btn-success">Продажи</a>
                                             <a href="{{ path('marketplace_raw_process_returns', {id: doc.id}) }}" class="btn btn-sm btn-warning">Возвраты</a>
                                             <a href="{{ path('marketplace_raw_process_costs', {id: doc.id}) }}" class="btn btn-sm btn-purple">Затраты</a>
+                                        {% elseif doc.documentType == 'realization' %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-teal"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modal-apply-realization"
+                                                    data-action="{{ path('marketplace_raw_process_realization', {id: doc.id}) }}">
+                                                Применить выручку
+                                            </button>
                                         {% endif %}
                                     </div>
                                 </td>
                             </tr>
-                            {# Строка 129-135 — ПРОВЕРЬ что этот блок совпадает с оригиналом #}
                             {% if doc.unprocessedCostsCount is defined and doc.unprocessedCostsCount > 0 %}
                                 <tr class="bg-warning-lt">
                                     <td colspan="8">
@@ -272,9 +292,7 @@
         </div>
     </div>
 
-    {# ============================================================= #}
-    {# Modal: Генерация ОПиУ — НОВОЕ                                  #}
-    {# ============================================================= #}
+    {# Modal: Генерация ОПиУ #}
     <div class="modal modal-blur fade" id="modal-generate-pl" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -319,7 +337,6 @@
                                     <span class="form-selectgroup-label">Расходы МП</span>
                                 </label>
                             </div>
-                            {# Hidden fields — заполняются JS на основе radio #}
                             <input type="hidden" name="all_streams" id="pl-all-streams" value="1">
                             <input type="hidden" name="stream" id="pl-stream" value="">
                         </div>
@@ -347,6 +364,89 @@
         </div>
     </div>
 
+    {# Modal: Подтверждение загрузки реализации Ozon #}
+    <div class="modal modal-blur fade" id="modal-sync-realization" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Загрузка реализации Ozon</div>
+                    <div class="text-muted mt-2">
+                        Если данных ещё нет — будут загружены все месяцы с начала года.<br>
+                        Если данные уже есть — будет обновлён прошлый месяц.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                            </div>
+                            <div class="col">
+                                <form method="post" id="form-sync-realization" action="">
+                                    <button type="submit" class="btn btn-teal w-100">Запустить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Подтверждение удаления подключения #}
+    <div class="modal modal-blur fade" id="modal-delete-connection" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Удалить подключение?</div>
+                    <div class="text-muted mt-2">
+                        Все данные синхронизации для этого подключения будут удалены. Это действие необратимо.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                            </div>
+                            <div class="col">
+                                <form method="post" id="form-delete-connection" action="">
+                                    <button type="submit" class="btn btn-danger w-100">Удалить</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Подтверждение применения выручки из реализации #}
+    <div class="modal modal-blur fade" id="modal-apply-realization" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-body">
+                    <div class="modal-title">Применить выручку?</div>
+                    <div class="text-muted mt-2">
+                        Значения выручки в существующих продажах будут обновлены данными из отчёта реализации Ozon.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="w-100">
+                        <div class="row">
+                            <div class="col">
+                                <button type="button" class="btn w-100" data-bs-dismiss="modal">Отмена</button>
+                            </div>
+                            <div class="col">
+                                <a href="" id="btn-apply-realization" class="btn btn-teal w-100">Применить</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Показ/скрытие поля Client-Id в зависимости от маркетплейса
         document.getElementById('connection-marketplace').addEventListener('change', function () {
@@ -362,35 +462,30 @@
             }
         });
 
-        // Sync period modal
+        // Sync period modal — подставляем action с connectionId
         document.getElementById('modal-sync-period').addEventListener('show.bs.modal', function (event) {
             var connectionId = event.relatedTarget.getAttribute('data-connection-id');
             document.getElementById('form-sync-period').action = '/marketplace/connection/' + connectionId + '/sync-period';
         });
 
-        // Блокировка кнопки при отправке формы синхронизации
+        // Блокировка кнопки при отправке формы синхронизации за период
         document.getElementById('form-sync-period').addEventListener('submit', function () {
             var submitBtn = this.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Синхронизация...';
         });
 
-        // ============================================================
-        // Генерация ОПиУ — НОВЫЙ JS
-        // ============================================================
-
-        // Radio → hidden fields (all_streams / stream)
+        // Генерация ОПиУ — radio → hidden fields
         document.querySelectorAll('input[name="stream_choice"]').forEach(function (radio) {
             radio.addEventListener('change', function () {
                 var allStreams = document.getElementById('pl-all-streams');
-                var stream = document.getElementById('pl-stream');
-
+                var stream    = document.getElementById('pl-stream');
                 if (this.value === 'all') {
                     allStreams.value = '1';
-                    stream.value = '';
+                    stream.value    = '';
                 } else {
                     allStreams.value = '0';
-                    stream.value = this.value;
+                    stream.value    = this.value;
                 }
             });
         });
@@ -402,9 +497,22 @@
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Генерация...';
         });
 
-        // ============================================================
+        // modal-sync-realization — подставляем action из data-action кнопки
+        document.getElementById('modal-sync-realization').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('form-sync-realization').action = event.relatedTarget.getAttribute('data-action');
+        });
+
+        // modal-delete-connection — подставляем action из data-action кнопки
+        document.getElementById('modal-delete-connection').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('form-delete-connection').action = event.relatedTarget.getAttribute('data-action');
+        });
+
+        // modal-apply-realization — подставляем href из data-action кнопки
+        document.getElementById('modal-apply-realization').addEventListener('show.bs.modal', function (event) {
+            document.getElementById('btn-apply-realization').href = event.relatedTarget.getAttribute('data-action');
+        });
+
         // Опрос статуса первичной загрузки
-        // ============================================================
         (function () {
             var pendingNodes = document.querySelectorAll('[data-status-url][data-synced="0"]');
             if (pendingNodes.length === 0) return;
@@ -422,7 +530,6 @@
                                 clearInterval(interval);
                                 node.innerHTML = '<small class="text-danger">Ошибка: ' + (data.lastSyncError ?? '') + '</small>';
                             }
-                            // pending — ничего не меняем, ждём следующего тика
                         })
                         .catch(function () { /* сеть недоступна — продолжаем опрос */ });
                 }, 15000);

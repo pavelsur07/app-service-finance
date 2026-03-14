@@ -1,0 +1,135 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'inventory' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        <div class="mb-3">
+            <a href="{{ path('marketplace_inventory_index') }}" class="text-muted">
+                ← Себестоимость
+            </a>
+        </div>
+
+        <div class="card mb-3">
+            <div class="card-header">
+                <div class="col">
+                    <h3 class="card-title mb-0">
+                        {{ listing.product_name ?? listing.listing_name ?? listing.marketplace_sku }}
+                        <span class="badge bg-azure-lt ms-2">{{ listing.marketplace|upper }}</span>
+                        {% if listing.product_name is null %}
+                            <span class="badge bg-yellow-lt ms-1">Без привязки к товару</span>
+                        {% endif %}
+                    </h3>
+                    <div class="text-muted small mt-1">
+                        SKU: {{ listing.marketplace_sku }}
+                        {% if listing.product_sku is not null %}
+                            &middot; Артикул: {{ listing.product_sku }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="card-actions">
+                    <button type="button"
+                            class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-add-cost">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>
+                        Добавить цену
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">История себестоимости</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th>Действует с</th>
+                        <th>По дату</th>
+                        <th class="text-end">Сумма</th>
+                        <th>Примечание</th>
+                        <th>Добавлено</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in history %}
+                        <tr>
+                            <td><span class="fw-medium">{{ row.effective_from|date('d.m.Y') }}</span></td>
+                            <td>
+                                {% if row.effective_to is not null %}
+                                    <span class="text-muted">{{ row.effective_to|date('d.m.Y') }}</span>
+                                {% else %}
+                                    <span class="badge bg-success-lt">Активна</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                            <span class="fw-medium">
+                                {{ row.price_amount|number_format(2, '.', ' ') }} {{ row.price_currency }}
+                            </span>
+                            </td>
+                            <td><span class="text-muted small">{{ row.note ?? '—' }}</span></td>
+                            <td><span class="text-muted small">{{ row.created_at|date('d.m.Y H:i') }}</span></td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center text-muted py-4">
+                                Себестоимость ещё не задана.
+                                <a href="#" data-bs-toggle="modal" data-bs-target="#modal-add-cost">
+                                    Добавить первую запись
+                                </a>.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+
+    {# Modal: Добавить себестоимость #}
+    <div class="modal modal-blur fade" id="modal-add-cost" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post"
+                      action="{{ path('marketplace_inventory_set_cost', {id: listing.listing_id}) }}">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Новая себестоимость</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-muted small mb-3">
+                            {{ listing.product_name ?? listing.listing_name ?? listing.marketplace_sku }}
+                            / {{ listing.marketplace|upper }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Сумма, ₽</label>
+                            <input type="number" name="price_amount" class="form-control"
+                                   step="0.01" min="0" placeholder="850.00" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Действует с</label>
+                            <input type="date" name="effective_from" class="form-control"
+                                   value="{{ 'now'|date('Y-m-d') }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечание</label>
+                            <input type="text" name="note" class="form-control"
+                                   placeholder="Новая партия, пересмотр цен...">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">
+                            Отмена
+                        </button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+{% endblock %}

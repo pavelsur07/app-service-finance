@@ -17,6 +17,36 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceSale::class);
     }
 
+
+    /**
+     * Найти продажу по posting_number + SKU листинга.
+     * Используется при обработке realization-документа Ozon
+     * для обновления totalRevenue из sale.amount.
+     *
+     * В realization одна строка = один SKU в одном отправлении.
+     * SKU хранится в marketplace_listings.marketplace_sku.
+     */
+    public function findByMarketplaceOrderAndSku(
+        Company         $company,
+        MarketplaceType $marketplace,
+        string          $externalOrderId,
+        string          $marketplaceSku,
+    ): ?MarketplaceSale
+    {
+        return $this->createQueryBuilder('s')
+            ->join('s.listing', 'l')
+            ->where('s.company = :company')
+            ->andWhere('s.marketplace = :marketplace')
+            ->andWhere('s.externalOrderId = :orderId')
+            ->andWhere('l.marketplaceSku = :sku')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('orderId', $externalOrderId)
+            ->setParameter('sku', $marketplaceSku)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function getByCompanyQueryBuilder(Company $company): QueryBuilder
     {
         return $this->createQueryBuilder('s')

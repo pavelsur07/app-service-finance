@@ -1,0 +1,166 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'inventory' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        {# Фильтр по маркетплейсу #}
+        <div class="mb-3 d-flex gap-2">
+            <select class="form-select w-auto"
+                    onchange="window.location.href = this.value">
+                <option value="{{ path('marketplace_inventory_index') }}"
+                    {{ marketplace is null ? 'selected' : '' }}>
+                    Все маркетплейсы
+                </option>
+                <option value="{{ path('marketplace_inventory_index', {marketplace: 'wildberries'}) }}"
+                    {{ marketplace == 'wildberries' ? 'selected' : '' }}>
+                    Wildberries
+                </option>
+                <option value="{{ path('marketplace_inventory_index', {marketplace: 'ozon'}) }}"
+                    {{ marketplace == 'ozon' ? 'selected' : '' }}>
+                    Ozon
+                </option>
+            </select>
+        </div>
+
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th>Листинг / Товар</th>
+                        <th>Маркетплейс</th>
+                        <th>SKU</th>
+                        <th>Артикул продавца</th>
+                        <th class="text-end">Себестоимость</th>
+                        <th>Действует с</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for row in pager.currentPageResults %}
+                        <tr>
+                            <td>
+                                {% if row.product_name is not null %}
+                                    <div class="fw-medium">{{ row.product_name }}</div>
+                                    <div class="text-muted small">{{ row.product_sku }}</div>
+                                {% else %}
+                                    <div class="fw-medium">{{ row.listing_name ?? row.marketplace_sku }}</div>
+                                    <div class="text-muted small">
+                                        <span class="badge bg-yellow-lt">Без привязки к товару</span>
+                                    </div>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-azure-lt">{{ row.marketplace|upper }}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted small">{{ row.marketplace_sku }}</span>
+                            </td>
+                            <td>
+                                <span class="text-muted small">{{ row.supplier_sku ?? '—' }}</span>
+                            </td>
+                            <td class="text-end">
+                                {% if row.cost_price is not null %}
+                                    <span class="fw-medium">
+                                    {{ row.cost_price|number_format(2, '.', ' ') }} {{ row.cost_currency }}
+                                </span>
+                                {% else %}
+                                    <span class="text-danger small">Не задана</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.cost_from is not null %}
+                                    <span class="text-muted small">{{ row.cost_from|date('d.m.Y') }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                <div class="btn-list">
+                                    <a href="{{ path('marketplace_inventory_history', {id: row.listing_id}) }}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        История
+                                    </a>
+                                    <button type="button"
+                                            class="btn btn-sm {{ row.cost_price is null ? 'btn-primary' : 'btn-outline-primary' }}"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#modal-set-cost"
+                                            data-action="{{ path('marketplace_inventory_set_cost', {id: row.listing_id}) }}"
+                                            data-listing-name="{{ row.product_name ?? row.listing_name ?? row.marketplace_sku }} / {{ row.marketplace|upper }}">
+                                        {{ row.cost_price is null ? 'Добавить' : 'Изменить' }}
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                {% if marketplace is not null %}
+                                    Нет листингов для выбранного маркетплейса.
+                                {% else %}
+                                    Нет листингов. Добавьте подключение к маркетплейсу и запустите синхронизацию.
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if pager.haveToPaginate %}
+                <div class="card-footer d-flex align-items-center">
+                    {{ include('partials/_pagerfanta.html.twig', {pager: pager}) }}
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+
+    {# Modal: Установить себестоимость #}
+    <div class="modal modal-blur fade" id="modal-set-cost" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="form-set-cost" action="">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Себестоимость</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="text-muted small mb-3" id="modal-set-cost-name"></div>
+                        <div class="mb-3">
+                            <label class="form-label required">Сумма, ₽</label>
+                            <input type="number" name="price_amount" class="form-control"
+                                   step="0.01" min="0" placeholder="850.00" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Действует с</label>
+                            <input type="date" name="effective_from" class="form-control"
+                                   value="{{ 'now'|date('Y-m-d') }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Примечание</label>
+                            <input type="text" name="note" class="form-control"
+                                   placeholder="Новая партия, пересмотр цен...">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">
+                            Отмена
+                        </button>
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('modal-set-cost').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            document.getElementById('form-set-cost').action = btn.getAttribute('data-action');
+            document.getElementById('modal-set-cost-name').textContent = btn.getAttribute('data-listing-name');
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,152 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Marketplace\Inventory\Infrastructure\Query;
+
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Query\QueryBuilder;
+
+/**
+ * DBAL READ-запросы для UI субмодуля Inventory.
+ *
+ * listingsQueryBuilder() — DBAL QueryBuilder для всех листингов компании
+ *   с текущей себестоимостью. Без фильтра по product_id — листинг
+ *   без привязки к продукту тоже отображается.
+ *
+ * fetchHistory()    — история цен конкретного листинга.
+ * findListingMeta() — мета-информация для заголовка страницы истории.
+ */
+final readonly class InventoryCostListingQuery
+{
+    public function __construct(private Connection $connection)
+    {
+    }
+
+    /**
+     * DBAL QueryBuilder для списка листингов с текущей себестоимостью.
+     *
+     * Использование в контроллере:
+     *   $qb = $query->listingsQueryBuilder($companyId, $marketplace);
+     *   $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
+     *       $qb->select('COUNT(DISTINCT l.id) AS total_results')->resetOrderBy()->setMaxResults(1);
+     *   });
+     *
+     * Результирующие строки:
+     *   listing_id, marketplace, marketplace_sku, supplier_sku, listing_name,
+     *   product_id (null если не привязан), product_name (null), product_sku (null),
+     *   cost_price (null если не задана), cost_currency, cost_from
+     *
+     * @param string      $companyId
+     * @param string|null $marketplace 'ozon' | 'wildberries' | null (все)
+     */
+    public function listingsQueryBuilder(string $companyId, ?string $marketplace): QueryBuilder
+    {
+        $today = (new \DateTimeImmutable())->format('Y-m-d');
+
+        $qb = $this->connection->createQueryBuilder()
+            ->select(
+                'l.id                AS listing_id',
+                'l.marketplace       AS marketplace',
+                'l.marketplace_sku   AS marketplace_sku',
+                'l.supplier_sku      AS supplier_sku',
+                'l.name              AS listing_name',
+                'p.id                AS product_id',
+                'p.name              AS product_name',
+                'p.sku               AS product_sku',
+                'ic.price_amount     AS cost_price',
+                'ic.price_currency   AS cost_currency',
+                'ic.effective_from   AS cost_from',
+            )
+            ->from('marketplace_listings', 'l')
+            ->leftJoin('l', 'products', 'p', 'p.id = l.product_id')
+            ->leftJoin(
+                'l',
+                'marketplace_inventory_cost_prices',
+                'ic',
+                'ic.listing_id = l.id
+                 AND ic.company_id = l.company_id
+                 AND ic.effective_from <= :today
+                 AND (ic.effective_to IS NULL OR ic.effective_to >= :today)',
+            )
+            ->where('l.company_id = :companyId')
+            ->orderBy('l.marketplace', 'ASC')
+            ->addOrderBy('l.name', 'ASC')
+            ->addOrderBy('l.marketplace_sku', 'ASC')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('today', $today);
+
+        if ($marketplace !== null) {
+            $qb->andWhere('l.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace);
+        }
+
+        return $qb;
+    }
+
+    /**
+     * История цен для конкретного листинга.
+     *
+     * @return list<array{
+     *     id: string,
+     *     effective_from: string,
+     *     effective_to: string|null,
+     *     price_amount: string,
+     *     price_currency: string,
+     *     note: string|null,
+     *     created_at: string,
+     * }>
+     */
+    public function fetchHistory(string $companyId, string $listingId, int $limit = 50): array
+    {
+        return $this->connection->fetchAllAssociative(
+            'SELECT id, effective_from, effective_to, price_amount, price_currency, note, created_at
+             FROM marketplace_inventory_cost_prices
+             WHERE company_id = :companyId
+               AND listing_id = :listingId
+             ORDER BY effective_from DESC
+             LIMIT :limit',
+            [
+                'companyId' => $companyId,
+                'listingId' => $listingId,
+                'limit'     => $limit,
+            ],
+            ['limit' => \PDO::PARAM_INT],
+        );
+    }
+
+    /**
+     * Мета-информация листинга для заголовка страницы истории.
+     *
+     * @return array{
+     *     listing_id: string,
+     *     marketplace: string,
+     *     marketplace_sku: string,
+     *     listing_name: string|null,
+     *     product_id: string|null,
+     *     product_name: string|null,
+     *     product_sku: string|null,
+     * }|null
+     */
+    public function findListingMeta(string $companyId, string $listingId): ?array
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT
+                l.id              AS listing_id,
+                l.marketplace     AS marketplace,
+                l.marketplace_sku AS marketplace_sku,
+                l.name            AS listing_name,
+                p.id              AS product_id,
+                p.name            AS product_name,
+                p.sku             AS product_sku
+             FROM marketplace_listings l
+             LEFT JOIN products p ON p.id = l.product_id
+             WHERE l.id = :listingId
+               AND l.company_id = :companyId
+             LIMIT 1',
+            ['listingId' => $listingId, 'companyId' => $companyId],
+        );
+
+        return $row ?: null;
+    }
+}

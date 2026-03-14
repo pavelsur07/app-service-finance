@@ -4,24 +4,30 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Service;
 
-use App\Catalog\Facade\ProductPurchasePriceFacade;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 
 /**
  * Резолвер себестоимости для документов маркетплейса.
- * Единственное место логики получения costPrice.
+ * Единственное место логики получения costPrice в процессорах.
+ *
+ * Зависит от CostPriceResolverInterface — не знает как считается себестоимость.
+ * Передаёт listingId — себестоимость привязана к листингу, не к продукту.
+ *
+ * Публичные сигнатуры resolveForSale / resolveForReturn не изменились —
+ * все процессоры (Ozon, WB) продолжают работать без изменений.
  */
 final class MarketplaceCostPriceResolver
 {
     public function __construct(
-        private readonly ProductPurchasePriceFacade $purchasePriceFacade,
+        private readonly CostPriceResolverInterface $costPriceResolver,
     ) {
     }
 
     /**
      * Получить себестоимость для продажи.
-     * Возвращает '0.00' если листинг не привязан к продукту или нет истории цен.
+     * Возвращает '0.00' если нет записи в Inventory для этого листинга.
      */
     public function resolveForSale(MarketplaceListing $listing, \DateTimeImmutable $saleDate): string
     {
@@ -32,9 +38,9 @@ final class MarketplaceCostPriceResolver
      * Получить себестоимость для возврата.
      *
      * Цепочка:
-     * 1. Ищем продажу по srid → берём costPrice из продажи
-     * 2. Если продажа не найдена или costPrice = 0 → ищем по order_dt из rawData
-     * 3. Если order_dt отсутствует → возвращаем '0.00' (без fallback, без искажений)
+     * 1. Берём costPrice из связанной продажи если > 0
+     * 2. Ищем по order_dt из rawData
+     * 3. Если нет данных — возвращаем '0.00'
      */
     public function resolveForReturn(
         MarketplaceListing $listing,
@@ -51,6 +57,7 @@ final class MarketplaceCostPriceResolver
         if ($orderDt !== null && $orderDt !== '') {
             try {
                 $orderDate = new \DateTimeImmutable($orderDt);
+
                 return $this->resolve($listing, $orderDate);
             } catch (\Exception) {
                 // некорректная дата — не используем
@@ -63,19 +70,10 @@ final class MarketplaceCostPriceResolver
 
     private function resolve(MarketplaceListing $listing, \DateTimeImmutable $date): string
     {
-        $product = $listing->getProduct();
-        if ($product === null) {
-            return '0.00';
-        }
-
-        $companyId = (string) $listing->getCompany()->getId();
-        $productId = (string) $product->getId();
-
-        $dto = $this->purchasePriceFacade->getPurchasePriceAt($companyId, $productId, $date);
-        if ($dto === null) {
-            return '0.00';
-        }
-
-        return $dto->amount;
+        return $this->costPriceResolver->resolve(
+            companyId: (string) $listing->getCompany()->getId(),
+            listingId: $listing->getId(),
+            date:      $date,
+        );
     }
 }
