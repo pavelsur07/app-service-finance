@@ -10,6 +10,9 @@
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction >> /var/log/cron/app.log 2>&1
 
+# 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
+ 0 6 10 * * php bin/console app:marketplace:ozon-realization-sync --env=prod >> /var/log/cron/app.log 2>&1
+
 # Раз в час: пересчёт оперативных P&L-агрегатов
 #5 * * * * php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
 
@@ -18,4 +21,5 @@
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
 0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod >> /var/log/cron/app.log 2>&1
+
 
