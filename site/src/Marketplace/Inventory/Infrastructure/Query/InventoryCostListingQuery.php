@@ -43,7 +43,7 @@ final readonly class InventoryCostListingQuery
                 'l.marketplace_sku   AS marketplace_sku',
                 'l.supplier_sku      AS supplier_sku',
                 'l.name              AS listing_name',
-                'b.barcode           AS barcode',
+                '(SELECT b.barcode FROM marketplace_listing_barcodes b WHERE b.listing_id = l.id AND b.company_id = l.company_id ORDER BY b.barcode LIMIT 1) AS barcode',
                 'p.id                AS product_id',
                 'p.name              AS product_name',
                 'p.sku               AS product_sku',
@@ -62,18 +62,7 @@ final readonly class InventoryCostListingQuery
                  AND ic.effective_from <= :today
                  AND (ic.effective_to IS NULL OR ic.effective_to >= :today)',
             )
-            ->leftJoin(
-                'l',
-                'marketplace_listing_barcodes',
-                'b',
-                'b.listing_id = l.id AND b.company_id = l.company_id',
-            )
             ->where('l.company_id = :companyId')
-            ->groupBy(
-                'l.id', 'l.marketplace', 'l.marketplace_sku', 'l.supplier_sku',
-                'l.name', 'b.barcode', 'p.id', 'p.name', 'p.sku',
-                'ic.price_amount', 'ic.price_currency', 'ic.effective_from',
-            )
             ->orderBy('l.marketplace', 'ASC')
             ->addOrderBy('l.name', 'ASC')
             ->addOrderBy('l.marketplace_sku', 'ASC')
