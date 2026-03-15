@@ -5,8 +5,7 @@
 {% block tab_content %}
     <div class="p-3">
 
-        {# Фильтр по маркетплейсу #}
-        <div class="mb-3 d-flex gap-2">
+        <div class="mb-3 d-flex align-items-center gap-2">
             <select class="form-select w-auto"
                     onchange="window.location.href = this.value">
                 <option value="{{ path('marketplace_inventory_index') }}"
@@ -22,6 +21,34 @@
                     Ozon
                 </option>
             </select>
+
+            <button type="button"
+                    class="btn btn-sm btn-outline-secondary ms-auto"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-import-cost">
+                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                     viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                     stroke-linecap="round" stroke-linejoin="round">
+                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                    <path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/>
+                    <path d="M7 11l5 5l5 -5"/>
+                    <path d="M12 4l0 12"/>
+                </svg>
+                Загрузить из файла
+            </button>
+
+            <form method="post" action="{{ path('marketplace_inventory_sync_barcodes') }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                         viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                         stroke-linecap="round" stroke-linejoin="round">
+                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                        <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
+                        <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+                    </svg>
+                    Синхронизировать баркоды Ozon
+                </button>
+            </form>
         </div>
 
         <div class="card">
@@ -33,6 +60,7 @@
                         <th>Маркетплейс</th>
                         <th>SKU</th>
                         <th>Артикул продавца</th>
+                        <th>Баркод</th>
                         <th class="text-end">Себестоимость</th>
                         <th>Действует с</th>
                         <th></th>
@@ -52,20 +80,15 @@
                                     </div>
                                 {% endif %}
                             </td>
-                            <td>
-                                <span class="badge bg-azure-lt">{{ row.marketplace|upper }}</span>
-                            </td>
-                            <td>
-                                <span class="text-muted small">{{ row.marketplace_sku }}</span>
-                            </td>
-                            <td>
-                                <span class="text-muted small">{{ row.supplier_sku ?? '—' }}</span>
-                            </td>
+                            <td><span class="badge bg-azure-lt">{{ row.marketplace|upper }}</span></td>
+                            <td><span class="text-muted small">{{ row.marketplace_sku }}</span></td>
+                            <td><span class="text-muted small">{{ row.supplier_sku ?? '—' }}</span></td>
+                            <td><span class="text-muted small">{{ row.barcode ?? '—' }}</span></td>
                             <td class="text-end">
                                 {% if row.cost_price is not null %}
                                     <span class="fw-medium">
-                                    {{ row.cost_price|number_format(2, '.', ' ') }} {{ row.cost_currency }}
-                                </span>
+                                        {{ row.cost_price|number_format(2, '.', ' ') }} {{ row.cost_currency }}
+                                    </span>
                                 {% else %}
                                     <span class="text-danger small">Не задана</span>
                                 {% endif %}
@@ -80,9 +103,7 @@
                             <td class="text-end">
                                 <div class="btn-list">
                                     <a href="{{ path('marketplace_inventory_history', {id: row.listing_id}) }}"
-                                       class="btn btn-sm btn-outline-secondary">
-                                        История
-                                    </a>
+                                       class="btn btn-sm btn-outline-secondary">История</a>
                                     <button type="button"
                                             class="btn btn-sm {{ row.cost_price is null ? 'btn-primary' : 'btn-outline-primary' }}"
                                             data-bs-toggle="modal"
@@ -96,7 +117,7 @@
                         </tr>
                     {% else %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">
+                            <td colspan="8" class="text-center text-muted py-4">
                                 {% if marketplace is not null %}
                                     Нет листингов для выбранного маркетплейса.
                                 {% else %}
@@ -115,10 +136,9 @@
                 </div>
             {% endif %}
         </div>
-
     </div>
 
-    {# Modal: Установить себестоимость #}
+    {# Modal: Установить себестоимость вручную #}
     <div class="modal modal-blur fade" id="modal-set-cost" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
             <div class="modal-content">
@@ -150,6 +170,65 @@
                             Отмена
                         </button>
                         <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    {# Modal: Загрузить себестоимость из файла #}
+    <div class="modal modal-blur fade" id="modal-import-cost" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post"
+                      action="{{ path('marketplace_inventory_import_cost_price') }}"
+                      enctype="multipart/form-data">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Загрузить себестоимость из файла</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Маркетплейс</label>
+                            <select name="marketplace" class="form-select" required>
+                                <option value="">— выберите —</option>
+                                <option value="ozon" {{ marketplace == 'ozon' ? 'selected' : '' }}>OZON</option>
+                                <option value="wildberries" {{ marketplace == 'wildberries' ? 'selected' : '' }}>WILDBERRIES</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Дата действия себестоимости</label>
+                            <input type="date" name="effective_from" class="form-control"
+                                   value="{{ 'now'|date('Y-m-d') }}" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Файл (xls, xlsx)</label>
+                            <input type="file" name="cost_file" class="form-control"
+                                   accept=".xls,.xlsx" required>
+                        </div>
+                        <div class="alert alert-info mb-0">
+                            <div class="small">
+                                <strong>Формат файла:</strong><br>
+                                Колонка A — Баркод товара<br>
+                                Колонка B — Себестоимость (число, напр. 850.00)<br>
+                                Строка с заголовками пропускается автоматически.<br>
+                                <span class="text-muted">Цена будет установлена только для листингов выбранного маркетплейса.</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link link-secondary me-auto" data-bs-dismiss="modal">
+                            Отмена
+                        </button>
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
+                                 stroke-linecap="round" stroke-linejoin="round">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M5 12l5 5l10 -10"/>
+                            </svg>
+                            Запустить импорт
+                        </button>
                     </div>
                 </form>
             </div>

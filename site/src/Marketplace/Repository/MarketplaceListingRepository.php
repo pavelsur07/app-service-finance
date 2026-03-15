@@ -16,6 +16,49 @@ class MarketplaceListingRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceListing::class);
     }
 
+
+    // -------------------------------------------------------------------------
+    // Добавить в MarketplaceListingRepository
+    // Worker-safe: принимает companyId string, не объект Company
+    // -------------------------------------------------------------------------
+
+    /**
+     * Найти все листинги компании для указанного маркетплейса.
+     * Worker-safe: принимает companyId как string, не объект Company.
+     *
+     * @return MarketplaceListing[]
+     */
+    public function findByCompanyIdAndMarketplace(
+        string          $companyId,
+        MarketplaceType $marketplace,
+    ): array
+    {
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->getQuery()
+            ->getResult();
+    }
+
+    public function findBySkuAndCompanyId(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $sku,
+    ): ?MarketplaceListing {
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.marketplaceSku = :sku')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('sku', $sku)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function save(MarketplaceListing $listing): void
     {
         $this->getEntityManager()->persist($listing);

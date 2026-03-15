@@ -11,8 +11,8 @@ use Doctrine\DBAL\Query\QueryBuilder;
  * DBAL READ-запросы для UI субмодуля Inventory.
  *
  * listingsQueryBuilder() — DBAL QueryBuilder для всех листингов компании
- *   с текущей себестоимостью. Без фильтра по product_id — листинг
- *   без привязки к продукту тоже отображается.
+ *   с текущей себестоимостью и первым баркодом. Без фильтра по product_id —
+ *   листинг без привязки к продукту тоже отображается.
  *
  * fetchHistory()    — история цен конкретного листинга.
  * findListingMeta() — мета-информация для заголовка страницы истории.
@@ -24,21 +24,13 @@ final readonly class InventoryCostListingQuery
     }
 
     /**
-     * DBAL QueryBuilder для списка листингов с текущей себестоимостью.
-     *
-     * Использование в контроллере:
-     *   $qb = $query->listingsQueryBuilder($companyId, $marketplace);
-     *   $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
-     *       $qb->select('COUNT(DISTINCT l.id) AS total_results')->resetOrderBy()->setMaxResults(1);
-     *   });
+     * DBAL QueryBuilder для списка листингов с текущей себестоимостью и баркодом.
      *
      * Результирующие строки:
      *   listing_id, marketplace, marketplace_sku, supplier_sku, listing_name,
+     *   barcode (первый баркод или null),
      *   product_id (null если не привязан), product_name (null), product_sku (null),
      *   cost_price (null если не задана), cost_currency, cost_from
-     *
-     * @param string      $companyId
-     * @param string|null $marketplace 'ozon' | 'wildberries' | null (все)
      */
     public function listingsQueryBuilder(string $companyId, ?string $marketplace): QueryBuilder
     {
@@ -51,6 +43,7 @@ final readonly class InventoryCostListingQuery
                 'l.marketplace_sku   AS marketplace_sku',
                 'l.supplier_sku      AS supplier_sku',
                 'l.name              AS listing_name',
+                'b.barcode           AS barcode',
                 'p.id                AS product_id',
                 'p.name              AS product_name',
                 'p.sku               AS product_sku',
@@ -69,7 +62,18 @@ final readonly class InventoryCostListingQuery
                  AND ic.effective_from <= :today
                  AND (ic.effective_to IS NULL OR ic.effective_to >= :today)',
             )
+            ->leftJoin(
+                'l',
+                'marketplace_listing_barcodes',
+                'b',
+                'b.listing_id = l.id AND b.company_id = l.company_id',
+            )
             ->where('l.company_id = :companyId')
+            ->groupBy(
+                'l.id', 'l.marketplace', 'l.marketplace_sku', 'l.supplier_sku',
+                'l.name', 'b.barcode', 'p.id', 'p.name', 'p.sku',
+                'ic.price_amount', 'ic.price_currency', 'ic.effective_from',
+            )
             ->orderBy('l.marketplace', 'ASC')
             ->addOrderBy('l.name', 'ASC')
             ->addOrderBy('l.marketplace_sku', 'ASC')
