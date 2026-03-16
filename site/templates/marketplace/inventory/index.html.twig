@@ -175,7 +175,24 @@
                             <td><span class="badge bg-azure-lt">{{ row.marketplace|upper }}</span></td>
                             <td><span class="text-muted small">{{ row.marketplace_sku }}</span></td>
                             <td><span class="text-muted small">{{ row.supplier_sku ?? '—' }}</span></td>
-                            <td><span class="text-muted small">{{ row.barcode ?? '—' }}</span></td>
+                            <td>
+                                {% if row.barcode %}
+                                    <span class="text-muted small">{{ row.barcode }}</span>
+                                {% elseif row.marketplace == 'ozon' %}
+                                    <form method="post" action="{{ path('marketplace_inventory_sync_barcode_single', {id: row.listing_id}) }}" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-ghost-secondary py-0 px-1" title="Получить баркод из Ozon API">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                <path d="M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4"/>
+                                                <path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/>
+                                            </svg>
+                                            Получить
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
                             <td class="text-end">
                                 {% if row.cost_price is not null %}
                                     <span class="fw-medium">
