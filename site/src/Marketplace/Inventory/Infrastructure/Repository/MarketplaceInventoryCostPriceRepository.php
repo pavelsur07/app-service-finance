@@ -43,6 +43,26 @@ class MarketplaceInventoryCostPriceRepository extends ServiceEntityRepository
     }
 
     /**
+     * Найти самую раннюю запись для листинга.
+     * Используется как fallback в InventoryCostPriceResolver когда дата запроса
+     * раньше первой записи — себестоимость считается действующей с момента установки.
+     */
+    public function findEarliest(
+        string $companyId,
+        string $listingId,
+    ): ?MarketplaceInventoryCostPrice {
+        return $this->createQueryBuilder('p')
+            ->where('p.companyId = :companyId')
+            ->andWhere('IDENTITY(p.listing) = :listingId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('listingId', $listingId)
+            ->orderBy('p.effectiveFrom', 'ASC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * Найти последнюю запись для листинга (без ограничения по дате).
      * Используется в SetInventoryCostPriceAction для закрытия предыдущего периода.
      */

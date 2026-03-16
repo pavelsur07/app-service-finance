@@ -8,12 +8,13 @@ use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Inventory\Infrastructure\Repository\MarketplaceInventoryCostPriceRepository;
 
 /**
- * Реализация CostPriceResolverInterface для этапа 1.
+ * Реализация CostPriceResolverInterface.
  *
- * Ищет актуальную запись в marketplace_inventory_cost_prices по listingId на дату.
- * Если записи нет — возвращает '0.00' (контрольный ноль для закрытия месяца).
- *
- * На этапе 2 заменяется партионной реализацией без изменения потребителей.
+ * Логика резолва на дату:
+ *   1. Ищем запись где effectiveFrom <= date AND (effectiveTo IS NULL OR effectiveTo >= date)
+ *   2. Если не найдена — дата раньше первой записи → возвращаем самую раннюю запись
+ *      (себестоимость считается действующей с момента первой установки)
+ *   3. Если записей нет вообще — возвращаем '0.00'
  */
 final class InventoryCostPriceResolver implements CostPriceResolverInterface
 {
@@ -27,12 +28,21 @@ final class InventoryCostPriceResolver implements CostPriceResolverInterface
         string $listingId,
         \DateTimeImmutable $date,
     ): string {
+        // Шаг 1: ищем активную запись на дату
         $record = $this->repository->findActiveAtDate($companyId, $listingId, $date);
 
-        if ($record === null) {
-            return '0.00';
+        if ($record !== null) {
+            return $record->getPriceAmount();
         }
 
-        return $record->getPriceAmount();
+        // Шаг 2: дата раньше первой записи — берём самую раннюю
+        $earliest = $this->repository->findEarliest($companyId, $listingId);
+
+        if ($earliest !== null) {
+            return $earliest->getPriceAmount();
+        }
+
+        // Шаг 3: записей нет вообще
+        return '0.00';
     }
 }
