@@ -161,14 +161,13 @@
             </div>
         </div>
     </div>
+    <script>
+        document.getElementById('modal-recalculate-cost')
+            .querySelector('form')
+            .addEventListener('submit', function () {
+                var btn = document.getElementById('btn-recalculate-sales');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Пересчитываем...';
+            });
+    </script>
 {% endblock %}
-
-<script>
-    document.getElementById('modal-recalculate-cost')
-        .querySelector('form')
-        .addEventListener('submit', function () {
-            var btn = document.getElementById('btn-recalculate-sales');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Пересчитываем...';
-        });
-</script>
