@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller\Inventory;
 
+use App\Marketplace\Enum\JobType;
 use App\Marketplace\Inventory\Application\Command\SetInventoryCostPriceCommand;
 use App\Marketplace\Inventory\Application\SetInventoryCostPriceAction;
 use App\Marketplace\Inventory\Infrastructure\Query\InventoryCostListingQuery;
+use App\Marketplace\Message\SyncOzonListingBarcodesMessage;
+use App\Marketplace\Repository\MarketplaceJobLogRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Query\QueryBuilder;
 use Pagerfanta\Doctrine\DBAL\QueryAdapter;
@@ -14,6 +17,7 @@ use Pagerfanta\Pagerfanta;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -22,9 +26,11 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class InventoryController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly InventoryCostListingQuery $query,
+        private readonly ActiveCompanyService        $companyService,
+        private readonly InventoryCostListingQuery   $query,
         private readonly SetInventoryCostPriceAction $setAction,
+        private readonly MarketplaceJobLogRepository $jobLogRepository,
+        private readonly MessageBusInterface         $messageBus,
     ) {
     }
 
@@ -48,10 +54,16 @@ final class InventoryController extends AbstractController
             30,
         );
 
+        $jobLogs = $this->jobLogRepository->findLastByJobTypes($companyId, [
+            JobType::BARCODE_SYNC_OZON,
+            JobType::COST_PRICE_IMPORT,
+        ]);
+
         return $this->render('marketplace/inventory/index.html.twig', [
             'active_tab'  => 'inventory',
             'pager'       => $pager,
             'marketplace' => $marketplace,
+            'job_logs'    => $jobLogs,
         ]);
     }
 
@@ -105,5 +117,20 @@ final class InventoryController extends AbstractController
         }
 
         return $this->redirectToRoute('marketplace_inventory_history', ['id' => $id]);
+    }
+
+    #[Route('/sync-barcodes', name: 'marketplace_inventory_sync_barcodes', methods: ['POST'])]
+    public function syncBarcodes(): Response
+    {
+        $company   = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+
+        $this->messageBus->dispatch(new SyncOzonListingBarcodesMessage(
+            companyId: $companyId,
+        ));
+
+        $this->addFlash('success', 'Синхронизация баркодов Ozon запущена.');
+
+        return $this->redirectToRoute('marketplace_inventory_index');
     }
 }

@@ -51,6 +51,98 @@
             </form>
         </div>
 
+
+        {# Виджет статуса последних задач #}
+        {% if job_logs is not empty %}
+            <div class="mb-3 d-flex flex-column gap-2">
+                {% for job_type, log in job_logs %}
+                    <div class="alert {{ log.hasErrors ? 'alert-warning' : (log.status.value == 'running' ? 'alert-info' : 'alert-success') }} alert-dismissible mb-0 py-2">
+                        <div class="d-flex align-items-center gap-2">
+                            {% if log.status.value == 'running' %}
+                                <div class="spinner-border spinner-border-sm" role="status"></div>
+                            {% elseif log.hasErrors %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4m0 4h.01"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.871l-8.106 -13.534a1.914 1.914 0 0 0 -3.274 0z"/></svg>
+                            {% else %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>
+                            {% endif %}
+
+                            <span class="fw-medium">{{ log.jobType.label }}</span>
+                            <span class="text-muted small">
+                            {{ log.startedAt|date('d.m.Y H:i') }}
+                                {% if log.finishedAt %}— {{ log.finishedAt|date('H:i:ss') }}{% endif %}
+                        </span>
+
+                            {% if log.summary %}
+                                <span class="small ms-1">
+                                {% if log.status.value == 'failed' %}
+                                    Ошибка: {{ log.summary.error ?? 'неизвестная ошибка' }}
+                                {% elseif log.jobType.value == 'barcode_sync_ozon' %}
+                                    создано {{ log.summary.barcodes_created ?? 0 }},
+                                    пропущено {{ log.summary.barcodes_skipped ?? 0 }},
+                                    не найдено в API: {{ log.summary.errors ?? 0 }}
+                                {% elseif log.jobType.value == 'cost_price_import' %}
+                                    импортировано {{ log.summary.imported ?? 0 }},
+                                    пропущено {{ log.summary.skipped ?? 0 }},
+                                    ошибок {{ log.summary.errors ?? 0 }}
+                                    ({{ log.summary.file ?? '' }}, {{ log.summary.marketplace ?? '' }})
+                                {% endif %}
+                            </span>
+                            {% endif %}
+
+                            {% if log.details is not empty %}
+                                <button type="button" class="btn btn-sm btn-link p-0 ms-1"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modal-job-details-{{ loop.index }}">
+                                    показать детали
+                                </button>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {# Модал с деталями ошибок #}
+                    {% if log.details is not empty %}
+                        <div class="modal modal-blur fade" id="modal-job-details-{{ loop.index }}" tabindex="-1" role="dialog">
+                            <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable" role="document">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">{{ log.jobType.label }} — детали</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <table class="table table-sm table-vcenter">
+                                            <thead>
+                                            <tr>
+                                                {% if log.jobType.value == 'barcode_sync_ozon' %}
+                                                    <th>SKU</th>
+                                                    <th>Название</th>
+                                                {% endif %}
+                                                <th>Причина</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody>
+                                            {% for detail in log.details %}
+                                                <tr>
+                                                    {% if log.jobType.value == 'barcode_sync_ozon' %}
+                                                        <td><span class="text-muted small">{{ detail.sku ?? '—' }}</span></td>
+                                                        <td>{{ detail.name ?? '—' }}</td>
+                                                    {% endif %}
+                                                    <td><span class="text-danger small">{{ detail.reason ?? '—' }}</span></td>
+                                                </tr>
+                                            {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-link" data-bs-dismiss="modal">Закрыть</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            </div>
+        {% endif %}
+
         <div class="card">
             <div class="table-responsive">
                 <table class="table table-vcenter card-table">
