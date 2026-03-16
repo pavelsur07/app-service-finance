@@ -32,6 +32,7 @@ final class MarketplaceSalesController extends AbstractController
         $company      = $this->companyService->getActiveCompany();
         $companyId    = (string) $company->getId();
         $marketplace  = $request->query->get('marketplace') ?: null;
+        $page         = max(1, $request->query->getInt('page', 1));
 
         $qb      = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace);
         $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
@@ -40,7 +41,7 @@ final class MarketplaceSalesController extends AbstractController
 
         $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
-            $request->query->get('page', 1),
+            $page,
             50,
         );
 
