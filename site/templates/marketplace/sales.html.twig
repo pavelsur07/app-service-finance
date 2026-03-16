@@ -148,7 +148,7 @@
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="btn-recalculate-sales">
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24"
                                  stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round">
                                 <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
@@ -162,3 +162,13 @@
         </div>
     </div>
 {% endblock %}
+
+<script>
+    document.getElementById('modal-recalculate-cost')
+        .querySelector('form')
+        .addEventListener('submit', function () {
+            var btn = document.getElementById('btn-recalculate-sales');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Пересчитываем...';
+        });
+</script>

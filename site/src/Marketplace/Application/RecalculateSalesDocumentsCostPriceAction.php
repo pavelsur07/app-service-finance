@@ -13,10 +13,10 @@ use Doctrine\ORM\EntityManagerInterface;
 final class RecalculateSalesDocumentsCostPriceAction
 {
     public function __construct(
-        private readonly MarketplaceSaleRepository   $saleRepository,
-        private readonly MarketplaceReturnRepository $returnRepository,
+        private readonly MarketplaceSaleRepository    $saleRepository,
+        private readonly MarketplaceReturnRepository  $returnRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
-        private readonly EntityManagerInterface      $em,
+        private readonly EntityManagerInterface       $em,
     ) {
     }
 
@@ -38,10 +38,8 @@ final class RecalculateSalesDocumentsCostPriceAction
         );
 
         foreach ($sales as $sale) {
-            $listing = $sale->getListing();
-
             $costPrice = $this->costPriceResolver->resolveForSale(
-                $listing,
+                $sale->getListing(),
                 $sale->getSaleDate(),
             );
 
@@ -63,13 +61,13 @@ final class RecalculateSalesDocumentsCostPriceAction
                 $return->getListing(),
                 $return->getSale(),
                 $return->getRawData(),
+                $return->getReturnDate(),
             );
 
             $return->setCostPrice($costPrice);
             ++$returnsCount;
         }
 
-        // Единый flush после всех изменений
         $this->em->flush();
 
         return ['sales' => $salesCount, 'returns' => $returnsCount];

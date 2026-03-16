@@ -27,7 +27,6 @@ final class MarketplaceCostPriceResolver
 
     /**
      * Получить себестоимость для продажи.
-     * Возвращает '0.00' если нет записи в Inventory для этого листинга.
      */
     public function resolveForSale(MarketplaceListing $listing, \DateTimeImmutable $saleDate): string
     {
@@ -40,12 +39,13 @@ final class MarketplaceCostPriceResolver
      * Цепочка:
      * 1. Берём costPrice из связанной продажи если > 0
      * 2. Ищем по order_dt из rawData
-     * 3. Если нет данных — возвращаем '0.00'
+     * 3. Резолвим по returnDate — дата возврата как fallback
      */
     public function resolveForReturn(
         MarketplaceListing $listing,
         ?MarketplaceSale $sale,
         ?array $rawData,
+        ?\DateTimeImmutable $returnDate = null,
     ): string {
         // Шаг 1: берём из продажи если есть реальная себестоимость
         if ($sale !== null && $sale->getCostPrice() !== null && bccomp($sale->getCostPrice(), '0.00', 2) > 0) {
@@ -64,7 +64,12 @@ final class MarketplaceCostPriceResolver
             }
         }
 
-        // Шаг 3: нет данных для точного определения — не искажаем
+        // Шаг 3: резолвим по дате возврата если передана
+        if ($returnDate !== null) {
+            return $this->resolve($listing, $returnDate);
+        }
+
+        // Шаг 4: нет данных для определения
         return '0.00';
     }
 
