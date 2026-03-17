@@ -1,0 +1,255 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'month_close' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        {# Фильтры периода #}
+        <form method="get" action="{{ path('marketplace_month_close_index') }}"
+              class="mb-4 d-flex align-items-end gap-3">
+            <div>
+                <label class="form-label">Маркетплейс</label>
+                <select name="marketplace" class="form-select w-auto" onchange="this.form.submit()">
+                    {% for mp in available_marketplaces %}
+                        <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>
+                            {{ mp.value|upper }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Год</label>
+                <select name="year" class="form-select w-auto" onchange="this.form.submit()">
+                    {% for y in range('now'|date('Y'), 'now'|date('Y') - 2, -1) %}
+                        <option value="{{ y }}" {{ year == y ? 'selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">Месяц</label>
+                <select name="month" class="form-select w-auto" onchange="this.form.submit()">
+                    {% set monthNames = {1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+                        5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+                        9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'} %}
+                    {% for n, name in monthNames %}
+                        <option value="{{ n }}" {{ month == n ? 'selected' : '' }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        {# Этапы закрытия #}
+        <div class="row g-3 mb-4">
+            {% for stage in stages %}
+                {% set stageStatus = month_close ? month_close.getStageStatus(stage) : null %}
+                {% set isClosed = stageStatus and stageStatus.value == 'closed' %}
+                {% set isReopened = stageStatus and stageStatus.value == 'reopened' %}
+
+                <div class="col-md-6">
+                    <div class="card h-100 {{ isClosed ? 'border-success' : (isReopened ? 'border-warning' : '') }}">
+                        <div class="card-header d-flex align-items-center">
+                            <h4 class="card-title mb-0 me-auto">
+                                {% if isClosed %}
+                                    <span class="text-success me-2">✓</span>
+                                {% elseif isReopened %}
+                                    <span class="text-warning me-2">↺</span>
+                                {% else %}
+                                    <span class="text-muted me-2">○</span>
+                                {% endif %}
+                                {{ stage.label }}
+                            </h4>
+                            {% if isClosed %}
+                                <span class="badge bg-success-lt">Закрыт</span>
+                            {% elseif isReopened %}
+                                <span class="badge bg-warning-lt">Переоткрыт</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">Не закрыт</span>
+                            {% endif %}
+                        </div>
+                        <div class="card-body">
+                            {% if isClosed %}
+                                {% if stage.value == 'sales_returns' %}
+                                    <div class="text-muted small mb-3">
+                                        Закрыт: {{ month_close.stageSalesReturnsClosedAt|date('d.m.Y H:i') }}
+                                    </div>
+                                    {% set docIds = month_close.stageSalesReturnsPLDocumentIds %}
+                                {% else %}
+                                    <div class="text-muted small mb-3">
+                                        Закрыт: {{ month_close.stageCostsClosedAt|date('d.m.Y H:i') }}
+                                    </div>
+                                    {% set docIds = month_close.stageCostsPLDocumentIds %}
+                                {% endif %}
+
+                                {% if docIds %}
+                                    <div class="text-muted small mb-3">
+                                        Документов ОПиУ: {{ docIds|length }}
+                                    </div>
+                                {% endif %}
+
+                                <form method="post"
+                                      action="{{ path('marketplace_month_close_reopen') }}">
+                                    <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                    <input type="hidden" name="year" value="{{ year }}">
+                                    <input type="hidden" name="month" value="{{ month }}">
+                                    <input type="hidden" name="stage" value="{{ stage.value }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-warning"
+                                            onclick="return confirm('Переоткрыть этап? Документы ОПиУ нужно будет удалить вручную.')">
+                                        Переоткрыть
+                                    </button>
+                                </form>
+                            {% else %}
+                                {# Кнопка Preflight + закрытие #}
+                                <button type="button"
+                                        class="btn btn-outline-secondary btn-sm mb-3"
+                                        data-stage="{{ stage.value }}"
+                                        data-marketplace="{{ marketplace }}"
+                                        data-year="{{ year }}"
+                                        data-month="{{ month }}"
+                                        onclick="runPreflight(this)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>
+                                    Проверить готовность
+                                </button>
+
+                                <div id="preflight-result-{{ stage.value }}" class="mb-3" style="display:none"></div>
+
+                                <form method="post"
+                                      action="{{ path('marketplace_month_close_stage') }}"
+                                      id="form-close-{{ stage.value }}">
+                                    <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                    <input type="hidden" name="year" value="{{ year }}">
+                                    <input type="hidden" name="month" value="{{ month }}">
+                                    <input type="hidden" name="stage" value="{{ stage.value }}">
+                                    <button type="submit"
+                                            class="btn btn-primary btn-sm"
+                                            id="btn-close-{{ stage.value }}"
+                                            disabled>
+                                        Закрыть этап
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {# История закрытий #}
+        {% if history is not empty %}
+            <h4 class="mb-3">История закрытий — {{ marketplace|upper }}</h4>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th>Период</th>
+                        <th>Продажи / Возвраты</th>
+                        <th>Затраты</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for mc in history %}
+                        <tr>
+                            <td>
+                                <a href="{{ path('marketplace_month_close_index', {
+                                    marketplace: marketplace,
+                                    year: mc.year,
+                                    month: mc.month
+                                }) }}" class="fw-medium">
+                                    {{ ['', 'Январь','Февраль','Март','Апрель','Май','Июнь',
+                                        'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][mc.month] }}
+                                    {{ mc.year }}
+                                </a>
+                            </td>
+                            <td>
+                                {% if mc.stageSalesReturnsStatus.value == 'closed' %}
+                                    <span class="badge bg-success-lt">Закрыт</span>
+                                    <span class="text-muted small ms-1">{{ mc.stageSalesReturnsClosedAt|date('d.m.Y') }}</span>
+                                {% elseif mc.stageSalesReturnsStatus.value == 'reopened' %}
+                                    <span class="badge bg-warning-lt">Переоткрыт</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-lt">Не закрыт</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if mc.stageCostsStatus.value == 'closed' %}
+                                    <span class="badge bg-success-lt">Закрыт</span>
+                                    <span class="text-muted small ms-1">{{ mc.stageCostsClosedAt|date('d.m.Y') }}</span>
+                                {% elseif mc.stageCostsStatus.value == 'reopened' %}
+                                    <span class="badge bg-warning-lt">Переоткрыт</span>
+                                {% else %}
+                                    <span class="badge bg-secondary-lt">Не закрыт</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %}
+
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <script>
+        function runPreflight(btn) {
+            const stage = btn.dataset.stage;
+            const resultDiv = document.getElementById('preflight-result-' + stage);
+            const closeBtn = document.getElementById('btn-close-' + stage);
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Проверяем...';
+            resultDiv.style.display = 'none';
+            closeBtn.disabled = true;
+
+            fetch('{{ path('marketplace_month_close_preflight') }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: new URLSearchParams({
+                    marketplace: btn.dataset.marketplace,
+                    year: btn.dataset.year,
+                    month: btn.dataset.month,
+                    stage: stage,
+                })
+            })
+                .then(r => r.json())
+                .then(data => {
+                    let html = '<div class="list-group list-group-flush">';
+                    data.checks.forEach(check => {
+                        const icon = check.passed
+                            ? '<span class="text-success">✓</span>'
+                            : (check.blocking ? '<span class="text-danger">✗</span>' : '<span class="text-warning">⚠</span>');
+                        html += `<div class="list-group-item px-0 py-2 d-flex gap-2 align-items-start">
+                        ${icon}
+                        <div>
+                            <div class="fw-medium small">${check.label}</div>
+                            <div class="text-muted small">${check.message}</div>
+                        </div>
+                     </div>`;
+                    });
+                    html += '</div>';
+
+                    resultDiv.innerHTML = html;
+                    resultDiv.style.display = 'block';
+                    closeBtn.disabled = !data.can_close;
+
+                    btn.disabled = false;
+                    btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 12l2 2l4 -4"/><path d="M12 3a12 12 0 0 0 8.5 3a12 12 0 0 1 -8.5 15a12 12 0 0 1 -8.5 -15a12 12 0 0 0 8.5 -3"/></svg>Проверить готовность';
+                })
+                .catch(() => {
+                    resultDiv.innerHTML = '<div class="alert alert-danger">Ошибка проверки. Попробуйте ещё раз.</div>';
+                    resultDiv.style.display = 'block';
+                    btn.disabled = false;
+                });
+        }
+
+        // Блокируем кнопку "Закрыть этап" при submit
+        document.querySelectorAll('form[id^="form-close-"]').forEach(form => {
+            form.addEventListener('submit', function() {
+                const btn = this.querySelector('button[type="submit"]');
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Закрываем...';
+            });
+        });
+    </script>
+{% endblock %}

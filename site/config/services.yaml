@@ -154,6 +154,29 @@ services:
     App\Marketplace\Inventory\CostPriceResolverInterface:
         class: App\Marketplace\Inventory\Application\InventoryCostPriceResolver
 
+    # -------------------------------------------------------------------------
+    # Добавить в site/config/services.yaml
+    # -------------------------------------------------------------------------
+
+    # Data Sources для закрытия месяца
+    # Тег marketplace.data_source позволяет добавлять новые источники
+    # без изменения ядра — достаточно создать новый класс и добавить тег
+
+    App\Marketplace\Application\Source\SalesReturnsDataSource:
+        tags: [ 'marketplace.data_source' ]
+
+    App\Marketplace\Application\Source\CostsDataSource:
+        tags: [ 'marketplace.data_source' ]
+
+    # CloseMonthStageAction получает все зарегистрированные Source через tagged_iterator
+    App\Marketplace\Application\CloseMonthStageAction:
+        arguments:
+            $dataSources: !tagged_iterator marketplace.data_source
+
+    # CostPriceResolverInterface → InventoryCostPriceResolver (уже должен быть)
+    # App\Marketplace\Inventory\CostPriceResolverInterface:
+    #     class: App\Marketplace\Inventory\Application\InventoryCostPriceResolver
+
     # ---------- Notification  ------------ #
     App\Notification\Channel\:
         resource: '../src/Notification/Channel/'

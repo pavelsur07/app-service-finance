@@ -1,0 +1,103 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'cost_pl_mapping' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        <form method="get" action="{{ path('marketplace_cost_pl_mapping_index') }}"
+              class="mb-4 d-flex align-items-end gap-3">
+            <div>
+                <label class="form-label">Маркетплейс</label>
+                <select name="marketplace" class="form-select w-auto" onchange="this.form.submit()">
+                    <option value="">Все маркетплейсы</option>
+                    {% for mp in available_marketplaces %}
+                        <option value="{{ mp.value }}"
+                            {{ selected_marketplace == mp.value ? 'selected' : '' }}>
+                            {{ mp.value|upper }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </form>
+
+        {% if cost_categories is empty %}
+            <div class="alert alert-info">
+                Нет категорий затрат. Загрузите затраты из маркетплейса.
+            </div>
+        {% else %}
+            <form method="post" action="{{ path('marketplace_cost_pl_mapping_bulk_save') }}">
+                <input type="hidden" name="marketplace" value="{{ selected_marketplace ?? '' }}">
+
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Категория затрат</th>
+                                <th>Маркетплейс</th>
+                                <th style="min-width: 280px">Категория ОПиУ</th>
+                                <th class="text-center">Включить в ОПиУ</th>
+                                <th style="width: 80px">Порядок</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for category in cost_categories %}
+                                {% set mapping = mappings_indexed[category.id] ?? null %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-medium">{{ category.name }}</div>
+                                        {% if category.code %}
+                                            <div class="text-muted small">{{ category.code }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-azure-lt">{{ category.marketplace.value|upper }}</span>
+                                    </td>
+                                    <td>
+                                        <select name="mappings[{{ category.id }}][pl_category_id]"
+                                                class="form-select form-select-sm">
+                                            <option value="">— не задана —</option>
+                                            {% for plCat in pl_categories %}
+                                                <option value="{{ plCat.id }}"
+                                                    {{ (mapping and mapping.plCategoryId == plCat.id) ? 'selected' : '' }}>
+                                                    {{ plCat.indentedName }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="checkbox"
+                                               name="mappings[{{ category.id }}][include_in_pl]"
+                                               value="1"
+                                               class="form-check-input"
+                                            {{ (mapping is null or mapping.includeInPl) ? 'checked' : '' }}>
+                                    </td>
+                                    <td>
+                                        <input type="number"
+                                               name="mappings[{{ category.id }}][sort_order]"
+                                               value="{{ mapping ? mapping.sortOrder : 0 }}"
+                                               class="form-control form-control-sm"
+                                               min="0" step="10">
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer d-flex justify-content-end">
+                        <button type="submit" class="btn btn-primary">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
+                                 viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M5 12l5 5l10 -10"/>
+                            </svg>
+                            Сохранить все маппинги
+                        </button>
+                    </div>
+                </div>
+            </form>
+        {% endif %}
+
+    </div>
+{% endblock %}

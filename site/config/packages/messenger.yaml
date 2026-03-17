@@ -30,6 +30,7 @@ framework:
             'App\Marketplace\Message\GenerateMarketplacePLMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\SyncOzonRealizationMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
+            'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
             'App\Catalog\Message\ImportProductsMessage': async
             #App\Message\ApplyAutoRulesForTransaction: async
