@@ -125,10 +125,11 @@ final class ProcessOzonRealizationAction
             $sku      = (string) ($row['item']['sku'] ?? '');
             $offerId  = (string) ($row['item']['offer_id'] ?? '') ?: null;
             $name     = (string) ($row['item']['name'] ?? '') ?: null;
-            $price    = (float) ($row['seller_price_per_instance'] ?? 0);
-            $quantity = (int) ($row['delivery_commission']['quantity'] ?? 0);
+            $quantity         = (int) ($row['delivery_commission']['quantity'] ?? 0);
+            // price_per_instance = цена единицы товара покупателю с учётом СПП
+            $pricePerInstance = (float) ($row['delivery_commission']['price_per_instance'] ?? 0);
 
-            if ($sku === '' || $price <= 0 || $quantity <= 0) {
+            if ($sku === '' || $quantity <= 0 || $pricePerInstance <= 0) {
                 $skipped++;
                 continue;
             }
@@ -138,7 +139,7 @@ final class ProcessOzonRealizationAction
                 $companyId,
                 $rawDoc,
                 $sku,
-                number_format($price, 2, '.', ''),
+                number_format($pricePerInstance, 2, '.', ''),
                 $quantity,
                 $periodFrom,
                 $periodTo,

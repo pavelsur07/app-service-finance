@@ -17,7 +17,8 @@ use Webmozart\Assert\Assert;
  * Одна строка = один SKU за период реализации.
  * Несколько строк с одним SKU за один период = несколько отгрузок.
  *
- * Выручка = seller_price_per_instance × quantity ("Реализовано на сумму").
+ * Выручка = delivery_commission.price_per_instance × quantity
+ * (цена единицы покупателю с учётом СПП скидки).
  * pl_document_id — заполняется при закрытии месяца.
  */
 #[ORM\Entity(repositoryClass: MarketplaceOzonRealizationRepository::class)]
@@ -53,7 +54,7 @@ class MarketplaceOzonRealization
     #[ORM\Column(type: 'string', length: 500, nullable: true)]
     private ?string $name;
 
-    /** Цена продавца за единицу (seller_price_per_instance) */
+    /** Цена единицы с учётом СПП (delivery_commission.price_per_instance) */
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2)]
     private string $sellerPricePerInstance;
 

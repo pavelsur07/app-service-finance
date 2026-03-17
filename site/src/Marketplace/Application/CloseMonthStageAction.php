@@ -97,9 +97,12 @@ final class CloseMonthStageAction
             );
         }
 
-        // 3. Обработать каждый Source этапа
+        // 3. Собрать entries со всех Source-ов этапа → один PLDocument
         $plDocumentIds = [];
         $source        = $this->resolveSource($marketplace);
+        $stream        = $this->resolveStream($stage);
+        $allPlEntries  = [];
+        $sourcesUsed   = [];
 
         foreach ($this->getSourcesForStage($stage, $marketplace) as $dataSource) {
             $entries = $dataSource->getUnprocessedEntries(
@@ -116,44 +119,54 @@ final class CloseMonthStageAction
                 continue;
             }
 
-            $plEntries = array_map(
-                static fn(array $row) => new PLEntryDTO(
+            foreach ($entries as $row) {
+                $allPlEntries[] = new PLEntryDTO(
                     plCategoryId: $row['pl_category_id'],
                     projectId:    $row['project_direction_id'] ?? null,
                     amount:       $row['total_amount'],
                     periodDate:   $periodTo,
-                    description:  $row['description'] ?? $dataSource->getLabel(),
+                    description:  $row['description_template'] ?? $row['description'] ?? $dataSource->getLabel(),
                     isNegative:   (bool) ($row['is_negative'] ?? false),
                     sortOrder:    (int) ($row['sort_order'] ?? 0),
-                ),
-                $entries,
-            );
+                );
+            }
 
-            $stream = $this->resolveStream($stage);
+            $sourcesUsed[] = $dataSource;
 
+            $this->logger->info('[MonthClose] Entries collected from source', [
+                'source'  => $dataSource->getSourceId(),
+                'entries' => count($entries),
+            ]);
+        }
+
+        // Создаём один документ для всех Source-ов этапа
+        if (!empty($allPlEntries)) {
             $documentId = $this->financeFacade->createPLDocument(
                 companyId:  $command->companyId,
                 source:     $source,
                 stream:     $stream,
                 periodFrom: $periodFrom,
                 periodTo:   $periodTo,
-                entries:    $plEntries,
+                entries:    $allPlEntries,
             );
 
-            $dataSource->markProcessed(
-                $command->companyId,
-                $command->marketplace,
-                $documentId,
-                $periodFrom,
-                $periodTo,
-            );
+            // Помечаем обработанными все Source-ы
+            foreach ($sourcesUsed as $dataSource) {
+                $dataSource->markProcessed(
+                    $command->companyId,
+                    $command->marketplace,
+                    $documentId,
+                    $periodFrom,
+                    $periodTo,
+                );
+            }
 
             $plDocumentIds[] = $documentId;
 
-            $this->logger->info('[MonthClose] Source processed', [
-                'source'      => $dataSource->getSourceId(),
+            $this->logger->info('[MonthClose] PLDocument created', [
                 'document_id' => $documentId,
-                'entries'     => count($plEntries),
+                'entries'     => count($allPlEntries),
+                'sources'     => array_map(fn($s) => $s->getSourceId(), $sourcesUsed),
             ]);
         }
 
