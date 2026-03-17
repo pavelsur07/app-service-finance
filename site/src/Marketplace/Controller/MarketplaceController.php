@@ -463,10 +463,9 @@ class MarketplaceController extends AbstractController
             $result = ($action)((string) $company->getId(), (string) $rawDoc->getId());
 
             $this->addFlash('success', sprintf(
-                'Реализация обработана: обновлено %d, пропущено %d, не найдено %d.',
-                $result['updated'],
+                'Реализация обработана: создано строк %d, пропущено %d.',
+                $result['created'],
                 $result['skipped'],
-                $result['not_found'],
             ));
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
