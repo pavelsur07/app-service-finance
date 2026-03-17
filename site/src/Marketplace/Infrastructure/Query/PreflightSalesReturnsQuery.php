@@ -74,9 +74,8 @@ final class PreflightSalesReturnsQuery
     }
 
     /**
-     * Проверить загружена ли реализация Ozon за месяц.
-     * Реализация загружается помесячно — проверяем наличие документа типа 'realization'
-     * с periodFrom = первый день месяца.
+     * Проверить загружена и обработана ли реализация Ozon за месяц.
+     * Проверяем наличие денормализованных строк в marketplace_ozon_realizations.
      */
     public function isOzonRealizationLoaded(
         string $companyId,
@@ -84,19 +83,18 @@ final class PreflightSalesReturnsQuery
         int $month,
     ): bool {
         $periodFrom = sprintf('%d-%02d-01', $year, $month);
+        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
         $result = $this->connection->fetchOne(
             'SELECT COUNT(*)
-             FROM marketplace_raw_documents
+             FROM marketplace_ozon_realizations
              WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND document_type = :documentType
-               AND period_from = :periodFrom',
+               AND period_from >= :periodFrom
+               AND period_to <= :periodTo',
             [
-                'companyId'    => $companyId,
-                'marketplace'  => 'ozon',
-                'documentType' => 'realization',
-                'periodFrom'   => $periodFrom,
+                'companyId'  => $companyId,
+                'periodFrom' => $periodFrom,
+                'periodTo'   => $periodTo,
             ],
         );
 

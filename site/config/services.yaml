@@ -173,6 +173,9 @@ services:
         arguments:
             $dataSources: !tagged_iterator marketplace.data_source
 
+    App\Marketplace\Application\Source\RealizationDataSource:
+        tags: ['marketplace.data_source']
+
     # CostPriceResolverInterface → InventoryCostPriceResolver (уже должен быть)
     # App\Marketplace\Inventory\CostPriceResolverInterface:
     #     class: App\Marketplace\Inventory\Application\InventoryCostPriceResolver
