@@ -89,7 +89,15 @@
                                 <span class="text-muted">—</span>
                             {% endif %}
                         </td>
-                        <td><small class="text-muted">{{ return.external_return_id|slice(0, 20) }}...</small></td>
+                        <td>
+                            <div class="d-flex align-items-center gap-2">
+                                <small class="text-muted">{{ return.external_return_id|slice(0, 20) }}...</small>
+                                {% if return.document_id is not null %}
+                                    <i class="ti ti-file-check text-success"
+                                       title="Возврат уже включён в документ ОПиУ"></i>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                 {% endfor %}
             {% endif %}

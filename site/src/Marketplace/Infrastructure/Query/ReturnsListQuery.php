@@ -22,6 +22,7 @@ final class ReturnsListQuery
                 'r.return_date',
                 'r.marketplace',
                 'r.external_return_id',
+                'r.document_id',
                 'r.quantity',
                 'r.refund_amount',
                 'r.cost_price',
