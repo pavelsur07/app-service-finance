@@ -16,7 +16,21 @@ final class PlNatureResolver
             ? $op->getPlCategory()
             : (method_exists($op, 'getCategory') ? $op->getCategory() : null);
 
-        return $category?->nature();
+        $nature = $category?->nature();
+        if ($nature instanceof PlNature) {
+            return $nature;
+        }
+
+        $amount = (float) $op->getAmount();
+        if ($amount > 0.0) {
+            return PlNature::INCOME;
+        }
+
+        if ($amount < 0.0) {
+            return PlNature::EXPENSE;
+        }
+
+        return null;
     }
 
     public function forDocument(Document $doc): PlNature|string
