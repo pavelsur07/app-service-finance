@@ -9,8 +9,11 @@ use Doctrine\DBAL\Connection;
 /**
  * Агрегирует необработанные возвраты по маппингу AmountSource → PLCategory.
  *
- * LEFT JOIN marketplace_sales — для получения pricePerUnit/costPrice оригинальной продажи
- * (AmountSource::RETURN_GROSS и RETURN_COST_PRICE ссылаются на поля продажи).
+ * LEFT JOIN marketplace_sales — для получения pricePerUnit/costPrice оригинальной продажи.
+ *
+ * Fallback логика для return_gross / return_cost_price:
+ *   Если sale_id IS NULL (нет связанной продажи) — используем refund_amount.
+ *   Это актуально для Ozon где возвраты не всегда матчатся с продажами.
  *
  * WHERE document_id IS NULL — только необработанные записи.
  */
@@ -46,9 +49,19 @@ final class UnprocessedReturnsQuery
                 m.sort_order,
                 SUM(
                     CASE m.amount_source
-                        WHEN 'return_refund'     THEN r.refund_amount
-                        WHEN 'return_gross'      THEN COALESCE(ms.price_per_unit, 0) * r.quantity
-                        WHEN 'return_cost_price' THEN COALESCE(ms.cost_price, 0) * r.quantity
+                        WHEN 'return_refund'
+                            THEN COALESCE(r.refund_amount, 0)
+                        WHEN 'return_gross'
+                            THEN COALESCE(
+                                ms.price_per_unit * r.quantity,
+                                r.refund_amount,
+                                0
+                            )
+                        WHEN 'return_cost_price'
+                            THEN COALESCE(
+                                ms.cost_price * r.quantity,
+                                0
+                            )
                         ELSE 0
                     END
                 ) AS total_amount
@@ -73,9 +86,19 @@ final class UnprocessedReturnsQuery
                 m.sort_order
             HAVING SUM(
                 CASE m.amount_source
-                    WHEN 'return_refund'     THEN r.refund_amount
-                    WHEN 'return_gross'      THEN COALESCE(ms.price_per_unit, 0) * r.quantity
-                    WHEN 'return_cost_price' THEN COALESCE(ms.cost_price, 0) * r.quantity
+                    WHEN 'return_refund'
+                        THEN COALESCE(r.refund_amount, 0)
+                    WHEN 'return_gross'
+                        THEN COALESCE(
+                            ms.price_per_unit * r.quantity,
+                            r.refund_amount,
+                            0
+                        )
+                    WHEN 'return_cost_price'
+                        THEN COALESCE(
+                            ms.cost_price * r.quantity,
+                            0
+                        )
                     ELSE 0
                 END
             ) != 0
@@ -83,10 +106,10 @@ final class UnprocessedReturnsQuery
         SQL;
 
         return $this->connection->fetchAllAssociative($sql, [
-            'companyId' => $companyId,
+            'companyId'   => $companyId,
             'marketplace' => $marketplace,
-            'periodFrom' => $periodFrom,
-            'periodTo' => $periodTo,
+            'periodFrom'  => $periodFrom,
+            'periodTo'    => $periodTo,
         ]);
     }
 }
