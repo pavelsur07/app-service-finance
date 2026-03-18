@@ -77,8 +77,11 @@ final class PlReportPreviewController extends AbstractController
         $fromInput = $request->query->get('from');
         $toInput = $request->query->get('to');
 
-        $defaultStart = (new \DateTimeImmutable('first day of this month'))->setTime(0, 0, 0);
-        $defaultEnd = (new \DateTimeImmutable('last day of this month'))->setTime(0, 0, 0);
+        $currentMonth = new \DateTimeImmutable('first day of this month');
+        $quarterStartMonth = ((int) $currentMonth->format('n') - 1) - (((int) $currentMonth->format('n') - 1) % 3) + 1;
+        $quarterStart = $currentMonth->setDate((int) $currentMonth->format('Y'), $quarterStartMonth, 1);
+        $defaultStart = $quarterStart->setTime(0, 0, 0);
+        $defaultEnd = $quarterStart->modify('+2 months')->modify('last day of this month')->setTime(0, 0, 0);
 
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
