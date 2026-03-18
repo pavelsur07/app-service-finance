@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\MarketplaceAnalytics\Controller;
+namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\MarketplaceAnalytics\Api\Request\CreateMarketplaceAnalyticsRequest;
 use App\MarketplaceAnalytics\Application\CreateMarketplaceAnalyticsAction;
