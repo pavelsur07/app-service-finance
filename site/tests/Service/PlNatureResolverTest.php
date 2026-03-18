@@ -48,6 +48,30 @@ final class PlNatureResolverTest extends TestCase
         self::assertNull($resolver->forOperation($operation));
     }
 
+    public function testFallsBackToAmountSignWhenCategoryIsNeutral(): void
+    {
+        $resolver = new PlNatureResolver();
+
+        $company = $this->createCompany();
+        $document = new Document(Uuid::uuid4()->toString(), $company);
+
+        $neutralCategory = $this->createCategory($company, 'Neutral KPI helper');
+        $neutralCategory->setFlow(PLFlow::NONE);
+
+        $incomeOperation = new DocumentOperation();
+        $incomeOperation->setDocument($document);
+        $incomeOperation->setCategory($neutralCategory);
+        $incomeOperation->setAmount('1250.00');
+
+        $expenseOperation = new DocumentOperation();
+        $expenseOperation->setDocument($document);
+        $expenseOperation->setCategory($neutralCategory);
+        $expenseOperation->setAmount('-450.00');
+
+        self::assertSame(PlNature::INCOME, $resolver->forOperation($incomeOperation));
+        self::assertSame(PlNature::EXPENSE, $resolver->forOperation($expenseOperation));
+    }
+
     public function testDocumentReturnsMixedWhenHasIncomeAndExpenseOperations(): void
     {
         $resolver = new PlNatureResolver();
