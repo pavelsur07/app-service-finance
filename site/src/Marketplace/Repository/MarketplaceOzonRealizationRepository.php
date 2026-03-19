@@ -83,8 +83,7 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
             ->getConnection()
             ->executeStatement(
                 'UPDATE marketplace_ozon_realizations
-                 SET pl_document_id = NULL,
-                     updated_at = NOW()
+                 SET pl_document_id = NULL
                  WHERE company_id = :companyId
                    AND pl_document_id IN (:plDocumentIds)',
                 [
@@ -106,8 +105,7 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
             ->getConnection()
             ->executeStatement(
                 'UPDATE marketplace_ozon_realizations
-                 SET pl_document_id = NULL,
-                     updated_at = NOW()
+                 SET pl_document_id = NULL
                  WHERE company_id = :companyId
                    AND period_from = :periodFrom
                    AND period_to = :periodTo
