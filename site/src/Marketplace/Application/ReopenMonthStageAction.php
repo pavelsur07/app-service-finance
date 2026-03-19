@@ -51,11 +51,16 @@ final class ReopenMonthStageAction
         }
 
         $documentIds = $monthClose->getStagePLDocumentIds($command->stage);
+        $periodFrom  = sprintf('%d-%02d-01', $monthClose->getYear(), $monthClose->getMonth());
+        $periodTo    = $monthClose->getPeriodEnd()->format('Y-m-d');
+
         $this->rollbackProcessedMarks(
             companyId: $command->companyId,
             marketplace: $command->marketplace,
             stage: $command->stage,
             plDocumentIds: $documentIds,
+            periodFrom: $periodFrom,
+            periodTo: $periodTo,
         );
 
         $monthClose->reopenStage($command->stage);
@@ -70,22 +75,20 @@ final class ReopenMonthStageAction
         string $marketplace,
         CloseStage $stage,
         array $plDocumentIds,
+        string $periodFrom,
+        string $periodTo,
     ): void {
-        if ($plDocumentIds === []) {
-            return;
-        }
-
         match ($stage) {
             CloseStage::SALES_RETURNS => $this->rollbackSalesReturns(
                 $companyId,
                 $marketplace,
                 $plDocumentIds,
+                $periodFrom,
+                $periodTo,
             ),
-            CloseStage::COSTS => $this->markProcessedQuery->unmarkCostsByDocumentIds(
-                $companyId,
-                $marketplace,
-                $plDocumentIds,
-            ),
+            CloseStage::COSTS => $plDocumentIds !== []
+                ? $this->markProcessedQuery->unmarkCostsByDocumentIds($companyId, $marketplace, $plDocumentIds)
+                : $this->markProcessedQuery->unmarkCostsByPeriod($companyId, $marketplace, $periodFrom, $periodTo),
         };
     }
 
@@ -96,12 +99,25 @@ final class ReopenMonthStageAction
         string $companyId,
         string $marketplace,
         array $plDocumentIds,
+        string $periodFrom,
+        string $periodTo,
     ): void {
-        $this->markProcessedQuery->unmarkSalesByDocumentIds($companyId, $marketplace, $plDocumentIds);
-        $this->markProcessedQuery->unmarkReturnsByDocumentIds($companyId, $marketplace, $plDocumentIds);
+        if ($plDocumentIds !== []) {
+            $this->markProcessedQuery->unmarkSalesByDocumentIds($companyId, $marketplace, $plDocumentIds);
+            $this->markProcessedQuery->unmarkReturnsByDocumentIds($companyId, $marketplace, $plDocumentIds);
+        } else {
+            // Фолбэк для старых/повреждённых month_close записей без сохранённых document IDs:
+            // снимаем маркировку за период этапа.
+            $this->markProcessedQuery->unmarkSalesByPeriod($companyId, $marketplace, $periodFrom, $periodTo);
+            $this->markProcessedQuery->unmarkReturnsByPeriod($companyId, $marketplace, $periodFrom, $periodTo);
+        }
 
         if ($marketplace === MarketplaceType::OZON->value) {
-            $this->ozonRealizationRepository->unmarkProcessedByDocumentIds($companyId, $plDocumentIds);
+            if ($plDocumentIds !== []) {
+                $this->ozonRealizationRepository->unmarkProcessedByDocumentIds($companyId, $plDocumentIds);
+            } else {
+                $this->ozonRealizationRepository->unmarkProcessedByPeriod($companyId, $periodFrom, $periodTo);
+            }
         }
     }
 }

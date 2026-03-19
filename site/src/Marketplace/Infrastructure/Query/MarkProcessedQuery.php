@@ -119,12 +119,17 @@ final class MarkProcessedQuery
      */
     public function unmarkSalesByDocumentIds(
         string $companyId,
-        string $_marketplace,
+        string $marketplace,
         array $documentIds,
     ): int {
+        if ($documentIds === []) {
+            return 0;
+        }
+
         return $this->unmarkByDocumentIds(
             table: 'marketplace_sales',
             companyId: $companyId,
+            marketplace: $marketplace,
             documentIds: $documentIds,
         );
     }
@@ -134,12 +139,17 @@ final class MarkProcessedQuery
      */
     public function unmarkReturnsByDocumentIds(
         string $companyId,
-        string $_marketplace,
+        string $marketplace,
         array $documentIds,
     ): int {
+        if ($documentIds === []) {
+            return 0;
+        }
+
         return $this->unmarkByDocumentIds(
             table: 'marketplace_returns',
             companyId: $companyId,
+            marketplace: $marketplace,
             documentIds: $documentIds,
         );
     }
@@ -149,13 +159,66 @@ final class MarkProcessedQuery
      */
     public function unmarkCostsByDocumentIds(
         string $companyId,
-        string $_marketplace,
+        string $marketplace,
         array $documentIds,
     ): int {
+        if ($documentIds === []) {
+            return 0;
+        }
+
         return $this->unmarkByDocumentIds(
             table: 'marketplace_costs',
             companyId: $companyId,
+            marketplace: $marketplace,
             documentIds: $documentIds,
+        );
+    }
+
+    public function unmarkSalesByPeriod(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): int {
+        return $this->unmarkByPeriod(
+            table: 'marketplace_sales',
+            dateColumn: 'sale_date',
+            companyId: $companyId,
+            marketplace: $marketplace,
+            periodFrom: $periodFrom,
+            periodTo: $periodTo,
+        );
+    }
+
+    public function unmarkReturnsByPeriod(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): int {
+        return $this->unmarkByPeriod(
+            table: 'marketplace_returns',
+            dateColumn: 'return_date',
+            companyId: $companyId,
+            marketplace: $marketplace,
+            periodFrom: $periodFrom,
+            periodTo: $periodTo,
+        );
+    }
+
+    public function unmarkCostsByPeriod(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): int {
+        return $this->unmarkByPeriod(
+            table: 'marketplace_costs',
+            dateColumn: 'cost_date',
+            companyId: $companyId,
+            marketplace: $marketplace,
+            periodFrom: $periodFrom,
+            periodTo: $periodTo,
         );
     }
 
@@ -165,27 +228,57 @@ final class MarkProcessedQuery
     private function unmarkByDocumentIds(
         string $table,
         string $companyId,
+        string $marketplace,
         array $documentIds,
     ): int {
-        if ($documentIds === []) {
-            return 0;
-        }
-
         return $this->connection->executeStatement(
             sprintf(
                 'UPDATE %s
                  SET document_id = NULL,
                      updated_at = NOW()
                  WHERE company_id = :companyId
+                   AND marketplace = :marketplace
                    AND document_id IN (:documentIds)',
                 $table,
             ),
             [
                 'companyId' => $companyId,
+                'marketplace' => $marketplace,
                 'documentIds' => $documentIds,
             ],
             [
                 'documentIds' => ArrayParameterType::STRING,
+            ],
+        );
+    }
+
+    private function unmarkByPeriod(
+        string $table,
+        string $dateColumn,
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): int {
+        return $this->connection->executeStatement(
+            sprintf(
+                'UPDATE %s
+                 SET document_id = NULL,
+                     updated_at = NOW()
+                 WHERE company_id = :companyId
+                   AND marketplace = :marketplace
+                   AND %s >= :periodFrom
+                   AND %s <= :periodTo
+                   AND document_id IS NOT NULL',
+                $table,
+                $dateColumn,
+                $dateColumn,
+            ),
+            [
+                'companyId' => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
             ],
         );
     }
