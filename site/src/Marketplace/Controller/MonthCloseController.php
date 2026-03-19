@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
-use App\Marketplace\Application\Command\CloseMonthStageCommand;
 use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
+use App\Marketplace\Application\Command\ReopenMonthStageCommand;
 use App\Marketplace\Application\MonthClosePreflightAction;
+use App\Marketplace\Application\ReopenMonthStageAction;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\CloseMonthStageMessage;
@@ -26,6 +27,7 @@ final class MonthCloseController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService            $companyService,
         private readonly MonthClosePreflightAction       $preflightAction,
+        private readonly ReopenMonthStageAction          $reopenMonthStageAction,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
         private readonly MessageBusInterface             $messageBus,
     ) {
@@ -191,26 +193,16 @@ final class MonthCloseController extends AbstractController
             return $this->redirectToRoute('marketplace_month_close_index');
         }
 
-        $monthClose = $this->monthCloseRepository->findByPeriod(
-            $companyId, $marketplaceType, $year, $month,
-        );
-
-        if ($monthClose === null || !$monthClose->isStageClosed($stage)) {
-            $this->addFlash('error', 'Этап не найден или не закрыт.');
-
-            return $this->redirectToRoute('marketplace_month_close_index');
-        }
-
-        // Проверяем financeLockBefore через Entity
-        $company     = $this->companyService->getActiveCompany();
-        $lockBefore  = $company->getFinanceLockBefore();
-        $periodEnd   = $monthClose->getPeriodEnd();
-
-        if ($lockBefore !== null && $periodEnd <= $lockBefore) {
-            $this->addFlash('error', sprintf(
-                'Период заблокирован для редактирования (дата блокировки: %s).',
-                $lockBefore->format('d.m.Y'),
+        try {
+            ($this->reopenMonthStageAction)(new ReopenMonthStageCommand(
+                companyId: $companyId,
+                marketplace: $marketplace,
+                year: $year,
+                month: $month,
+                stage: $stage,
             ));
+        } catch (\DomainException $exception) {
+            $this->addFlash('error', $exception->getMessage());
 
             return $this->redirectToRoute('marketplace_month_close_index', [
                 'marketplace' => $marketplace,
@@ -218,9 +210,6 @@ final class MonthCloseController extends AbstractController
                 'month'       => $month,
             ]);
         }
-
-        $monthClose->reopenStage($stage);
-        $this->monthCloseRepository->save($monthClose);
 
         $this->addFlash('success', sprintf(
             'Этап "%s" за %s %d переоткрыт.',
