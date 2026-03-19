@@ -128,13 +128,22 @@ class MarketplaceMonthClose
         };
     }
 
+    /**
+     * Переоткрыть этап.
+     *
+     * Полностью сбрасывает все поля этапа: статус, даты, userId, IDs документов и snapshot.
+     * Это гарантирует, что при повторном закрытии getStagePLDocumentIds() не вернёт
+     * устаревшие ID от предыдущего (уже удалённого) PLDocument.
+     *
+     * Вызывается ПОСЛЕ того как FinanceFacade::deletePLDocument() удалил старые документы.
+     */
     public function reopenStage(CloseStage $stage): void
     {
         $this->updatedAt = new \DateTimeImmutable();
 
         match ($stage) {
-            CloseStage::SALES_RETURNS => $this->stageSalesReturnsStatus = MonthCloseStageStatus::REOPENED,
-            CloseStage::COSTS         => $this->stageCostsStatus = MonthCloseStageStatus::REOPENED,
+            CloseStage::SALES_RETURNS => $this->doReopenSalesReturns(),
+            CloseStage::COSTS         => $this->doReopenCosts(),
         };
     }
 
@@ -212,11 +221,11 @@ class MarketplaceMonthClose
 
     private function closeSalesReturns(string $userId, array $plDocumentIds, array $preflightSnapshot): void
     {
-        $this->stageSalesReturnsStatus             = MonthCloseStageStatus::CLOSED;
-        $this->stageSalesReturnsClosedAt           = new \DateTimeImmutable();
-        $this->stageSalesReturnsClosedByUserId     = $userId;
-        $this->stageSalesReturnsPLDocumentIds      = $plDocumentIds;
-        $this->stageSalesReturnsPreflightSnapshot  = $preflightSnapshot;
+        $this->stageSalesReturnsStatus            = MonthCloseStageStatus::CLOSED;
+        $this->stageSalesReturnsClosedAt          = new \DateTimeImmutable();
+        $this->stageSalesReturnsClosedByUserId    = $userId;
+        $this->stageSalesReturnsPLDocumentIds     = $plDocumentIds;
+        $this->stageSalesReturnsPreflightSnapshot = $preflightSnapshot;
     }
 
     private function closeCosts(string $userId, array $plDocumentIds, array $preflightSnapshot): void
@@ -226,5 +235,31 @@ class MarketplaceMonthClose
         $this->stageCostsClosedByUserId    = $userId;
         $this->stageCostsPLDocumentIds     = $plDocumentIds;
         $this->stageCostsPreflightSnapshot = $preflightSnapshot;
+    }
+
+    /**
+     * Сбрасывает все поля этапа SALES_RETURNS в начальное состояние.
+     * Вызывается при переоткрытии.
+     */
+    private function doReopenSalesReturns(): void
+    {
+        $this->stageSalesReturnsStatus            = MonthCloseStageStatus::REOPENED;
+        $this->stageSalesReturnsClosedAt          = null;
+        $this->stageSalesReturnsClosedByUserId    = null;
+        $this->stageSalesReturnsPLDocumentIds     = null;  // ← ключевой сброс
+        $this->stageSalesReturnsPreflightSnapshot = null;
+    }
+
+    /**
+     * Сбрасывает все поля этапа COSTS в начальное состояние.
+     * Вызывается при переоткрытии.
+     */
+    private function doReopenCosts(): void
+    {
+        $this->stageCostsStatus            = MonthCloseStageStatus::REOPENED;
+        $this->stageCostsClosedAt          = null;
+        $this->stageCostsClosedByUserId    = null;
+        $this->stageCostsPLDocumentIds     = null;  // ← ключевой сброс
+        $this->stageCostsPreflightSnapshot = null;
     }
 }

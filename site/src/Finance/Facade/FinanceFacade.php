@@ -8,6 +8,7 @@ use App\Enum\DocumentType;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
+use App\Finance\Application\DeletePLDocumentAction;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
@@ -24,6 +25,7 @@ final class FinanceFacade
 {
     public function __construct(
         private readonly CreatePLDocumentAction $createAction,
+        private readonly DeletePLDocumentAction $deleteAction,
     ) {
     }
 
@@ -85,10 +87,23 @@ final class FinanceFacade
             counterpartyId: null,
             projectDirectionId: null,
             operations: $operations,
-            source: $source,          // ← НОВОЕ
-            stream: $stream,          // ← НОВОЕ
+            source: $source,
+            stream: $stream,
         );
 
         return ($this->createAction)($command);
+    }
+
+    /**
+     * Удаляет документ ОПиУ и пересчитывает PL-регистр за день документа.
+     *
+     * Идемпотентен: если документ уже удалён — молча возвращает управление.
+     * Используется при переоткрытии этапа «Закрытие месяца».
+     *
+     * @throws \DomainException если документ не принадлежит компании
+     */
+    public function deletePLDocument(string $companyId, string $documentId): void
+    {
+        ($this->deleteAction)($companyId, $documentId);
     }
 }
