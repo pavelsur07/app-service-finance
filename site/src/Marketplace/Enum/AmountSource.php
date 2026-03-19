@@ -13,8 +13,9 @@ namespace App\Marketplace\Enum;
  *   SALE_COST_PRICE → cost_price × quantity      (себестоимость)
  *
  * Реализация Ozon (из marketplace_ozon_realizations):
- *   SALE_REALIZATION → seller_price_per_instance × quantity
- *                      Агрегированный месячный отчёт реализации.
+ *   SALE_REALIZATION → delivery_commission.price_per_instance × quantity
+ *                      Цена покупателя с учётом СПП скидки.
+ *                      Агрегированный месячный отчёт реализации (/v2/finance/realization).
  *                      Только для Ozon. Настраивается отдельным маппингом.
  *
  * Возвраты (из marketplace_returns):
@@ -55,7 +56,7 @@ enum AmountSource: string
             self::SALE_GROSS        => 'Выручка без СПП (цена продавца × кол-во)',
             self::SALE_REVENUE      => 'Выручка (accruals_for_sale)',
             self::SALE_COST_PRICE   => 'Себестоимость продаж (costPrice × кол-во)',
-            self::SALE_REALIZATION  => 'Реализация Ozon (seller_price × кол-во)',
+            self::SALE_REALIZATION  => 'Реализация Ozon (price_per_instance × кол-во)',
             self::RETURN_REFUND     => 'Сумма возврата (refundAmount)',
             self::RETURN_GROSS      => 'Возврат без СПП (цена × кол-во)',
             self::RETURN_COST_PRICE => 'Себестоимость возвратов (costPrice × кол-во)',
@@ -68,7 +69,7 @@ enum AmountSource: string
             self::SALE_GROSS        => 's.price_per_unit * s.quantity',
             self::SALE_REVENUE      => 's.total_revenue',
             self::SALE_COST_PRICE   => 's.cost_price * s.quantity',
-            self::SALE_REALIZATION  => 'r.total_amount', // marketplace_ozon_realizations
+            self::SALE_REALIZATION  => 'r.total_amount', // marketplace_ozon_realizations: price_per_instance × quantity
             self::RETURN_REFUND     => 'r.refund_amount',
             self::RETURN_GROSS      => 'ms.price_per_unit * r.quantity',
             self::RETURN_COST_PRICE => 'ms.cost_price * r.quantity',

@@ -17,7 +17,7 @@ use Webmozart\Assert\Assert;
  * Одна строка = один SKU за период реализации.
  * Несколько строк с одним SKU за один период = несколько отгрузок.
  *
- * Выручка = delivery_commission.price_per_instance × quantity
+ * Выручка = delivery_commission.price_per_instance × delivery_commission.quantity
  * (цена единицы покупателю с учётом СПП скидки).
  * pl_document_id — заполняется при закрытии месяца.
  */
@@ -54,15 +54,21 @@ class MarketplaceOzonRealization
     #[ORM\Column(type: 'string', length: 500, nullable: true)]
     private ?string $name;
 
-    /** Цена единицы с учётом СПП (delivery_commission.price_per_instance) */
-    #[ORM\Column(type: 'decimal', precision: 12, scale: 2)]
-    private string $sellerPricePerInstance;
+    /**
+     * Цена единицы покупателю с учётом СПП скидки.
+     * Источник: delivery_commission.price_per_instance из /v2/finance/realization.
+     *
+     * Колонка намеренно сохраняет старое имя seller_price_per_instance —
+     * миграция не требуется.
+     */
+    #[ORM\Column(name: 'seller_price_per_instance', type: 'decimal', precision: 12, scale: 2)]
+    private string $pricePerInstance;
 
     /** Количество */
     #[ORM\Column(type: 'integer')]
     private int $quantity;
 
-    /** Итого выручка = seller_price_per_instance × quantity */
+    /** Итого выручка = price_per_instance × quantity */
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2)]
     private string $totalAmount;
 
@@ -89,7 +95,7 @@ class MarketplaceOzonRealization
         string $companyId,
         MarketplaceRawDocument $rawDocument,
         string $sku,
-        string $sellerPricePerInstance,
+        string $pricePerInstance,
         int $quantity,
         \DateTimeImmutable $periodFrom,
         \DateTimeImmutable $periodTo,
@@ -97,16 +103,16 @@ class MarketplaceOzonRealization
         Assert::uuid($id);
         Assert::uuid($companyId);
 
-        $this->id                    = $id;
-        $this->companyId             = $companyId;
-        $this->rawDocument           = $rawDocument;
-        $this->sku                   = $sku;
-        $this->sellerPricePerInstance = $sellerPricePerInstance;
-        $this->quantity              = $quantity;
-        $this->periodFrom            = $periodFrom;
-        $this->periodTo              = $periodTo;
-        $this->totalAmount           = bcmul($sellerPricePerInstance, (string) $quantity, 2);
-        $this->createdAt             = new \DateTimeImmutable();
+        $this->id               = $id;
+        $this->companyId        = $companyId;
+        $this->rawDocument      = $rawDocument;
+        $this->sku              = $sku;
+        $this->pricePerInstance = $pricePerInstance;
+        $this->quantity         = $quantity;
+        $this->periodFrom       = $periodFrom;
+        $this->periodTo         = $periodTo;
+        $this->totalAmount      = bcmul($pricePerInstance, (string) $quantity, 2);
+        $this->createdAt        = new \DateTimeImmutable();
     }
 
     public function getId(): string { return $this->id; }
@@ -116,7 +122,7 @@ class MarketplaceOzonRealization
     public function getSku(): string { return $this->sku; }
     public function getOfferId(): ?string { return $this->offerId; }
     public function getName(): ?string { return $this->name; }
-    public function getSellerPricePerInstance(): string { return $this->sellerPricePerInstance; }
+    public function getPricePerInstance(): string { return $this->pricePerInstance; }
     public function getQuantity(): int { return $this->quantity; }
     public function getTotalAmount(): string { return $this->totalAmount; }
     public function getPeriodFrom(): \DateTimeImmutable { return $this->periodFrom; }

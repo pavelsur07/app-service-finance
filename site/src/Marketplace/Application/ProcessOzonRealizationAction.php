@@ -21,18 +21,19 @@ use Ramsey\Uuid\Uuid;
  * Структура строки реализации v2:
  * {
  *   "item": {
- *     "sku": 1851658436,
- *     "offer_id": "241550",
+ *     "sku": 220280923,
+ *     "offer_id": "WJ1020101211/черный-M",
  *     "name": "..."
  *   },
- *   "seller_price_per_instance": 1256,     ← цена продавца = выручка
+ *   "seller_price_per_instance": 2430,       ← цена продавца БЕЗ СПП (не используется)
  *   "delivery_commission": {
- *     "quantity": 1,                        ← количество
+ *     "price_per_instance": 1594.67,          ← цена покупателя с учётом СПП — используем это
+ *     "quantity": 1,                           ← количество
  *     ...
  *   }
  * }
  *
- * Выручка = seller_price_per_instance × delivery_commission.quantity.
+ * Выручка = delivery_commission.price_per_instance × delivery_commission.quantity.
  * Сохраняем в marketplace_ozon_realizations (денормализованная таблица).
  */
 final class ProcessOzonRealizationAction
@@ -122,11 +123,16 @@ final class ProcessOzonRealizationAction
         $counter   = 0;
 
         foreach ($rows as $row) {
-            $sku      = (string) ($row['item']['sku'] ?? '');
-            $offerId  = (string) ($row['item']['offer_id'] ?? '') ?: null;
-            $name     = (string) ($row['item']['name'] ?? '') ?: null;
-            $quantity         = (int) ($row['delivery_commission']['quantity'] ?? 0);
-            // price_per_instance = цена единицы товара покупателю с учётом СПП
+            $sku     = (string) ($row['item']['sku'] ?? '');
+            $offerId = (string) ($row['item']['offer_id'] ?? '') ?: null;
+            $name    = (string) ($row['item']['name'] ?? '') ?: null;
+
+            $quantity = (int) ($row['delivery_commission']['quantity'] ?? 0);
+
+            // Цена покупателя с учётом СПП скидки.
+            // delivery_commission.price_per_instance — это фактическая выручка за единицу,
+            // которую Ozon засчитывает продавцу в отчёте реализации.
+            // НЕ путать с seller_price_per_instance — ценой продавца без СПП.
             $pricePerInstance = (float) ($row['delivery_commission']['price_per_instance'] ?? 0);
 
             if ($sku === '' || $quantity <= 0 || $pricePerInstance <= 0) {
