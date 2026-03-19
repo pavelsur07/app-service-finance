@@ -1,0 +1,430 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'month_close' %}
+
+{% set monthNames = {1: 'Январь', 2: 'Февраль', 3: 'Март', 4: 'Апрель',
+    5: 'Май', 6: 'Июнь', 7: 'Июль', 8: 'Август',
+    9: 'Сентябрь', 10: 'Октябрь', 11: 'Ноябрь', 12: 'Декабрь'} %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        {# ── Заголовок ─────────────────────────────────────────────────────────── #}
+        <div class="d-flex align-items-start gap-3 mb-4">
+            <div>
+                <h3 class="mb-0">Сверка закрытия месяца</h3>
+                <div class="text-muted small mt-1">
+                    Показывает откуда и какие суммы попали (или попадут) в ОПиУ
+                </div>
+            </div>
+            <div class="ms-auto d-flex gap-2">
+                <a href="{{ path('marketplace_month_close_debug_json', app.request.query.all) }}"
+                   class="btn btn-sm btn-outline-secondary" target="_blank">
+                    ↓ JSON
+                </a>
+                <a href="{{ path('marketplace_month_close_index', {
+                    marketplace: marketplace, year: year, month: month
+                }) }}" class="btn btn-sm btn-link">← К закрытию</a>
+            </div>
+        </div>
+
+        {# ── Фильтры ───────────────────────────────────────────────────────────── #}
+        <form method="get" action="{{ path('marketplace_month_close_debug') }}"
+              class="mb-4 d-flex flex-wrap align-items-end gap-3">
+
+            <div>
+                <label class="form-label mb-1 small">Маркетплейс</label>
+                <select name="marketplace" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    {% for mp in available_marketplaces %}
+                        <option value="{{ mp.value }}" {{ marketplace == mp.value ? 'selected' : '' }}>
+                            {{ mp.value|upper }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label mb-1 small">Год</label>
+                <select name="year" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    {% for y in range('now'|date('Y'), 'now'|date('Y') - 2, -1) %}
+                        <option value="{{ y }}" {{ year == y ? 'selected' : '' }}>{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label mb-1 small">Месяц</label>
+                <select name="month" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    {% for n, name in monthNames %}
+                        <option value="{{ n }}" {{ month == n ? 'selected' : '' }}>{{ name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div>
+                <label class="form-label mb-1 small">Статус записей</label>
+                <select name="processed" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value=""  {{ processed is null  ? 'selected' : '' }}>Все</option>
+                    <option value="0" {{ processed == false ? 'selected' : '' }}>Необработанные</option>
+                    <option value="1" {{ processed == true  ? 'selected' : '' }}>Обработанные</option>
+                </select>
+            </div>
+
+            {% if document_id %}
+                <input type="hidden" name="document_id" value="{{ document_id }}">
+                <div class="d-flex align-items-end gap-2">
+                    <div>
+                        <label class="form-label mb-1 small">Фильтр по документу</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text font-monospace small">{{ document_id|slice(0,8) }}…</span>
+                            <a href="{{ path('marketplace_month_close_debug', app.request.query.all|merge({document_id: null})) }}"
+                               class="btn btn-outline-secondary btn-sm">✕ Сбросить</a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+        </form>
+
+        {# ── Блок: Продажи и Возвраты ──────────────────────────────────────────── #}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h4 class="card-title mb-0">Продажи и возвраты</h4>
+            </div>
+            <div class="card-body p-0">
+                {% if sales_returns is empty %}
+                    <div class="p-3 text-muted small">Нет данных за выбранный период с текущими фильтрами</div>
+                {% else %}
+                    <div class="table-responsive">
+                        <table class="table table-vcenter table-sm mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Тип</th>
+                                <th>Источник суммы</th>
+                                <th>Категория ОПиУ</th>
+                                <th class="text-end">Записей</th>
+                                <th class="text-end">Сумма → ОПиУ</th>
+                                <th>Знак</th>
+                                <th>Документы ОПиУ</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in sales_returns %}
+                                <tr class="js-aggregate-row">
+                                    <td>
+                                    <span class="badge {{ row.source_type == 'sale' ? 'bg-green-lt text-green' : 'bg-orange-lt text-orange' }}">
+                                        {{ row.source_type == 'sale' ? 'Продажа' : 'Возврат' }}
+                                    </span>
+                                    </td>
+                                    <td class="font-monospace text-muted small">{{ row.amount_source }}</td>
+                                    <td>{{ row.pl_category_name }}</td>
+                                    <td class="text-end">{{ row.records_count }}</td>
+                                    <td class="text-end fw-medium">
+                                        {{ row.total_amount|number_format(2, '.', ' ') }} ₽
+                                    </td>
+                                    <td>
+                                        {% if row.is_negative %}
+                                            <span class="badge bg-red-lt">−</span>
+                                        {% else %}
+                                            <span class="badge bg-green-lt">+</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% for docId in row.document_ids %}
+                                            <a href="{{ path('document_show', {id: docId}) }}"
+                                               class="font-monospace text-muted d-block"
+                                               title="{{ docId }}" target="_blank">
+                                                {{ docId|slice(0, 8) }}…
+                                            </a>
+                                            <a href="{{ path('marketplace_month_close_debug', app.request.query.all|merge({document_id: docId})) }}"
+                                               class="small text-muted">фильтр</a>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary js-expand"
+                                                data-source="{{ row.source_type == 'sale' ? 'sales' : 'returns' }}"
+                                                data-marketplace="{{ marketplace }}"
+                                                data-year="{{ year }}"
+                                                data-month="{{ month }}"
+                                                data-processed="{{ processed is null ? '' : (processed ? '1' : '0') }}"
+                                                data-document-id="{{ document_id ?? '' }}">
+                                            Детали
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="js-detail-row d-none">
+                                    <td colspan="8" class="p-0">
+                                        <div class="js-detail-container p-3 bg-light border-top"></div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# ── Блок: Реализация Ozon ─────────────────────────────────────────────── #}
+        {% if realization is defined and realization is not empty %}
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="card-title mb-0">Реализация Ozon</h4>
+                    <div class="card-subtitle text-muted small mt-1">
+                        «Цена продавца» = seller_price_per_instance (без СПП, для справки).
+                        «Выручка → ОПиУ» = price_per_instance × кол-во (с учётом СПП) — это попадает в документ ОПиУ.
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter table-sm mb-0">
+                            <thead class="table-light">
+                            <tr>
+                                <th>Категория ОПиУ</th>
+                                <th class="text-end">Записей</th>
+                                <th class="text-end">Σ Цена продавца (без СПП)</th>
+                                <th class="text-end">Σ Выручка → ОПиУ (с СПП)</th>
+                                <th>Знак</th>
+                                <th>Документы ОПиУ</th>
+                                <th></th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in realization %}
+                                <tr class="js-aggregate-row">
+                                    <td>{{ row.pl_category_name }}</td>
+                                    <td class="text-end">{{ row.records_count }}</td>
+                                    <td class="text-end text-muted">
+                                        {{ row.total_seller_price_amount|number_format(2, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end fw-medium">
+                                        {{ row.total_amount|number_format(2, '.', ' ') }} ₽
+                                    </td>
+                                    <td>
+                                        {% if row.is_negative %}
+                                            <span class="badge bg-red-lt">−</span>
+                                        {% else %}
+                                            <span class="badge bg-green-lt">+</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small">
+                                        {% for docId in row.document_ids %}
+                                            <a href="{{ path('document_show', {id: docId}) }}"
+                                               class="font-monospace text-muted d-block"
+                                               title="{{ docId }}" target="_blank">
+                                                {{ docId|slice(0, 8) }}…
+                                            </a>
+                                            <a href="{{ path('marketplace_month_close_debug', app.request.query.all|merge({document_id: docId})) }}"
+                                               class="small text-muted">фильтр</a>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-outline-secondary js-expand"
+                                                data-source="realization"
+                                                data-marketplace="{{ marketplace }}"
+                                                data-year="{{ year }}"
+                                                data-month="{{ month }}"
+                                                data-processed="{{ processed is null ? '' : (processed ? '1' : '0') }}"
+                                                data-document-id="{{ document_id ?? '' }}">
+                                            Детали
+                                        </button>
+                                    </td>
+                                </tr>
+                                <tr class="js-detail-row d-none">
+                                    <td colspan="7" class="p-0">
+                                        <div class="js-detail-container p-3 bg-light border-top"></div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const ROWS_URL = {{ path('marketplace_month_close_debug_rows')|json_encode|raw }};
+
+            document.querySelectorAll('.js-expand').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const tr        = btn.closest('tr');
+                    const detailTr  = tr.nextElementSibling;
+                    const container = detailTr.querySelector('.js-detail-container');
+
+                    if (!detailTr.classList.contains('d-none')) {
+                        detailTr.classList.add('d-none');
+                        btn.textContent = 'Детали';
+                        return;
+                    }
+
+                    detailTr.classList.remove('d-none');
+                    btn.textContent = 'Скрыть';
+
+                    if (container.dataset.loaded) return;
+
+                    const baseParams = new URLSearchParams({
+                        source:      btn.dataset.source,
+                        marketplace: btn.dataset.marketplace,
+                        year:        btn.dataset.year,
+                        month:       btn.dataset.month,
+                        processed:   btn.dataset.processed,
+                        document_id: btn.dataset.documentId,
+                    });
+
+                    loadPage(container, baseParams, 1);
+                });
+            });
+
+            function loadPage(container, baseParams, page) {
+                container.innerHTML = '<div class="text-muted small py-2">Загрузка…</div>';
+                container.dataset.loaded = '';
+
+                const params = new URLSearchParams(baseParams);
+                params.set('page', page);
+
+                fetch(ROWS_URL + '?' + params.toString())
+                    .then(r => r.json())
+                    .then(data => {
+                        container.innerHTML = renderDetail(data, baseParams.get('source'));
+                        container.dataset.loaded = '1';
+
+                        container.querySelectorAll('.js-page').forEach(function (pb) {
+                            pb.addEventListener('click', function () {
+                                loadPage(container, baseParams, parseInt(pb.dataset.page));
+                            });
+                        });
+                    })
+                    .catch(() => {
+                        container.innerHTML = '<div class="alert alert-danger small">Ошибка загрузки</div>';
+                    });
+            }
+
+            function renderDetail(data, source) {
+                if (!data.rows || data.rows.length === 0) {
+                    return '<div class="text-muted small">Нет строк</div>';
+                }
+
+                let html = `<div class="text-muted small mb-2">Всего: ${data.total} строк · Страница ${data.page} из ${data.pages}</div>`;
+                html += '<div class="table-responsive"><table class="table table-sm table-bordered small mb-2">';
+
+                if (source === 'sales') {
+                    html += `<thead class="table-light"><tr>
+                <th>Дата</th><th>operation_id</th><th>SKU</th><th>Товар</th>
+                <th class="text-end">Кол-во</th>
+                <th class="text-end">Цена ед.</th>
+                <th class="text-end">total_revenue</th>
+                <th class="text-end">Себест.</th>
+                <th>Источник суммы</th>
+                <th>Категория ОПиУ</th>
+                <th class="text-end">Сумма → ОПиУ</th>
+                <th>Документ</th>
+            </tr></thead><tbody>`;
+                    data.rows.forEach(r => {
+                        html += `<tr>
+                    <td>${r.sale_date}</td>
+                    <td class="font-monospace">${r.external_order_id}</td>
+                    <td>${r.marketplace_sku ?? ''}</td>
+                    <td>${r.listing_name ?? '—'}</td>
+                    <td class="text-end">${r.quantity}</td>
+                    <td class="text-end">${fmt(r.price_per_unit)}</td>
+                    <td class="text-end">${fmt(r.total_revenue)}</td>
+                    <td class="text-end text-muted">${r.cost_price ? fmt(r.cost_price) : '—'}</td>
+                    <td class="font-monospace text-muted">${r.amount_source}</td>
+                    <td>${r.pl_category_name}</td>
+                    <td class="text-end fw-medium">${r.is_negative ? '−' : '+'} ${fmt(r.computed_amount)}</td>
+                    <td class="font-monospace">${docLink(r.document_id)}</td>
+                </tr>`;
+                    });
+
+                } else if (source === 'returns') {
+                    html += `<thead class="table-light"><tr>
+                <th>Дата</th><th>return_id</th><th>SKU</th><th>Товар</th>
+                <th class="text-end">Кол-во</th>
+                <th class="text-end">refund_amount</th>
+                <th class="text-end">Цена продажи</th>
+                <th>Источник суммы</th>
+                <th>Категория ОПиУ</th>
+                <th class="text-end">Сумма → ОПиУ</th>
+                <th>Документ</th>
+            </tr></thead><tbody>`;
+                    data.rows.forEach(r => {
+                        html += `<tr>
+                    <td>${r.return_date}</td>
+                    <td class="font-monospace">${r.external_return_id}</td>
+                    <td>${r.marketplace_sku ?? ''}</td>
+                    <td>${r.listing_name ?? '—'}</td>
+                    <td class="text-end">${r.quantity}</td>
+                    <td class="text-end">${fmt(r.refund_amount)}</td>
+                    <td class="text-end text-muted">${r.sale_price_per_unit ? fmt(r.sale_price_per_unit) : '—'}</td>
+                    <td class="font-monospace text-muted">${r.amount_source}</td>
+                    <td>${r.pl_category_name}</td>
+                    <td class="text-end fw-medium">${r.is_negative ? '−' : '+'} ${fmt(r.computed_amount)}</td>
+                    <td class="font-monospace">${docLink(r.document_id)}</td>
+                </tr>`;
+                    });
+
+                } else if (source === 'realization') {
+                    html += `<thead class="table-light"><tr>
+                <th>offer_id</th><th>SKU</th><th>Товар</th>
+                <th class="text-end">Кол-во</th>
+                <th class="text-end">Цена продавца (без СПП)</th>
+                <th class="text-end">price_per_instance (с СПП)</th>
+                <th class="text-end">Σ → ОПиУ</th>
+                <th>Период</th>
+                <th>Категория ОПиУ</th>
+                <th>Документ</th>
+            </tr></thead><tbody>`;
+                    data.rows.forEach(r => {
+                        html += `<tr>
+                    <td class="font-monospace">${r.offer_id ?? '—'}</td>
+                    <td>${r.sku}</td>
+                    <td>${r.name ?? '—'}</td>
+                    <td class="text-end">${r.quantity}</td>
+                    <td class="text-end text-muted">${fmt(r.seller_price_per_instance)}</td>
+                    <td class="text-end">${fmt(r.price_per_instance)}</td>
+                    <td class="text-end fw-medium">${r.is_negative ? '−' : '+'} ${fmt(r.total_amount)}</td>
+                    <td class="text-muted">${r.period_from} – ${r.period_to}</td>
+                    <td>${r.pl_category_name}</td>
+                    <td class="font-monospace">${docLink(r.document_id)}</td>
+                </tr>`;
+                    });
+                }
+
+                html += '</tbody></table></div>';
+
+                // Пагинация
+                if (data.pages > 1) {
+                    html += '<div class="d-flex gap-1 flex-wrap mt-1">';
+                    for (let p = 1; p <= data.pages; p++) {
+                        const cls = p === data.page ? 'btn-secondary' : 'btn-outline-secondary';
+                        html += `<button class="btn btn-xs ${cls} js-page" data-page="${p}">${p}</button>`;
+                    }
+                    html += '</div>';
+                }
+
+                return html;
+            }
+
+            function fmt(val) {
+                if (val === null || val === undefined || val === '') return '—';
+                const n = parseFloat(val);
+                if (isNaN(n)) return val;
+                return n.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ₽';
+            }
+
+            function docLink(id) {
+                if (!id) return '<span class="text-muted">—</span>';
+                return `<a href="/documents/${id}" target="_blank" title="${id}">${id.slice(0, 8)}…</a>`;
+            }
+        });
+    </script>
+{% endblock %}
