@@ -96,4 +96,27 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
                 ],
             );
     }
+
+    public function unmarkProcessedByPeriod(
+        string $companyId,
+        string $periodFrom,
+        string $periodTo,
+    ): int {
+        return $this->getEntityManager()
+            ->getConnection()
+            ->executeStatement(
+                'UPDATE marketplace_ozon_realizations
+                 SET pl_document_id = NULL,
+                     updated_at = NOW()
+                 WHERE company_id = :companyId
+                   AND period_from = :periodFrom
+                   AND period_to = :periodTo
+                   AND pl_document_id IS NOT NULL',
+                [
+                    'companyId' => $companyId,
+                    'periodFrom' => $periodFrom,
+                    'periodTo' => $periodTo,
+                ],
+            );
+    }
 }
