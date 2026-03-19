@@ -119,13 +119,12 @@ final class MarkProcessedQuery
      */
     public function unmarkSalesByDocumentIds(
         string $companyId,
-        string $marketplace,
+        string $_marketplace,
         array $documentIds,
     ): int {
         return $this->unmarkByDocumentIds(
             table: 'marketplace_sales',
             companyId: $companyId,
-            marketplace: $marketplace,
             documentIds: $documentIds,
         );
     }
@@ -135,13 +134,12 @@ final class MarkProcessedQuery
      */
     public function unmarkReturnsByDocumentIds(
         string $companyId,
-        string $marketplace,
+        string $_marketplace,
         array $documentIds,
     ): int {
         return $this->unmarkByDocumentIds(
             table: 'marketplace_returns',
             companyId: $companyId,
-            marketplace: $marketplace,
             documentIds: $documentIds,
         );
     }
@@ -151,13 +149,12 @@ final class MarkProcessedQuery
      */
     public function unmarkCostsByDocumentIds(
         string $companyId,
-        string $marketplace,
+        string $_marketplace,
         array $documentIds,
     ): int {
         return $this->unmarkByDocumentIds(
             table: 'marketplace_costs',
             companyId: $companyId,
-            marketplace: $marketplace,
             documentIds: $documentIds,
         );
     }
@@ -168,7 +165,6 @@ final class MarkProcessedQuery
     private function unmarkByDocumentIds(
         string $table,
         string $companyId,
-        string $marketplace,
         array $documentIds,
     ): int {
         if ($documentIds === []) {
@@ -181,13 +177,11 @@ final class MarkProcessedQuery
                  SET document_id = NULL,
                      updated_at = NOW()
                  WHERE company_id = :companyId
-                   AND marketplace = :marketplace
                    AND document_id IN (:documentIds)',
                 $table,
             ),
             [
                 'companyId' => $companyId,
-                'marketplace' => $marketplace,
                 'documentIds' => $documentIds,
             ],
             [
