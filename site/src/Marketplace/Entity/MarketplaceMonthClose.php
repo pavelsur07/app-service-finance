@@ -151,6 +151,26 @@ class MarketplaceMonthClose
         return $this->getStageStatus($stage)->isClosed();
     }
 
+    /**
+     * @return string[]
+     */
+    public function getStagePLDocumentIds(CloseStage $stage): array
+    {
+        $ids = match ($stage) {
+            CloseStage::SALES_RETURNS => $this->stageSalesReturnsPLDocumentIds,
+            CloseStage::COSTS         => $this->stageCostsPLDocumentIds,
+        };
+
+        if (!is_array($ids)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $ids,
+            static fn (mixed $id): bool => is_string($id) && $id !== '',
+        ));
+    }
+
     public function isFullyClosed(): bool
     {
         return $this->stageSalesReturnsStatus->isClosed()

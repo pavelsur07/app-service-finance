@@ -6,6 +6,7 @@ namespace App\Marketplace\Repository;
 
 use App\Marketplace\Entity\MarketplaceOzonRealization;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
@@ -67,5 +68,32 @@ class MarketplaceOzonRealizationRepository extends ServiceEntityRepository
     {
         $this->getEntityManager()->persist($entity);
         $this->getEntityManager()->flush();
+    }
+
+    /**
+     * @param string[] $plDocumentIds
+     */
+    public function unmarkProcessedByDocumentIds(string $companyId, array $plDocumentIds): int
+    {
+        if ($plDocumentIds === []) {
+            return 0;
+        }
+
+        return $this->getEntityManager()
+            ->getConnection()
+            ->executeStatement(
+                'UPDATE marketplace_ozon_realizations
+                 SET pl_document_id = NULL,
+                     updated_at = NOW()
+                 WHERE company_id = :companyId
+                   AND pl_document_id IN (:plDocumentIds)',
+                [
+                    'companyId' => $companyId,
+                    'plDocumentIds' => $plDocumentIds,
+                ],
+                [
+                    'plDocumentIds' => ArrayParameterType::STRING,
+                ],
+            );
     }
 }
