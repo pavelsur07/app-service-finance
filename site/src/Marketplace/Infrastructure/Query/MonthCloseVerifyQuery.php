@@ -281,6 +281,11 @@ final class MonthCloseVerifyQuery
         string $periodFrom,
         string $periodTo,
     ): array {
+        // period_from = 'YYYY-MM-01' → year и month отдельные колонки
+        $date  = new \DateTimeImmutable($periodFrom);
+        $year  = (int) $date->format('Y');
+        $month = (int) $date->format('n');
+
         $row = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
@@ -293,9 +298,10 @@ final class MonthCloseVerifyQuery
             FROM marketplace_month_closes
             WHERE company_id  = :companyId
               AND marketplace = :marketplace
-              AND period_from = :periodFrom
+              AND year        = :year
+              AND month       = :month
             SQL,
-            ['companyId' => $companyId, 'marketplace' => $marketplace, 'periodFrom' => $periodFrom],
+            ['companyId' => $companyId, 'marketplace' => $marketplace, 'year' => $year, 'month' => $month],
         );
 
         if (!$row) {
