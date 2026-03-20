@@ -242,14 +242,17 @@ final class ProcessOzonRealizationAction
      * @return array{created: int, updated: int, skipped: int}
      */
     /**
-     * Переобработка через bulk DBAL UPDATE.
+     * Переобработка через удаление и пересоздание строк.
      *
-     * Проблема старого подхода (findByPeriodIndexedBySku):
-     *   один SKU встречается много раз с разными quantity и price_per_instance,
-     *   индексирование по SKU брало только первую строку — остальные пропускались.
+     * Предыдущие подходы (индексирование по SKU, UPDATE по sku+quantity) не работали
+     * из-за дублей: один SKU встречается много раз с одинаковым quantity но разным
+     * price_per_instance — нет уникального ключа кроме UUID строки.
      *
-     * Новый подход: UPDATE по (company_id, raw_document_id, sku, quantity) —
-     * это уникально идентифицирует строку внутри одного документа реализации.
+     * Стратегия:
+     *   1. Сохранить pl_document_id существующих строк (чтобы не потерять связь с PLDocument)
+     *   2. Удалить все строки периода для данного raw_document_id
+     *   3. Создать строки заново из JSON с правильными полями
+     *   4. Восстановить pl_document_id по SKU
      *
      * @return array{created: int, updated: int, skipped: int}
      */
@@ -262,103 +265,70 @@ final class ProcessOzonRealizationAction
     ): array {
         $rawDocId   = $rawDoc->getId();
         $connection = $this->em->getConnection();
-        $updated    = 0;
-        $skipped    = 0;
 
-        foreach ($rows as $row) {
-            $sku                = (string) ($row['item']['sku'] ?? '');
-            $deliveryCommission = $row['delivery_commission'] ?? null;
-            $returnCommission   = $row['return_commission'] ?? null;
+        // 1. Сохраняем pl_document_id по SKU перед удалением
+        //    (нужно восстановить связь с PLDocument после пересоздания)
+        $plDocumentIds = $connection->fetchAllKeyValue(
+            'SELECT sku, pl_document_id
+             FROM marketplace_ozon_realizations
+             WHERE company_id     = :companyId
+               AND raw_document_id = :rawDocId
+               AND pl_document_id IS NOT NULL',
+            ['companyId' => $companyId, 'rawDocId' => $rawDocId],
+        );
 
-            if ($sku === '') {
-                $skipped++;
-                continue;
-            }
+        // 2. Удаляем все строки этого raw-документа
+        $deleted = $connection->executeStatement(
+            'DELETE FROM marketplace_ozon_realizations
+             WHERE company_id     = :companyId
+               AND raw_document_id = :rawDocId',
+            ['companyId' => $companyId, 'rawDocId' => $rawDocId],
+        );
 
-            $setParts = [];
-            $params   = [
-                'companyId' => $companyId,
-                'rawDocId'  => $rawDocId,
-                'sku'       => $sku,
-            ];
+        $this->logger->info('[OzonRealization] Reprocess: deleted existing rows', [
+            'raw_doc_id' => $rawDocId,
+            'deleted'    => $deleted,
+        ]);
 
-            // 1. Обновляем delivery_commission — исправляем seller_price → price_per_instance
-            if ($deliveryCommission !== null) {
-                $pricePerInstance = (float) ($deliveryCommission['price_per_instance'] ?? 0);
-                $quantity         = (int)   ($deliveryCommission['quantity'] ?? 0);
+        // 3. Пересоздаём через process() — создаёт строки с правильными полями
+        $company = $this->em->find(Company::class, $companyId);
+        $result  = $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
 
-                if ($pricePerInstance > 0 && $quantity > 0) {
-                    $price       = number_format($pricePerInstance, 2, '.', '');
-                    $totalAmount = bcmul($price, (string) $quantity, 2);
-
-                    $setParts[]              = 'seller_price_per_instance = :pricePerInstance';
-                    $setParts[]              = 'total_amount = :totalAmount';
-                    $params['pricePerInstance'] = $price;
-                    $params['totalAmount']       = $totalAmount;
-                    $params['quantity']          = $quantity;
+        // 4. Восстанавливаем pl_document_id для закрытых строк
+        if (!empty($plDocumentIds)) {
+            foreach ($plDocumentIds as $sku => $plDocumentId) {
+                if ($plDocumentId === null) {
+                    continue;
                 }
-            }
 
-            // 2. Обновляем return_commission
-            if ($returnCommission !== null) {
-                $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
-                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
-
-                if ($returnPrice > 0 && $returnQty > 0) {
-                    $rPrice      = number_format($returnPrice, 2, '.', '');
-                    $returnTotal = bcmul($rPrice, (string) $returnQty, 2);
-
-                    $setParts[]                       = 'return_price_per_instance = :returnPrice';
-                    $setParts[]                       = 'return_quantity = :returnQty';
-                    $setParts[]                       = 'return_amount = :returnAmount';
-                    $params['returnPrice']             = $rPrice;
-                    $params['returnQty']               = $returnQty;
-                    $params['returnAmount']            = $returnTotal;
-                }
-            }
-
-            if (empty($setParts)) {
-                $skipped++;
-                continue;
-            }
-
-            // WHERE по (company_id, raw_document_id, sku, quantity) —
-            // уникально идентифицирует строку внутри документа реализации
-            $whereQuantity = isset($params['quantity'])
-                ? 'AND quantity = :quantity'
-                : '';
-
-            $affected = $connection->executeStatement(
-                sprintf(
-                    'UPDATE marketplace_ozon_realizations SET %s
-                     WHERE company_id    = :companyId
+                $connection->executeStatement(
+                    'UPDATE marketplace_ozon_realizations
+                     SET pl_document_id = :plDocumentId
+                     WHERE company_id     = :companyId
                        AND raw_document_id = :rawDocId
-                       AND sku           = :sku
-                       %s',
-                    implode(', ', $setParts),
-                    $whereQuantity,
-                ),
-                $params,
-            );
-
-            if ($affected > 0) {
-                $updated += $affected;
-            } else {
-                $skipped++;
-                $this->logger->warning('[OzonRealization] Reprocess: no rows matched', [
-                    'sku'      => $sku,
-                    'rawDocId' => $rawDocId,
-                ]);
+                       AND sku            = :sku',
+                    [
+                        'plDocumentId' => $plDocumentId,
+                        'companyId'    => $companyId,
+                        'rawDocId'     => $rawDocId,
+                        'sku'          => (string) $sku,
+                    ],
+                );
             }
+
+            $this->logger->info('[OzonRealization] Reprocess: restored pl_document_id', [
+                'raw_doc_id' => $rawDocId,
+                'restored'   => count($plDocumentIds),
+            ]);
         }
 
         $this->logger->info('[OzonRealization] Reprocess completed', [
             'raw_doc_id' => $rawDocId,
-            'updated'    => $updated,
-            'skipped'    => $skipped,
+            'created'    => $result['created'],
+            'skipped'    => $result['skipped'],
         ]);
 
-        return ['created' => 0, 'updated' => $updated, 'skipped' => $skipped];
+        return ['created' => 0, 'updated' => $result['created'], 'skipped' => $result['skipped']];
     }
 
     private function updateRawDocStats(string $rawDocId, int $created, int $skipped): void
