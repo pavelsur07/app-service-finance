@@ -154,15 +154,60 @@ final class ProcessOzonRealizationAction
             $name     = (string) ($row['item']['name'] ?? '') ?: null;
 
             $deliveryCommission = $row['delivery_commission'] ?? null;
-            $quantity           = (int) ($deliveryCommission['quantity'] ?? 0);
+            $returnCommission   = $row['return_commission'] ?? null;
 
-            // Цена покупателя с учётом СПП
-            $pricePerInstance   = (float) ($deliveryCommission['price_per_instance'] ?? 0);
+            $quantity         = (int)   ($deliveryCommission['quantity'] ?? 0);
+            $pricePerInstance = (float) ($deliveryCommission['price_per_instance'] ?? 0);
 
-            // Пропускаем строки без данных продажи (возврат без продажи в периоде)
-            // Такие строки: delivery_commission = null, только return_commission заполнен
-            if ($sku === '' || $quantity <= 0 || $pricePerInstance <= 0) {
+            if ($sku === '') {
                 $skipped++;
+                continue;
+            }
+
+            // Строка «только возврат»: delivery_commission = null, return_commission заполнен.
+            // Пример: товар возвращён в периоде без продажи в этом же периоде.
+            // Создаём запись с total_amount = 0 и заполненным return_amount,
+            // чтобы return_realization попал в ОПиУ при закрытии месяца.
+            if ($quantity <= 0 || $pricePerInstance <= 0) {
+                if ($returnCommission === null) {
+                    $skipped++;
+                    continue;
+                }
+
+                $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
+                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+
+                if ($returnPrice <= 0 || $returnQty <= 0) {
+                    $skipped++;
+                    continue;
+                }
+
+                // Создаём строку с нулевой продажей — только для учёта возврата
+                $realization = new MarketplaceOzonRealization(
+                    Uuid::uuid4()->toString(),
+                    $companyId,
+                    $rawDoc,
+                    $sku,
+                    '0.00',
+                    $returnQty,
+                    $periodFrom,
+                    $periodTo,
+                );
+                $realization->setOfferId($offerId);
+                $realization->setName($name);
+                $realization->setListing($listingsCache[$sku] ?? null);
+                $realization->setReturnCommission($returnPrice, $returnQty);
+
+                $this->em->persist($realization);
+                $created++;
+                $counter++;
+
+                if ($counter % $batchSize === 0) {
+                    $this->em->flush();
+                    $this->em->clear();
+                    $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+                }
+
                 continue;
             }
 
