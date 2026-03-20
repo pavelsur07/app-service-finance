@@ -435,6 +435,16 @@
             document.getElementById('reprocess-marketplace').value = event.relatedTarget.getAttribute('data-marketplace');
         });
 
+        // Блокировка кнопки при отправке формы переобработки
+        document.getElementById('form-reprocess').addEventListener('submit', function () {
+            var btn = document.getElementById('btn-reprocess');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Обработка...';
+            // Закрываем модал чтобы пользователь видел страницу во время обработки
+            var modal = bootstrap.Modal.getInstance(document.getElementById('modal-reprocess'));
+            if (modal) { modal.hide(); }
+        });
+
         // modal-sync-realization — подставляем action из data-action кнопки
         document.getElementById('modal-sync-realization').addEventListener('show.bs.modal', function (event) {
             document.getElementById('form-sync-realization').action = event.relatedTarget.getAttribute('data-action');
