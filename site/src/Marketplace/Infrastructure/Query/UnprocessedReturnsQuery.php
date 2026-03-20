@@ -72,6 +72,7 @@ final class UnprocessedReturnsQuery
                 ON m.company_id = r.company_id
                 AND m.marketplace = r.marketplace
                 AND m.operation_type = 'return'
+                AND m.amount_source != 'return_realization'
                 AND m.is_active = true
             WHERE r.company_id = :companyId
                 AND r.marketplace = :marketplace
