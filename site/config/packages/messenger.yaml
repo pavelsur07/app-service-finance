@@ -27,7 +27,6 @@ framework:
             'App\Marketplace\Message\SyncOzonReportMessage': async
             'App\Marketplace\Message\InitialSyncMessage': async
             'App\Marketplace\Message\TriggerInitialSyncMessage': async
-            'App\Marketplace\Message\GenerateMarketplacePLMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\SyncOzonRealizationMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
