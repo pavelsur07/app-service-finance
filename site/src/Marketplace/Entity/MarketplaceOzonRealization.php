@@ -134,6 +134,25 @@ class MarketplaceOzonRealization
     }
 
     /**
+     * Обновить данные продажи из delivery_commission.
+     * Вызывается при переобработке если в БД хранились неверные данные
+     * (старый код брал seller_price_per_instance вместо price_per_instance).
+     * flush() — ответственность вызывающего кода.
+     */
+    public function updateDeliveryCommission(float $pricePerInstance, int $quantity): void
+    {
+        if ($pricePerInstance <= 0 || $quantity <= 0) {
+            return;
+        }
+
+        $price = number_format($pricePerInstance, 2, '.', '');
+
+        $this->pricePerInstance = $price;
+        $this->quantity         = $quantity;
+        $this->totalAmount      = bcmul($price, (string) $quantity, 2);
+    }
+
+    /**
      * Установить данные возврата из return_commission.
      * Вызывается при обработке строки реализации если return_commission != null.
      * flush() — ответственность вызывающего кода.

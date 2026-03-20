@@ -149,13 +149,23 @@ final class MonthCloseVerifyQuery
             ['companyId' => $companyId, 'periodFrom' => $periodFrom, 'periodTo' => $periodTo],
         );
 
+        $totalSale        = (float) ($row['total_sale_amount'] ?? 0);
+        $totalSellerPrice = (float) ($row['total_seller_price_amount'] ?? 0);
+
+        // Если суммы равны — скорее всего в БД хранится seller_price вместо price_per_instance
+        // (старый баг). Нужно переобработать документы реализации.
+        $dataIntegrityStatus = abs($totalSale - $totalSellerPrice) < 0.01
+            ? 'ERROR — total_sale_amount == total_seller_price_amount. В БД хранится seller_price вместо price_per_instance. Нажми «Применить выручку» для всех документов реализации.'
+            : 'OK — суммы различаются, данные корректны';
+
         return [
-            'hint'                     => 'Сравни total_sale_amount с «Реализовано на сумму» и total_return_amount с «Возвращено на сумму» из xlsx-отчёта Ozon',
-            'total_rows'               => (int)   ($row['total_rows'] ?? 0),
-            'total_sale_amount'        => number_format((float) ($row['total_sale_amount'] ?? 0), 2, '.', ' '),
-            'total_seller_price_amount'=> number_format((float) ($row['total_seller_price_amount'] ?? 0), 2, '.', ' '),
-            'return_rows'              => (int)   ($row['return_rows'] ?? 0),
-            'total_return_amount'      => number_format((float) ($row['total_return_amount'] ?? 0), 2, '.', ' '),
+            'hint'                      => 'Сравни total_sale_amount с «Реализовано на сумму» и total_return_amount с «Возвращено на сумму» из xlsx-отчёта Ozon',
+            'data_integrity_status'     => $dataIntegrityStatus,
+            'total_rows'                => (int)   ($row['total_rows'] ?? 0),
+            'total_sale_amount'         => number_format($totalSale, 2, '.', ' '),
+            'total_seller_price_amount' => number_format($totalSellerPrice, 2, '.', ' '),
+            'return_rows'               => (int)   ($row['return_rows'] ?? 0),
+            'total_return_amount'       => number_format((float) ($row['total_return_amount'] ?? 0), 2, '.', ' '),
             'mapped_to_pl' => [
                 'sale_realization'   => number_format((float) $mappedSale, 2, '.', ' '),
                 'return_realization' => number_format((float) $mappedReturn, 2, '.', ' '),

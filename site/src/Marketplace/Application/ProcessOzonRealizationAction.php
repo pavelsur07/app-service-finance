@@ -231,8 +231,9 @@ final class ProcessOzonRealizationAction
 
     /**
      * Переобработка нужна для двух сценариев:
-     *   1. Исторические данные: строки созданы до добавления полей return_commission.
-     *      Поля returnPricePerInstance/returnQuantity/returnAmount = null, нужно заполнить.
+     *   1. Исторические данные: строки созданы старым кодом который брал
+     *      seller_price_per_instance вместо delivery_commission.price_per_instance.
+     *      Пересчитываем pricePerInstance и totalAmount + заполняем return_commission.
      *   2. Пользователь нажал «Применить выручку» повторно.
      *
      * Важно: строки с pl_document_id (уже закрытые) тоже обновляем —
@@ -247,7 +248,6 @@ final class ProcessOzonRealizationAction
         \DateTimeImmutable $periodFrom,
         \DateTimeImmutable $periodTo,
     ): array {
-        // Загружаем все существующие строки периода индексированные по SKU
         $existing = $this->realizationRepository->findByPeriodIndexedBySku(
             $companyId,
             $periodFrom->format('Y-m-d'),
@@ -258,24 +258,15 @@ final class ProcessOzonRealizationAction
         $skipped = 0;
 
         foreach ($rows as $row) {
-            $sku              = (string) ($row['item']['sku'] ?? '');
-            $returnCommission = $row['return_commission'] ?? null;
+            $sku                = (string) ($row['item']['sku'] ?? '');
+            $deliveryCommission = $row['delivery_commission'] ?? null;
+            $returnCommission   = $row['return_commission'] ?? null;
 
-            if ($sku === '' || $returnCommission === null) {
+            if ($sku === '') {
                 $skipped++;
                 continue;
             }
 
-            $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
-            $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
-
-            if ($returnPrice <= 0 || $returnQty <= 0) {
-                $skipped++;
-                continue;
-            }
-
-            // Ищем существующую строку — может быть несколько на один SKU (разные quantity)
-            // Берём первую найденную для данного SKU
             $realization = $existing[$sku] ?? null;
 
             if ($realization === null) {
@@ -286,8 +277,36 @@ final class ProcessOzonRealizationAction
                 continue;
             }
 
-            $realization->setReturnCommission($returnPrice, $returnQty);
-            $updated++;
+            $hasChanges = false;
+
+            // 1. Обновляем delivery_commission — исправляем исторические данные
+            //    где мог храниться seller_price вместо price_per_instance
+            if ($deliveryCommission !== null) {
+                $pricePerInstance = (float) ($deliveryCommission['price_per_instance'] ?? 0);
+                $quantity         = (int)   ($deliveryCommission['quantity'] ?? 0);
+
+                if ($pricePerInstance > 0 && $quantity > 0) {
+                    $realization->updateDeliveryCommission($pricePerInstance, $quantity);
+                    $hasChanges = true;
+                }
+            }
+
+            // 2. Обновляем return_commission
+            if ($returnCommission !== null) {
+                $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
+                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+
+                if ($returnPrice > 0 && $returnQty > 0) {
+                    $realization->setReturnCommission($returnPrice, $returnQty);
+                    $hasChanges = true;
+                }
+            }
+
+            if ($hasChanges) {
+                $updated++;
+            } else {
+                $skipped++;
+            }
         }
 
         $this->em->flush();
