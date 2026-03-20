@@ -15,10 +15,16 @@ use Webmozart\Assert\Assert;
  * Поле raw_data.result.rows[].
  *
  * Одна строка = один SKU за период реализации.
- * Несколько строк с одним SKU за один период = несколько отгрузок.
  *
- * Выручка = delivery_commission.price_per_instance × delivery_commission.quantity
- * (цена единицы покупателю с учётом СПП скидки).
+ * Выручка (продажа):
+ *   delivery_commission.price_per_instance × delivery_commission.quantity
+ *   → поля: pricePerInstance, quantity, totalAmount
+ *
+ * Возврат с СПП:
+ *   return_commission.price_per_instance × return_commission.quantity
+ *   → поля: returnPricePerInstance, returnQuantity, returnAmount
+ *   Null если return_commission отсутствует в строке реализации.
+ *
  * pl_document_id — заполняется при закрытии месяца.
  */
 #[ORM\Entity(repositoryClass: MarketplaceOzonRealizationRepository::class)]
@@ -42,48 +48,60 @@ class MarketplaceOzonRealization
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private MarketplaceRawDocument $rawDocument;
 
-    /** SKU маркетплейса */
     #[ORM\Column(type: 'string', length: 50)]
     private string $sku;
 
-    /** Артикул продавца */
     #[ORM\Column(type: 'string', length: 100, nullable: true)]
     private ?string $offerId;
 
-    /** Наименование товара */
     #[ORM\Column(type: 'string', length: 500, nullable: true)]
     private ?string $name;
 
     /**
-     * Цена единицы покупателю с учётом СПП скидки.
-     * Источник: delivery_commission.price_per_instance из /v2/finance/realization.
-     *
-     * Колонка намеренно сохраняет старое имя seller_price_per_instance —
-     * миграция не требуется.
+     * Цена единицы покупателю с учётом СПП.
+     * Источник: delivery_commission.price_per_instance.
+     * Колонка БД сохраняет имя seller_price_per_instance из исходной миграции.
      */
     #[ORM\Column(name: 'seller_price_per_instance', type: 'decimal', precision: 12, scale: 2)]
     private string $pricePerInstance;
 
-    /** Количество */
     #[ORM\Column(type: 'integer')]
     private int $quantity;
 
-    /** Итого выручка = price_per_instance × quantity */
+    /** Итого выручка = pricePerInstance × quantity */
     #[ORM\Column(type: 'decimal', precision: 12, scale: 2)]
     private string $totalAmount;
 
-    /** Начало периода реализации */
+    // -------------------------------------------------------------------------
+    // Возврат (return_commission) — nullable
+    // -------------------------------------------------------------------------
+
+    /**
+     * Цена единицы возврата с учётом СПП.
+     * Источник: return_commission.price_per_instance.
+     * Null если в строке реализации return_commission = null.
+     */
+    #[ORM\Column(type: 'decimal', precision: 12, scale: 2, nullable: true)]
+    private ?string $returnPricePerInstance = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $returnQuantity = null;
+
+    /**
+     * Итого сумма возврата = returnPricePerInstance × returnQuantity.
+     * Источник суммы для AmountSource::RETURN_REALIZATION.
+     */
+    #[ORM\Column(type: 'decimal', precision: 12, scale: 2, nullable: true)]
+    private ?string $returnAmount = null;
+
+    // -------------------------------------------------------------------------
+
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $periodFrom;
 
-    /** Конец периода реализации */
     #[ORM\Column(type: 'date_immutable')]
     private \DateTimeImmutable $periodTo;
 
-    /**
-     * ID документа ОПиУ — заполняется при закрытии месяца.
-     * NULL = не обработано.
-     */
     #[ORM\Column(type: 'guid', nullable: true)]
     private ?string $plDocumentId = null;
 
@@ -115,6 +133,31 @@ class MarketplaceOzonRealization
         $this->createdAt        = new \DateTimeImmutable();
     }
 
+    /**
+     * Установить данные возврата из return_commission.
+     * Вызывается при обработке строки реализации если return_commission != null.
+     * flush() — ответственность вызывающего кода.
+     */
+    public function setReturnCommission(float $pricePerInstance, int $quantity): void
+    {
+        if ($pricePerInstance <= 0 || $quantity <= 0) {
+            return;
+        }
+
+        $price = number_format($pricePerInstance, 2, '.', '');
+
+        $this->returnPricePerInstance = $price;
+        $this->returnQuantity         = $quantity;
+        $this->returnAmount           = bcmul($price, (string) $quantity, 2);
+    }
+
+    public function hasReturn(): bool
+    {
+        return $this->returnAmount !== null;
+    }
+
+    // --- Getters ---
+
     public function getId(): string { return $this->id; }
     public function getCompanyId(): string { return $this->companyId; }
     public function getListing(): ?MarketplaceListing { return $this->listing; }
@@ -125,6 +168,9 @@ class MarketplaceOzonRealization
     public function getPricePerInstance(): string { return $this->pricePerInstance; }
     public function getQuantity(): int { return $this->quantity; }
     public function getTotalAmount(): string { return $this->totalAmount; }
+    public function getReturnPricePerInstance(): ?string { return $this->returnPricePerInstance; }
+    public function getReturnQuantity(): ?int { return $this->returnQuantity; }
+    public function getReturnAmount(): ?string { return $this->returnAmount; }
     public function getPeriodFrom(): \DateTimeImmutable { return $this->periodFrom; }
     public function getPeriodTo(): \DateTimeImmutable { return $this->periodTo; }
     public function getPlDocumentId(): ?string { return $this->plDocumentId; }

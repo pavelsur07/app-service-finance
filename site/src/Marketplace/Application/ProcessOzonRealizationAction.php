@@ -20,21 +20,28 @@ use Ramsey\Uuid\Uuid;
  *
  * Структура строки реализации v2:
  * {
- *   "item": {
- *     "sku": 220280923,
- *     "offer_id": "WJ1020101211/черный-M",
- *     "name": "..."
- *   },
+ *   "item": { "sku": 220280923, "offer_id": "...", "name": "..." },
  *   "seller_price_per_instance": 2430,       ← цена продавца БЕЗ СПП (не используется)
  *   "delivery_commission": {
- *     "price_per_instance": 1594.67,          ← цена покупателя с учётом СПП — используем это
- *     "quantity": 1,                           ← количество
+ *     "price_per_instance": 1594.67,          ← цена покупателя с учётом СПП — используем
+ *     "quantity": 1,
+ *     ...
+ *   },
+ *   "return_commission": {                    ← nullable; заполнен если был возврат
+ *     "price_per_instance": 1594.67,          ← цена возврата с учётом СПП
+ *     "quantity": 1,
  *     ...
  *   }
  * }
  *
- * Выручка = delivery_commission.price_per_instance × delivery_commission.quantity.
- * Сохраняем в marketplace_ozon_realizations (денормализованная таблица).
+ * Выручка   = delivery_commission.price_per_instance × delivery_commission.quantity
+ * Возврат   = return_commission.price_per_instance × return_commission.quantity
+ *
+ * Переобработка (повторный вызов для уже обработанного периода):
+ *   Существующие строки обновляются — заполняются поля return_commission
+ *   которые отсутствовали до добавления фичи «Возврат с СПП».
+ *   Строки с pl_document_id (уже закрытые) также обновляются —
+ *   данные нужны для корректного закрытия следующих периодов.
  */
 final class ProcessOzonRealizationAction
 {
@@ -48,7 +55,7 @@ final class ProcessOzonRealizationAction
     }
 
     /**
-     * @return array{created: int, skipped: int}
+     * @return array{created: int, updated: int, skipped: int}
      */
     public function __invoke(string $companyId, string $rawDocId): array
     {
@@ -81,28 +88,46 @@ final class ProcessOzonRealizationAction
         if (empty($rows)) {
             $this->logger->info('[OzonRealization] No rows in document', ['raw_doc_id' => $rawDocId]);
 
-            return ['created' => 0, 'skipped' => 0];
+            return ['created' => 0, 'updated' => 0, 'skipped' => 0];
         }
 
         // Период из заголовка реализации
         $periodFrom = new \DateTimeImmutable($header['start_date'] ?? date('Y-m-01'));
         $periodTo   = new \DateTimeImmutable($header['stop_date'] ?? date('Y-m-t'));
 
-        // Проверяем — уже обработан ли этот период
-        if ($this->realizationRepository->existsForPeriod(
+        // Проверяем режим: первичная обработка или переобработка (повторный запуск)
+        $isReprocess = $this->realizationRepository->existsForPeriod(
             $companyId,
             $periodFrom->format('Y-m-d'),
             $periodTo->format('Y-m-d'),
-        )) {
-            $this->logger->info('[OzonRealization] Already processed for period', [
+        );
+
+        if ($isReprocess) {
+            $this->logger->info('[OzonRealization] Reprocessing existing period — updating return_commission fields', [
                 'period_from' => $periodFrom->format('Y-m-d'),
                 'period_to'   => $periodTo->format('Y-m-d'),
             ]);
 
-            return ['created' => 0, 'skipped' => count($rows)];
+            return $this->reprocess($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
         }
 
-        // Собираем все SKU для batch-загрузки листингов
+        return $this->process($companyId, $rawDoc, $rows, $periodFrom, $periodTo);
+    }
+
+    // -------------------------------------------------------------------------
+    // Первичная обработка
+    // -------------------------------------------------------------------------
+
+    /**
+     * @return array{created: int, updated: int, skipped: int}
+     */
+    private function process(
+        string $companyId,
+        MarketplaceRawDocument $rawDoc,
+        array $rows,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): array {
         $allSkus = [];
         foreach ($rows as $row) {
             $sku = (string) ($row['item']['sku'] ?? '');
@@ -112,7 +137,7 @@ final class ProcessOzonRealizationAction
         }
 
         $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
-            $company,
+            $this->em->find(Company::class, $companyId),
             MarketplaceType::OZON,
             array_keys($allSkus),
         );
@@ -121,20 +146,21 @@ final class ProcessOzonRealizationAction
         $skipped   = 0;
         $batchSize = 250;
         $counter   = 0;
+        $rawDocId  = $rawDoc->getId();
 
         foreach ($rows as $row) {
-            $sku     = (string) ($row['item']['sku'] ?? '');
-            $offerId = (string) ($row['item']['offer_id'] ?? '') ?: null;
-            $name    = (string) ($row['item']['name'] ?? '') ?: null;
+            $sku      = (string) ($row['item']['sku'] ?? '');
+            $offerId  = (string) ($row['item']['offer_id'] ?? '') ?: null;
+            $name     = (string) ($row['item']['name'] ?? '') ?: null;
 
-            $quantity = (int) ($row['delivery_commission']['quantity'] ?? 0);
+            $deliveryCommission = $row['delivery_commission'] ?? null;
+            $quantity           = (int) ($deliveryCommission['quantity'] ?? 0);
 
-            // Цена покупателя с учётом СПП скидки.
-            // delivery_commission.price_per_instance — это фактическая выручка за единицу,
-            // которую Ozon засчитывает продавцу в отчёте реализации.
-            // НЕ путать с seller_price_per_instance — ценой продавца без СПП.
-            $pricePerInstance = (float) ($row['delivery_commission']['price_per_instance'] ?? 0);
+            // Цена покупателя с учётом СПП
+            $pricePerInstance   = (float) ($deliveryCommission['price_per_instance'] ?? 0);
 
+            // Пропускаем строки без данных продажи (возврат без продажи в периоде)
+            // Такие строки: delivery_commission = null, только return_commission заполнен
             if ($sku === '' || $quantity <= 0 || $pricePerInstance <= 0) {
                 $skipped++;
                 continue;
@@ -154,6 +180,14 @@ final class ProcessOzonRealizationAction
             $realization->setOfferId($offerId);
             $realization->setName($name);
             $realization->setListing($listingsCache[$sku] ?? null);
+
+            // Возврат
+            $returnCommission = $row['return_commission'] ?? null;
+            if ($returnCommission !== null) {
+                $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
+                $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+                $realization->setReturnCommission($returnPrice, $returnQty);
+            }
 
             $this->em->persist($realization);
 
@@ -180,13 +214,7 @@ final class ProcessOzonRealizationAction
 
         $this->em->flush();
 
-        // Обновляем статистику raw документа
-        $rawDoc = $this->rawDocumentRepository->find($rawDocId);
-        if ($rawDoc !== null) {
-            $rawDoc->setRecordsCreated($created);
-            $rawDoc->setRecordsSkipped($skipped);
-            $this->em->flush();
-        }
+        $this->updateRawDocStats($rawDocId, $created, $skipped);
 
         $this->logger->info('[OzonRealization] Completed', [
             'raw_doc_id' => $rawDocId,
@@ -194,6 +222,92 @@ final class ProcessOzonRealizationAction
             'skipped'    => $skipped,
         ]);
 
-        return ['created' => $created, 'skipped' => $skipped];
+        return ['created' => $created, 'updated' => 0, 'skipped' => $skipped];
+    }
+
+    // -------------------------------------------------------------------------
+    // Переобработка: обновляем поля return_commission в существующих строках
+    // -------------------------------------------------------------------------
+
+    /**
+     * Переобработка нужна для двух сценариев:
+     *   1. Исторические данные: строки созданы до добавления полей return_commission.
+     *      Поля returnPricePerInstance/returnQuantity/returnAmount = null, нужно заполнить.
+     *   2. Пользователь нажал «Применить выручку» повторно.
+     *
+     * Важно: строки с pl_document_id (уже закрытые) тоже обновляем —
+     * при следующем переоткрытии/закрытии данные будут корректными.
+     *
+     * @return array{created: int, updated: int, skipped: int}
+     */
+    private function reprocess(
+        string $companyId,
+        MarketplaceRawDocument $rawDoc,
+        array $rows,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): array {
+        // Загружаем все существующие строки периода индексированные по SKU
+        $existing = $this->realizationRepository->findByPeriodIndexedBySku(
+            $companyId,
+            $periodFrom->format('Y-m-d'),
+            $periodTo->format('Y-m-d'),
+        );
+
+        $updated = 0;
+        $skipped = 0;
+
+        foreach ($rows as $row) {
+            $sku              = (string) ($row['item']['sku'] ?? '');
+            $returnCommission = $row['return_commission'] ?? null;
+
+            if ($sku === '' || $returnCommission === null) {
+                $skipped++;
+                continue;
+            }
+
+            $returnPrice = (float) ($returnCommission['price_per_instance'] ?? 0);
+            $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
+
+            if ($returnPrice <= 0 || $returnQty <= 0) {
+                $skipped++;
+                continue;
+            }
+
+            // Ищем существующую строку — может быть несколько на один SKU (разные quantity)
+            // Берём первую найденную для данного SKU
+            $realization = $existing[$sku] ?? null;
+
+            if ($realization === null) {
+                $skipped++;
+                $this->logger->warning('[OzonRealization] Reprocess: no existing row for SKU', [
+                    'sku' => $sku,
+                ]);
+                continue;
+            }
+
+            $realization->setReturnCommission($returnPrice, $returnQty);
+            $updated++;
+        }
+
+        $this->em->flush();
+
+        $this->logger->info('[OzonRealization] Reprocess completed', [
+            'raw_doc_id' => $rawDoc->getId(),
+            'updated'    => $updated,
+            'skipped'    => $skipped,
+        ]);
+
+        return ['created' => 0, 'updated' => $updated, 'skipped' => $skipped];
+    }
+
+    private function updateRawDocStats(string $rawDocId, int $created, int $skipped): void
+    {
+        $rawDoc = $this->rawDocumentRepository->find($rawDocId);
+        if ($rawDoc !== null) {
+            $rawDoc->setRecordsCreated($created);
+            $rawDoc->setRecordsSkipped($skipped);
+            $this->em->flush();
+        }
     }
 }

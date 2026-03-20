@@ -65,13 +65,15 @@ final class MonthCloseDebugQuery
 
     /**
      * @return array<int, array{
-     *     pl_category_id:           string,
-     *     pl_category_name:         string,
-     *     is_negative:              bool,
-     *     records_count:            int,
+     *     pl_category_id:            string,
+     *     pl_category_name:          string,
+     *     is_negative:               bool,
+     *     records_count:             int,
      *     total_seller_price_amount: string,
-     *     total_amount:             string,
-     *     document_ids:             string[],
+     *     total_amount:              string,
+     *     total_return_amount:       string,
+     *     return_records_count:      int,
+     *     document_ids:              string[],
      * }>
      */
     public function aggregateRealization(
@@ -97,6 +99,8 @@ final class MonthCloseDebugQuery
                 COUNT(r.id)                                     AS records_count,
                 SUM(r.seller_price_per_instance * r.quantity)  AS total_seller_price_amount,
                 SUM(r.total_amount)                             AS total_amount,
+                COUNT(r.return_amount)                          AS return_records_count,
+                COALESCE(SUM(r.return_amount), 0)               AS total_return_amount,
                 array_agg(DISTINCT r.pl_document_id)
                     FILTER (WHERE r.pl_document_id IS NOT NULL) AS document_ids
             FROM marketplace_ozon_realizations r
@@ -359,6 +363,9 @@ final class MonthCloseDebugQuery
                 (r.seller_price_per_instance
                     * r.quantity)::numeric(15,2) AS seller_total,
                 r.total_amount,
+                r.return_price_per_instance,
+                r.return_quantity,
+                r.return_amount,
                 r.period_from::text             AS period_from,
                 r.period_to::text               AS period_to,
                 m.pl_category_id,

@@ -185,6 +185,7 @@
                                 <th class="text-end">Записей</th>
                                 <th class="text-end">Σ Цена продавца (без СПП)</th>
                                 <th class="text-end">Σ Выручка → ОПиУ (с СПП)</th>
+                                <th class="text-end">Σ Возврат с СПП → ОПиУ</th>
                                 <th>Знак</th>
                                 <th>Документы ОПиУ</th>
                                 <th></th>
@@ -200,6 +201,14 @@
                                     </td>
                                     <td class="text-end fw-medium">
                                         {{ row.total_amount|number_format(2, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end {{ row.total_return_amount > 0 ? 'fw-medium text-warning' : 'text-muted' }}">
+                                        {% if row.return_records_count > 0 %}
+                                            {{ row.total_return_amount|number_format(2, '.', ' ') }} ₽
+                                            <span class="text-muted small">({{ row.return_records_count }} шт.)</span>
+                                        {% else %}
+                                            —
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {% if row.is_negative %}
@@ -232,7 +241,7 @@
                                     </td>
                                 </tr>
                                 <tr class="js-detail-row d-none">
-                                    <td colspan="7" class="p-0">
+                                    <td colspan="8" class="p-0">
                                         <div class="js-detail-container p-3 bg-light border-top"></div>
                                     </td>
                                 </tr>
@@ -378,12 +387,19 @@
                 <th class="text-end">Кол-во</th>
                 <th class="text-end">Цена продавца (без СПП)</th>
                 <th class="text-end">price_per_instance (с СПП)</th>
-                <th class="text-end">Σ → ОПиУ</th>
+                <th class="text-end">Σ выручка → ОПиУ</th>
+                <th class="text-end">Возврат price_per_instance</th>
+                <th class="text-end">Возврат кол-во</th>
+                <th class="text-end">Σ возврат → ОПиУ</th>
                 <th>Период</th>
                 <th>Категория ОПиУ</th>
                 <th>Документ</th>
             </tr></thead><tbody>`;
                     data.rows.forEach(r => {
+                        const sign = r.is_negative ? '−' : '+';
+                        const retCell = r.return_amount
+                            ? `<span class="fw-medium text-warning">${r.is_negative ? '+' : '−'} ${fmt(r.return_amount)}</span>`
+                            : '<span class="text-muted">—</span>';
                         html += `<tr>
                     <td class="font-monospace">${r.offer_id ?? '—'}</td>
                     <td>${r.sku}</td>
@@ -391,7 +407,10 @@
                     <td class="text-end">${r.quantity}</td>
                     <td class="text-end text-muted">${fmt(r.seller_price_per_instance)}</td>
                     <td class="text-end">${fmt(r.price_per_instance)}</td>
-                    <td class="text-end fw-medium">${r.is_negative ? '−' : '+'} ${fmt(r.total_amount)}</td>
+                    <td class="text-end fw-medium">${sign} ${fmt(r.total_amount)}</td>
+                    <td class="text-end text-muted">${r.return_price_per_instance ? fmt(r.return_price_per_instance) : '—'}</td>
+                    <td class="text-end text-muted">${r.return_quantity ?? '—'}</td>
+                    <td class="text-end">${retCell}</td>
                     <td class="text-muted">${r.period_from} – ${r.period_to}</td>
                     <td>${r.pl_category_name}</td>
                     <td class="font-monospace">${docLink(r.document_id)}</td>

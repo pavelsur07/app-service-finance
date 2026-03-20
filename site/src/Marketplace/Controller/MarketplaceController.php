@@ -1,15 +1,15 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
-use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
-use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
@@ -35,14 +35,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 class MarketplaceController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly MarketplaceConnectionRepository $connectionRepository,
+        private readonly ActiveCompanyService              $companyService,
+        private readonly MarketplaceConnectionRepository  $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
-        private readonly MarketplaceRawProcessorRegistry $processorRegistry,
-        private readonly OzonRealizationStatusQuery $realizationStatusQuery,
-        private readonly EntityManagerInterface $em,
-        private readonly MessageBusInterface $messageBus,
+        private readonly MarketplaceAdapterRegistry       $adapterRegistry,
+        private readonly MarketplaceRawProcessorRegistry  $processorRegistry,
+        private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
+        private readonly EntityManagerInterface           $em,
+        private readonly MessageBusInterface              $messageBus,
     ) {
     }
 
@@ -462,11 +462,20 @@ class MarketplaceController extends AbstractController
         try {
             $result = ($action)((string) $company->getId(), (string) $rawDoc->getId());
 
-            $this->addFlash('success', sprintf(
-                'Реализация обработана: создано строк %d, пропущено %d.',
-                $result['created'],
-                $result['skipped'],
-            ));
+            // Различаем первичную обработку и переобработку (повторный запуск)
+            if ($result['updated'] > 0) {
+                $this->addFlash('success', sprintf(
+                    'Реализация переобработана: обновлено строк с возвратами %d, пропущено %d.',
+                    $result['updated'],
+                    $result['skipped'],
+                ));
+            } else {
+                $this->addFlash('success', sprintf(
+                    'Реализация обработана: создано строк %d, пропущено %d.',
+                    $result['created'],
+                    $result['skipped'],
+                ));
+            }
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
         }

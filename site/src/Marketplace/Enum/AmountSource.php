@@ -13,10 +13,14 @@ namespace App\Marketplace\Enum;
  *   SALE_COST_PRICE → cost_price × quantity      (себестоимость)
  *
  * Реализация Ozon (из marketplace_ozon_realizations):
- *   SALE_REALIZATION → delivery_commission.price_per_instance × quantity
- *                      Цена покупателя с учётом СПП скидки.
- *                      Агрегированный месячный отчёт реализации (/v2/finance/realization).
- *                      Только для Ozon. Настраивается отдельным маппингом.
+ *   SALE_REALIZATION   → delivery_commission.price_per_instance × quantity
+ *                        Цена покупателя с учётом СПП скидки.
+ *                        Агрегированный месячный отчёт реализации (/v2/finance/realization).
+ *                        Только для Ozon.
+ *
+ *   RETURN_REALIZATION → return_commission.price_per_instance × quantity
+ *                        Сумма возврата с учётом СПП из отчёта реализации.
+ *                        Только для Ozon. Настраивается отдельным маппингом.
  *
  * Возвраты (из marketplace_returns):
  *   RETURN_REFUND     → refund_amount
@@ -32,9 +36,10 @@ enum AmountSource: string
     case SALE_REALIZATION  = 'sale_realization';
 
     // === Return sources ===
-    case RETURN_REFUND     = 'return_refund';
-    case RETURN_GROSS      = 'return_gross';
-    case RETURN_COST_PRICE = 'return_cost_price';
+    case RETURN_REFUND      = 'return_refund';
+    case RETURN_GROSS       = 'return_gross';
+    case RETURN_COST_PRICE  = 'return_cost_price';
+    case RETURN_REALIZATION = 'return_realization';
 
     public function getOperationType(): string
     {
@@ -42,11 +47,12 @@ enum AmountSource: string
             self::SALE_GROSS,
             self::SALE_REVENUE,
             self::SALE_COST_PRICE,
-            self::SALE_REALIZATION  => 'sale',
+            self::SALE_REALIZATION   => 'sale',
 
             self::RETURN_REFUND,
             self::RETURN_GROSS,
-            self::RETURN_COST_PRICE => 'return',
+            self::RETURN_COST_PRICE,
+            self::RETURN_REALIZATION => 'return',
         };
     }
 
@@ -60,6 +66,7 @@ enum AmountSource: string
             self::RETURN_REFUND     => 'Сумма возврата (refundAmount)',
             self::RETURN_GROSS      => 'Возврат без СПП (цена × кол-во)',
             self::RETURN_COST_PRICE => 'Себестоимость возвратов (costPrice × кол-во)',
+            self::RETURN_REALIZATION => 'Возврат с СПП Ozon (return_commission.price_per_instance × кол-во)',
         };
     }
 
@@ -69,10 +76,24 @@ enum AmountSource: string
             self::SALE_GROSS        => 's.price_per_unit * s.quantity',
             self::SALE_REVENUE      => 's.total_revenue',
             self::SALE_COST_PRICE   => 's.cost_price * s.quantity',
-            self::SALE_REALIZATION  => 'r.total_amount', // marketplace_ozon_realizations: price_per_instance × quantity
+            self::SALE_REALIZATION  => 'r.total_amount',        // marketplace_ozon_realizations: price_per_instance × quantity
             self::RETURN_REFUND     => 'r.refund_amount',
             self::RETURN_GROSS      => 'ms.price_per_unit * r.quantity',
             self::RETURN_COST_PRICE => 'ms.cost_price * r.quantity',
+            self::RETURN_REALIZATION => 'r.return_amount',      // marketplace_ozon_realizations: return_price_per_instance × return_quantity
+        };
+    }
+
+    /**
+     * Применим ли источник только к конкретному маркетплейсу.
+     * null — применим ко всем.
+     */
+    public function getMarketplaceRestriction(): ?MarketplaceType
+    {
+        return match ($this) {
+            self::SALE_REALIZATION,
+            self::RETURN_REALIZATION => MarketplaceType::OZON,
+            default                  => null,
         };
     }
 }
