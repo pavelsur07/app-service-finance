@@ -59,7 +59,7 @@ final class UnprocessedReturnsQuery
                             )
                         WHEN 'return_cost_price'
                             THEN COALESCE(
-                                ms.cost_price * r.quantity,
+                                r.cost_price * r.quantity,
                                 0
                             )
                         ELSE 0
@@ -97,7 +97,7 @@ final class UnprocessedReturnsQuery
                         )
                     WHEN 'return_cost_price'
                         THEN COALESCE(
-                            ms.cost_price * r.quantity,
+                            r.cost_price * r.quantity,
                             0
                         )
                     ELSE 0
