@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\ProcessOzonRealizationAction;
+use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
@@ -43,6 +44,7 @@ class MarketplaceController extends AbstractController
         private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
         private readonly EntityManagerInterface           $em,
         private readonly MessageBusInterface              $messageBus,
+        private readonly ReprocessMarketplacePeriodAction $reprocessAction,
     ) {
     }
 
@@ -478,6 +480,53 @@ class MarketplaceController extends AbstractController
             }
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/reprocess', name: 'marketplace_reprocess', methods: ['POST'])]
+    public function reprocess(Request $request): Response
+    {
+        $company = $this->companyService->getActiveCompany();
+
+        $marketplace  = $request->request->get('marketplace', '');
+        $periodFromStr = $request->request->get('period_from', '');
+        $periodToStr   = $request->request->get('period_to', '');
+        $type          = $request->request->get('type', 'all'); // all | sales_report | realization
+
+        if (MarketplaceType::tryFrom($marketplace) === null) {
+            $this->addFlash('error', 'Неизвестный маркетплейс: ' . $marketplace);
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        try {
+            $periodFrom = new \DateTimeImmutable($periodFromStr);
+            $periodTo   = new \DateTimeImmutable($periodToStr);
+        } catch (\Exception) {
+            $this->addFlash('error', 'Неверный формат дат');
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        try {
+            $result = ($this->reprocessAction)(
+                companyId:   (string) $company->getId(),
+                marketplace: $marketplace,
+                periodFrom:  $periodFrom,
+                periodTo:    $periodTo,
+                type:        $type,
+            );
+
+            $this->addFlash('success', sprintf(
+                'Переобработка завершена: документов %d, продажи %d, возвраты %d, затраты %d, реализация %d.',
+                $result['docs'],
+                $result['sales'],
+                $result['returns'],
+                $result['costs'],
+                $result['realization'],
+            ));
+        } catch (\Exception $e) {
+            $this->addFlash('error', 'Ошибка переобработки: ' . $e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');

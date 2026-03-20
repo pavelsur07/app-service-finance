@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Repository;
 
 use App\Company\Entity\Company;
@@ -15,16 +17,10 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceRawDocument::class);
     }
 
-    public function save(MarketplaceRawDocument $document): void
-    {
-        $this->getEntityManager()->persist($document);
-        $this->getEntityManager()->flush();
-    }
-
     /**
      * @return MarketplaceRawDocument[]
      */
-    public function findByCompany(Company $company, int $limit = 50): array
+    public function findByCompany(Company $company, int $limit = 20): array
     {
         return $this->createQueryBuilder('d')
             ->where('d.company = :company')
@@ -35,21 +31,41 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findLatestByType(
-        Company $company,
+    /**
+     * Найти raw-документы за период для переобработки.
+     *
+     * Используется в ReprocessMarketplaceCommand.
+     * Фильтрует по periodFrom/periodTo документа (перекрытие с запрошенным периодом).
+     *
+     * @param string|null $documentType  null = все типы | 'sales_report' | 'realization'
+     * @return MarketplaceRawDocument[]
+     */
+    public function findByCompanyAndPeriod(
+        string $companyId,
         MarketplaceType $marketplace,
-        string $documentType,
-    ): ?MarketplaceRawDocument {
-        return $this->createQueryBuilder('d')
-            ->where('d.company = :company')
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+        ?string $documentType = null,
+    ): array {
+        $qb = $this->createQueryBuilder('d')
+            ->join('d.company', 'c')
+            ->where('c.id = :companyId')
             ->andWhere('d.marketplace = :marketplace')
-            ->andWhere('d.documentType = :type')
-            ->setParameter('company', $company)
+            // Документ перекрывается с периодом если его конец >= начала запроса
+            // и его начало <= конца запроса
+            ->andWhere('d.periodFrom <= :periodTo')
+            ->andWhere('d.periodTo >= :periodFrom')
+            ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
-            ->setParameter('type', $documentType)
-            ->orderBy('d.syncedAt', 'DESC')
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+            ->setParameter('periodFrom', $periodFrom)
+            ->setParameter('periodTo', $periodTo)
+            ->orderBy('d.syncedAt', 'ASC');
+
+        if ($documentType !== null) {
+            $qb->andWhere('d.documentType = :documentType')
+                ->setParameter('documentType', $documentType);
+        }
+
+        return $qb->getQuery()->getResult();
     }
 }
