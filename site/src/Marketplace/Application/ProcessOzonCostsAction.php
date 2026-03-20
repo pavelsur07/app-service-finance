@@ -43,79 +43,93 @@ use Ramsey\Uuid\Uuid;
 final class ProcessOzonCostsAction
 {
     /**
-     * Точный маппинг service name → category code.
-     * Null = нулевой маркер, пропустить.
+     * Атомарный маппинг: каждый service name → свой уникальный category code.
+     *
+     * Группировка для ОПиУ происходит ТОЛЬКО на уровне маппинга PLCategory —
+     * пользователь сам решает какие категории объединять в одну строку P&L.
+     *
+     * Null = нулевой маркер (price всегда 0), пропустить без создания записи.
      *
      * @var array<string, string|null>
      */
     private const SERVICE_CATEGORY_MAP = [
-        // === ЛОГИСТИКА ===
-        'MarketplaceServiceItemDirectFlowLogistic'               => 'ozon_logistics',
-        'MarketplaceServiceItemReturnFlowLogistic'               => 'ozon_logistics',
-        'MarketplaceServiceItemDirectFlowLogisticVDC'            => 'ozon_logistics',
-        'MarketplaceServiceItemDelivToCustomer'                  => 'ozon_logistics',
-        'MarketplaceServiceItemRedistributionLastMileCourier'    => 'ozon_logistics',
-        'MarketplaceServiceItemDirectFlowTrans'                  => 'ozon_logistics',
-        'MarketplaceServiceItemReturnFlowTrans'                  => 'ozon_logistics',
-        'MarketplaceServiceItemDeliveryKGT'                      => 'ozon_logistics',
-        'ItemAdvertisementForSupplierLogistic'                   => 'ozon_logistics',
-        'ItemAdvertisementForSupplierLogisticSeller'             => 'ozon_logistics',
-        'MarketplaceDeliveryCostItem'                            => 'ozon_logistics',
+        // === ЛОГИСТИКА ПРЯМАЯ ===
+        'MarketplaceServiceItemDirectFlowLogistic'               => 'ozon_logistic_direct',
+        'MarketplaceServiceItemDirectFlowLogisticVDC'            => 'ozon_logistic_direct_vdc',
+        'MarketplaceServiceItemDirectFlowTrans'                  => 'ozon_logistic_direct_trans',
+        'MarketplaceDeliveryCostItem'                            => 'ozon_logistic_delivery',
+        'MarketplaceServiceItemDelivToCustomer'                  => 'ozon_logistic_last_mile',
+        'MarketplaceServiceItemRedistributionLastMileCourier'    => 'ozon_logistic_last_mile',
+        'MarketplaceServiceItemDeliveryKGT'                      => 'ozon_logistic_kgt',
+
+        // === ЛОГИСТИКА ОБРАТНАЯ ===
+        'MarketplaceServiceItemReturnFlowLogistic'               => 'ozon_logistic_return',
+        'MarketplaceServiceItemReturnFlowTrans'                  => 'ozon_logistic_return_trans',
+
+        // === ЛОГИСТИКА ПОСТАВКИ НА СКЛАД ===
+        'ItemAdvertisementForSupplierLogistic'                   => 'ozon_logistic_inbound',
+        'ItemAdvertisementForSupplierLogisticSeller'             => 'ozon_logistic_inbound_seller',
+        'MarketplaceServiceItemPickup'                           => 'ozon_logistic_pickup',
 
         // === ОБРАБОТКА ОТПРАВЛЕНИЙ ===
-        'MarketplaceServiceItemFulfillment'                      => 'ozon_processing',
-        'MarketplaceServiceItemDropoffFF'                        => 'ozon_processing',
-        'MarketplaceServiceItemDropoffPVZ'                       => 'ozon_processing',
-        'MarketplaceServiceItemDropoffSC'                        => 'ozon_processing',
-        'MarketplaceServiceItemDropoffPPZ'                       => 'ozon_processing',
-        'MarketplaceServiceItemReturnPartGoodsCustomer'          => 'ozon_processing',
-        'MarketplaceNotDeliveredCostItem'                        => 'ozon_processing',
-        'MarketplaceReturnAfterDeliveryCostItem'                 => 'ozon_processing',
-        'MarketplaceServiceItemRedistributionReturnsPVZ'         => 'ozon_processing',
-        'MarketplaceServiceItemPickup'                           => 'ozon_processing',
+        'MarketplaceServiceItemFulfillment'                      => 'ozon_fulfillment',
+        'MarketplaceServiceItemDropoffFF'                        => 'ozon_dropoff_ff',
+        'MarketplaceServiceItemDropoffPVZ'                       => 'ozon_dropoff_pvz',
+        'MarketplaceServiceItemDropoffSC'                        => 'ozon_dropoff_sc',
+        'MarketplaceServiceItemDropoffPPZ'                       => 'ozon_dropoff_ppz',
 
-        // === НУЛЕВЫЕ МАРКЕРЫ (пропускать) ===
+        // === ОБРАБОТКА ВОЗВРАТОВ ===
+        'MarketplaceServiceItemRedistributionReturnsPVZ'         => 'ozon_return_pvz',
+        'MarketplaceServiceItemReturnPartGoodsCustomer'          => 'ozon_return_partial',
+        'MarketplaceNotDeliveredCostItem'                        => 'ozon_return_not_delivered',
+        'MarketplaceReturnAfterDeliveryCostItem'                 => 'ozon_return_after_delivery',
+        'MarketplaceReturnStorageServiceAtThePickupPointFbsItem' => 'ozon_return_storage_pvz',
+        'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'   => 'ozon_return_storage_wh',
+
+        // === НУЛЕВЫЕ МАРКЕРЫ (пропускать, price = 0) ===
         'MarketplaceServiceItemReturnNotDelivToCustomer'         => null,
         'MarketplaceServiceItemReturnAfterDelivToCustomer'       => null,
 
         // === УПАКОВКА ===
-        'MarketplaceServiceItemPackageMaterialsProvision'        => 'ozon_packaging',
-        'MarketplaceServiceItemPackageRedistribution'            => 'ozon_packaging',
+        'MarketplaceServiceItemPackageMaterialsProvision'        => 'ozon_package_materials',
+        'MarketplaceServiceItemPackageRedistribution'            => 'ozon_package_labor',
 
         // === ХРАНЕНИЕ ===
         'OperationMarketplaceServiceStorage'                     => 'ozon_storage',
-        'MarketplaceReturnStorageServiceAtThePickupPointFbsItem' => 'ozon_storage',
-        'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'   => 'ozon_storage',
+        'MarketplaceReturnStorageServiceAtThePickupPointFbsItem' => 'ozon_return_storage_pvz',
+        'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'   => 'ozon_return_storage_wh',
 
-        // === КРОСС-ДОКИНГ / ПОСТАВКА ===
+        // === КРОСС-ДОКИНГ / ПОСТАВКА НА FBO ===
         'MarketplaceServiceItemCrossdocking'                     => 'ozon_crossdocking',
-        'OperationMarketplaceSupplyAdditional'                   => 'ozon_supply',
-        'OperationMarketplaceServiceSupplyInboundCargoShortage'  => 'ozon_supply',
-        'OperationMarketplaceServiceSupplyInboundCargoSurplus'   => 'ozon_supply',
+        'OperationMarketplaceSupplyAdditional'                   => 'ozon_supply_additional',
+        'OperationMarketplaceServiceSupplyInboundCargoShortage'  => 'ozon_supply_shortage',
+        'OperationMarketplaceServiceSupplyInboundCargoSurplus'   => 'ozon_supply_surplus',
 
         // === ЭКВАЙРИНГ ===
         'MarketplaceRedistributionOfAcquiringOperation'          => 'ozon_acquiring',
 
-        // === РЕКЛАМА / ПРОДВИЖЕНИЕ ===
-        'OperationMarketplaceCostPerClick'                       => 'ozon_promotion',
-        'MarketplaceMarketingActionCostItem'                     => 'ozon_promotion',
-        'MarketplaceServicePremiumPromotion'                     => 'ozon_promotion',
-        'MarketplaceServicePremiumCashbackIndividualPoints'      => 'ozon_promotion',
-        'ItemAgentServiceStarsMembership'                        => 'ozon_promotion',
-        'MarketplaceSaleReviewsItem'                             => 'ozon_promotion',
+        // === РЕКЛАМА ===
+        'OperationMarketplaceCostPerClick'                       => 'ozon_cpc',
+        'MarketplaceMarketingActionCostItem'                     => 'ozon_marketing_action',
+        'MarketplaceSaleReviewsItem'                             => 'ozon_reviews',
+
+        // === ПРОДВИЖЕНИЕ / PREMIUM ===
+        'MarketplaceServicePremiumPromotion'                     => 'ozon_premium_promotion',
+        'MarketplaceServicePremiumCashbackIndividualPoints'      => 'ozon_premium_cashback',
+        'ItemAgentServiceStarsMembership'                        => 'ozon_stars_membership',
 
         // === ФИНАНСОВЫЕ УСЛУГИ ===
-        'OperationMarketplaceServiceEarlyPaymentAccrual'         => 'ozon_finance',
-        'MarketplaceServiceItemFlexiblePaymentSchedule'          => 'ozon_finance',
-        'MarketplaceServiceItemInstallment'                      => 'ozon_finance',
+        'OperationMarketplaceServiceEarlyPaymentAccrual'         => 'ozon_early_payment',
+        'MarketplaceServiceItemFlexiblePaymentSchedule'          => 'ozon_flexible_payment',
+        'MarketplaceServiceItemInstallment'                      => 'ozon_installment',
 
         // === ШТРАФЫ / УДЕРЖАНИЯ ===
-        'OperationMarketplaceWithHoldingForUndeliverableGoods'   => 'ozon_penalty',
+        'OperationMarketplaceWithHoldingForUndeliverableGoods'   => 'ozon_penalty_undeliverable',
 
         // === ПРОЧЕЕ ===
-        'MarketplaceServiceItemMarkingItems'                     => 'ozon_other_service',
-        'MarketplaceServiceItemReturnFromStock'                  => 'ozon_other_service',
-        'OperationMarketplaceAgencyFeeAggregator3PLGlobal'       => 'ozon_other_service',
+        'MarketplaceServiceItemMarkingItems'                     => 'ozon_marking',
+        'MarketplaceServiceItemReturnFromStock'                  => 'ozon_return_from_stock',
+        'OperationMarketplaceAgencyFeeAggregator3PLGlobal'       => 'ozon_agency_fee',
     ];
 
     /**
@@ -559,21 +573,68 @@ final class ProcessOzonCostsAction
     private function getCategoryName(string $categoryCode): string
     {
         return match ($categoryCode) {
-            'ozon_sale_commission'  => 'Комиссия Ozon за продажу',
-            'ozon_delivery'         => 'Доставка Ozon',
-            'ozon_return_delivery'  => 'Обратная доставка Ozon',
-            'ozon_logistics'        => 'Логистика Ozon',
-            'ozon_processing'       => 'Обработка отправления Ozon',
-            'ozon_packaging'        => 'Упаковка Ozon',
-            'ozon_storage'          => 'Хранение на складе Ozon',
-            'ozon_crossdocking'     => 'Кросс-докинг Ozon',
-            'ozon_supply'           => 'Услуги поставки Ozon',
-            'ozon_acquiring'        => 'Эквайринг Ozon',
-            'ozon_promotion'        => 'Продвижение / реклама Ozon',
-            'ozon_finance'          => 'Финансовые услуги Ozon',
-            'ozon_penalty'          => 'Штрафы / удержания Ozon',
-            'ozon_compensation'     => 'Компенсации Ozon',
-            default                 => 'Прочие услуги Ozon',
+            // Комиссия / доставка (из полей операции)
+            'ozon_sale_commission'       => 'Комиссия Ozon за продажу',
+            'ozon_delivery'              => 'Доставка Ozon',
+            'ozon_return_delivery'       => 'Обратная доставка Ozon',
+            // Логистика прямая
+            'ozon_logistic_direct'       => 'Логистика к покупателю Ozon',
+            'ozon_logistic_direct_vdc'   => 'Логистика к покупателю (вРЦ) Ozon',
+            'ozon_logistic_direct_trans' => 'Магистраль к покупателю Ozon',
+            'ozon_logistic_delivery'     => 'Доставка до покупателя Ozon',
+            'ozon_logistic_last_mile'    => 'Last mile Ozon',
+            'ozon_logistic_kgt'          => 'Доставка КГТ Ozon',
+            // Логистика обратная
+            'ozon_logistic_return'       => 'Обратная логистика Ozon',
+            'ozon_logistic_return_trans' => 'Обратная магистраль Ozon',
+            // Логистика поставки
+            'ozon_logistic_inbound'      => 'Кросс-докинг (поставка) Ozon',
+            'ozon_logistic_inbound_seller' => 'ТЭУ (поставка продавцом) Ozon',
+            'ozon_logistic_pickup'       => 'Выезд за товаром (Pick-up) Ozon',
+            // Обработка отправлений
+            'ozon_fulfillment'           => 'Сборка заказа Ozon',
+            'ozon_dropoff_ff'            => 'Обработка отправления FF Ozon',
+            'ozon_dropoff_pvz'           => 'Обработка отправления ПВЗ Ozon',
+            'ozon_dropoff_sc'            => 'Обработка отправления СЦ Ozon',
+            'ozon_dropoff_ppz'           => 'Обработка отправления ППЗ Ozon',
+            // Обработка возвратов
+            'ozon_return_pvz'            => 'Перевыставление возврата ПВЗ Ozon',
+            'ozon_return_partial'        => 'Обработка частичного возврата Ozon',
+            'ozon_return_not_delivered'  => 'Возврат невостребованного товара Ozon',
+            'ozon_return_after_delivery' => 'Возврат после доставки Ozon',
+            'ozon_return_storage_pvz'    => 'Краткосрочное хранение возврата ПВЗ Ozon',
+            'ozon_return_storage_wh'     => 'Долгосрочное хранение возврата склад Ozon',
+            // Упаковка
+            'ozon_package_materials'     => 'Упаковочные материалы Ozon',
+            'ozon_package_labor'         => 'Упаковка партнёрами Ozon',
+            // Хранение
+            'ozon_storage'               => 'Хранение на складе Ozon',
+            // Поставка FBO
+            'ozon_crossdocking'          => 'Кросс-докинг Ozon',
+            'ozon_supply_additional'     => 'Обработка товара в грузоместе FBO Ozon',
+            'ozon_supply_shortage'       => 'Бронирование места (неполный состав) Ozon',
+            'ozon_supply_surplus'        => 'Обработка излишков поставки Ozon',
+            // Эквайринг
+            'ozon_acquiring'             => 'Эквайринг Ozon',
+            // Реклама
+            'ozon_cpc'                   => 'Оплата за клик Ozon',
+            'ozon_marketing_action'      => 'Маркетинговые акции Ozon',
+            'ozon_reviews'               => 'Приобретение отзывов Ozon',
+            // Продвижение Premium
+            'ozon_premium_promotion'     => 'Продвижение Premium Ozon',
+            'ozon_premium_cashback'      => 'Бонусы продавца Premium Ozon',
+            'ozon_stars_membership'      => 'Звёздные товары Ozon',
+            // Финансовые услуги
+            'ozon_early_payment'         => 'Досрочная выплата Ozon',
+            'ozon_flexible_payment'      => 'Гибкий график выплат Ozon',
+            'ozon_installment'           => 'Продажа в рассрочку Ozon',
+            // Штрафы
+            'ozon_penalty_undeliverable' => 'Удержание за недовложение Ozon',
+            // Прочее
+            'ozon_marking'               => 'Обязательная маркировка Ozon',
+            'ozon_return_from_stock'     => 'Комплектация для вывоза продавцом Ozon',
+            'ozon_agency_fee'            => 'Агентская услуга 3PL Global Ozon',
+            default                      => 'Прочие услуги Ozon',
         };
     }
 }
