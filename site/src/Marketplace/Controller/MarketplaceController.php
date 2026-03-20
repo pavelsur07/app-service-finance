@@ -556,10 +556,11 @@ class MarketplaceController extends AbstractController
                 ->setParameter('category', $categoryId);
         }
 
+        $page       = max(1, $request->query->getInt('page', 1));
         $adapter    = new QueryAdapter($queryBuilder);
         $pagerfanta = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
-            $request->query->get('page', 1),
+            $page,
             50
         );
 
