@@ -6,6 +6,7 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MonthCloseDebugQuery;
+use App\Marketplace\Infrastructure\Query\MonthCloseVerifyQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -36,8 +37,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MonthCloseDebugController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly MonthCloseDebugQuery $debugQuery,
+        private readonly ActiveCompanyService  $companyService,
+        private readonly MonthCloseDebugQuery  $debugQuery,
+        private readonly MonthCloseVerifyQuery $verifyQuery,
     ) {
     }
 
@@ -119,6 +121,37 @@ final class MonthCloseDebugController extends AbstractController
                 'realization' => $realizationDetail,
             ],
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // JSON: сверка данных для ручной проверки
+    // -------------------------------------------------------------------------
+
+    /**
+     * Эндпоинт сверки — возвращает компактный JSON для ручной проверки с отчётом Ozon.
+     *
+     * GET /marketplace/month-close/debug/verify?marketplace=ozon&year=2026&month=1
+     *
+     * Скопируй результат и вставь в чат для анализа.
+     */
+    #[Route('/verify', name: 'marketplace_month_close_debug_verify', methods: ['GET'])]
+    public function verify(Request $request): JsonResponse
+    {
+        [
+            $companyId, $marketplace, $year, $month,
+            $periodFrom, $periodTo,,,
+        ] = $this->resolveParams($request);
+
+        $data = $this->verifyQuery->run($companyId, $marketplace, $periodFrom, $periodTo);
+
+        return $this->json([
+            'meta' => [
+                'marketplace' => $marketplace,
+                'period'      => "{$periodFrom} – {$periodTo}",
+                'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ],
+            'checks' => $data,
+        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
     }
 
     // -------------------------------------------------------------------------
