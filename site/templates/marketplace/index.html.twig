@@ -105,38 +105,6 @@
             </div>
         </div>
 
-        {# Генерация ОПиУ #}
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-tabler icon-tabler-report-analytics me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 5h-2a2 2 0 0 0 -2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2 -2v-12a2 2 0 0 0 -2 -2h-2" /><rect x="9" y="3" width="6" height="4" rx="2" /><path d="M9 17v-5" /><path d="M12 17v-1" /><path d="M15 17v-3" /></svg>
-                    Генерация ОПиУ
-                </h3>
-                <div class="card-actions">
-                    <a href="#" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-generate-pl">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14 3v4a1 1 0 0 0 1 1h4" /><path d="M17 21h-10a2 2 0 0 1 -2 -2v-14a2 2 0 0 1 2 -2h7l5 5v11a2 2 0 0 1 -2 2z" /><path d="M9 17h6" /><path d="M12 14v3" /></svg>
-                        Сгенерировать отчёт
-                    </a>
-                </div>
-            </div>
-            <div class="card-body">
-                <div class="text-muted">
-                    Генерация документа ОПиУ (Отчёт о прибылях и убытках) на основе данных продаж, возвратов и расходов маркетплейса.
-                    Необработанные записи будут агрегированы по категориям и преобразованы в строки отчёта.
-                </div>
-                {% if connections is not empty %}
-                    <div class="mt-2">
-                        <small class="text-muted">
-                            Доступные маркетплейсы:
-                            {% for connection in connections %}
-                                <span class="badge bg-azure-lt me-1">{{ connection.marketplace.displayName }}</span>
-                            {% endfor %}
-                        </small>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
-
         {# История синхронизаций #}
         <div class="card">
             <div class="card-header">
@@ -292,78 +260,6 @@
         </div>
     </div>
 
-    {# Modal: Генерация ОПиУ #}
-    <div class="modal modal-blur fade" id="modal-generate-pl" tabindex="-1" role="dialog" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered" role="document">
-            <div class="modal-content">
-                <form method="post" action="{{ path('marketplace_pl_generate') }}" id="form-generate-pl">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Генерация ОПиУ</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label required">Маркетплейс</label>
-                            <select name="marketplace" class="form-select" required>
-                                <option value="">Выберите маркетплейс</option>
-                                {% for connection in connections %}
-                                    <option value="{{ connection.marketplace.value }}">{{ connection.marketplace.displayName }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label required">Период — начало</label>
-                            <input type="date" name="period_from" class="form-control" required
-                                   value="{{ 'now'|date_modify('first day of this month')|date('Y-m-d') }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label required">Период — конец</label>
-                            <input type="date" name="period_to" class="form-control" required
-                                   value="{{ 'now'|date_modify('last day of this month')|date('Y-m-d') }}">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Поток данных</label>
-                            <div class="form-selectgroup">
-                                <label class="form-selectgroup-item">
-                                    <input type="radio" name="stream_choice" value="all" class="form-selectgroup-input" checked>
-                                    <span class="form-selectgroup-label">Все (выручка + расходы)</span>
-                                </label>
-                                <label class="form-selectgroup-item">
-                                    <input type="radio" name="stream_choice" value="revenue" class="form-selectgroup-input">
-                                    <span class="form-selectgroup-label">Выручка и возвраты</span>
-                                </label>
-                                <label class="form-selectgroup-item">
-                                    <input type="radio" name="stream_choice" value="costs" class="form-selectgroup-input">
-                                    <span class="form-selectgroup-label">Расходы МП</span>
-                                </label>
-                            </div>
-                            <input type="hidden" name="all_streams" id="pl-all-streams" value="1">
-                            <input type="hidden" name="stream" id="pl-stream" value="">
-                        </div>
-                        <div class="alert alert-info mb-0">
-                            <div class="d-flex">
-                                <div>
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="12" cy="12" r="9" /><line x1="12" y1="8" x2="12.01" y2="8" /><polyline points="11 12 12 12 12 16 13 16" /></svg>
-                                </div>
-                                <div>
-                                    Будут обработаны только записи, у которых ещё нет привязки к документу ОПиУ.
-                                    Повторная генерация за тот же период безопасна.
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
-                        <button type="submit" class="btn btn-primary" id="btn-generate-pl">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10" /></svg>
-                            Сгенерировать
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     {# Modal: Подтверждение загрузки реализации Ozon #}
     <div class="modal modal-blur fade" id="modal-sync-realization" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
@@ -473,28 +369,6 @@
             var submitBtn = this.querySelector('button[type="submit"]');
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Синхронизация...';
-        });
-
-        // Генерация ОПиУ — radio → hidden fields
-        document.querySelectorAll('input[name="stream_choice"]').forEach(function (radio) {
-            radio.addEventListener('change', function () {
-                var allStreams = document.getElementById('pl-all-streams');
-                var stream    = document.getElementById('pl-stream');
-                if (this.value === 'all') {
-                    allStreams.value = '1';
-                    stream.value    = '';
-                } else {
-                    allStreams.value = '0';
-                    stream.value    = this.value;
-                }
-            });
-        });
-
-        // Блокировка кнопки при генерации ОПиУ
-        document.getElementById('form-generate-pl').addEventListener('submit', function () {
-            var btn = document.getElementById('btn-generate-pl');
-            btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Генерация...';
         });
 
         // modal-sync-realization — подставляем action из data-action кнопки
