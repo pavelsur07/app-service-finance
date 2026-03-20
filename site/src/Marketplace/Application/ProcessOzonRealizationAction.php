@@ -241,6 +241,18 @@ final class ProcessOzonRealizationAction
      *
      * @return array{created: int, updated: int, skipped: int}
      */
+    /**
+     * Переобработка через bulk DBAL UPDATE.
+     *
+     * Проблема старого подхода (findByPeriodIndexedBySku):
+     *   один SKU встречается много раз с разными quantity и price_per_instance,
+     *   индексирование по SKU брало только первую строку — остальные пропускались.
+     *
+     * Новый подход: UPDATE по (company_id, raw_document_id, sku, quantity) —
+     * это уникально идентифицирует строку внутри одного документа реализации.
+     *
+     * @return array{created: int, updated: int, skipped: int}
+     */
     private function reprocess(
         string $companyId,
         MarketplaceRawDocument $rawDoc,
@@ -248,14 +260,10 @@ final class ProcessOzonRealizationAction
         \DateTimeImmutable $periodFrom,
         \DateTimeImmutable $periodTo,
     ): array {
-        $existing = $this->realizationRepository->findByPeriodIndexedBySku(
-            $companyId,
-            $periodFrom->format('Y-m-d'),
-            $periodTo->format('Y-m-d'),
-        );
-
-        $updated = 0;
-        $skipped = 0;
+        $rawDocId   = $rawDoc->getId();
+        $connection = $this->em->getConnection();
+        $updated    = 0;
+        $skipped    = 0;
 
         foreach ($rows as $row) {
             $sku                = (string) ($row['item']['sku'] ?? '');
@@ -267,27 +275,27 @@ final class ProcessOzonRealizationAction
                 continue;
             }
 
-            $realization = $existing[$sku] ?? null;
+            $setParts = [];
+            $params   = [
+                'companyId' => $companyId,
+                'rawDocId'  => $rawDocId,
+                'sku'       => $sku,
+            ];
 
-            if ($realization === null) {
-                $skipped++;
-                $this->logger->warning('[OzonRealization] Reprocess: no existing row for SKU', [
-                    'sku' => $sku,
-                ]);
-                continue;
-            }
-
-            $hasChanges = false;
-
-            // 1. Обновляем delivery_commission — исправляем исторические данные
-            //    где мог храниться seller_price вместо price_per_instance
+            // 1. Обновляем delivery_commission — исправляем seller_price → price_per_instance
             if ($deliveryCommission !== null) {
                 $pricePerInstance = (float) ($deliveryCommission['price_per_instance'] ?? 0);
                 $quantity         = (int)   ($deliveryCommission['quantity'] ?? 0);
 
                 if ($pricePerInstance > 0 && $quantity > 0) {
-                    $realization->updateDeliveryCommission($pricePerInstance, $quantity);
-                    $hasChanges = true;
+                    $price       = number_format($pricePerInstance, 2, '.', '');
+                    $totalAmount = bcmul($price, (string) $quantity, 2);
+
+                    $setParts[]              = 'seller_price_per_instance = :pricePerInstance';
+                    $setParts[]              = 'total_amount = :totalAmount';
+                    $params['pricePerInstance'] = $price;
+                    $params['totalAmount']       = $totalAmount;
+                    $params['quantity']          = $quantity;
                 }
             }
 
@@ -297,22 +305,55 @@ final class ProcessOzonRealizationAction
                 $returnQty   = (int)   ($returnCommission['quantity'] ?? 0);
 
                 if ($returnPrice > 0 && $returnQty > 0) {
-                    $realization->setReturnCommission($returnPrice, $returnQty);
-                    $hasChanges = true;
+                    $rPrice      = number_format($returnPrice, 2, '.', '');
+                    $returnTotal = bcmul($rPrice, (string) $returnQty, 2);
+
+                    $setParts[]                       = 'return_price_per_instance = :returnPrice';
+                    $setParts[]                       = 'return_quantity = :returnQty';
+                    $setParts[]                       = 'return_amount = :returnAmount';
+                    $params['returnPrice']             = $rPrice;
+                    $params['returnQty']               = $returnQty;
+                    $params['returnAmount']            = $returnTotal;
                 }
             }
 
-            if ($hasChanges) {
-                $updated++;
+            if (empty($setParts)) {
+                $skipped++;
+                continue;
+            }
+
+            // WHERE по (company_id, raw_document_id, sku, quantity) —
+            // уникально идентифицирует строку внутри документа реализации
+            $whereQuantity = isset($params['quantity'])
+                ? 'AND quantity = :quantity'
+                : '';
+
+            $affected = $connection->executeStatement(
+                sprintf(
+                    'UPDATE marketplace_ozon_realizations SET %s
+                     WHERE company_id    = :companyId
+                       AND raw_document_id = :rawDocId
+                       AND sku           = :sku
+                       %s',
+                    implode(', ', $setParts),
+                    $whereQuantity,
+                ),
+                $params,
+            );
+
+            if ($affected > 0) {
+                $updated += $affected;
             } else {
                 $skipped++;
+                $this->logger->warning('[OzonRealization] Reprocess: no rows matched', [
+                    'sku'      => $sku,
+                    'rawDocId' => $rawDocId,
+                ]);
             }
         }
 
-        $this->em->flush();
-
         $this->logger->info('[OzonRealization] Reprocess completed', [
-            'raw_doc_id' => $rawDoc->getId(),
+            'raw_doc_id' => $rawDocId,
             'updated'    => $updated,
             'skipped'    => $skipped,
         ]);
