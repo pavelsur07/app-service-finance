@@ -118,6 +118,8 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         'MarketplaceServiceItemDisposalDetailed'                 => 'ozon_disposal',
         'MarketplaceServiceSellerReturnsCargoAssortment'         => 'ozon_return_from_stock',
         'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
+        'MarketplaceServiceItemElectronicServicesPremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
+        'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_supply_additional',
     ];
 
     public function __construct(
@@ -400,6 +402,29 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                         '_item_idx'     => $itemIdx,
                     ];
                 }
+            }
+        }
+
+        // 5. Если services[] пустой — затраты в op['amount'] напрямую
+        // Применимо к: реклама, хранение, кросс-докинг, поставка, досрочная выплата и т.д.
+        if (empty($services)) {
+            $opAmount = abs((float) ($op['amount'] ?? 0));
+            $opType   = $op['type'] ?? '';
+
+            // Пропускаем продажи и компенсации (не затраты)
+            if ($opAmount > 0.001 && !in_array($opType, ['orders', 'compensation'], true)) {
+                $operationType = $op['operation_type'] ?? '';
+                $categoryCode  = $this->resolveServiceCategoryCode($operationType);
+
+                $entries[] = [
+                    'external_id'   => $operationId . '_main',
+                    'category_code' => $categoryCode,
+                    'category_name' => $this->getCategoryName($categoryCode),
+                    'amount'        => (string) $opAmount,
+                    'cost_date'     => $operationDate,
+                    'description'   => $op['operation_type_name'] ?? $operationType,
+                    '_item_idx'     => 0,
+                ];
             }
         }
 
