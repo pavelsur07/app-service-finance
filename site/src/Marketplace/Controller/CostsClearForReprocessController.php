@@ -42,7 +42,7 @@ final class CostsClearForReprocessController extends AbstractController
      * GET  → предпросмотр: сколько записей будет удалено, без удаления.
      * POST → удаление после confirm=1.
      */
-    #[Route('/clear-for-reprocess', name: 'marketplace_costs_clear_for_reprocess', methods: ['GET', 'POST'])]
+    #[Route('/clear-for-reprocess', name: 'marketplace_costs_clear_for_reprocess', methods: ['GET'])]
     public function clearForReprocess(Request $request): JsonResponse
     {
         $company     = $this->companyService->getActiveCompany();
@@ -75,7 +75,7 @@ final class CostsClearForReprocessController extends AbstractController
         );
 
         // GET или confirm не передан — только предпросмотр
-        if ($request->isMethod('GET') || !$confirm) {
+        if (!$confirm) {
             return $this->json([
                 'action'      => 'preview',
                 'marketplace' => $marketplace,
