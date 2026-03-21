@@ -166,6 +166,58 @@
             </div>
         </div>
 
+
+        {# Очистка справочника категорий #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-red">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>
+                    Очистка справочника категорий затрат
+                </h3>
+                <div class="card-options">
+                    <span class="badge bg-warning text-warning-fg">ВРЕМЕННО</span>
+                </div>
+            </div>
+            <div class="card-body pb-0">
+                <div class="alert alert-info">
+                    Удаляет категории без привязанных записей затрат — старые grouped категории
+                    (<code>ozon_logistics</code>, <code>ozon_promotion</code> и т.д.) после перехода на атомарный маппинг.
+                    Категории с записями затрат <strong>не затрагиваются</strong>.
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Эндпоинт</th>
+                        <th>Описание</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code>/marketplace/costs/admin/cleanup-categories</code></td>
+                        <td><span class="text-green fw-bold">Шаг 1</span> — предпросмотр: какие категории будут удалены</td>
+                        <td class="text-end">
+                            <a href="/marketplace/costs/admin/cleanup-categories" class="btn btn-sm btn-outline-danger" target="_blank">
+                                Preview
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code>/marketplace/costs/admin/cleanup-categories?confirm=1</code></td>
+                        <td><span class="text-red fw-bold">Шаг 2</span> — удалить неиспользуемые категории</td>
+                        <td class="text-end">
+                            <a href="/marketplace/costs/admin/cleanup-categories?confirm=1" class="btn btn-sm btn-danger" target="_blank">
+                                Удалить
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
     </div>
 {% endblock %}
 
