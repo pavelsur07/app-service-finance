@@ -108,6 +108,11 @@ final class OzonServiceCategoryMap
         'OperationPointsForReviews'                              => 'ozon_reviews',
         'OperationMarketplaceSupplyExpirationDateProcessing'     => 'ozon_supply_additional',
         'OperationPromotionWithCostPerOrder'                     => 'ozon_marketing_action',
+        'OperationSubscriptionPremiumPlus'                       => 'ozon_premium_promotion',
+        'DefectRateDetailed'                                     => 'ozon_penalty_undeliverable',
+        'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_crossdocking',
+        'OperationMarketplaceModerationFine'                     => 'ozon_penalty_undeliverable',
+        'OperationMarketplaceSupplyDefectProcessing'             => 'ozon_supply_additional',
 
         // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (из op['operation_type_name'] для операций без services[]) ===
         'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
