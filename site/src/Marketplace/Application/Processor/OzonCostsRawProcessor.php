@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
@@ -167,13 +168,29 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             ]);
         }
 
-        return 0; // processBatch вызывается отдельно
+        // Читаем все операции из raw документа включая type=orders.
+        // processBatch() получает только COST-bucket (type=services/returns/other),
+        // но комиссия и логистика из type=orders тоже являются затратами.
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            return 0;
+        }
+
+        $rows = $rawDoc->getRawData();
+        if (isset($rows['result']['operations']) && is_array($rows['result']['operations'])) {
+            $rows = $rows['result']['operations'];
+        }
+
+        // Передаём ВСЕ строки — processBatch сам разберётся что обрабатывать
+        $this->processBatch($companyId, MarketplaceType::OZON, $rows, $rawDocId);
+
+        return 0;
     }
 
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
+    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
     {
         if (empty($rawRows)) {
             return;
@@ -297,6 +314,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $cost->setExternalId($externalId);
+            if ($rawDocId !== null) {
+                $cost->setRawDocumentId($rawDocId);
+            }
             $cost->setCostDate($entry['cost_date']);
             $cost->setAmount($entry['amount']);
             $cost->setDescription($entry['description']);
@@ -375,8 +395,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $serviceName = $service['name'] ?? '';
 
             // Нулевые маркеры по таблице
-            if (array_key_exists($serviceName, self::SERVICE_CATEGORY_MAP)
-                && self::SERVICE_CATEGORY_MAP[$serviceName] === null) {
+            if (OzonServiceCategoryMap::isZeroMarker($serviceName)) {
                 continue;
             }
 
@@ -386,7 +405,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 $entries[] = [
                     'external_id'   => $operationId . '_svc_' . $svcIdx,
                     'category_code' => $categoryCode,
-                    'category_name' => $this->getCategoryName($categoryCode),
+                    'category_name' => OzonServiceCategoryMap::getCategoryName($categoryCode),
                     'amount'        => (string) $serviceAmount,
                     'cost_date'     => $operationDate,
                     'description'   => $serviceName,
@@ -405,7 +424,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     $entries[] = [
                         'external_id'   => $operationId . '_svc_' . $svcIdx . '_item_' . $itemIdx,
                         'category_code' => $categoryCode,
-                        'category_name' => $this->getCategoryName($categoryCode),
+                        'category_name' => OzonServiceCategoryMap::getCategoryName($categoryCode),
                         'amount'        => (string) $amount,
                         'cost_date'     => $operationDate,
                         'description'   => $serviceName,
@@ -429,7 +448,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 $entries[] = [
                     'external_id'   => $operationId . '_main',
                     'category_code' => $categoryCode,
-                    'category_name' => $this->getCategoryName($categoryCode),
+                    'category_name' => OzonServiceCategoryMap::getCategoryName($categoryCode),
                     'amount'        => (string) $opAmount,
                     'cost_date'     => $operationDate,
                     'description'   => $op['operation_type_name'] ?? $operationType,
@@ -443,20 +462,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
     private function resolveServiceCategoryCode(string $serviceName): string
     {
-        // Primary: точный маппинг
-        if (array_key_exists($serviceName, self::SERVICE_CATEGORY_MAP)) {
-            return self::SERVICE_CATEGORY_MAP[$serviceName] ?? 'ozon_other_service';
-        }
-
-        // Fallback: fuzzy + логируем
-        $fallbackCode = $this->fuzzyResolve($serviceName);
-
-        $this->logger->warning('ozon_unknown_service_name', [
-            'service_name' => $serviceName,
-            'resolved_to'  => $fallbackCode,
-        ]);
-
-        return $fallbackCode;
+        return OzonServiceCategoryMap::resolve($serviceName, $this->logger) ?? 'ozon_other_service';
     }
 
     private function fuzzyResolve(string $serviceName): string
@@ -496,57 +502,4 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         return 'ozon_other_service';
     }
 
-    private function getCategoryName(string $categoryCode): string
-    {
-        return match ($categoryCode) {
-            'ozon_sale_commission'       => 'Комиссия Ozon за продажу',
-            'ozon_delivery'              => 'Доставка Ozon',
-            'ozon_return_delivery'       => 'Обратная доставка Ozon',
-            'ozon_logistic_direct'       => 'Логистика к покупателю Ozon',
-            'ozon_logistic_direct_vdc'   => 'Логистика к покупателю (вРЦ) Ozon',
-            'ozon_logistic_direct_trans' => 'Магистраль к покупателю Ozon',
-            'ozon_logistic_delivery'     => 'Доставка до покупателя Ozon',
-            'ozon_logistic_last_mile'    => 'Last mile Ozon',
-            'ozon_logistic_kgt'          => 'Доставка КГТ Ozon',
-            'ozon_logistic_return'       => 'Обратная логистика Ozon',
-            'ozon_logistic_return_trans' => 'Обратная магистраль Ozon',
-            'ozon_logistic_inbound'      => 'Кросс-докинг (поставка) Ozon',
-            'ozon_logistic_inbound_seller' => 'ТЭУ (поставка продавцом) Ozon',
-            'ozon_logistic_pickup'       => 'Выезд за товаром (Pick-up) Ozon',
-            'ozon_fulfillment'           => 'Сборка заказа Ozon',
-            'ozon_dropoff_ff'            => 'Обработка отправления FF Ozon',
-            'ozon_dropoff_pvz'           => 'Обработка отправления ПВЗ Ozon',
-            'ozon_dropoff_sc'            => 'Обработка отправления СЦ Ozon',
-            'ozon_dropoff_ppz'           => 'Обработка отправления ППЗ Ozon',
-            'ozon_return_pvz'            => 'Перевыставление возврата ПВЗ Ozon',
-            'ozon_return_partial'        => 'Обработка частичного возврата Ozon',
-            'ozon_return_not_delivered'  => 'Возврат невостребованного товара Ozon',
-            'ozon_return_after_delivery' => 'Возврат после доставки Ozon',
-            'ozon_return_storage_pvz'    => 'Краткосрочное хранение возврата ПВЗ Ozon',
-            'ozon_return_storage_wh'     => 'Долгосрочное хранение возврата склад Ozon',
-            'ozon_package_materials'     => 'Упаковочные материалы Ozon',
-            'ozon_package_labor'         => 'Упаковка партнёрами Ozon',
-            'ozon_storage'               => 'Хранение на складе Ozon',
-            'ozon_crossdocking'          => 'Кросс-докинг Ozon',
-            'ozon_supply_additional'     => 'Обработка товара в грузоместе FBO Ozon',
-            'ozon_supply_shortage'       => 'Бронирование места (неполный состав) Ozon',
-            'ozon_supply_surplus'        => 'Обработка излишков поставки Ozon',
-            'ozon_acquiring'             => 'Эквайринг Ozon',
-            'ozon_cpc'                   => 'Оплата за клик Ozon',
-            'ozon_marketing_action'      => 'Маркетинговые акции Ozon',
-            'ozon_reviews'               => 'Приобретение отзывов Ozon',
-            'ozon_premium_promotion'     => 'Продвижение Premium Ozon',
-            'ozon_premium_cashback'      => 'Бонусы продавца Premium Ozon',
-            'ozon_stars_membership'      => 'Звёздные товары Ozon',
-            'ozon_early_payment'         => 'Досрочная выплата Ozon',
-            'ozon_flexible_payment'      => 'Гибкий график выплат Ozon',
-            'ozon_installment'           => 'Продажа в рассрочку Ozon',
-            'ozon_penalty_undeliverable' => 'Удержание за недовложение Ozon',
-            'ozon_marking'               => 'Обязательная маркировка Ozon',
-            'ozon_return_from_stock'     => 'Комплектация для вывоза продавцом Ozon',
-            'ozon_agency_fee'            => 'Агентская услуга 3PL Global Ozon',
-            'ozon_disposal'              => 'Утилизация товара Ozon',
-            default                      => 'Прочие услуги Ozon',
-        };
-    }
 }
