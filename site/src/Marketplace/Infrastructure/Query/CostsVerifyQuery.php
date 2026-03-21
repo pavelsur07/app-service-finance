@@ -36,6 +36,7 @@ final class CostsVerifyQuery
         string $periodTo,
     ): array {
         return [
+            'raw_documents'        => $this->rawDocuments($companyId, $marketplace, $periodFrom, $periodTo),
             'totals_by_category'   => $this->totalsByCategory($companyId, $marketplace, $periodFrom, $periodTo),
             'grand_total'          => $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo),
             'unknown_service_names'=> $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo),
@@ -235,4 +236,52 @@ final class CostsVerifyQuery
             'amount_without_sku'=> number_format((float) ($row['amount_without_sku'] ?? 0), 2, '.', ' '),
         ];
     }
+
+    /**
+     * Raw-документы за период — для проверки полноты переобработки.
+     * Если какой-то документ не переобработан — затраты за его период отсутствуют.
+     */
+    private function rawDocuments(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): array {
+        $rows = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                id,
+                document_type,
+                period_from::text  AS period_from,
+                period_to::text    AS period_to,
+                records_count,
+                synced_at::text    AS synced_at
+            FROM marketplace_raw_documents
+            WHERE company_id    = :companyId
+              AND marketplace   = :marketplace
+              AND document_type = 'sales_report'
+              AND period_from  >= :periodFrom
+              AND period_to    <= :periodTo
+            ORDER BY period_from
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        return [
+            'hint'  => 'Все документы должны быть переобработаны. Если список неполный — загрузи недостающий период через «Синхронизировать за период»',
+            'count' => count($rows),
+            'items' => array_map(static fn (array $r) => [
+                'id'            => $r['id'],
+                'period'        => $r['period_from'] . ' – ' . $r['period_to'],
+                'records_count' => (int) $r['records_count'],
+                'synced_at'     => $r['synced_at'],
+            ], $rows),
+        ];
+    }
+
 }
