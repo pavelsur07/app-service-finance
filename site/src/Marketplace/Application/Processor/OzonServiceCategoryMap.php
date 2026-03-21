@@ -102,6 +102,13 @@ final class OzonServiceCategoryMap
         'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
         'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_supply_additional',
 
+        // === АНГЛИЙСКИЕ operation_type ДЛЯ ОПЕРАЦИЙ БЕЗ services[] ===
+        // Эти operation_type приходят в поле op['operation_type'] когда services[] пустой
+        'OperationMarketplaceServicePremiumCashbackBonusAccrual' => 'ozon_premium_cashback',
+        'OperationPointsForReviews'                              => 'ozon_reviews',
+        'OperationMarketplaceSupplyExpirationDateProcessing'     => 'ozon_supply_additional',
+        'OperationPromotionWithCostPerOrder'                     => 'ozon_marketing_action',
+
         // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (из op['operation_type_name'] для операций без services[]) ===
         'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
         'Бонусы продавца - рассылка'                             => 'ozon_premium_cashback',
