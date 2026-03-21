@@ -120,6 +120,16 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
         'MarketplaceServiceItemElectronicServicesPremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
         'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_supply_additional',
+
+        // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (operation_type_name из op['amount'] операций) ===
+        'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
+        'Бонусы продавца - рассылка'                             => 'ozon_premium_cashback',
+        'Баллы за отзывы'                                        => 'ozon_reviews',
+        'Перемещение товаров между складами Ozon'                => 'ozon_crossdocking',
+        'Обработка сроков годности на FBO'                       => 'ozon_supply_additional',
+        'Модерация запрещённого контента'                        => 'ozon_penalty_undeliverable',
+        'Обработка операционных ошибок продавца: отгрузка в нерекомендованный слот' => 'ozon_penalty_undeliverable',
+        'Обработка брака с приемки'                              => 'ozon_supply_additional',
     ];
 
     public function __construct(
