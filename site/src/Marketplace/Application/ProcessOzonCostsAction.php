@@ -12,6 +12,7 @@ use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Repository\MarketplaceListingRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -144,6 +145,7 @@ final class ProcessOzonCostsAction
 
     public function __construct(
         private readonly EntityManagerInterface $em,
+        private readonly Connection $connection,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
@@ -167,6 +169,22 @@ final class ProcessOzonCostsAction
         $companyId = (string) $company->getId();
         $batchSize = 100;
         $synced    = 0;
+
+        // Удаляем ранее созданные затраты по этому raw-документу.
+        // Обеспечивает корректную переобработку: при изменении SERVICE_CATEGORY_MAP
+        // или исправлении логики старые записи удаляются и создаются заново.
+        // Удаляем только затраты без document_id (не закрытые в ОПиУ).
+        $deleted = $this->connection->executeStatement(
+            'DELETE FROM marketplace_costs WHERE raw_document_id = :rawDocId AND document_id IS NULL',
+            ['rawDocId' => $rawDocId],
+        );
+
+        if ($deleted > 0) {
+            $this->logger->info('[Ozon] Deleted existing costs for reprocessing', [
+                'raw_doc_id' => $rawDocId,
+                'deleted'    => $deleted,
+            ]);
+        }
 
         $this->logger->info('[Ozon] Starting costs processing', ['total_records' => count($rawData)]);
 
@@ -267,6 +285,7 @@ final class ProcessOzonCostsAction
                     );
 
                     $cost->setExternalId($externalId);
+                    $cost->setRawDocumentId($rawDocId);
                     $cost->setCostDate($entry['cost_date']);
                     $cost->setAmount($entry['amount']);
                     $cost->setDescription($entry['description']);
