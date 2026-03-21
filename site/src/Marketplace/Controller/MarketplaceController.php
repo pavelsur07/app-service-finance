@@ -54,7 +54,7 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
 
         $connections  = $this->connectionRepository->findByCompany($company);
-        $rawDocuments = $this->rawDocumentRepository->findByCompany($company, 20);
+        $rawDocuments = $this->rawDocumentRepository->findByCompany($company, 50);
 
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,

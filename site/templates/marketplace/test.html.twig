@@ -167,6 +167,56 @@
         </div>
 
 
+
+        {# Обработка затрат за период через process() #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-purple">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M7 9l5 -5l5 5"/><path d="M7 15l5 5l5 -5"/></svg>
+                    Обработка затрат за период (включая комиссию из заказов)
+                </h3>
+            </div>
+            <div class="card-body pb-0">
+                <div class="alert alert-info">
+                    Вызывает <code>process()</code> для каждого raw-документа напрямую — обрабатывает
+                    <strong>все</strong> операции включая <code>type=orders</code> (комиссия, логистика из заказов).
+                    В отличие от кнопки «Переобработать» которая видит только COST bucket.
+                    <br>Предварительно очисти затраты через блок выше.
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Эндпоинт</th>
+                        <th>Описание</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/costs/admin/process-period"></code></td>
+                        <td><span class="text-green fw-bold">Шаг 1</span> — предпросмотр: какие документы будут обработаны</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-outline-purple open-link" data-path="/marketplace/costs/admin/process-period" target="_blank">
+                                Preview
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/costs/admin/process-period" data-extra="&run=1"></code></td>
+                        <td><span class="text-purple fw-bold">Шаг 2</span> — запустить обработку затрат за период</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-purple open-link" data-path="/marketplace/costs/admin/process-period" data-extra="&run=1" target="_blank">
+                                Запустить
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         {# Очистка справочника категорий #}
         <div class="card mb-3">
             <div class="card-header">
