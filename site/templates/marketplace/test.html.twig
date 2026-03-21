@@ -1,0 +1,213 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'test' %}
+
+{% block tab_content %}
+    <div class="p-3">
+
+        {# Параметры — одни на всю страницу #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M14.5 4h-5l-1 6h7z"/><path d="M6.5 15h11l1 5h-13z"/><path d="M9 15l-2.5 -5.5"/><path d="M15 15l2.5 -5.5"/></svg>
+                    Параметры
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-auto">
+                        <label class="form-label">Маркетплейс</label>
+                        <select id="param-marketplace" class="form-select">
+                            <option value="ozon">Ozon</option>
+                            <option value="wildberries">Wildberries</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">Год</label>
+                        <input type="number" id="param-year" class="form-control" value="{{ 'now'|date('Y') }}" min="2024" max="2030" style="width:100px">
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">Месяц</label>
+                        <select id="param-month" class="form-select" style="width:140px">
+                            <option value="1">Январь</option>
+                            <option value="2">Февраль</option>
+                            <option value="3">Март</option>
+                            <option value="4">Апрель</option>
+                            <option value="5">Май</option>
+                            <option value="6">Июнь</option>
+                            <option value="7">Июль</option>
+                            <option value="8">Август</option>
+                            <option value="9">Сентябрь</option>
+                            <option value="10">Октябрь</option>
+                            <option value="11">Ноябрь</option>
+                            <option value="12">Декабрь</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# Сверка данных #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-green">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M9 11l3 3l8 -8"/><path d="M20 12v6a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-12a2 2 0 0 1 2 -2h9"/></svg>
+                    Сверка данных
+                </h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Эндпоинт</th>
+                        <th>Описание</th>
+                        <th>Сравнивать с</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/month-close/debug/verify"></code></td>
+                        <td>Продажи / Возвраты / Реализация</td>
+                        <td class="text-muted small">Отчёт о реализации Ozon (.xlsx)</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-success open-link" data-path="/marketplace/month-close/debug/verify" target="_blank">
+                                Открыть JSON
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/costs/debug/verify"></code></td>
+                        <td>Затраты Ozon</td>
+                        <td class="text-muted small">Детализация начислений Ozon (.xlsx)</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-success open-link" data-path="/marketplace/costs/debug/verify" target="_blank">
+                                Открыть JSON
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/month-close/debug"></code></td>
+                        <td>Debug HTML — строки продаж / возвратов / реализации</td>
+                        <td class="text-muted small">Детальный просмотр записей</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-outline-success open-link" data-path="/marketplace/month-close/debug" target="_blank">
+                                Открыть
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/month-close/debug/json"></code></td>
+                        <td>Debug JSON — полный дамп продаж / возвратов / реализации</td>
+                        <td class="text-muted small">Скачать / Postman</td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-outline-success open-link" data-path="/marketplace/month-close/debug/json" target="_blank">
+                                Открыть JSON
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {# Очистка затрат перед переобработкой #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-orange">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 7l16 0"/><path d="M10 11l0 6"/><path d="M14 11l0 6"/><path d="M5 7l1 12a2 2 0 0 0 2 2h8a2 2 0 0 0 2 -2l1 -12"/><path d="M9 7v-3a1 1 0 0 1 1 -1h4a1 1 0 0 1 1 1v3"/></svg>
+                    Очистка затрат (перед переобработкой)
+                </h3>
+                <div class="card-options">
+                    <span class="badge bg-warning text-warning-fg">ВРЕМЕННО</span>
+                </div>
+            </div>
+            <div class="card-body pb-0">
+                <div class="alert alert-warning">
+                    Использовать однократно пока у старых записей нет <code>raw_document_id</code>.
+                    Записи с <code>document_id</code> (закрытые в ОПиУ) <strong>не затрагиваются</strong>.
+                    После очистки запусти переобработку затрат через кнопку «Переобработать» на вкладке Интеграции.
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                    <tr>
+                        <th>Эндпоинт</th>
+                        <th>Описание</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/costs/admin/clear-for-reprocess"></code></td>
+                        <td>
+                            <span class="text-green fw-bold">Шаг 1</span> — предпросмотр: сколько записей будет удалено
+                        </td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-outline-warning open-link" data-path="/marketplace/costs/admin/clear-for-reprocess" target="_blank">
+                                Preview
+                            </a>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><code class="link-url" data-path="/marketplace/costs/admin/clear-for-reprocess" data-extra="&confirm=1"></code></td>
+                        <td>
+                            <span class="text-red fw-bold">Шаг 2</span> — выполнить удаление затрат за период
+                        </td>
+                        <td class="text-end">
+                            <a href="#" class="btn btn-sm btn-danger open-link" data-path="/marketplace/costs/admin/clear-for-reprocess" data-extra="&confirm=1" target="_blank">
+                                Удалить
+                            </a>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block modals %}
+    <script>
+        (function () {
+            var marketplaceEl = document.getElementById('param-marketplace');
+            var yearEl        = document.getElementById('param-year');
+            var monthEl       = document.getElementById('param-month');
+
+            // Выставляем текущий месяц по умолчанию
+            monthEl.value = '{{ "now"|date("n") }}';
+
+            function buildUrl(path, extra) {
+                var marketplace = marketplaceEl.value;
+                var year        = yearEl.value;
+                var month       = monthEl.value;
+                return path + '?marketplace=' + marketplace + '&year=' + year + '&month=' + month + (extra || '');
+            }
+
+            function updateAll() {
+                // Обновляем текст всех code.link-url
+                document.querySelectorAll('.link-url').forEach(function (el) {
+                    var path  = el.dataset.path;
+                    var extra = el.dataset.extra || '';
+                    el.textContent = buildUrl(path, extra);
+                });
+
+                // Обновляем href всех кнопок
+                document.querySelectorAll('.open-link').forEach(function (el) {
+                    var path  = el.dataset.path;
+                    var extra = el.dataset.extra || '';
+                    el.href = buildUrl(path, extra);
+                });
+            }
+
+            marketplaceEl.addEventListener('change', updateAll);
+            yearEl.addEventListener('input', updateAll);
+            monthEl.addEventListener('change', updateAll);
+
+            // Инициализация при загрузке
+            updateAll();
+        })();
+    </script>
+{% endblock %}
