@@ -387,7 +387,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $itemCount = max(1, count($items));
 
         foreach ($services as $svcIdx => $service) {
-            $serviceAmount = abs((float) ($service['price'] ?? 0));
+            $servicePrice  = (float) ($service['price'] ?? 0);
+            $serviceAmount = abs($servicePrice);
+
             if ($serviceAmount <= 0.001) {
                 continue;
             }
@@ -397,6 +399,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             // Нулевые маркеры по таблице
             if (OzonServiceCategoryMap::isZeroMarker($serviceName)) {
                 continue;
+            }
+
+            // Положительный price = возврат затрат (напр. возврат эквайринга при возврате покупателя)
+            // Сохраняем отрицательный знак чтобы уменьшать затраты
+            if ($servicePrice > 0) {
+                $serviceAmount = -$serviceAmount;
             }
 
             $categoryCode = $this->resolveServiceCategoryCode($serviceName);
