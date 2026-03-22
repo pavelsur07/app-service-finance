@@ -259,8 +259,28 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            // Пропускаем финансовый возврат покупателю — не затраты
+            // ClientReturnAgentOperation — финансовый возврат покупателю.
+            // Сам возврат обрабатывается в OzonReturnsRawProcessor.
+            // Но sale_commission > 0 = возврат комиссии продавцу — это уменьшение затрат.
             if (($op['operation_type'] ?? '') === 'ClientReturnAgentOperation') {
+                $returnCommission = (float) ($op['sale_commission'] ?? 0);
+                if ($returnCommission > 0) {
+                    $operationId   = (string) ($op['operation_id'] ?? '');
+                    $operationDate = new \DateTimeImmutable($op['operation_date']);
+                    // Отрицательная затрата — уменьшает комиссию
+                    $allEntries[] = [
+                        'entry' => [
+                            'external_id'   => $operationId . '_commission_return',
+                            'category_code' => 'ozon_sale_commission',
+                            'category_name' => 'Комиссия Ozon за продажу',
+                            'amount'        => (string) (-$returnCommission),
+                            'cost_date'     => $operationDate,
+                            'description'   => 'Возврат комиссии Ozon',
+                            '_item_idx'     => 0,
+                        ],
+                        'listingId' => null,
+                    ];
+                }
                 continue;
             }
 
