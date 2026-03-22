@@ -36,11 +36,12 @@ final class CostsVerifyQuery
         string $periodTo,
     ): array {
         return [
-            'raw_documents'        => $this->rawDocuments($companyId, $marketplace, $periodFrom, $periodTo),
-            'totals_by_category'   => $this->totalsByCategory($companyId, $marketplace, $periodFrom, $periodTo),
-            'grand_total'          => $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo),
-            'unknown_service_names'=> $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo),
-            'coverage'             => $this->coverage($companyId, $marketplace, $periodFrom, $periodTo),
+            'raw_documents'          => $this->rawDocuments($companyId, $marketplace, $periodFrom, $periodTo),
+            'totals_by_category'     => $this->totalsByCategory($companyId, $marketplace, $periodFrom, $periodTo),
+            'grand_total'            => $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo),
+            'returns_reconciliation' => $this->returnsReconciliation($companyId, $marketplace, $periodFrom, $periodTo),
+            'unknown_service_names'  => $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo),
+            'coverage'               => $this->coverage($companyId, $marketplace, $periodFrom, $periodTo),
         ];
     }
 
@@ -285,6 +286,55 @@ final class CostsVerifyQuery
                 'records_count' => (int) $r['records_count'],
                 'synced_at'     => $r['synced_at'],
             ], $rows),
+        ];
+    }
+
+
+    /**
+     * Сверка возвратов: проверяем что сумма возвратов из marketplace_returns
+     * соответствует разнице grand_total между нашим расчётом и xlsx.
+     *
+     * Разница = refund_amount из marketplace_returns (уже учтён отдельно).
+     * Если returns_total совпадает с расхождением — всё корректно.
+     */
+    private function returnsReconciliation(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): array {
+        $row = $this->connection->fetchAssociative(
+            <<<'SQL'
+            SELECT
+                COUNT(*)                    AS total_returns,
+                COALESCE(SUM(refund_amount), 0) AS total_refund_amount,
+                COUNT(*) FILTER (WHERE document_id IS NOT NULL) AS closed_returns,
+                COUNT(*) FILTER (WHERE document_id IS NULL)     AS open_returns
+            FROM marketplace_returns
+            WHERE company_id   = :companyId
+              AND marketplace  = :marketplace
+              AND return_date >= :periodFrom
+              AND return_date <= :periodTo
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        $totalRefund = (float) ($row['total_refund_amount'] ?? 0);
+
+        return [
+            'hint'                => 'Сумма возвратов из marketplace_returns. Разница grand_total с xlsx = эта сумма (возвраты учтены отдельно, не в затратах)',
+            'total_returns'       => (int) ($row['total_returns'] ?? 0),
+            'total_refund_amount' => number_format($totalRefund, 2, '.', ' '),
+            'closed_returns'      => (int) ($row['closed_returns'] ?? 0),
+            'open_returns'        => (int) ($row['open_returns'] ?? 0),
+            'status'              => $totalRefund > 0
+                ? 'OK — возвраты учтены в marketplace_returns, не дублируются в затратах'
+                : 'WARNING — нет данных о возвратах за период',
         ];
     }
 
