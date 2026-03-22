@@ -360,15 +360,23 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $entries = [];
 
         // 1. Комиссия
-        $commission = abs((float) ($op['sale_commission'] ?? 0));
-        if ($commission > 0) {
+        // sale_commission < 0 — обычная комиссия (затрата, берём abs → положительная)
+        // sale_commission > 0 — возврат/корректировка комиссии продавцу (уменьшение затрат → отрицательная)
+        $rawCommission = (float) ($op['sale_commission'] ?? 0);
+        if (abs($rawCommission) > 0.001) {
+            $commissionAmount = $rawCommission < 0
+                ? abs($rawCommission)
+                : -$rawCommission;
+
             $entries[] = [
                 'external_id'   => $operationId . '_commission',
                 'category_code' => 'ozon_sale_commission',
                 'category_name' => 'Комиссия Ozon за продажу',
-                'amount'        => (string) $commission,
+                'amount'        => (string) $commissionAmount,
                 'cost_date'     => $operationDate,
-                'description'   => 'Комиссия за продажу Ozon',
+                'description'   => $rawCommission > 0
+                    ? 'Возврат комиссии Ozon (корректировка)'
+                    : 'Комиссия за продажу Ozon',
                 '_item_idx'     => 0,
             ];
         }
