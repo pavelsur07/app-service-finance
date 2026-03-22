@@ -40,6 +40,7 @@ final class CostsVerifyQuery
             'totals_by_category'     => $this->totalsByCategory($companyId, $marketplace, $periodFrom, $periodTo),
             'grand_total'            => $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo),
             'returns_reconciliation' => $this->returnsReconciliation($companyId, $marketplace, $periodFrom, $periodTo),
+            'returns_detail'         => $this->returnsDetail($companyId, $marketplace, $periodFrom, $periodTo),
             'unknown_service_names'  => $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo),
             'coverage'               => $this->coverage($companyId, $marketplace, $periodFrom, $periodTo),
         ];
@@ -289,6 +290,136 @@ final class CostsVerifyQuery
         ];
     }
 
+
+    /**
+     * Детализация возвратов за период.
+     *
+     * Показывает полную картину по возвратам:
+     *   - Сколько возвратов покупателей (ClientReturnAgentOperation)
+     *   - Сумма возвращённой выручки покупателям (accruals_for_sale < 0)
+     *   - Сумма возвращённой комиссии продавцу (sale_commission > 0) — уже учтена в затратах как -комиссия
+     *   - Итоговый «чистый» эффект на затраты
+     *
+     * В xlsx Ozon возвращённая выручка входит в группу «Возвраты» → «Возврат выручки»
+     * и увеличивает итоговую сумму затрат в отчёте.
+     * У нас это учтено в marketplace_returns, не в marketplace_costs.
+     *
+     * Формула сверки:
+     *   xlsx_grand_total = наш_grand_total + return_revenue_amount - commission_returned_amount
+     */
+    private function returnsDetail(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): array {
+        // Возвращённая комиссия, которую мы УЖЕ пишем в marketplace_costs как отрицательную затрату
+        $commissionReturned = (float) ($this->connection->fetchOne(
+            <<<'SQL'
+            SELECT COALESCE(SUM(ABS(c.amount)), 0)
+            FROM marketplace_costs c
+            INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+            WHERE c.company_id  = :companyId
+              AND c.marketplace = :marketplace
+              AND c.cost_date  >= :periodFrom
+              AND c.cost_date  <= :periodTo
+              AND cc.code       = 'ozon_sale_commission'
+              AND c.amount      < 0
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        ) ?? 0);
+
+        // Возвраты из marketplace_returns — выручка возвращённая покупателям
+        $returnsRow = $this->connection->fetchAssociative(
+            <<<'SQL'
+            SELECT
+                COUNT(*)                                        AS total_count,
+                COALESCE(SUM(refund_amount), 0)                AS total_refund_amount,
+                COALESCE(SUM(CASE WHEN return_type = 'client'
+                    THEN refund_amount ELSE 0 END), 0)         AS client_refund_amount,
+                COALESCE(SUM(CASE WHEN return_type != 'client'
+                    THEN refund_amount ELSE 0 END), 0)         AS other_refund_amount,
+                COUNT(*) FILTER (WHERE return_type = 'client') AS client_count,
+                COUNT(*) FILTER (WHERE return_type != 'client') AS other_count
+            FROM marketplace_returns
+            WHERE company_id   = :companyId
+              AND marketplace  = :marketplace
+              AND return_date >= :periodFrom
+              AND return_date <= :periodTo
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        $totalRefund        = (float) ($returnsRow['total_refund_amount'] ?? 0);
+        $clientRefund       = (float) ($returnsRow['client_refund_amount'] ?? 0);
+        $otherRefund        = (float) ($returnsRow['other_refund_amount'] ?? 0);
+
+        // Разбивка возвратов по дням — для сопоставления с xlsx
+        $byDay = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                return_date::text       AS return_date,
+                return_type,
+                COUNT(*)                AS count,
+                SUM(refund_amount)      AS refund_amount
+            FROM marketplace_returns
+            WHERE company_id   = :companyId
+              AND marketplace  = :marketplace
+              AND return_date >= :periodFrom
+              AND return_date <= :periodTo
+            GROUP BY return_date, return_type
+            ORDER BY return_date, return_type
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        // Формула сверки с xlsx:
+        // xlsx_grand_total ≈ наш_grand_total + return_revenue (выручка возвратов)
+        // return_revenue учтена в marketplace_returns, НЕ в marketplace_costs
+        // commission_returned уже в marketplace_costs (отрицательная затрата) — в xlsx тоже присутствует
+
+        return [
+            'hint' => implode(' ', [
+                'Детализация возвратов за период.',
+                'return_revenue_amount — выручка возвращённая покупателям (учтена в marketplace_returns, НЕ в затратах).',
+                'commission_returned_amount — возврат комиссии продавцу (уже учтён в затратах как отрицательная комиссия).',
+                'xlsx_reconciliation_delta — разница которую ты увидишь между нашим grand_total и xlsx (= return_revenue).',
+            ]),
+            'total_returns'              => (int) ($returnsRow['total_count'] ?? 0),
+            'client_returns_count'       => (int) ($returnsRow['client_count'] ?? 0),
+            'other_returns_count'        => (int) ($returnsRow['other_count'] ?? 0),
+            'return_revenue_amount'      => number_format($totalRefund, 2, '.', ' '),
+            'client_return_revenue'      => number_format($clientRefund, 2, '.', ' '),
+            'other_return_revenue'       => number_format($otherRefund, 2, '.', ' '),
+            'commission_returned_amount' => number_format($commissionReturned, 2, '.', ' '),
+            'xlsx_reconciliation_delta'  => number_format($totalRefund, 2, '.', ' '),
+            'note' => sprintf(
+                'xlsx покажет на ~%s больше чем наш grand_total — это возвраты выручки покупателям (группа «Возвраты» → «Возврат выручки» в xlsx)',
+                number_format($totalRefund, 2, '.', ' '),
+            ),
+            'by_day' => array_map(static fn (array $r) => [
+                'date'          => $r['return_date'],
+                'type'          => $r['return_type'],
+                'count'         => (int) $r['count'],
+                'refund_amount' => number_format((float) $r['refund_amount'], 2, '.', ' '),
+            ], $byDay),
+        ];
+    }
 
     /**
      * Сверка возвратов: проверяем что сумма возвратов из marketplace_returns
