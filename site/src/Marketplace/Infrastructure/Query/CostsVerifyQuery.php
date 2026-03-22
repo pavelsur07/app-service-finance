@@ -153,9 +153,11 @@ final class CostsVerifyQuery
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
-                c.description        AS service_name,
-                COUNT(c.id)          AS count,
-                SUM(c.amount)        AS amount
+                c.description           AS service_name,
+                COUNT(c.id)             AS count,
+                SUM(c.amount)           AS amount,
+                MIN(c.cost_date)::text  AS first_date,
+                MAX(c.cost_date)::text  AS last_date
             FROM marketplace_costs c
             INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
             WHERE c.company_id  = :companyId
@@ -186,6 +188,8 @@ final class CostsVerifyQuery
                 'service_name' => $r['service_name'],
                 'count'        => (int) $r['count'],
                 'amount'       => number_format((float) $r['amount'], 2, '.', ' '),
+                'first_date'   => $r['first_date'],
+                'last_date'    => $r['last_date'],
             ], $rows),
         ];
     }

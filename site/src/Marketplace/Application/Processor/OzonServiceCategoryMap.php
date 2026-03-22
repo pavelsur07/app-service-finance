@@ -110,9 +110,11 @@ final class OzonServiceCategoryMap
         'OperationPromotionWithCostPerOrder'                     => 'ozon_marketing_action',
         'OperationSubscriptionPremiumPlus'                       => 'ozon_premium_promotion',
         'DefectRateDetailed'                                     => 'ozon_penalty_undeliverable',
+        'MarketplaceServiceItemReplenishment'                     => 'ozon_crossdocking',
         'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_crossdocking',
         'OperationMarketplaceModerationFine'                     => 'ozon_penalty_undeliverable',
         'OperationMarketplaceSupplyDefectProcessing'             => 'ozon_supply_additional',
+        'OperationMarketplaceServiceProcessingSpoilageSurplus'   => 'ozon_supply_additional',
 
         // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (из op['operation_type_name'] для операций без services[]) ===
         'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
