@@ -113,6 +113,7 @@ final class OzonServiceCategoryMap
         'MarketplaceServiceItemReplenishment'                     => 'ozon_crossdocking',
         'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_crossdocking',
         'OperationMarketplaceModerationFine'                     => 'ozon_penalty_undeliverable',
+        'OperationModerationProhibitedContent'                   => 'ozon_penalty_undeliverable',
         'OperationMarketplaceSupplyDefectProcessing'             => 'ozon_supply_additional',
         'OperationMarketplaceServiceProcessingSpoilageSurplus'   => 'ozon_supply_additional',
 
