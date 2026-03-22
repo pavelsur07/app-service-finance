@@ -338,14 +338,11 @@ final class CostsVerifyQuery
         $returnsRow = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
-                COUNT(*)                                        AS total_count,
-                COALESCE(SUM(refund_amount), 0)                AS total_refund_amount,
-                COALESCE(SUM(CASE WHEN return_type = 'client'
-                    THEN refund_amount ELSE 0 END), 0)         AS client_refund_amount,
-                COALESCE(SUM(CASE WHEN return_type != 'client'
-                    THEN refund_amount ELSE 0 END), 0)         AS other_refund_amount,
-                COUNT(*) FILTER (WHERE return_type = 'client') AS client_count,
-                COUNT(*) FILTER (WHERE return_type != 'client') AS other_count
+                COUNT(*)                                            AS total_count,
+                COALESCE(SUM(refund_amount), 0)                    AS total_refund_amount,
+                COALESCE(SUM(quantity), 0)                         AS total_quantity,
+                COUNT(*) FILTER (WHERE sale_id IS NOT NULL)        AS matched_to_sale,
+                COUNT(*) FILTER (WHERE sale_id IS NULL)            AS unmatched
             FROM marketplace_returns
             WHERE company_id   = :companyId
               AND marketplace  = :marketplace
@@ -360,25 +357,47 @@ final class CostsVerifyQuery
             ],
         );
 
-        $totalRefund        = (float) ($returnsRow['total_refund_amount'] ?? 0);
-        $clientRefund       = (float) ($returnsRow['client_refund_amount'] ?? 0);
-        $otherRefund        = (float) ($returnsRow['other_refund_amount'] ?? 0);
+        $totalRefund = (float) ($returnsRow['total_refund_amount'] ?? 0);
 
-        // Разбивка возвратов по дням — для сопоставления с xlsx
+        // Разбивка по причине возврата
+        $byReason = $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                COALESCE(return_reason, 'не указана') AS return_reason,
+                COUNT(*)                              AS count,
+                COALESCE(SUM(quantity), 0)            AS quantity,
+                SUM(refund_amount)                    AS refund_amount
+            FROM marketplace_returns
+            WHERE company_id   = :companyId
+              AND marketplace  = :marketplace
+              AND return_date >= :periodFrom
+              AND return_date <= :periodTo
+            GROUP BY return_reason
+            ORDER BY SUM(refund_amount) DESC
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        // Разбивка по дням
         $byDay = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
                 return_date::text       AS return_date,
-                return_type,
                 COUNT(*)                AS count,
+                SUM(quantity)           AS quantity,
                 SUM(refund_amount)      AS refund_amount
             FROM marketplace_returns
             WHERE company_id   = :companyId
               AND marketplace  = :marketplace
               AND return_date >= :periodFrom
               AND return_date <= :periodTo
-            GROUP BY return_date, return_type
-            ORDER BY return_date, return_type
+            GROUP BY return_date
+            ORDER BY return_date
             SQL,
             [
                 'companyId'   => $companyId,
@@ -388,34 +407,34 @@ final class CostsVerifyQuery
             ],
         );
 
-        // Формула сверки с xlsx:
-        // xlsx_grand_total ≈ наш_grand_total + return_revenue (выручка возвратов)
-        // return_revenue учтена в marketplace_returns, НЕ в marketplace_costs
-        // commission_returned уже в marketplace_costs (отрицательная затрата) — в xlsx тоже присутствует
-
         return [
             'hint' => implode(' ', [
                 'Детализация возвратов за период.',
                 'return_revenue_amount — выручка возвращённая покупателям (учтена в marketplace_returns, НЕ в затратах).',
                 'commission_returned_amount — возврат комиссии продавцу (уже учтён в затратах как отрицательная комиссия).',
-                'xlsx_reconciliation_delta — разница которую ты увидишь между нашим grand_total и xlsx (= return_revenue).',
+                'xlsx_reconciliation_delta — разница которую ты увидишь между нашим grand_total и xlsx.',
             ]),
             'total_returns'              => (int) ($returnsRow['total_count'] ?? 0),
-            'client_returns_count'       => (int) ($returnsRow['client_count'] ?? 0),
-            'other_returns_count'        => (int) ($returnsRow['other_count'] ?? 0),
+            'total_quantity'             => (int) ($returnsRow['total_quantity'] ?? 0),
+            'matched_to_sale'            => (int) ($returnsRow['matched_to_sale'] ?? 0),
+            'unmatched'                  => (int) ($returnsRow['unmatched'] ?? 0),
             'return_revenue_amount'      => number_format($totalRefund, 2, '.', ' '),
-            'client_return_revenue'      => number_format($clientRefund, 2, '.', ' '),
-            'other_return_revenue'       => number_format($otherRefund, 2, '.', ' '),
             'commission_returned_amount' => number_format($commissionReturned, 2, '.', ' '),
             'xlsx_reconciliation_delta'  => number_format($totalRefund, 2, '.', ' '),
             'note' => sprintf(
                 'xlsx покажет на ~%s больше чем наш grand_total — это возвраты выручки покупателям (группа «Возвраты» → «Возврат выручки» в xlsx)',
                 number_format($totalRefund, 2, '.', ' '),
             ),
+            'by_reason' => array_map(static fn (array $r) => [
+                'reason'        => $r['return_reason'],
+                'count'         => (int) $r['count'],
+                'quantity'      => (int) $r['quantity'],
+                'refund_amount' => number_format((float) $r['refund_amount'], 2, '.', ' '),
+            ], $byReason),
             'by_day' => array_map(static fn (array $r) => [
                 'date'          => $r['return_date'],
-                'type'          => $r['return_type'],
                 'count'         => (int) $r['count'],
+                'quantity'      => (int) $r['quantity'],
                 'refund_amount' => number_format((float) $r['refund_amount'], 2, '.', ' '),
             ], $byDay),
         ];
