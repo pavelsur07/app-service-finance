@@ -7,16 +7,27 @@ namespace App\Marketplace\Application\Processor;
 use Psr\Log\LoggerInterface;
 
 /**
- * Единый словарь маппинга service name → category code для Ozon.
+ * Единственный источник истины для маппинга service name → category code (Ozon).
  *
- * Используется в OzonSalesRawProcessor и OzonCostsRawProcessor.
- * Изменять маппинг только здесь — оба процессора подхватят автоматически.
+ * ПРАВИЛО: все маппинги только здесь. Другие классы используют только через resolve().
+ * Никаких локальных копий SERVICE_CATEGORY_MAP в процессорах — это приводит к багам.
+ *
+ * Используется в: OzonCostsRawProcessor, OzonSalesRawProcessor.
+ * Изменять маппинг только здесь — процессоры подхватят автоматически.
  *
  * Группировка для ОПиУ происходит ТОЛЬКО на уровне маппинга PLCategory.
  * Null = нулевой маркер (price всегда 0), пропустить без создания записи.
+ *
+ * После изменения маппинга — переобработать затраты за все затронутые периоды.
  */
 final class OzonServiceCategoryMap
 {
+    /**
+     * Версия словаря — обновлять при любом изменении маппинга.
+     * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
+     */
+    public const VERSION = '2026-03-23.2';
+
     /**
      * @var array<string, string|null>
      */
@@ -154,6 +165,21 @@ final class OzonServiceCategoryMap
     /**
      * Проверяет является ли service name нулевым маркером (price = 0, пропустить).
      */
+    public static function getMapStats(): array
+    {
+        $map    = self::MAP;
+        $total  = count($map);
+        $nulls  = count(array_filter($map, static fn ($v) => $v === null));
+        $unique = count(array_unique(array_filter($map)));
+
+        return [
+            'version'         => self::VERSION,
+            'total_entries'   => $total,
+            'zero_markers'    => $nulls,
+            'unique_categories' => $unique,
+        ];
+    }
+
     public static function isZeroMarker(string $serviceName): bool
     {
         return array_key_exists($serviceName, self::MAP) && self::MAP[$serviceName] === null;

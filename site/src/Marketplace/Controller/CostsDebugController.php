@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\CostsVerifyQuery;
-use App\Marketplace\Infrastructure\Query\RawOperationsAnalysisQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,9 +31,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class CostsDebugController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService       $companyService,
-        private readonly CostsVerifyQuery           $verifyQuery,
-        private readonly RawOperationsAnalysisQuery $rawAnalysisQuery,
+        private readonly ActiveCompanyService $companyService,
+        private readonly CostsVerifyQuery     $verifyQuery,
     ) {
     }
 
@@ -62,31 +61,17 @@ final class CostsDebugController extends AbstractController
     // -------------------------------------------------------------------------
 
     /**
-     * Анализ operation_type и service_name из raw-документов за период.
+     * Версия задеплоенного OzonServiceCategoryMap.
+     * Используй для проверки что нужный маппинг попал на прод.
      *
-     * Помогает найти какие operation_type скрываются за расхождением с xlsx.
-     * Показывает все уникальные комбинации operation_type + service_name с суммами.
-     *
-     * GET /marketplace/costs/debug/raw-operations?marketplace=ozon&year=2026&month=1
-     * GET /marketplace/costs/debug/raw-operations?marketplace=ozon&year=2026&month=1&category=ozon_crossdocking
+     * GET /marketplace/costs/debug/map-version
      */
-    #[Route('/raw-operations', name: 'marketplace_costs_debug_raw_operations', methods: ['GET'])]
-    public function rawOperations(Request $request): JsonResponse
+    #[Route('/map-version', name: 'marketplace_costs_debug_map_version', methods: ['GET'])]
+    public function mapVersion(): JsonResponse
     {
-        [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
-
-        $filterCategory = $request->query->get('category');
-
-        $data = $this->rawAnalysisQuery->run($companyId, $marketplace, $periodFrom, $periodTo, $filterCategory);
-
         return $this->json([
-            'meta' => [
-                'marketplace'     => $marketplace,
-                'period'          => "{$periodFrom} – {$periodTo}",
-                'filter_category' => $filterCategory,
-                'generated_at'    => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-            ],
-            'data' => $data,
+            'map' => OzonServiceCategoryMap::getMapStats(),
+            'hint' => 'Сравни version с последним коммитом в OzonServiceCategoryMap',
         ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
     }
 
