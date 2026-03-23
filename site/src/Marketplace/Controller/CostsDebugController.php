@@ -40,13 +40,21 @@ final class CostsDebugController extends AbstractController
      * Компактный JSON для ручной сверки с «Детализацией начислений» Ozon.
      *
      * Скопируй результат и сравни с xlsx-отчётом из ЛК Ozon.
+     *
+     * Параметры:
+     *   ?xlsx_total=3761721.62 — итог колонки «Сумма» из xlsx (только расходные группы).
+     *                            Если передан — period_health.reconciliation покажет OK или MISMATCH.
      */
     #[Route('/verify', name: 'marketplace_costs_debug_verify', methods: ['GET'])]
     public function verify(Request $request): JsonResponse
     {
         [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
 
-        $data = $this->verifyQuery->run($companyId, $marketplace, $periodFrom, $periodTo);
+        $xlsxTotal = $request->query->get('xlsx_total') !== null
+            ? (float) $request->query->get('xlsx_total')
+            : null;
+
+        $data = $this->verifyQuery->run($companyId, $marketplace, $periodFrom, $periodTo, $xlsxTotal);
 
         return $this->json([
             'meta' => [

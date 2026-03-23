@@ -34,14 +34,30 @@ final class CostsVerifyQuery
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        ?float $xlsxTotal = null,
     ): array {
+        $grandTotal          = $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo);
+        $returnsReconciliation = $this->returnsReconciliation($companyId, $marketplace, $periodFrom, $periodTo);
+        $unknownServiceNames = $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo);
+        $reconciliation      = $this->reconciliation($grandTotal, $returnsReconciliation, $xlsxTotal);
+        $periodHealth        = $this->periodHealth($unknownServiceNames, $reconciliation);
+
+        // Убираем внутренние _raw поля перед отдачей
+        $grandTotalPublic = array_filter(
+            $grandTotal,
+            static fn (string $key) => !str_starts_with($key, '_'),
+            ARRAY_FILTER_USE_KEY,
+        );
+
         return [
+            'period_health'          => $periodHealth,
+            'reconciliation'         => $reconciliation,
             'raw_documents'          => $this->rawDocuments($companyId, $marketplace, $periodFrom, $periodTo),
             'totals_by_category'     => $this->totalsByCategory($companyId, $marketplace, $periodFrom, $periodTo),
-            'grand_total'            => $this->grandTotal($companyId, $marketplace, $periodFrom, $periodTo),
-            'returns_reconciliation' => $this->returnsReconciliation($companyId, $marketplace, $periodFrom, $periodTo),
+            'grand_total'            => $grandTotalPublic,
+            'returns_reconciliation' => $returnsReconciliation,
             'returns_detail'         => $this->returnsDetail($companyId, $marketplace, $periodFrom, $periodTo),
-            'unknown_service_names'  => $this->unknownServiceNames($companyId, $marketplace, $periodFrom, $periodTo),
+            'unknown_service_names'  => $unknownServiceNames,
             'coverage'               => $this->coverage($companyId, $marketplace, $periodFrom, $periodTo),
         ];
     }
@@ -100,7 +116,18 @@ final class CostsVerifyQuery
     /**
      * Итоговая сумма всех затрат за период.
      *
-     * Сравни с итогом колонки «Сумма» в xlsx Ozon (только отрицательные строки = расходы).
+     * Знаковое соглашение:
+     *   amount > 0 — затрата (расход продавца)
+     *   amount < 0 — сторно/возврат от маркетплейса (уменьшение затрат)
+     *
+     * costs_amount  = сумма всех затрат (amount > 0)
+     * storno_amount = сумма всех сторно ABS(amount < 0)
+     * net_amount    = costs_amount - storno_amount = grand_total
+     *
+     * xlsx_comparable = net_amount + return_revenue_amount
+     *   Это число нужно сравнивать с итогом xlsx «Детализации начислений».
+     *   Разница только в возвратах выручки покупателям — Ozon включает их в xlsx,
+     *   мы учитываем в marketplace_returns отдельно.
      */
     private function grandTotal(
         string $companyId,
@@ -111,10 +138,12 @@ final class CostsVerifyQuery
         $row = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
-                COUNT(c.id)   AS total_count,
-                SUM(c.amount) AS total_amount,
-                COUNT(c.listing_id)              AS linked_to_sku,
-                COUNT(c.id) - COUNT(c.listing_id) AS general_costs
+                COUNT(c.id)                                            AS total_count,
+                SUM(c.amount)                                          AS net_amount,
+                SUM(CASE WHEN c.amount > 0 THEN c.amount  ELSE 0 END) AS costs_amount,
+                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END) AS storno_amount,
+                COUNT(c.listing_id)                                    AS linked_to_sku,
+                COUNT(c.id) - COUNT(c.listing_id)                      AS general_costs
             FROM marketplace_costs c
             WHERE c.company_id  = :companyId
               AND c.marketplace = :marketplace
@@ -129,12 +158,24 @@ final class CostsVerifyQuery
             ],
         );
 
+        $netAmount    = (float) ($row['net_amount'] ?? 0);
+        $costsAmount  = (float) ($row['costs_amount'] ?? 0);
+        $stornoAmount = (float) ($row['storno_amount'] ?? 0);
+
+        // return_revenue_amount берём из returnsReconciliation — здесь вычисляем отдельно
+        // для xlsx_comparable (чтобы не делать второй запрос передаём null, заполняется в reconciliation())
         return [
-            'hint'          => 'Сравни total_amount с итогом колонки «Сумма» (расходы) в xlsx Детализации Ozon за тот же период',
+            'hint'          => 'net_amount = costs_amount − storno_amount. xlsx_comparable = net_amount + return_revenue_amount — сравни с итогом xlsx.',
             'total_count'   => (int) ($row['total_count'] ?? 0),
-            'total_amount'  => number_format((float) ($row['total_amount'] ?? 0), 2, '.', ' '),
+            'costs_amount'  => number_format($costsAmount, 2, '.', ' '),
+            'storno_amount' => number_format($stornoAmount, 2, '.', ' '),
+            'net_amount'    => number_format($netAmount, 2, '.', ' '),
             'linked_to_sku' => (int) ($row['linked_to_sku'] ?? 0),
             'general_costs' => (int) ($row['general_costs'] ?? 0),
+            // _raw используется внутри для reconciliation(), не выводится напрямую
+            '_net_amount_raw'    => $netAmount,
+            '_costs_amount_raw'  => $costsAmount,
+            '_storno_amount_raw' => $stornoAmount,
         ];
     }
 
@@ -485,6 +526,102 @@ final class CostsVerifyQuery
             'status'              => $totalRefund > 0
                 ? 'OK — возвраты учтены в marketplace_returns, не дублируются в затратах'
                 : 'WARNING — нет данных о возвратах за период',
+        ];
+    }
+
+    /**
+     * Сверка с xlsx.
+     *
+     * Формула:
+     *   xlsx_comparable = net_amount + return_revenue_amount
+     *
+     * Где:
+     *   net_amount            — наши затраты нетто (costs − storno)
+     *   return_revenue_amount — выручка возвращённая покупателям (в marketplace_returns, не в costs)
+     *
+     * Если передан xlsx_total — считает дельту и возвращает статус.
+     * Допустимое отклонение: 0.00 (любая разница = MISMATCH).
+     *
+     * Знаковое соглашение MarketplaceCost.amount:
+     *   > 0 — затрата (расход продавца, например комиссия, логистика)
+     *   < 0 — сторно/возврат от маркетплейса (уменьшение затрат, например возврат комиссии)
+     */
+    private function reconciliation(
+        array $grandTotal,
+        array $returnsReconciliation,
+        ?float $xlsxTotal,
+    ): array {
+        $netAmount           = $grandTotal['_net_amount_raw'];
+        $returnRevenueAmount = (float) str_replace(' ', '', $returnsReconciliation['total_refund_amount']);
+        $xlsxComparable      = $netAmount + $returnRevenueAmount;
+
+        $result = [
+            'hint'                 => 'xlsx_comparable = net_amount + return_revenue_amount. Передай ?xlsx_total=XXXXX для автоматической проверки.',
+            'net_amount'           => number_format($netAmount, 2, '.', ' '),
+            'return_revenue_amount'=> number_format($returnRevenueAmount, 2, '.', ' '),
+            'xlsx_comparable'      => number_format($xlsxComparable, 2, '.', ' '),
+        ];
+
+        if ($xlsxTotal !== null) {
+            $delta  = round($xlsxComparable - $xlsxTotal, 2);
+            $status = $delta === 0.0 ? 'OK' : 'MISMATCH';
+
+            $result['xlsx_total_provided'] = number_format($xlsxTotal, 2, '.', ' ');
+            $result['delta']               = number_format($delta, 2, '.', ' ');
+            $result['status']              = $status;
+
+            if ($status === 'MISMATCH') {
+                $result['hint_mismatch'] = $delta > 0
+                    ? 'xlsx_comparable больше xlsx_total — возможно не все затраты обработаны или есть дублирование'
+                    : 'xlsx_comparable меньше xlsx_total — возможно пропущены затраты или неверный маппинг';
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Агрегированный статус периода — один взгляд чтобы понять закрыт период или нет.
+     *
+     * OK       — все проверки прошли
+     * WARNING  — отклонения требующие внимания но не критичные
+     * MISMATCH — расхождение с xlsx (если xlsx_total передан)
+     * ERROR    — нераспознанные service names или другие критичные проблемы
+     */
+    private function periodHealth(
+        array $unknownServiceNames,
+        array $reconciliation,
+    ): array {
+        $checks = [];
+
+        // Проверка: нераспознанные service names
+        $unknownCount = (int) ($unknownServiceNames['count'] ?? 0);
+        $checks['unknown_service_names'] = $unknownCount === 0
+            ? ['status' => 'OK',    'message' => 'Все service names распознаны']
+            : ['status' => 'ERROR', 'message' => "Нераспознанных service names: {$unknownCount} — добавь в OzonServiceCategoryMap и переобработай"];
+
+        // Проверка: сверка с xlsx (только если xlsx_total передан)
+        if (isset($reconciliation['status'])) {
+            $checks['reconciliation'] = $reconciliation['status'] === 'OK'
+                ? ['status' => 'OK',       'message' => "Совпадает с xlsx: {$reconciliation['xlsx_comparable']}"]
+                : ['status' => 'MISMATCH', 'message' => "Расхождение с xlsx: delta = {$reconciliation['delta']}"];
+        } else {
+            $checks['reconciliation'] = [
+                'status'  => 'SKIPPED',
+                'message' => 'Передай ?xlsx_total=XXXXX для проверки сверки с xlsx',
+            ];
+        }
+
+        // Итоговый статус — worst case
+        $statuses      = array_column($checks, 'status');
+        $overallStatus = 'OK';
+        if (in_array('ERROR', $statuses, true))        $overallStatus = 'ERROR';
+        elseif (in_array('MISMATCH', $statuses, true)) $overallStatus = 'MISMATCH';
+        elseif (in_array('WARNING', $statuses, true))  $overallStatus = 'WARNING';
+
+        return [
+            'status' => $overallStatus,
+            'checks' => $checks,
         ];
     }
 
