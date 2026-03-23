@@ -147,13 +147,16 @@ final class CostsDebugController extends AbstractController
                 op->>'type'                             AS type,
                 op->>'amount'                           AS amount,
                 op->>'operation_date'                   AS operation_date,
-                op->'services'                          AS services
+                op->>'services'                         AS services
             FROM marketplace_raw_documents d,
                  jsonb_array_elements(
-                     COALESCE(
-                         NULLIF(d.raw_data::jsonb->'result'->'operations', 'null'::jsonb),
-                         d.raw_data::jsonb
-                     )
+                     CASE
+                         WHEN jsonb_typeof(d.raw_data::jsonb->'result'->'operations') = 'array'
+                         THEN d.raw_data::jsonb->'result'->'operations'
+                         WHEN jsonb_typeof(d.raw_data::jsonb) = 'array'
+                         THEN d.raw_data::jsonb
+                         ELSE '[]'::jsonb
+                     END
                  ) AS op
             WHERE d.company_id  = :companyId
               AND d.marketplace = :marketplace
@@ -162,7 +165,7 @@ final class CostsDebugController extends AbstractController
               AND (
                   op->>'operation_type'         ILIKE :keyword
                   OR op->>'operation_type_name' ILIKE :keyword
-                  OR (op->>'services')           ILIKE :keyword
+                  OR op->>'services'            ILIKE :keyword
               )
             ORDER BY op->>'operation_date'
             LIMIT {$limit}
