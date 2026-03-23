@@ -6,7 +6,7 @@ namespace App\Marketplace\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
 
-final class MarketplaceRawDocumentMarketplaceQuery
+final class MarketplaceRawDocumentMarketplaceQuery implements MarketplaceRawDocumentMarketplaceQueryInterface
 {
     public function __construct(private readonly Connection $connection)
     {

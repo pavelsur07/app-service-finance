@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistry;
+use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -17,8 +17,8 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 final readonly class ProcessMarketplaceRawDocumentAction
 {
     public function __construct(
-        private RowClassifierRegistry $classifierRegistry,
-        private MarketplaceRawProcessorRegistry $processorRegistry,
+        private RowClassifierRegistryInterface $classifierRegistry,
+        private MarketplaceRawProcessorRegistryInterface $processorRegistry,
         private MarketplaceRawDocumentRepository $repository,
         private EntityManagerInterface $entityManager,
     ) {

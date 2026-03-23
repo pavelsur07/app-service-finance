@@ -7,16 +7,17 @@ namespace App\Tests\Unit\Marketplace;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
-use App\Marketplace\Infrastructure\Query\MarketplaceRawDocumentMarketplaceQuery;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarketplaceRawDocumentMarketplaceQueryInterface;
 use PHPUnit\Framework\TestCase;
 
 final class ProcessRawDocumentActionTest extends TestCase
 {
     public function testRoutesToRegistryProcessorAndReturnsResult(): void
     {
-        $query = $this->createMock(MarketplaceRawDocumentMarketplaceQuery::class);
-        $registry = $this->createMock(MarketplaceRawProcessorRegistry::class);
+        $query     = $this->createMock(MarketplaceRawDocumentMarketplaceQueryInterface::class);
+        $registry  = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
         $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
 
         $query
@@ -28,7 +29,7 @@ final class ProcessRawDocumentActionTest extends TestCase
         $registry
             ->expects(self::once())
             ->method('get')
-            ->with('ozon', 'sales')
+            ->with('ozon', MarketplaceType::OZON, 'sales')
             ->willReturn($processor);
 
         $processor
@@ -44,8 +45,8 @@ final class ProcessRawDocumentActionTest extends TestCase
 
     public function testThrowsWhenRawDocumentMissing(): void
     {
-        $query = $this->createMock(MarketplaceRawDocumentMarketplaceQuery::class);
-        $registry = $this->createMock(MarketplaceRawProcessorRegistry::class);
+        $query    = $this->createMock(MarketplaceRawDocumentMarketplaceQueryInterface::class);
+        $registry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
 
         $query
             ->expects(self::once())

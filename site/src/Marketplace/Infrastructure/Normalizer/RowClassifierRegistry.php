@@ -8,7 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
-final readonly class RowClassifierRegistry
+final readonly class RowClassifierRegistry implements RowClassifierRegistryInterface
 {
     /** @var RowClassifierInterface[] */
     private array $classifiers;

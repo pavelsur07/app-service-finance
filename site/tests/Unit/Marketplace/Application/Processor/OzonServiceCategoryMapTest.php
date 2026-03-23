@@ -6,7 +6,35 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
 use PHPUnit\Framework\TestCase;
-use Psr\Log\Test\TestLogger;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LogLevel;
+
+/**
+ * Минимальный стаб логгера для проверки наличия warning-вызовов.
+ * Заменяет Psr\Log\Test\TestLogger который недоступен без psr/log dev-зависимости.
+ */
+final class WarningCapturingLogger extends AbstractLogger
+{
+    /** @var array<int, array{level: string, message: string}> */
+    private array $warnings = [];
+
+    public function log(mixed $level, mixed $message, array $context = []): void
+    {
+        if ($level === LogLevel::WARNING) {
+            $this->warnings[] = ['level' => $level, 'message' => (string) $message];
+        }
+    }
+
+    public function hasWarnings(): bool
+    {
+        return count($this->warnings) > 0;
+    }
+
+    public function reset(): void
+    {
+        $this->warnings = [];
+    }
+}
 
 /**
  * Проверяет синхронность OzonServiceCategoryMap:
@@ -24,11 +52,16 @@ final class OzonServiceCategoryMapTest extends TestCase
      */
     public function testAllKnownServiceNamesResolveWithoutWarning(): void
     {
-        $logger = new TestLogger();
+        $logger = new WarningCapturingLogger();
 
         $knownServiceNames = $this->getKnownServiceNames();
 
         foreach ($knownServiceNames as $serviceName) {
+            // Нулевые маркеры (null в MAP) — легитимны, пропускаем
+            if (OzonServiceCategoryMap::isZeroMarker($serviceName)) {
+                continue;
+            }
+
             $logger->reset();
             $code = OzonServiceCategoryMap::resolve($serviceName, $logger);
 

@@ -8,7 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use Symfony\Component\DependencyInjection\Attribute\TaggedIterator;
 
-final readonly class MarketplaceRawProcessorRegistry
+final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawProcessorRegistryInterface
 {
     /** @var MarketplaceRawProcessorInterface[] */
     private array $processors;

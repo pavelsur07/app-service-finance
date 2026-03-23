@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
-use App\Marketplace\Infrastructure\Query\MarketplaceRawDocumentMarketplaceQuery;
+use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarketplaceRawDocumentMarketplaceQueryInterface;
 
-final class ProcessRawDocumentAction
+final class ProcessRawDocumentAction implements ProcessRawDocumentActionInterface
 {
     public function __construct(
-        private readonly MarketplaceRawDocumentMarketplaceQuery $marketplaceQuery,
-        private readonly MarketplaceRawProcessorRegistry $registry,
+        private readonly MarketplaceRawDocumentMarketplaceQueryInterface $marketplaceQuery,
+        private readonly MarketplaceRawProcessorRegistryInterface $registry,
     ) {
     }
 
@@ -24,7 +25,8 @@ final class ProcessRawDocumentAction
             throw new \InvalidArgumentException("Raw document not found: {$cmd->rawDocId}");
         }
 
-        $processor = $this->registry->get($marketplaceValue, $cmd->kind);
+        $marketplace = MarketplaceType::from($marketplaceValue);
+        $processor   = $this->registry->get($marketplaceValue, $marketplace, $cmd->kind);
 
         return $processor->process($cmd->companyId, $cmd->rawDocId);
     }
