@@ -162,7 +162,7 @@ final class CostsDebugController extends AbstractController
               AND (
                   op->>'operation_type'         ILIKE :keyword
                   OR op->>'operation_type_name' ILIKE :keyword
-                  OR op->'services'::text        ILIKE :keyword
+                  OR (op->>'services')           ILIKE :keyword
               )
             ORDER BY op->>'operation_date'
             LIMIT {$limit}
