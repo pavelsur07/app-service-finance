@@ -104,14 +104,14 @@ final class OzonServiceCategoryMap
 
         // === АНГЛИЙСКИЕ operation_type ДЛЯ ОПЕРАЦИЙ БЕЗ services[] ===
         // Эти operation_type приходят в поле op['operation_type'] когда services[] пустой
-        'OperationMarketplaceServicePremiumCashbackBonusAccrual' => 'ozon_premium_cashback',
+        'OperationMarketplaceServicePremiumCashbackBonusAccrual' => 'ozon_seller_bonus',
         'OperationPointsForReviews'                              => 'ozon_reviews',
         'OperationMarketplaceSupplyExpirationDateProcessing'     => 'ozon_supply_additional',
         'OperationPromotionWithCostPerOrder'                     => 'ozon_marketing_action',
         'OperationSubscriptionPremiumPlus'                       => 'ozon_premium_promotion',
         'DefectRateDetailed'                                     => 'ozon_penalty_undeliverable',
         'MarketplaceServiceItemReplenishment'                     => 'ozon_warehouse_movement',
-        'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_crossdocking',
+        'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_warehouse_movement',
         'OperationMarketplaceModerationFine'                     => 'ozon_penalty_undeliverable',
         'OperationModerationProhibitedContent'                   => 'ozon_penalty_undeliverable',
         'OperationMarketplaceSupplyDefectProcessing'             => 'ozon_supply_additional',
@@ -119,13 +119,14 @@ final class OzonServiceCategoryMap
 
         // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (из op['operation_type_name'] для операций без services[]) ===
         'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
-        'Бонусы продавца - рассылка'                             => 'ozon_premium_cashback',
+        'Бонусы продавца - рассылка'                             => 'ozon_seller_bonus',
         'Баллы за отзывы'                                        => 'ozon_reviews',
-        'Перемещение товаров между складами Ozon'                => 'ozon_crossdocking',
+        'Перемещение товаров между складами Ozon'                => 'ozon_warehouse_movement',
         'Обработка сроков годности на FBO'                       => 'ozon_supply_additional',
         'Модерация запрещённого контента'                        => 'ozon_penalty_undeliverable',
         'Обработка операционных ошибок продавца: отгрузка в нерекомендованный слот' => 'ozon_penalty_undeliverable',
         'Обработка брака с приемки'                              => 'ozon_supply_additional',
+        'Временное размещение товара партнерами'                  => 'ozon_storage_partner',
     ];
 
     /**
