@@ -150,12 +150,10 @@ final class CostsDebugController extends AbstractController
                 op->'services'                          AS services
             FROM marketplace_raw_documents d,
                  jsonb_array_elements(
-                     CASE
-                         WHEN d.raw_data ?? 'result'
-                              AND d.raw_data->'result' ?? 'operations'
-                         THEN d.raw_data->'result'->'operations'
-                         ELSE d.raw_data
-                     END
+                     COALESCE(
+                         NULLIF(d.raw_data::jsonb->'result'->'operations', 'null'::jsonb),
+                         d.raw_data::jsonb
+                     )
                  ) AS op
             WHERE d.company_id  = :companyId
               AND d.marketplace = :marketplace
