@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-03-23.4';
+    public const VERSION = '2026-03-23.5';
 
     /**
      * @var array<string, string|null>
@@ -104,6 +104,10 @@ final class OzonServiceCategoryMap
 
         // === ШТРАФЫ / УДЕРЖАНИЯ ===
         'OperationMarketplaceWithHoldingForUndeliverableGoods'   => 'ozon_penalty_undeliverable',
+
+        // === ДЕКОМПЕНСАЦИИ ===
+        // type=compensation но фактически расход — Ozon списывает деньги обратно
+        'MarketplaceSellerDecompensationItemByTypeDocOperation'  => 'ozon_decompensation',
 
         // === ПРОЧЕЕ ===
         'MarketplaceServiceItemMarkingItems'                     => 'ozon_marking',
@@ -235,6 +239,7 @@ final class OzonServiceCategoryMap
             'ozon_flexible_payment'      => 'Гибкий график выплат Ozon',
             'ozon_installment'           => 'Продажа в рассрочку Ozon',
             'ozon_penalty_undeliverable' => 'Удержание за недовложение Ozon',
+            'ozon_decompensation'        => 'Декомпенсации Ozon',
             'ozon_marking'               => 'Обязательная маркировка Ozon',
             'ozon_return_from_stock'     => 'Комплектация для вывоза продавцом Ozon',
             'ozon_agency_fee'            => 'Агентская услуга 3PL Global Ozon',
