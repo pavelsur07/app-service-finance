@@ -7,6 +7,7 @@ namespace App\Marketplace\Controller;
 use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\CostsVerifyQuery;
+use App\Marketplace\Infrastructure\Query\RawOperationsAnalysisQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,8 +32,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class CostsDebugController extends AbstractController
 {
     public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly CostsVerifyQuery     $verifyQuery,
+        private readonly ActiveCompanyService        $companyService,
+        private readonly CostsVerifyQuery            $verifyQuery,
+        private readonly RawOperationsAnalysisQuery  $rawOperationsQuery,
     ) {
     }
 
@@ -63,6 +65,43 @@ final class CostsDebugController extends AbstractController
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ],
             'checks' => $data,
+        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Анализ operation_type и service_name из raw-документов за период.
+     *
+     * Используй для диагностики расхождений между нашим grand_total и xlsx.
+     * Показывает реальное распределение operation_type / service_name → category_code.
+     *
+     * GET /marketplace/costs/debug/raw-operations?marketplace=ozon&year=2026&month=2
+     * GET /marketplace/costs/debug/raw-operations?marketplace=ozon&year=2026&month=2&category=ozon_logistic_direct
+     */
+    #[Route('/raw-operations', name: 'marketplace_costs_debug_raw_operations', methods: ['GET'])]
+    public function rawOperations(Request $request): JsonResponse
+    {
+        [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
+
+        $filterCategory = $request->query->get('category') ?: null;
+
+        $data = $this->rawOperationsQuery->run(
+            $companyId,
+            $marketplace,
+            $periodFrom,
+            $periodTo,
+            $filterCategory,
+        );
+
+        return $this->json([
+            'meta' => [
+                'marketplace'     => $marketplace,
+                'period'          => "{$periodFrom} – {$periodTo}",
+                'filter_category' => $filterCategory,
+                'generated_at'    => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ],
+            'data' => $data,
         ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
     }
 
