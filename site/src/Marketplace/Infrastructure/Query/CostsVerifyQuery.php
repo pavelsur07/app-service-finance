@@ -67,7 +67,13 @@ final class CostsVerifyQuery
     /**
      * Итоги по каждой категории затрат за период.
      *
-     * Сравни каждую строку с суммой по соответствующему service_name в xlsx Ozon.
+     * Для каждой категории показывает:
+     *   costs_amount  — брутто затраты (amount > 0) — это то что xlsx показывает по типу
+     *   storno_amount — сторно/возвраты (ABS(amount < 0)) — отмены начислений, возврат комиссии
+     *   net_amount    — нетто = costs_amount − storno_amount — идёт в ОПиУ
+     *
+     * При сверке с xlsx: сравнивай costs_amount с xlsx, не net_amount.
+     * Если xlsx > net_amount — разница = storno_amount. Это норма, не расхождение.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -80,12 +86,14 @@ final class CostsVerifyQuery
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
-                cc.code                          AS category_code,
-                cc.name                          AS category_name,
-                COUNT(c.id)                      AS count,
-                SUM(c.amount)                    AS amount,
-                COUNT(c.listing_id)              AS linked_to_sku,
-                COUNT(c.id) - COUNT(c.listing_id) AS general_costs
+                cc.code                                                         AS category_code,
+                cc.name                                                         AS category_name,
+                COUNT(c.id)                                                     AS count,
+                SUM(c.amount)                                                   AS net_amount,
+                SUM(CASE WHEN c.amount > 0 THEN c.amount  ELSE 0 END)          AS costs_amount,
+                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END)      AS storno_amount,
+                COUNT(c.listing_id)                                             AS linked_to_sku,
+                COUNT(c.id) - COUNT(c.listing_id)                               AS general_costs
             FROM marketplace_costs c
             INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
             WHERE c.company_id  = :companyId
@@ -107,7 +115,9 @@ final class CostsVerifyQuery
             'category_code'  => $r['category_code'],
             'category_name'  => $r['category_name'],
             'count'          => (int) $r['count'],
-            'amount'         => number_format((float) $r['amount'], 2, '.', ' '),
+            'costs_amount'   => number_format((float) $r['costs_amount'], 2, '.', ' '),
+            'storno_amount'  => number_format((float) $r['storno_amount'], 2, '.', ' '),
+            'net_amount'     => number_format((float) $r['net_amount'], 2, '.', ' '),
             'linked_to_sku'  => (int) $r['linked_to_sku'],
             'general_costs'  => (int) $r['general_costs'],
         ], $rows);
