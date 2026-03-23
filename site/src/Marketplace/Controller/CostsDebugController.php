@@ -136,7 +136,7 @@ final class CostsDebugController extends AbstractController
 
         // Ищем в raw JSON через PostgreSQL JSONB
         $rows = $this->connection->fetchAllAssociative(
-            <<<'SQL'
+            <<<SQL
             SELECT
                 d.id                                    AS doc_id,
                 d.period_from::text                     AS period_from,
@@ -162,12 +162,12 @@ final class CostsDebugController extends AbstractController
               AND d.period_from >= :periodFrom
               AND d.period_to  <= :periodTo
               AND (
-                  op->>'operation_type'      ILIKE :keyword
+                  op->>'operation_type'         ILIKE :keyword
                   OR op->>'operation_type_name' ILIKE :keyword
-                  OR op->'services'::text       ILIKE :keyword
+                  OR op->'services'::text        ILIKE :keyword
               )
             ORDER BY op->>'operation_date'
-            LIMIT :limit
+            LIMIT {$limit}
             SQL,
             [
                 'companyId'   => $companyId,
@@ -175,7 +175,6 @@ final class CostsDebugController extends AbstractController
                 'periodFrom'  => $periodFrom,
                 'periodTo'    => $periodTo,
                 'keyword'     => '%' . $keyword . '%',
-                'limit'       => $limit,
             ],
         );
 
