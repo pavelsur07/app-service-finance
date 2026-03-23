@@ -373,18 +373,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         // 5. Если services[] пустой — затраты в op['amount'] напрямую
         // Применимо к: реклама, хранение, кросс-докинг, поставка, досрочная выплата и т.д.
         if (empty($services)) {
-            $opAmount      = abs((float) ($op['amount'] ?? 0));
-            $opType        = $op['type'] ?? '';
-            $operationType = $op['operation_type'] ?? '';
+            $opAmount = abs((float) ($op['amount'] ?? 0));
+            $opType   = $op['type'] ?? '';
 
-            // Декомпенсации — это расход продавца несмотря на type=compensation.
-            // Ozon списывает деньги обратно (напр. возврат товара на сток).
-            // Пропускаем только чистые компенсации (доход), не декомпенсации.
-            $isDecompensation = $opType === 'compensation'
-                && str_contains($operationType, 'Decompensation');
-
-            // Пропускаем продажи и компенсации (доход), но не декомпенсации
-            if ($opAmount > 0.001 && (!in_array($opType, ['orders', 'compensation'], true) || $isDecompensation)) {
+            // Пропускаем продажи и компенсации (не затраты)
+            // type=compensation включает как компенсации от Ozon (доход) так и декомпенсации (расход),
+            // но они учитываются нетто на стороне Ozon — в ОПиУ не включаем.
+            if ($opAmount > 0.001 && !in_array($opType, ['orders', 'compensation'], true)) {
+                $operationType = $op['operation_type'] ?? '';
                 $categoryCode  = $this->resolveServiceCategoryCode($operationType);
 
                 $entries[] = [
