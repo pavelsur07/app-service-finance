@@ -151,8 +151,8 @@ final class CostsDebugController extends AbstractController
             FROM marketplace_raw_documents d,
                  jsonb_array_elements(
                      CASE
-                         WHEN d.raw_data ? 'result'
-                              AND d.raw_data->'result' ? 'operations'
+                         WHEN d.raw_data ?? 'result'
+                              AND d.raw_data->'result' ?? 'operations'
                          THEN d.raw_data->'result'->'operations'
                          ELSE d.raw_data
                      END
