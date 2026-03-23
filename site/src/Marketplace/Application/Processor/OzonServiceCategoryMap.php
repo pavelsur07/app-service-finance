@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-03-23.2';
+    public const VERSION = '2026-03-23.3';
 
     /**
      * @var array<string, string|null>
@@ -75,6 +75,7 @@ final class OzonServiceCategoryMap
 
         // === ХРАНЕНИЕ ===
         'OperationMarketplaceServiceStorage'                     => 'ozon_storage',
+        'MarketplaceServiceItemTemporaryStorageRedistribution'   => 'ozon_storage_partner',
 
         // === КРОСС-ДОКИНГ / ПОСТАВКА НА FBO ===
         'MarketplaceServiceItemCrossdocking'                     => 'ozon_crossdocking',
@@ -216,6 +217,7 @@ final class OzonServiceCategoryMap
             'ozon_package_materials'     => 'Упаковочные материалы Ozon',
             'ozon_package_labor'         => 'Упаковка партнёрами Ozon',
             'ozon_storage'               => 'Хранение на складе Ozon',
+            'ozon_storage_partner'       => 'Временное хранение у партнёров Ozon',
             'ozon_crossdocking'          => 'Кросс-докинг Ozon',
             'ozon_supply_additional'     => 'Обработка товара в грузоместе FBO Ozon',
             'ozon_supply_shortage'       => 'Бронирование места (неполный состав) Ozon',
