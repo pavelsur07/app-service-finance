@@ -21,14 +21,23 @@ use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
  * Не использует ActiveCompanyService — companyId через Command.
  *
  * Результат: PreflightResult с перечнем проверок, ошибок и предупреждений.
+ *
+ * Уровни проверок COSTS:
+ *   ERROR (блокирует):
+ *     - уже есть обработанные затраты (аномалия — нужно переоткрыть)
+ *     - нераспознанные service names (ozon_other_service)
+ *   WARNING (не блокирует, предупреждение):
+ *     - затраты без маппинга к ОПиУ
+ *     - исключённые категории (include_in_pl = false)
+ *     - нет затрат за период
  */
 final class MonthClosePreflightAction
 {
     public function __construct(
-        private readonly PreflightSalesReturnsQuery   $salesReturnsQuery,
-        private readonly PreflightCostsQuery          $costsQuery,
+        private readonly PreflightSalesReturnsQuery      $salesReturnsQuery,
+        private readonly PreflightCostsQuery             $costsQuery,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly CompanyFacade                $companyFacade,
+        private readonly CompanyFacade                   $companyFacade,
     ) {
     }
 
@@ -39,7 +48,6 @@ final class MonthClosePreflightAction
             CloseStage::COSTS         => $this->checkCosts($command),
         };
 
-        // Общие проверки для любого этапа
         $checks = array_merge(
             $this->checkCommon($command),
             $checks,
@@ -56,61 +64,37 @@ final class MonthClosePreflightAction
     {
         $checks = [];
 
-        // Проверка financeLockBefore
-        $company = $this->companyFacade->findById($command->companyId);
+        $company    = $this->companyFacade->findById($command->companyId);
         $lockBefore = $company?->getFinanceLockBefore();
 
         if ($lockBefore !== null) {
-            $periodEnd = new \DateTimeImmutable(
-                sprintf('%d-%02d-01', $command->year, $command->month)
-            );
-            $periodEnd = $periodEnd->modify('last day of this month');
+            $periodEnd = (new \DateTimeImmutable(sprintf('%d-%02d-01', $command->year, $command->month)))
+                ->modify('last day of this month');
 
             if ($periodEnd <= $lockBefore) {
                 $checks[] = PreflightCheck::error(
                     'finance_lock',
                     'Период заблокирован',
-                    sprintf(
-                        'Период закрыт для редактирования (дата блокировки: %s)',
-                        $lockBefore->format('d.m.Y'),
-                    ),
+                    sprintf('Период закрыт для редактирования (дата блокировки: %s)', $lockBefore->format('d.m.Y')),
                 );
             } else {
-                $checks[] = PreflightCheck::ok(
-                    'finance_lock',
-                    'Период заблокирован',
-                    'Период открыт для редактирования',
-                );
+                $checks[] = PreflightCheck::ok('finance_lock', 'Период заблокирован', 'Период открыт для редактирования');
             }
         }
 
-        // Проверка — не закрыт ли уже этот этап
-        $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
-        $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
         $marketplace = MarketplaceType::from($command->marketplace);
-
-        $monthClose = $this->monthCloseRepository->findByPeriod(
-            $command->companyId,
-            $marketplace,
-            $command->year,
-            $command->month,
+        $monthClose  = $this->monthCloseRepository->findByPeriod(
+            $command->companyId, $marketplace, $command->year, $command->month,
         );
 
         if ($monthClose !== null && $monthClose->isStageClosed($command->stage)) {
             $checks[] = PreflightCheck::error(
                 'already_closed',
                 'Этап закрыт',
-                sprintf(
-                    'Этап "%s" уже закрыт. Переоткройте период для повторного закрытия.',
-                    $command->stage->getLabel(),
-                ),
+                sprintf('Этап "%s" уже закрыт. Переоткройте период для повторного закрытия.', $command->stage->getLabel()),
             );
         } else {
-            $checks[] = PreflightCheck::ok(
-                'already_closed',
-                'Этап закрыт',
-                'Этап ещё не закрыт',
-            );
+            $checks[] = PreflightCheck::ok('already_closed', 'Этап закрыт', 'Этап ещё не закрыт');
         }
 
         return $checks;
@@ -126,24 +110,12 @@ final class MonthClosePreflightAction
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
         $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
-        // Продажи
-        $salesStats = $this->salesReturnsQuery->getSalesStats(
-            $command->companyId,
-            $command->marketplace,
-            $periodFrom,
-            $periodTo,
-        );
-
+        $salesStats       = $this->salesReturnsQuery->getSalesStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
         $salesTotal       = (int) $salesStats['total'];
         $salesWithoutCost = (int) $salesStats['without_cost'];
 
         if ($salesTotal === 0) {
-            $checks[] = PreflightCheck::warning(
-                'sales_count',
-                'Продажи за период',
-                'Нет продаж за выбранный период',
-                $salesTotal,
-            );
+            $checks[] = PreflightCheck::warning('sales_count', 'Продажи за период', 'Нет продаж за выбранный период', $salesTotal);
         } elseif ($salesWithoutCost > 0) {
             $checks[] = PreflightCheck::error(
                 'sales_without_cost',
@@ -152,32 +124,15 @@ final class MonthClosePreflightAction
                 $salesWithoutCost,
             );
         } else {
-            $checks[] = PreflightCheck::ok(
-                'sales_without_cost',
-                'Себестоимость продаж',
-                sprintf('Все продажи имеют себестоимость (%d шт.)', $salesTotal),
-                $salesTotal,
-            );
+            $checks[] = PreflightCheck::ok('sales_without_cost', 'Себестоимость продаж', sprintf('Все продажи имеют себестоимость (%d шт.)', $salesTotal), $salesTotal);
         }
 
-        // Возвраты
-        $returnsStats = $this->salesReturnsQuery->getReturnsStats(
-            $command->companyId,
-            $command->marketplace,
-            $periodFrom,
-            $periodTo,
-        );
-
+        $returnsStats       = $this->salesReturnsQuery->getReturnsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
         $returnsTotal       = (int) $returnsStats['total'];
         $returnsWithoutCost = (int) $returnsStats['without_cost'];
 
         if ($returnsTotal === 0) {
-            $checks[] = PreflightCheck::ok(
-                'returns_without_cost',
-                'Себестоимость возвратов',
-                'Нет возвратов за период',
-                0,
-            );
+            $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', 'Нет возвратов за период', 0);
         } elseif ($returnsWithoutCost > 0) {
             $checks[] = PreflightCheck::error(
                 'returns_without_cost',
@@ -186,34 +141,15 @@ final class MonthClosePreflightAction
                 $returnsWithoutCost,
             );
         } else {
-            $checks[] = PreflightCheck::ok(
-                'returns_without_cost',
-                'Себестоимость возвратов',
-                sprintf('Все возвраты имеют себестоимость (%d шт.)', $returnsTotal),
-                $returnsTotal,
-            );
+            $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', sprintf('Все возвраты имеют себестоимость (%d шт.)', $returnsTotal), $returnsTotal);
         }
 
-        // Реализация Ozon (предупреждение, не блокирует)
         if ($command->marketplace === MarketplaceType::OZON->value) {
-            $realizationLoaded = $this->salesReturnsQuery->isOzonRealizationLoaded(
-                $command->companyId,
-                $command->year,
-                $command->month,
-            );
-
+            $realizationLoaded = $this->salesReturnsQuery->isOzonRealizationLoaded($command->companyId, $command->year, $command->month);
             if (!$realizationLoaded) {
-                $checks[] = PreflightCheck::warning(
-                    'ozon_realization',
-                    'Реализация Ozon',
-                    'Реализация Ozon за этот месяц не загружена. Выручка с СПП не будет включена в ОПиУ.',
-                );
+                $checks[] = PreflightCheck::warning('ozon_realization', 'Реализация Ozon', 'Реализация Ozon за этот месяц не загружена. Выручка с СПП не будет включена в ОПиУ.');
             } else {
-                $checks[] = PreflightCheck::ok(
-                    'ozon_realization',
-                    'Реализация Ozon',
-                    'Реализация Ozon загружена',
-                );
+                $checks[] = PreflightCheck::ok('ozon_realization', 'Реализация Ozon', 'Реализация Ozon загружена');
             }
         }
 
@@ -230,57 +166,82 @@ final class MonthClosePreflightAction
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
         $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
-        $costsStats = $this->costsQuery->getCostsStats(
-            $command->companyId,
-            $command->marketplace,
-            $periodFrom,
-            $periodTo,
-        );
+        $costsStats      = $this->costsQuery->getCostsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
+        $total           = (int) $costsStats['total'];
+        $alreadyProcessed = (int) $costsStats['already_processed'];
+        $withoutMapping  = (int) $costsStats['without_pl_mapping'];
+        $excluded        = (int) $costsStats['excluded_from_pl'];
+        $netAmountForPl  = $costsStats['net_amount_for_pl'] ?? '0';
 
-        $total          = (int) $costsStats['total'];
-        $withoutMapping = (int) $costsStats['without_pl_mapping'];
-        $excluded       = (int) $costsStats['excluded_from_pl'];
-
+        // Проверка 1: нет затрат за период (предупреждение)
         if ($total === 0) {
-            $checks[] = PreflightCheck::warning(
-                'costs_count',
-                'Затраты за период',
-                'Нет затрат за выбранный период',
-                0,
-            );
+            $checks[] = PreflightCheck::warning('costs_count', 'Затраты за период', 'Нет затрат за выбранный период', 0);
         } else {
-            $checks[] = PreflightCheck::ok(
-                'costs_count',
-                'Затраты за период',
-                sprintf('Затрат за период: %d шт.', $total),
-                $total,
-            );
+            $checks[] = PreflightCheck::ok('costs_count', 'Затраты за период', sprintf('Затрат за период: %d шт.', $total), $total);
         }
 
+        // Проверка 2: уже обработанные затраты (БЛОКИРУЕТ — аномалия)
+        if ($alreadyProcessed > 0) {
+            $checks[] = PreflightCheck::error(
+                'costs_already_processed',
+                'Уже обработанные затраты',
+                sprintf(
+                    'Найдено %d затрат с document_id IS NOT NULL. Этап не был переоткрыт корректно. Переоткройте этап и повторите.',
+                    $alreadyProcessed,
+                ),
+                $alreadyProcessed,
+            );
+        } else {
+            $checks[] = PreflightCheck::ok('costs_already_processed', 'Уже обработанные затраты', 'Все затраты готовы к обработке');
+        }
+
+        // Проверка 3: нераспознанные service names (БЛОКИРУЕТ)
+        $unknownCount = $this->costsQuery->getUnknownServiceNamesCount(
+            $command->companyId, $command->marketplace, $periodFrom, $periodTo,
+        );
+        if ($unknownCount > 0) {
+            $checks[] = PreflightCheck::error(
+                'costs_unknown_service_names',
+                'Нераспознанные операции',
+                sprintf(
+                    'Найдено %d операций с неизвестным service name (ozon_other_service). Добавьте в OzonServiceCategoryMap и переобработайте затраты.',
+                    $unknownCount,
+                ),
+                $unknownCount,
+            );
+        } else {
+            $checks[] = PreflightCheck::ok('costs_unknown_service_names', 'Нераспознанные операции', 'Все операции распознаны');
+        }
+
+        // Проверка 4: затраты без маппинга к ОПиУ (ПРЕДУПРЕЖДЕНИЕ — не блокирует)
         if ($withoutMapping > 0) {
             $checks[] = PreflightCheck::warning(
                 'costs_without_mapping',
                 'Маппинг затрат к ОПиУ',
-                sprintf(
-                    'Затрат без маппинга к ОПиУ: %d шт. Они не попадут в ОПиУ. Настройте маппинг в разделе "Себестоимость".',
-                    $withoutMapping,
-                ),
+                sprintf('Затрат без маппинга к ОПиУ: %d шт. Они не попадут в ОПиУ. Настройте маппинг в разделе "Себестоимость".', $withoutMapping),
                 $withoutMapping,
             );
         } else {
-            $checks[] = PreflightCheck::ok(
-                'costs_without_mapping',
-                'Маппинг затрат к ОПиУ',
-                'Все затраты имеют маппинг к ОПиУ',
-            );
+            $checks[] = PreflightCheck::ok('costs_without_mapping', 'Маппинг затрат к ОПиУ', 'Все затраты имеют маппинг к ОПиУ');
         }
 
+        // Проверка 5: исключённые категории (информационно)
         if ($excluded > 0) {
-            $checks[] = PreflightCheck::ok(
+            $checks[] = PreflightCheck::warning(
                 'costs_excluded',
                 'Исключённые затраты',
                 sprintf('Затрат исключено из ОПиУ (include_in_pl = false): %d шт.', $excluded),
                 $excluded,
+            );
+        }
+
+        // Проверка 6: контрольная сумма — информационно, для snapshot
+        if ($total > 0) {
+            $checks[] = PreflightCheck::ok(
+                'costs_control_sum',
+                'Контрольная сумма',
+                sprintf('Сумма затрат для ОПиУ (нетто): %s руб.', number_format((float) $netAmountForPl, 2, '.', ' ')),
+                $netAmountForPl,
             );
         }
 
