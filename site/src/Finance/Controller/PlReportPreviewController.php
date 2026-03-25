@@ -149,7 +149,7 @@ final class PlReportPreviewController extends AbstractController
      * Скачивает файл вида pl_report_2024-01-01_2024-03-31.json
      */
     #[Route('/finance/report/preview/json', name: 'finance_report_preview_json', methods: ['GET'])]
-    public function json(
+    public function exportJson(
         Request $request,
         ActiveCompanyService $activeCompany,
         PlReportGridBuilder $gridBuilder,
