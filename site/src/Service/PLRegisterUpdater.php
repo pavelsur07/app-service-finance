@@ -57,10 +57,6 @@ final class PLRegisterUpdater
 
         $this->em->flush();
 
-        // Пересчёт PL-регистра меняет источник данных для revenue/profit/top_pnl виджетов,
-        // поэтому после flush повышаем версию snapshot cache компании.
-        // Это важно для согласованности: новый snapshot key должен использоваться только
-        // когда пересчитанные агрегаты уже сохранены в БД.
         $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
@@ -97,9 +93,6 @@ final class PLRegisterUpdater
 
         $this->em->flush();
 
-        // recalcRange используется при массовом пересчёте интервала и меняет витрину для dashboard.
-        // Повышаем версию snapshot cache только после flush, чтобы новая версия кэша строилась
-        // на уже пересчитанных агрегатах, а не на промежуточном состоянии.
         $this->snapshotCacheInvalidator->invalidateForCompany($company);
     }
 
@@ -138,9 +131,17 @@ final class PLRegisterUpdater
                     continue;
                 }
 
+                // FIX: если проект не указан на операции — берём проект документа.
+                // Ранее операции без projectDirection молча пропускались через continue,
+                // из-за чего документы ОПиУ без проекта на операции не попадали в PLDailyTotal
+                // и, как следствие, не отображались в отчёте /finance/report/preview.
                 $project = method_exists($operation, 'getProjectDirection')
                     ? $operation->getProjectDirection()
                     : null;
+
+                if (!$project instanceof ProjectDirection) {
+                    $project = $document->getProjectDirection();
+                }
 
                 if (!$project instanceof ProjectDirection) {
                     continue;
