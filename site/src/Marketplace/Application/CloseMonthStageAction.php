@@ -14,6 +14,7 @@ use App\Marketplace\Application\Source\MarketplaceDataSourceInterface;
 use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -25,7 +26,8 @@ use Ramsey\Uuid\Uuid;
  *   1. Повторный Preflight (защита от race condition)
  *   2. Найти или создать MarketplaceMonthClose
  *   3. Для каждого Source этапа — агрегировать → создать PLDocument → пометить обработанными
- *   4. Закрыть этап в MarketplaceMonthClose
+ *   4. [COSTS only] Контрольная сумма — сверить PLDocument с marketplace_costs
+ *   5. Закрыть этап в MarketplaceMonthClose
  *
  * Не использует ActiveCompanyService — companyId через Command.
  * Worker-safe.
@@ -37,6 +39,7 @@ final class CloseMonthStageAction
         private readonly MonthClosePreflightAction       $preflightAction,
         private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
         private readonly FinanceFacade                   $financeFacade,
+        private readonly UnprocessedCostsQuery           $unprocessedCostsQuery,
         private readonly LoggerInterface                 $logger,
         private readonly iterable                        $dataSources,
     ) {
@@ -141,6 +144,17 @@ final class CloseMonthStageAction
 
         // Создаём один документ для всех Source-ов этапа
         if (!empty($allPlEntries)) {
+            // Контрольная сумма ДО создания документа (только для COSTS)
+            $controlSumBefore = null;
+            if ($stage === CloseStage::COSTS) {
+                $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
+                    $command->companyId,
+                    $command->marketplace,
+                    $periodFrom,
+                    $periodTo,
+                );
+            }
+
             $documentId = $this->financeFacade->createPLDocument(
                 companyId:  $command->companyId,
                 source:     $source,
@@ -159,6 +173,41 @@ final class CloseMonthStageAction
                     $periodFrom,
                     $periodTo,
                 );
+            }
+
+            // Контрольная сумма строк PLDocument vs marketplace_costs (только для COSTS)
+            if ($stage === CloseStage::COSTS && $controlSumBefore !== null) {
+                $plDocumentSum = array_reduce(
+                    $allPlEntries,
+                    static function (string $carry, PLEntryDTO $entry): string {
+                        // Сторно (is_negative=false для затрат) уменьшает сумму
+                        if (!$entry->isNegative) {
+                            return bcsub($carry, $entry->amount, 2);
+                        }
+                        return bcadd($carry, $entry->amount, 2);
+                    },
+                    '0',
+                );
+
+                $delta = abs((float) $controlSumBefore - (float) $plDocumentSum);
+
+                if ($delta > 0.01) {
+                    // Критическая ошибка — откатываем через удаление документа
+                    $this->financeFacade->deletePLDocument($command->companyId, $documentId);
+
+                    throw new \RuntimeException(sprintf(
+                        '[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.',
+                        $controlSumBefore,
+                        $plDocumentSum,
+                        $delta,
+                    ));
+                }
+
+                $this->logger->info('[MonthClose] Control sum verified', [
+                    'control_sum_costs'    => $controlSumBefore,
+                    'control_sum_document' => $plDocumentSum,
+                    'delta'                => $delta,
+                ]);
             }
 
             $plDocumentIds[] = $documentId;
