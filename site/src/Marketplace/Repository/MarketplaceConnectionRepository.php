@@ -63,12 +63,16 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
         string $companyId,
         MarketplaceType $marketplace,
     ): ?MarketplaceConnection {
-        return $this->createQueryBuilder('c')
-            ->where('c.company = :companyId')
-            ->andWhere('c.marketplace = :marketplace')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('marketplace', $marketplace)
-            ->getQuery()
-            ->getOneOrNullResult();
+        $conn = $this->getEntityManager()->getConnection();
+        $id   = $conn->fetchOne(
+            'SELECT id FROM marketplace_connections WHERE company_id = :companyId AND marketplace = :marketplace LIMIT 1',
+            ['companyId' => $companyId, 'marketplace' => $marketplace->value],
+        );
+
+        if (!$id) {
+            return null;
+        }
+
+        return $this->find($id);
     }
 }
