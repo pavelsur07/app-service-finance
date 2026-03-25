@@ -15,6 +15,7 @@ use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -36,12 +37,13 @@ final class CloseMonthStageAction
 {
     /** @param iterable<MarketplaceDataSourceInterface> $dataSources */
     public function __construct(
-        private readonly MonthClosePreflightAction       $preflightAction,
-        private readonly MarketplaceMonthCloseRepository $monthCloseRepository,
-        private readonly FinanceFacade                   $financeFacade,
-        private readonly UnprocessedCostsQuery           $unprocessedCostsQuery,
-        private readonly LoggerInterface                 $logger,
-        private readonly iterable                        $dataSources,
+        private readonly MonthClosePreflightAction          $preflightAction,
+        private readonly MarketplaceMonthCloseRepository    $monthCloseRepository,
+        private readonly MarketplaceConnectionRepository    $connectionRepository,
+        private readonly FinanceFacade                      $financeFacade,
+        private readonly UnprocessedCostsQuery              $unprocessedCostsQuery,
+        private readonly LoggerInterface                    $logger,
+        private readonly iterable                           $dataSources,
     ) {
     }
 
@@ -101,11 +103,21 @@ final class CloseMonthStageAction
         }
 
         // 3. Собрать entries со всех Source-ов этапа → один PLDocument
-        $plDocumentIds = [];
-        $source        = $this->resolveSource($marketplace);
-        $stream        = $this->resolveStream($stage);
-        $allPlEntries  = [];
-        $sourcesUsed   = [];
+        $plDocumentIds    = [];
+        $source           = $this->resolveSource($marketplace);
+        $stream           = $this->resolveStream($stage);
+        $allPlEntries     = [];
+        $sourcesUsed      = [];
+
+        // Читаем проект ОПиУ из настроек подключения маркетплейса
+        $projectDirectionId = null;
+        $connection = $this->connectionRepository->findOneBy([
+            'companyId'   => $command->companyId,
+            'marketplace' => $marketplace,
+        ]);
+        if ($connection !== null) {
+            $projectDirectionId = $connection->getProjectDirectionId();
+        }
 
         foreach ($this->getSourcesForStage($stage, $marketplace) as $dataSource) {
             $entries = $dataSource->getUnprocessedEntries(
@@ -125,7 +137,7 @@ final class CloseMonthStageAction
             foreach ($entries as $row) {
                 $allPlEntries[] = new PLEntryDTO(
                     plCategoryId: $row['pl_category_id'],
-                    projectId:    $row['project_direction_id'] ?? null,
+                    projectId:    $row['project_direction_id'] ?? $projectDirectionId,
                     amount:       $row['total_amount'],
                     periodDate:   $periodTo,
                     description:  $row['description_template'] ?? $row['description'] ?? $dataSource->getLabel(),
@@ -156,12 +168,13 @@ final class CloseMonthStageAction
             }
 
             $documentId = $this->financeFacade->createPLDocument(
-                companyId:  $command->companyId,
-                source:     $source,
-                stream:     $stream,
-                periodFrom: $periodFrom,
-                periodTo:   $periodTo,
-                entries:    $allPlEntries,
+                companyId:          $command->companyId,
+                source:             $source,
+                stream:             $stream,
+                periodFrom:         $periodFrom,
+                periodTo:           $periodTo,
+                entries:            $allPlEntries,
+                projectDirectionId: $projectDirectionId,
             );
 
             // Помечаем обработанными все Source-ы

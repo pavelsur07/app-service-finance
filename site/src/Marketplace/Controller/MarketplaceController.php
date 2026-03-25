@@ -18,6 +18,7 @@ use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
@@ -42,6 +43,7 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceAdapterRegistry       $adapterRegistry,
         private readonly MarketplaceRawProcessorRegistry  $processorRegistry,
         private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
+        private readonly ProjectDirectionRepository       $projectDirectionRepository,
         private readonly EntityManagerInterface           $em,
         private readonly MessageBusInterface              $messageBus,
         private readonly ReprocessMarketplacePeriodAction $reprocessAction,
@@ -680,5 +682,51 @@ class MarketplaceController extends AbstractController
         }
 
         return $months;
+    }
+
+    /**
+     * Редактирование настроек подключения — API ключ, проект ОПиУ.
+     *
+     * GET  /marketplace/connection/{id}/edit  — форма
+     * POST /marketplace/connection/{id}/edit  — сохранение
+     */
+    #[Route('/connection/{id}/edit', name: 'marketplace_connection_edit', methods: ['GET', 'POST'])]
+    public function editConnection(string $id, Request $request): Response
+    {
+        $company    = $this->companyService->getActiveCompany();
+        $connection = $this->connectionRepository->find($id);
+
+        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+            throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if ($request->isMethod('POST')) {
+            $apiKey    = trim((string) $request->request->get('api_key', ''));
+            $clientId  = trim((string) $request->request->get('client_id', '')) ?: null;
+            $projectId = trim((string) $request->request->get('project_direction_id', '')) ?: null;
+
+            if ($apiKey !== '') {
+                $connection->setApiKey($apiKey);
+            }
+            $connection->setClientId($clientId);
+            $connection->setProjectDirectionId($projectId);
+
+            $this->em->flush();
+
+            $this->addFlash('success', 'Настройки подключения сохранены');
+
+            return $this->redirectToRoute('marketplace_index');
+        }
+
+        // Список проектов для выбора
+        $projectDirections = $this->projectDirectionRepository->findBy(
+            ['company' => $company],
+            ['sort' => 'ASC', 'name' => 'ASC'],
+        );
+
+        return $this->render('marketplace/connection/edit.html.twig', [
+            'connection'         => $connection,
+            'project_directions' => $projectDirections,
+        ]);
     }
 }

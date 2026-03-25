@@ -195,6 +195,26 @@ class MarketplaceConnection
         return $this;
     }
 
+    /**
+     * UUID проекта ОПиУ для данного маркетплейса.
+     * Хранится в settings['project_direction_id'].
+     * Используется при закрытии месяца для проставления проекта в PLDocument.
+     */
+    public function getProjectDirectionId(): ?string
+    {
+        return $this->settings['project_direction_id'] ?? null;
+    }
+
+    public function setProjectDirectionId(?string $projectDirectionId): self
+    {
+        $settings = $this->settings ?? [];
+        $settings['project_direction_id'] = $projectDirectionId;
+        $this->settings  = $settings;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;

@@ -32,13 +32,13 @@ final class FinanceFacade
     /**
      * Создаёт документ ОПиУ с набором строк.
      *
-     * @param string           $companyId  UUID компании
-     * @param PLDocumentSource $source     Источник данных (WB, Ozon, manual...)
-     * @param PLDocumentStream $stream     Поток (revenue, costs, storno)
-     * @param string           $periodFrom Начало периода (Y-m-d)
-     * @param string           $periodTo   Конец периода (Y-m-d)
-     * @param array            $entries    Массив PLEntryDTO[] с полями:
-     *                                     plCategoryId, projectId, amount, description, isNegative, sortOrder
+     * @param string           $companyId          UUID компании
+     * @param PLDocumentSource $source             Источник данных (WB, Ozon, manual...)
+     * @param PLDocumentStream $stream             Поток (revenue, costs, storno)
+     * @param string           $periodFrom         Начало периода (Y-m-d)
+     * @param string           $periodTo           Конец периода (Y-m-d)
+     * @param array            $entries            Массив PLEntryDTO[]
+     * @param string|null      $projectDirectionId UUID проекта ОПиУ для документа и строк (nullable)
      *
      * @return string documentId (UUID созданного документа)
      */
@@ -49,6 +49,7 @@ final class FinanceFacade
         string $periodFrom,
         string $periodTo,
         array $entries,
+        ?string $projectDirectionId = null,
     ): string {
         $description = sprintf(
             '%s | %s | %s – %s',
@@ -59,36 +60,36 @@ final class FinanceFacade
         );
 
         // Трансформируем PLEntryDTO[] → CreatePLDocumentOperationCommand[]
+        // Проект строки: берём из PLEntryDTO.projectId, fallback — проект документа
         $operations = [];
         foreach ($entries as $entry) {
             $amount = $entry->amount;
 
-            // Применяем знак: isNegative → инвертируем сумму
             if ($entry->isNegative) {
                 $amount = bcmul($amount, '-1', 2);
             }
 
             $operations[] = new CreatePLDocumentOperationCommand(
-                amount: $amount,
-                categoryId: $entry->plCategoryId,
-                counterpartyId: null,
-                projectDirectionId: $entry->projectId,
-                comment: $entry->description,
+                amount:             $amount,
+                categoryId:         $entry->plCategoryId,
+                counterpartyId:     null,
+                projectDirectionId: $entry->projectId ?? $projectDirectionId,
+                comment:            $entry->description,
             );
         }
 
         $command = new CreatePLDocumentCommand(
-            companyId: $companyId,
-            date: new \DateTimeImmutable($periodTo),
-            type: DocumentType::MARKETPLACE_PL,
-            status: DocumentStatus::ACTIVE,
-            number: null,
-            description: $description,
-            counterpartyId: null,
-            projectDirectionId: null,
-            operations: $operations,
-            source: $source,
-            stream: $stream,
+            companyId:          $companyId,
+            date:               new \DateTimeImmutable($periodTo),
+            type:               DocumentType::MARKETPLACE_PL,
+            status:             DocumentStatus::ACTIVE,
+            number:             null,
+            description:        $description,
+            counterpartyId:     null,
+            projectDirectionId: $projectDirectionId,
+            operations:         $operations,
+            source:             $source,
+            stream:             $stream,
         );
 
         return ($this->createAction)($command);
