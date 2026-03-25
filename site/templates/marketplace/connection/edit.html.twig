@@ -8,7 +8,7 @@
             <div class="row align-items-center">
                 <div class="col-auto">
                     <h2 class="page-title">
-                        Настройки подключения — {{ connection.marketplace.displayName }}
+                        Настройки — {{ connection.marketplace.displayName }}
                     </h2>
                 </div>
             </div>
@@ -17,27 +17,6 @@
         <div class="card">
             <div class="card-body">
                 <form method="POST" action="{{ path('marketplace_connection_edit', {id: connection.id}) }}">
-
-                    <div class="mb-3">
-                        <label class="form-label required">API Key</label>
-                        <input type="text"
-                               name="api_key"
-                               class="form-control"
-                               placeholder="Оставьте пустым чтобы не менять"
-                               autocomplete="off">
-                        <small class="text-muted">Текущий ключ скрыт. Введите новый только если хотите изменить.</small>
-                    </div>
-
-                    {% if connection.marketplace.value == 'ozon' %}
-                        <div class="mb-3">
-                            <label class="form-label">Client-Id</label>
-                            <input type="text"
-                                   name="client_id"
-                                   class="form-control"
-                                   value="{{ connection.clientId }}"
-                                   placeholder="Client-Id Ozon">
-                        </div>
-                    {% endif %}
 
                     <div class="mb-3">
                         <label class="form-label">Проект ОПиУ</label>

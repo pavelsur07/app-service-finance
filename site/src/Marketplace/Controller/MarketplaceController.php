@@ -701,19 +701,13 @@ class MarketplaceController extends AbstractController
         }
 
         if ($request->isMethod('POST')) {
-            $apiKey    = trim((string) $request->request->get('api_key', ''));
-            $clientId  = trim((string) $request->request->get('client_id', '')) ?: null;
             $projectId = trim((string) $request->request->get('project_direction_id', '')) ?: null;
 
-            if ($apiKey !== '') {
-                $connection->setApiKey($apiKey);
-            }
-            $connection->setClientId($clientId);
             $connection->setProjectDirectionId($projectId);
 
             $this->em->flush();
 
-            $this->addFlash('success', 'Настройки подключения сохранены');
+            $this->addFlash('success', 'Настройки сохранены');
 
             return $this->redirectToRoute('marketplace_index');
         }
