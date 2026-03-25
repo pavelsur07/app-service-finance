@@ -111,10 +111,10 @@ final class CloseMonthStageAction
 
         // Читаем проект ОПиУ из настроек подключения маркетплейса
         $projectDirectionId = null;
-        $connection = $this->connectionRepository->findOneBy([
-            'companyId'   => $command->companyId,
-            'marketplace' => $marketplace,
-        ]);
+        $connection = $this->connectionRepository->findByCompanyIdAndMarketplace(
+            $command->companyId,
+            $marketplace,
+        );
         if ($connection !== null) {
             $projectDirectionId = $connection->getProjectDirectionId();
         }

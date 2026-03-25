@@ -54,4 +54,21 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Найти подключение по UUID компании и маркетплейсу.
+     * Используется в worker-контексте где Company entity не загружена.
+     */
+    public function findByCompanyIdAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+    ): ?MarketplaceConnection {
+        return $this->createQueryBuilder('c')
+            ->where('c.company = :companyId')
+            ->andWhere('c.marketplace = :marketplace')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
 }
