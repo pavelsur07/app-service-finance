@@ -21,6 +21,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\Form\FormError;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -249,6 +250,62 @@ class DocumentController extends AbstractController
             'item' => $document,
             'transactionAllocation' => $transactionAllocation,
         ]);
+    }
+
+    #[Route('/{id}/json', name: 'document_export_json', methods: ['GET'])]
+    public function exportJson(Document $document, ActiveCompanyService $companyService): JsonResponse
+    {
+        $company = $companyService->getActiveCompany();
+        if ($document->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
+        $payload = [
+            'id' => $document->getId(),
+            'date' => $document->getDate()->format('Y-m-d'),
+            'number' => $document->getNumber(),
+            'description' => $document->getDescription(),
+            'type' => $document->getType()->value,
+            'status' => $document->getStatus()->value,
+            'source' => $document->getSource()?->value,
+            'stream' => $document->getStream()?->value,
+            'counterparty' => [
+                'id' => $document->getCounterparty()?->getId(),
+                'name' => $document->getCounterparty()?->getName(),
+            ],
+            'projectDirection' => [
+                'id' => $document->getProjectDirection()?->getId(),
+                'name' => $document->getProjectDirection()?->getName(),
+            ],
+            'operations' => [],
+        ];
+
+        foreach ($document->getOperations() as $operation) {
+            $payload['operations'][] = [
+                'id' => $operation->getId(),
+                'amount' => $operation->getAmount(),
+                'comment' => $operation->getComment(),
+                'category' => [
+                    'id' => $operation->getCategory()?->getId(),
+                    'name' => $operation->getCategory()?->getName(),
+                ],
+                'counterparty' => [
+                    'id' => $operation->getCounterparty()?->getId(),
+                    'name' => $operation->getCounterparty()?->getName(),
+                ],
+                'projectDirection' => [
+                    'id' => $operation->getProjectDirection()?->getId(),
+                    'name' => $operation->getProjectDirection()?->getName(),
+                ],
+            ];
+        }
+
+        $response = $this->json($payload, Response::HTTP_OK, [], [
+            'json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE,
+        ]);
+        $response->headers->set('Content-Disposition', sprintf('attachment; filename="document-%s.json"', $document->getId()));
+
+        return $response;
     }
 
     #[Route('/{id}/delete', name: 'document_delete', methods: ['POST'])]

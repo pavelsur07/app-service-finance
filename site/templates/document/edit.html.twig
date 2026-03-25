@@ -76,7 +76,12 @@
                     </div>
                     <button type="button" class="btn btn-sm btn-secondary add_item_link mt-2">+ Добавить операцию</button>
                 </div>
-                <button class="btn btn-primary">Сохранить</button>
+                <div class="d-flex gap-2">
+                    <button class="btn btn-primary">Сохранить</button>
+                    <a class="btn btn-outline-secondary" href="{{ path('document_export_json', {'id': item.id}) }}" target="_blank" rel="noopener">
+                        JSON
+                    </a>
+                </div>
                 {{ form_end(form) }}
             </div>
         </div>
