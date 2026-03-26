@@ -54,13 +54,12 @@ final class CostReconciliationQuery
               AND c.marketplace = :marketplace
               AND c.cost_date  >= :periodFrom
               AND c.cost_date  <= :periodTo
-            SQL,
-            [
-                'companyId'   => $companyId,
-                'marketplace' => $marketplace,
-                'periodFrom'  => $periodFrom,
-                'periodTo'    => $periodTo,
-            ],
+            SQL,            [
+            'companyId'   => $companyId,
+            'marketplace' => $marketplace,
+            'periodFrom'  => $periodFrom,
+            'periodTo'    => $periodTo,
+        ],
         );
 
         $apiNetAmount    = (float) ($apiStats['net_amount'] ?? 0);
@@ -68,11 +67,20 @@ final class CostReconciliationQuery
         $apiCostsAmount  = (float) ($apiStats['costs_amount'] ?? 0);
         $apiStornoAmount = (float) ($apiStats['storno_amount'] ?? 0);
 
+        // xlsx_total = сумма только расходных групп (отрицательные serviceGroup итоги)
+        // Исключаем доходные группы: Продажи, Компенсации и декомпенсации
+        $xlsxExpensesOnly = 0.0;
+        foreach ($reportResult['lines'] as $line) {
+            $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
+            // Берём только отрицательные строки (расходы)
+            if ($lineNet < 0) {
+                $xlsxExpensesOnly += $lineNet;
+            }
+        }
+        $xlsxTotal = abs($xlsxExpensesOnly);
+
         // Сопоставимая сумма — наша формула сверки
         $xlsxComparable = $apiNetAmount + $returnRevenue;
-
-        // xlsx total из отчёта
-        $xlsxTotal = abs((float) $reportResult['totalNet']);
 
         $delta  = round(abs($xlsxComparable) - $xlsxTotal, 2);
         $status = abs($delta) < 0.01 ? 'matched' : 'mismatch';

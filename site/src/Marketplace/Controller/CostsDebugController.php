@@ -371,6 +371,7 @@ final class CostsDebugController extends AbstractController
                     'total_expenses'   => $reportResult['totalExpenses'],
                     'total_storno'     => $reportResult['totalStorno'],
                     'total_net'        => $reportResult['totalNet'],
+                    'expenses_only'    => $reconciliation['xlsx_total'],
                     'lines_count'      => count($reportResult['lines']),
                     'by_service_group' => $this->aggregateByServiceGroup($reportResult['lines']),
                 ],
@@ -394,11 +395,21 @@ final class CostsDebugController extends AbstractController
         foreach ($lines as $line) {
             $group = $line['serviceGroup'] ?: 'Без группы';
             if (!isset($groups[$group])) {
-                $groups[$group] = ['serviceGroup' => $group, 'total' => 0.0, 'types' => []];
+                $groups[$group] = [
+                    'serviceGroup' => $group,
+                    'total'        => 0.0,
+                    'accruals'     => 0.0,
+                    'expenses'     => 0.0,
+                    'storno'       => 0.0,
+                    'types'        => [],
+                ];
             }
             $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
-            $groups[$group]['total'] = round($groups[$group]['total'] + $lineNet, 2);
-            $groups[$group]['types'][] = ['typeName' => $line['typeName'], 'net' => round($lineNet, 2)];
+            $groups[$group]['total']    = round($groups[$group]['total'] + $lineNet, 2);
+            $groups[$group]['accruals'] = round($groups[$group]['accruals'] + $line['accruals']['total'], 2);
+            $groups[$group]['expenses'] = round($groups[$group]['expenses'] + $line['expenses']['total'], 2);
+            $groups[$group]['storno']   = round($groups[$group]['storno'] + $line['storno']['total'], 2);
+            $groups[$group]['types'][]  = ['typeName' => $line['typeName'], 'net' => round($lineNet, 2)];
         }
         usort($groups, fn($a, $b) => $a['total'] <=> $b['total']);
         return array_values($groups);

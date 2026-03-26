@@ -121,22 +121,28 @@
                             <table class="table table-sm table-vcenter card-table">
                                 <thead>
                                 <tr>
-                                    <th>Группа</th>
+                                    <th>Группа / Тип</th>
+                                    <th class="text-end">Начисл.</th>
+                                    <th class="text-end">Расходы</th>
+                                    <th class="text-end">Сторно</th>
                                     <th class="text-end">Нетто</th>
                                 </tr>
                                 </thead>
                                 <tbody>
                                 {% for group in result.xlsx_report.by_service_group %}
-                                    <tr>
+                                    <tr class="{{ group.total > 0 ? 'table-success' : '' }}">
                                         <td>
-                                            <div>{{ group.serviceGroup }}</div>
+                                            <div class="fw-medium">{{ group.serviceGroup }}</div>
                                             <div class="text-muted small">
                                                 {% for t in group.types %}
-                                                    {{ t.typeName }}: {{ t.net|number_format(2, '.', ' ') }}{% if not loop.last %}, {% endif %}
+                                                    {{ t.typeName }}: {{ t.net|number_format(2, '.', ' ') }}{% if not loop.last %} · {% endif %}
                                                 {% endfor %}
                                             </div>
                                         </td>
-                                        <td class="text-end {{ group.total < 0 ? 'text-danger' : 'text-success' }}">
+                                        <td class="text-end text-success small">{{ group.accruals|number_format(2, '.', ' ') }}</td>
+                                        <td class="text-end text-danger small">{{ group.expenses|number_format(2, '.', ' ') }}</td>
+                                        <td class="text-end text-warning small">{{ group.storno|number_format(2, '.', ' ') }}</td>
+                                        <td class="text-end fw-medium {{ group.total < 0 ? 'text-danger' : 'text-success' }}">
                                             {{ group.total|number_format(2, '.', ' ') }}
                                         </td>
                                     </tr>
@@ -144,8 +150,9 @@
                                 </tbody>
                                 <tfoot>
                                 <tr class="fw-bold">
-                                    <td>Итого</td>
-                                    <td class="text-end">{{ result.xlsx_report.total_net|number_format(2, '.', ' ') }}</td>
+                                    <td>Итого расходных групп (xlsx_total)</td>
+                                    <td></td><td></td><td></td>
+                                    <td class="text-end">{{ result.xlsx_report.expenses_only|number_format(2, '.', ' ') }}</td>
                                 </tr>
                                 </tfoot>
                             </table>
