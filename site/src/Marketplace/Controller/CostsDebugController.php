@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
+use App\Marketplace\Application\Reconciliation\OzonReportParserFacade;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\CostReconciliationQuery;
 use App\Marketplace\Infrastructure\Query\CostsVerifyQuery;
 use App\Marketplace\Infrastructure\Query\RawOperationsAnalysisQuery;
 use App\Shared\Service\ActiveCompanyService;
@@ -36,6 +38,8 @@ final class CostsDebugController extends AbstractController
         private readonly ActiveCompanyService        $companyService,
         private readonly CostsVerifyQuery            $verifyQuery,
         private readonly RawOperationsAnalysisQuery  $rawOperationsQuery,
+        private readonly OzonReportParserFacade      $parserFacade,
+        private readonly CostReconciliationQuery     $reconciliationQuery,
         private readonly Connection                  $connection,
     ) {
     }
@@ -200,6 +204,204 @@ final class CostsDebugController extends AbstractController
                 'services'           => json_decode($r['services'] ?? '[]', true),
             ], $rows),
         ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Парсит загруженный xlsx и возвращает ReportResult без записи в БД.
+     * Используй для диагностики расхождений в сверке.
+     *
+     * POST /marketplace/costs/debug/xlsx-parse
+     * Form-data: xlsx_file=@file.xlsx
+     */
+    #[Route('/xlsx-parse', name: 'marketplace_costs_debug_xlsx_parse', methods: ['POST'])]
+    public function xlsxParse(Request $request): JsonResponse
+    {
+        $file = $request->files->get('xlsx_file');
+        if ($file === null) {
+            return $this->json(['error' => 'Файл не загружен. Передай xlsx_file в form-data.'], 400);
+        }
+
+        try {
+            $result = $this->parserFacade->parseFromPath($file->getPathname());
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Ошибка парсинга: ' . $e->getMessage()], 500);
+        }
+
+        return $this->json([
+            'meta' => [
+                'generated_at'   => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'hint'           => 'Это ReportResult из xlsx без записи в БД. Сравни totalNet с нашим xlsx_comparable из verify.',
+            ],
+            'report' => [
+                'period'         => $result['period'],
+                'total_accruals' => $result['totalAccruals'],
+                'total_expenses' => $result['totalExpenses'],
+                'total_storno'   => $result['totalStorno'],
+                'total_net'      => $result['totalNet'],
+                'lines_count'    => count($result['lines']),
+                'lines'          => array_map(static fn(array $l) => [
+                    'typeName'     => $l['typeName'],
+                    'serviceGroup' => $l['serviceGroup'],
+                    'baseSign'     => $l['baseSign'],
+                    'accruals'     => $l['accruals'],
+                    'expenses'     => $l['expenses'],
+                    'storno'       => $l['storno'],
+                    'zero'         => $l['zero'],
+                    'line_net'     => round(
+                        $l['accruals']['total'] + $l['expenses']['total'] + $l['storno']['total'],
+                        2
+                    ),
+                ], $result['lines']),
+            ],
+        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Детальное сравнение xlsx с API данными — показывает расхождение по каждой группе.
+     *
+     * POST /marketplace/costs/debug/reconcile-debug?marketplace=ozon&year=2026&month=2
+     * Form-data: xlsx_file=@file.xlsx
+     */
+    #[Route('/reconcile-debug', name: 'marketplace_costs_debug_reconcile_debug', methods: ['POST'])]
+    public function reconcileDebug(Request $request): JsonResponse
+    {
+        [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
+
+        $file = $request->files->get('xlsx_file');
+        if ($file === null) {
+            return $this->json(['error' => 'Файл не загружен. Передай xlsx_file в form-data.'], 400);
+        }
+
+        try {
+            $reportResult = $this->parserFacade->parseFromPath($file->getPathname());
+        } catch (\Throwable $e) {
+            return $this->json(['error' => 'Ошибка парсинга xlsx: ' . $e->getMessage()], 500);
+        }
+
+        $reconciliation = $this->reconciliationQuery->reconcile(
+            $companyId, $marketplace, $periodFrom, $periodTo, $reportResult,
+        );
+
+        // Детализация по группам xlsx vs наш verify
+        $verifyData = $this->verifyQuery->run($companyId, $marketplace, $periodFrom, $periodTo, null);
+
+        return $this->json([
+            'meta' => [
+                'marketplace'  => $marketplace,
+                'period'       => "{$periodFrom} – {$periodTo}",
+                'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ],
+            'reconciliation' => $reconciliation,
+            'xlsx_report' => [
+                'period'         => $reportResult['period'],
+                'total_accruals' => $reportResult['totalAccruals'],
+                'total_expenses' => $reportResult['totalExpenses'],
+                'total_storno'   => $reportResult['totalStorno'],
+                'total_net'      => $reportResult['totalNet'],
+                'xlsx_total_abs' => abs($reportResult['totalNet']),
+                'lines_count'    => count($reportResult['lines']),
+                'by_service_group' => $this->aggregateByServiceGroup($reportResult['lines']),
+            ],
+            'api_data' => [
+                'net_amount'         => $verifyData['grand_total']['net_amount'] ?? null,
+                'costs_amount'       => $verifyData['grand_total']['costs_amount'] ?? null,
+                'storno_amount'      => $verifyData['grand_total']['storno_amount'] ?? null,
+                'return_revenue'     => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
+                'xlsx_comparable'    => $reconciliation['xlsx_comparable'],
+            ],
+            'hint' => [
+                'formula'        => 'xlsx_comparable = api_net_amount + return_revenue_amount',
+                'delta_meaning'  => 'delta > 0: xlsx больше нашего comparable. delta < 0: xlsx меньше.',
+                'check_groups'   => 'Сравни by_service_group из xlsx с totals_by_category из verify.',
+            ],
+        ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
+    }
+
+    // -------------------------------------------------------------------------
+
+    /**
+     * Страница отладки сверки xlsx с API данными.
+     *
+     * GET  /marketplace/costs/debug/reconcile  — форма загрузки
+     * POST /marketplace/costs/debug/reconcile  — результат сверки на той же странице
+     */
+    #[Route('/reconcile', name: 'marketplace_costs_debug_reconcile_page', methods: ['GET', 'POST'])]
+    public function reconcilePage(Request $request): \Symfony\Component\HttpFoundation\Response
+    {
+        [$companyId, $marketplace, $year, $month, $periodFrom, $periodTo] = $this->resolveParams($request);
+
+        $templateVars = [
+            'active_tab'             => 'costs_debug',
+            'marketplace'            => $marketplace,
+            'available_marketplaces' => MarketplaceType::cases(),
+            'year'                   => $year,
+            'month'                  => $month,
+        ];
+
+        if ($request->isMethod('POST')) {
+            $file = $request->files->get('xlsx_file');
+
+            if ($file === null) {
+                $this->addFlash('error', 'Файл не загружен.');
+                return $this->render('@Marketplace/costs/reconciliation_debug.html.twig', $templateVars);
+            }
+
+            try {
+                $reportResult = $this->parserFacade->parseFromPath($file->getPathname());
+            } catch (\Throwable $e) {
+                $this->addFlash('error', 'Ошибка парсинга xlsx: ' . $e->getMessage());
+                return $this->render('@Marketplace/costs/reconciliation_debug.html.twig', $templateVars);
+            }
+
+            $reconciliation = $this->reconciliationQuery->reconcile(
+                $companyId, $marketplace, $periodFrom, $periodTo, $reportResult,
+            );
+
+            $verifyData = $this->verifyQuery->run($companyId, $marketplace, $periodFrom, $periodTo, null);
+
+            $templateVars['result'] = [
+                'reconciliation' => $reconciliation,
+                'xlsx_report'    => [
+                    'period'           => $reportResult['period'],
+                    'total_accruals'   => $reportResult['totalAccruals'],
+                    'total_expenses'   => $reportResult['totalExpenses'],
+                    'total_storno'     => $reportResult['totalStorno'],
+                    'total_net'        => $reportResult['totalNet'],
+                    'lines_count'      => count($reportResult['lines']),
+                    'by_service_group' => $this->aggregateByServiceGroup($reportResult['lines']),
+                ],
+                'api_data'       => [
+                    'net_amount'      => $verifyData['grand_total']['net_amount'] ?? null,
+                    'costs_amount'    => $verifyData['grand_total']['costs_amount'] ?? null,
+                    'storno_amount'   => $verifyData['grand_total']['storno_amount'] ?? null,
+                    'return_revenue'  => $verifyData['returns_reconciliation']['total_refund_amount'] ?? null,
+                    'xlsx_comparable' => $reconciliation['xlsx_comparable'],
+                ],
+                'api_categories' => $verifyData['totals_by_category'] ?? [],
+            ];
+        }
+
+        return $this->render('@Marketplace/costs/reconciliation_debug.html.twig', $templateVars);
+    }
+
+    private function aggregateByServiceGroup(array $lines): array
+    {
+        $groups = [];
+        foreach ($lines as $line) {
+            $group = $line['serviceGroup'] ?: 'Без группы';
+            if (!isset($groups[$group])) {
+                $groups[$group] = ['serviceGroup' => $group, 'total' => 0.0, 'types' => []];
+            }
+            $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
+            $groups[$group]['total'] = round($groups[$group]['total'] + $lineNet, 2);
+            $groups[$group]['types'][] = ['typeName' => $line['typeName'], 'net' => round($lineNet, 2)];
+        }
+        usort($groups, fn($a, $b) => $a['total'] <=> $b['total']);
+        return array_values($groups);
     }
 
     // -------------------------------------------------------------------------

@@ -1,0 +1,206 @@
+{% extends 'marketplace/layout.html.twig' %}
+
+{% set active_tab = 'costs_debug' %}
+
+{% block tab_content %}
+    <div class="container-xl">
+        <div class="page-header">
+            <div class="row align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Debug: Сверка затрат с xlsx</h2>
+                    <div class="text-muted mt-1">Парсинг файла и сравнение с API данными без записи в БД</div>
+                </div>
+            </div>
+        </div>
+
+        {# Форма загрузки #}
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">Загрузить отчёт Ozon</h3>
+            </div>
+            <div class="card-body">
+                <form method="POST"
+                      action="{{ path('marketplace_costs_debug_reconcile_page') }}"
+                      enctype="multipart/form-data">
+                    <div class="row g-3">
+                        <div class="col-md-3">
+                            <label class="form-label">Маркетплейс</label>
+                            <select name="marketplace" class="form-select">
+                                {% for mp in available_marketplaces %}
+                                    <option value="{{ mp.value }}"
+                                        {{ mp.value == marketplace ? 'selected' : '' }}>
+                                        {{ mp.displayName }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Год</label>
+                            <input type="number" name="year" class="form-control"
+                                   value="{{ year }}" min="2020" max="2099">
+                        </div>
+                        <div class="col-md-2">
+                            <label class="form-label">Месяц</label>
+                            <select name="month" class="form-select">
+                                {% for m in 1..12 %}
+                                    <option value="{{ m }}" {{ m == month ? 'selected' : '' }}>
+                                        {{ ['','Январь','Февраль','Март','Апрель','Май','Июнь',
+                                            'Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'][m] }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Файл xlsx <span class="text-muted">(Детализация начислений)</span></label>
+                            <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
+                        </div>
+                        <div class="col-md-1 d-flex align-items-end">
+                            <button type="submit" class="btn btn-primary w-100">Проверить</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if result is defined %}
+
+            {# Итог сверки #}
+            <div class="card mb-4 {{ result.reconciliation.status == 'matched' ? 'border-success' : 'border-warning' }}">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        {% if result.reconciliation.status == 'matched' %}
+                            <span class="text-success me-2">✓</span> Сверка: совпадает
+                        {% else %}
+                            <span class="text-warning me-2">⚠</span> Сверка: расхождение
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <div class="subheader mb-1">API нетто</div>
+                            <div class="h3">{{ result.reconciliation.api_net_amount|number_format(2, '.', ' ') }}</div>
+                            <div class="text-muted small">costs: {{ result.reconciliation.api_costs_amount|number_format(2, '.', ' ') }}
+                                / storno: {{ result.reconciliation.api_storno_amount|number_format(2, '.', ' ') }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="subheader mb-1">xlsx comparable (нетто + возвраты)</div>
+                            <div class="h3">{{ result.reconciliation.xlsx_comparable|number_format(2, '.', ' ') }}</div>
+                            <div class="text-muted small">возвраты: {{ result.reconciliation.return_revenue|number_format(2, '.', ' ') }}</div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="subheader mb-1">xlsx total (из файла)</div>
+                            <div class="h3">{{ result.reconciliation.xlsx_total|number_format(2, '.', ' ') }}</div>
+                            <div class="text-muted small">
+                                delta: <strong class="{{ result.reconciliation.delta == 0 ? 'text-success' : 'text-danger' }}">
+                                    {{ result.reconciliation.delta|number_format(2, '.', ' ') }}
+                                </strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3 text-muted small">
+                        Формула: <code>xlsx_comparable = api_net_amount + return_revenue</code>
+                        · Период xlsx: <strong>{{ result.xlsx_report.period }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+
+                {# Разбивка xlsx по serviceGroup #}
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h3 class="card-title">xlsx по группам (serviceGroup)</h3>
+                            <div class="card-options text-muted small">
+                                totalNet: {{ result.xlsx_report.total_net|number_format(2, '.', ' ') }}
+                                · строк: {{ result.xlsx_report.lines_count }}
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-vcenter card-table">
+                                <thead>
+                                <tr>
+                                    <th>Группа</th>
+                                    <th class="text-end">Нетто</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for group in result.xlsx_report.by_service_group %}
+                                    <tr>
+                                        <td>
+                                            <div>{{ group.serviceGroup }}</div>
+                                            <div class="text-muted small">
+                                                {% for t in group.types %}
+                                                    {{ t.typeName }}: {{ t.net|number_format(2, '.', ' ') }}{% if not loop.last %}, {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        </td>
+                                        <td class="text-end {{ group.total < 0 ? 'text-danger' : 'text-success' }}">
+                                            {{ group.total|number_format(2, '.', ' ') }}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                <tr class="fw-bold">
+                                    <td>Итого</td>
+                                    <td class="text-end">{{ result.xlsx_report.total_net|number_format(2, '.', ' ') }}</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {# API данные по категориям #}
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h3 class="card-title">API по категориям (marketplace_costs)</h3>
+                            <div class="card-options text-muted small">
+                                нетто: {{ result.api_data.net_amount }}
+                            </div>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-sm table-vcenter card-table">
+                                <thead>
+                                <tr>
+                                    <th>Категория</th>
+                                    <th class="text-end">Costs</th>
+                                    <th class="text-end">Storno</th>
+                                    <th class="text-end">Нетто</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for cat in result.api_categories %}
+                                    <tr>
+                                        <td>
+                                            <div>{{ cat.category_name }}</div>
+                                            <div class="text-muted small">{{ cat.category_code }}</div>
+                                        </td>
+                                        <td class="text-end text-danger">{{ cat.costs_amount }}</td>
+                                        <td class="text-end text-success">{{ cat.storno_amount }}</td>
+                                        <td class="text-end fw-medium">{{ cat.net_amount }}</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                                <tfoot>
+                                <tr class="fw-bold">
+                                    <td>Итого</td>
+                                    <td class="text-end text-danger">{{ result.api_data.costs_amount }}</td>
+                                    <td class="text-end text-success">{{ result.api_data.storno_amount }}</td>
+                                    <td class="text-end">{{ result.api_data.net_amount }}</td>
+                                </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+        {% endif %}
+
+    </div>
+{% endblock %}
