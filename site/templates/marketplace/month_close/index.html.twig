@@ -79,6 +79,55 @@
                                         Закрыт: {{ month_close.stageCostsClosedAt|date('d.m.Y H:i') }}
                                     </div>
                                     {% set docIds = month_close.stageCostsPLDocumentIds %}
+
+                                    {# Блок сверки с xlsx (только для COSTS) #}
+                                    {% set reconciliation = month_close.costsReconciliation %}
+                                    {% if reconciliation %}
+                                        {% if reconciliation.status == 'matched' %}
+                                            <div class="alert alert-success alert-sm py-2 mb-3">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2">✓</span>
+                                                    <div>
+                                                        <div class="fw-medium">Сверка с xlsx: совпадает</div>
+                                                        <div class="text-muted small">
+                                                            API: {{ reconciliation.xlsx_comparable|number_format(2, '.', ' ') }} руб. ·
+                                                            xlsx: {{ reconciliation.xlsx_total|number_format(2, '.', ' ') }} руб. ·
+                                                            delta: {{ reconciliation.delta|number_format(2, '.', ' ') }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% else %}
+                                            <div class="alert alert-warning alert-sm py-2 mb-3">
+                                                <div class="d-flex align-items-center">
+                                                    <span class="me-2">⚠</span>
+                                                    <div>
+                                                        <div class="fw-medium">Сверка с xlsx: расхождение</div>
+                                                        <div class="text-muted small">
+                                                            Delta: {{ reconciliation.delta|number_format(2, '.', ' ') }} руб.
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="mb-3">
+                                            <form method="post"
+                                                  action="{{ path('marketplace_month_close_reconcile') }}"
+                                                  enctype="multipart/form-data">
+                                                <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                                <input type="hidden" name="year" value="{{ year }}">
+                                                <input type="hidden" name="month" value="{{ month }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="file" name="xlsx_file" class="form-control form-control-sm" accept=".xlsx" required>
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                        Сверить с xlsx
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Загрузите отчёт «Детализация начислений» из ЛК Ozon</small>
+                                            </form>
+                                        </div>
+                                    {% endif %}
                                 {% endif %}
 
                                 {% if docIds %}
@@ -144,6 +193,7 @@
                         <th>Период</th>
                         <th>Продажи / Возвраты</th>
                         <th>Затраты</th>
+                        <th>Сверка</th>
                     </tr>
                     </thead>
                     <tbody>
@@ -178,6 +228,29 @@
                                     <span class="badge bg-warning-lt">Переоткрыт</span>
                                 {% else %}
                                     <span class="badge bg-secondary-lt">Не закрыт</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if mc.stageCostsStatus.value == 'closed' %}
+                                    {% if mc.hasCostsReconciliation %}
+                                        {% if mc.costsReconciliationStatus == 'matched' %}
+                                            <span class="text-success" title="Сверка выполнена: данные совпадают">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M5 12l5 5l10 -10"/></svg>
+                                            </span>
+                                        {% else %}
+                                            <span class="text-warning" title="Сверка выполнена: есть расхождение">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></svg>
+                                            </span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-warning"
+                                              title="Период закрыт без сверки с xlsx">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm" width="16" height="16" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path d="M12 16h.01"/></svg>
+                                            <span class="text-muted small ms-1">Без сверки</span>
+                                        </span>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                         </tr>

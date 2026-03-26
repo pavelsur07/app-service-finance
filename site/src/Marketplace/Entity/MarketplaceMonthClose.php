@@ -85,6 +85,18 @@ class MarketplaceMonthClose
 
     // --- Служебные поля ---
 
+    /**
+     * Произвольные настройки периода закрытия.
+     * Используется для хранения результата сверки с xlsx без новой миграции.
+     *
+     * Структура costs_reconciliation:
+     *   status: matched | mismatch
+     *   api_net_amount, xlsx_total, delta
+     *   file_path, reconciled_at
+     */
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $settings = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -216,6 +228,31 @@ class MarketplaceMonthClose
     public function getStageCostsStatus(): MonthCloseStageStatus { return $this->stageCostsStatus; }
     public function getStageCostsClosedAt(): ?\DateTimeImmutable { return $this->stageCostsClosedAt; }
     public function getStageCostsPLDocumentIds(): ?array { return $this->stageCostsPLDocumentIds; }
+
+    // --- Сверка с xlsx ---
+
+    public function getCostsReconciliation(): ?array
+    {
+        return $this->settings['costs_reconciliation'] ?? null;
+    }
+
+    public function setCostsReconciliation(array $reconciliation): void
+    {
+        $settings = $this->settings ?? [];
+        $settings['costs_reconciliation'] = $reconciliation;
+        $this->settings  = $settings;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function hasCostsReconciliation(): bool
+    {
+        return isset($this->settings['costs_reconciliation']);
+    }
+
+    public function getCostsReconciliationStatus(): ?string
+    {
+        return $this->settings['costs_reconciliation']['status'] ?? null;
+    }
 
     // --- Private helpers ---
 
