@@ -442,9 +442,12 @@ final class CostsDebugController extends AbstractController
         $company   = $this->companyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $marketplace = $request->query->get('marketplace') ?: MarketplaceType::OZON->value;
-        $year        = (int) $request->query->get('year', date('Y'));
-        $month       = (int) $request->query->get('month', date('n'));
+        // При POST читаем из request (form), при GET — из query
+        $get = $request->isMethod('POST') ? $request->request : $request->query;
+
+        $marketplace = $get->get('marketplace') ?: MarketplaceType::OZON->value;
+        $year        = (int) $get->get('year', date('Y'));
+        $month       = (int) $get->get('month', date('n'));
 
         if (MarketplaceType::tryFrom($marketplace) === null) {
             $marketplace = MarketplaceType::OZON->value;
