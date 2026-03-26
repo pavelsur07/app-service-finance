@@ -78,9 +78,9 @@ class CompanyMemberRepository extends ServiceEntityRepository
 
     public function findFirstActiveCompanyForUser(User $user): ?Company
     {
-        $company = $this->createQueryBuilder('companyMember')
-            ->select('company')
+        $companyMember = $this->createQueryBuilder('companyMember')
             ->innerJoin('companyMember.company', 'company')
+            ->addSelect('company')
             ->andWhere('companyMember.user = :user')
             ->andWhere('companyMember.status = :status')
             ->setParameter('user', $user)
@@ -90,8 +90,8 @@ class CompanyMemberRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
 
-        if ($company instanceof Company) {
-            return $company;
+        if ($companyMember instanceof CompanyMember) {
+            return $companyMember->getCompany();
         }
 
         return null;
