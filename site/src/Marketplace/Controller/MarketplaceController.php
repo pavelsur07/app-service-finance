@@ -22,7 +22,6 @@ use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\QueryBuilder;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
@@ -62,9 +61,7 @@ class MarketplaceController extends AbstractController
         $connections = $this->connectionRepository->findByCompany($company);
         $qb          = $this->rawDocumentsListQuery->buildQueryBuilder($company);
 
-        $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
-            $qb->select('COUNT(d.id)')->resetDQLPart('orderBy');
-        });
+        $adapter = new QueryAdapter($qb);
 
         $rawDocumentsPager = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
