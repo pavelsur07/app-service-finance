@@ -55,15 +55,13 @@ COPY ./docker/common/wait-for-it.sh /usr/local/bin/wait-for-it
 RUN chmod 555 /usr/local/bin/wait-for-it
 
 # supercronic — запекаем в образ, чтобы scheduler не скачивал бинарник при каждом старте
-ENV SUPERCRONIC_VERSION="0.2.31"
-RUN wget -qO /tmp/supercronic-linux-amd64 \
+ENV SUPERCRONIC_VERSION="0.2.31" \
+    SUPERCRONIC_SHA1SUM="fb4242e9d28528a76b70d878dbf69fe8d94ba7d2"
+
+RUN wget -qO /usr/local/bin/supercronic \
         "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-amd64" \
-    && wget -qO /tmp/supercronic.sha256 \
-        "https://github.com/aptible/supercronic/releases/download/v${SUPERCRONIC_VERSION}/supercronic-linux-amd64.sha256" \
-    && (cd /tmp && sha256sum -c supercronic.sha256) \
-    && mv /tmp/supercronic-linux-amd64 /usr/local/bin/supercronic \
-    && chmod +x /usr/local/bin/supercronic \
-    && rm /tmp/supercronic.sha256
+    && echo "${SUPERCRONIC_SHA1SUM}  /usr/local/bin/supercronic" | sha1sum -c - \
+    && chmod +x /usr/local/bin/supercronic
 
 # Пользователь app (uid=1000) добавляем в группу www-data (group-write на 0775)
 RUN adduser -u 1000 -G www-data -s /bin/sh -D app
