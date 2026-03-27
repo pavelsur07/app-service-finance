@@ -67,14 +67,21 @@ final class CostReconciliationQuery
         $apiCostsAmount  = (float) ($apiStats['costs_amount'] ?? 0);
         $apiStornoAmount = (float) ($apiStats['storno_amount'] ?? 0);
 
-        // xlsx_total = сумма только расходных групп (отрицательные serviceGroup итоги)
-        // Исключаем доходные группы: Продажи, Компенсации и декомпенсации
-        $xlsxExpensesOnly = 0.0;
+        // xlsx_total = сумма отрицательных serviceGroup итогов
+        // Считаем нетто по каждой группе, берём только отрицательные группы.
+        // Это соответствует логике xlsx: расходные группы имеют отрицательный итог.
+        // Доходные группы (Продажи, Компенсации с положительным итогом) исключаются автоматически.
+        $groupTotals = [];
         foreach ($reportResult['lines'] as $line) {
+            $group   = $line['serviceGroup'] ?: 'Без группы';
             $lineNet = $line['accruals']['total'] + $line['expenses']['total'] + $line['storno']['total'];
-            // Берём только отрицательные строки (расходы)
-            if ($lineNet < 0) {
-                $xlsxExpensesOnly += $lineNet;
+            $groupTotals[$group] = ($groupTotals[$group] ?? 0.0) + $lineNet;
+        }
+
+        $xlsxExpensesOnly = 0.0;
+        foreach ($groupTotals as $groupNet) {
+            if ($groupNet < 0) {
+                $xlsxExpensesOnly += $groupNet;
             }
         }
         $xlsxTotal = abs($xlsxExpensesOnly);
