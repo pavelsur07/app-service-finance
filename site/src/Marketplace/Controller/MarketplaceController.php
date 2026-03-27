@@ -13,6 +13,7 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
+use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -21,6 +22,7 @@ use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\ORM\QueryBuilder;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;
 use Pagerfanta\Pagerfanta;
 use Ramsey\Uuid\Uuid;
@@ -43,6 +45,7 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceAdapterRegistry       $adapterRegistry,
         private readonly MarketplaceRawProcessorRegistry  $processorRegistry,
         private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
+        private readonly RawDocumentsListQuery            $rawDocumentsListQuery,
         private readonly ProjectDirectionRepository       $projectDirectionRepository,
         private readonly EntityManagerInterface           $em,
         private readonly MessageBusInterface              $messageBus,
@@ -51,16 +54,27 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('', name: 'marketplace_index')]
-    public function index(): Response
+    public function index(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $page    = max(1, $request->query->getInt('page', 1));
 
-        $connections  = $this->connectionRepository->findByCompany($company);
-        $rawDocuments = $this->rawDocumentRepository->findByCompany($company, 50);
+        $connections = $this->connectionRepository->findByCompany($company);
+        $qb          = $this->rawDocumentsListQuery->buildQueryBuilder($company);
+
+        $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
+            $qb->select('COUNT(d.id)')->resetDQLPart('orderBy');
+        });
+
+        $rawDocumentsPager = Pagerfanta::createForCurrentPageWithMaxPerPage(
+            $adapter,
+            $page,
+            50,
+        );
 
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,
-            'rawDocuments'          => $rawDocuments,
+            'rawDocumentsPager'     => $rawDocumentsPager,
             'availableMarketplaces' => MarketplaceType::cases(),
         ]);
     }

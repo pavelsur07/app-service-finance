@@ -133,12 +133,12 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% if rawDocuments is empty %}
+                    {% if rawDocumentsPager.nbResults == 0 %}
                         <tr>
                             <td colspan="8" class="text-center text-muted">Нет данных</td>
                         </tr>
                     {% else %}
-                        {% for doc in rawDocuments %}
+                        {% for doc in rawDocumentsPager.currentPageResults %}
                             <tr>
                                 <td><span class="badge bg-azure text-azure-fg">{{ doc.marketplace.displayName }}</span></td>
                                 <td>{{ doc.documentType }}</td>
@@ -192,6 +192,13 @@
                     </tbody>
                 </table>
             </div>
+            {% if rawDocumentsPager.haveToPaginate %}
+                <div class="card-footer d-flex align-items-center">
+                    {% include 'partials/_pagerfanta.html.twig' with {
+                        'pager': rawDocumentsPager
+                    } %}
+                </div>
+            {% endif %}
         </div>
 
     </div>
