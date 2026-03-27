@@ -55,12 +55,17 @@ final readonly class InventoryCostListingQuery
             ->leftJoin('l', 'products', 'p', 'p.id = l.product_id')
             ->leftJoin(
                 'l',
-                'marketplace_inventory_cost_prices',
+                // DISTINCT ON гарантирует одну строку на листинг — последнюю активную цену.
+                // Без этого листинг дублировался бы при наличии нескольких записей себестоимости
+                // с пересекающимися диапазонами (например, два ряда с effective_to IS NULL).
+                '(SELECT DISTINCT ON (listing_id)
+                      listing_id, company_id, price_amount, price_currency, effective_from
+                  FROM marketplace_inventory_cost_prices
+                  WHERE effective_from <= :today
+                    AND (effective_to IS NULL OR effective_to >= :today)
+                  ORDER BY listing_id, effective_from DESC)',
                 'ic',
-                'ic.listing_id = l.id
-                 AND ic.company_id = l.company_id
-                 AND ic.effective_from <= :today
-                 AND (ic.effective_to IS NULL OR ic.effective_to >= :today)',
+                'ic.listing_id = l.id AND ic.company_id = l.company_id',
             )
             ->where('l.company_id = :companyId')
             ->orderBy('l.marketplace', 'ASC')
