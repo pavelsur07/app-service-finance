@@ -55,7 +55,6 @@ final class OzonXlsxServiceGroupMap
             'ozon_return_from_stock'     => 'Услуги FBO',
             'ozon_supply_additional'     => 'Услуги FBO',
             'ozon_storage'               => 'Услуги FBO',
-            'ozon_fulfillment'           => 'Услуги FBO',
             'ozon_logistic_pickup'       => 'Услуги FBO',   // Вывоз товара со склада силами Ozon: Доставка до ПВЗ
 
             // === Услуги партнёров ===
@@ -67,6 +66,7 @@ final class OzonXlsxServiceGroupMap
             'ozon_return_pvz'            => 'Услуги партнёров',
             'ozon_storage_partner'       => 'Услуги партнёров',
             'ozon_acquiring'             => 'Услуги партнёров',
+            'ozon_fulfillment'           => 'Услуги партнёров',  // Обработка отправления Drop-off партнёрами (АПВЗ)
 
             // === Другие услуги и штрафы ===
             // Типы: Утилизация товара (все виды), Модерация запрещённого контента,
