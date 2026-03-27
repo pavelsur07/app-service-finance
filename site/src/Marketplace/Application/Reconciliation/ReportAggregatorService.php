@@ -15,12 +15,17 @@ final class ReportAggregatorService
      */
     public function aggregate(string $period, array $classifiedRows, array $baseSignMap): array
     {
-        $lines = [];
+        $lines  = [];
+        $groups = []; // serviceGroup → raw sum (без классификатора)
 
         foreach ($classifiedRows as $row) {
             $typeName = $row['typeName'];
             $amount   = (float) $row['amount'];
             $class    = $row['class'];
+            $group    = $row['serviceGroup'] ?: 'Без группы';
+
+            // Сырая сумма по группе — без классификатора, просто sum(amount)
+            $groups[$group] = ($groups[$group] ?? 0.0) + $amount;
 
             if (!isset($lines[$typeName])) {
                 $lines[$typeName] = [
@@ -66,12 +71,13 @@ final class ReportAggregatorService
         unset($line);
 
         return [
-            'period'        => $period,
-            'lines'         => $lines,
-            'totalAccruals' => round($totalAccruals, 2),
-            'totalExpenses' => round($totalExpenses, 2),
-            'totalStorno'   => round($totalStorno, 2),
-            'totalNet'      => round($totalAccruals + $totalExpenses + $totalStorno, 2),
+            'period'                  => $period,
+            'lines'                   => $lines,
+            'totalAccruals'           => round($totalAccruals, 2),
+            'totalExpenses'           => round($totalExpenses, 2),
+            'totalStorno'             => round($totalStorno, 2),
+            'totalNet'                => round($totalAccruals + $totalExpenses + $totalStorno, 2),
+            'groupNetByServiceGroup'  => array_map(fn($v) => round($v, 2), $groups),
         ];
     }
 }

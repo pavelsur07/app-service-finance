@@ -207,6 +207,53 @@
 
             </div>
 
+            {% if result.reconciliation.group_comparison is defined and result.reconciliation.group_comparison %}
+                <div class="card mt-4">
+                    <div class="card-header">
+                        <h3 class="card-title">Сверка по группам (serviceGroup)</h3>
+                        <div class="card-options text-muted small">xlsx группы vs наши категории</div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th>Группа xlsx</th>
+                                <th class="text-end">xlsx нетто</th>
+                                <th class="text-end">API costs</th>
+                                <th class="text-end">API storno</th>
+                                <th class="text-end">API нетто</th>
+                                <th class="text-end">Delta</th>
+                                <th>Статус</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for row in result.reconciliation.group_comparison %}
+                                <tr class="{{ row.status == 'mismatch' ? 'table-warning' : '' }}">
+                                    <td class="fw-medium">{{ row.service_group }}</td>
+                                    <td class="text-end {{ row.xlsx_net < 0 ? 'text-danger' : 'text-success' }}">
+                                        {{ row.xlsx_net|number_format(2, '.', ' ') }}
+                                    </td>
+                                    <td class="text-end text-danger small">{{ row.api_costs|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end text-success small">{{ row.api_storno|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end fw-medium">{{ row.api_net|number_format(2, '.', ' ') }}</td>
+                                    <td class="text-end {{ row.delta != 0 ? 'text-danger fw-bold' : 'text-success' }}">
+                                        {{ row.delta|number_format(2, '.', ' ') }}
+                                    </td>
+                                    <td>
+                                        {% if row.status == 'matched' %}
+                                            <span class="text-success">✓</span>
+                                        {% else %}
+                                            <span class="text-danger">⚠ расхождение</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+
         {% endif %}
 
     </div>
