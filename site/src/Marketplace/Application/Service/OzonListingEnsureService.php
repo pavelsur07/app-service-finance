@@ -7,23 +7,23 @@ namespace App\Marketplace\Application\Service;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\OzonListingUpsertQuery;
 use App\Marketplace\Repository\MarketplaceListingRepository;
-use Doctrine\DBAL\Connection;
-use Ramsey\Uuid\Uuid;
 
 /**
  * Идемпотентное создание листингов Ozon.
  *
- * Использует INSERT ... ON CONFLICT DO NOTHING чтобы безопасно создавать листинги
- * даже при параллельной обработке нескольких батчей (Sales / Returns / Costs одновременно).
- * Если другой процесс уже успел создать листинг с тем же SKU — INSERT просто ничего не делает,
- * а повторный SELECT возвращает существующую запись без дублирования.
+ * Использует INSERT ... ON CONFLICT DO NOTHING (через OzonListingUpsertQuery)
+ * чтобы безопасно создавать листинги даже при параллельной обработке нескольких
+ * батчей (Sales / Returns / Costs одновременно).
+ * Если другой процесс уже успел создать листинг с тем же SKU — INSERT просто
+ * ничего не делает, а повторный SELECT возвращает существующую запись.
  */
 final class OzonListingEnsureService
 {
     public function __construct(
         private readonly MarketplaceListingRepository $listingRepository,
-        private readonly Connection $connection,
+        private readonly OzonListingUpsertQuery $upsertQuery,
     ) {}
 
     /**
@@ -58,27 +58,10 @@ final class OzonListingEnsureService
             return $existing;
         }
 
-        $now       = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
         $companyId = (string) $company->getId();
 
         foreach ($missing as $sku => $name) {
-            $this->connection->executeStatement(
-                <<<'SQL'
-                INSERT INTO marketplace_listings
-                    (id, company_id, marketplace, marketplace_sku, size, price, name, is_active, created_at, updated_at)
-                VALUES
-                    (:id, :company_id, :marketplace, :sku, 'UNKNOWN', '0.00', :name, true, :now, :now)
-                ON CONFLICT (company_id, marketplace, marketplace_sku, size) DO NOTHING
-                SQL,
-                [
-                    'id'          => Uuid::uuid4()->toString(),
-                    'company_id'  => $companyId,
-                    'marketplace' => MarketplaceType::OZON->value,
-                    'sku'         => (string) $sku,
-                    'name'        => $name,
-                    'now'         => $now,
-                ],
-            );
+            $this->upsertQuery->upsertIfNotExists($companyId, (string) $sku, $name);
         }
 
         // Повторный запрос после вставки: получаем как только что созданные,
