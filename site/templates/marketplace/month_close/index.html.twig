@@ -110,6 +110,24 @@
                                                 </div>
                                             </div>
                                         {% endif %}
+
+                                        {# Форма пересверки — всегда доступна когда этап закрыт #}
+                                        <div class="mb-3">
+                                            <form method="post"
+                                                  action="{{ path('marketplace_month_close_reconcile') }}"
+                                                  enctype="multipart/form-data">
+                                                <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                                <input type="hidden" name="year" value="{{ year }}">
+                                                <input type="hidden" name="month" value="{{ month }}">
+                                                <div class="input-group input-group-sm">
+                                                    <input type="file" name="xlsx_file" class="form-control form-control-sm" accept=".xlsx" required>
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                        Пересверить
+                                                    </button>
+                                                </div>
+                                                <small class="text-muted">Загрузите актуальный отчёт «Детализация начислений»</small>
+                                            </form>
+                                        </div>
                                     {% else %}
                                         <div class="mb-3">
                                             <form method="post"
