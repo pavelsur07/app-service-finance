@@ -75,7 +75,7 @@ final class InventorySyncSingleBarcodeController extends AbstractController
                 continue;
             }
 
-            if ($this->barcodeRepository->existsForCompany($companyId, $barcode)) {
+            if ($this->barcodeRepository->existsForCompanyAndMarketplace($companyId, MarketplaceType::OZON, $barcode)) {
                 continue;
             }
 
@@ -83,6 +83,7 @@ final class InventorySyncSingleBarcodeController extends AbstractController
                 Uuid::uuid4()->toString(),
                 $listing,
                 $companyId,
+                MarketplaceType::OZON->value,
                 $barcode,
             ));
             $created++;

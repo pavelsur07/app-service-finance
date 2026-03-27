@@ -105,6 +105,8 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         if ($newListings > 0) {
             $this->em->flush();
+            // Баркоды вставляются после flush, чтобы FK на листинг был уже в БД
+            $this->listingResolver->flushBarcodes();
         }
 
         $allSrids = array_values(array_filter(array_column($returnsData, 'srid')));

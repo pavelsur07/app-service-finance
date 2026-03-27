@@ -10,7 +10,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceListingBarcodeRepository::class)]
 #[ORM\Table(name: 'marketplace_listing_barcodes')]
-#[ORM\UniqueConstraint(name: 'uniq_company_barcode', columns: ['company_id', 'barcode'])]
+#[ORM\UniqueConstraint(name: 'uniq_listing_barcodes_cmp_mkt_barcode', columns: ['company_id', 'marketplace', 'barcode'])]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_listing_barcodes')]
 class MarketplaceListingBarcode
 {
@@ -25,18 +25,23 @@ class MarketplaceListingBarcode
     #[ORM\Column(type: 'guid')]
     private string $companyId;
 
+    #[ORM\Column(length: 50)]
+    private string $marketplace;
+
     #[ORM\Column(length: 100)]
     private string $barcode;
 
-    public function __construct(string $id, MarketplaceListing $listing, string $companyId, string $barcode)
+    public function __construct(string $id, MarketplaceListing $listing, string $companyId, string $marketplace, string $barcode)
     {
         Assert::uuid($id);
         Assert::uuid($companyId);
+        Assert::notEmpty($marketplace);
         Assert::notEmpty($barcode);
 
         $this->id = $id;
         $this->listing = $listing;
         $this->companyId = $companyId;
+        $this->marketplace = $marketplace;
         $this->barcode = $barcode;
     }
 
@@ -53,6 +58,11 @@ class MarketplaceListingBarcode
     public function getCompanyId(): string
     {
         return $this->companyId;
+    }
+
+    public function getMarketplace(): string
+    {
+        return $this->marketplace;
     }
 
     public function getBarcode(): string

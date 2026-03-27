@@ -111,7 +111,7 @@ final class SyncOzonListingBarcodesHandler
                         continue;
                     }
 
-                    if ($this->barcodeRepository->existsForCompany($companyId, $barcode)) {
+                    if ($this->barcodeRepository->existsForCompanyAndMarketplace($companyId, MarketplaceType::OZON, $barcode)) {
                         $barcodesSkipped++;
                         continue;
                     }
@@ -120,6 +120,7 @@ final class SyncOzonListingBarcodesHandler
                         Uuid::uuid4()->toString(),
                         $listing,
                         $companyId,
+                        MarketplaceType::OZON->value,
                         $barcode,
                     );
                     $this->em->persist($barcodeEntity);

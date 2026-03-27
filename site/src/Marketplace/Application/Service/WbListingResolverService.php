@@ -6,8 +6,8 @@ namespace App\Marketplace\Application\Service;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceListing;
-use App\Marketplace\Entity\MarketplaceListingBarcode;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,9 +15,13 @@ use Ramsey\Uuid\Uuid;
 
 final class WbListingResolverService
 {
+    /** @var list<array{companyId: string, listingId: string, barcode: string}> */
+    private array $pendingBarcodes = [];
+
     public function __construct(
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
+        private readonly WbBarcodeUpsertQuery $barcodeUpsertQuery,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -91,18 +95,33 @@ final class WbListingResolverService
 
         $this->em->persist($listing);
 
-        // Сохраняем barcode только при создании нового листинга с известным размером
+        // Откладываем вставку баркода до вызова flushBarcodes() после em->flush(),
+        // чтобы FK (listing_id → marketplace_listings) был уже в БД.
         if ($barcode !== null && $barcode !== '' && $size !== 'UNKNOWN') {
-            $barcodeEntity = new MarketplaceListingBarcode(
-                Uuid::uuid4()->toString(),
-                $listing,
-                $companyId,
-                $barcode,
-            );
-            $this->em->persist($barcodeEntity);
+            $this->pendingBarcodes[] = [
+                'companyId' => $companyId,
+                'listingId' => $listing->getId(),
+                'barcode'   => $barcode,
+            ];
         }
 
         return $listing;
+    }
+
+    /**
+     * Записывает накопленные баркоды через идемпотентный INSERT ON CONFLICT DO NOTHING.
+     * Вызывать ПОСЛЕ em->flush() — листинги должны уже быть в БД.
+     */
+    public function flushBarcodes(): void
+    {
+        foreach ($this->pendingBarcodes as $pending) {
+            $this->barcodeUpsertQuery->upsertIfNotExists(
+                $pending['companyId'],
+                $pending['listingId'],
+                $pending['barcode'],
+            );
+        }
+        $this->pendingBarcodes = [];
     }
 
     private function normalizeWbSize(?string $tsName): string
