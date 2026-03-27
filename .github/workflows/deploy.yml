@@ -50,7 +50,7 @@ jobs:
               with:
                   context: ${{ matrix.context }}
                   file: ${{ matrix.file }}
-                  push: true
+                  push: ${{ github.event_name != 'pull_request' }}
                   tags: ghcr.io/pavelsur07/${{ matrix.tag }}
                   cache-from: type=gha
                   cache-to: type=gha,mode=max
@@ -58,6 +58,7 @@ jobs:
     # 2. ЭТАП ДЕПЛОЯ
     deploy:
         needs: build-and-push # Ждет завершения ВСЕХ сборок из матрицы
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         steps:
             - name: 📦 Checkout repository
@@ -114,6 +115,7 @@ jobs:
     # 3. ЭТАП МИГРАЦИЙ
     migrations:
         needs: deploy
+        if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         steps:
             - name: 🔐 Setup SSH key
