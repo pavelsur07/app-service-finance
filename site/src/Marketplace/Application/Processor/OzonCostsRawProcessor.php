@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\MappingErrorLogger;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -39,9 +40,15 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
+        private readonly MappingErrorLogger $mappingErrorLogger,
         private readonly LoggerInterface $logger,
     ) {
     }
+
+    /** Контекст текущего батча для логирования ошибок маппинга */
+    private string $currentCompanyId = '';
+    private int $currentYear = 0;
+    private int $currentMonth = 0;
 
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
     {
@@ -100,6 +107,20 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         if (!$company instanceof Company) {
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
+
+        // Определяем период из первой строки для логирования ошибок маппинга
+        $this->currentCompanyId = $companyId;
+        $firstDate = null;
+        foreach ($rawRows as $op) {
+            if (!empty($op['operation_date'])) {
+                try {
+                    $firstDate = new \DateTimeImmutable($op['operation_date']);
+                } catch (\Throwable) {}
+                break;
+            }
+        }
+        $this->currentYear  = $firstDate ? (int) $firstDate->format('Y') : (int) date('Y');
+        $this->currentMonth = $firstDate ? (int) $firstDate->format('n') : (int) date('n');
 
         // Собираем все SKU
         $allSkus = [];
@@ -250,6 +271,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $this->em->flush();
+        $this->mappingErrorLogger->resetBatch();
     }
 
     /**
@@ -398,9 +420,27 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         return $entries;
     }
 
-    private function resolveServiceCategoryCode(string $serviceName): string
+    private function resolveServiceCategoryCode(string $serviceName, ?array $rawOp = null): string
     {
-        return OzonServiceCategoryMap::resolve($serviceName, $this->logger) ?? 'ozon_other_service';
+        $code = OzonServiceCategoryMap::resolve($serviceName, $this->logger);
+
+        if ($code === null) {
+            // Неизвестный service_name — логируем для мониторинга в админке
+            $this->mappingErrorLogger->log(
+                companyId:     $this->currentCompanyId,
+                marketplace:   MarketplaceType::OZON->value,
+                year:          $this->currentYear,
+                month:         $this->currentMonth,
+                serviceName:   $serviceName,
+                operationType: $rawOp['operation_type'] ?? '',
+                amount:        abs((float) ($rawOp['amount'] ?? 0)),
+                sampleRaw:     $rawOp,
+            );
+
+            return 'ozon_other_service';
+        }
+
+        return $code;
     }
 
     private function resolveCategoryName(string $categoryCode): string

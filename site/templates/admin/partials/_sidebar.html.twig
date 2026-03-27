@@ -1,66 +1,87 @@
 <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="light">
-  <div class="container-fluid">
-    <h1 class="navbar-brand navbar-brand-autodark">
-      <a href="{{ path('admin_dashboard') }}">Fin-Plan · Admin</a>
-    </h1>
-    <div class="navbar-collapse">
-      <ul class="navbar-nav">
-        <li class="nav-item">
-          <a class="nav-link {% if app.request.get('_route') starts with 'admin_dashboard' %}active{% endif %}"
-             href="{{ path('admin_dashboard') }}">
+    <div class="container-fluid">
+        <h1 class="navbar-brand navbar-brand-autodark">
+            <a href="{{ path('admin_dashboard') }}">Fin-Plan · Admin</a>
+        </h1>
+        <div class="navbar-collapse">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('_route') starts with 'admin_dashboard' %}active{% endif %}"
+                       href="{{ path('admin_dashboard') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-layout-dashboard"></i>
             </span>
-            <span class="nav-link-title">Dashboard</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if app.request.get('_route') starts with 'admin_user_' %}active{% endif %}"
-             href="{{ path('admin_user_index') }}">
+                        <span class="nav-link-title">Dashboard</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('_route') starts with 'admin_user_' %}active{% endif %}"
+                       href="{{ path('admin_user_index') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-users"></i>
             </span>
-            <span class="nav-link-title">Пользователи</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if app.request.get('_route') starts with 'admin_telegram_bot_' %}active{% endif %}"
-             href="{{ path('admin_telegram_bot_index') }}">
+                        <span class="nav-link-title">Пользователи</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('_route') starts with 'admin_telegram_bot_' %}active{% endif %}"
+                       href="{{ path('admin_telegram_bot_index') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-brand-telegram"></i>
             </span>
-            <span class="nav-link-title">Telegram (финансы) → Боты</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if app.request.get('_route') starts with 'admin_analytics_pl_recalc_' %}active{% endif %}"
-             href="{{ path('admin_analytics_pl_recalc_form') }}">
+                        <span class="nav-link-title">Telegram (финансы) → Боты</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('_route') starts with 'admin_analytics_pl_recalc_' %}active{% endif %}"
+                       href="{{ path('admin_analytics_pl_recalc_form') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-chart-dots-3"></i>
             </span>
-            <span class="nav-link-title">Analytics · PL Recalc</span>
-          </a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link {% if app.request.get('_route') starts with 'admin_billing_' %}active{% endif %}"
-             href="{{ path('admin_billing_index') }}">
+                        <span class="nav-link-title">Analytics · PL Recalc</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('_route') starts with 'admin_billing_' %}active{% endif %}"
+                       href="{{ path('admin_billing_index') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-receipt-2"></i>
             </span>
-            <span class="nav-link-title">Billing</span>
-          </a>
-        </li>
-        {# Раздел «Ссылки привязки» отключён: генерация перенесена в интеграции компаний (/integrations/telegram). #}
-          <li class="nav-item">
-              <a class="nav-link {% if app.request.get('admin_demo') starts with 'admin_user_' %}active{% endif %}"
-                 href="{{ path('admin_demo') }}">
+                        <span class="nav-link-title">Billing</span>
+                    </a>
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle {% if app.request.get('_route') starts with 'admin_marketplace_' %}active{% endif %}"
+                       href="#marketplace-menu"
+                       data-bs-toggle="collapse">
+            <span class="nav-link-icon d-md-none d-lg-inline-block">
+              <i class="ti ti-shopping-cart"></i>
+            </span>
+                        <span class="nav-link-title">Маркетплейсы</span>
+                    </a>
+                    <div class="collapse {% if app.request.get('_route') starts with 'admin_marketplace_' %}show{% endif %}"
+                         id="marketplace-menu">
+                        <ul class="navbar-nav ps-3">
+                            <li class="nav-item">
+                                <a class="nav-link {% if app.request.get('_route') == 'admin_marketplace_mapping_errors' %}active{% endif %}"
+                                   href="{{ path('admin_marketplace_mapping_errors') }}">
+                                    <span class="nav-link-title">Неизвестные затраты</span>
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </li>
+                {# Раздел «Ссылки привязки» отключён: генерация перенесена в интеграции компаний (/integrations/telegram). #}
+                <li class="nav-item">
+                    <a class="nav-link {% if app.request.get('admin_demo') starts with 'admin_user_' %}active{% endif %}"
+                       href="{{ path('admin_demo') }}">
             <span class="nav-link-icon d-md-none d-lg-inline-block">
               <i class="ti ti-users"></i>
             </span>
-                  <span class="nav-link-title">Demo</span>
-              </a>
-          </li>
-      </ul>
+                        <span class="nav-link-title">Demo</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
     </div>
-  </div>
 </aside>
