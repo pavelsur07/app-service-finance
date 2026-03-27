@@ -63,12 +63,7 @@ class MappingErrorRepository extends ServiceEntityRepository
                 me.resolved_at
             FROM marketplace_mapping_errors me
             INNER JOIN companies c ON c.id = me.company_id
-            LEFT JOIN (
-                SELECT DISTINCT ON (company_id) company_id, email
-                FROM users
-                WHERE role IN ('ROLE_COMPANY_OWNER', 'ROLE_USER')
-                ORDER BY company_id, created_at ASC
-            ) u ON u.company_id = me.company_id
+            LEFT JOIN "user" u ON u.id = c.user_id
             WHERE me.resolved_at IS NULL
             ORDER BY me.detected_at DESC
             SQL,
@@ -101,12 +96,7 @@ class MappingErrorRepository extends ServiceEntityRepository
                 me.resolved_at
             FROM marketplace_mapping_errors me
             INNER JOIN companies c ON c.id = me.company_id
-            LEFT JOIN (
-                SELECT DISTINCT ON (company_id) company_id, email
-                FROM users
-                WHERE role IN ('ROLE_COMPANY_OWNER', 'ROLE_USER')
-                ORDER BY company_id, created_at ASC
-            ) u ON u.company_id = me.company_id
+            LEFT JOIN "user" u ON u.id = c.user_id
             ORDER BY me.resolved_at NULLS FIRST, me.detected_at DESC
             LIMIT {$limit} OFFSET {$offset}
             SQL,
