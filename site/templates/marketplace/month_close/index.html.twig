@@ -115,34 +115,38 @@
                                         <div class="mb-3">
                                             <form method="post"
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
-                                                  enctype="multipart/form-data">
+                                                  enctype="multipart/form-data"
+                                                  onsubmit="handleReconcileSubmit(this)">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
-                                                <div class="input-group input-group-sm">
-                                                    <input type="file" name="xlsx_file" class="form-control form-control-sm" accept=".xlsx" required>
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                                        Пересверить
-                                                    </button>
+                                                <div class="mb-2">
+                                                    <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
+                                                    <small class="text-muted">Загрузите актуальный отчёт «Детализация начислений»</small>
                                                 </div>
-                                                <small class="text-muted">Загрузите актуальный отчёт «Детализация начислений»</small>
+                                                <button type="submit" class="btn btn-secondary">
+                                                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
+                                                    <span class="btn-label">Пересверить</span>
+                                                </button>
                                             </form>
                                         </div>
                                     {% else %}
                                         <div class="mb-3">
                                             <form method="post"
                                                   action="{{ path('marketplace_month_close_reconcile') }}"
-                                                  enctype="multipart/form-data">
+                                                  enctype="multipart/form-data"
+                                                  onsubmit="handleReconcileSubmit(this)">
                                                 <input type="hidden" name="marketplace" value="{{ marketplace }}">
                                                 <input type="hidden" name="year" value="{{ year }}">
                                                 <input type="hidden" name="month" value="{{ month }}">
-                                                <div class="input-group input-group-sm">
-                                                    <input type="file" name="xlsx_file" class="form-control form-control-sm" accept=".xlsx" required>
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
-                                                        Сверить с xlsx
-                                                    </button>
+                                                <div class="mb-2">
+                                                    <input type="file" name="xlsx_file" class="form-control" accept=".xlsx" required>
+                                                    <small class="text-muted">Загрузите отчёт «Детализация начислений» из ЛК Ozon</small>
                                                 </div>
-                                                <small class="text-muted">Загрузите отчёт «Детализация начислений» из ЛК Ozon</small>
+                                                <button type="submit" class="btn btn-secondary">
+                                                    <span class="spinner-border spinner-border-sm me-1 d-none" role="status"></span>
+                                                    <span class="btn-label">Сверить с xlsx</span>
+                                                </button>
                                             </form>
                                         </div>
                                     {% endif %}
@@ -283,6 +287,15 @@
 
 {% block modals %}
     <script>
+        function handleReconcileSubmit(form) {
+            const btn = form.querySelector('button[type="submit"]');
+            const spinner = btn.querySelector('.spinner-border');
+            const label = btn.querySelector('.btn-label');
+            btn.disabled = true;
+            spinner.classList.remove('d-none');
+            label.textContent = 'Обработка...';
+        }
+
         function runPreflight(btn) {
             const stage = btn.dataset.stage;
             const resultDiv = document.getElementById('preflight-result-' + stage);
