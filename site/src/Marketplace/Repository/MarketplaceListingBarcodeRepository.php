@@ -74,8 +74,23 @@ class MarketplaceListingBarcodeRepository extends ServiceEntityRepository
     }
 
     /**
-     * Проверить существование barcode для компании (без учёта marketplace —
-     * barcode глобально уникален в рамках компании).
+     * Проверить существование barcode для компании и маркетплейса.
+     * Один и тот же barcode может существовать на разных маркетплейсах.
+     */
+    public function existsForCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $barcode,
+    ): bool {
+        return $this->findOneBy([
+            'companyId'   => $companyId,
+            'marketplace' => $marketplace->value,
+            'barcode'     => $barcode,
+        ]) !== null;
+    }
+
+    /**
+     * @deprecated Используйте existsForCompanyAndMarketplace — баркод уникален внутри маркетплейса, не глобально.
      */
     public function existsForCompany(string $companyId, string $barcode): bool
     {

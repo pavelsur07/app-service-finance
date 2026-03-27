@@ -47,16 +47,18 @@ final class Version20260401000000 extends AbstractMigration
         // 4. Удаляем старый неправильный индекс без учёта маркетплейса
         $this->addSql('DROP INDEX IF EXISTS uniq_company_barcode');
 
-        // 5. Создаём правильный уникальный индекс: один баркод уникален внутри маркетплейса компании
+        // 5. Создаём правильный уникальный индекс: один баркод уникален внутри маркетплейса компании.
+        // Имя намеренно отличается от uniq_company_marketplace_barcode на marketplace_barcode_catalog —
+        // в PostgreSQL имена индексов уникальны в рамках схемы.
         $this->addSql('
-            CREATE UNIQUE INDEX uniq_company_marketplace_barcode
+            CREATE UNIQUE INDEX uniq_listing_barcodes_cmp_mkt_barcode
             ON marketplace_listing_barcodes (company_id, marketplace, barcode)
         ');
     }
 
     public function down(Schema $schema): void
     {
-        $this->addSql('DROP INDEX IF EXISTS uniq_company_marketplace_barcode');
+        $this->addSql('DROP INDEX IF EXISTS uniq_listing_barcodes_cmp_mkt_barcode');
         $this->addSql('ALTER TABLE marketplace_listing_barcodes DROP COLUMN marketplace');
         $this->addSql('CREATE UNIQUE INDEX uniq_company_barcode ON marketplace_listing_barcodes (company_id, barcode)');
     }

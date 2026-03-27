@@ -10,7 +10,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: MarketplaceListingBarcodeRepository::class)]
 #[ORM\Table(name: 'marketplace_listing_barcodes')]
-#[ORM\UniqueConstraint(name: 'uniq_company_marketplace_barcode', columns: ['company_id', 'marketplace', 'barcode'])]
+#[ORM\UniqueConstraint(name: 'uniq_listing_barcodes_cmp_mkt_barcode', columns: ['company_id', 'marketplace', 'barcode'])]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_listing_barcodes')]
 class MarketplaceListingBarcode
 {
