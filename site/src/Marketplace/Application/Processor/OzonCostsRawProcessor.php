@@ -7,13 +7,13 @@ namespace App\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\MappingErrorLogger;
+use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
-use App\Marketplace\Repository\MarketplaceListingRepository;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -37,7 +37,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
-        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly OzonListingEnsureService $listingEnsureService,
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MappingErrorLogger $mappingErrorLogger,
@@ -122,52 +122,21 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $this->currentYear  = $firstDate ? (int) $firstDate->format('Y') : (int) date('Y');
         $this->currentMonth = $firstDate ? (int) $firstDate->format('n') : (int) date('n');
 
-        // Собираем все SKU
-        $allSkus = [];
+        // Собираем SKU с именами для идемпотентного создания листингов
+        $skusWithNames = [];
         foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku !== '') {
-                    $allSkus[$sku] = true;
+                if ($sku !== '' && !isset($skusWithNames[$sku])) {
+                    $skusWithNames[$sku] = $item['name'] ?? null;
                 }
             }
         }
 
-        // Предзагрузка листингов
+        // Идемпотентное создание/загрузка листингов (безопасно при параллельной обработке)
         $listingsIdCache = [];
-        if (!empty($allSkus)) {
-            $listings = $this->listingRepository->findListingsBySkusIndexed(
-                $company,
-                MarketplaceType::OZON,
-                array_keys($allSkus),
-            );
-            foreach ($listings as $sku => $listing) {
-                $listingsIdCache[$sku] = $listing->getId();
-            }
-        }
-
-        // Создаём отсутствующие листинги
-        $newListings = 0;
-        foreach ($rawRows as $op) {
-            foreach ($op['items'] ?? [] as $item) {
-                $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsIdCache[$sku])) {
-                    continue;
-                }
-
-                $listing = new MarketplaceListing(Uuid::uuid4()->toString(), $company, null, MarketplaceType::OZON);
-                $listing->setMarketplaceSku($sku);
-                $listing->setPrice('0.00');
-                $listing->setName($item['name'] ?? null);
-                $this->em->persist($listing);
-
-                $listingsIdCache[$sku] = $listing->getId();
-                $newListings++;
-            }
-        }
-
-        if ($newListings > 0) {
-            $this->em->flush();
+        foreach ($this->listingEnsureService->ensureListings($company, $skusWithNames) as $sku => $listing) {
+            $listingsIdCache[$sku] = $listing->getId();
         }
 
         $this->categoryResolver->preload($company, MarketplaceType::OZON);

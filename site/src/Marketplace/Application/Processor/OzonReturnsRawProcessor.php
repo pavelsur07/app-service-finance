@@ -7,11 +7,10 @@ namespace App\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessOzonReturnsAction;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
-use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
-use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -24,7 +23,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly ProcessOzonReturnsAction $action,
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceReturnRepository $returnRepository,
-        private readonly MarketplaceListingRepository $listingRepository,
+        private readonly OzonListingEnsureService $listingEnsureService,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
         private readonly LoggerInterface $logger,
@@ -60,56 +59,19 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        // Собираем все SKU
-        $allSkus = [];
+        // Собираем SKU с именами для идемпотентного создания листингов
+        $skusWithNames = [];
         foreach ($rawRows as $op) {
             foreach ($op['items'] ?? [] as $item) {
                 $sku = (string) ($item['sku'] ?? '');
-                if ($sku !== '') {
-                    $allSkus[$sku] = true;
+                if ($sku !== '' && !isset($skusWithNames[$sku])) {
+                    $skusWithNames[$sku] = $item['name'] ?? null;
                 }
             }
         }
 
-        // Предзагрузка листингов — храним объекты для costPriceResolver
-        /** @var array<string, MarketplaceListing> $listingsCache */
-        $listingsCache = [];
-        if (!empty($allSkus)) {
-            $listingsCache = $this->listingRepository->findListingsBySkusIndexed(
-                $company,
-                MarketplaceType::OZON,
-                array_keys($allSkus),
-            );
-        }
-
-        // Создаём отсутствующие листинги
-        $newListings = 0;
-        foreach ($rawRows as $op) {
-            foreach ($op['items'] ?? [] as $item) {
-                $sku = (string) ($item['sku'] ?? '');
-                if ($sku === '' || isset($listingsCache[$sku])) {
-                    continue;
-                }
-
-                $listing = new MarketplaceListing(
-                    Uuid::uuid4()->toString(),
-                    $company,
-                    null,
-                    MarketplaceType::OZON,
-                );
-                $listing->setMarketplaceSku($sku);
-                $listing->setName($item['name'] ?? null);
-                $listing->setPrice('0.00');
-                $this->em->persist($listing);
-
-                $listingsCache[$sku] = $listing;
-                $newListings++;
-            }
-        }
-
-        if ($newListings > 0) {
-            $this->em->flush();
-        }
+        // Идемпотентное создание/загрузка листингов (безопасно при параллельной обработке)
+        $listingsCache = $this->listingEnsureService->ensureListings($company, $skusWithNames);
 
         // Дедупликация
         $allExternalIds = array_values(array_map(
