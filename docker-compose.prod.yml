@@ -238,17 +238,11 @@ services:
             - default
 
     scheduler:
-        #build:
-        #    context: site
-        #    dockerfile: docker/production/php-cli/Dockerfile
         image: ghcr.io/pavelsur07/site-php-cli:latest
+        container_name: scheduler
         user: root
-        entrypoint: ["/bin/sh", "-lc"]
-        command: >
-            'wget -qO /tmp/supercronic
-            https://github.com/aptible/supercronic/releases/download/v0.2.31/supercronic-linux-amd64
-            && chmod +x /tmp/supercronic
-            && /tmp/supercronic -json /etc/crontabs/app.cron'
+        entrypoint: ["/usr/local/bin/supercronic"]
+        command: ["-json", "/etc/crontabs/app.cron"]
         environment:
             TZ: Europe/Moscow
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
