@@ -62,9 +62,14 @@ class MarketplaceController extends AbstractController
         $connections = $this->connectionRepository->findByCompany($company);
         $qb          = $this->rawDocumentsListQuery->buildQueryBuilder($company);
 
-        $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
-            $qb->select('COUNT(d.id)')->resetDQLPart('orderBy');
-        });
+        $adapter = new QueryAdapter(
+            $qb,
+            true,
+            null,
+            static function (QueryBuilder $qb): void {
+                $qb->select('COUNT(d.id)')->resetDQLPart('orderBy');
+            }
+        );
 
         $rawDocumentsPager = Pagerfanta::createForCurrentPageWithMaxPerPage(
             $adapter,
