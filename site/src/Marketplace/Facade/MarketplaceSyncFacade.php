@@ -1,21 +1,20 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Facade;
 
-use App\Company\Entity\Company;
 use App\Marketplace\Application\Command\FetchMarketplaceDataCommand;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
-use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-final class MarketplaceSyncFacade
+final readonly class MarketplaceSyncFacade
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
-        private readonly ProcessRawDocumentAction $processRawDocumentAction,
-        private readonly MessageBusInterface $messageBus,
+        private ProcessRawDocumentAction $processRawDocumentAction,
+        private MessageBusInterface $messageBus,
     ) {
     }
 
@@ -88,13 +87,4 @@ final class MarketplaceSyncFacade
         return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'costs'));
     }
 
-    private function requireCompany(string $companyId): Company
-    {
-        $company = $this->em->find(Company::class, $companyId);
-        if (!$company instanceof Company) {
-            throw new \RuntimeException('Company not found: '.$companyId);
-        }
-
-        return $company;
-    }
 }
