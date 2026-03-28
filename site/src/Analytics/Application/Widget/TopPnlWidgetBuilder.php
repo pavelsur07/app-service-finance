@@ -5,9 +5,9 @@ namespace App\Analytics\Application\Widget;
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
-use App\Repository\PLCategoryRepository;
-use App\Repository\PLDailyTotalRepository;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 
 final readonly class TopPnlWidgetBuilder
 {

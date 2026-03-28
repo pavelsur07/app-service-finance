@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Finance\Engine;
 
-use App\Enum\PLValueFormat;
+use App\Finance\Enum\PLValueFormat;
 use App\Finance\Engine\ValueFormatter;
 use PHPUnit\Framework\TestCase;
 

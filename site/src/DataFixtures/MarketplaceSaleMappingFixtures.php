@@ -3,7 +3,7 @@
 namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;

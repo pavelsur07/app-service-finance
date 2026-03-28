@@ -6,11 +6,11 @@ use App\Analytics\Api\Response\RevenueWidgetResponse;
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
-use App\Repository\PLCategoryRepository;
-use App\Repository\PLDailyTotalRepository;
+use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 
 final readonly class RevenueWidgetBuilder
 {

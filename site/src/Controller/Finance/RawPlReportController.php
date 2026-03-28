@@ -4,12 +4,12 @@ namespace App\Controller\Finance;
 
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
-use App\Entity\PLDailyTotal;
-use App\Enum\PlNature;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Entity\PLDailyTotal;
+use App\Finance\Enum\PlNature;
 use App\Finance\Repository\DocumentRepository;
-use App\Repository\PLDailyTotalRepository;
-use App\Service\PlNatureResolver;
+use App\Finance\Repository\PLDailyTotalRepository;
+use App\Finance\Application\Service\PlNatureResolver;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

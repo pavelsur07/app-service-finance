@@ -5,10 +5,10 @@ namespace App\Analytics\Application\Widget;
 use App\Analytics\Application\DrilldownBuilder;
 use App\Analytics\Domain\Period;
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
-use App\Enum\PLExpenseType;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLExpenseType;
 use App\Finance\Report\PlReportGridBuilder;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 
 final readonly class ProfitWidgetBuilder
 {

@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
+
+namespace App\Finance\Repository;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

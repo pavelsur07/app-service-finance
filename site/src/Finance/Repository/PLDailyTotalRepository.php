@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
+
+namespace App\Finance\Repository;
 
 use App\Company\Entity\Company;
-use App\Entity\PLDailyTotal;
+use App\Finance\Entity\PLDailyTotal;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\Persistence\ManagerRegistry;

@@ -5,7 +5,7 @@ namespace App\Cash\Controller\Transaction;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Form\Transaction\CashflowCategoryType;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
-use App\Entity\PLCategory;
-use App\Form\PLCategoryFormType;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Form\PLCategoryFormType;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

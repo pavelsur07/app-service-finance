@@ -6,7 +6,7 @@ use App\Analytics\Application\LastUpdatedAtResolver;
 use App\Cash\Repository\Accounts\MoneyFundMovementRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
-use App\Repository\PLDailyTotalRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 use PHPUnit\Framework\TestCase;
 
 final class LastUpdatedAtResolverTest extends TestCase

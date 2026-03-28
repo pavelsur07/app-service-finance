@@ -7,7 +7,7 @@ namespace App\Finance\Report;
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Engine\ValueFormatter;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 
 final class PlReportProjectsCompareBuilder
 {
@@ -102,7 +102,7 @@ final class PlReportProjectsCompareBuilder
                 $row['values']['_total'] = $this->fmt->format($sum, $format);
             } else {
                 // fallback безопасно: деньги
-                $row['values']['_total'] = $this->fmt->format($sum, \App\Enum\PLValueFormat::MONEY);
+                $row['values']['_total'] = $this->fmt->format($sum, \App\Finance\Enum\PLValueFormat::MONEY);
             }
         }
         unset($row);

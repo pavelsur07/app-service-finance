@@ -9,7 +9,7 @@ use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\Onboarding\AccountBootstrapper;
-use App\Service\PLRegisterUpdater;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;

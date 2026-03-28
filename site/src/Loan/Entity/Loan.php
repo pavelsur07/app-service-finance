@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Loan\Entity;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Loan\Repository\LoanRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;

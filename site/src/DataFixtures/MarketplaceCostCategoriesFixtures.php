@@ -3,7 +3,7 @@
 namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\FixturesBundle\Fixture;

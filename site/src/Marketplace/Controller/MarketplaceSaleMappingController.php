@@ -2,13 +2,13 @@
 
 namespace App\Marketplace\Controller;
 
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
 use App\Marketplace\Entity\MarketplaceSaleMapping;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceSaleMappingRepository;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\EntityManagerInterface;

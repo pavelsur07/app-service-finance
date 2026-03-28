@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Finance\Controller;
 
-use App\Entity\PLCategory;
-use App\Enum\PLCategoryType;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportPeriod;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;

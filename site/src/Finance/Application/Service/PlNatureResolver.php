@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Finance\Application\Service;
 
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Enum\PlNature;
+use App\Finance\Enum\PlNature;
 
 final class PlNatureResolver
 {

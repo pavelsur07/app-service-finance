@@ -12,7 +12,7 @@ use App\Loan\Form\LoanType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Loan\Service\LoanScheduleToDocumentService;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;

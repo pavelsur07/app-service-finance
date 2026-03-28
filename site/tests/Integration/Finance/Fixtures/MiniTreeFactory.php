@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Finance\Fixtures;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
-use App\Enum\PLCategoryType;
-use App\Enum\PLValueFormat;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLValueFormat;
 use Ramsey\Uuid\Uuid;
 
 final class MiniTreeFactory

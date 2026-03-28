@@ -6,7 +6,7 @@ namespace App\Loan\Service;
 
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
 use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;

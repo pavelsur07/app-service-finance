@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace App\Finance\Report;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
-use App\Enum\PLCategoryType;
+use App\Finance\Enum\PLCategoryType;
 use App\Finance\Engine\DependencyExtractor;
 use App\Finance\Engine\Graph;
 use App\Finance\Engine\TopoSort;
@@ -16,7 +16,7 @@ use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Formula\Evaluator;
 use App\Finance\Formula\Parser;
 use App\Finance\Formula\Tokenizer;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 
 final class PlReportCalculator
 {

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Finance\Application\Service;
 
 use App\Company\Entity\Company;
-use App\Entity\PLMonthlySnapshot;
-use App\Repository\PLMonthlySnapshotRepository;
+use App\Finance\Entity\PLMonthlySnapshot;
+use App\Finance\Repository\PLMonthlySnapshotRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 

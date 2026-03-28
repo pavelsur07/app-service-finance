@@ -12,9 +12,9 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Enum\MoneyAccountType;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

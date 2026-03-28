@@ -10,13 +10,13 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Enum\DocumentType;
-use App\Enum\PLCategoryType;
-use App\Enum\PLFlow;
+use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLFlow;
 use App\Finance\Enum\DocumentStatus;
-use App\Service\PLRegisterUpdater;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Tests\Support\Kernel\IntegrationTestCase;
 use Ramsey\Uuid\Uuid;
 

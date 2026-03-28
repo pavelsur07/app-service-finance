@@ -9,7 +9,7 @@ use App\Company\Entity\Company;
 use App\Finance\Facts\FactsProviderInterface;
 use App\Finance\Report\PlReportCalculator;
 use App\Finance\Report\PlReportGridBuilder;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 use PHPUnit\Framework\TestCase;
 
 final class ProfitWidgetBuilderTest extends TestCase
