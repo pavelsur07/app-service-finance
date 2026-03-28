@@ -73,11 +73,16 @@ getNamesByIds(array $ids): array
 
 ### `PLCategoryFacade` (`src/Finance/Facade/PLCategoryFacade.php`)
 ```php
-// Список категорий PnL для ChoiceType в формах
-getChoicesForCompany(string $companyId): array
+// Дерево категорий в виде DTO (для ChoiceType в формах)
+// @return PLCategoryDTO[]
+getTreeByCompanyId(string $companyId): array
 
-// Дерево категорий (для вложенного отображения)
-getTreeForCompany(string $companyId): array
+// Дерево категорий в виде Entity (legacy: для EntityType пока Loan не мигрирован на string $plCategoryId)
+// @return PLCategory[]
+findTreeEntitiesByCompanyId(string $companyId): array
+
+// Найти одну категорию по ID с проверкой принадлежности компании
+findByIdAndCompany(string $categoryId, string $companyId): ?PLCategoryDTO
 ```
 
 ### `FinanceFacade` (`src/Finance/Facade/FinanceFacade.php`)
