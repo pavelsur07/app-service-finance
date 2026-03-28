@@ -4,12 +4,12 @@ namespace App\Cash\Entity\PaymentPlan;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
+use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
-use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
-use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
-use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 

@@ -2,8 +2,8 @@
 
 namespace App\Cash\Entity\Accounts;
 
-use App\Company\Entity\Company;
 use App\Cash\Enum\Accounts\MoneyAccountType;
+use App\Company\Entity\Company;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
