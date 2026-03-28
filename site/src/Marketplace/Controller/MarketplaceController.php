@@ -6,11 +6,12 @@ namespace App\Marketplace\Controller;
 
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
-use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
@@ -42,13 +43,13 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceConnectionRepository  $connectionRepository,
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
         private readonly MarketplaceAdapterRegistry       $adapterRegistry,
-        private readonly MarketplaceRawProcessorRegistry  $processorRegistry,
         private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
         private readonly RawDocumentsListQuery            $rawDocumentsListQuery,
         private readonly ProjectDirectionRepository       $projectDirectionRepository,
         private readonly EntityManagerInterface           $em,
         private readonly MessageBusInterface              $messageBus,
         private readonly ReprocessMarketplacePeriodAction $reprocessAction,
+        private readonly SyncConnectionAction             $syncConnectionAction,
     ) {
     }
 
@@ -180,49 +181,24 @@ class MarketplaceController extends AbstractController
     {
         $company = $this->companyService->getActiveCompany();
 
-        $connection = $this->connectionRepository->find($id);
-
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
-            throw $this->createNotFoundException('Подключение не найдено');
-        }
-
-        $connection->markSyncStarted();
-        $this->em->flush();
-
         try {
-            $fromDate = new \DateTimeImmutable('-7 days');
-            $toDate   = new \DateTimeImmutable();
-
-            $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
-
-            $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                $connection->getMarketplace(),
-                'sales_report'
+            $cmd   = new SyncConnectionCommand(
+                companyId:    (string) $company->getId(),
+                connectionId: $id,
+                fromDate:     new \DateTimeImmutable('-7 days'),
+                toDate:       new \DateTimeImmutable(),
             );
-            $rawDoc->setPeriodFrom($fromDate);
-            $rawDoc->setPeriodTo($toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount(count($response));
+            $count = ($this->syncConnectionAction)($cmd);
 
-            $this->em->persist($rawDoc);
-            $this->em->flush();
-
-            $connection->markSyncSuccess();
-            $this->em->flush();
-
+            $connection = $this->connectionRepository->find($id);
             $this->addFlash('success', sprintf(
                 'Загружено %d записей от %s.',
-                count($response),
-                $connection->getMarketplace()->getDisplayName()
+                $count,
+                $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
             ));
+        } catch (\DomainException $e) {
+            throw $this->createNotFoundException($e->getMessage());
         } catch (\Exception $e) {
-            $connection->markSyncFailed($e->getMessage());
-            $this->em->flush();
-
             $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
         }
 
@@ -232,11 +208,10 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period')]
     public function syncConnectionPeriod(string $id, Request $request): Response
     {
-        $company = $this->companyService->getActiveCompany();
-
+        $company    = $this->companyService->getActiveCompany();
         $connection = $this->connectionRepository->find($id);
 
-        if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
+        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
         }
 
@@ -252,54 +227,35 @@ class MarketplaceController extends AbstractController
         try {
             $fromDate = new \DateTimeImmutable($dateFromStr);
             $toDate   = new \DateTimeImmutable($dateToStr . ' 23:59:59');
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             $this->addFlash('error', 'Неверный формат дат');
 
             return $this->redirectToRoute('marketplace_index');
         }
 
-        $diff = $fromDate->diff($toDate)->days;
-        if ($diff > 31) {
+        if ($fromDate->diff($toDate)->days > 31) {
             $this->addFlash('error', 'Максимальный период — 31 день');
 
             return $this->redirectToRoute('marketplace_index');
         }
 
-        $connection->markSyncStarted();
-        $this->em->flush();
-
         try {
-            $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $fromDate, $toDate);
-
-            $rawDoc = new \App\Marketplace\Entity\MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                $connection->getMarketplace(),
-                'sales_report'
+            $cmd   = new SyncConnectionCommand(
+                companyId:    (string) $company->getId(),
+                connectionId: $id,
+                fromDate:     $fromDate,
+                toDate:       $toDate,
             );
-            $rawDoc->setPeriodFrom($fromDate);
-            $rawDoc->setPeriodTo($toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount(count($response));
-
-            $this->em->persist($rawDoc);
-            $this->em->flush();
-
-            $connection->markSyncSuccess();
-            $this->em->flush();
+            $count = ($this->syncConnectionAction)($cmd);
 
             $this->addFlash('success', sprintf(
-                'Загружено %d записей за период %s — %s.',
-                count($response),
+                'Загружено %d записей от %s за период %s — %s.',
+                $count,
+                $connection->getMarketplace()->getDisplayName(),
                 $fromDate->format('d.m.Y'),
-                $toDate->format('d.m.Y')
+                $toDate->format('d.m.Y'),
             ));
         } catch (\Exception $e) {
-            $connection->markSyncFailed($e->getMessage());
-            $this->em->flush();
-
             $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
         }
 
