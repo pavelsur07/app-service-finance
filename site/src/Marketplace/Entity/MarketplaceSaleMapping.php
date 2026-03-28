@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Entity\PLCategory;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;

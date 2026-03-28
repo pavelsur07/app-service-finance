@@ -11,7 +11,7 @@ use App\Company\Entity\User;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Enum\DocumentType;
 use App\Enum\PLCategoryType;
 use App\Enum\PLFlow;

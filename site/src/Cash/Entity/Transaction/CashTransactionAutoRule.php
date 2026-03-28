@@ -7,7 +7,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
