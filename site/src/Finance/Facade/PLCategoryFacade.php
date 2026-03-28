@@ -6,6 +6,7 @@ namespace App\Finance\Facade;
 
 use App\Company\Facade\CompanyFacade;
 use App\Finance\DTO\PLCategoryDTO;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Repository\PLCategoryRepository;
 
 /**
@@ -48,6 +49,21 @@ final class PLCategoryFacade
             ),
             $entities,
         );
+    }
+
+    /**
+     * Дерево сущностей для legacy-форм (EntityType) — использовать до миграции Loan на string $plCategoryId.
+     *
+     * @return PLCategory[]
+     */
+    public function findTreeEntitiesByCompanyId(string $companyId): array
+    {
+        $company = $this->companyFacade->findById($companyId);
+        if ($company === null) {
+            return [];
+        }
+
+        return $this->repository->findTreeByCompany($company);
     }
 
     /**
