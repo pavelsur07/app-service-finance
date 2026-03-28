@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceCostPLMappingRepository;
+use App\Marketplace\Repository\MarketplaceCostRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -26,6 +27,7 @@ final class CostPLMappingController extends AbstractController
         private readonly ActiveCompanyService               $companyService,
         private readonly MarketplaceCostPLMappingRepository $mappingRepository,
         private readonly MarketplaceCostCategoryRepository  $costCategoryRepository,
+        private readonly MarketplaceCostRepository          $costRepository,
         private readonly PLCategoryFacade                   $plCategoryFacade,
         private readonly EntityManagerInterface             $em,
     ) {
@@ -113,5 +115,46 @@ final class CostPLMappingController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_pl_mapping_index', [
             'marketplace' => $marketplace,
         ]);
+    }
+
+    #[Route('/{id}/delete-category', name: 'marketplace_cost_pl_mapping_delete_category', methods: ['POST'])]
+    public function deleteCategory(string $id, Request $request): Response
+    {
+        $company   = $this->companyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+        $marketplace = (string) $request->request->get('marketplace', '');
+
+        $category = $this->costCategoryRepository->find($id);
+
+        if ($category === null || (string) $category->getCompany()->getId() !== $companyId) {
+            throw $this->createNotFoundException();
+        }
+
+        if ($category->isSystem()) {
+            $this->addFlash('error', 'Невозможно удалить системную категорию');
+            return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);
+        }
+
+        $costsCount = $this->costRepository->count(['category' => $category]);
+        if ($costsCount > 0) {
+            $this->addFlash('error', sprintf(
+                'Невозможно удалить категорию "%s": она содержит %d затрат(ы).',
+                $category->getName(),
+                $costsCount
+            ));
+            return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);
+        }
+
+        $mapping = $this->mappingRepository->findByCostCategory($companyId, $id);
+        if ($mapping !== null) {
+            $this->em->remove($mapping);
+        }
+
+        $category->softDelete();
+        $this->em->flush();
+
+        $this->addFlash('success', sprintf('Категория "%s" удалена', $category->getName()));
+
+        return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);
     }
 }
