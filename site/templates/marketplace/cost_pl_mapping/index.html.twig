@@ -87,7 +87,7 @@
                                                     class="btn btn-sm btn-ghost-danger"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#modal-delete-cost-category"
-                                                    data-id="{{ category.id }}"
+                                                    data-url="{{ path('marketplace_cost_pl_mapping_delete_category', {id: category.id}) }}"
                                                     data-name="{{ category.name }}"
                                                     data-marketplace="{{ selected_marketplace ?? '' }}">
                                                 Удалить
@@ -153,14 +153,13 @@
     <script>
         document.getElementById('modal-delete-cost-category').addEventListener('show.bs.modal', function (event) {
             var btn = event.relatedTarget;
-            var categoryId = btn.getAttribute('data-id');
             var categoryName = btn.getAttribute('data-name');
             var marketplace = btn.getAttribute('data-marketplace');
+            var url = btn.getAttribute('data-url');
 
             document.getElementById('delete-modal-category-name').textContent = '"' + categoryName + '"';
             document.getElementById('delete-modal-marketplace').value = marketplace;
-            document.getElementById('form-delete-cost-category').action =
-                '/marketplace/cost-pl-mapping/' + categoryId + '/delete-category';
+            document.getElementById('form-delete-cost-category').action = url;
         });
     </script>
 {% endblock %}
