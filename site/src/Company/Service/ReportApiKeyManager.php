@@ -3,8 +3,8 @@
 namespace App\Company\Service;
 
 use App\Company\Entity\Company;
-use App\Entity\ReportApiKey;
-use App\Repository\ReportApiKeyRepository;
+use App\Company\Entity\ReportApiKey;
+use App\Company\Repository\ReportApiKeyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 class ReportApiKeyManager
