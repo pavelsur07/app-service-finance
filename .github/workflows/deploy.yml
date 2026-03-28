@@ -125,15 +125,28 @@ jobs:
               with:
                   ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-            - name: 🕐 Wait for services to be ready
-              run: sleep 5
-
             - name: 🧬 Run Doctrine migrations
               run: |
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
-                    echo "🚧 Выполняем миграции"
+                    set -e
                     cd ${{ secrets.SERVER_DIR }}/current
 
+                    echo "⏳ Ожидаем готовности site-php-fpm (до 90с)..."
+                    for i in $(seq 1 30); do
+                      STATUS=$(docker inspect --format='{{.State.Health.Status}}' site-php-fpm 2>/dev/null || echo "not_found")
+                      if [ "$STATUS" = "healthy" ]; then
+                        echo "✅ site-php-fpm healthy"
+                        break
+                      fi
+                      echo "  попытка $i/30: status=$STATUS"
+                      sleep 3
+                    done
+                    if [ "$STATUS" != "healthy" ]; then
+                      echo "❌ site-php-fpm не стал healthy за 90с"
+                      exit 1
+                    fi
+
+                    echo "🚧 Выполняем миграции"
                     APP_ENV="${{ secrets.APP_ENV }}" \
                     APP_SECRET="${{ secrets.APP_SECRET }}" \
                     DATABASE_URL="${{ secrets.DATABASE_URL }}" \
