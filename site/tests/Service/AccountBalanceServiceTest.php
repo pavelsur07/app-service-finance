@@ -11,7 +11,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\DTO\CashTransactionDTO;
+use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Enum\Accounts\MoneyAccountType;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;

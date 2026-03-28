@@ -6,7 +6,7 @@ namespace App\Cash\Service\PaymentPlan;
 
 use App\Cash\Entity\PaymentPlan\PaymentPlan;
 use App\Company\Entity\Company;
-use App\DTO\PaymentPlanDTO;
+use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use Doctrine\ORM\EntityManagerInterface;

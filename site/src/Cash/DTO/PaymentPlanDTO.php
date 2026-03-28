@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\DTO;
+namespace App\Cash\DTO;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;

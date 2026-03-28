@@ -7,7 +7,7 @@ use App\Cash\Service\PaymentPlan\PaymentCalendarFacade;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\DTO\PaymentPlanDTO;
+use App\Cash\DTO\PaymentPlanDTO;
 use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use Doctrine\ORM\EntityManagerInterface;

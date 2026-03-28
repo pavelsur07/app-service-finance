@@ -8,7 +8,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Repository\Accounts\MoneyAccountDailyBalanceRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;
-use App\DTO\ForecastDTO;
+use App\Cash\DTO\ForecastDTO;
 
 final class ForecastBalanceService
 {

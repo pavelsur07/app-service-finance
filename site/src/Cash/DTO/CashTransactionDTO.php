@@ -1,6 +1,8 @@
 <?php
 
-namespace App\DTO;
+declare(strict_types=1);
+
+namespace App\Cash\DTO;
 
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Enum\CounterpartyType;
