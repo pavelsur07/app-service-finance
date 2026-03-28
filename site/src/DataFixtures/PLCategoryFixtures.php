@@ -3,10 +3,10 @@
 namespace App\DataFixtures;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
-use App\Enum\PLCategoryType;
-use App\Enum\PLExpenseType;
-use App\Enum\PLFlow;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType;
+use App\Finance\Enum\PLExpenseType;
+use App\Finance\Enum\PLFlow;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Common\DataFixtures\DependentFixtureInterface;
 use Doctrine\Persistence\ObjectManager;

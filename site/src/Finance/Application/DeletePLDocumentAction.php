@@ -6,7 +6,7 @@ namespace App\Finance\Application;
 
 use App\Company\Facade\CompanyFacade;
 use App\Finance\Repository\DocumentRepository;
-use App\Service\PLRegisterUpdater;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**

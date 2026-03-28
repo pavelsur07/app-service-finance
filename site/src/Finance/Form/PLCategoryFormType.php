@@ -1,12 +1,14 @@
 <?php
 
-namespace App\Form;
+declare(strict_types=1);
 
-use App\Entity\PLCategory;
-use App\Enum\PLCategoryType as PLCategoryTypeEnum;
-use App\Enum\PLExpenseType;
-use App\Enum\PLFlow;
-use App\Enum\PLValueFormat;
+namespace App\Finance\Form;
+
+use App\Finance\Entity\PLCategory;
+use App\Finance\Enum\PLCategoryType as PLCategoryTypeEnum;
+use App\Finance\Enum\PLExpenseType;
+use App\Finance\Enum\PLFlow;
+use App\Finance\Enum\PLValueFormat;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;

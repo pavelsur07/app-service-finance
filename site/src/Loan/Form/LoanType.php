@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Loan\Form;
 
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Loan\Entity\Loan;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

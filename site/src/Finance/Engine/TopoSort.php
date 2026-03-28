@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Engine;
 
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 
 final class TopoSort
 {

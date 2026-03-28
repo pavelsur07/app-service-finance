@@ -10,9 +10,9 @@ use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\DocumentType;
-use App\Enum\PLFlow;
+use App\Finance\Enum\PLFlow;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
@@ -126,13 +126,13 @@ final class DocumentCopyControllerTest extends WebTestCase
 
     private function resetDatabase(EntityManagerInterface $em): void
     {
-        $em->createQuery('DELETE FROM App\\Entity\\DocumentOperation o')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Document d')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\PLDailyTotal t')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\PLCategory c')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\Counterparty c')->execute();
+        $em->createQuery('DELETE FROM App\\Finance\\Entity\\DocumentOperation o')->execute();
+        $em->createQuery('DELETE FROM App\\Finance\\Entity\\Document d')->execute();
+        $em->createQuery('DELETE FROM App\\Finance\\Entity\\PLDailyTotal t')->execute();
+        $em->createQuery('DELETE FROM App\\Finance\\Entity\\PLCategory c')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\Counterparty c')->execute();
         $em->createQuery('DELETE FROM App\\Company\\Entity\\Company c')->execute();
-        $em->createQuery('DELETE FROM App\\Entity\\User u')->execute();
+        $em->createQuery('DELETE FROM App\\Company\\Entity\\User u')->execute();
     }
 
     private function createUser(UserPasswordHasherInterface $hasher, string $email): User

@@ -2,19 +2,19 @@
 
 declare(strict_types=1);
 
-namespace App\Service;
+namespace App\Finance\Application\Service;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Company\Entity\Company;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
-use App\Entity\PLDailyTotal;
+use App\Finance\Entity\PLCategory;
+use App\Finance\Entity\PLDailyTotal;
 use App\Company\Entity\ProjectDirection;
-use App\Enum\PlNature;
+use App\Finance\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Repository\DocumentRepository;
-use App\Repository\PLDailyTotalRepository;
+use App\Finance\Repository\PLDailyTotalRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;
 

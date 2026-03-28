@@ -6,11 +6,11 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
 use App\Finance\Enum\DocumentType;
 use App\Company\Repository\ProjectDirectionRepository;
-use App\Service\PLRegisterUpdater;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

@@ -6,7 +6,7 @@ namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\ProjectDirection;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceSaleMappingRepository;

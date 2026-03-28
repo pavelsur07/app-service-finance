@@ -3,7 +3,7 @@
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use Doctrine\ORM\Mapping as ORM;

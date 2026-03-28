@@ -6,7 +6,7 @@ namespace App\Finance\Facade;
 
 use App\Company\Facade\CompanyFacade;
 use App\Finance\DTO\PLCategoryDTO;
-use App\Repository\PLCategoryRepository;
+use App\Finance\Repository\PLCategoryRepository;
 
 /**
  * Публичный API модуля Finance для других модулей.

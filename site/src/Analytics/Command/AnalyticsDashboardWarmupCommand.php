@@ -7,7 +7,7 @@ use App\Analytics\Application\DashboardSnapshotService;
 use App\Analytics\Application\PeriodResolver;
 use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Service\PLRegisterUpdater;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;

@@ -6,7 +6,7 @@ namespace App\Finance\Form;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Entity\PLCategory;
+use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\DocumentOperation;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;

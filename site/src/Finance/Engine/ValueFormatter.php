@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Engine;
 
-use App\Enum\PLValueFormat;
+use App\Finance\Enum\PLValueFormat;
 
 final class ValueFormatter
 {
