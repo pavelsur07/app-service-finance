@@ -70,7 +70,8 @@ COPY --from=frontend_builder /app/public/build ./public/build
 
 ENV APP_ENV=prod
 
-# Команды AssetMapper удалены, так как мы используем Vite
+RUN php bin/console assets:install public --no-debug \
+    && php bin/console importmap:install
 
 RUN chown www-data:www-data ./var -R
 
