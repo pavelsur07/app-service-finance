@@ -10,7 +10,7 @@ use App\Entity\DocumentOperation;
 use App\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
 use App\Form\DocumentType;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Repository\ProjectDirectionRepository;

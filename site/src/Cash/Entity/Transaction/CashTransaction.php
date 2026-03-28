@@ -6,7 +6,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\ProjectDirection;
 use Doctrine\Common\Collections\ArrayCollection;

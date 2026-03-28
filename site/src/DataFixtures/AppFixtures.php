@@ -8,7 +8,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Enum\MoneyAccountType;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;

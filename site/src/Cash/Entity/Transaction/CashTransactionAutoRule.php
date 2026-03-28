@@ -6,7 +6,7 @@ use App\Cash\Enum\Transaction\CashTransactionAutoRuleAction;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleOperationType;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Company\Entity\Company;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;

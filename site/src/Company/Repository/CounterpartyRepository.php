@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
+
+namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Counterparty;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

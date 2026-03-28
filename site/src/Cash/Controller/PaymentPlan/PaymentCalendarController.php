@@ -16,7 +16,7 @@ use App\Cash\Service\PaymentPlan\RecurrenceMaterializer;
 use App\Company\Entity\Company;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;

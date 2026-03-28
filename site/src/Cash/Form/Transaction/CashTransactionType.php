@@ -10,7 +10,7 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\DTO\CashTransactionDTO;
 use App\Entity\ProjectDirection;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Component\Form\AbstractType;
