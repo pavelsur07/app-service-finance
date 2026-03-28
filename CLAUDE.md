@@ -1,16 +1,184 @@
-# Claude Code Instructions — VashFinDir
+# CLAUDE.md — VashFinDir
 
-Читай перед любой задачей: ARCHITECTURE.md
+> Этот файл читается Claude Code автоматически при старте.
+> Содержит правила и запреты. Паттерны с примерами кода → `PATTERNS.md`.
 
-## Правила
-- Не создавай файлы в src/Entity/, src/Service/, src/Repository/
-- Новые Entity: string $companyId, UUID v7 в конструкторе
-- Межмодульно: только через Facade (см. ARCHITECTURE.md)
-- flush() только в Action, не в Repository
-- final class по умолчанию, declare(strict_types=1) везде
-- Комментарии на русском языке
+---
 
-## Перед написанием кода
-1. Уточни модуль
-2. Проверь ARCHITECTURE.md — есть ли уже нужный Facade/Enum
-3. Не выдумывай интерфейсы — спрашивай если неясно
+## Три файла — три роли
+
+| Файл | Назначение |
+|---|---|
+| `CLAUDE.md` | Правила, запреты, чеклисты — читать всегда |
+| `PATTERNS.md` | Паттерны с примерами кода — читать по задаче |
+| `ARCHITECTURE.md` | Живые данные: Facade, Enum, Entity — читать перед кодом |
+
+---
+
+## Перед написанием любого кода
+
+1. Прочитай `ARCHITECTURE.md` — актуальные Facade-методы, Enum-значения, статус Entity
+2. Уточни модуль если не указан явно
+3. Используй **только** Facade и Enum из `ARCHITECTURE.md` — не выдумывай
+4. Нет нужного Facade/метода — **спроси**, не создавай самостоятельно
+5. Нужен паттерн реализации → читай соответствующий раздел `PATTERNS.md`
+
+---
+
+## Куда класть новый код
+
+### ✅ Разрешено
+```
+src/{Module}/Controller/
+src/{Module}/Controller/Api/
+src/{Module}/Entity/
+src/{Module}/Repository/
+src/{Module}/Application/
+src/{Module}/Application/Command/
+src/{Module}/Application/DTO/
+src/{Module}/Application/Processor/
+src/{Module}/Application/Service/
+src/{Module}/Application/Source/
+src/{Module}/Domain/
+src/{Module}/Domain/ValueObject/
+src/{Module}/Domain/Service/
+src/{Module}/Infrastructure/
+src/{Module}/Infrastructure/Api/
+src/{Module}/Infrastructure/Query/
+src/{Module}/Infrastructure/Normalizer/
+src/{Module}/DTO/
+src/{Module}/Enum/
+src/{Module}/Facade/
+src/{Module}/Form/
+src/{Module}/Message/
+src/{Module}/MessageHandler/
+src/{Module}/EventSubscriber/
+src/{Module}/Exception/
+tests/Builders/{Module}/
+```
+
+### ❌ Запрещено — legacy-зона, не создавать новые файлы
+```
+src/Entity/
+src/Service/
+src/Repository/
+src/Controller/
+```
+
+---
+
+## Обязательные правила
+
+### Каждый PHP-файл
+```php
+<?php
+
+declare(strict_types=1);
+```
+`final class` по умолчанию · `readonly class` для DTO и stateless-сервисов · constructor injection `private readonly`
+
+### Entity — новые модули
+- UUID v7: `Uuid::uuid7()->toString()` — генерируется в **конструкторе Entity**
+- `#[ORM\Table(name: '...')]` — явное имя таблицы **всегда**
+- `string $companyId` вместо `#[ManyToOne] Company $company`
+- `companyId` неизменяем (нет setter'а), валидируется через `Assert::uuid()`
+- Ссылки на Entity других модулей: `string $counterpartyId`, не `#[ManyToOne]`
+- `DateTimeImmutable` везде, не `DateTime`
+- Паттерн полностью → `PATTERNS.md` раздел 11
+
+### Безопасность — IDOR (критично)
+- Каждый Repository-метод обязан принимать `string $companyId`
+- В контроллере всегда: `$company = $this->activeCompanyService->getActiveCompany()`
+- `$repo->find($id)` без company — **запрещено**, это IDOR-уязвимость
+- Паттерн полностью → `PATTERNS.md` раздел 14
+
+### Controller
+- Один контроллер = один action = метод `__invoke`
+- Маршруты через `#[Route]` атрибуты, не YAML
+- Ноль бизнес-логики — только HTTP in/out
+- Паттерн полностью → `PATTERNS.md` раздел 2
+
+### Action
+- `final class`, метод `__invoke`, без `Request`, без `Response`
+- `flush()` — только в Action, не в Repository
+- Паттерн полностью → `PATTERNS.md` раздел 3
+
+### Facade
+- Единственная точка входа между модулями
+- Запрещено импортировать `Service/`, `Repository/`, `Application/`, `Infrastructure/` чужого модуля
+- Паттерн полностью → `PATTERNS.md` раздел 7
+
+### Message (Messenger)
+- `readonly class` только с scalar ID — не Entity
+- Новый Message → добавить routing в `config/packages/messenger.yaml`
+- Handler: нет `Request`/`Session`/`Security` — CLI-контекст
+- Паттерн полностью → `PATTERNS.md` раздел 10
+
+### Формы с данными чужого модуля
+- `ChoiceType` с данными из Facade — не `EntityType` с чужой Entity
+- Паттерн полностью → `PATTERNS.md` раздел 8
+
+---
+
+## Глобальные запреты
+
+```
+dump() / dd() / var_dump()               — нельзя в коммитах
+new SomeService()                        — только constructor injection
+flush() в Repository                     — только в Action
+хардкод секретов / URL / API-ключей     — только через .env
+бизнес-логика в Controller               — вынести в Action
+бизнес-логика в Entity                   — только инварианты в конструкторе
+import Service/Repository из чужого модуля — только через Facade
+ManyToOne на Entity чужого модуля        — только string $entityId
+EntityType с чужой Entity в формах       — только ChoiceType + Facade
+SELECT * в raw SQL                        — явное перечисление колонок
+циклические зависимости между модулями   — нельзя
+getRepository() чужого модуля            — только через Facade
+```
+
+---
+
+## Тесты — минимальные требования перед merge
+
+- Новый Action → минимум один happy-path тест
+- Новый Domain Policy → unit-тесты на все ветки
+- Новая Entity → Builder в `tests/Builders/{Module}/`
+- Исправление бага → регрессионный тест
+
+Паттерны тестов и Builder → `PATTERNS.md` разделы 16, 17
+
+---
+
+## Новый модуль — чеклист конфигурации
+
+```yaml
+# 1. config/routes.yaml
+newmodule_controllers:
+    resource:
+        path: ../src/NewModule/Controller/
+        namespace: App\NewModule\Controller
+    type: attribute
+
+# 2. config/packages/doctrine.yaml
+NewModule:
+    type: attribute
+    is_bundle: false
+    dir: '%kernel.project_dir%/src/NewModule/Entity'
+    prefix: 'App\NewModule\Entity'
+    alias: NewModule
+
+# 3. config/packages/messenger.yaml (если есть async Messages)
+App\NewModule\Message\SomeMessage: async
+
+# 4. config/packages/twig.yaml (если есть шаблоны)
+paths:
+    '%kernel.project_dir%/templates/newmodule': NewModule
+```
+
+---
+
+## После реализации — обязательно
+
+Добавил новый Facade, Facade-метод или Enum → **обнови `ARCHITECTURE.md`**.
+Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
