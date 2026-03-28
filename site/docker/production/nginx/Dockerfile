@@ -3,7 +3,7 @@ FROM node:20-alpine AS frontend_builder
 WORKDIR /app
 COPY package.json package-lock.json ./
 # Используем install, если ci падает из-за несовпадения версий
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 
