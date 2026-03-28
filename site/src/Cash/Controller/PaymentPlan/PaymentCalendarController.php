@@ -17,7 +17,7 @@ use App\Company\Entity\Company;
 use App\DTO\ForecastDTO;
 use App\DTO\PaymentPlanDTO;
 use App\Company\Entity\Counterparty;
-use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;

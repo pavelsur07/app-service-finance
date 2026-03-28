@@ -5,7 +5,7 @@ namespace App\Tests\Controller\Cash;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\HttpFoundation\File\UploadedFile;

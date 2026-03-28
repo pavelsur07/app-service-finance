@@ -13,7 +13,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Entity\PLCategory;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

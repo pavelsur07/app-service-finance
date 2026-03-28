@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Enum;
+declare(strict_types=1);
+
+namespace App\Cash\Enum\Transaction;
 
 enum ConditionField: string
 {

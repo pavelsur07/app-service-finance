@@ -9,7 +9,7 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Company\Entity\Company;
 use App\DTO\PaymentPlanDTO;
 use App\Company\Entity\Counterparty;
-use App\Enum\PaymentPlanStatus;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

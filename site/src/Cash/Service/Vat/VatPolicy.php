@@ -4,7 +4,7 @@ namespace App\Cash\Service\Vat;
 
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
-use App\Enum\CompanyTaxSystem;
+use App\Company\Enum\CompanyTaxSystem;
 
 class VatPolicy
 {

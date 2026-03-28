@@ -10,7 +10,7 @@ use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Entity\Counterparty;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManager;

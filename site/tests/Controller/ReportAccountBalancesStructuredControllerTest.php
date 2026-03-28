@@ -8,7 +8,7 @@ use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;

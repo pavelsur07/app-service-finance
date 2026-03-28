@@ -7,7 +7,7 @@ use App\Cash\Entity\PaymentPlan\PaymentPlanMatch;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Repository\PaymentPlan\PaymentPlanMatchRepository;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
-use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;

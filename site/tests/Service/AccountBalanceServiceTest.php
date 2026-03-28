@@ -12,7 +12,7 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\DTO\CashTransactionDTO;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Doctrine\ORM\EntityManager;
 use Doctrine\ORM\Tools\SchemaTool;
 use Doctrine\ORM\Tools\Setup;

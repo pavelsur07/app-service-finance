@@ -10,7 +10,7 @@ use App\Cash\Entity\Accounts\MoneyFund;
 use App\Cash\Entity\Accounts\MoneyFundMovement;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;

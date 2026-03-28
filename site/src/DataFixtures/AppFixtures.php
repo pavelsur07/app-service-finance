@@ -9,7 +9,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Doctrine\Bundle\FixturesBundle\Fixture;
 use Doctrine\Persistence\ObjectManager;
 use Ramsey\Uuid\Nonstandard\Uuid;

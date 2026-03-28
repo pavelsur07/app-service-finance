@@ -7,8 +7,8 @@ use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Service\PaymentPlan\PaymentPlanService;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\PaymentPlanStatus as PaymentPlanStatusEnum;
-use App\Enum\PaymentPlanType as PaymentPlanTypeEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanStatus as PaymentPlanStatusEnum;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType as PaymentPlanTypeEnum;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

@@ -8,7 +8,7 @@ use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Service\DailyBalanceRecalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Query;

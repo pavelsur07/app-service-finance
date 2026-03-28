@@ -6,7 +6,7 @@ namespace App\Tests\Builders\Cash;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Company\Entity\Company;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Tests\Builders\Company\CompanyBuilder;
 
 final class MoneyAccountBuilder

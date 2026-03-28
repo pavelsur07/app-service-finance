@@ -6,7 +6,7 @@ namespace App\Tests\Unit\Company;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\CompanyTaxSystem;
+use App\Company\Enum\CompanyTaxSystem;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use PHPUnit\Framework\TestCase;
