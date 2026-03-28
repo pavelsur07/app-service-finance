@@ -8,7 +8,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Repository\Accounts\MoneyAccountRepository;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
-use App\DTO\CashTransactionDTO;
+use App\Cash\DTO\CashTransactionDTO;
 use App\Company\Entity\ProjectDirection;
 use App\Company\Repository\CounterpartyRepository;
 use App\Company\Repository\ProjectDirectionRepository;

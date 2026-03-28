@@ -10,7 +10,7 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
-use App\DTO\CashTransactionDTO;
+use App\Cash\DTO\CashTransactionDTO;
 use App\Finance\Entity\Document;
 use App\Message\EnqueueAutoRulesForRange;
 use App\Company\Repository\CounterpartyRepository;
