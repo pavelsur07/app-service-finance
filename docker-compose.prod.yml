@@ -14,7 +14,7 @@ services:
             - TZ=Europe/Moscow
         command:
             - --api.dashboard=true
-            # - --api.insecure=true       # (раскомментировать временно, чтобы зайти на http://<host>:8080/dashboard/)
+            - --api.insecure=true
             - --providers.docker=true
             - --providers.docker.exposedByDefault=false
             - --entrypoints.http.address=:80
@@ -27,7 +27,8 @@ services:
         ports:
             - "80:80"
             - "443:443"
-            - "8080:8080"    # Traefik dashboard (при insecure=true)
+            - "127.0.0.1:8080:8080"  # только loopback хоста; доступ через SSH-туннель:
+                                      # ssh -L 8080:localhost:8080 user@server → http://localhost:8080/dashboard/
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - traefik-certs:/certs
