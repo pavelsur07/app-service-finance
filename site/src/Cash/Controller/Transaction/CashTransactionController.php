@@ -2,6 +2,7 @@
 
 namespace App\Cash\Controller\Transaction;
 
+use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Cash\Form\Transaction\CashTransactionType;
@@ -10,10 +11,9 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Cash\Service\Transaction\CashTransactionToDocumentService;
-use App\Cash\DTO\CashTransactionDTO;
+use App\Company\Repository\CounterpartyRepository;
 use App\Finance\Entity\Document;
 use App\Message\EnqueueAutoRulesForRange;
-use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;

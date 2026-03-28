@@ -3,6 +3,7 @@
 namespace App\Cash\Service\Transaction;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
+use App\Cash\DTO\CashTransactionDTO;
 use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
@@ -12,7 +13,6 @@ use App\Cash\Service\PaymentPlan\PaymentPlanMatcher;
 use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
-use App\Cash\DTO\CashTransactionDTO;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
