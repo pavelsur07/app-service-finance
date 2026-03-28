@@ -208,6 +208,13 @@ class MarketplaceController extends AbstractController
     #[Route('/connection/{id}/sync-period', name: 'marketplace_connection_sync_period')]
     public function syncConnectionPeriod(string $id, Request $request): Response
     {
+        $company    = $this->companyService->getActiveCompany();
+        $connection = $this->connectionRepository->find($id);
+
+        if (!$connection || (string) $connection->getCompany()->getId() !== (string) $company->getId()) {
+            throw $this->createNotFoundException('Подключение не найдено');
+        }
+
         $dateFromStr = $request->query->get('date_from');
         $dateToStr   = $request->query->get('date_to');
 
@@ -232,8 +239,6 @@ class MarketplaceController extends AbstractController
             return $this->redirectToRoute('marketplace_index');
         }
 
-        $company = $this->companyService->getActiveCompany();
-
         try {
             $cmd   = new SyncConnectionCommand(
                 companyId:    (string) $company->getId(),
@@ -243,16 +248,13 @@ class MarketplaceController extends AbstractController
             );
             $count = ($this->syncConnectionAction)($cmd);
 
-            $connection = $this->connectionRepository->find($id);
             $this->addFlash('success', sprintf(
                 'Загружено %d записей от %s за период %s — %s.',
                 $count,
-                $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
+                $connection->getMarketplace()->getDisplayName(),
                 $fromDate->format('d.m.Y'),
                 $toDate->format('d.m.Y'),
             ));
-        } catch (\DomainException $e) {
-            throw $this->createNotFoundException($e->getMessage());
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка загрузки: ' . $e->getMessage());
         }
