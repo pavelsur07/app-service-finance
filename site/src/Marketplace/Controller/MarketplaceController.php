@@ -194,7 +194,7 @@ class MarketplaceController extends AbstractController
             $this->addFlash('success', sprintf(
                 'Загружено %d записей от %s.',
                 $count,
-                $connection->getMarketplace()->getDisplayName(),
+                $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
             ));
         } catch (\DomainException $e) {
             throw $this->createNotFoundException($e->getMessage());
@@ -243,9 +243,11 @@ class MarketplaceController extends AbstractController
             );
             $count = ($this->syncConnectionAction)($cmd);
 
+            $connection = $this->connectionRepository->find($id);
             $this->addFlash('success', sprintf(
-                'Загружено %d записей за период %s — %s.',
+                'Загружено %d записей от %s за период %s — %s.',
                 $count,
+                $connection?->getMarketplace()->getDisplayName() ?? 'маркетплейса',
                 $fromDate->format('d.m.Y'),
                 $toDate->format('d.m.Y'),
             ));

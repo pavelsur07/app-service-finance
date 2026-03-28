@@ -43,7 +43,8 @@ final class SyncConnectionAction
         try {
             $company  = $connection->getCompany();
             $adapter  = $this->adapterRegistry->get($connection->getMarketplace());
-            $response = $adapter->fetchRawReport($company, $command->fromDate, $command->toDate);
+            $response     = $adapter->fetchRawReport($company, $command->fromDate, $command->toDate);
+            $recordsCount = count($response);
 
             $rawDoc = new MarketplaceRawDocument(
                 Uuid::uuid4()->toString(),
@@ -55,15 +56,13 @@ final class SyncConnectionAction
             $rawDoc->setPeriodTo($command->toDate);
             $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
             $rawDoc->setRawData($response);
-            $rawDoc->setRecordsCount(count($response));
+            $rawDoc->setRecordsCount($recordsCount);
 
             $this->em->persist($rawDoc);
-            $this->em->flush();
-
             $connection->markSyncSuccess();
             $this->em->flush();
 
-            return count($response);
+            return $recordsCount;
         } catch (\Exception $e) {
             $connection->markSyncFailed($e->getMessage());
             $this->em->flush();
