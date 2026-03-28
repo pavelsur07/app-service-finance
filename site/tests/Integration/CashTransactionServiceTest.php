@@ -10,7 +10,7 @@ use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Enum\CounterpartyType;
 use App\DTO\CashTransactionDTO;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Enum\MoneyAccountType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;

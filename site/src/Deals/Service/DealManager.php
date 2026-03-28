@@ -23,8 +23,8 @@ use App\Deals\Service\Request\RemoveDealChargeRequest;
 use App\Deals\Service\Request\RemoveDealItemRequest;
 use App\Deals\Service\Request\UpdateDealHeaderRequest;
 use App\Deals\Service\Request\UpdateDealItemRequest;
-use App\Entity\Counterparty;
-use App\Repository\CounterpartyRepository;
+use App\Company\Entity\Counterparty;
+use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 

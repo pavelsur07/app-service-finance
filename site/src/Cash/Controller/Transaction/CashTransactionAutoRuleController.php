@@ -15,7 +15,7 @@ use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Cash\Repository\Transaction\CashTransactionAutoRuleRepository;
 use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionAutoRuleService;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Util\StringNormalizer;

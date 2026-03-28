@@ -4,7 +4,7 @@ namespace App\Deals\Service;
 
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealStatus;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 
 class DealFilter
 {

@@ -5,7 +5,7 @@ namespace App\Cash\Form\Transaction;
 use App\Cash\Entity\Transaction\CashTransactionAutoRuleCondition;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionField;
 use App\Cash\Enum\Transaction\CashTransactionAutoRuleConditionOperator;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\EnumType;

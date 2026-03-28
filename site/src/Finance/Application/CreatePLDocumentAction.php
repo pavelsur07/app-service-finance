@@ -6,14 +6,14 @@ namespace App\Finance\Application;
 
 use App\Company\Entity\Company;
 use App\Company\Infrastructure\Repository\CompanyRepository;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\ProjectDirection;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Repository\ProjectDirectionRepository;

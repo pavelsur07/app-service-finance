@@ -1,10 +1,11 @@
 <?php
 
-namespace App\Entity;
+declare(strict_types=1);
 
-use App\Company\Entity\Company;
+namespace App\Company\Entity;
+
 use App\Company\Enum\CounterpartyType;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Validator\Constraints as Assert;
 use Webmozart\Assert\Assert as WebAssert;

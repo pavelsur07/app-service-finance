@@ -6,7 +6,7 @@ use App\Cash\Entity\Accounts\MoneyAccount;
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Repository\PaymentPlan\PaymentPlanRepository;
 use App\Company\Entity\Company;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Enum\PaymentPlanStatus;
 use App\Cash\Enum\PaymentPlan\PaymentPlanSource;
 use App\Enum\PaymentPlanType;
