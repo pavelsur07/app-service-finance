@@ -6,7 +6,7 @@ use App\Company\Entity\Company;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Enum\DocumentType;
 use App\Service\PLRegisterUpdater;
 use Doctrine\Bundle\FixturesBundle\Fixture;

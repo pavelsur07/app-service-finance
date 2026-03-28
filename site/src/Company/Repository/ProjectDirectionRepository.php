@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
+
+namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

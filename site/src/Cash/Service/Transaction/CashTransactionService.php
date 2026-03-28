@@ -14,7 +14,7 @@ use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
 use App\DTO\CashTransactionDTO;
 use App\Company\Entity\Counterparty;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;
 use App\Service\DailyBalanceRecalculator;

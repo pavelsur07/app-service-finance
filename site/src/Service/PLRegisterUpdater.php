@@ -10,7 +10,7 @@ use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
 use App\Repository\DocumentRepository;

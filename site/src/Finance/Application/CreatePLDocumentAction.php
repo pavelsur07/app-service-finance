@@ -10,13 +10,13 @@ use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Company\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
-use App\Repository\ProjectDirectionRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\PLRegisterUpdater;
 use Ramsey\Uuid\Uuid;
 

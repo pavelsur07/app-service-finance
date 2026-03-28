@@ -7,7 +7,7 @@ namespace App\Finance\Controller;
 use App\Finance\Report\PlReportGridBuilder;
 use App\Finance\Report\PlReportPeriod;
 use App\Finance\Report\PlReportProjectsCompareBuilder;
-use App\Repository\ProjectDirectionRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\Onboarding\AccountBootstrapper;
 use App\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;

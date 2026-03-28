@@ -1,10 +1,12 @@
 <?php
 
-namespace App\Controller;
+declare(strict_types=1);
 
+namespace App\Company\Controller;
+
+use App\Company\Entity\ProjectDirection;
 use App\Company\Form\ProjectDirectionType;
-use App\Entity\ProjectDirection;
-use App\Repository\ProjectDirectionRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;

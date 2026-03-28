@@ -10,7 +10,7 @@ use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Enum\DocumentStatus;
 use App\Enum\DocumentType;
 use App\Enum\PLFlow;

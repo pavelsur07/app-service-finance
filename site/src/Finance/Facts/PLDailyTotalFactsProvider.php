@@ -7,10 +7,10 @@ namespace App\Finance\Facts;
 use App\Company\Entity\Company;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
-use App\Entity\ProjectDirection;
+use App\Company\Entity\ProjectDirection;
 use App\Finance\Report\PlReportPeriod;
 use App\Repository\PLCategoryRepository;
-use App\Repository\ProjectDirectionRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class PLDailyTotalFactsProvider implements FactsProviderInterface

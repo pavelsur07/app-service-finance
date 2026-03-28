@@ -13,7 +13,7 @@ use App\Form\DocumentType;
 use App\Company\Repository\CounterpartyRepository;
 use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
-use App\Repository\ProjectDirectionRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\PlNatureResolver;
 use App\Service\PLRegisterUpdater;
 use App\Shared\Service\ActiveCompanyService;
