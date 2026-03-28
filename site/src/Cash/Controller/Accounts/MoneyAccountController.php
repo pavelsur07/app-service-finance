@@ -68,6 +68,11 @@ class MoneyAccountController extends AbstractController
         MoneyAccount $account,
         AccountBalanceService $balanceService,
     ): Response {
+        $company = $this->activeCompanyService->getActiveCompany();
+        if ($account->getCompany() !== $company) {
+            throw $this->createNotFoundException();
+        }
+
         $form = $this->createForm(MoneyAccountFormType::class, $account);
         $form->handleRequest($request);
 
@@ -159,7 +164,6 @@ class MoneyAccountController extends AbstractController
 
             $this->moneyAccountService->update();
 
-            $company = $account->getCompany();
             $balanceService->recalculateDailyRange(
                 $company,
                 $account,
