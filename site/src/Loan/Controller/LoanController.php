@@ -12,7 +12,7 @@ use App\Loan\Form\LoanType;
 use App\Loan\Repository\LoanPaymentScheduleRepository;
 use App\Loan\Repository\LoanRepository;
 use App\Loan\Service\LoanScheduleToDocumentService;
-use App\Finance\Repository\PLCategoryRepository;
+use App\Finance\Facade\PLCategoryFacade;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -46,11 +46,11 @@ class LoanController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         ActiveCompanyService $activeCompanyService,
-        PLCategoryRepository $plCategoryRepository,
+        PLCategoryFacade $plCategoryFacade,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         $loan = new Loan($company, '', '0.00', new \DateTimeImmutable());
-        $categories = $plCategoryRepository->findTreeByCompany($company);
+        $categories = $plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
         $form = $this->createForm(LoanType::class, $loan, [
             'categories' => $categories,
         ]);
@@ -77,14 +77,14 @@ class LoanController extends AbstractController
         Request $request,
         EntityManagerInterface $entityManager,
         ActiveCompanyService $activeCompanyService,
-        PLCategoryRepository $plCategoryRepository,
+        PLCategoryFacade $plCategoryFacade,
     ): Response {
         $company = $activeCompanyService->getActiveCompany();
         if ($loan->getCompany() !== $company) {
             throw $this->createNotFoundException();
         }
 
-        $categories = $plCategoryRepository->findTreeByCompany($company);
+        $categories = $plCategoryFacade->findTreeEntitiesByCompanyId((string) $company->getId());
         $form = $this->createForm(LoanType::class, $loan, [
             'categories' => $categories,
         ]);
