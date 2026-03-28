@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
+
+namespace App\Company\Repository;
 
 use App\Company\Entity\Company;
-use App\Entity\ReportApiKey;
+use App\Company\Entity\ReportApiKey;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
