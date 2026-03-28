@@ -6,7 +6,7 @@ namespace App\Tests\Integration\Finance;
 
 use App\Company\Entity\Company;
 use App\Company\Enum\CounterpartyType;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\Document;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;

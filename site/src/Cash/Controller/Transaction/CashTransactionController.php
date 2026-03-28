@@ -13,7 +13,7 @@ use App\Cash\Service\Transaction\CashTransactionToDocumentService;
 use App\DTO\CashTransactionDTO;
 use App\Entity\Document;
 use App\Message\EnqueueAutoRulesForRange;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\CompanyContextService;
 use Doctrine\ORM\Exception\ORMException;

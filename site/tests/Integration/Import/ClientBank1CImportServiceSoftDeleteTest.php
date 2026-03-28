@@ -11,7 +11,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\ClientBank1CImportService;
 use App\Cash\Service\Import\ImportLogger;
 use App\Company\Entity\Company;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use App\Tests\Builders\Cash\MoneyAccountBuilder;
 use App\Tests\Builders\Company\CompanyBuilder;

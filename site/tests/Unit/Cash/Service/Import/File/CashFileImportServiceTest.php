@@ -9,7 +9,7 @@ use App\Cash\Service\Accounts\AccountBalanceService;
 use App\Cash\Service\Import\File\CashFileImportService;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
 use App\Cash\Service\Import\ImportLogger;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 

@@ -13,7 +13,7 @@ use App\Cash\Service\Vat\VatCalculator;
 use App\Cash\Service\Vat\VatPolicy;
 use App\Company\Entity\Company;
 use App\DTO\CashTransactionDTO;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use App\Entity\ProjectDirection;
 use App\Exception\CurrencyMismatchException;
 use App\Message\ApplyAutoRulesForTransaction;

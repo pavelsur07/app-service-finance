@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Controller;
+declare(strict_types=1);
 
+namespace App\Company\Controller;
+
+use App\Company\Entity\Counterparty;
 use App\Company\Enum\CounterpartyType as CounterpartyTypeEnum;
 use App\Company\Form\CounterpartyType;
-use App\Entity\Counterparty;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -135,7 +137,7 @@ class CounterpartyController extends AbstractController
             $counterparty->setIsArchived(false);
             $counterparty->setUpdatedAt(new \DateTimeImmutable());
             $em->flush();
-            $this->addFlash('success', 'Контрагент восстановлен');
+            $this->addFlash('success', 'Контрагент восстановлён');
         }
 
         return $this->redirectToRoute('counterparty_index');

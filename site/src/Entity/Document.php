@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
+use App\Company\Entity\Counterparty;
 use App\Enum\DocumentType;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\PLDocumentSource;

@@ -7,7 +7,7 @@ namespace App\Cash\Application;
 use App\Cash\Application\Command\ScoreCompanyCounterpartiesCommand;
 use App\Cash\Domain\Service\CounterpartyScoringMath;
 use App\Cash\Infrastructure\Query\CounterpartyHistoryQuery;
-use App\Repository\CounterpartyRepository;
+use App\Company\Repository\CounterpartyRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class ScoreCompanyCounterpartiesAction

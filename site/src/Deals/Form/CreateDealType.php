@@ -8,7 +8,7 @@ use App\Company\Entity\Company;
 use App\Deals\DTO\CreateDealFormData;
 use App\Deals\Enum\DealChannel;
 use App\Deals\Enum\DealType;
-use App\Entity\Counterparty;
+use App\Company\Entity\Counterparty;
 use Doctrine\ORM\EntityRepository;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;
