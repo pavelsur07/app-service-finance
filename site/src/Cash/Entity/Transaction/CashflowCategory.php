@@ -7,7 +7,7 @@ use App\Cash\Enum\Transaction\CashflowFlowKind;
 use App\Cash\Repository\Transaction\CashflowCategoryRepository;
 use App\Company\Entity\Company;
 use App\Finance\Entity\PLCategory;
-use App\Enum\PaymentPlanType;
+use App\Cash\Enum\PaymentPlan\PaymentPlanType;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

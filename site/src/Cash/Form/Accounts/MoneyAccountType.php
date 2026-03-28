@@ -3,7 +3,7 @@
 namespace App\Cash\Form\Accounts;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Enum\MoneyAccountType as MoneyAccountTypeEnum;
+use App\Cash\Enum\Accounts\MoneyAccountType as MoneyAccountTypeEnum;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\CheckboxType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;

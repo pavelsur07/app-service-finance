@@ -7,7 +7,7 @@ use App\Cash\Entity\Accounts\MoneyAccountDailyBalance;
 use App\Cash\Service\Accounts\AccountBalanceProvider;
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;

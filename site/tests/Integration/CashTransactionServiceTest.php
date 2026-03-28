@@ -11,7 +11,7 @@ use App\Cash\Service\Transaction\CashTransactionService;
 use App\Company\Enum\CounterpartyType;
 use App\DTO\CashTransactionDTO;
 use App\Company\Entity\Counterparty;
-use App\Enum\MoneyAccountType;
+use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;

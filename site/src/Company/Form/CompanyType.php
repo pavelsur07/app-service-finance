@@ -3,7 +3,7 @@
 namespace App\Company\Form;
 
 use App\Company\Entity\Company;
-use App\Enum\CompanyTaxSystem;
+use App\Company\Enum\CompanyTaxSystem;
 use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\ChoiceType;
 use Symfony\Component\Form\Extension\Core\Type\DateType;
