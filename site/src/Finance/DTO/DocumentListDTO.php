@@ -1,6 +1,8 @@
 <?php
 
-namespace App\DTO;
+declare(strict_types=1);
+
+namespace App\Finance\DTO;
 
 use App\Company\Entity\Company;
 

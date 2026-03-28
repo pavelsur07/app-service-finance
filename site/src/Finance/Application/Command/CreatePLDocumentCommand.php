@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Application\Command;
 
 use App\Finance\Enum\DocumentStatus;
-use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
 

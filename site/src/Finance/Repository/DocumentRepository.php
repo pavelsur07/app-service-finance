@@ -1,9 +1,11 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
 
-use App\DTO\DocumentListDTO;
-use App\Entity\Document;
+namespace App\Finance\Repository;
+
+use App\Finance\DTO\DocumentListDTO;
+use App\Finance\Entity\Document;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Pagerfanta\Doctrine\ORM\QueryAdapter;

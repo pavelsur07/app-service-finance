@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Finance\Application;
 
 use App\Company\Facade\CompanyFacade;
-use App\Repository\DocumentRepository;
+use App\Finance\Repository\DocumentRepository;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
 

@@ -2,12 +2,12 @@
 
 namespace App\Controller\Finance;
 
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
 use App\Enum\PlNature;
-use App\Repository\DocumentRepository;
+use App\Finance\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
 use App\Service\PlNatureResolver;
 use App\Shared\Service\ActiveCompanyService;

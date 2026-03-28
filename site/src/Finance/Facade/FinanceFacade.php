@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Finance\Facade;
 
-use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;

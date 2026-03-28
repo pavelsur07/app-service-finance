@@ -6,14 +6,14 @@ namespace App\Service;
 
 use App\Analytics\Infrastructure\Cache\SnapshotCacheInvalidator;
 use App\Company\Entity\Company;
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Entity\PLDailyTotal;
 use App\Company\Entity\ProjectDirection;
 use App\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
-use App\Repository\DocumentRepository;
+use App\Finance\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\EntityManagerInterface;

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Service;
 
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Enum\PlNature;
 
 final class PlNatureResolver

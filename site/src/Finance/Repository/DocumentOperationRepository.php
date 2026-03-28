@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Repository;
+declare(strict_types=1);
 
-use App\Entity\DocumentOperation;
+namespace App\Finance\Repository;
+
+use App\Finance\Entity\DocumentOperation;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 

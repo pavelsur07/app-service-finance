@@ -4,11 +4,11 @@ namespace App\Cash\Service\Transaction;
 
 use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Company\Entity\ProjectDirection;
-use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentType;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\PLRegisterUpdater;
 use Doctrine\ORM\EntityManagerInterface;
