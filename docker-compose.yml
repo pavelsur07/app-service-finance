@@ -83,6 +83,12 @@ services:
         context: site/docker
         dockerfile: development/php-cli/Dockerfile
       working_dir: /app
+      restart: unless-stopped
+      depends_on:
+        site-postgres:
+          condition: service_healthy
+        site-redis:
+          condition: service_healthy
       volumes:
         - ./site:/app
       command: php bin/console messenger:consume async --time-limit=3600 --memory-limit=256M -vv
