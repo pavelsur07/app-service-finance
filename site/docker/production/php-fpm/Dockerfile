@@ -70,8 +70,7 @@ COPY --from=frontend_builder /app/public/build ./public/build
 
 ENV APP_ENV=prod
 
-RUN php bin/console assets:install public --no-debug \
-    && php bin/console importmap:install
+RUN php bin/console assets:install public --no-debug
 
 RUN chown www-data:www-data ./var -R
 
