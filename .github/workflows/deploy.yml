@@ -163,7 +163,7 @@ jobs:
         runs-on: ubuntu-latest
         services:
             postgres:
-                image: postgres:16
+                image: postgres:15-alpine
                 env:
                     POSTGRES_DB: app
                     POSTGRES_USER: app
@@ -192,7 +192,7 @@ jobs:
             - name: 🐘 Setup PHP
               uses: shivammathur/setup-php@v2
               with:
-                  php-version: 8.2
+                  php-version: 8.3
                   tools: composer
 
             - name: 📦 Install dependencies
@@ -221,7 +221,7 @@ jobs:
               env:
                   APP_ENV: test
                   APP_DEBUG: 0
-                  DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=16&charset=utf8"
+                  DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=15&charset=utf8"
                   REDIS_DSN: "redis://127.0.0.1:6379"
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
