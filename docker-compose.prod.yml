@@ -14,12 +14,11 @@ services:
             - TZ=Europe/Moscow
         command:
             - --api.dashboard=true
-            - --api.insecure=false
+            - --api.insecure=true
             - --providers.docker=true
             - --providers.docker.exposedByDefault=false
             - --entrypoints.http.address=:80
             - --entrypoints.https.address=:443
-            - --entrypoints.traefik.address=127.0.0.1:8080
             - --certificatesresolvers.letsEncrypt.acme.httpChallenge=true
             - --certificatesresolvers.letsEncrypt.acme.httpChallenge.entryPoint=http
             - --certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru
@@ -28,8 +27,8 @@ services:
         ports:
             - "80:80"
             - "443:443"
-            # 8080 не пробрасывается наружу; дашборд доступен через SSH-туннель:
-            # ssh -L 8080:localhost:8080 user@server → http://localhost:8080/dashboard/
+            - "127.0.0.1:8080:8080"  # только loopback хоста; доступ через SSH-туннель:
+                                      # ssh -L 8080:localhost:8080 user@server → http://localhost:8080/dashboard/
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - traefik-certs:/certs
