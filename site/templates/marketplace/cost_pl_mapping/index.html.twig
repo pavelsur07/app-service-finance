@@ -39,6 +39,7 @@
                                 <th style="min-width: 280px">Категория ОПиУ</th>
                                 <th class="text-center">Включить в ОПиУ</th>
                                 <th style="width: 80px">Порядок</th>
+                                <th style="width: 60px"></th>
                             </tr>
                             </thead>
                             <tbody>
@@ -80,6 +81,19 @@
                                                class="form-control form-control-sm"
                                                min="0" step="10">
                                     </td>
+                                    <td>
+                                        {% if not category.isSystem %}
+                                            <button type="button"
+                                                    class="btn btn-sm btn-ghost-danger"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modal-delete-cost-category"
+                                                    data-id="{{ category.id }}"
+                                                    data-name="{{ category.name }}"
+                                                    data-marketplace="{{ selected_marketplace ?? '' }}">
+                                                Удалить
+                                            </button>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                             {% endfor %}
                             </tbody>
@@ -100,4 +114,53 @@
         {% endif %}
 
     </div>
+
+    {# Modal: Удалить категорию затрат #}
+    <div class="modal modal-blur fade" id="modal-delete-cost-category" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <form method="post" id="form-delete-cost-category">
+                    <input type="hidden" name="marketplace" id="delete-modal-marketplace" value="">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Удалить категорию затрат</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="alert alert-warning" role="alert">
+                            <div class="d-flex">
+                                <div>
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon alert-icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4" /><path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z" /><path d="M12 16h.01" /></svg>
+                                </div>
+                                <div>
+                                    <h4 class="alert-title">Внимание!</h4>
+                                    <div class="text-muted">
+                                        Категория затрат <strong id="delete-modal-category-name"></strong> будет удалена.
+                                        Привязка к категории ОПиУ также будет снята. Продолжить?
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="submit" class="btn btn-danger">Удалить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('modal-delete-cost-category').addEventListener('show.bs.modal', function (event) {
+            var btn = event.relatedTarget;
+            var categoryId = btn.getAttribute('data-id');
+            var categoryName = btn.getAttribute('data-name');
+            var marketplace = btn.getAttribute('data-marketplace');
+
+            document.getElementById('delete-modal-category-name').textContent = '"' + categoryName + '"';
+            document.getElementById('delete-modal-marketplace').value = marketplace;
+            document.getElementById('form-delete-cost-category').action =
+                '/marketplace/cost-pl-mapping/' + categoryId + '/delete-category';
+        });
+    </script>
 {% endblock %}
