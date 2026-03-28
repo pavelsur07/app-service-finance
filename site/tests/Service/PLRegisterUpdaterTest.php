@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Enum\PLFlow;
-use App\Repository\DocumentRepository;
+use App\Finance\Repository\DocumentRepository;
 use App\Repository\PLDailyTotalRepository;
 use App\Service\PlNatureResolver;
 use App\Service\PLRegisterUpdater;

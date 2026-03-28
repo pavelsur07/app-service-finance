@@ -1,16 +1,18 @@
 <?php
 
-namespace App\Entity;
+declare(strict_types=1);
+
+namespace App\Finance\Entity;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
-use App\Repository\DocumentRepository;
+use App\Finance\Repository\DocumentRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;

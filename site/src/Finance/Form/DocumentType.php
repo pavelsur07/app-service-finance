@@ -1,11 +1,13 @@
 <?php
 
-namespace App\Form;
+declare(strict_types=1);
+
+namespace App\Finance\Form;
 
 use App\Company\Entity\Counterparty;
-use App\Entity\Document;
 use App\Company\Entity\ProjectDirection;
-use App\Enum\DocumentType as DocumentTypeEnum;
+use App\Finance\Enum\DocumentType as DocumentTypeEnum;
+use App\Finance\Entity\Document;
 use App\Shared\Form\Type\ProjectDirectionPickerType;
 use Symfony\Bridge\Doctrine\Form\Type\EntityType;
 use Symfony\Component\Form\AbstractType;

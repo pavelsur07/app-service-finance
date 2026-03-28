@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Loan\Service;
 
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
-use App\Enum\DocumentType;
+use App\Finance\Enum\DocumentType;
 use App\Loan\Entity\Loan;
 use App\Loan\Entity\LoanPaymentSchedule;
 use Ramsey\Uuid\Uuid;

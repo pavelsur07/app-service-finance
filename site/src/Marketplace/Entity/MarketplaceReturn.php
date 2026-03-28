@@ -3,7 +3,7 @@
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
-use App\Entity\Document;
+use App\Finance\Entity\Document;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use Doctrine\ORM\Mapping as ORM;

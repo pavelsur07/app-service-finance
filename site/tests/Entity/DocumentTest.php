@@ -8,7 +8,7 @@ use App\Company\Entity\Company;
 use App\Company\Entity\User;
 use App\Company\Enum\CounterpartyType;
 use App\Company\Entity\Counterparty;
-use App\Entity\Document;
+use App\Finance\Entity\Document;
 use PHPUnit\Framework\TestCase;
 use Ramsey\Uuid\Uuid;
 

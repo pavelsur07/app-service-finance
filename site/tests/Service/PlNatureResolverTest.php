@@ -6,8 +6,8 @@ namespace App\Tests\Service;
 
 use App\Company\Entity\Company;
 use App\Company\Entity\User;
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Entity\PLCategory;
 use App\Enum\PLFlow;
 use App\Enum\PlNature;

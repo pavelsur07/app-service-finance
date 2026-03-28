@@ -1,17 +1,19 @@
 <?php
 
-namespace App\Controller;
+declare(strict_types=1);
+
+namespace App\Finance\Controller;
 
 use App\Cash\Entity\Transaction\CashTransaction;
 use App\Company\Entity\Company;
-use App\DTO\DocumentListDTO;
-use App\Entity\Document;
-use App\Entity\DocumentOperation;
+use App\Finance\DTO\DocumentListDTO;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
+use App\Finance\Form\DocumentType;
+use App\Finance\Repository\DocumentRepository;
 use App\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
-use App\Form\DocumentType;
 use App\Company\Repository\CounterpartyRepository;
-use App\Repository\DocumentRepository;
 use App\Repository\PLCategoryRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Service\PlNatureResolver;

@@ -1,6 +1,8 @@
 <?php
 
-namespace App\Enum;
+declare(strict_types=1);
+
+namespace App\Finance\Enum;
 
 enum DocumentType: string
 {

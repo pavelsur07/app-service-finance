@@ -1,10 +1,13 @@
 <?php
 
-namespace App\Entity;
+declare(strict_types=1);
+
+namespace App\Finance\Entity;
 
 use App\Company\Entity\Counterparty;
 use App\Company\Entity\ProjectDirection;
-use App\Repository\DocumentOperationRepository;
+use App\Entity\PLCategory;
+use App\Finance\Repository\DocumentOperationRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
