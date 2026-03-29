@@ -105,7 +105,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         return ['items' => $items, 'total' => $total];
     }
 
-    public function findById(
+    public function findByIdAndCompany(
         string $id,
         string $companyId,
     ): ?UnitEconomyCostMapping {

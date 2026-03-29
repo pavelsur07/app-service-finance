@@ -46,7 +46,7 @@ interface UnitEconomyCostMappingRepositoryInterface
         int $perPage,
     ): array;
 
-    public function findById(
+    public function findByIdAndCompany(
         string $id,
         string $companyId,
     ): ?UnitEconomyCostMapping;
