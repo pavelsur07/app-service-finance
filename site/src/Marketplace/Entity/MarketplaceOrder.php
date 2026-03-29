@@ -75,6 +75,7 @@ class MarketplaceOrder
         Assert::uuid($companyId);
         Assert::uuid($listingId);
         Assert::notEmpty($externalOrderId);
+        Assert::maxLength($externalOrderId, 100);
         Assert::greaterThan($quantity, 0);
 
         $this->companyId       = $companyId;
