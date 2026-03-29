@@ -6,11 +6,12 @@ namespace App\Marketplace\Entity;
 
 use App\Marketplace\Enum\AdvertisingType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Repository\MarketplaceAdvertisingCostRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: MarketplaceAdvertisingCostRepository::class)]
 #[ORM\Table(name: 'marketplace_advertising_costs')]
 #[ORM\UniqueConstraint(
     name: 'uniq_mp_adv_cost',

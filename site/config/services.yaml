@@ -69,6 +69,8 @@ services:
 
     App\Catalog\Domain\ProductSkuUniquenessChecker: '@App\Catalog\Infrastructure\ProductSkuUniquenessCheckerDoctrine'
 
+    App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
+
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:
         resource: '../src/Balance/Provider/'
