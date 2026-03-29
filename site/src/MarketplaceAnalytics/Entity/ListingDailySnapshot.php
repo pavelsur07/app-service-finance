@@ -8,7 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: \App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepository::class)]
 #[ORM\Table(name: 'listing_daily_snapshots')]
 #[ORM\UniqueConstraint(
     name: 'uniq_snapshot_company_listing_date',
