@@ -107,6 +107,25 @@ deletePLDocument(string $companyId, string $documentId): void
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
+### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)
+```php
+// Юнит-экономика по листингам за период
+// @return ListingUnitEconomics[]
+getUnitEconomics(string $companyId, AnalysisPeriod $period, ?string $marketplace): array
+
+// Сводка по портфелю за период
+getPortfolioSummary(string $companyId, AnalysisPeriod $period, ?string $marketplace): PortfolioSummary
+
+// Запросить async пересчёт снапшотов за период, возвращает jobId
+requestRecalc(string $companyId, AnalysisPeriod $period): string
+
+// Переназначить тип затрат для маппинга
+remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
+
+// Сбросить маппинг к системному значению
+resetCostMapping(string $companyId, string $mappingId): UnitEconomyCostMapping
+```
+
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
 ```php
 // Рекламные расходы по листингу и дате
