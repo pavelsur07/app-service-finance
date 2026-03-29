@@ -98,22 +98,20 @@ final class ListingDailySnapshotBuilder
             snapshotDate: $this->snapshotDate,
         );
 
-        if ($this->costPrice !== null || $this->salesQuantity !== 0) {
-            $snapshot->recalculate(
-                revenue: '0.00',
-                refunds: '0.00',
-                salesQuantity: $this->salesQuantity,
-                returnsQuantity: 0,
-                ordersQuantity: 0,
-                deliveredQuantity: 0,
-                avgSalePrice: '0.00',
-                costPrice: $this->costPrice,
-                totalCostPrice: null,
-                costBreakdown: [],
-                advertisingDetails: [],
-                dataQuality: [],
-            );
-        }
+        $snapshot->recalculate(
+            revenue: '0.00',
+            refunds: '0.00',
+            salesQuantity: $this->salesQuantity,
+            returnsQuantity: 0,
+            ordersQuantity: 0,
+            deliveredQuantity: 0,
+            avgSalePrice: '0.00',
+            costPrice: $this->costPrice,
+            totalCostPrice: null,
+            costBreakdown: [],
+            advertisingDetails: [],
+            dataQuality: [],
+        );
 
         return $snapshot;
     }
