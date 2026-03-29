@@ -19,7 +19,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['company_id'], name: 'idx_mp_adv_cost_company')]
 #[ORM\Index(columns: ['company_id', 'date'], name: 'idx_mp_adv_cost_company_date')]
 #[ORM\Index(columns: ['listing_id', 'date'], name: 'idx_mp_adv_cost_listing_date')]
-final class MarketplaceAdvertisingCost
+class MarketplaceAdvertisingCost
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
