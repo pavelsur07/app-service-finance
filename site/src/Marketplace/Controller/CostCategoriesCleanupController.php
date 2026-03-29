@@ -20,8 +20,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * но больше не используются ни одной записью marketplace_costs.
  *
  * Использование:
- *   GET  /marketplace/costs/admin/cleanup-categories          → предпросмотр
- *   GET  /marketplace/costs/admin/cleanup-categories?confirm=1 → удаление
+ *   GET  /marketplace/costs/admin/cleanup-categories               → предпросмотр (возвращает _token)
+ *   POST /marketplace/costs/admin/cleanup-categories confirm=1     → удаление (требует _token)
  *
  * Удаляет ТОЛЬКО категории без привязанных затрат (document_id проверяется через costs).
  * После удаления — удалить этот контроллер.
@@ -64,6 +64,9 @@ final class CostCategoriesCleanupController extends AbstractController
         );
 
         if (!$confirm) {
+            $csrfToken = $this->container->get('security.csrf.token_manager')
+                ->getToken('cleanup_categories')->getValue();
+
             return $this->json([
                 'action'    => 'preview',
                 'to_delete' => count($unused),
@@ -72,7 +75,8 @@ final class CostCategoriesCleanupController extends AbstractController
                     'name'       => $r['name'],
                     'created_at' => $r['created_at'],
                 ], $unused),
-                'next_step' => 'POST /marketplace/costs/admin/cleanup-categories with confirm=1&_token=<csrf_token>',
+                '_token'    => $csrfToken,
+                'next_step' => 'POST /marketplace/costs/admin/cleanup-categories with confirm=1&_token=<value from _token above>',
             ], 200, [], ['json_encode_options' => JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE]);
         }
 

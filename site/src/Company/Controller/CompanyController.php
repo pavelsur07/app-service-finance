@@ -41,11 +41,13 @@ class CompanyController extends AbstractController
 
         $request->getSession()->set('active_company_id', $company->getId());
 
-        $referer = $request->headers->get('referer', '');
-        $host = $request->getHost();
+        $referer = $request->headers->get('referer');
 
-        if ($referer !== '' && str_contains($referer, $host)) {
-            return $this->redirect($referer);
+        if ($referer !== null) {
+            $refererHost = parse_url($referer, PHP_URL_HOST);
+            if ($refererHost === $request->getHost()) {
+                return $this->redirect($referer);
+            }
         }
 
         return $this->redirectToRoute('app_home_index');
