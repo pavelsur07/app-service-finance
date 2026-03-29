@@ -107,6 +107,17 @@ deletePLDocument(string $companyId, string $documentId): void
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
+### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
+```php
+// Рекламные расходы по листингу и дате
+// @return AdvertisingCostDTO[]
+getAdvertisingCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+
+// Заказы по листингу и дате
+// @return OrderDTO[]
+getOrdersForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+```
+
 ---
 
 ## Enum — актуальные значения
