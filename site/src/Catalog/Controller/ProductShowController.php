@@ -14,8 +14,10 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Routing\RouterInterface;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Webmozart\Assert\Assert;
 
+#[IsGranted('ROLE_USER')]
 final class ProductShowController extends AbstractController
 {
     public function __construct(private readonly RouterInterface $router)

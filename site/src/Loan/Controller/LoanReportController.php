@@ -10,7 +10,9 @@ use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 class LoanReportController extends AbstractController
 {
     #[Route('/loans/report', name: 'loan_report', methods: ['GET'])]
