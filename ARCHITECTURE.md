@@ -129,6 +129,10 @@ getReturnsForListingAndDate(string $companyId, string $listingId, \DateTimeImmut
 // @return CostData[]
 getCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
 
+// Активные листинги компании (опционально — фильтр по маркетплейсу)
+// @return list<array{id: string, marketplace: string, marketplaceSku: string}>
+getActiveListings(string $companyId, ?string $marketplace): array
+
 // Себестоимость по листингу и дате (null если не задана)
 getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
 ```

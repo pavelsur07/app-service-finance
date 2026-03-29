@@ -162,6 +162,33 @@ final readonly class MarketplaceFacade
         ), $rows);
     }
 
+    /**
+     * @return list<array{id: string, marketplace: string, marketplaceSku: string}>
+     */
+    public function getActiveListings(string $companyId, ?string $marketplace): array
+    {
+        $qb = $this->connection->createQueryBuilder()
+            ->select('l.id', 'l.marketplace', 'l.marketplace_sku AS marketplace_sku')
+            ->from('marketplace_listings', 'l')
+            ->where('l.company_id = :companyId')
+            ->andWhere('l.is_active = :active')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('active', true);
+
+        if ($marketplace !== null) {
+            $qb->andWhere('l.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace);
+        }
+
+        $rows = $qb->executeQuery()->fetchAllAssociative();
+
+        return array_map(static fn(array $row) => [
+            'id' => $row['id'],
+            'marketplace' => $row['marketplace'],
+            'marketplaceSku' => $row['marketplace_sku'],
+        ], $rows);
+    }
+
     public function getCostPriceForListing(
         string $companyId,
         string $listingId,
