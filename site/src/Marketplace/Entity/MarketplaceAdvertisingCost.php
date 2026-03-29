@@ -73,6 +73,7 @@ class MarketplaceAdvertisingCost
         Assert::uuid($this->id);
         Assert::uuid($companyId);
         Assert::uuid($listingId);
+        Assert::numeric($amount);
         Assert::greaterThanEq((float) $amount, 0.0);
 
         $this->companyId          = $companyId;
@@ -90,6 +91,7 @@ class MarketplaceAdvertisingCost
 
     public function updateAmount(string $amount, array $analyticsData): void
     {
+        Assert::numeric($amount);
         Assert::greaterThanEq((float) $amount, 0.0);
 
         $this->amount        = $amount;
