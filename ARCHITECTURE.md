@@ -46,6 +46,7 @@
 | `MarketplaceJobLog` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceCostPLMapping` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
