@@ -6,11 +6,12 @@ namespace App\Marketplace\Entity;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\OrderStatus;
+use App\Marketplace\Repository\MarketplaceOrderRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: MarketplaceOrderRepository::class)]
 #[ORM\Table(name: 'marketplace_orders')]
 #[ORM\UniqueConstraint(
     name: 'uniq_mp_order',

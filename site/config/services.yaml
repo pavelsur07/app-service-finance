@@ -70,6 +70,7 @@ services:
     App\Catalog\Domain\ProductSkuUniquenessChecker: '@App\Catalog\Infrastructure\ProductSkuUniquenessCheckerDoctrine'
 
     App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
+    App\Marketplace\Repository\MarketplaceOrderRepositoryInterface: '@App\Marketplace\Repository\MarketplaceOrderRepository'
 
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:
