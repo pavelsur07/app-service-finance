@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Facade;
 
+use App\Marketplace\DTO\ActiveListingDTO;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\DTO\CostData;
 use App\Marketplace\DTO\OrderDTO;
@@ -163,7 +164,7 @@ final readonly class MarketplaceFacade
     }
 
     /**
-     * @return list<array{id: string, marketplace: string, marketplaceSku: string}>
+     * @return ActiveListingDTO[]
      */
     public function getActiveListings(string $companyId, ?string $marketplace): array
     {
@@ -182,11 +183,11 @@ final readonly class MarketplaceFacade
 
         $rows = $qb->executeQuery()->fetchAllAssociative();
 
-        return array_map(static fn(array $row) => [
-            'id' => $row['id'],
-            'marketplace' => $row['marketplace'],
-            'marketplaceSku' => $row['marketplace_sku'],
-        ], $rows);
+        return array_map(static fn(array $row) => new ActiveListingDTO(
+            id: $row['id'],
+            marketplace: $row['marketplace'],
+            marketplaceSku: $row['marketplace_sku'],
+        ), $rows);
     }
 
     public function getCostPriceForListing(
