@@ -38,7 +38,7 @@ final readonly class SnapshotRecalcPolicy
             foreach ($listings as $listing) {
                 $this->snapshotCalculationPolicy->calculateForListingDay(
                     $companyId,
-                    $listing['id'],
+                    $listing->id,
                     $current,
                 );
             }
