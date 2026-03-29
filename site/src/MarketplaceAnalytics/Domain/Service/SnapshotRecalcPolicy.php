@@ -16,20 +16,17 @@ final readonly class SnapshotRecalcPolicy
 
     public function recalcBySchedule(string $companyId, int $lookbackDays): void
     {
-        $listings = $this->marketplaceFacade->getActiveListings($companyId, null);
-        $today = new \DateTimeImmutable('today');
-
-        for ($i = 1; $i <= $lookbackDays; $i++) {
-            $date = $today->modify("-{$i} day");
-
-            foreach ($listings as $listing) {
-                $this->snapshotCalculationPolicy->calculateForListingDay(
-                    $companyId,
-                    $listing['id'],
-                    $date,
-                );
-            }
+        if ($lookbackDays <= 0) {
+            return;
         }
+
+        $today = new \DateTimeImmutable('today');
+        $period = new AnalysisPeriod(
+            $today->modify("-{$lookbackDays} day"),
+            $today->modify('-1 day'),
+        );
+
+        $this->recalcByUserRequest($companyId, $period);
     }
 
     public function recalcByUserRequest(string $companyId, AnalysisPeriod $period): void
