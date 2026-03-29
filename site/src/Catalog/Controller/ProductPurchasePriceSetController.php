@@ -11,7 +11,9 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 final class ProductPurchasePriceSetController extends AbstractController
 {
     #[Route('/catalog/products/{id}/purchase-prices', name: 'catalog_products_purchase_prices_set', methods: ['POST'])]
