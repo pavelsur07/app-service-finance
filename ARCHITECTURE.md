@@ -45,6 +45,7 @@
 | `MarketplaceOzonRealization` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceJobLog` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceCostPLMapping` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
