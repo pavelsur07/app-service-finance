@@ -52,6 +52,7 @@
                                     <div class="btn-list">
                                         <a class="btn btn-sm btn-outline-primary" href="{{ path('moysklad_connections_edit', {id: connection.id}) }}">Редактировать</a>
                                         <form method="post" action="{{ path('moysklad_connections_delete', {id: connection.id}) }}" onsubmit="return confirm('Удалить подключение?');">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('delete' ~ connection.id) }}">
                                             <button type="submit" class="btn btn-sm btn-outline-danger">Удалить</button>
                                         </form>
                                     </div>

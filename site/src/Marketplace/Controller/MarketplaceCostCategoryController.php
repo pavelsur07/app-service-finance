@@ -123,8 +123,8 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle')]
-    public function toggle(string $id): Response
+    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle', methods: ['POST'])]
+    public function toggle(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
 
@@ -132,6 +132,10 @@ class MarketplaceCostCategoryController extends AbstractController
 
         if (!$category || $category->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('toggle' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         $category->setIsActive(!$category->isActive());
@@ -144,7 +148,7 @@ class MarketplaceCostCategoryController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'])]
-    public function delete(string $id): Response
+    public function delete(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
 
@@ -152,6 +156,10 @@ class MarketplaceCostCategoryController extends AbstractController
 
         if (!$category || $category->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException();
+        }
+
+        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         // Проверка: системная категория
