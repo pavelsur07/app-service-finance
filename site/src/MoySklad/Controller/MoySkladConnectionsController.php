@@ -129,8 +129,12 @@ final class MoySkladConnectionsController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'moysklad_connections_delete', methods: ['POST'])]
-    public function delete(string $id, DeleteMoySkladConnectionAction $action): Response
+    public function delete(string $id, Request $request, DeleteMoySkladConnectionAction $action): Response
     {
+        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
         $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
 
         try {

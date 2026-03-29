@@ -6,6 +6,7 @@ namespace App\Marketplace\Controller;
 
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
@@ -63,35 +64,49 @@ final class AdminCleanupController extends AbstractController
         $html .= '<table><tr><th>Таблица</th><th>Записей</th></tr>';
         foreach ($counts as $table => $count) {
             $class = $count > 0 ? 'warn' : 'ok';
-            $html .= "<tr><td>{$table}</td><td class='{$class}'>{$count}</td></tr>";
+            $t = htmlspecialchars($table, ENT_QUOTES, 'UTF-8');
+            $html .= "<tr><td>{$t}</td><td class='{$class}'>{$count}</td></tr>";
         }
         $html .= '</table>';
 
         $html .= '<p><strong>Привязанные листинги (потребуют повторного маппинга):</strong></p>';
         $html .= '<table><tr><th>ID</th><th>Маркетплейс</th><th>SKU</th><th>Название</th></tr>';
         foreach ($mappedListings as $row) {
-            $html .= "<tr><td>{$row['id']}</td><td>{$row['marketplace']}</td><td>{$row['marketplace_sku']}</td><td>{$row['name']}</td></tr>";
+            $id = htmlspecialchars((string) $row['id'], ENT_QUOTES, 'UTF-8');
+            $mp = htmlspecialchars((string) $row['marketplace'], ENT_QUOTES, 'UTF-8');
+            $sku = htmlspecialchars((string) $row['marketplace_sku'], ENT_QUOTES, 'UTF-8');
+            $name = htmlspecialchars((string) $row['name'], ENT_QUOTES, 'UTF-8');
+            $html .= "<tr><td>{$id}</td><td>{$mp}</td><td>{$sku}</td><td>{$name}</td></tr>";
         }
         $html .= '</table>';
 
         $html .= '<p><strong>Подключения (статус сбросится, подключения сохранятся):</strong></p>';
         $html .= '<table><tr><th>ID</th><th>Маркетплейс</th><th>last_sync_at</th></tr>';
         foreach ($connections as $row) {
-            $html .= "<tr><td>{$row['id']}</td><td>{$row['marketplace']}</td><td>{$row['last_sync_at']}</td></tr>";
+            $cId = htmlspecialchars((string) $row['id'], ENT_QUOTES, 'UTF-8');
+            $cMp = htmlspecialchars((string) $row['marketplace'], ENT_QUOTES, 'UTF-8');
+            $cSync = htmlspecialchars((string) ($row['last_sync_at'] ?? ''), ENT_QUOTES, 'UTF-8');
+            $html .= "<tr><td>{$cId}</td><td>{$cMp}</td><td>{$cSync}</td></tr>";
         }
         $html .= '</table>';
 
-        $html .= '<a href="/admin/marketplace-cleanup/run" class="btn"
-                     onclick="return confirm(\'Точно выполнить очистку? Это необратимо.\')">
-                     🗑 Выполнить очистку
-                  </a>';
+        $csrfToken = $this->container->get('security.csrf.token_manager')->getToken('admin_marketplace_cleanup')->getValue();
+        $html .= '<form method="POST" action="/admin/marketplace-cleanup/run" style="display:inline"
+                     onsubmit="return confirm(\'Точно выполнить очистку? Это необратимо.\')">
+                     <input type="hidden" name="_token" value="' . htmlspecialchars($csrfToken, ENT_QUOTES, 'UTF-8') . '">
+                     <button type="submit" class="btn">Выполнить очистку</button>
+                  </form>';
 
         return new Response($html);
     }
 
-    #[Route('/run', name: 'admin_marketplace_cleanup_run', methods: ['GET'])]
-    public function run(): Response
+    #[Route('/run', name: 'admin_marketplace_cleanup_run', methods: ['POST'])]
+    public function run(Request $request): Response
     {
+        if (!$this->isCsrfTokenValid('admin_marketplace_cleanup', $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
         $this->connection->beginTransaction();
 
         try {

@@ -119,6 +119,65 @@ enum AuditLogAction: string
 }
 ```
 
+### `src/Marketplace/Enum/AdvertisingType.php`
+```php
+enum AdvertisingType: string
+{
+    case CPC = 'cpc';
+    case OTHER = 'other';
+    case EXTERNAL = 'external';
+}
+```
+
+### `src/Marketplace/Enum/OrderStatus.php`
+```php
+enum OrderStatus: string
+{
+    case ORDERED = 'ordered';
+    case DELIVERED = 'delivered';
+    case RETURNED = 'returned';
+    case CANCELLED = 'cancelled';
+}
+```
+
+### `src/MarketplaceAnalytics/Enum/UnitEconomyCostType.php`
+```php
+enum UnitEconomyCostType: string
+{
+    case LOGISTICS_TO = 'logistics_to';
+    case LOGISTICS_BACK = 'logistics_back';
+    case STORAGE = 'storage';
+    case ADVERTISING_CPC = 'advertising_cpc';
+    case ADVERTISING_OTHER = 'advertising_other';
+    case ADVERTISING_EXTERNAL = 'advertising_external';
+    case COMMISSION = 'commission';
+    case OTHER = 'other';
+
+    public function isAdvertising(): bool; // true для ADVERTISING_CPC, ADVERTISING_OTHER, ADVERTISING_EXTERNAL
+}
+```
+
+### `src/MarketplaceAnalytics/Enum/DataQualityFlag.php`
+```php
+enum DataQualityFlag: string
+{
+    case COST_PRICE_MISSING = 'cost_price_missing';
+    case API_ADVERTISING_MISSING = 'api_advertising_missing';
+    case API_STORAGE_MISSING = 'api_storage_missing';
+    case API_ORDERS_MISSING = 'api_orders_missing';
+    case DATA_DELAYED = 'data_delayed';
+}
+```
+
+### `src/MarketplaceAnalytics/Enum/SnapshotRecalcScope.php`
+```php
+enum SnapshotRecalcScope: string
+{
+    case SINGLE_DAY = 'single_day';
+    case DATE_RANGE = 'date_range';
+}
+```
+
 > **Остальные Enum** (ProductStatus, TransactionType, MarketplaceType и др.) добавлять сюда по мере реализации.
 > Не угадывать значения — спрашивать или смотреть в исходниках.
 

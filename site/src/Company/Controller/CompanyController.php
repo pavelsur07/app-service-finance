@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Company\Controller;
 
 use App\Balance\Service\BalanceStructureSeeder;
@@ -12,7 +14,9 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 #[Route('/company')]
 class CompanyController extends AbstractController
 {
@@ -39,7 +43,16 @@ class CompanyController extends AbstractController
 
         $request->getSession()->set('active_company_id', $company->getId());
 
-        return $this->redirect($request->headers->get('referer') ?: $this->generateUrl('app_home_index'));
+        $referer = $request->headers->get('referer');
+
+        if ($referer !== null) {
+            $refererHost = parse_url($referer, PHP_URL_HOST);
+            if ($refererHost === $request->getHost()) {
+                return $this->redirect($referer);
+            }
+        }
+
+        return $this->redirectToRoute('app_home_index');
     }
 
     #[Route('/new', name: 'company_new', methods: ['GET', 'POST'])]
@@ -65,18 +78,28 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}', name: 'company_show', methods: ['GET'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function show(string $id, Company $company): Response
+    public function show(string $id, CompanyRepository $companyRepository): Response
     {
-        // Можно добавить проверку владельца!
+        $company = $companyRepository->find($id);
+
+        if (!$company || $company->getUser() !== $this->getUser()) {
+            throw $this->createNotFoundException();
+        }
+
         return $this->render('company/show.html.twig', [
             'company' => $company,
         ]);
     }
 
     #[Route('/{id}/edit', name: 'company_edit', methods: ['GET', 'POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function edit(string $id, Request $request, Company $company, EntityManagerInterface $em): Response
+    public function edit(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em): Response
     {
-        // Можно добавить проверку владельца!
+        $company = $companyRepository->find($id);
+
+        if (!$company || $company->getUser() !== $this->getUser()) {
+            throw $this->createNotFoundException();
+        }
+
         $form = $this->createForm(CompanyType::class, $company);
         $form->handleRequest($request);
 
@@ -93,8 +116,14 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/delete', name: 'company_delete', methods: ['POST'], requirements: ['id' => '[0-9a-fA-F-]{36}'])]
-    public function delete(Request $request, Company $company, EntityManagerInterface $em): Response
+    public function delete(string $id, Request $request, CompanyRepository $companyRepository, EntityManagerInterface $em): Response
     {
+        $company = $companyRepository->find($id);
+
+        if (!$company || $company->getUser() !== $this->getUser()) {
+            throw $this->createNotFoundException();
+        }
+
         if ($this->isCsrfTokenValid('delete'.$company->getId(), $request->request->get('_token'))) {
             $em->remove($company);
             $em->flush();
