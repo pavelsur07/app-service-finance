@@ -7,6 +7,7 @@ namespace App\MarketplaceAnalytics\Domain\Service;
 use App\Marketplace\DTO\AdvertisingCostDTO;
 use App\Marketplace\Enum\AdvertisingType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\OrderStatus;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Domain\ValueObject\AdvertisingCpcMetrics;
 use App\MarketplaceAnalytics\Domain\ValueObject\AdvertisingDetails;
@@ -162,7 +163,7 @@ final readonly class SnapshotCalculationPolicy
         $ordersQuantity = count($orders);
         $deliveredQuantity = 0;
         foreach ($orders as $order) {
-            if ($order->status->value === 'delivered') {
+            if ($order->status === OrderStatus::DELIVERED) {
                 $deliveredQuantity++;
             }
         }

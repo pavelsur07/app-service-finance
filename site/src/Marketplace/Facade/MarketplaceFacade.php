@@ -90,6 +90,7 @@ final readonly class MarketplaceFacade
             quantity: (int) $row['quantity'],
             pricePerUnit: $row['price_per_unit'],
             totalRevenue: $row['total_revenue'],
+            rawData: $row['raw_data'] !== null ? json_decode($row['raw_data'], true) : null,
         ), $rows);
     }
 
