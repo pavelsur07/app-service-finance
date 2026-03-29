@@ -116,6 +116,21 @@ getAdvertisingCostsForListingAndDate(string $companyId, string $listingId, \Date
 // Заказы по листингу и дате
 // @return OrderDTO[]
 getOrdersForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+
+// Продажи по листингу и дате
+// @return SaleData[]
+getSalesForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+
+// Возвраты по листингу и дате
+// @return ReturnData[]
+getReturnsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+
+// Затраты по листингу и дате
+// @return CostData[]
+getCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutable $date): array
+
+// Себестоимость по листингу и дате (null если не задана)
+getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
 ```
 
 ---
