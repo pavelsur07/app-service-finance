@@ -8,6 +8,7 @@ final readonly class RecalcSnapshotsMessage
 {
     public function __construct(
         public string $companyId,
-        public string $snapshotDate,
+        public string $dateFrom,
+        public string $dateTo,
     ) {}
 }
