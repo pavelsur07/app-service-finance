@@ -48,6 +48,7 @@
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
+| `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
