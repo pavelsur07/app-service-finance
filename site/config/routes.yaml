@@ -85,6 +85,12 @@ telegram_integration_controllers:
     type: attribute
 
 # Marketplace controller routes (Ozon/Wildberries) removed intentionally.
+marketplace_analytics_controllers:
+    resource:
+        path: ../src/MarketplaceAnalytics/Controller/
+        namespace: App\MarketplaceAnalytics\Controller
+    type: attribute
+
 admin:
     resource: routes/admin.yaml
 
