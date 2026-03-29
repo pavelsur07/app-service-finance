@@ -7,7 +7,9 @@ namespace App\Loan\Controller;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 final class LoanScheduleTemplateController extends AbstractController
 {
     #[Route('/loans/schedule/template', name: 'loan_schedule_template', methods: ['GET'])]

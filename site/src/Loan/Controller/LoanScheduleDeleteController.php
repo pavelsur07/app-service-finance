@@ -13,7 +13,9 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+#[IsGranted('ROLE_USER')]
 final class LoanScheduleDeleteController extends AbstractController
 {
     #[Route('/loans/{loanId}/schedule/{itemId}/delete', name: 'loan_schedule_delete', methods: ['POST'])]
