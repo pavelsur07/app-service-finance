@@ -130,6 +130,10 @@ final class CostPLMappingController extends AbstractController
             throw $this->createNotFoundException();
         }
 
+        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
         if ($category->isSystem()) {
             $this->addFlash('error', 'Невозможно удалить системную категорию');
             return $this->redirectToRoute('marketplace_cost_pl_mapping_index', ['marketplace' => $marketplace]);

@@ -92,15 +92,19 @@
                                                     data-marketplace="{{ connection.marketplace.value }}">
                                                 Переобработать
                                             </button>
-                                            <a href="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" class="btn btn-sm btn-outline-secondary">
-                                                {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
-                                            </a>
+                                            <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" style="display:inline">
+                                                <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ connection.id) }}">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                                    {{ connection.isActive ? 'Деактивировать' : 'Активировать' }}
+                                                </button>
+                                            </form>
                                             <button type="button"
                                                     class="btn btn-sm btn-outline-danger"
                                                     data-bs-toggle="modal"
                                                     data-bs-target="#modal-delete-connection"
                                                     data-connection-id="{{ connection.id }}"
-                                                    data-action="{{ path('marketplace_connection_delete', {id: connection.id}) }}">
+                                                    data-action="{{ path('marketplace_connection_delete', {id: connection.id}) }}"
+                                                    data-token="{{ csrf_token('delete' ~ connection.id) }}">
                                                 Удалить
                                             </button>
                                         </div>
@@ -374,6 +378,7 @@
                             </div>
                             <div class="col">
                                 <form method="post" id="form-delete-connection" action="">
+                                    <input type="hidden" name="_token" id="delete-connection-token" value="">
                                     <button type="submit" class="btn btn-danger w-100">Удалить</button>
                                 </form>
                             </div>
@@ -461,6 +466,7 @@
         // modal-delete-connection — подставляем action из data-action кнопки
         document.getElementById('modal-delete-connection').addEventListener('show.bs.modal', function (event) {
             document.getElementById('form-delete-connection').action = event.relatedTarget.getAttribute('data-action');
+            document.getElementById('delete-connection-token').value = event.relatedTarget.getAttribute('data-token');
         });
 
         // modal-apply-realization — подставляем href из data-action кнопки

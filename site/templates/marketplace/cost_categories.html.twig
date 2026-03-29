@@ -86,17 +86,20 @@
                                    data-is-active="{{ category.isActive ? '1' : '0' }}">
                                     Редактировать
                                 </a>
-                                <a href="{{ path('marketplace_cost_categories_toggle', {id: category.id}) }}"
-                                   class="btn btn-sm btn-ghost-{{ category.isActive ? 'warning' : 'success' }}">
-                                    {{ category.isActive ? 'Деактивировать' : 'Активировать' }}
-                                </a>
+                                <form method="post" action="{{ path('marketplace_cost_categories_toggle', {id: category.id}) }}" style="display:inline">
+                                    <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ category.id) }}">
+                                    <button type="submit" class="btn btn-sm btn-ghost-{{ category.isActive ? 'warning' : 'success' }}">
+                                        {{ category.isActive ? 'Деактивировать' : 'Активировать' }}
+                                    </button>
+                                </form>
                                 {% if not category.isSystem %}
                                     <a href="#"
                                        class="btn btn-sm btn-ghost-danger"
                                        data-bs-toggle="modal"
                                        data-bs-target="#modal-delete-category"
                                        data-id="{{ category.id }}"
-                                       data-name="{{ category.name }}">
+                                       data-name="{{ category.name }}"
+                                       data-token="{{ csrf_token('delete' ~ category.id) }}">
                                         Удалить
                                     </a>
                                 {% endif %}
@@ -198,6 +201,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" id="form-delete-category">
+                    <input type="hidden" name="_token" id="delete-category-token" value="">
                     <div class="modal-header">
                         <h5 class="modal-title">Удалить категорию</h5>
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -245,6 +249,7 @@
 
             document.getElementById('delete-category-name').textContent = categoryName;
             document.getElementById('form-delete-category').action = '/marketplace/cost-categories/' + categoryId + '/delete';
+            document.getElementById('delete-category-token').value = btn.getAttribute('data-token');
         });
     </script>
 {% endblock %}

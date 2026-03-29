@@ -563,8 +563,8 @@ class MarketplaceController extends AbstractController
         ]);
     }
 
-    #[Route('/connection/{id}/toggle', name: 'marketplace_connection_toggle')]
-    public function toggleConnection(string $id): Response
+    #[Route('/connection/{id}/toggle', name: 'marketplace_connection_toggle', methods: ['POST'])]
+    public function toggleConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
 
@@ -572,6 +572,10 @@ class MarketplaceController extends AbstractController
 
         if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->isCsrfTokenValid('toggle' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         $connection->setIsActive(!$connection->isActive());
@@ -584,7 +588,7 @@ class MarketplaceController extends AbstractController
     }
 
     #[Route('/connection/{id}/delete', name: 'marketplace_connection_delete', methods: ['POST'])]
-    public function deleteConnection(string $id): Response
+    public function deleteConnection(string $id, Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
 
@@ -592,6 +596,10 @@ class MarketplaceController extends AbstractController
 
         if (!$connection || $connection->getCompany()->getId() !== $company->getId()) {
             throw $this->createNotFoundException('Подключение не найдено');
+        }
+
+        if (!$this->isCsrfTokenValid('delete' . $id, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
         $this->em->remove($connection);

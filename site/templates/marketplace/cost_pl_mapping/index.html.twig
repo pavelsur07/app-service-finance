@@ -89,7 +89,8 @@
                                                     data-bs-target="#modal-delete-cost-category"
                                                     data-url="{{ path('marketplace_cost_pl_mapping_delete_category', {id: category.id}) }}"
                                                     data-name="{{ category.name }}"
-                                                    data-marketplace="{{ selected_marketplace ?? '' }}">
+                                                    data-marketplace="{{ selected_marketplace ?? '' }}"
+                                                    data-token="{{ csrf_token('delete' ~ category.id) }}">
                                                 Удалить
                                             </button>
                                         {% endif %}
@@ -120,6 +121,7 @@
         <div class="modal-dialog modal-dialog-centered" role="document">
             <div class="modal-content">
                 <form method="post" id="form-delete-cost-category">
+                    <input type="hidden" name="_token" id="delete-modal-token" value="">
                     <input type="hidden" name="marketplace" id="delete-modal-marketplace" value="">
                     <div class="modal-header">
                         <h5 class="modal-title">Удалить категорию затрат</h5>
@@ -159,6 +161,7 @@
 
             document.getElementById('delete-modal-category-name').textContent = '"' + categoryName + '"';
             document.getElementById('delete-modal-marketplace').value = marketplace;
+            document.getElementById('delete-modal-token').value = btn.getAttribute('data-token');
             document.getElementById('form-delete-cost-category').action = url;
         });
     </script>
