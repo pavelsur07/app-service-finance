@@ -119,6 +119,27 @@ enum AuditLogAction: string
 }
 ```
 
+### `src/Marketplace/Enum/AdvertisingType.php`
+```php
+enum AdvertisingType: string
+{
+    case CPC = 'cpc';
+    case OTHER = 'other';
+    case EXTERNAL = 'external';
+}
+```
+
+### `src/Marketplace/Enum/OrderStatus.php`
+```php
+enum OrderStatus: string
+{
+    case ORDERED = 'ordered';
+    case DELIVERED = 'delivered';
+    case RETURNED = 'returned';
+    case CANCELLED = 'cancelled';
+}
+```
+
 > **Остальные Enum** (ProductStatus, TransactionType, MarketplaceType и др.) добавлять сюда по мере реализации.
 > Не угадывать значения — спрашивать или смотреть в исходниках.
 
