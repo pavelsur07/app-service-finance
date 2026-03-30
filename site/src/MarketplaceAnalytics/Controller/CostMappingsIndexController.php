@@ -33,12 +33,13 @@ final class CostMappingsIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $marketplace = $request->query->get('marketplace');
-        $isSystem = $request->query->has('is_system')
-            ? filter_var($request->query->get('is_system'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+        $isSystemRaw = $request->query->get('is_system');
+        $isSystem = ($isSystemRaw !== null && $isSystemRaw !== '')
+            ? filter_var($isSystemRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
             : null;
         $page = max(1, $request->query->getInt('page', 1));
 
-        $marketplaceEnum = $marketplace !== null
+        $marketplaceEnum = ($marketplace !== null && $marketplace !== '')
             ? MarketplaceType::tryFrom($marketplace)
             : null;
 
