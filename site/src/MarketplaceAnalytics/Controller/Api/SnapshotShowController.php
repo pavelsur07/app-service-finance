@@ -27,6 +27,7 @@ final class SnapshotShowController extends AbstractController
         '/api/marketplace-analytics/snapshots/{id}',
         name: 'marketplace_analytics_api_snapshot_show',
         methods: ['GET'],
+        requirements: ['id' => '[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'],
     )]
     public function __invoke(string $id): JsonResponse
     {
