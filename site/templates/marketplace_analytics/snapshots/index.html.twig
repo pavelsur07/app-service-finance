@@ -115,13 +115,13 @@
                                     </td>
 
                                     <td class="text-end">
-                                        {{ row.advertising_cpc|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.advertising_cpc ?? 0)|number_format(0, '.', ' ') }} ₽
                                     </td>
                                     <td class="text-end">
-                                        {{ row.logistics_to|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.logistics_to ?? 0)|number_format(0, '.', ' ') }} ₽
                                     </td>
                                     <td class="text-end">
-                                        {{ row.commission|number_format(0, '.', ' ') }} ₽
+                                        {{ (row.commission ?? 0)|number_format(0, '.', ' ') }} ₽
                                     </td>
 
                                     <td class="text-muted" style="white-space: nowrap">
