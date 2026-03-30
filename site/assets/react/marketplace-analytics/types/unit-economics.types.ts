@@ -16,6 +16,7 @@ export interface UnitEconomicsRow {
     storage: string;
     advertising_cpc: string;
     advertising_other: string;
+    advertising_external: string;
     commission: string;
     other_costs: string;
     has_quality_issues: boolean;

@@ -19,6 +19,7 @@ function calcProfit(row: UnitEconomicsRow): number | null {
         - parseFloat(row.storage)
         - parseFloat(row.advertising_cpc)
         - parseFloat(row.advertising_other)
+        - parseFloat(row.advertising_external)
         - parseFloat(row.commission)
         - parseFloat(row.other_costs)
     );
@@ -45,7 +46,7 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
         return (
             <div className="empty">
                 <div className="empty-img">
-                    <i className="ti ti-package text-muted" style={{ fontSize: '3rem' }}></i>
+                    <i className="ti ti-package text-muted fs-1"></i>
                 </div>
                 <p className="empty-title">Нет данных за выбранный период</p>
             </div>
@@ -71,7 +72,7 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                 <tbody>
                     {items.map((row) => {
                         const profit = calcProfit(row);
-                        const advertising = parseFloat(row.advertising_cpc) + parseFloat(row.advertising_other);
+                        const advertising = parseFloat(row.advertising_cpc) + parseFloat(row.advertising_other) + parseFloat(row.advertising_external);
 
                         return (
                             <tr key={row.listing_id}>
