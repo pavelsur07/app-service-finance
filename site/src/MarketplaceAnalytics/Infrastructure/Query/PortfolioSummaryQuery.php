@@ -32,11 +32,13 @@ final readonly class PortfolioSummaryQuery
      */
     public function fetch(
         string $companyId,
-        string $marketplace,
+        ?string $marketplace,
         string $dateFrom,
         string $dateTo,
     ): array {
-        $sql = <<<'SQL'
+        $marketplaceCondition = $marketplace !== null ? 'AND marketplace = :marketplace' : '';
+
+        $sql = <<<SQL
             SELECT
                 COALESCE(SUM(revenue), '0.00')    AS total_revenue,
                 COALESCE(SUM(refunds), '0.00')    AS total_refunds,
@@ -56,16 +58,21 @@ final readonly class PortfolioSummaryQuery
                 END AS total_profit
             FROM listing_daily_snapshots
             WHERE company_id  = :companyId
-              AND marketplace = :marketplace
+              {$marketplaceCondition}
               AND snapshot_date BETWEEN :dateFrom AND :dateTo
             SQL;
 
-        $row = $this->connection->fetchAssociative($sql, [
+        $params = [
             'companyId' => $companyId,
-            'marketplace' => $marketplace,
             'dateFrom' => $dateFrom,
             'dateTo' => $dateTo,
-        ]);
+        ];
+
+        if ($marketplace !== null) {
+            $params['marketplace'] = $marketplace;
+        }
+
+        $row = $this->connection->fetchAssociative($sql, $params);
 
         if ($row === false) {
             return self::DEFAULTS;

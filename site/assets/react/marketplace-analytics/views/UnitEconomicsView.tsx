@@ -1,14 +1,12 @@
 import React from 'react';
 import type { UnitEconomicsRow, PortfolioSummary, UnitEconomicsMeta } from '../types/unit-economics.types';
 import type { MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
-import { MARKETPLACE_LABELS } from '../types/analytics.types';
 import KpiCards from '../components/KpiCards';
 import UnitEconomicsTable from '../components/UnitEconomicsTable';
 import RecalcModal from '../components/RecalcModal';
 
-const MARKETPLACES: MarketplaceOption[] = ['wildberries', 'ozon', 'yandex_market', 'sber_megamarket'];
-
 interface UnitEconomicsViewProps {
+    marketplaces: MarketplaceOption[];
     marketplace: string;
     dateFrom: string;
     dateTo: string;
@@ -57,9 +55,9 @@ const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
                         value={props.marketplace}
                         onChange={(e) => props.onMarketplaceChange(e.target.value)}
                     >
-                        {MARKETPLACES.map((mp) => (
-                            <option key={mp} value={mp}>
-                                {MARKETPLACE_LABELS[mp]}
+                        {props.marketplaces.map((mp) => (
+                            <option key={mp.value} value={mp.value}>
+                                {mp.label}
                             </option>
                         ))}
                     </select>
@@ -130,6 +128,7 @@ const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
             </div>
 
             <RecalcModal
+                marketplaces={props.marketplaces}
                 isOpen={props.recalcModalOpen}
                 isLoading={props.recalcLoading}
                 error={props.recalcError}

@@ -26,18 +26,23 @@ export function useUnitEconomics(params: UseUnitEconomicsParams): UseUnitEconomi
     const { isLoading, data, error, run } = useAbortableQuery<UnitEconomicsResponse>();
 
     const load = useCallback(() => {
-        if (!params.marketplace || params.marketplace === 'all' || !params.dateFrom || !params.dateTo) {
+        if (!params.dateFrom || !params.dateTo) {
             return;
+        }
+
+        const query: Record<string, string | number> = {
+            date_from: params.dateFrom,
+            date_to: params.dateTo,
+            page: params.page,
+        };
+
+        if (params.marketplace) {
+            query.marketplace = params.marketplace;
         }
 
         void run({
             url: '/api/marketplace-analytics/unit-economics',
-            query: {
-                marketplace: params.marketplace,
-                date_from: params.dateFrom,
-                date_to: params.dateTo,
-                page: params.page,
-            },
+            query,
         });
     }, [params.marketplace, params.dateFrom, params.dateTo, params.page, run]);
 

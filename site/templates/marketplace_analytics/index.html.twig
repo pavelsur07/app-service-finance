@@ -11,7 +11,7 @@
                 <div class="tab-pane active show">
                     <div
                         id="react-marketplace-analytics"
-                        data-default-marketplace="all"
+                        data-marketplaces="{{ marketplaces|json_encode|e('html_attr') }}"
                     ></div>
                 </div>
             </div>
