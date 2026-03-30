@@ -1,138 +1,155 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Маппинги затрат{% endblock %}
+{% block title %}Настройки — Аналитика маркетплейсов{% endblock %}
 
 {% set perPage = 50 %}
 {% set pages = (total / perPage)|round(0, 'ceil') %}
 {% if pages < 1 %}{% set pages = 1 %}{% endif %}
 
 {% block content %}
-    <div class="page-header d-print-none mb-3">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <h2 class="page-title">Маппинги затрат</h2>
-            </div>
-        </div>
-    </div>
+    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'settings' } %}
 
-    {# Фильтры #}
-    <div class="card mb-3">
-        <div class="card-body">
-            <form method="GET" action="{{ path('marketplace_analytics_cost_mappings_index') }}">
-                <div class="row g-2 align-items-end">
-                    <div class="col-auto">
-                        <label class="form-label">Маркетплейс</label>
-                        <select name="marketplace" class="form-select">
-                            <option value="">Все</option>
-                            <option value="wildberries" {{ filters.marketplace == 'wildberries' ? 'selected' }}>Wildberries</option>
-                            <option value="ozon" {{ filters.marketplace == 'ozon' ? 'selected' }}>Ozon</option>
-                            <option value="yandex_market" {{ filters.marketplace == 'yandex_market' ? 'selected' }}>Яндекс Маркет</option>
-                            <option value="sber_megamarket" {{ filters.marketplace == 'sber_megamarket' ? 'selected' }}>СберМегаМаркет</option>
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <label class="form-label">Тип</label>
-                        <select name="is_system" class="form-select">
-                            <option value="">Все</option>
-                            <option value="1" {{ filters.is_system is same as(true) ? 'selected' }}>Системные</option>
-                            <option value="0" {{ filters.is_system is same as(false) ? 'selected' }}>Изменённые</option>
-                        </select>
-                    </div>
-                    <div class="col-auto">
-                        <button type="submit" class="btn btn-primary">Применить</button>
-                    </div>
-                    <div class="col-auto">
-                        <a href="{{ path('marketplace_analytics_cost_mappings_index') }}" class="btn btn-outline-secondary">Сбросить</a>
-                    </div>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="tab-content">
+                <div class="tab-pane active show">
 
-    {# Таблица #}
-    <div class="card">
-        <div class="table-responsive">
-            <table class="table table-vcenter card-table">
-                <thead>
-                    <tr>
-                        <th>Маркетплейс</th>
-                        <th>Код затрат</th>
-                        <th>Статья</th>
-                        <th>Тип</th>
-                        <th>Действия</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% if mappings is empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                Нет маппингов для отображения
-                            </td>
-                        </tr>
-                    {% else %}
-                        {% for mapping in mappings %}
-                            <tr
-                                data-controller="cost-mapping-remap"
-                                data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
-                                data-cost-mapping-remap-reset-url-value="{{ path('marketplace_analytics_api_cost_mapping_reset', {id: mapping.id}) }}"
-                            >
-                                <td>{{ mapping.marketplace.value }}</td>
-                                <td>{{ mapping.costCategoryCode }}</td>
-                                <td>
-                                    <select
-                                        class="form-select form-select-sm w-auto"
-                                        data-cost-mapping-remap-target="select"
-                                        data-action="change->cost-mapping-remap#remap"
-                                    >
-                                        {% for type in unitEconomyCostTypes %}
-                                            <option
-                                                value="{{ type.value }}"
-                                                {{ mapping.unitEconomyCostType.value == type.value ? 'selected' }}
-                                            >{{ type.value }}</option>
+                    {% for message in app.flashes('success') %}
+                        <div class="alert alert-success alert-dismissible mb-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+                    {% for message in app.flashes('error') %}
+                        <div class="alert alert-danger alert-dismissible mb-3" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    {% endfor %}
+
+                    {# Фильтры #}
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <form method="GET" action="{{ path('marketplace_analytics_cost_mappings_index') }}">
+                                <div class="row g-2 align-items-end">
+                                    <div class="col-auto">
+                                        <label class="form-label">Маркетплейс</label>
+                                        <select name="marketplace" class="form-select">
+                                            <option value="">Все</option>
+                                            <option value="wildberries" {{ filters.marketplace == 'wildberries' ? 'selected' }}>Wildberries</option>
+                                            <option value="ozon" {{ filters.marketplace == 'ozon' ? 'selected' }}>Ozon</option>
+                                            <option value="yandex_market" {{ filters.marketplace == 'yandex_market' ? 'selected' }}>Яндекс Маркет</option>
+                                            <option value="sber_megamarket" {{ filters.marketplace == 'sber_megamarket' ? 'selected' }}>СберМегаМаркет</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <label class="form-label">Тип</label>
+                                        <select name="is_system" class="form-select">
+                                            <option value="">Все</option>
+                                            <option value="1" {{ filters.is_system is same as(true) ? 'selected' }}>Системные</option>
+                                            <option value="0" {{ filters.is_system is same as(false) ? 'selected' }}>Изменённые</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-auto">
+                                        <button type="submit" class="btn btn-primary">Применить</button>
+                                    </div>
+                                    <div class="col-auto">
+                                        <a href="{{ path('marketplace_analytics_cost_mappings_index') }}" class="btn btn-outline-secondary">Сбросить</a>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {# Таблица #}
+                    <div class="card">
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>Маркетплейс</th>
+                                        <th>Код затрат</th>
+                                        <th>Статья</th>
+                                        <th>Тип</th>
+                                        <th>Действия</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% if mappings is empty %}
+                                        <tr>
+                                            <td colspan="5" class="text-center py-5 text-muted">
+                                                Нет маппингов для отображения
+                                            </td>
+                                        </tr>
+                                    {% else %}
+                                        {% for mapping in mappings %}
+                                            <tr
+                                                data-controller="cost-mapping-remap"
+                                                data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
+                                                data-cost-mapping-remap-reset-url-value="{{ path('marketplace_analytics_api_cost_mapping_reset', {id: mapping.id}) }}"
+                                            >
+                                                <td>{{ mapping.marketplace.value }}</td>
+                                                <td>{{ mapping.costCategoryCode }}</td>
+                                                <td>
+                                                    <select
+                                                        class="form-select form-select-sm w-auto"
+                                                        data-cost-mapping-remap-target="select"
+                                                        data-action="change->cost-mapping-remap#remap"
+                                                    >
+                                                        {% for type in unitEconomyCostTypes %}
+                                                            <option
+                                                                value="{{ type.value }}"
+                                                                {{ mapping.unitEconomyCostType.value == type.value ? 'selected' }}
+                                                            >{{ type.value }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <span
+                                                        data-cost-mapping-remap-target="badge"
+                                                        class="badge {{ mapping.isSystem ? 'bg-secondary-lt' : 'bg-warning-lt' }}"
+                                                    >{{ mapping.isSystem ? 'Системный' : 'Изменён' }}</span>
+                                                </td>
+                                                <td>
+                                                    {% if not mapping.isSystem %}
+                                                        <button
+                                                            type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            data-action="click->cost-mapping-remap#reset"
+                                                        >Сбросить</button>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
                                         {% endfor %}
-                                    </select>
-                                </td>
-                                <td>
-                                    <span
-                                        data-cost-mapping-remap-target="badge"
-                                        class="badge {{ mapping.isSystem ? 'bg-secondary-lt' : 'bg-warning-lt' }}"
-                                    >{{ mapping.isSystem ? 'Системный' : 'Изменён' }}</span>
-                                </td>
-                                <td>
-                                    {% if not mapping.isSystem %}
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-outline-secondary"
-                                            data-action="click->cost-mapping-remap#reset"
-                                        >Сбросить</button>
                                     {% endif %}
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    {% endif %}
-                </tbody>
-            </table>
-        </div>
+                                </tbody>
+                            </table>
+                        </div>
 
-        {# Пагинация #}
-        {% if pages > 1 %}
-            <div class="card-footer d-flex align-items-center">
-                <p class="m-0 text-muted">
-                    Страница {{ page }} из {{ pages }} (всего {{ total }})
-                </p>
-                <ul class="pagination m-0 ms-auto">
-                    <li class="page-item {{ page <= 1 ? 'disabled' }}">
-                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page - 1})) }}">
-                            Назад
-                        </a>
-                    </li>
-                    <li class="page-item {{ page >= pages ? 'disabled' }}">
-                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page + 1})) }}">
-                            Вперёд
-                        </a>
-                    </li>
-                </ul>
+                        {# Пагинация #}
+                        {% if pages > 1 %}
+                            <div class="card-footer d-flex align-items-center">
+                                <p class="m-0 text-muted">
+                                    Страница {{ page }} из {{ pages }} (всего {{ total }})
+                                </p>
+                                <ul class="pagination m-0 ms-auto">
+                                    <li class="page-item {{ page <= 1 ? 'disabled' }}">
+                                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page - 1})) }}">
+                                            Назад
+                                        </a>
+                                    </li>
+                                    <li class="page-item {{ page >= pages ? 'disabled' }}">
+                                        <a class="page-link" href="{{ path('marketplace_analytics_cost_mappings_index', filters|merge({page: page + 1})) }}">
+                                            Вперёд
+                                        </a>
+                                    </li>
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </div>
+
+                </div>
             </div>
-        {% endif %}
+        </div>
     </div>
 {% endblock %}
