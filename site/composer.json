@@ -122,9 +122,11 @@
         }
     },
     "require-dev": {
+        "dg/bypass-finals": "*",
         "doctrine/doctrine-fixtures-bundle": "^4.3.1",
         "friendsofphp/php-cs-fixer": "^3.92.5",
         "friendsoftwig/twigcs": "^6.6",
+        "phpseclib/bcmath_compat": "*",
         "phpunit/phpunit": "^11.5.48",
         "squizlabs/php_codesniffer": "^4.0.1",
         "symfony/browser-kit": "7.3.*",
