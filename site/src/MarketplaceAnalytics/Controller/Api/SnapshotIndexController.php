@@ -42,8 +42,15 @@ final class SnapshotIndexController extends AbstractController
             );
         }
 
-        $dateFrom = $req->dateFrom !== null ? new \DateTimeImmutable($req->dateFrom) : null;
-        $dateTo = $req->dateTo !== null ? new \DateTimeImmutable($req->dateTo) : null;
+        try {
+            $dateFrom = $req->dateFrom !== null ? new \DateTimeImmutable($req->dateFrom) : null;
+            $dateTo = $req->dateTo !== null ? new \DateTimeImmutable($req->dateTo) : null;
+        } catch (\Exception) {
+            return $this->json(
+                ['type' => 'BAD_REQUEST', 'message' => 'Неверный формат даты. Используйте YYYY-MM-DD.'],
+                Response::HTTP_BAD_REQUEST,
+            );
+        }
 
         $result = $this->snapshotRepository->findPaginated(
             $company->getId(),
@@ -55,14 +62,9 @@ final class SnapshotIndexController extends AbstractController
             $req->perPage,
         );
 
-        $listingIds = array_unique(array_map(
-            static fn($s) => $s->getListingId(),
-            $result['items'],
-        ));
-
         $listingMap = [];
-        if ($listingIds !== []) {
-            $listings = $this->marketplaceFacade->getActiveListings($company->getId(), null);
+        if ($result['items'] !== []) {
+            $listings = $this->marketplaceFacade->getActiveListings($company->getId(), $req->marketplace);
             foreach ($listings as $listing) {
                 $listingMap[$listing->id] = $listing;
             }
@@ -71,7 +73,7 @@ final class SnapshotIndexController extends AbstractController
         $data = array_map(
             static fn($snapshot) => SnapshotResponse::fromEntity(
                 $snapshot,
-                $listingMap[$snapshot->getListingId()]->marketplaceSku ?? '',
+                $listingMap[$snapshot->getListingId()]->name ?? '',
                 $listingMap[$snapshot->getListingId()]->marketplaceSku ?? '',
             )->toArray(),
             $result['items'],

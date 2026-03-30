@@ -40,20 +40,17 @@ final class SnapshotShowController extends AbstractController
             );
         }
 
-        $listingName = '';
-        $listingSku = '';
-
-        $listings = $this->marketplaceFacade->getActiveListings($company->getId(), null);
-        foreach ($listings as $listing) {
-            if ($listing->id === $snapshot->getListingId()) {
-                $listingName = $listing->marketplaceSku;
-                $listingSku = $listing->marketplaceSku;
-                break;
-            }
-        }
+        $listing = $this->marketplaceFacade->findListingById(
+            $company->getId(),
+            $snapshot->getListingId(),
+        );
 
         return $this->json(
-            SnapshotResponse::fromEntity($snapshot, $listingName, $listingSku)->toArray(),
+            SnapshotResponse::fromEntity(
+                $snapshot,
+                $listing?->name ?? '',
+                $listing?->marketplaceSku ?? '',
+            )->toArray(),
         );
     }
 }
