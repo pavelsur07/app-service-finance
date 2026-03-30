@@ -17,8 +17,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
-#[Route('/api/marketplace-analytics/unit-economics', name: 'marketplace_analytics_api_unit_economics')]
-#[IsGranted('ROLE_COMPANY_MEMBER')]
+#[Route('/api/marketplace-analytics/unit-economics', name: 'marketplace_analytics_api_unit_economics', methods: ['GET'])]
+#[IsGranted('ROLE_USER')]
 final class UnitEconomicsController extends AbstractController
 {
     public function __construct(
