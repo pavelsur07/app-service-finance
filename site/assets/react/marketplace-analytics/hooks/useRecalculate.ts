@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError, httpJson } from '../../shared/http/client';
 import type { RecalculateJobResponse } from '../types/analytics.types';
 
@@ -44,6 +44,12 @@ export function useRecalculate(): UseRecalculateResult {
                     setIsLoading(false);
                 }
             });
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            abortRef.current?.abort();
+        };
     }, []);
 
     return {

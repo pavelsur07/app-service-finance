@@ -45,10 +45,10 @@ const RecalcModal: React.FC<RecalcModalProps> = ({
                         </div>
                         <form onSubmit={handleSubmit}>
                             <div className="modal-body">
-                                {error && (
+                                {error && !lastJob && (
                                     <div className="alert alert-danger">{error}</div>
                                 )}
-                                {lastJob && (
+                                {lastJob && !error && (
                                     <div className="alert alert-success">
                                         {lastJob.message} (ID: {lastJob.job_id})
                                     </div>
