@@ -241,8 +241,8 @@
                                 <span>Маркетплейсы</span>
                             </a>
 
-                            {% set unit_economics_active = current_route == 'marketplace_analytics_index' %}
-                            <a class="dropdown-item {{ unit_economics_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_index') }}">
+                            {% set unit_economics_active = current_route == 'marketplace_analytics_unit_economics_index' %}
+                            <a class="dropdown-item {{ unit_economics_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_unit_economics_index') }}">
                                 <span>Unit-экономика</span>
                             </a>
 

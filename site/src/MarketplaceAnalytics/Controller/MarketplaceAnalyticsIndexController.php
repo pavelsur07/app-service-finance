@@ -20,7 +20,7 @@ final class MarketplaceAnalyticsIndexController extends AbstractController
 
     #[Route(
         '/marketplace-analytics',
-        name: 'marketplace_analytics_index',
+        name: 'marketplace_analytics_unit_economics_index',
         methods: ['GET'],
     )]
     public function __invoke(Request $request): Response
