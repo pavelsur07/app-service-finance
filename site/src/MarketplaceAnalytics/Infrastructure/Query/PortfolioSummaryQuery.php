@@ -44,15 +44,15 @@ final readonly class PortfolioSummaryQuery
                 COUNT(DISTINCT listing_id)         AS total_listings,
                 CASE
                     WHEN COUNT(*) FILTER (WHERE cost_price IS NULL) > 0 THEN NULL
-                    ELSE SUM(revenue) - SUM(refunds) - SUM(total_cost_price)
-                         - SUM((cost_breakdown->>'logistics_to')::numeric)
-                         - SUM((cost_breakdown->>'logistics_back')::numeric)
-                         - SUM((cost_breakdown->>'storage')::numeric)
-                         - SUM((cost_breakdown->>'advertising_cpc')::numeric)
-                         - SUM((cost_breakdown->>'advertising_other')::numeric)
-                         - SUM((cost_breakdown->>'advertising_external')::numeric)
-                         - SUM((cost_breakdown->>'commission')::numeric)
-                         - SUM((cost_breakdown->>'other')::numeric)
+                    ELSE COALESCE(SUM(revenue), 0) - COALESCE(SUM(refunds), 0) - COALESCE(SUM(total_cost_price), 0)
+                         - COALESCE(SUM((cost_breakdown->>'logistics_to')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'logistics_back')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'storage')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'advertising_cpc')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'advertising_other')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'advertising_external')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'commission')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'other')::numeric), 0)
                 END AS total_profit
             FROM listing_daily_snapshots
             WHERE company_id  = :companyId

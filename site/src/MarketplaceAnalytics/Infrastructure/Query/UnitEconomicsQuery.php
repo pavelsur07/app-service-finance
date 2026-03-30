@@ -34,15 +34,15 @@ final readonly class UnitEconomicsQuery
                 "CASE WHEN SUM(s.sales_quantity) > 0 THEN SUM(s.avg_sale_price * s.sales_quantity) / SUM(s.sales_quantity) ELSE 0 END AS avg_sale_price",
                 "CASE WHEN COUNT(*) FILTER (WHERE s.cost_price IS NULL) > 0 THEN NULL ELSE SUM(s.total_cost_price) END AS total_cost_price",
                 'AVG(s.cost_price) AS avg_cost_price',
-                "SUM((s.cost_breakdown->>'logistics_to')::numeric) AS logistics_to",
-                "SUM((s.cost_breakdown->>'logistics_back')::numeric) AS logistics_back",
-                "SUM((s.cost_breakdown->>'storage')::numeric) AS storage",
-                "SUM((s.cost_breakdown->>'advertising_cpc')::numeric) AS advertising_cpc",
-                "SUM((s.cost_breakdown->>'advertising_other')::numeric) AS advertising_other",
-                "SUM((s.cost_breakdown->>'advertising_external')::numeric) AS advertising_external",
-                "SUM((s.cost_breakdown->>'commission')::numeric) AS commission",
-                "SUM((s.cost_breakdown->>'other')::numeric) AS other_costs",
-                "BOOL_OR(s.data_quality::jsonb != '[]'::jsonb) AS has_quality_issues",
+                "COALESCE(SUM((s.cost_breakdown->>'logistics_to')::numeric), 0) AS logistics_to",
+                "COALESCE(SUM((s.cost_breakdown->>'logistics_back')::numeric), 0) AS logistics_back",
+                "COALESCE(SUM((s.cost_breakdown->>'storage')::numeric), 0) AS storage",
+                "COALESCE(SUM((s.cost_breakdown->>'advertising_cpc')::numeric), 0) AS advertising_cpc",
+                "COALESCE(SUM((s.cost_breakdown->>'advertising_other')::numeric), 0) AS advertising_other",
+                "COALESCE(SUM((s.cost_breakdown->>'advertising_external')::numeric), 0) AS advertising_external",
+                "COALESCE(SUM((s.cost_breakdown->>'commission')::numeric), 0) AS commission",
+                "COALESCE(SUM((s.cost_breakdown->>'other')::numeric), 0) AS other_costs",
+                "BOOL_OR(s.data_quality != '[]'::jsonb) AS has_quality_issues",
                 'COUNT(*) AS snapshots_count',
             )
             ->from('listing_daily_snapshots', 's')
@@ -54,7 +54,9 @@ final readonly class UnitEconomicsQuery
             ->setParameter('marketplace', $marketplace)
             ->setParameter('dateFrom', $dateFrom)
             ->setParameter('dateTo', $dateTo)
-            ->groupBy('s.listing_id', 'l.name', 'l.marketplace_sku')
-            ->orderBy('revenue', 'DESC');
+            ->groupBy('s.listing_id')
+            ->addGroupBy('l.name')
+            ->addGroupBy('l.marketplace_sku')
+            ->orderBy('SUM(s.revenue)', 'DESC');
     }
 }
