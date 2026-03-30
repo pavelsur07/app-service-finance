@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\MessageHandler;
 
+use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAnalytics\Application\EnsureCostMappingsSeededAction;
 use App\MarketplaceAnalytics\Domain\Service\SnapshotRecalcPolicy;
 use App\MarketplaceAnalytics\Domain\ValueObject\AnalysisPeriod;
 use App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage;
@@ -16,6 +18,7 @@ final class RecalcSnapshotsMessageHandler
 {
     public function __construct(
         private readonly SnapshotRecalcPolicy $snapshotRecalcPolicy,
+        private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
         private readonly EntityManagerInterface $entityManager,
         private readonly AppLogger $logger,
     ) {}
@@ -23,6 +26,10 @@ final class RecalcSnapshotsMessageHandler
     public function __invoke(RecalcSnapshotsMessage $message): void
     {
         try {
+            foreach (MarketplaceType::cases() as $type) {
+                ($this->ensureCostMappingsSeededAction)($message->companyId, $type->value);
+            }
+
             $period = AnalysisPeriod::custom(
                 new \DateTimeImmutable($message->dateFrom),
                 new \DateTimeImmutable($message->dateTo),

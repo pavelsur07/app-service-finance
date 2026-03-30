@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Controller;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAnalytics\Application\EnsureCostMappingsSeededAction;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
 use App\Shared\Service\ActiveCompanyService;
@@ -20,6 +21,7 @@ final class CostMappingsIndexController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
+        private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
     ) {}
 
     #[Route(
@@ -39,6 +41,14 @@ final class CostMappingsIndexController extends AbstractController
         $marketplaceEnum = $marketplace !== null
             ? MarketplaceType::tryFrom($marketplace)
             : null;
+
+        if ($marketplaceEnum !== null) {
+            ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
+        } else {
+            foreach (MarketplaceType::cases() as $type) {
+                ($this->ensureCostMappingsSeededAction)($company->getId(), $type->value);
+            }
+        }
 
         $result = $this->repository->findPaginated(
             $company->getId(),
