@@ -27,8 +27,8 @@ final readonly class ListCostMappingsRequest
         return new self(
             marketplace: $request->query->get('marketplace'),
             isSystem: $isSystem,
-            page: $request->query->getInt('page', 1),
-            perPage: $request->query->getInt('perPage', 50),
+            page: max(1, $request->query->getInt('page', 1)),
+            perPage: max(1, $request->query->getInt('perPage', 50)),
         );
     }
 }
