@@ -1,5 +1,4 @@
 import React from 'react';
-import { IconAlertTriangle, IconPackage } from '@tabler/icons-react';
 import type { UnitEconomicsRow } from '../types/unit-economics.types';
 import { formatMoney } from '../utils/utils';
 
@@ -46,7 +45,7 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
         return (
             <div className="empty">
                 <div className="empty-img">
-                    <IconPackage size={48} stroke={1} className="text-muted" />
+                    <i className="ti ti-package text-muted" style={{ fontSize: '3rem' }}></i>
                 </div>
                 <p className="empty-title">Нет данных за выбранный период</p>
             </div>
@@ -99,7 +98,7 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                                 </td>
                                 <td>
                                     {row.has_quality_issues && (
-                                        <IconAlertTriangle size={16} stroke={1.5} className="text-warning" />
+                                        <i className="ti ti-alert-triangle text-warning"></i>
                                     )}
                                 </td>
                             </tr>
