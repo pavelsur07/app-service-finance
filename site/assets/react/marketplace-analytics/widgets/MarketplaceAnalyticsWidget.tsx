@@ -10,7 +10,7 @@ interface MarketplaceAnalyticsWidgetProps {
 }
 
 const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
-    defaultMarketplace = 'wildberries',
+    defaultMarketplace = 'all',
 }) => {
     const defaults = getDefaultDateRange();
 

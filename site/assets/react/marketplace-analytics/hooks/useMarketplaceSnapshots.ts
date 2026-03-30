@@ -24,17 +24,21 @@ export function useMarketplaceSnapshots(params: UseMarketplaceSnapshotsParams): 
     const perPage = params.perPage ?? 20;
 
     const load = useCallback(() => {
-        if (!params.marketplace || !params.dateFrom || !params.dateTo) return;
+        if (!params.dateFrom || !params.dateTo) return;
+
+        const query: Record<string, string | number> = {
+            dateFrom: params.dateFrom,
+            dateTo: params.dateTo,
+            page: params.page,
+            perPage,
+        };
+        if (params.marketplace && params.marketplace !== 'all') {
+            query.marketplace = params.marketplace;
+        }
 
         void run({
             url: '/api/marketplace-analytics/snapshots',
-            query: {
-                marketplace: params.marketplace,
-                dateFrom: params.dateFrom,
-                dateTo: params.dateTo,
-                page: params.page,
-                perPage,
-            },
+            query,
         });
     }, [params.marketplace, params.dateFrom, params.dateTo, params.page, perPage, run]);
 

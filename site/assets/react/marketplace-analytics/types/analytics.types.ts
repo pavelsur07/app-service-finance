@@ -71,9 +71,10 @@ export interface RecalculateJobResponse {
     date_to: string;
 }
 
-export type MarketplaceOption = 'wildberries' | 'ozon' | 'yandex_market' | 'sber_megamarket';
+export type MarketplaceOption = 'all' | 'wildberries' | 'ozon' | 'yandex_market' | 'sber_megamarket';
 
 export const MARKETPLACE_LABELS: Record<MarketplaceOption, string> = {
+    all: 'Все',
     wildberries: 'Wildberries',
     ozon: 'Ozon',
     yandex_market: 'Яндекс Маркет',

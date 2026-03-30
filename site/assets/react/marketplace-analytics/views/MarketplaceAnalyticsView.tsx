@@ -31,7 +31,7 @@ interface MarketplaceAnalyticsViewProps {
     onRecalculate: (marketplace: string, dateFrom: string, dateTo: string) => void;
 }
 
-const MARKETPLACES: MarketplaceOption[] = ['wildberries', 'ozon', 'yandex_market', 'sber_megamarket'];
+const MARKETPLACES: MarketplaceOption[] = ['all', 'wildberries', 'ozon', 'yandex_market', 'sber_megamarket'];
 
 const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props) => {
     return (
