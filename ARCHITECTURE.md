@@ -152,6 +152,9 @@ getCostsForListingAndDate(string $companyId, string $listingId, \DateTimeImmutab
 // @return ActiveListingDTO[]
 getActiveListings(string $companyId, ?string $marketplace): array
 
+// Найти листинг по ID и компании
+findListingById(string $companyId, string $listingId): ?ActiveListingDTO
+
 // Себестоимость по листингу и дате (null если не задана)
 getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
 ```
