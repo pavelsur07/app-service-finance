@@ -1,12 +1,22 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}Аналитика маркетплейсов{% endblock %}
+{% block title %}Юнит-экономика — Аналитика маркетплейсов{% endblock %}
 
 {% block content %}
-    <div
-        id="react-marketplace-analytics"
-        data-default-marketplace="wildberries"
-    ></div>
+    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'analytics' } %}
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="tab-content">
+                <div class="tab-pane active show">
+                    <div
+                        id="react-marketplace-analytics"
+                        data-default-marketplace="wildberries"
+                    ></div>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}
 
 {% block javascripts %}
