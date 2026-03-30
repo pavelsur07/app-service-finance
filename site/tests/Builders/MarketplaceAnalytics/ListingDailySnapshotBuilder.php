@@ -20,6 +20,16 @@ final class ListingDailySnapshotBuilder
     private \DateTimeImmutable $snapshotDate;
     private ?string $costPrice = null;
     private int $salesQuantity = 0;
+    private string $revenue = '0.00';
+    private string $refunds = '0.00';
+    private int $returnsQuantity = 0;
+    private int $ordersQuantity = 0;
+    private int $deliveredQuantity = 0;
+    private string $avgSalePrice = '0.00';
+    private ?string $totalCostPrice = null;
+    private array $costBreakdown = [];
+    private array $advertisingDetails = [];
+    private array $dataQuality = [];
 
     private function __construct()
     {
@@ -88,6 +98,94 @@ final class ListingDailySnapshotBuilder
         return $clone;
     }
 
+    public function withRevenue(string $revenue): self
+    {
+        $clone = clone $this;
+        $clone->revenue = $revenue;
+
+        return $clone;
+    }
+
+    public function withRefunds(string $refunds): self
+    {
+        $clone = clone $this;
+        $clone->refunds = $refunds;
+
+        return $clone;
+    }
+
+    public function withReturnsQuantity(int $returnsQuantity): self
+    {
+        $clone = clone $this;
+        $clone->returnsQuantity = $returnsQuantity;
+
+        return $clone;
+    }
+
+    public function withOrdersQuantity(int $ordersQuantity): self
+    {
+        $clone = clone $this;
+        $clone->ordersQuantity = $ordersQuantity;
+
+        return $clone;
+    }
+
+    public function withDeliveredQuantity(int $deliveredQuantity): self
+    {
+        $clone = clone $this;
+        $clone->deliveredQuantity = $deliveredQuantity;
+
+        return $clone;
+    }
+
+    public function withAvgSalePrice(string $avgSalePrice): self
+    {
+        $clone = clone $this;
+        $clone->avgSalePrice = $avgSalePrice;
+
+        return $clone;
+    }
+
+    public function withTotalCostPrice(string $totalCostPrice): self
+    {
+        $clone = clone $this;
+        $clone->totalCostPrice = $totalCostPrice;
+
+        return $clone;
+    }
+
+    public function withCostBreakdown(array $costBreakdown): self
+    {
+        $clone = clone $this;
+        $clone->costBreakdown = $costBreakdown;
+
+        return $clone;
+    }
+
+    public function withAdvertisingDetails(array $advertisingDetails): self
+    {
+        $clone = clone $this;
+        $clone->advertisingDetails = $advertisingDetails;
+
+        return $clone;
+    }
+
+    public function withDataQuality(array $dataQuality): self
+    {
+        $clone = clone $this;
+        $clone->dataQuality = $dataQuality;
+
+        return $clone;
+    }
+
+    public function withMarketplace(MarketplaceType $marketplace): self
+    {
+        $clone = clone $this;
+        $clone->marketplace = $marketplace;
+
+        return $clone;
+    }
+
     public function build(): ListingDailySnapshot
     {
         $snapshot = new ListingDailySnapshot(
@@ -99,18 +197,18 @@ final class ListingDailySnapshotBuilder
         );
 
         $snapshot->recalculate(
-            revenue: '0.00',
-            refunds: '0.00',
+            revenue: $this->revenue,
+            refunds: $this->refunds,
             salesQuantity: $this->salesQuantity,
-            returnsQuantity: 0,
-            ordersQuantity: 0,
-            deliveredQuantity: 0,
-            avgSalePrice: '0.00',
+            returnsQuantity: $this->returnsQuantity,
+            ordersQuantity: $this->ordersQuantity,
+            deliveredQuantity: $this->deliveredQuantity,
+            avgSalePrice: $this->avgSalePrice,
             costPrice: $this->costPrice,
-            totalCostPrice: null,
-            costBreakdown: [],
-            advertisingDetails: [],
-            dataQuality: [],
+            totalCostPrice: $this->totalCostPrice,
+            costBreakdown: $this->costBreakdown,
+            advertisingDetails: $this->advertisingDetails,
+            dataQuality: $this->dataQuality,
         );
 
         return $snapshot;
