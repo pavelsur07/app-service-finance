@@ -44,17 +44,18 @@ final class EnsureCostMappingsSeededActionTest extends TestCase
         ($this->action)(self::COMPANY_ID, self::MARKETPLACE);
     }
 
-    public function testFlushCalledEvenIfSeedIsIdempotent(): void
+    public function testFlushCalledOnRepeatedInvocation(): void
     {
         $this->seedPolicy
-            ->expects($this->once())
+            ->expects($this->exactly(2))
             ->method('seedForCompanyAndMarketplace')
             ->with(self::COMPANY_ID, self::MARKETPLACE);
 
         $this->entityManager
-            ->expects($this->once())
+            ->expects($this->exactly(2))
             ->method('flush');
 
+        ($this->action)(self::COMPANY_ID, self::MARKETPLACE);
         ($this->action)(self::COMPANY_ID, self::MARKETPLACE);
     }
 }
