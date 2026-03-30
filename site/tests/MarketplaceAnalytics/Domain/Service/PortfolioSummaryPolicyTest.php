@@ -52,6 +52,7 @@ final class PortfolioSummaryPolicyTest extends TestCase
         $result = $this->policy->calculate(self::COMPANY_ID, $this->period, null);
 
         $this->assertSame('3000.00', $result->totalRevenue);
+        $this->assertNull($result->totalProfit);
     }
 
     public function testDeltasCalculatedWhenBothPeriodsHaveData(): void
@@ -78,6 +79,7 @@ final class PortfolioSummaryPolicyTest extends TestCase
 
         $this->assertSame('1000.00', $result->revenueDeltaAbsolute);
         $this->assertSame(50.0, $result->revenueDeltaPercent);
+        $this->assertNull($result->profitDeltaPercent);
     }
 
     public function testDeltaPercentNullWhenPreviousPeriodEmpty(): void
