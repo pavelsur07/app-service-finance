@@ -3,7 +3,8 @@
 {% block title %}Маппинги затрат{% endblock %}
 
 {% set perPage = 50 %}
-{% set pages = [((total / perPage)|round(0, 'ceil')), 1]|max %}
+{% set pages = (total / perPage)|round(0, 'ceil') %}
+{% if pages < 1 %}{% set pages = 1 %}{% endif %}
 
 {% block content %}
     <div class="page-header d-print-none mb-3">
