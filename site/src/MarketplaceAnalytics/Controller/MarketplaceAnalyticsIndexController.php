@@ -28,13 +28,16 @@ final class MarketplaceAnalyticsIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
-        $marketplaces = array_map(
-            static fn (MarketplaceType $t): array => [
-                'value' => $t->value,
-                'label' => $t->getDisplayName(),
-            ],
-            MarketplaceType::cases(),
-        );
+        $marketplaces = [
+            ['value' => '', 'label' => 'Все'],
+            ...array_map(
+                static fn (MarketplaceType $t): array => [
+                    'value' => $t->value,
+                    'label' => $t->getDisplayName(),
+                ],
+                MarketplaceType::cases(),
+            ),
+        ];
 
         return $this->render('marketplace_analytics/index.html.twig', [
             'companyId' => $company->getId(),

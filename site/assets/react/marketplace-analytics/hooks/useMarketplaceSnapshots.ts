@@ -32,7 +32,7 @@ export function useMarketplaceSnapshots(params: UseMarketplaceSnapshotsParams): 
             page: params.page,
             perPage,
         };
-        if (params.marketplace && params.marketplace !== 'all') {
+        if (params.marketplace) {
             query.marketplace = params.marketplace;
         }
 
