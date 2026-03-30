@@ -89,10 +89,10 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                                         : <span className="badge bg-muted-lt text-muted">Нет данных</span>
                                     }
                                 </td>
-                                <td className="text-end">{formatMoney(String(advertising))}</td>
+                                <td className="text-end">{formatMoney(advertising)}</td>
                                 <td className="text-end">
                                     {profit !== null
-                                        ? <span className={profit >= 0 ? 'text-green' : 'text-red'}>{formatMoney(String(profit))}</span>
+                                        ? <span className={profit >= 0 ? 'text-green' : 'text-red'}>{formatMoney(profit)}</span>
                                         : <span className="text-muted">{'\u2014'}</span>
                                     }
                                 </td>
