@@ -208,6 +208,7 @@
                 or current_route starts with 'telegram_integration_'
                 or current_route starts with 'cash_bank_connection_'
                 or current_route starts with 'integrations_marketplace_'
+                or current_route starts with 'marketplace_analytics_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
@@ -222,6 +223,7 @@
                     or current_route starts with 'cash_bank_connection_'
                     or current_route starts with 'marketplace_'
                     or current_route starts with 'integrations_marketplace_'
+                    or current_route starts with 'marketplace_analytics_'
                 ) ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
@@ -234,9 +236,14 @@
                                 <span>Банки / Подключения</span>
                             </a>
 
-                            {% set marketplace_active = current_route starts with 'marketplace_' %}
+                            {% set marketplace_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') %}
                             <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
                                 <span>Маркетплейсы</span>
+                            </a>
+
+                            {% set unit_economics_active = current_route starts with 'marketplace_analytics_' %}
+                            <a class="dropdown-item {{ unit_economics_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_index') }}">
+                                <span>Unit-экономика</span>
                             </a>
 
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
