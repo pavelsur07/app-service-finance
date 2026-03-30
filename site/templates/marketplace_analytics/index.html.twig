@@ -1,0 +1,15 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Аналитика маркетплейсов{% endblock %}
+
+{% block content %}
+    <div
+        id="react-marketplace-analytics"
+        data-default-marketplace="wildberries"
+    ></div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('marketplace_analytics_page') }}
+{% endblock %}
