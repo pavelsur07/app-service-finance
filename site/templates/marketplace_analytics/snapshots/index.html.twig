@@ -1,0 +1,177 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Снапшоты — Аналитика маркетплейсов{% endblock %}
+
+{% block content %}
+    {% include 'marketplace_analytics/_tabs.html.twig' with { activeTab: 'snapshots' } %}
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form method="GET"
+                          action="{{ path('marketplace_analytics_snapshots_index') }}"
+                          class="row g-2 align-items-end">
+
+                        <div class="col-auto">
+                            <label class="form-label">Маркетплейс</label>
+                            <select name="marketplace" class="form-select">
+                                <option value="">Все маркетплейсы</option>
+                                {% for mp in available_marketplaces %}
+                                    <option
+                                        value="{{ mp.value }}"
+                                        {{ filters.marketplace == mp.value ? 'selected' : '' }}
+                                    >{{ mp.getDisplayName() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-auto">
+                            <label class="form-label">Дата с</label>
+                            <input
+                                type="date" name="date_from"
+                                class="form-control"
+                                value="{{ filters.date_from ?? '' }}"
+                            >
+                        </div>
+
+                        <div class="col-auto">
+                            <label class="form-label">Дата по</label>
+                            <input
+                                type="date" name="date_to"
+                                class="form-control"
+                                value="{{ filters.date_to ?? '' }}"
+                            >
+                        </div>
+
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-secondary">
+                                Применить
+                            </button>
+                            <a
+                                href="{{ path('marketplace_analytics_snapshots_index') }}"
+                                class="btn btn-link"
+                            >Сбросить</a>
+                        </div>
+
+                    </form>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Товар</th>
+                                <th>SKU</th>
+                                <th class="text-end">Выручка</th>
+                                <th class="text-end">Возвраты</th>
+                                <th class="text-end">Продажи</th>
+                                <th class="text-end">Себест. ед.</th>
+                                <th class="text-end">Себест. итого</th>
+                                <th class="text-end">Реклама CPC</th>
+                                <th class="text-end">Логистика</th>
+                                <th class="text-end">Комиссия</th>
+                                <th>Пересчитан</th>
+                                <th class="w-1"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+
+                            {% for row in pager %}
+                                <tr>
+                                    <td class="text-muted">
+                                        {{ row.snapshot_date|date('d.m.Y') }}
+                                    </td>
+                                    <td>{{ row.listing_name }}</td>
+                                    <td class="text-muted">{{ row.marketplace_sku }}</td>
+
+                                    <td class="text-end">
+                                        {{ row.revenue|number_format(0, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end text-red">
+                                        {{ row.refunds|number_format(0, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end">
+                                        {{ row.sales_quantity }}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {% if row.cost_price is not null %}
+                                            {{ row.cost_price|number_format(0, '.', ' ') }} ₽
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if row.total_cost_price is not null %}
+                                            {{ row.total_cost_price|number_format(0, '.', ' ') }} ₽
+                                        {% else %}
+                                            <span class="text-muted">—</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <td class="text-end">
+                                        {{ row.advertising_cpc|number_format(0, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end">
+                                        {{ row.logistics_to|number_format(0, '.', ' ') }} ₽
+                                    </td>
+                                    <td class="text-end">
+                                        {{ row.commission|number_format(0, '.', ' ') }} ₽
+                                    </td>
+
+                                    <td class="text-muted" style="white-space: nowrap">
+                                        {{ row.calculated_at|date('d.m.Y H:i') }}
+                                    </td>
+
+                                    <td>
+                                        {% if row.data_quality is not null and row.data_quality != '[]' %}
+                                            <span
+                                                class="text-warning"
+                                                title="{{ row.data_quality|replace({'[': '', ']': '', '"': ''})|trim }}"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg"
+                                                     class="icon" width="24" height="24"
+                                                     viewBox="0 0 24 24" stroke-width="2"
+                                                     stroke="currentColor" fill="none">
+                                                    <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                                    <path d="M12 9v4"/>
+                                                    <path d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/>
+                                                    <path d="M12 16h.01"/>
+                                                </svg>
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="13" class="text-center py-5">
+                                        <div class="empty">
+                                            <p class="empty-title">Снапшоты не найдены</p>
+                                            <p class="empty-subtitle text-muted">
+                                                Измените фильтры или запустите пересчёт
+                                            </p>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+
+                        </tbody>
+                    </table>
+                </div>
+
+                {% if pager.haveToPaginate %}
+                    <div class="card-footer d-flex align-items-center">
+                        {% include 'partials/_pagerfanta.html.twig' with { pager: pager } %}
+                    </div>
+                {% endif %}
+
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
