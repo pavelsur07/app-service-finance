@@ -5,9 +5,6 @@ declare(strict_types=1);
 namespace App\Tests\MarketplaceAnalytics\Domain\Service;
 
 use App\MarketplaceAnalytics\Domain\Service\UnitEconomicsAggregationPolicy;
-use App\MarketplaceAnalytics\Domain\ValueObject\AdvertisingCpcMetrics;
-use App\MarketplaceAnalytics\Domain\ValueObject\AdvertisingDetails;
-use App\MarketplaceAnalytics\Domain\ValueObject\AdvertisingOtherMetrics;
 use App\MarketplaceAnalytics\Domain\ValueObject\AnalysisPeriod;
 use App\MarketplaceAnalytics\Domain\ValueObject\CostBreakdown;
 use App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface;
