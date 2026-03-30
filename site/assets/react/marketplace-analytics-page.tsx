@@ -1,7 +1,7 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { ErrorBoundary } from './shared/ui/ErrorBoundary';
-import MarketplaceAnalyticsWidget from './marketplace-analytics/widgets/MarketplaceAnalyticsWidget';
+import UnitEconomicsWidget from './marketplace-analytics/widgets/UnitEconomicsWidget';
 
 function mountMarketplaceAnalyticsPage() {
     const el = document.getElementById('react-marketplace-analytics');
@@ -14,7 +14,7 @@ function mountMarketplaceAnalyticsPage() {
 
     root.render(
         <ErrorBoundary widgetName="MarketplaceAnalytics">
-            <MarketplaceAnalyticsWidget defaultMarketplace={defaultMarketplace} />
+            <UnitEconomicsWidget defaultMarketplace={defaultMarketplace} />
         </ErrorBoundary>
     );
 }
