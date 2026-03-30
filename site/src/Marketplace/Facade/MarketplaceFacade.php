@@ -12,6 +12,7 @@ use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
+use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
 use Doctrine\DBAL\Connection;
@@ -23,6 +24,7 @@ final readonly class MarketplaceFacade
         private MarketplaceOrderRepositoryInterface $orderRepository,
         private Connection $connection,
         private CostPriceResolverInterface $costPriceResolver,
+        private CostCategoriesQuery $costCategoriesQuery,
     ) {}
 
     /**
@@ -220,5 +222,15 @@ final readonly class MarketplaceFacade
         $result = $this->costPriceResolver->resolve($companyId, $listingId, $date);
 
         return bccomp($result, '0.00', 2) === 0 ? null : $result;
+    }
+
+    /**
+     * @return array<array{id: string, code: string, name: string}>
+     */
+    public function getCostCategoriesForCompany(
+        string $companyId,
+        string $marketplace,
+    ): array {
+        return $this->costCategoriesQuery->fetchForCompanyAndMarketplace($companyId, $marketplace);
     }
 }
