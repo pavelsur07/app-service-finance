@@ -2,18 +2,19 @@ import React, { useState, useCallback } from 'react';
 import { useUnitEconomics } from '../hooks/useUnitEconomics';
 import { useRecalculate } from '../hooks/useRecalculate';
 import { getDefaultDateRange } from '../utils/utils';
+import type { MarketplaceOption } from '../types/analytics.types';
 import UnitEconomicsView from '../views/UnitEconomicsView';
 
 interface UnitEconomicsWidgetProps {
-    defaultMarketplace?: string;
+    marketplaces: MarketplaceOption[];
 }
 
 const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
-    defaultMarketplace = 'wildberries',
+    marketplaces,
 }) => {
     const defaults = getDefaultDateRange();
 
-    const [marketplace, setMarketplace] = useState(defaultMarketplace);
+    const [marketplace, setMarketplace] = useState(marketplaces[0]?.value ?? '');
     const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
     const [dateTo, setDateTo] = useState(defaults.dateTo);
     const [page, setPage] = useState(1);
@@ -49,6 +50,7 @@ const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
 
     return (
         <UnitEconomicsView
+            marketplaces={marketplaces}
             marketplace={marketplace}
             dateFrom={dateFrom}
             dateTo={dateTo}

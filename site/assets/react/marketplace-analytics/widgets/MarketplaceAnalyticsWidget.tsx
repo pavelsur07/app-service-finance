@@ -3,18 +3,19 @@ import { useMarketplaceSummary } from '../hooks/useMarketplaceSummary';
 import { useMarketplaceSnapshots } from '../hooks/useMarketplaceSnapshots';
 import { useRecalculate } from '../hooks/useRecalculate';
 import { getDefaultDateRange } from '../utils/utils';
+import type { MarketplaceOption } from '../types/analytics.types';
 import MarketplaceAnalyticsView from '../views/MarketplaceAnalyticsView';
 
 interface MarketplaceAnalyticsWidgetProps {
-    defaultMarketplace?: string;
+    marketplaces: MarketplaceOption[];
 }
 
 const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
-    defaultMarketplace = 'all',
+    marketplaces,
 }) => {
     const defaults = getDefaultDateRange();
 
-    const [marketplace, setMarketplace] = useState(defaultMarketplace);
+    const [marketplace, setMarketplace] = useState(marketplaces[0]?.value ?? '');
     const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
     const [dateTo, setDateTo] = useState(defaults.dateTo);
     const [page, setPage] = useState(1);
@@ -45,6 +46,7 @@ const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
 
     return (
         <MarketplaceAnalyticsView
+            marketplaces={marketplaces}
             marketplace={marketplace}
             dateFrom={dateFrom}
             dateTo={dateTo}

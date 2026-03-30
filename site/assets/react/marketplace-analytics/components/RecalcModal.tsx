@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import type { MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
-import { MARKETPLACE_LABELS } from '../types/analytics.types';
 import { getDefaultDateRange } from '../utils/utils';
 
 interface RecalcModalProps {
+    marketplaces: MarketplaceOption[];
     isOpen: boolean;
     isLoading: boolean;
     error: string | null;
@@ -12,9 +12,8 @@ interface RecalcModalProps {
     onClose: () => void;
 }
 
-const MARKETPLACES: MarketplaceOption[] = ['wildberries', 'ozon', 'yandex_market', 'sber_megamarket'];
-
 const RecalcModal: React.FC<RecalcModalProps> = ({
+    marketplaces,
     isOpen,
     isLoading,
     error,
@@ -23,7 +22,7 @@ const RecalcModal: React.FC<RecalcModalProps> = ({
     onClose,
 }) => {
     const defaults = getDefaultDateRange();
-    const [marketplace, setMarketplace] = useState<string>(MARKETPLACES[0]);
+    const [marketplace, setMarketplace] = useState<string>(marketplaces[0]?.value ?? '');
     const [dateFrom, setDateFrom] = useState(defaults.dateFrom);
     const [dateTo, setDateTo] = useState(defaults.dateTo);
 
@@ -60,9 +59,9 @@ const RecalcModal: React.FC<RecalcModalProps> = ({
                                         value={marketplace}
                                         onChange={(e) => setMarketplace(e.target.value)}
                                     >
-                                        {MARKETPLACES.map((mp) => (
-                                            <option key={mp} value={mp}>
-                                                {MARKETPLACE_LABELS[mp]}
+                                        {marketplaces.map((mp) => (
+                                            <option key={mp.value} value={mp.value}>
+                                                {mp.label}
                                             </option>
                                         ))}
                                     </select>

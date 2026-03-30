@@ -35,17 +35,17 @@ final class UnitEconomicsController extends AbstractController
 
         $marketplace = $request->query->get('marketplace');
         if ($marketplace === null || $marketplace === '') {
-            return $this->json(['error' => 'Parameter "marketplace" is required.'], 400);
-        }
-
-        $validValues = array_map(
-            static fn (MarketplaceType $t): string => $t->value,
-            MarketplaceType::cases(),
-        );
-        if (!in_array($marketplace, $validValues, true)) {
-            return $this->json([
-                'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
-            ], 422);
+            $marketplace = null;
+        } else {
+            $validValues = array_map(
+                static fn (MarketplaceType $t): string => $t->value,
+                MarketplaceType::cases(),
+            );
+            if (!in_array($marketplace, $validValues, true)) {
+                return $this->json([
+                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                ], 422);
+            }
         }
 
         $dateFrom = $request->query->get(

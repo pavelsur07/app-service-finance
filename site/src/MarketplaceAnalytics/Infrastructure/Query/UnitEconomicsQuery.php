@@ -16,11 +16,11 @@ final readonly class UnitEconomicsQuery
 
     public function buildQueryBuilder(
         string $companyId,
-        string $marketplace,
+        ?string $marketplace,
         string $dateFrom,
         string $dateTo,
     ): QueryBuilder {
-        return $this->connection->createQueryBuilder()
+        $qb = $this->connection->createQueryBuilder()
             ->select(
                 's.listing_id',
                 'l.name AS listing_name',
@@ -48,15 +48,20 @@ final readonly class UnitEconomicsQuery
             ->from('listing_daily_snapshots', 's')
             ->innerJoin('s', 'marketplace_listings', 'l', 'l.id = s.listing_id AND l.company_id = s.company_id')
             ->where('s.company_id = :companyId')
-            ->andWhere('s.marketplace = :marketplace')
             ->andWhere('s.snapshot_date BETWEEN :dateFrom AND :dateTo')
             ->setParameter('companyId', $companyId)
-            ->setParameter('marketplace', $marketplace)
             ->setParameter('dateFrom', $dateFrom)
             ->setParameter('dateTo', $dateTo)
             ->groupBy('s.listing_id')
             ->addGroupBy('l.name')
             ->addGroupBy('l.marketplace_sku')
             ->orderBy('SUM(s.revenue)', 'DESC');
+
+        if ($marketplace !== null) {
+            $qb->andWhere('s.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace);
+        }
+
+        return $qb;
     }
 }

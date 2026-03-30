@@ -1,11 +1,11 @@
 import React from 'react';
 import type { SnapshotSummaryTotals, SnapshotItem, MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
-import { MARKETPLACE_LABELS } from '../types/analytics.types';
 import KpiCards from '../components/KpiCards';
 import SnapshotsTable from '../components/SnapshotsTable';
 import RecalcModal from '../components/RecalcModal';
 
 interface MarketplaceAnalyticsViewProps {
+    marketplaces: MarketplaceOption[];
     marketplace: string;
     dateFrom: string;
     dateTo: string;
@@ -31,8 +31,6 @@ interface MarketplaceAnalyticsViewProps {
     onRecalculate: (marketplace: string, dateFrom: string, dateTo: string) => void;
 }
 
-const MARKETPLACES: MarketplaceOption[] = ['all', 'wildberries', 'ozon', 'yandex_market', 'sber_megamarket'];
-
 const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props) => {
     return (
         <>
@@ -56,9 +54,9 @@ const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props
                         value={props.marketplace}
                         onChange={(e) => props.onMarketplaceChange(e.target.value)}
                     >
-                        {MARKETPLACES.map((mp) => (
-                            <option key={mp} value={mp}>
-                                {MARKETPLACE_LABELS[mp]}
+                        {props.marketplaces.map((mp) => (
+                            <option key={mp.value} value={mp.value}>
+                                {mp.label}
                             </option>
                         ))}
                     </select>
@@ -98,6 +96,7 @@ const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props
             />
 
             <RecalcModal
+                marketplaces={props.marketplaces}
                 isOpen={props.recalcModalOpen}
                 isLoading={props.recalcLoading}
                 error={props.recalcError}

@@ -25,7 +25,7 @@ export function useMarketplaceSummary(params: UseMarketplaceSummaryParams): UseM
             dateFrom: params.dateFrom,
             dateTo: params.dateTo,
         };
-        if (params.marketplace && params.marketplace !== 'all') {
+        if (params.marketplace) {
             query.marketplace = params.marketplace;
         }
 
