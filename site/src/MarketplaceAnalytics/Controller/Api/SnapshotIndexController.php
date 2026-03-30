@@ -35,12 +35,9 @@ final class SnapshotIndexController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $req = ListSnapshotsRequest::fromRequest($request);
 
-        if ($req->marketplace === null || $req->marketplace === '') {
-            return $this->json(
-                ['type' => 'BAD_REQUEST', 'message' => 'Параметр marketplace обязателен'],
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
+        $marketplace = ($req->marketplace !== null && $req->marketplace !== '')
+            ? $req->marketplace
+            : null;
 
         try {
             $dateFrom = $req->dateFrom !== null ? new \DateTimeImmutable($req->dateFrom) : null;
@@ -54,7 +51,7 @@ final class SnapshotIndexController extends AbstractController
 
         $result = $this->snapshotRepository->findPaginated(
             $company->getId(),
-            $req->marketplace,
+            $marketplace,
             $dateFrom,
             $dateTo,
             $req->listingId,
@@ -64,7 +61,7 @@ final class SnapshotIndexController extends AbstractController
 
         $listingMap = [];
         if ($result['items'] !== []) {
-            $listings = $this->marketplaceFacade->getActiveListings($company->getId(), $req->marketplace);
+            $listings = $this->marketplaceFacade->getActiveListings($company->getId(), $marketplace);
             foreach ($listings as $listing) {
                 $listingMap[$listing->id] = $listing;
             }
