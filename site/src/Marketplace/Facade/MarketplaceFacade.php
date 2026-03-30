@@ -169,7 +169,7 @@ final readonly class MarketplaceFacade
     public function getActiveListings(string $companyId, ?string $marketplace): array
     {
         $qb = $this->connection->createQueryBuilder()
-            ->select('l.id', 'l.marketplace', 'l.marketplace_sku AS marketplace_sku')
+            ->select('l.id', 'l.marketplace', 'l.marketplace_sku AS marketplace_sku', 'l.name')
             ->from('marketplace_listings', 'l')
             ->where('l.company_id = :companyId')
             ->andWhere('l.is_active = :active')
@@ -187,7 +187,29 @@ final readonly class MarketplaceFacade
             id: $row['id'],
             marketplace: $row['marketplace'],
             marketplaceSku: $row['marketplace_sku'],
+            name: $row['name'],
         ), $rows);
+    }
+
+    public function findListingById(string $companyId, string $listingId): ?ActiveListingDTO
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT l.id, l.marketplace, l.marketplace_sku AS marketplace_sku, l.name
+             FROM marketplace_listings l
+             WHERE l.id = :id AND l.company_id = :companyId',
+            ['id' => $listingId, 'companyId' => $companyId],
+        );
+
+        if ($row === false) {
+            return null;
+        }
+
+        return new ActiveListingDTO(
+            id: $row['id'],
+            marketplace: $row['marketplace'],
+            marketplaceSku: $row['marketplace_sku'],
+            name: $row['name'],
+        );
     }
 
     public function getCostPriceForListing(
