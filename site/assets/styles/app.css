@@ -100,6 +100,11 @@ body {
     gap: 0;
 }
 
+.page-wrapper {
+    margin-left: 0;
+    padding-left: 0;
+}
+
 .navbar-vertical {
     margin: 0;
 }
