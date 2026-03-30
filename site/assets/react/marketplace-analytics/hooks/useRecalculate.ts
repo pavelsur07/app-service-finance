@@ -22,6 +22,7 @@ export function useRecalculate(): UseRecalculateResult {
 
         setIsLoading(true);
         setError(null);
+        setLastJob(null);
 
         httpJson<RecalculateJobResponse>('/api/marketplace-analytics/snapshots/recalculate', {
             method: 'POST',
