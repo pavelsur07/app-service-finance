@@ -241,9 +241,14 @@
                                 <span>Маркетплейсы</span>
                             </a>
 
-                            {% set unit_economics_active = current_route starts with 'marketplace_analytics_' %}
+                            {% set unit_economics_active = current_route == 'marketplace_analytics_index' %}
                             <a class="dropdown-item {{ unit_economics_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_index') }}">
                                 <span>Unit-экономика</span>
+                            </a>
+
+                            {% set unit_settings_active = current_route starts with 'marketplace_analytics_cost_mappings_' %}
+                            <a class="dropdown-item {{ unit_settings_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_cost_mappings_index') }}">
+                                <span>Unit-настройка</span>
                             </a>
 
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}
