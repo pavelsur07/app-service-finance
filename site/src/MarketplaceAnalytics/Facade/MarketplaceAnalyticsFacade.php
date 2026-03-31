@@ -60,7 +60,8 @@ final readonly class MarketplaceAnalyticsFacade
     public function resetCostMapping(
         string $companyId,
         string $mappingId,
+        UnitEconomyCostType $newType,
     ): UnitEconomyCostMapping {
-        return ($this->resetCostMappingAction)($companyId, $mappingId);
+        return ($this->resetCostMappingAction)($companyId, $mappingId, $newType);
     }
 }
