@@ -13,7 +13,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: UnitEconomyCostMappingRepository::class)]
 #[ORM\Table(name: 'unit_economy_cost_mappings')]
 #[ORM\UniqueConstraint(
-    name: 'uniq_cost_mapping',
+    name: 'uq_cost_mapping_company_marketplace_category',
     columns: ['company_id', 'marketplace', 'cost_category_id'],
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_mapping_company')]
