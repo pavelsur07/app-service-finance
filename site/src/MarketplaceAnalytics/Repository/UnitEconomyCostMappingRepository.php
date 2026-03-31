@@ -34,26 +34,15 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         ]);
     }
 
-    public function findOneByKey(
+    public function findOneByCategoryId(
         string $companyId,
         MarketplaceType $marketplace,
-        string $costCategoryCode,
+        string $costCategoryId,
     ): ?UnitEconomyCostMapping {
         return $this->findOneBy([
             'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'costCategoryCode' => $costCategoryCode,
-        ]);
-    }
-
-    public function findSystemMapping(
-        MarketplaceType $marketplace,
-        string $costCategoryCode,
-    ): ?UnitEconomyCostMapping {
-        return $this->findOneBy([
-            'marketplace' => $marketplace,
-            'costCategoryCode' => $costCategoryCode,
-            'isSystem' => true,
+            'costCategoryId' => $costCategoryId,
         ]);
     }
 
@@ -73,7 +62,6 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
     public function findPaginated(
         string $companyId,
         ?MarketplaceType $marketplace,
-        ?bool $isSystem,
         int $page,
         int $perPage,
     ): array {
@@ -84,11 +72,6 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         if ($marketplace !== null) {
             $qb->andWhere('m.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
-        }
-
-        if ($isSystem !== null) {
-            $qb->andWhere('m.isSystem = :isSystem')
-                ->setParameter('isSystem', $isSystem);
         }
 
         $countQb = clone $qb;
@@ -121,10 +104,6 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
     ): void {
         if ($mapping->getCompanyId() !== $companyId) {
             throw new \DomainException('Маппинг не принадлежит компании');
-        }
-
-        if ($mapping->isSystem()) {
-            throw new \DomainException('Системный маппинг нельзя удалить');
         }
 
         $this->getEntityManager()->remove($mapping);
