@@ -63,7 +63,7 @@ final class CostMappingsIndexController extends AbstractController
             'available_marketplaces' => MarketplaceType::cases(),
             'selected_marketplace'   => $selectedMarketplace,
             'categories'             => $categories,
-            'costTypes'              => UnitEconomyCostType::cases(),
+            'cost_types'             => UnitEconomyCostType::cases(),
             'filters'                => ['marketplace' => $selectedMarketplace],
         ]);
     }

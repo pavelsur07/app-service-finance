@@ -59,7 +59,7 @@
                                         data-cost-mapping-add-target="costType"
                                     >
                                         <option value="">— выберите —</option>
-                                        {% for type in costTypes %}
+                                        {% for type in cost_types %}
                                             <option value="{{ type.value }}">
                                                 {{ type.getLabel() }}
                                             </option>
@@ -116,25 +116,9 @@
                                         </tr>
                                     {% else %}
                                         {% for mapping in mappings %}
-                                            <tr
-                                                data-controller="cost-mapping-remap"
-                                                data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
-                                            >
+                                            <tr>
                                                 <td>{{ mapping.marketplace.getDisplayName() }}</td>
-                                                <td>
-                                                    <select
-                                                        class="form-select form-select-sm w-auto"
-                                                        data-cost-mapping-remap-target="select"
-                                                        data-action="change->cost-mapping-remap#remap"
-                                                    >
-                                                        {% for type in costTypes %}
-                                                            <option
-                                                                value="{{ type.value }}"
-                                                                {{ mapping.unitEconomyCostType.value == type.value ? 'selected' }}
-                                                            >{{ type.getLabel() }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </td>
+                                                <td>{{ mapping.unitEconomyCostType.getLabel() }}</td>
                                                 <td>{{ mapping.costCategoryName }}</td>
                                                 <td>
                                                     <button
