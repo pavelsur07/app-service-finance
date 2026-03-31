@@ -38,7 +38,7 @@ final class RemapCostMappingActionTest extends TestCase
             ->withUnitEconomyCostType(UnitEconomyCostType::LOGISTICS_TO)
             ->build();
 
-        $this->repository->method('findByIdAndCompany')
+        $this->repository->method('findById')
             ->with(self::MAPPING_ID, self::COMPANY_ID)
             ->willReturn($mapping);
 
@@ -52,7 +52,7 @@ final class RemapCostMappingActionTest extends TestCase
 
     public function testThrowsDomainExceptionWhenMappingNotFound(): void
     {
-        $this->repository->method('findByIdAndCompany')
+        $this->repository->method('findById')
             ->with(self::MAPPING_ID, self::COMPANY_ID)
             ->willReturn(null);
 
@@ -66,11 +66,11 @@ final class RemapCostMappingActionTest extends TestCase
 
     public function testThrowsDomainExceptionOnIdorAttempt(): void
     {
-        // Маппинг принадлежит другой компании — findByIdAndCompany возвращает null
+        // Маппинг принадлежит другой компании — findById возвращает null
         // так как репозиторий фильтрует по companyId (IDOR-защита)
         $otherCompanyId = '22222222-2222-2222-2222-222222222222';
 
-        $this->repository->method('findByIdAndCompany')
+        $this->repository->method('findById')
             ->with(self::MAPPING_ID, $otherCompanyId)
             ->willReturn(null);
 
