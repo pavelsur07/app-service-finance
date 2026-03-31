@@ -54,11 +54,11 @@ final readonly class MarketplaceAnalyticsFacade
     public function addCostMapping(
         string $companyId,
         string $marketplace,
+        UnitEconomyCostType $unitEconomyCostType,
         string $costCategoryId,
         string $costCategoryName,
-        UnitEconomyCostType $unitEconomyCostType,
     ): UnitEconomyCostMapping {
-        return ($this->addCostMappingAction)($companyId, $marketplace, $costCategoryId, $costCategoryName, $unitEconomyCostType);
+        return ($this->addCostMappingAction)($companyId, $marketplace, $unitEconomyCostType, $costCategoryId, $costCategoryName);
     }
 
     public function deleteCostMapping(string $companyId, string $mappingId): void
