@@ -54,6 +54,23 @@
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
 | `AuditLog` | Shared | `string $companyId` ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
+
+### `UnitEconomyCostMapping` — поля
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` (UUID v7) | PK |
+| `companyId` | `string` (UUID) | Неизменяем, без setter |
+| `marketplace` | `MarketplaceType` | WB, Ozon и др. |
+| `unitEconomyCostType` | `UnitEconomyCostType` | Статья юнит-экономики (8 фиксированных) |
+| `costCategoryId` | `string` (UUID) | ID категории затрат МП (из `marketplace_cost_categories`) |
+| `costCategoryName` | `string` | Название для отображения |
+| `createdAt` | `DateTimeImmutable` | — |
+| `updatedAt` | `DateTimeImmutable` | — |
+
+**Логика:** одна категория МП → одна статья (UniqueConstraint по `companyId + marketplace + costCategoryId`).
+Одна статья ← несколько категорий МП.
+Удалено: `isSystem`, `costCategoryCode`.
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
 
@@ -126,9 +143,6 @@ addCostMapping(string $companyId, string $marketplace, UnitEconomyCostType $unit
 // Удалить маппинг
 // Выбрасывает DomainException если маппинг не найден
 deleteCostMapping(string $companyId, string $mappingId): void
-
-// Переназначить тип затрат для маппинга
-remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
 ```
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
@@ -401,3 +415,4 @@ paths:
 | Версия | Дата | Что изменилось |
 |---|---|---|
 | 1.0 | 2026-03-28 | Инициализация на основе архитектурного документа v1.3 |
+| 1.1 | 2026-03-31 | MarketplaceAnalytics: рефакторинг маппинга затрат — статья фиксированная (UnitEconomyCostType), категория МП выбирается из справочника (marketplace_cost_categories), убраны isSystem и costCategoryCode. Из Facade удалены remapCostMapping, resetCostMapping. |
