@@ -55,7 +55,7 @@ class UnitEconomyCostMapping
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
-        Assert::notEmpty($costCategoryId);
+        Assert::uuid($costCategoryId);
         Assert::notEmpty($costCategoryName);
 
         $this->id                  = $id;
