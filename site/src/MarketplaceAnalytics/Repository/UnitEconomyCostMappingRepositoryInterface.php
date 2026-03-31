@@ -22,12 +22,7 @@ interface UnitEconomyCostMappingRepositoryInterface
     public function findOneByKey(
         string $companyId,
         MarketplaceType $marketplace,
-        string $costCategoryCode,
-    ): ?UnitEconomyCostMapping;
-
-    public function findSystemMapping(
-        MarketplaceType $marketplace,
-        string $costCategoryCode,
+        string $costCategoryId,
     ): ?UnitEconomyCostMapping;
 
     public function hasCompanyMappings(
@@ -41,7 +36,6 @@ interface UnitEconomyCostMappingRepositoryInterface
     public function findPaginated(
         string $companyId,
         ?MarketplaceType $marketplace,
-        ?bool $isSystem,
         int $page,
         int $perPage,
     ): array;

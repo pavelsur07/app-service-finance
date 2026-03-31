@@ -17,18 +17,13 @@ final readonly class CostMappingResolver
     public function resolve(
         string $companyId,
         string $marketplace,
-        string $costCategoryCode,
+        string $costCategoryId,
     ): UnitEconomyCostType {
         $marketplaceType = MarketplaceType::from($marketplace);
 
-        $mapping = $this->repository->findOneByKey($companyId, $marketplaceType, $costCategoryCode);
+        $mapping = $this->repository->findOneByKey($companyId, $marketplaceType, $costCategoryId);
         if ($mapping !== null) {
             return $mapping->getUnitEconomyCostType();
-        }
-
-        $systemMapping = $this->repository->findSystemMapping($marketplaceType, $costCategoryCode);
-        if ($systemMapping !== null) {
-            return $systemMapping->getUnitEconomyCostType();
         }
 
         return UnitEconomyCostType::OTHER;
@@ -37,8 +32,8 @@ final readonly class CostMappingResolver
     public function isAdvertisingCategory(
         string $companyId,
         string $marketplace,
-        string $costCategoryCode,
+        string $costCategoryId,
     ): bool {
-        return $this->resolve($companyId, $marketplace, $costCategoryCode)->isAdvertising();
+        return $this->resolve($companyId, $marketplace, $costCategoryId)->isAdvertising();
     }
 }
