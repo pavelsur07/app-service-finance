@@ -1,7 +1,7 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['category', 'costType', 'marketplace'];
+    static targets = ['category', 'costType', 'marketplace', 'submitButton'];
     static values = { addUrl: String };
 
     async add() {
@@ -46,8 +46,7 @@ export default class extends Controller {
     }
 
     #setLoading(bool) {
-        const btn = this.element.querySelector('[data-action="click->cost-mapping-add#add"]');
-        if (btn) btn.disabled = bool;
+        this.submitButtonTarget.disabled = bool;
     }
 
     #showError(msg) {
