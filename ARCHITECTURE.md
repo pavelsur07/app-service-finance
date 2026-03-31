@@ -119,11 +119,16 @@ getPortfolioSummary(string $companyId, AnalysisPeriod $period, ?string $marketpl
 // Запросить async пересчёт снапшотов за период, возвращает jobId
 requestRecalc(string $companyId, AnalysisPeriod $period): string
 
+// Создать маппинг категории затрат МП → статья юнит-экономики
+// Выбрасывает DomainException если маппинг для данной категории уже существует
+addCostMapping(string $companyId, string $marketplace, string $costCategoryId, string $costCategoryName, UnitEconomyCostType $unitEconomyCostType): UnitEconomyCostMapping
+
+// Удалить маппинг
+// Выбрасывает DomainException если маппинг не найден
+deleteCostMapping(string $companyId, string $mappingId): void
+
 // Переназначить тип затрат для маппинга
 remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
-
-// Сбросить маппинг к системному значению
-resetCostMapping(string $companyId, string $mappingId): UnitEconomyCostMapping
 ```
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)

@@ -27,58 +27,89 @@
                         </div>
                     {% endfor %}
 
-                    {# Фильтры #}
+                    {# Форма добавления маппинга #}
                     <div class="card mb-3">
-                        <div class="card-body">
-                            <form method="GET" action="{{ path('marketplace_analytics_cost_mappings_index') }}">
-                                <div class="row g-2 align-items-end">
-                                    <div class="col-auto">
-                                        <label class="form-label">Маркетплейс</label>
-                                        <select name="marketplace" class="form-select">
-                                            <option value="">Все</option>
-                                            <option value="wildberries" {{ filters.marketplace == 'wildberries' ? 'selected' }}>Wildberries</option>
-                                            <option value="ozon" {{ filters.marketplace == 'ozon' ? 'selected' }}>Ozon</option>
-                                            <option value="yandex_market" {{ filters.marketplace == 'yandex_market' ? 'selected' }}>Яндекс Маркет</option>
-                                            <option value="sber_megamarket" {{ filters.marketplace == 'sber_megamarket' ? 'selected' }}>СберМегаМаркет</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-auto">
-                                        <label class="form-label">Тип</label>
-                                        <select name="is_system" class="form-select">
-                                            <option value="">Все</option>
-                                            <option value="1" {{ filters.is_system is same as(true) ? 'selected' }}>Системные</option>
-                                            <option value="0" {{ filters.is_system is same as(false) ? 'selected' }}>Изменённые</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-auto">
-                                        <button type="submit" class="btn btn-primary">Применить</button>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{ path('marketplace_analytics_cost_mappings_index') }}" class="btn btn-outline-secondary">Сбросить</a>
-                                    </div>
+                        <div class="card-header">
+                            <h3 class="card-title">Добавить маппинг</h3>
+                        </div>
+                        <div class="card-body"
+                            data-controller="cost-mapping-add"
+                            data-cost-mapping-add-add-url-value="{{ path('marketplace_analytics_api_cost_mapping_add') }}"
+                        >
+                            <div class="row g-2 align-items-end">
+
+                                <div class="col-auto">
+                                    <label class="form-label">Маркетплейс</label>
+                                    <select name="marketplace" class="form-select"
+                                        onchange="window.location.href='{{ path('marketplace_analytics_cost_mappings_index') }}' + '?marketplace=' + this.value">
+                                        {% for mp in available_marketplaces %}
+                                            <option value="{{ mp.value }}"
+                                                {{ selected_marketplace == mp.value ? 'selected' }}>
+                                                {{ mp.getDisplayName() }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
-                            </form>
+
+                                <div class="col-auto">
+                                    <label class="form-label">Категория затрат МП</label>
+                                    <select
+                                        class="form-select"
+                                        data-cost-mapping-add-target="category"
+                                    >
+                                        <option value="">— выберите —</option>
+                                        {% for cat in categories %}
+                                            <option
+                                                value="{{ cat.id }}"
+                                                data-name="{{ cat.name|e('html_attr') }}"
+                                            >{{ cat.name }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-auto">
+                                    <label class="form-label">Статья юнит-экономики</label>
+                                    <select
+                                        class="form-select"
+                                        data-cost-mapping-add-target="costType"
+                                    >
+                                        <option value="">— выберите —</option>
+                                        {% for type in costTypes %}
+                                            <option value="{{ type.value }}">
+                                                {{ type.getLabel() }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-auto">
+                                    <button
+                                        class="btn btn-primary"
+                                        data-action="click->cost-mapping-add#add"
+                                    >Добавить</button>
+                                </div>
+
+                            </div>
                         </div>
                     </div>
 
-                    {# Таблица #}
+                    {# Таблица маппингов #}
                     <div class="card">
                         <div class="table-responsive">
                             <table class="table table-vcenter card-table">
                                 <thead>
                                     <tr>
                                         <th>Маркетплейс</th>
-                                        <th>Код затрат</th>
-                                        <th>Статья</th>
-                                        <th>Тип</th>
+                                        <th>Категория затрат МП</th>
+                                        <th>Статья юнит-экономики</th>
                                         <th>Действия</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% if mappings is empty %}
                                         <tr>
-                                            <td colspan="5" class="text-center py-5 text-muted">
-                                                Нет маппингов для отображения
+                                            <td colspan="4" class="text-center py-5 text-muted">
+                                                Маппинги не добавлены. Добавьте первый маппинг выше.
                                             </td>
                                         </tr>
                                     {% else %}
@@ -86,38 +117,31 @@
                                             <tr
                                                 data-controller="cost-mapping-remap"
                                                 data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
-                                                data-cost-mapping-remap-reset-url-value="{{ path('marketplace_analytics_api_cost_mapping_reset', {id: mapping.id}) }}"
                                             >
-                                                <td>{{ mapping.marketplace.value }}</td>
-                                                <td>{{ mapping.costCategoryCode }}</td>
+                                                <td>{{ mapping.marketplace.getDisplayName() }}</td>
+                                                <td>{{ mapping.costCategoryName }}</td>
                                                 <td>
                                                     <select
                                                         class="form-select form-select-sm w-auto"
                                                         data-cost-mapping-remap-target="select"
                                                         data-action="change->cost-mapping-remap#remap"
                                                     >
-                                                        {% for type in unitEconomyCostTypes %}
+                                                        {% for type in costTypes %}
                                                             <option
                                                                 value="{{ type.value }}"
                                                                 {{ mapping.unitEconomyCostType.value == type.value ? 'selected' }}
-                                                            >{{ type.value }}</option>
+                                                            >{{ type.getLabel() }}</option>
                                                         {% endfor %}
                                                     </select>
                                                 </td>
                                                 <td>
-                                                    <span
-                                                        data-cost-mapping-remap-target="badge"
-                                                        class="badge {{ mapping.isSystem ? 'bg-secondary-lt' : 'bg-warning-lt' }}"
-                                                    >{{ mapping.isSystem ? 'Системный' : 'Изменён' }}</span>
-                                                </td>
-                                                <td>
-                                                    {% if not mapping.isSystem %}
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            data-action="click->cost-mapping-remap#reset"
-                                                        >Сбросить</button>
-                                                    {% endif %}
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-ghost-danger"
+                                                        data-controller="cost-mapping-delete"
+                                                        data-cost-mapping-delete-url-value="{{ path('marketplace_analytics_api_cost_mapping_delete', {id: mapping.id}) }}"
+                                                        data-action="click->cost-mapping-delete#delete"
+                                                    >Удалить</button>
                                                 </td>
                                             </tr>
                                         {% endfor %}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Controller;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\EnsureCostMappingsSeededAction;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
@@ -22,6 +23,7 @@ final class CostMappingsIndexController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
         private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
+        private readonly MarketplaceFacade $marketplaceFacade,
     ) {}
 
     #[Route(
@@ -32,36 +34,38 @@ final class CostMappingsIndexController extends AbstractController
     public function __invoke(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
-        $marketplace = $request->query->get('marketplace');
+
+        $selectedMarketplace = $request->query->get('marketplace')
+            ?: MarketplaceType::WILDBERRIES->value;
+
+        $marketplaceEnum = MarketplaceType::tryFrom($selectedMarketplace)
+            ?? MarketplaceType::WILDBERRIES;
+
+        ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
+
         $page = max(1, $request->query->getInt('page', 1));
-
-        $marketplaceEnum = ($marketplace !== null && $marketplace !== '')
-            ? MarketplaceType::tryFrom($marketplace)
-            : null;
-
-        if ($marketplaceEnum !== null) {
-            ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
-        } else {
-            foreach (MarketplaceType::cases() as $type) {
-                ($this->ensureCostMappingsSeededAction)($company->getId(), $type->value);
-            }
-        }
 
         $result = $this->repository->findPaginated(
             $company->getId(),
-            ($marketplace !== null && $marketplace !== '') ? $marketplace : null,
+            $selectedMarketplace,
             $page,
             50,
         );
 
-        $costTypes = array_column(UnitEconomyCostType::cases(), null, 'value');
+        $categories = $this->marketplaceFacade->getCostCategoriesForCompany(
+            $company->getId(),
+            $selectedMarketplace,
+        );
 
         return $this->render('marketplace_analytics/cost_mappings/index.html.twig', [
-            'mappings' => $result['items'],
-            'total' => $result['total'],
-            'page' => $page,
-            'filters' => ['marketplace' => $marketplace],
-            'unitEconomyCostTypes' => $costTypes,
+            'mappings'               => $result['items'],
+            'total'                  => $result['total'],
+            'page'                   => $page,
+            'available_marketplaces' => MarketplaceType::cases(),
+            'selected_marketplace'   => $selectedMarketplace,
+            'categories'             => $categories,
+            'costTypes'              => UnitEconomyCostType::cases(),
+            'filters'                => ['marketplace' => $selectedMarketplace],
         ]);
     }
 }

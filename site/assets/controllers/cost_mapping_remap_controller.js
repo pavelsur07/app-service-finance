@@ -1,8 +1,8 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['select', 'badge'];
-    static values = { remapUrl: String, resetUrl: String };
+    static targets = ['select'];
+    static values = { remapUrl: String };
 
     async remap() {
         this.#setLoading(true);
@@ -20,7 +20,7 @@ export default class extends Controller {
                 return;
             }
 
-            this.#updateBadge(false);
+            this.#updateBadge();
         } catch {
             this.#showError('Не удалось сохранить');
         } finally {
@@ -28,37 +28,8 @@ export default class extends Controller {
         }
     }
 
-    async reset() {
-        if (!confirm('Сбросить к системному значению?')) return;
-
-        this.#setLoading(true);
-
-        try {
-            const res = await fetch(this.resetUrlValue, {
-                method: 'PATCH',
-                credentials: 'same-origin',
-            });
-
-            if (!res.ok) {
-                this.#showError('Не удалось сбросить');
-                return;
-            }
-
-            const data = await res.json();
-            this.selectTarget.value = data.unit_economy_cost_type;
-            this.#updateBadge(true);
-        } catch {
-            this.#showError('Не удалось сбросить');
-        } finally {
-            this.#setLoading(false);
-        }
-    }
-
-    #updateBadge(isSystem) {
-        this.badgeTarget.textContent = isSystem ? 'Системный' : 'Изменён';
-        this.badgeTarget.className = isSystem
-            ? 'badge bg-secondary-lt'
-            : 'badge bg-warning-lt';
+    #updateBadge() {
+        // badges removed from UI
     }
 
     #setLoading(bool) {
