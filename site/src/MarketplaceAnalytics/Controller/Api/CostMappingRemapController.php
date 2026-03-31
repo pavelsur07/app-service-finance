@@ -18,7 +18,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 use Symfony\Component\Serializer\SerializerInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 
-#[IsGranted('ROLE_USER')]
+#[IsGranted('ROLE_COMPANY_USER')]
 final class CostMappingRemapController extends AbstractController
 {
     public function __construct(
@@ -59,8 +59,15 @@ final class CostMappingRemapController extends AbstractController
             );
         }
 
+        $type = UnitEconomyCostType::tryFrom($dto->unitEconomyCostType);
+        if ($type === null) {
+            return $this->json(
+                ['type' => 'VALIDATION_ERROR', 'message' => 'Неизвестный тип статьи юнит-экономики'],
+                Response::HTTP_UNPROCESSABLE_ENTITY,
+            );
+        }
+
         try {
-            $type = UnitEconomyCostType::from($dto->unitEconomyCostType);
             $mapping = $this->facade->remapCostMapping($company->getId(), $id, $type);
         } catch (\DomainException $e) {
             return $this->json(
