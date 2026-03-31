@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'unit_economy_cost_mappings')]
 #[ORM\UniqueConstraint(
     name: 'uniq_cost_mapping',
-    columns: ['company_id', 'marketplace', 'cost_category_code'],
+    columns: ['company_id', 'marketplace', 'cost_category_id'],
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_mapping_company')]
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_cost_mapping_company_marketplace')]
@@ -30,14 +30,14 @@ class UnitEconomyCostMapping
     #[ORM\Column(type: 'string', length: 50, enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
 
-    #[ORM\Column(type: 'string', length: 50)]
-    private string $costCategoryCode;
+    #[ORM\Column(type: 'guid')]
+    private string $costCategoryId;
+
+    #[ORM\Column(type: 'string', length: 255)]
+    private string $costCategoryName;
 
     #[ORM\Column(type: 'string', length: 50, enumType: UnitEconomyCostType::class)]
     private UnitEconomyCostType $unitEconomyCostType;
-
-    #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    private bool $isSystem;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -49,21 +49,22 @@ class UnitEconomyCostMapping
         string $id,
         string $companyId,
         MarketplaceType $marketplace,
-        string $costCategoryCode,
+        string $costCategoryId,
+        string $costCategoryName,
         UnitEconomyCostType $unitEconomyCostType,
-        bool $isSystem = false,
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
-        Assert::notEmpty($costCategoryCode);
-        Assert::maxLength($costCategoryCode, 50);
+        Assert::uuid($costCategoryId);
+        Assert::notEmpty($costCategoryName);
+        Assert::maxLength($costCategoryName, 255);
 
         $this->id                  = $id;
         $this->companyId           = $companyId;
         $this->marketplace         = $marketplace;
-        $this->costCategoryCode    = $costCategoryCode;
+        $this->costCategoryId      = $costCategoryId;
+        $this->costCategoryName    = $costCategoryName;
         $this->unitEconomyCostType = $unitEconomyCostType;
-        $this->isSystem            = $isSystem;
         $this->createdAt           = new \DateTimeImmutable();
         $this->updatedAt           = new \DateTimeImmutable();
     }
@@ -77,9 +78,9 @@ class UnitEconomyCostMapping
     public function getId(): string { return $this->id; }
     public function getCompanyId(): string { return $this->companyId; }
     public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getCostCategoryCode(): string { return $this->costCategoryCode; }
+    public function getCostCategoryId(): string { return $this->costCategoryId; }
+    public function getCostCategoryName(): string { return $this->costCategoryName; }
     public function getUnitEconomyCostType(): UnitEconomyCostType { return $this->unitEconomyCostType; }
-    public function isSystem(): bool { return $this->isSystem; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 }

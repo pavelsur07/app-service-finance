@@ -27,22 +27,22 @@ final readonly class DefaultCostMappingSeedPolicy
         }
 
         $defaults = [
-            'logistics_delivery' => UnitEconomyCostType::LOGISTICS_TO,
-            'logistics_return' => UnitEconomyCostType::LOGISTICS_BACK,
-            'storage' => UnitEconomyCostType::STORAGE,
-            'commission' => UnitEconomyCostType::COMMISSION,
-            'advertising_cpc' => UnitEconomyCostType::ADVERTISING_CPC,
-            'advertising_other' => UnitEconomyCostType::ADVERTISING_OTHER,
+            ['id' => 'a0000001-0000-0000-0000-000000000001', 'name' => 'Логистика (доставка)', 'type' => UnitEconomyCostType::LOGISTICS_TO],
+            ['id' => 'a0000001-0000-0000-0000-000000000002', 'name' => 'Логистика (возврат)', 'type' => UnitEconomyCostType::LOGISTICS_BACK],
+            ['id' => 'a0000001-0000-0000-0000-000000000003', 'name' => 'Хранение', 'type' => UnitEconomyCostType::STORAGE],
+            ['id' => 'a0000001-0000-0000-0000-000000000004', 'name' => 'Комиссия', 'type' => UnitEconomyCostType::COMMISSION],
+            ['id' => 'a0000001-0000-0000-0000-000000000005', 'name' => 'Реклама (CPC)', 'type' => UnitEconomyCostType::ADVERTISING_CPC],
+            ['id' => 'a0000001-0000-0000-0000-000000000006', 'name' => 'Реклама (прочая)', 'type' => UnitEconomyCostType::ADVERTISING_OTHER],
         ];
 
-        foreach ($defaults as $code => $type) {
+        foreach ($defaults as $default) {
             $mapping = new UnitEconomyCostMapping(
                 Uuid::uuid7()->toString(),
                 $companyId,
                 $marketplaceType,
-                $code,
-                $type,
-                isSystem: true,
+                $default['id'],
+                $default['name'],
+                $default['type'],
             );
             $this->repository->save($mapping);
         }

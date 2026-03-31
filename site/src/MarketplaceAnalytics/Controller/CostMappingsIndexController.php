@@ -33,10 +33,6 @@ final class CostMappingsIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $marketplace = $request->query->get('marketplace');
-        $isSystemRaw = $request->query->get('is_system');
-        $isSystem = ($isSystemRaw !== null && $isSystemRaw !== '')
-            ? filter_var($isSystemRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
-            : null;
         $page = max(1, $request->query->getInt('page', 1));
 
         $marketplaceEnum = ($marketplace !== null && $marketplace !== '')
@@ -54,7 +50,6 @@ final class CostMappingsIndexController extends AbstractController
         $result = $this->repository->findPaginated(
             $company->getId(),
             $marketplaceEnum,
-            $isSystem,
             $page,
             50,
         );
@@ -65,7 +60,7 @@ final class CostMappingsIndexController extends AbstractController
             'mappings' => $result['items'],
             'total' => $result['total'],
             'page' => $page,
-            'filters' => ['marketplace' => $marketplace, 'is_system' => $isSystem],
+            'filters' => ['marketplace' => $marketplace],
             'unitEconomyCostTypes' => $costTypes,
         ]);
     }

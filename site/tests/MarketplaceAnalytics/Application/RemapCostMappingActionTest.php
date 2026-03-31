@@ -35,7 +35,6 @@ final class RemapCostMappingActionTest extends TestCase
     public function testRemapChangesUnitEconomyCostType(): void
     {
         $mapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asCustom()
             ->withUnitEconomyCostType(UnitEconomyCostType::LOGISTICS_TO)
             ->build();
 
