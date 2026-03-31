@@ -143,6 +143,10 @@ addCostMapping(string $companyId, string $marketplace, UnitEconomyCostType $unit
 // Удалить маппинг
 // Выбрасывает DomainException если маппинг не найден
 deleteCostMapping(string $companyId, string $mappingId): void
+
+// Переназначить статью юнит-экономики для маппинга (API только, UI кнопки нет)
+// Выбрасывает DomainException если маппинг не найден
+remapCostMapping(string $companyId, string $mappingId, UnitEconomyCostType $newType): UnitEconomyCostMapping
 ```
 
 ### `MarketplaceFacade` (`src/Marketplace/Facade/MarketplaceFacade.php`)
