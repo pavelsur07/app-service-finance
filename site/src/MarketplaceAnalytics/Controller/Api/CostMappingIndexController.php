@@ -40,7 +40,6 @@ final class CostMappingIndexController extends AbstractController
         $result = $this->repository->findPaginated(
             $company->getId(),
             $marketplace,
-            $req->isSystem,
             $req->page,
             $req->perPage,
         );

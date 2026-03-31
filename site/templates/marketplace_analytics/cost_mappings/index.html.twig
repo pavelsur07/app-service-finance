@@ -43,14 +43,6 @@
                                         </select>
                                     </div>
                                     <div class="col-auto">
-                                        <label class="form-label">Тип</label>
-                                        <select name="is_system" class="form-select">
-                                            <option value="">Все</option>
-                                            <option value="1" {{ filters.is_system is same as(true) ? 'selected' }}>Системные</option>
-                                            <option value="0" {{ filters.is_system is same as(false) ? 'selected' }}>Изменённые</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-auto">
                                         <button type="submit" class="btn btn-primary">Применить</button>
                                     </div>
                                     <div class="col-auto">
@@ -68,16 +60,15 @@
                                 <thead>
                                     <tr>
                                         <th>Маркетплейс</th>
-                                        <th>Код затрат</th>
+                                        <th>Категория затрат</th>
                                         <th>Статья</th>
-                                        <th>Тип</th>
                                         <th>Действия</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {% if mappings is empty %}
                                         <tr>
-                                            <td colspan="5" class="text-center py-5 text-muted">
+                                            <td colspan="4" class="text-center py-5 text-muted">
                                                 Нет маппингов для отображения
                                             </td>
                                         </tr>
@@ -86,10 +77,9 @@
                                             <tr
                                                 data-controller="cost-mapping-remap"
                                                 data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
-                                                data-cost-mapping-remap-reset-url-value="{{ path('marketplace_analytics_api_cost_mapping_reset', {id: mapping.id}) }}"
                                             >
                                                 <td>{{ mapping.marketplace.value }}</td>
-                                                <td>{{ mapping.costCategoryCode }}</td>
+                                                <td>{{ mapping.costCategoryName }}</td>
                                                 <td>
                                                     <select
                                                         class="form-select form-select-sm w-auto"
@@ -105,19 +95,11 @@
                                                     </select>
                                                 </td>
                                                 <td>
-                                                    <span
-                                                        data-cost-mapping-remap-target="badge"
-                                                        class="badge {{ mapping.isSystem ? 'bg-secondary-lt' : 'bg-warning-lt' }}"
-                                                    >{{ mapping.isSystem ? 'Системный' : 'Изменён' }}</span>
-                                                </td>
-                                                <td>
-                                                    {% if not mapping.isSystem %}
-                                                        <button
-                                                            type="button"
-                                                            class="btn btn-sm btn-outline-secondary"
-                                                            data-action="click->cost-mapping-remap#reset"
-                                                        >Сбросить</button>
-                                                    {% endif %}
+                                                    <button
+                                                        type="button"
+                                                        class="btn btn-sm btn-outline-secondary"
+                                                        data-action="click->cost-mapping-remap#remap"
+                                                    >Изменить</button>
                                                 </td>
                                             </tr>
                                         {% endfor %}

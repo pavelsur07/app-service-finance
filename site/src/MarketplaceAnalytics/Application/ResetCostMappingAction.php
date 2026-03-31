@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Application;
 
 use App\MarketplaceAnalytics\Entity\UnitEconomyCostMapping;
+use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -18,6 +19,7 @@ final class ResetCostMappingAction
     public function __invoke(
         string $companyId,
         string $mappingId,
+        UnitEconomyCostType $newType,
     ): UnitEconomyCostMapping {
         $mapping = $this->repository->findByIdAndCompany($mappingId, $companyId);
 
@@ -25,20 +27,7 @@ final class ResetCostMappingAction
             throw new \DomainException('Маппинг не найден');
         }
 
-        if ($mapping->isSystem()) {
-            throw new \DomainException('Маппинг уже имеет системное значение');
-        }
-
-        $systemMapping = $this->repository->findSystemMapping(
-            $mapping->getMarketplace(),
-            $mapping->getCostCategoryCode(),
-        );
-
-        if ($systemMapping === null) {
-            throw new \DomainException('Системный маппинг для данного кода не найден');
-        }
-
-        $mapping->remapTo($systemMapping->getUnitEconomyCostType());
+        $mapping->remapTo($newType);
 
         $this->entityManager->flush();
 
