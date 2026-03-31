@@ -118,7 +118,7 @@
                                                     <button
                                                         type="button"
                                                         class="btn btn-sm btn-ghost-danger"
-                                                        onclick="deleteCostMapping('{{ mapping.id }}')"
+                                                        onclick="deleteCostMapping(this, '{{ mapping.id }}')"
                                                     >Удалить</button>
                                                 </td>
                                             </tr>
@@ -160,7 +160,7 @@
     {{ parent() }}
     <script>
     const ADD_URL    = '{{ path('marketplace_analytics_api_cost_mapping_add') }}';
-    const DELETE_URL = '/api/marketplace-analytics/cost-mappings/';
+    const DELETE_URL = ADD_URL + '/';
 
     async function addCostMapping() {
         const marketplace  = document.getElementById('select-marketplace').value;
@@ -181,6 +181,7 @@
             const res = await fetch(ADD_URL, {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
                 body: JSON.stringify({
                     marketplace:         marketplace,
                     unitEconomyCostType: costType,
@@ -203,19 +204,17 @@
         }
     }
 
-    async function deleteCostMapping(id) {
+    async function deleteCostMapping(btn, id) {
         if (!confirm('Удалить маппинг?')) return;
 
         try {
             const res = await fetch(DELETE_URL + id, {
                 method: 'DELETE',
+                credentials: 'same-origin',
             });
 
             if (res.status === 204) {
-                const btn = document.querySelector(
-                    '[onclick="deleteCostMapping(\'' + id + '\')"]'
-                );
-                btn?.closest('tr')?.remove();
+                btn.closest('tr')?.remove();
                 return;
             }
 
