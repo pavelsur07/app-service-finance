@@ -38,15 +38,15 @@ final readonly class CostMappingResponse
     public function toArray(): array
     {
         return [
-            'id'                        => $this->id,
-            'company_id'                => $this->companyId,
-            'marketplace'               => $this->marketplace,
-            'unit_economy_cost_type'    => $this->unitEconomyCostType,
+            'id' => $this->id,
+            'company_id' => $this->companyId,
+            'marketplace' => $this->marketplace,
+            'unit_economy_cost_type' => $this->unitEconomyCostType,
             'unit_economy_cost_type_label' => $this->unitEconomyCostTypeLabel,
-            'cost_category_id'          => $this->costCategoryId,
-            'cost_category_name'        => $this->costCategoryName,
-            'created_at'                => $this->createdAt,
-            'updated_at'                => $this->updatedAt,
+            'cost_category_id' => $this->costCategoryId,
+            'cost_category_name' => $this->costCategoryName,
+            'created_at' => $this->createdAt,
+            'updated_at' => $this->updatedAt,
         ];
     }
 }
