@@ -15,6 +15,20 @@ enum UnitEconomyCostType: string
     case COMMISSION = 'commission';
     case OTHER = 'other';
 
+    public function getLabel(): string
+    {
+        return match ($this) {
+            self::LOGISTICS_TO         => 'Логистика (доставка)',
+            self::LOGISTICS_BACK       => 'Логистика (возврат)',
+            self::STORAGE              => 'Хранение',
+            self::ADVERTISING_CPC      => 'Реклама (CPC)',
+            self::ADVERTISING_OTHER    => 'Реклама (прочая)',
+            self::ADVERTISING_EXTERNAL => 'Реклама (внешняя)',
+            self::COMMISSION           => 'Комиссия',
+            self::OTHER                => 'Прочее',
+        };
+    }
+
     public function isAdvertising(): bool
     {
         return match ($this) {

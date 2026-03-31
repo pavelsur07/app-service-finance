@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Facade;
 
+use App\MarketplaceAnalytics\Application\AddCostMappingAction;
+use App\MarketplaceAnalytics\Application\DeleteCostMappingAction;
 use App\MarketplaceAnalytics\Application\GetPortfolioSummaryAction;
 use App\MarketplaceAnalytics\Application\GetUnitEconomicsAction;
 use App\MarketplaceAnalytics\Application\RecalcSnapshotAction;
 use App\MarketplaceAnalytics\Application\RemapCostMappingAction;
-use App\MarketplaceAnalytics\Application\ResetCostMappingAction;
 use App\MarketplaceAnalytics\Domain\ValueObject\AnalysisPeriod;
 use App\MarketplaceAnalytics\DTO\ListingUnitEconomics;
 use App\MarketplaceAnalytics\DTO\PortfolioSummary;
@@ -21,8 +22,9 @@ final readonly class MarketplaceAnalyticsFacade
         private GetUnitEconomicsAction $getUnitEconomicsAction,
         private GetPortfolioSummaryAction $getPortfolioSummaryAction,
         private RecalcSnapshotAction $recalcSnapshotAction,
+        private AddCostMappingAction $addCostMappingAction,
+        private DeleteCostMappingAction $deleteCostMappingAction,
         private RemapCostMappingAction $remapCostMappingAction,
-        private ResetCostMappingAction $resetCostMappingAction,
     ) {}
 
     /**
@@ -49,18 +51,26 @@ final readonly class MarketplaceAnalyticsFacade
         return ($this->recalcSnapshotAction)($companyId, $period);
     }
 
+    public function addCostMapping(
+        string $companyId,
+        string $marketplace,
+        string $costCategoryId,
+        string $costCategoryName,
+        UnitEconomyCostType $unitEconomyCostType,
+    ): UnitEconomyCostMapping {
+        return ($this->addCostMappingAction)($companyId, $marketplace, $costCategoryId, $costCategoryName, $unitEconomyCostType);
+    }
+
+    public function deleteCostMapping(string $companyId, string $mappingId): void
+    {
+        ($this->deleteCostMappingAction)($companyId, $mappingId);
+    }
+
     public function remapCostMapping(
         string $companyId,
         string $mappingId,
         UnitEconomyCostType $newType,
     ): UnitEconomyCostMapping {
         return ($this->remapCostMappingAction)($companyId, $mappingId, $newType);
-    }
-
-    public function resetCostMapping(
-        string $companyId,
-        string $mappingId,
-    ): UnitEconomyCostMapping {
-        return ($this->resetCostMappingAction)($companyId, $mappingId);
     }
 }
