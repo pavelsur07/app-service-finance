@@ -118,7 +118,7 @@
                                                     <button
                                                         type="button"
                                                         class="btn btn-sm btn-ghost-danger"
-                                                        onclick="deleteCostMapping(this, '{{ mapping.id }}')"
+                                                        onclick="deleteCostMapping(this, '{{ mapping.id|e('html_attr') }}')"
                                                     >Удалить</button>
                                                 </td>
                                             </tr>
@@ -207,6 +207,8 @@
     async function deleteCostMapping(btn, id) {
         if (!confirm('Удалить маппинг?')) return;
 
+        btn.disabled = true;
+
         try {
             const res = await fetch(DELETE_URL + id, {
                 method: 'DELETE',
@@ -222,6 +224,8 @@
             alert(data.message ?? 'Не удалось удалить маппинг');
         } catch (e) {
             alert('Ошибка сети');
+        } finally {
+            btn.disabled = false;
         }
     }
     </script>
