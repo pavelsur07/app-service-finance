@@ -95,6 +95,15 @@ declare(strict_types=1);
 ```
 `final class` по умолчанию · `readonly class` для DTO и stateless-сервисов · constructor injection `private readonly`
 
+**Исключение — Entity: только `class`, не `final class`.**
+Doctrine генерирует proxy-класс наследованием от Entity.
+`final` блокирует это → ошибка `"Cannot generate lazy ghost: class X is final"`.
+
+Итого по модификаторам:
+- `class` — Entity
+- `final class` — Builder, Action, Policy, Controller, Facade, Repository, Query, Handler
+- `final readonly class` — DTO, Message, stateless-сервисы
+
 ### Entity — новые модули
 - UUID v7: `Uuid::uuid7()->toString()` — генерируется в **конструкторе Entity**
 - `#[ORM\Table(name: '...')]` — явное имя таблицы **всегда**
