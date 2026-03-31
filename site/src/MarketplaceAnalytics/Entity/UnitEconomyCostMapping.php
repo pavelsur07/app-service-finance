@@ -30,14 +30,14 @@ class UnitEconomyCostMapping
     #[ORM\Column(type: 'string', length: 50, enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
 
+    #[ORM\Column(type: 'string', length: 50, enumType: UnitEconomyCostType::class)]
+    private UnitEconomyCostType $unitEconomyCostType;
+
     #[ORM\Column(type: 'guid')]
     private string $costCategoryId;
 
     #[ORM\Column(type: 'string', length: 255)]
     private string $costCategoryName;
-
-    #[ORM\Column(type: 'string', length: 50, enumType: UnitEconomyCostType::class)]
-    private UnitEconomyCostType $unitEconomyCostType;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
@@ -49,9 +49,9 @@ class UnitEconomyCostMapping
         string $id,
         string $companyId,
         MarketplaceType $marketplace,
+        UnitEconomyCostType $unitEconomyCostType,
         string $costCategoryId,
         string $costCategoryName,
-        UnitEconomyCostType $unitEconomyCostType,
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
@@ -61,9 +61,9 @@ class UnitEconomyCostMapping
         $this->id                  = $id;
         $this->companyId           = $companyId;
         $this->marketplace         = $marketplace;
+        $this->unitEconomyCostType = $unitEconomyCostType;
         $this->costCategoryId      = $costCategoryId;
         $this->costCategoryName    = $costCategoryName;
-        $this->unitEconomyCostType = $unitEconomyCostType;
         $this->createdAt           = new \DateTimeImmutable();
         $this->updatedAt           = new \DateTimeImmutable();
     }
@@ -77,9 +77,9 @@ class UnitEconomyCostMapping
     public function getId(): string { return $this->id; }
     public function getCompanyId(): string { return $this->companyId; }
     public function getMarketplace(): MarketplaceType { return $this->marketplace; }
+    public function getUnitEconomyCostType(): UnitEconomyCostType { return $this->unitEconomyCostType; }
     public function getCostCategoryId(): string { return $this->costCategoryId; }
     public function getCostCategoryName(): string { return $this->costCategoryName; }
-    public function getUnitEconomyCostType(): UnitEconomyCostType { return $this->unitEconomyCostType; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 }

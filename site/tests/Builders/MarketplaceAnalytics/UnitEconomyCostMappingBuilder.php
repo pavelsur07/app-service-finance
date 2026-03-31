@@ -86,9 +86,9 @@ final class UnitEconomyCostMappingBuilder
             id: $this->id,
             companyId: $this->companyId,
             marketplace: $this->marketplace,
+            unitEconomyCostType: $this->unitEconomyCostType,
             costCategoryId: $this->costCategoryId,
             costCategoryName: $this->costCategoryName,
-            unitEconomyCostType: $this->unitEconomyCostType,
         );
     }
 }

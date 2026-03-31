@@ -35,9 +35,9 @@ final class AddCostMappingAction
             Uuid::uuid7()->toString(),
             $companyId,
             MarketplaceType::from($marketplace),
+            $unitEconomyCostType,
             $costCategoryId,
             $costCategoryName,
-            $unitEconomyCostType,
         );
 
         $this->repository->save($mapping);
