@@ -11,6 +11,7 @@ readonly class CostData
         public string $categoryCode, // Код категории затрат
         public string $amount,
         public \DateTimeImmutable $costDate,
+        public ?string $categoryId = null,  // UUID категории затрат (для CostMappingResolver)
         public ?string $marketplaceSku = null, // Nullable для общих затрат
         public ?string $description = null,
         public ?string $externalId = null,
