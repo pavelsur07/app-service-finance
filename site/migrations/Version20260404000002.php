@@ -54,10 +54,23 @@ final class Version20260404000002 extends AbstractMigration
                         'advertising_cpc','advertising_other','advertising_external',
                         'commission','other'))
         SQL);
+
+        // Удаляем старые колонки — новый код их не использует
+        $this->addSql(<<<'SQL'
+            ALTER TABLE unit_economy_cost_mappings
+                DROP COLUMN IF EXISTS is_system,
+                DROP COLUMN IF EXISTS cost_category_code
+        SQL);
     }
 
     public function down(Schema $schema): void
     {
+        $this->addSql(<<<'SQL'
+            ALTER TABLE unit_economy_cost_mappings
+                ADD COLUMN IF NOT EXISTS is_system          BOOLEAN     NOT NULL DEFAULT FALSE,
+                ADD COLUMN IF NOT EXISTS cost_category_code VARCHAR(50) DEFAULT NULL
+        SQL);
+
         $this->addSql(<<<'SQL'
             ALTER TABLE unit_economy_cost_mappings
                 DROP CONSTRAINT IF EXISTS uniq_cost_mapping,

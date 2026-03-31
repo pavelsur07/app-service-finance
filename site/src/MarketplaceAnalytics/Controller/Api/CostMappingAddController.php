@@ -66,9 +66,9 @@ final class CostMappingAddController extends AbstractController
             $mapping = $this->facade->addCostMapping(
                 $company->getId(),
                 $marketplace,
+                $type,
                 $costCategoryId,
                 $costCategoryName,
-                $type,
             );
         } catch (\DomainException $e) {
             return $this->json(

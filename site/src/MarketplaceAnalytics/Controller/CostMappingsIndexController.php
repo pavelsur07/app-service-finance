@@ -40,7 +40,7 @@ final class CostMappingsIndexController extends AbstractController
 
         $selectedMarketplace = $marketplaceEnum->value;
 
-        ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
+        ($this->ensureCostMappingsSeededAction)($company->getId(), $selectedMarketplace);
 
         $page = max(1, $request->query->getInt('page', 1));
 

@@ -21,9 +21,9 @@ final class AddCostMappingAction
     public function __invoke(
         string $companyId,
         string $marketplace,
+        UnitEconomyCostType $unitEconomyCostType,
         string $costCategoryId,
         string $costCategoryName,
-        UnitEconomyCostType $unitEconomyCostType,
     ): UnitEconomyCostMapping {
         $existing = $this->repository->findOneByCategoryId($companyId, $marketplace, $costCategoryId);
 

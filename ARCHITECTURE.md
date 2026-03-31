@@ -121,7 +121,7 @@ requestRecalc(string $companyId, AnalysisPeriod $period): string
 
 // Создать маппинг категории затрат МП → статья юнит-экономики
 // Выбрасывает DomainException если маппинг для данной категории уже существует
-addCostMapping(string $companyId, string $marketplace, string $costCategoryId, string $costCategoryName, UnitEconomyCostType $unitEconomyCostType): UnitEconomyCostMapping
+addCostMapping(string $companyId, string $marketplace, UnitEconomyCostType $unitEconomyCostType, string $costCategoryId, string $costCategoryName): UnitEconomyCostMapping
 
 // Удалить маппинг
 // Выбрасывает DomainException если маппинг не найден

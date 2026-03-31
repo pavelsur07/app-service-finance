@@ -49,9 +49,9 @@ final class AddCostMappingActionTest extends TestCase
         $result = ($this->action)(
             self::COMPANY_ID,
             self::MARKETPLACE,
+            UnitEconomyCostType::LOGISTICS_TO,
             self::CATEGORY_ID,
             'Логистика',
-            UnitEconomyCostType::LOGISTICS_TO,
         );
 
         $this->assertSame(self::COMPANY_ID, $result->getCompanyId());
@@ -80,9 +80,9 @@ final class AddCostMappingActionTest extends TestCase
         ($this->action)(
             self::COMPANY_ID,
             self::MARKETPLACE,
+            UnitEconomyCostType::LOGISTICS_TO,
             self::CATEGORY_ID,
             'Логистика',
-            UnitEconomyCostType::LOGISTICS_TO,
         );
     }
 }

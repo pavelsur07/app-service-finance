@@ -53,6 +53,21 @@
                                 </div>
 
                                 <div class="col-auto">
+                                    <label class="form-label">Статья юнит-экономики</label>
+                                    <select
+                                        class="form-select"
+                                        data-cost-mapping-add-target="costType"
+                                    >
+                                        <option value="">— выберите —</option>
+                                        {% for type in costTypes %}
+                                            <option value="{{ type.value }}">
+                                                {{ type.getLabel() }}
+                                            </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+
+                                <div class="col-auto">
                                     <label class="form-label">Категория затрат МП</label>
                                     <select
                                         class="form-select"
@@ -69,23 +84,9 @@
                                 </div>
 
                                 <div class="col-auto">
-                                    <label class="form-label">Статья юнит-экономики</label>
-                                    <select
-                                        class="form-select"
-                                        data-cost-mapping-add-target="costType"
-                                    >
-                                        <option value="">— выберите —</option>
-                                        {% for type in costTypes %}
-                                            <option value="{{ type.value }}">
-                                                {{ type.getLabel() }}
-                                            </option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-
-                                <div class="col-auto">
                                     <button
                                         class="btn btn-primary"
+                                        data-cost-mapping-add-target="submitButton"
                                         data-action="click->cost-mapping-add#add"
                                     >Добавить</button>
                                 </div>
@@ -101,8 +102,8 @@
                                 <thead>
                                     <tr>
                                         <th>Маркетплейс</th>
-                                        <th>Категория затрат МП</th>
                                         <th>Статья юнит-экономики</th>
+                                        <th>Категория затрат МП</th>
                                         <th>Действия</th>
                                     </tr>
                                 </thead>
@@ -120,7 +121,6 @@
                                                 data-cost-mapping-remap-remap-url-value="{{ path('marketplace_analytics_api_cost_mapping_remap', {id: mapping.id}) }}"
                                             >
                                                 <td>{{ mapping.marketplace.getDisplayName() }}</td>
-                                                <td>{{ mapping.costCategoryName }}</td>
                                                 <td>
                                                     <select
                                                         class="form-select form-select-sm w-auto"
@@ -135,6 +135,7 @@
                                                         {% endfor %}
                                                     </select>
                                                 </td>
+                                                <td>{{ mapping.costCategoryName }}</td>
                                                 <td>
                                                     <button
                                                         type="button"
