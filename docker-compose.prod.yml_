@@ -4,30 +4,10 @@ x-logging: &default-logging
     options:
         max-size: "10m"
         max-file: "3"
-
-# ───────────────────────────────────────────────────────────────
-# Общий блок переменных окружения для PHP-сервисов (DRY)
-# ───────────────────────────────────────────────────────────────
-x-php-env: &php-env
-    TZ: Europe/Moscow
-    DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
-    APP_ENV: prod
-    APP_SECRET: ${APP_SECRET}
-    REDIS_DSN: redis://site-redis:6379
-    MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
-    MAILER_DSN: ${SITE_MAILER_DSN}
-    SENTRY_DSN: ${SENTRY_DSN}
-    HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
-    APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
-    APP_MAIL_REPLY_TO: "support@vashfindir.ru"
-    FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
-    LLM_API_URL: "https://example.com/v1/chat/completions"
-    LLM_API_KEY: "change-me"
-
 services:
 
     traefik:
-        image: traefik:3.3
+        image: traefik:3.3               # Рекомендуется указать конкретную версию (например, 3.3.4)
         container_name: traefik
         restart: always
         environment:
@@ -44,12 +24,11 @@ services:
             - --certificatesresolvers.letsEncrypt.acme.email=mail@2bstock.ru
             - --certificatesresolvers.letsEncrypt.acme.storage=/certs/acme.json
             - --log.level=INFO
-            # ⬇️ FIX: Traefik будет считать контейнер «живым» только после прохождения healthcheck
-            - --providers.docker.defaultRule=
         ports:
             - "80:80"
             - "443:443"
-            - "127.0.0.1:8080:8080"
+            - "127.0.0.1:8080:8080"  # только loopback хоста; доступ через SSH-туннель:
+                                      # ssh -L 8080:localhost:8080 user@server → http://localhost:8080/dashboard/
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock:ro
             - traefik-certs:/certs
@@ -62,7 +41,7 @@ services:
             - traefik.http.routers.http-catchall.rule=Host(`app.vashfindir.ru`) || Host(`app.2bstock.ru`) || Host(`www.app.2bstock.ru`)
             - traefik.http.routers.http-catchall.entrypoints=http
             - traefik.http.routers.http-catchall.middlewares=legacy-domain-redirect,redirect-to-https
-            - traefik.http.routers.http-catchall.priority=1
+            - traefik.http.routers.http-catchall.priority=1          # Низкий приоритет, чтобы не мешать ACME
 
             - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
             - traefik.http.middlewares.redirect-to-https.redirectscheme.permanent=true
@@ -75,9 +54,8 @@ services:
             - traefik.http.routers.legacy-app.middlewares=legacy-domain-redirect
             - traefik.http.routers.legacy-app.tls=true
             - traefik.http.routers.legacy-app.tls.certresolver=letsEncrypt
-
     land:
-        image: ghcr.io/pavelsur07/land-nginx:latest
+        image: ghcr.io/pavelsur07/land-nginx:latest # <-- Добавляем это
         container_name: land-nginx
         restart: always
         environment:
@@ -87,13 +65,6 @@ services:
         networks:
             - traefik-public
             - default
-        # ⬇️ FIX: healthcheck для landing nginx
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://127.0.0.1/"]
-            interval: 5s
-            timeout: 3s
-            retries: 5
-            start_period: 5s
         labels:
             - traefik.enable=true
             - traefik.http.routers.land.rule=Host(`2bstock.ru`) || Host(`www.2bstock.ru`)
@@ -105,30 +76,24 @@ services:
             - traefik.http.routers.land-http.entrypoints=http
             - traefik.http.routers.land-http.middlewares=redirect-to-https
             - traefik.http.routers.land-http.priority=10
-            - traefik.docker.network=traefik-public
+            - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
 
     site:
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/nginx/Dockerfile
         image: ghcr.io/pavelsur07/site-nginx:latest
         container_name: site-nginx
         restart: always
         environment:
             - TZ=Europe/Moscow
         depends_on:
-            site-php-fpm:
-                # ⬇️ FIX: Nginx стартует ТОЛЬКО когда PHP-FPM прошёл healthcheck (отвечает на /ping)
-                condition: service_healthy
+            - site-php-fpm
         expose:
             - "80"
         networks:
             - traefik-public
             - default
-        # ⬇️ FIX: healthcheck для site nginx — /health возвращает 200
-        healthcheck:
-            test: ["CMD", "curl", "-f", "http://127.0.0.1/health"]
-            interval: 5s
-            timeout: 3s
-            retries: 5
-            start_period: 10s
         labels:
             - traefik.enable=true
             - traefik.http.routers.myapp.rule=Host(`app.vashfindir.ru`)
@@ -140,84 +105,107 @@ services:
             - traefik.http.routers.myapp-http.entrypoints=http
             - traefik.http.routers.myapp-http.middlewares=redirect-to-https
             - traefik.http.routers.myapp-http.priority=10
-            - traefik.docker.network=traefik-public
+            - traefik.docker.network=traefik-public    # Явно указать сеть для Traefik
         volumes:
             - site_storage:/app/var/storage
 
+
     site-php-fpm:
-        image: ghcr.io/pavelsur07/site-php-fpm:latest
+        image: ghcr.io/pavelsur07/site-php-fpm:latest # <-- Добавляем
         container_name: site-php-fpm
         restart: always
         logging: *default-logging
         environment:
-            <<: *php-env
+            TZ: Europe/Moscow
+            DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
+            APP_ENV: prod
+            APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            MAILER_DSN: ${SITE_MAILER_DSN}
+            SENTRY_DSN: ${SENTRY_DSN}
+            HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
-            site-postgres:
-                # ⬇️ FIX: PHP-FPM ждёт, пока Postgres пройдёт healthcheck
-                condition: service_healthy
-            site-redis:
-                # ⬇️ FIX: PHP-FPM ждёт, пока Redis пройдёт healthcheck
-                condition: service_healthy
+            - site-postgres
+            - site-redis
         volumes:
             - site_storage:/app/var/storage
-        # ⬇️ FIX: увеличен start_period — даём время на cache:warmup при первом старте
-        healthcheck:
-            test: ["CMD-SHELL", "REDIRECT_STATUS=true SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 1"]
-            interval: 5s
-            timeout: 3s
-            retries: 10
-            start_period: 30s
-        # ⬇️ FIX: Даём контейнеру 30 секунд на graceful shutdown (дождаться завершения текущих запросов)
-        stop_grace_period: 30s
         deploy:
             resources:
                 limits:
-                    memory: 1500M
+                    memory: 1500M # Максимум, который может забрать PHP
                 reservations:
                     memory: 256M
-
     site-php-cli:
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/php-cli/Dockerfile
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-php-cli
         environment:
-            <<: *php-env
+            TZ: Europe/Moscow
+            DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
+            APP_ENV: prod
+            APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            MAILER_DSN: ${SITE_MAILER_DSN}
+            SENTRY_DSN: ${SENTRY_DSN}
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
-            site-postgres:
-                condition: service_healthy
-            site-redis:
-                condition: service_healthy
+            - site-postgres
+            - site-redis
         volumes:
             - site_storage:/app/var/storage
-
     site-messenger-worker:
+        #build:
+        #    context: site
+        #    dockerfile: docker/production/php-cli/Dockerfile
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker
         restart: always
         command: php bin/console messenger:consume async -vv --time-limit=3600
         environment:
-            <<: *php-env
+            TZ: Europe/Moscow
+            DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
+            APP_ENV: prod
+            APP_SECRET: ${APP_SECRET}
+            REDIS_DSN: redis://site-redis:6379
+            MESSENGER_TRANSPORT_DSN: redis://site-redis:6379/messages
+            MAILER_DSN: ${SITE_MAILER_DSN}
+            SENTRY_DSN: ${SENTRY_DSN}
+            APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"
+            APP_MAIL_REPLY_TO: "support@vashfindir.ru"
+            FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
+            LLM_API_URL: "https://example.com/v1/chat/completions"
+            LLM_API_KEY: "change-me"
         networks:
             - default
         depends_on:
-            site-postgres:
-                condition: service_healthy
-            site-redis:
-                condition: service_healthy
+            - site-postgres
+            - site-redis
         volumes:
             - site_storage:/app/var/storage
-        # ⬇️ FIX: Даём воркеру завершить текущее сообщение при остановке
-        stop_grace_period: 60s
         healthcheck:
+            # Проверяем, запущен ли процесс воркера внутри контейнера
             test: [ "CMD-SHELL", "ps aux | grep 'messenger:consume' | grep -v grep" ]
             interval: 30s
             timeout: 10s
             retries: 3
-            start_period: 10s
-
+            start_period: 10s # Даем время на запуск контейнера
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
@@ -238,14 +226,6 @@ services:
             - postgres_data:/var/lib/postgresql/data
         networks:
             - default
-        # ⬇️ FIX: Добавлен healthcheck (без него depends_on condition: service_healthy не работает)
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U app -d app"]
-            interval: 5s
-            timeout: 3s
-            retries: 10
-            start_period: 10s
-
     site-redis:
         image: redis:7-alpine
         container_name: site-redis
@@ -257,13 +237,6 @@ services:
             - site-redis-data:/data
         networks:
             - default
-        # ⬇️ FIX: Добавлен healthcheck
-        healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
-            interval: 5s
-            timeout: 3s
-            retries: 10
-            start_period: 5s
 
     scheduler:
         image: ghcr.io/pavelsur07/site-php-cli:latest
@@ -288,10 +261,8 @@ services:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - ./var/log/cron:/var/log/cron:rw
         depends_on:
-            site-postgres:
-                condition: service_healthy
-            site-redis:
-                condition: service_healthy
+            - site-postgres
+            - site-redis
         restart: unless-stopped
 
 volumes:
@@ -302,6 +273,6 @@ volumes:
 
 networks:
     traefik-public:
-        external: true
+        external: true    # должна быть создана отдельно (или убрать external для автосоздания)
     default:
         driver: bridge

@@ -4,13 +4,12 @@ on:
     push:
         branches: [ master ]
     pull_request:
-
 jobs:
     # 1. ЭТАП СБОРКИ: Запускаем 4 сборки одновременно
     build-and-push:
         runs-on: ubuntu-latest
         strategy:
-            fail-fast: false
+            fail-fast: false # Продолжать сборку остальных, если один упал
             matrix:
                 include:
                     - service: landing
@@ -58,9 +57,9 @@ jobs:
                   cache-from: type=gha,scope=${{ matrix.service }}
                   cache-to: type=gha,scope=${{ matrix.service }},mode=max
 
-    # 2. ЭТАП ДЕПЛОЯ (rolling update — минимальный даунтайм)
+    # 2. ЭТАП ДЕПЛОЯ
     deploy:
-        needs: build-and-push
+        needs: build-and-push # Ждет завершения ВСЕХ сборок из матрицы
         if: github.event_name != 'pull_request'
         runs-on: ubuntu-latest
         steps:
@@ -83,7 +82,7 @@ jobs:
               run: |
                   scp -o StrictHostKeyChecking=no app.zip ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:${{ secrets.SERVER_DIR }}
 
-            - name: 🚀 Deploy application (rolling update)
+            - name: 🚀 Deploy application
               run: |
                   ssh -o StrictHostKeyChecking=no ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} << 'EOF'
                     set -e
@@ -97,44 +96,22 @@ jobs:
 
                     cd ./current
 
-                    # Экспортируем переменные для docker compose
-                    export APP_ENV="${{ secrets.APP_ENV }}"
-                    export APP_SECRET="${{ secrets.APP_SECRET }}"
-                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
-                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
-
-                    echo "🚚 Скачивание свежих образов из GHCR"
+                    echo "🚚 Скачивание всех свежих образов из GHCR"
                     docker compose -f docker-compose.prod.yml pull land site site-php-fpm site-php-cli
 
-                    # ───────────────────────────────────────────────
-                    # ROLLING UPDATE: обновляем сервисы в правильном порядке
-                    # Порядок: infra → backend → frontend (reverse proxy)
-                    # ───────────────────────────────────────────────
-
-                    echo "🐳 [1/5] Обновляем PHP-FPM (бэкенд)"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait site-php-fpm
-                    echo "✅ site-php-fpm healthy"
-
-                    echo "🐳 [2/5] Обновляем Nginx (фронтенд сайта)"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait site
-                    echo "✅ site-nginx healthy"
-
-                    echo "🐳 [3/5] Обновляем Landing"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps --wait land
-                    echo "✅ land healthy"
-
-                    echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker scheduler
-
-                    echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
+                    echo "🐳 Запуск сервисов"
+                    APP_ENV="${{ secrets.APP_ENV }}" \
+                    APP_SECRET="${{ secrets.APP_SECRET }}" \
+                    DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                    POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+                    SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}" \
+                    SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
+                    HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}" \
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
-                    echo "🧹 Очистка старых образов Docker"
+                    echo "🧹 Очистка старых слоев Docker"
                     docker image prune -f
-                    echo "✅ Деплой завершён без даунтайма"
+                    echo "✅ Деплой завершён"
                   EOF
 
     # 3. ЭТАП МИГРАЦИЙ
@@ -170,14 +147,13 @@ jobs:
                     fi
 
                     echo "🚧 Выполняем миграции"
-                    export APP_ENV="${{ secrets.APP_ENV }}"
-                    export APP_SECRET="${{ secrets.APP_SECRET }}"
-                    export DATABASE_URL="${{ secrets.DATABASE_URL }}"
-                    export POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}"
-                    export SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}"
-                    export SENTRY_DSN="${{ secrets.SENTRY_DSN }}"
-                    export HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}"
-
+                    APP_ENV="${{ secrets.APP_ENV }}" \
+                    APP_SECRET="${{ secrets.APP_SECRET }}" \
+                    DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+                    POSTGRES_PASSWORD="${{ secrets.POSTGRES_PASSWORD }}" \
+                    SITE_MAILER_DSN="${{ secrets.SITE_MAILER_DSN }}" \
+                    SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
+                    HEALTH_CHECK_TOKEN="${{ secrets.HEALTH_CHECK_TOKEN }}" \
                     docker compose -f docker-compose.prod.yml run --rm site-php-cli bin/console doctrine:migrations:migrate --no-interaction
                     echo "✅ Миграции применены"
                   EOF
