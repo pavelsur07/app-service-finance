@@ -30,7 +30,7 @@ class UnitEconomyCostMapping
     #[ORM\Column(type: 'string', length: 50, enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
 
-    #[ORM\Column(type: 'guid')]
+    #[ORM\Column(type: 'string', length: 36)]
     private string $costCategoryId;
 
     #[ORM\Column(type: 'string', length: 255)]
@@ -55,9 +55,8 @@ class UnitEconomyCostMapping
     ) {
         Assert::uuid($id);
         Assert::uuid($companyId);
-        Assert::uuid($costCategoryId);
+        Assert::notEmpty($costCategoryId);
         Assert::notEmpty($costCategoryName);
-        Assert::maxLength($costCategoryName, 255);
 
         $this->id                  = $id;
         $this->companyId           = $companyId;
