@@ -30,7 +30,7 @@ class UnitEconomyCostMapping
     #[ORM\Column(type: 'string', length: 50, enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
 
-    #[ORM\Column(type: 'string', length: 36)]
+    #[ORM\Column(type: 'guid')]
     private string $costCategoryId;
 
     #[ORM\Column(type: 'string', length: 255)]
