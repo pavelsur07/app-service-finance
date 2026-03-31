@@ -32,17 +32,17 @@
                         <div class="card-header">
                             <h3 class="card-title">Добавить маппинг</h3>
                         </div>
-                        <div class="card-body"
-                            data-controller="cost-mapping-add"
-                            data-cost-mapping-add-add-url-value="{{ path('marketplace_analytics_api_cost_mapping_add') }}"
-                        >
+                        <div class="card-body">
                             <div class="row g-2 align-items-end">
 
                                 <div class="col-auto">
                                     <label class="form-label">Маркетплейс</label>
-                                    <select name="marketplace" class="form-select"
-                                        data-cost-mapping-add-target="marketplace"
-                                        onchange="window.location.href='{{ path('marketplace_analytics_cost_mappings_index') }}' + '?marketplace=' + this.value">
+                                    <select
+                                        id="select-marketplace"
+                                        name="marketplace"
+                                        class="form-select"
+                                        onchange="window.location.href = '{{ path('marketplace_analytics_cost_mappings_index') }}' + '?marketplace=' + this.value"
+                                    >
                                         {% for mp in available_marketplaces %}
                                             <option value="{{ mp.value }}"
                                                 {{ selected_marketplace == mp.value ? 'selected' }}>
@@ -54,10 +54,7 @@
 
                                 <div class="col-auto">
                                     <label class="form-label">Статья юнит-экономики</label>
-                                    <select
-                                        class="form-select"
-                                        data-cost-mapping-add-target="costType"
-                                    >
+                                    <select id="select-cost-type" class="form-select">
                                         <option value="">— выберите —</option>
                                         {% for type in cost_types %}
                                             <option value="{{ type.value }}">
@@ -69,10 +66,7 @@
 
                                 <div class="col-auto">
                                     <label class="form-label">Категория затрат МП</label>
-                                    <select
-                                        class="form-select"
-                                        data-cost-mapping-add-target="category"
-                                    >
+                                    <select id="select-category" class="form-select">
                                         <option value="">— выберите —</option>
                                         {% for cat in categories %}
                                             <option
@@ -85,9 +79,9 @@
 
                                 <div class="col-auto">
                                     <button
+                                        id="btn-add-mapping"
                                         class="btn btn-primary"
-                                        data-cost-mapping-add-target="submitButton"
-                                        data-action="click->cost-mapping-add#add"
+                                        onclick="addCostMapping()"
                                     >Добавить</button>
                                 </div>
 
@@ -124,9 +118,7 @@
                                                     <button
                                                         type="button"
                                                         class="btn btn-sm btn-ghost-danger"
-                                                        data-controller="cost-mapping-delete"
-                                                        data-cost-mapping-delete-url-value="{{ path('marketplace_analytics_api_cost_mapping_delete', {id: mapping.id}) }}"
-                                                        data-action="click->cost-mapping-delete#delete"
+                                                        onclick="deleteCostMapping(this, '{{ mapping.id|e('html_attr') }}')"
                                                     >Удалить</button>
                                                 </td>
                                             </tr>
@@ -162,4 +154,79 @@
             </div>
         </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+    const ADD_URL    = '{{ path('marketplace_analytics_api_cost_mapping_add') }}';
+    const DELETE_URL = ADD_URL + '/';
+
+    async function addCostMapping() {
+        const marketplace  = document.getElementById('select-marketplace').value;
+        const costType     = document.getElementById('select-cost-type').value;
+        const categoryEl   = document.getElementById('select-category');
+        const categoryId   = categoryEl.value;
+        const categoryName = categoryEl.selectedOptions[0]?.dataset.name ?? '';
+
+        if (!costType || !categoryId) {
+            alert('Выберите статью и категорию затрат');
+            return;
+        }
+
+        const btn = document.getElementById('btn-add-mapping');
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(ADD_URL, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                    marketplace:         marketplace,
+                    unitEconomyCostType: costType,
+                    costCategoryId:      categoryId,
+                    costCategoryName:    categoryName,
+                }),
+            });
+
+            if (res.status === 201) {
+                window.location.reload();
+                return;
+            }
+
+            const data = await res.json();
+            alert(data.message ?? 'Ошибка добавления');
+        } catch (e) {
+            alert('Ошибка сети');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    async function deleteCostMapping(btn, id) {
+        if (!confirm('Удалить маппинг?')) return;
+
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(DELETE_URL + id, {
+                method: 'DELETE',
+                credentials: 'same-origin',
+            });
+
+            if (res.status === 204) {
+                btn.closest('tr')?.remove();
+                return;
+            }
+
+            const data = await res.json();
+            alert(data.message ?? 'Не удалось удалить маппинг');
+        } catch (e) {
+            alert('Ошибка сети');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+    </script>
 {% endblock %}
