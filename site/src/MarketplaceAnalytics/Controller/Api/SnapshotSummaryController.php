@@ -34,12 +34,9 @@ final class SnapshotSummaryController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $req = SnapshotSummaryRequest::fromRequest($request);
 
-        if ($req->marketplace === null || $req->marketplace === '') {
-            return $this->json(
-                ['type' => 'BAD_REQUEST', 'message' => 'Параметр marketplace обязателен'],
-                Response::HTTP_BAD_REQUEST,
-            );
-        }
+        $marketplace = ($req->marketplace !== null && $req->marketplace !== '')
+            ? $req->marketplace
+            : null;
 
         if ($req->dateFrom === null || $req->dateTo === null) {
             return $this->json(
@@ -63,7 +60,7 @@ final class SnapshotSummaryController extends AbstractController
         $items = $this->facade->getUnitEconomics(
             $company->getId(),
             $period,
-            $req->marketplace,
+            $marketplace,
         );
 
         $response = SnapshotSummaryResponse::fromUnitEconomics($period, $items);

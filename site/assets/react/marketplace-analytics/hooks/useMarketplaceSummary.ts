@@ -19,15 +19,19 @@ export function useMarketplaceSummary(params: UseMarketplaceSummaryParams): UseM
     const { isLoading, data, error, run } = useAbortableQuery<SnapshotSummaryResponse>();
 
     useEffect(() => {
-        if (!params.marketplace || !params.dateFrom || !params.dateTo) return;
+        if (!params.dateFrom || !params.dateTo) return;
+
+        const query: Record<string, string> = {
+            dateFrom: params.dateFrom,
+            dateTo: params.dateTo,
+        };
+        if (params.marketplace) {
+            query.marketplace = params.marketplace;
+        }
 
         void run({
             url: '/api/marketplace-analytics/snapshots/summary',
-            query: {
-                marketplace: params.marketplace,
-                dateFrom: params.dateFrom,
-                dateTo: params.dateTo,
-            },
+            query,
         });
     }, [params.marketplace, params.dateFrom, params.dateTo, run]);
 

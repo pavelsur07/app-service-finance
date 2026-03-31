@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Application\Command;
 
+use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAnalytics\Application\EnsureCostMappingsSeededAction;
 use App\MarketplaceAnalytics\Domain\Service\SnapshotRecalcPolicy;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
@@ -19,6 +21,7 @@ final class RecalcSnapshotsCommand extends Command
 {
     public function __construct(
         private readonly SnapshotRecalcPolicy $policy,
+        private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
         private readonly EntityManagerInterface $entityManager,
         private readonly AppLogger $logger,
     ) {
@@ -47,6 +50,10 @@ final class RecalcSnapshotsCommand extends Command
         $lookbackDays = (int) $input->getOption('lookback-days');
 
         try {
+            foreach (MarketplaceType::cases() as $type) {
+                ($this->ensureCostMappingsSeededAction)($companyId, $type->value);
+            }
+
             $this->policy->recalcBySchedule($companyId, $lookbackDays);
             $this->entityManager->flush();
             $output->writeln('<info>Done</info>');

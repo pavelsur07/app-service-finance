@@ -8,6 +8,7 @@ DG\BypassFinals::enable();
 DG\BypassFinals::allowPaths([
     '*/src/Marketplace/Facade/MarketplaceFacade.php',
     '*/src/MarketplaceAnalytics/Domain/Service/CostMappingResolver.php',
+    '*/src/MarketplaceAnalytics/Domain/Service/DefaultCostMappingSeedPolicy.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {

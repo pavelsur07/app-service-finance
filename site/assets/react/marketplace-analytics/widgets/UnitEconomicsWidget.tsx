@@ -1,16 +1,15 @@
 import React, { useState, useCallback } from 'react';
-import { useMarketplaceSummary } from '../hooks/useMarketplaceSummary';
-import { useMarketplaceSnapshots } from '../hooks/useMarketplaceSnapshots';
+import { useUnitEconomics } from '../hooks/useUnitEconomics';
 import { useRecalculate } from '../hooks/useRecalculate';
 import { getDefaultDateRange } from '../utils/utils';
 import type { MarketplaceOption } from '../types/analytics.types';
-import MarketplaceAnalyticsView from '../views/MarketplaceAnalyticsView';
+import UnitEconomicsView from '../views/UnitEconomicsView';
 
-interface MarketplaceAnalyticsWidgetProps {
+interface UnitEconomicsWidgetProps {
     marketplaces: MarketplaceOption[];
 }
 
-const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
+const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
     marketplaces,
 }) => {
     const defaults = getDefaultDateRange();
@@ -21,8 +20,13 @@ const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
     const [page, setPage] = useState(1);
     const [recalcModalOpen, setRecalcModalOpen] = useState(false);
 
-    const summary = useMarketplaceSummary({ marketplace, dateFrom, dateTo });
-    const snapshotsData = useMarketplaceSnapshots({ marketplace, dateFrom, dateTo, page });
+    const { items, summary, meta, isLoading, isError } = useUnitEconomics({
+        marketplace,
+        dateFrom,
+        dateTo,
+        page,
+    });
+
     const recalc = useRecalculate();
 
     const handleMarketplaceChange = useCallback((mp: string) => {
@@ -45,20 +49,17 @@ const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
     }, [recalc]);
 
     return (
-        <MarketplaceAnalyticsView
+        <UnitEconomicsView
             marketplaces={marketplaces}
             marketplace={marketplace}
             dateFrom={dateFrom}
             dateTo={dateTo}
-            summaryTotals={summary.totals}
-            summaryLoading={summary.isLoading}
-            summaryError={summary.error}
-            snapshots={snapshotsData.snapshots}
-            snapshotsLoading={snapshotsData.isLoading}
-            snapshotsError={snapshotsData.error}
+            items={items}
+            summary={summary}
+            meta={meta}
+            isLoading={isLoading}
+            isError={isError}
             page={page}
-            pages={snapshotsData.pages}
-            total={snapshotsData.total}
             recalcModalOpen={recalcModalOpen}
             recalcLoading={recalc.isLoading}
             recalcError={recalc.error}
@@ -74,4 +75,4 @@ const MarketplaceAnalyticsWidget: React.FC<MarketplaceAnalyticsWidgetProps> = ({
     );
 };
 
-export default MarketplaceAnalyticsWidget;
+export default UnitEconomicsWidget;

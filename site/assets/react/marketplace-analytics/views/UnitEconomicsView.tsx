@@ -1,23 +1,21 @@
 import React from 'react';
-import type { SnapshotSummaryTotals, SnapshotItem, MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
+import type { UnitEconomicsRow, PortfolioSummary, UnitEconomicsMeta } from '../types/unit-economics.types';
+import type { MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
 import KpiCards from '../components/KpiCards';
-import SnapshotsTable from '../components/SnapshotsTable';
+import UnitEconomicsTable from '../components/UnitEconomicsTable';
 import RecalcModal from '../components/RecalcModal';
 
-interface MarketplaceAnalyticsViewProps {
+interface UnitEconomicsViewProps {
     marketplaces: MarketplaceOption[];
     marketplace: string;
     dateFrom: string;
     dateTo: string;
-    summaryTotals: SnapshotSummaryTotals | null;
-    summaryLoading: boolean;
-    summaryError: string | null;
-    snapshots: SnapshotItem[];
-    snapshotsLoading: boolean;
-    snapshotsError: string | null;
+    items: UnitEconomicsRow[];
+    summary: PortfolioSummary | null;
+    meta: UnitEconomicsMeta | null;
+    isLoading: boolean;
+    isError: boolean;
     page: number;
-    pages: number;
-    total: number;
     recalcModalOpen: boolean;
     recalcLoading: boolean;
     recalcError: string | null;
@@ -31,7 +29,10 @@ interface MarketplaceAnalyticsViewProps {
     onRecalculate: (marketplace: string, dateFrom: string, dateTo: string) => void;
 }
 
-const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props) => {
+const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
+    const pages = props.meta?.pages ?? 0;
+    const total = props.meta?.total ?? 0;
+
     return (
         <>
             <div className="page-header d-print-none mb-3">
@@ -79,21 +80,52 @@ const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props
                 </div>
             </div>
 
-            {props.summaryError && (
-                <div className="alert alert-danger mb-3">{props.summaryError}</div>
+            {props.isError && (
+                <div className="alert alert-danger mb-3">Не удалось загрузить данные</div>
             )}
 
-            <KpiCards totals={props.summaryTotals} isLoading={props.summaryLoading} />
+            <KpiCards portfolio={props.summary} isLoading={props.isLoading} />
 
-            <SnapshotsTable
-                snapshots={props.snapshots}
-                isLoading={props.snapshotsLoading}
-                error={props.snapshotsError}
-                page={props.page}
-                pages={props.pages}
-                total={props.total}
-                onPageChange={props.onPageChange}
-            />
+            <div className="card">
+                <div className="card-header">
+                    <h3 className="card-title">Юнит-экономика по товарам</h3>
+                    {total > 0 && (
+                        <div className="card-options">
+                            <span className="text-muted">Всего: {total.toLocaleString('ru-RU')}</span>
+                        </div>
+                    )}
+                </div>
+
+                <UnitEconomicsTable items={props.items} isLoading={props.isLoading} />
+
+                {pages > 1 && (
+                    <div className="card-footer d-flex align-items-center">
+                        <p className="m-0 text-muted">
+                            Страница {props.page} из {pages}
+                        </p>
+                        <ul className="pagination m-0 ms-auto">
+                            <li className={`page-item ${props.page <= 1 ? 'disabled' : ''}`}>
+                                <button
+                                    className="page-link"
+                                    onClick={() => props.onPageChange(props.page - 1)}
+                                    disabled={props.page <= 1}
+                                >
+                                    Назад
+                                </button>
+                            </li>
+                            <li className={`page-item ${props.page >= pages ? 'disabled' : ''}`}>
+                                <button
+                                    className="page-link"
+                                    onClick={() => props.onPageChange(props.page + 1)}
+                                    disabled={props.page >= pages}
+                                >
+                                    Вперёд
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                )}
+            </div>
 
             <RecalcModal
                 marketplaces={props.marketplaces}
@@ -108,4 +140,4 @@ const MarketplaceAnalyticsView: React.FC<MarketplaceAnalyticsViewProps> = (props
     );
 };
 
-export default MarketplaceAnalyticsView;
+export default UnitEconomicsView;

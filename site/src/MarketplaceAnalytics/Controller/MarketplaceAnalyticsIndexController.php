@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller;
 
+use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -20,15 +21,27 @@ final class MarketplaceAnalyticsIndexController extends AbstractController
 
     #[Route(
         '/marketplace-analytics',
-        name: 'marketplace_analytics_index',
+        name: 'marketplace_analytics_unit_economics_index',
         methods: ['GET'],
     )]
     public function __invoke(Request $request): Response
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
+        $marketplaces = [
+            ['value' => '', 'label' => 'Все'],
+            ...array_map(
+                static fn (MarketplaceType $t): array => [
+                    'value' => $t->value,
+                    'label' => $t->getDisplayName(),
+                ],
+                MarketplaceType::cases(),
+            ),
+        ];
+
         return $this->render('marketplace_analytics/index.html.twig', [
             'companyId' => $company->getId(),
+            'marketplaces' => $marketplaces,
         ]);
     }
 }

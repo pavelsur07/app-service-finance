@@ -1,0 +1,62 @@
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">Аналитика маркетплейсов</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-header d-print-none mt-0 pt-0">
+    <div class="container-xl">
+        <div class="row">
+            <div class="col">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a href="{{ path('marketplace_analytics_unit_economics_index') }}"
+                           class="nav-link {{ activeTab == 'analytics' ? 'active' : '' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="icon me-2" width="24" height="24"
+                                 viewBox="0 0 24 24" stroke-width="2"
+                                 stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+                            </svg>
+                            Юнит-экономика
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ path('marketplace_analytics_snapshots_index') }}"
+                           class="nav-link {{ activeTab == 'snapshots' ? 'active' : '' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="icon me-2" width="24" height="24"
+                                 viewBox="0 0 24 24" stroke-width="2"
+                                 stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <rect x="3" y="5" width="18" height="14" rx="2"/>
+                                <path d="M3 10h18"/>
+                                <path d="M10 3v18"/>
+                            </svg>
+                            Снапшоты
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="{{ path('marketplace_analytics_cost_mappings_index') }}"
+                           class="nav-link {{ activeTab == 'settings' ? 'active' : '' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg"
+                                 class="icon me-2" width="24" height="24"
+                                 viewBox="0 0 24 24" stroke-width="2"
+                                 stroke="currentColor" fill="none">
+                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                <path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                            Настройки
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

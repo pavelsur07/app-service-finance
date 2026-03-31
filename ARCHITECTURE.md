@@ -157,6 +157,10 @@ findListingById(string $companyId, string $listingId): ?ActiveListingDTO
 
 // Себестоимость по листингу и дате (null если не задана)
 getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
+
+// Список категорий затрат для формы маппинга юнит-экономики
+// @return array<array{id: string, code: string, name: string}>
+getCostCategoriesForCompany(string $companyId, string $marketplace): array
 ```
 
 ---

@@ -62,7 +62,7 @@ final class ListingDailySnapshotRepository extends ServiceEntityRepository imple
      */
     public function findPaginated(
         string $companyId,
-        string $marketplace,
+        ?string $marketplace,
         ?\DateTimeImmutable $dateFrom,
         ?\DateTimeImmutable $dateTo,
         ?string $listingId,
@@ -71,9 +71,12 @@ final class ListingDailySnapshotRepository extends ServiceEntityRepository imple
     ): array {
         $qb = $this->createQueryBuilder('s')
             ->where('s.companyId = :companyId')
-            ->andWhere('s.marketplace = :marketplace')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('marketplace', $marketplace);
+            ->setParameter('companyId', $companyId);
+
+        if ($marketplace !== null) {
+            $qb->andWhere('s.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace);
+        }
 
         if ($dateFrom !== null) {
             $qb->andWhere('s.snapshotDate >= :dateFrom')

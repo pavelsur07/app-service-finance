@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Controller;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAnalytics\Application\EnsureCostMappingsSeededAction;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
 use App\Shared\Service\ActiveCompanyService;
@@ -20,6 +21,7 @@ final class CostMappingsIndexController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly UnitEconomyCostMappingRepositoryInterface $repository,
+        private readonly EnsureCostMappingsSeededAction $ensureCostMappingsSeededAction,
     ) {}
 
     #[Route(
@@ -31,14 +33,23 @@ final class CostMappingsIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
         $marketplace = $request->query->get('marketplace');
-        $isSystem = $request->query->has('is_system')
-            ? filter_var($request->query->get('is_system'), FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+        $isSystemRaw = $request->query->get('is_system');
+        $isSystem = ($isSystemRaw !== null && $isSystemRaw !== '')
+            ? filter_var($isSystemRaw, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
             : null;
         $page = max(1, $request->query->getInt('page', 1));
 
-        $marketplaceEnum = $marketplace !== null
+        $marketplaceEnum = ($marketplace !== null && $marketplace !== '')
             ? MarketplaceType::tryFrom($marketplace)
             : null;
+
+        if ($marketplaceEnum !== null) {
+            ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
+        } else {
+            foreach (MarketplaceType::cases() as $type) {
+                ($this->ensureCostMappingsSeededAction)($company->getId(), $type->value);
+            }
+        }
 
         $result = $this->repository->findPaginated(
             $company->getId(),

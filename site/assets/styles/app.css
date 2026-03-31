@@ -94,6 +94,21 @@ body {
     }
 }*/
 
+/* Убираем лишние отступы между sidebar, header и page-wrapper */
+.page {
+    --tblr-page-gap: 0;
+    gap: 0;
+}
+
+.page-wrapper {
+    margin-left: 0;
+    padding-left: 0;
+}
+
+.navbar-vertical {
+    margin: 0;
+}
+
 /* Улучшаем контрастность модалок с эффектом blur, чтобы данные оставались читаемыми */
 .modal.modal-blur .modal-content {
     background-color: var(--tblr-bg-surface);

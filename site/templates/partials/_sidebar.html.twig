@@ -139,6 +139,8 @@
                 </a>
             </li>
 
+            {% include "partials/_sidebar_marketplace.html.twig" %}
+
             {% include "partials/_sidebar_report.html.twig" %}
 
             <!-- Справочники -->
@@ -208,23 +210,13 @@
                 or current_route starts with 'telegram_integration_'
                 or current_route starts with 'cash_bank_connection_'
                 or current_route starts with 'integrations_marketplace_'
-                or current_route starts with 'marketplace_analytics_'
             %}
             <li class="nav-item dropdown {{ integrations_active ? 'show' : '' }}">
                 <a class="nav-link dropdown-toggle {{ integrations_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ integrations_active ? 'true' : 'false' }}">
                     <span class="nav-link-icon"><i class="ti ti-plug-connected"></i></span>
                     <span class="nav-link-title">Интеграции</span>
                 </a>
-                {% set integrations_show = (
-                    integrations_active
-                    or current_route starts with 'ozon_'
-                    or current_route starts with 'wildberries_'
-                    or current_route starts with 'telegram_integration_'
-                    or current_route starts with 'cash_bank_connection_'
-                    or current_route starts with 'marketplace_'
-                    or current_route starts with 'integrations_marketplace_'
-                    or current_route starts with 'marketplace_analytics_'
-                ) ? 'show' : '' %}
+                {% set integrations_show = integrations_active ? 'show' : '' %}
                     <div class="dropdown-menu {{ integrations_show }}">
                         <div class="dropdown-menu-column">
                             {% set telegram_finance_active = current_route starts with 'telegram_integration_' %}
@@ -234,16 +226,6 @@
                             {% set bank_connections_active = current_route starts with 'cash_bank_connection_' %}
                             <a class="dropdown-item {{ bank_connections_active ? 'active' : '' }}" href="{{ path('cash_bank_connection_index') }}">
                                 <span>Банки / Подключения</span>
-                            </a>
-
-                            {% set marketplace_active = current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') %}
-                            <a class="dropdown-item {{ marketplace_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
-                                <span>Маркетплейсы</span>
-                            </a>
-
-                            {% set unit_economics_active = current_route starts with 'marketplace_analytics_' %}
-                            <a class="dropdown-item {{ unit_economics_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_index') }}">
-                                <span>Unit-экономика</span>
                             </a>
 
                             {% set marketplace_active = current_route starts with 'integrations_marketplace_' %}

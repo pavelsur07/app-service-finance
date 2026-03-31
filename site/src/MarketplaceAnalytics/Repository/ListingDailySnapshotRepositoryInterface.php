@@ -31,7 +31,7 @@ interface ListingDailySnapshotRepositoryInterface
      */
     public function findPaginated(
         string $companyId,
-        string $marketplace,
+        ?string $marketplace,
         ?\DateTimeImmutable $dateFrom,
         ?\DateTimeImmutable $dateTo,
         ?string $listingId,
