@@ -38,7 +38,7 @@ final class ResetCostMappingActionTest extends TestCase
             ->withUnitEconomyCostType(UnitEconomyCostType::COMMISSION)
             ->build();
 
-        $this->repository->method('findByIdAndCompany')
+        $this->repository->method('findById')
             ->with(self::MAPPING_ID, self::COMPANY_ID)
             ->willReturn($mapping);
 
@@ -52,7 +52,7 @@ final class ResetCostMappingActionTest extends TestCase
 
     public function testThrowsWhenMappingNotFound(): void
     {
-        $this->repository->method('findByIdAndCompany')
+        $this->repository->method('findById')
             ->with(self::MAPPING_ID, self::COMPANY_ID)
             ->willReturn(null);
 

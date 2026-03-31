@@ -49,7 +49,7 @@ final class CostMappingsIndexController extends AbstractController
 
         $result = $this->repository->findPaginated(
             $company->getId(),
-            $marketplaceEnum,
+            ($marketplace !== null && $marketplace !== '') ? $marketplace : null,
             $page,
             50,
         );

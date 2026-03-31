@@ -22,7 +22,7 @@ final readonly class DefaultCostMappingSeedPolicy
     ): void {
         $marketplaceType = MarketplaceType::from($marketplace);
 
-        if ($this->repository->hasCompanyMappings($companyId, $marketplaceType)) {
+        if (!empty($this->repository->findByCompanyAndMarketplace($companyId, $marketplace))) {
             return;
         }
 

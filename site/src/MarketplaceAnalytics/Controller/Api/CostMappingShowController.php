@@ -29,7 +29,7 @@ final class CostMappingShowController extends AbstractController
     public function __invoke(string $id): JsonResponse
     {
         $company = $this->activeCompanyService->getActiveCompany();
-        $mapping = $this->repository->findByIdAndCompany($id, $company->getId());
+        $mapping = $this->repository->findById($id, $company->getId());
 
         if ($mapping === null) {
             return $this->json(

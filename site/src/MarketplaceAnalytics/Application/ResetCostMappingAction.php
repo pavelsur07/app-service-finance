@@ -20,7 +20,7 @@ final class ResetCostMappingAction
         string $companyId,
         string $mappingId,
     ): UnitEconomyCostMapping {
-        $mapping = $this->repository->findByIdAndCompany($mappingId, $companyId);
+        $mapping = $this->repository->findById($mappingId, $companyId);
 
         if ($mapping === null) {
             throw new \DomainException('Маппинг не найден');

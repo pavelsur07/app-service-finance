@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Repository;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Entity\UnitEconomyCostMapping;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -21,37 +20,37 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         $this->getEntityManager()->persist($mapping);
     }
 
+    public function findById(
+        string $id,
+        string $companyId,
+    ): ?UnitEconomyCostMapping {
+        return $this->findOneBy([
+            'id'        => $id,
+            'companyId' => $companyId,
+        ]);
+    }
+
+    public function findOneByCategoryId(
+        string $companyId,
+        string $marketplace,
+        string $costCategoryId,
+    ): ?UnitEconomyCostMapping {
+        return $this->findOneBy([
+            'companyId'      => $companyId,
+            'marketplace'    => $marketplace,
+            'costCategoryId' => $costCategoryId,
+        ]);
+    }
+
     /**
      * @return UnitEconomyCostMapping[]
      */
     public function findByCompanyAndMarketplace(
         string $companyId,
-        MarketplaceType $marketplace,
+        string $marketplace,
     ): array {
         return $this->findBy([
-            'companyId' => $companyId,
-            'marketplace' => $marketplace,
-        ]);
-    }
-
-    public function findOneByKey(
-        string $companyId,
-        MarketplaceType $marketplace,
-        string $costCategoryId,
-    ): ?UnitEconomyCostMapping {
-        return $this->findOneBy([
-            'companyId' => $companyId,
-            'marketplace' => $marketplace,
-            'costCategoryId' => $costCategoryId,
-        ]);
-    }
-
-    public function hasCompanyMappings(
-        string $companyId,
-        MarketplaceType $marketplace,
-    ): bool {
-        return (bool) $this->count([
-            'companyId' => $companyId,
+            'companyId'   => $companyId,
             'marketplace' => $marketplace,
         ]);
     }
@@ -61,7 +60,7 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
      */
     public function findPaginated(
         string $companyId,
-        ?MarketplaceType $marketplace,
+        ?string $marketplace,
         int $page,
         int $perPage,
     ): array {
@@ -74,12 +73,14 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
                 ->setParameter('marketplace', $marketplace);
         }
 
-        $countQb = clone $qb;
-        $total = (int) $countQb->select('COUNT(m.id)')
+        $total = (int) (clone $qb)
+            ->select('COUNT(m.id)')
             ->getQuery()
             ->getSingleScalarResult();
 
         $items = $qb
+            ->orderBy('m.marketplace', 'ASC')
+            ->addOrderBy('m.costCategoryName', 'ASC')
             ->setMaxResults($perPage)
             ->setFirstResult(($page - 1) * $perPage)
             ->getQuery()
@@ -88,22 +89,14 @@ final class UnitEconomyCostMappingRepository extends ServiceEntityRepository imp
         return ['items' => $items, 'total' => $total];
     }
 
-    public function findByIdAndCompany(
+    public function delete(
         string $id,
         string $companyId,
-    ): ?UnitEconomyCostMapping {
-        return $this->findOneBy([
-            'id' => $id,
-            'companyId' => $companyId,
-        ]);
-    }
-
-    public function delete(
-        UnitEconomyCostMapping $mapping,
-        string $companyId,
     ): void {
-        if ($mapping->getCompanyId() !== $companyId) {
-            throw new \DomainException('Маппинг не принадлежит компании');
+        $mapping = $this->findById($id, $companyId);
+
+        if ($mapping === null) {
+            throw new \DomainException('Маппинг не найден');
         }
 
         $this->getEntityManager()->remove($mapping);

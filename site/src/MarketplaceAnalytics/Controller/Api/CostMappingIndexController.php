@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Api\Request\ListCostMappingsRequest;
 use App\MarketplaceAnalytics\Api\Response\CostMappingResponse;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
@@ -33,13 +32,9 @@ final class CostMappingIndexController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $req = ListCostMappingsRequest::fromRequest($request);
 
-        $marketplace = $req->marketplace !== null
-            ? MarketplaceType::tryFrom($req->marketplace)
-            : null;
-
         $result = $this->repository->findPaginated(
             $company->getId(),
-            $marketplace,
+            $req->marketplace,
             $req->page,
             $req->perPage,
         );

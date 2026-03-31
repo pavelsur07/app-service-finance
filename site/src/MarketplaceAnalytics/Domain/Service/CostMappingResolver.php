@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Domain\Service;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
 
@@ -19,14 +18,9 @@ final readonly class CostMappingResolver
         string $marketplace,
         string $costCategoryId,
     ): UnitEconomyCostType {
-        $marketplaceType = MarketplaceType::from($marketplace);
+        $mapping = $this->repository->findOneByCategoryId($companyId, $marketplace, $costCategoryId);
 
-        $mapping = $this->repository->findOneByKey($companyId, $marketplaceType, $costCategoryId);
-        if ($mapping !== null) {
-            return $mapping->getUnitEconomyCostType();
-        }
-
-        return UnitEconomyCostType::OTHER;
+        return $mapping?->getUnitEconomyCostType() ?? UnitEconomyCostType::OTHER;
     }
 
     public function isAdvertisingCategory(
