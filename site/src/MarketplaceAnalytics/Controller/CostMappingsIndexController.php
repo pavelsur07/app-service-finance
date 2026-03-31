@@ -35,11 +35,10 @@ final class CostMappingsIndexController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
-        $selectedMarketplace = $request->query->get('marketplace')
-            ?: MarketplaceType::WILDBERRIES->value;
-
-        $marketplaceEnum = MarketplaceType::tryFrom($selectedMarketplace)
+        $marketplaceEnum = MarketplaceType::tryFrom($request->query->get('marketplace') ?? '')
             ?? MarketplaceType::WILDBERRIES;
+
+        $selectedMarketplace = $marketplaceEnum->value;
 
         ($this->ensureCostMappingsSeededAction)($company->getId(), $marketplaceEnum->value);
 

@@ -1,7 +1,7 @@
 import { Controller } from '@hotwired/stimulus';
 
 export default class extends Controller {
-    static targets = ['category', 'costType'];
+    static targets = ['category', 'costType', 'marketplace'];
     static values = { addUrl: String };
 
     async add() {
@@ -24,7 +24,7 @@ export default class extends Controller {
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    marketplace:         this.#getSelectedMarketplace(),
+                    marketplace:         this.marketplaceTarget.value,
                     costCategoryId:      categoryId,
                     costCategoryName:    categoryName,
                     unitEconomyCostType: costType,
@@ -43,10 +43,6 @@ export default class extends Controller {
         } finally {
             this.#setLoading(false);
         }
-    }
-
-    #getSelectedMarketplace() {
-        return document.querySelector('select[name="marketplace"]')?.value ?? '';
     }
 
     #setLoading(bool) {
