@@ -7,7 +7,7 @@ namespace DoctrineMigrations;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version20260401000001 extends AbstractMigration
+final class Version20260404000001 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -18,7 +18,7 @@ final class Version20260401000001 extends AbstractMigration
     {
         $this->addSql(<<<'SQL'
             ALTER TABLE unit_economy_cost_mappings
-                ADD COLUMN IF NOT EXISTS cost_category_id   VARCHAR(36) DEFAULT NULL,
+                ADD COLUMN IF NOT EXISTS cost_category_id   UUID DEFAULT NULL,
                 ADD COLUMN IF NOT EXISTS cost_category_name VARCHAR(255) DEFAULT NULL
         SQL);
 

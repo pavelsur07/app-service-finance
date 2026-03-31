@@ -7,15 +7,17 @@ namespace DoctrineMigrations;
 use Doctrine\DBAL\Schema\Schema;
 use Doctrine\Migrations\AbstractMigration;
 
-final class Version20260401000002 extends AbstractMigration
+final class Version20260404000002 extends AbstractMigration
 {
     public function getDescription(): string
     {
-        return 'UnitEconomyCostMapping migrate: truncate old data, apply NOT NULL, add unique constraint, remove old columns';
+        return 'UnitEconomyCostMapping migrate: truncate old data, apply NOT NULL, add unique and check constraints';
     }
 
     public function up(Schema $schema): void
     {
+        // Старые маппинги созданные seed-логикой сбрасываем намеренно —
+        // новая логика требует ручного заполнения пользователем
         $this->addSql('TRUNCATE TABLE unit_economy_cost_mappings');
 
         $this->addSql(<<<'SQL'
@@ -31,7 +33,7 @@ final class Version20260401000002 extends AbstractMigration
 
         $this->addSql(<<<'SQL'
             ALTER TABLE unit_economy_cost_mappings
-                ADD CONSTRAINT uq_cost_mapping_company_marketplace_category
+                ADD CONSTRAINT uniq_cost_mapping
                     UNIQUE (company_id, marketplace, cost_category_id)
         SQL);
 
@@ -52,20 +54,21 @@ final class Version20260401000002 extends AbstractMigration
                         'advertising_cpc','advertising_other','advertising_external',
                         'commission','other'))
         SQL);
-
-        $this->addSql(<<<'SQL'
-            ALTER TABLE unit_economy_cost_mappings
-                DROP COLUMN IF EXISTS is_system,
-                DROP COLUMN IF EXISTS cost_category_code
-        SQL);
     }
 
     public function down(Schema $schema): void
     {
         $this->addSql(<<<'SQL'
             ALTER TABLE unit_economy_cost_mappings
-                ADD COLUMN IF NOT EXISTS is_system           BOOLEAN     NOT NULL DEFAULT FALSE,
-                ADD COLUMN IF NOT EXISTS cost_category_code  VARCHAR(50) DEFAULT NULL
+                DROP CONSTRAINT IF EXISTS uniq_cost_mapping,
+                DROP CONSTRAINT IF EXISTS chk_cost_mapping_marketplace,
+                DROP CONSTRAINT IF EXISTS chk_cost_mapping_unit_economy_cost_type
+        SQL);
+
+        $this->addSql(<<<'SQL'
+            ALTER TABLE unit_economy_cost_mappings
+                ALTER COLUMN cost_category_id   DROP NOT NULL,
+                ALTER COLUMN cost_category_name DROP NOT NULL
         SQL);
     }
 }
