@@ -57,7 +57,6 @@ class UnitEconomyCostMapping
         Assert::uuid($companyId);
         Assert::uuid($costCategoryId);
         Assert::notEmpty($costCategoryName);
-        Assert::maxLength($costCategoryName, 255);
 
         $this->id                  = $id;
         $this->companyId           = $companyId;
