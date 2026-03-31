@@ -18,7 +18,7 @@ use Webmozart\Assert\Assert;
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_cost_mapping_company')]
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_cost_mapping_company_marketplace')]
-final class UnitEconomyCostMapping
+class UnitEconomyCostMapping
 {
     #[ORM\Id]
     #[ORM\Column(type: 'guid', unique: true)]
