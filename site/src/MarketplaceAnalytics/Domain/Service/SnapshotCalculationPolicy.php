@@ -16,6 +16,7 @@ use App\MarketplaceAnalytics\Domain\ValueObject\CostBreakdown;
 use App\MarketplaceAnalytics\Domain\ValueObject\DataQualityFlags;
 use App\MarketplaceAnalytics\Entity\ListingDailySnapshot;
 use App\MarketplaceAnalytics\Enum\DataQualityFlag;
+use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -85,7 +86,9 @@ final readonly class SnapshotCalculationPolicy
         $costMap = [];
 
         foreach ($costs as $costDTO) {
-            $type = $this->costMappingResolver->resolve($companyId, $marketplace, $costDTO->categoryCode);
+            $type = $costDTO->categoryId !== null
+                ? $this->costMappingResolver->resolve($companyId, $marketplace, $costDTO->categoryId)
+                : UnitEconomyCostType::OTHER;
             if ($type->isAdvertising()) {
                 continue;
             }

@@ -140,7 +140,7 @@ final readonly class MarketplaceFacade
     ): array {
         $rows = $this->connection->fetchAllAssociative(
             'SELECT c.marketplace, c.amount, c.cost_date, c.description, c.external_id,
-                    cat.code AS category_code, l.marketplace_sku
+                    cat.id AS category_id, cat.code AS category_code, l.marketplace_sku
              FROM marketplace_costs c
              JOIN marketplace_cost_categories cat ON c.category_id = cat.id
              LEFT JOIN marketplace_listings l ON c.listing_id = l.id
@@ -159,6 +159,7 @@ final readonly class MarketplaceFacade
             categoryCode: $row['category_code'],
             amount: $row['amount'],
             costDate: new \DateTimeImmutable($row['cost_date']),
+            categoryId: $row['category_id'],
             marketplaceSku: $row['marketplace_sku'] ?? null,
             description: $row['description'],
             externalId: $row['external_id'],
