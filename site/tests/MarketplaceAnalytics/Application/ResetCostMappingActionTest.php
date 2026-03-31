@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Tests\MarketplaceAnalytics\Application;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Application\ResetCostMappingAction;
 use App\MarketplaceAnalytics\Enum\UnitEconomyCostType;
 use App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface;
@@ -33,53 +32,22 @@ final class ResetCostMappingActionTest extends TestCase
         );
     }
 
-    public function testResetRestoresToSystemValue(): void
+    public function testRemapsToNewType(): void
     {
         $mapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asCustom()
             ->withUnitEconomyCostType(UnitEconomyCostType::OTHER)
-            ->build();
-
-        $systemMapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asSystem()
-            ->withCostCategoryCode($mapping->getCostCategoryCode())
-            ->withMarketplace(MarketplaceType::WILDBERRIES)
-            ->withUnitEconomyCostType(UnitEconomyCostType::LOGISTICS_TO)
             ->build();
 
         $this->repository->method('findByIdAndCompany')
             ->with(self::MAPPING_ID, self::COMPANY_ID)
             ->willReturn($mapping);
-
-        $this->repository->method('findSystemMapping')
-            ->with($mapping->getMarketplace(), $mapping->getCostCategoryCode())
-            ->willReturn($systemMapping);
 
         $this->entityManager->expects($this->once())
             ->method('flush');
 
-        $result = ($this->action)(self::COMPANY_ID, self::MAPPING_ID);
+        $result = ($this->action)(self::COMPANY_ID, self::MAPPING_ID, UnitEconomyCostType::LOGISTICS_TO);
 
         $this->assertSame(UnitEconomyCostType::LOGISTICS_TO, $result->getUnitEconomyCostType());
-    }
-
-    public function testThrowsWhenMappingAlreadySystem(): void
-    {
-        $mapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asSystem()
-            ->build();
-
-        $this->repository->method('findByIdAndCompany')
-            ->with(self::MAPPING_ID, self::COMPANY_ID)
-            ->willReturn($mapping);
-
-        $this->entityManager->expects($this->never())
-            ->method('flush');
-
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('уже имеет системное значение');
-
-        ($this->action)(self::COMPANY_ID, self::MAPPING_ID);
     }
 
     public function testThrowsWhenMappingNotFound(): void
@@ -93,28 +61,6 @@ final class ResetCostMappingActionTest extends TestCase
 
         $this->expectException(\DomainException::class);
 
-        ($this->action)(self::COMPANY_ID, self::MAPPING_ID);
-    }
-
-    public function testThrowsWhenSystemMappingNotFound(): void
-    {
-        $mapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asCustom()
-            ->build();
-
-        $this->repository->method('findByIdAndCompany')
-            ->with(self::MAPPING_ID, self::COMPANY_ID)
-            ->willReturn($mapping);
-
-        $this->repository->method('findSystemMapping')
-            ->willReturn(null);
-
-        $this->entityManager->expects($this->never())
-            ->method('flush');
-
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Системный маппинг');
-
-        ($this->action)(self::COMPANY_ID, self::MAPPING_ID);
+        ($this->action)(self::COMPANY_ID, self::MAPPING_ID, UnitEconomyCostType::LOGISTICS_TO);
     }
 }

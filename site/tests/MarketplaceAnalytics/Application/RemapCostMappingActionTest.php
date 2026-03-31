@@ -35,7 +35,6 @@ final class RemapCostMappingActionTest extends TestCase
     public function testRemapChangesUnitEconomyCostType(): void
     {
         $mapping = UnitEconomyCostMappingBuilder::aMapping()
-            ->asCustom()
             ->withUnitEconomyCostType(UnitEconomyCostType::LOGISTICS_TO)
             ->build();
 
@@ -67,8 +66,6 @@ final class RemapCostMappingActionTest extends TestCase
 
     public function testThrowsDomainExceptionOnIdorAttempt(): void
     {
-        // Маппинг принадлежит другой компании — findByIdAndCompany возвращает null
-        // так как репозиторий фильтрует по companyId (IDOR-защита)
         $otherCompanyId = '22222222-2222-2222-2222-222222222222';
 
         $this->repository->method('findByIdAndCompany')
