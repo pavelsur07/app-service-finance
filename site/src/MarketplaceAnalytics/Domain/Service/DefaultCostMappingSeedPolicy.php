@@ -40,9 +40,9 @@ final readonly class DefaultCostMappingSeedPolicy
                 Uuid::uuid7()->toString(),
                 $companyId,
                 $marketplaceType,
+                $default['type'],
                 $default['id'],
                 $default['name'],
-                $default['type'],
             );
             $this->repository->save($mapping);
         }

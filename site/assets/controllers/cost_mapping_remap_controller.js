@@ -17,19 +17,12 @@ export default class extends Controller {
 
             if (!res.ok) {
                 this.#showError('Не удалось сохранить');
-                return;
             }
-
-            this.#updateBadge();
         } catch {
             this.#showError('Не удалось сохранить');
         } finally {
             this.#setLoading(false);
         }
-    }
-
-    #updateBadge() {
-        // badges removed from UI
     }
 
     #setLoading(bool) {
