@@ -67,6 +67,7 @@ final class UnitEconomicsController extends AbstractController
         $adapter = new QueryAdapter($qb, static function (QueryBuilder $qb): void {
             $qb->select('COUNT(DISTINCT s.listing_id)')
                 ->resetGroupBy()
+                ->resetHaving()
                 ->resetOrderBy();
         });
 

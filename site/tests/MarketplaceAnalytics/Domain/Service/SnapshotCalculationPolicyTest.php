@@ -270,6 +270,32 @@ final class SnapshotCalculationPolicyTest extends TestCase
         $this->assertSame($ad['cpc']['spend'], $cb->advertisingCpc);
     }
 
+    /**
+     * Regression: листинг Ozon без продаж за день получал marketplace='wildberries'
+     * из-за хардкодного fallback `$marketplace ?? 'wildberries'`.
+     * Маркетплейс снапшота должен браться из параметра, а не из активности за день.
+     */
+    public function testSnapshotUsesExplicitMarketplaceWhenNoSalesOrReturns(): void
+    {
+        $this->marketplaceFacade->method('getSalesForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getReturnsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getCostPriceForListing')->willReturn(null);
+        $this->marketplaceFacade->method('getCostsForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getOrdersForListingAndDate')->willReturn([]);
+        $this->marketplaceFacade->method('getAdvertisingCostsForListingAndDate')->willReturn([]);
+
+        $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
+
+        $snapshot = $this->policy->calculateForListingDay(
+            self::COMPANY_ID,
+            self::LISTING_ID,
+            $this->date,
+            MarketplaceType::OZON->value,
+        );
+
+        $this->assertSame(MarketplaceType::OZON, $snapshot->getMarketplace());
+    }
+
     private function makeMinimalSale(): SaleData
     {
         return new SaleData(
