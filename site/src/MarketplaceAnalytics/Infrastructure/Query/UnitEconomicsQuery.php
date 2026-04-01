@@ -55,6 +55,7 @@ final readonly class UnitEconomicsQuery
             ->groupBy('s.listing_id')
             ->addGroupBy('l.name')
             ->addGroupBy('l.marketplace_sku')
+            ->having('SUM(s.sales_quantity) > 0 OR SUM(s.revenue) > 0 OR SUM(s.refunds) > 0 OR SUM(s.orders_quantity) > 0')
             ->orderBy('SUM(s.revenue)', 'DESC');
 
         if ($marketplace !== null) {

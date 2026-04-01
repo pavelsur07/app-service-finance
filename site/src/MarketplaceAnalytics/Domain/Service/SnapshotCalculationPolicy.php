@@ -32,6 +32,7 @@ final readonly class SnapshotCalculationPolicy
         string $companyId,
         string $listingId,
         \DateTimeImmutable $date,
+        string $marketplace,
     ): ListingDailySnapshot {
         $flags = DataQualityFlags::empty();
 
@@ -39,12 +40,10 @@ final readonly class SnapshotCalculationPolicy
         $sales = $this->marketplaceFacade->getSalesForListingAndDate($companyId, $listingId, $date);
         $revenue = '0.00';
         $salesQuantity = 0;
-        $marketplace = null;
 
         foreach ($sales as $sale) {
             $revenue = bcadd($revenue, $sale->totalRevenue, 2);
             $salesQuantity += $sale->quantity;
-            $marketplace = $sale->marketplace->value;
         }
 
         $avgSalePrice = bccomp($revenue, '0.00', 2) > 0 && $salesQuantity > 0
@@ -59,9 +58,6 @@ final readonly class SnapshotCalculationPolicy
         foreach ($returns as $return) {
             $refunds = bcadd($refunds, $return->refundAmount, 2);
             $returnsQuantity += $return->quantity;
-            if ($marketplace === null) {
-                $marketplace = $return->marketplace->value;
-            }
         }
 
         // 3. Cost price
@@ -81,7 +77,6 @@ final readonly class SnapshotCalculationPolicy
         }
 
         // 4. Costs (non-advertising)
-        $marketplace = $marketplace ?? 'wildberries';
         $costs = $this->marketplaceFacade->getCostsForListingAndDate($companyId, $listingId, $date);
         $costMap = [];
 
