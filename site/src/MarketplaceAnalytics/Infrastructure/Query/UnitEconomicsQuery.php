@@ -46,7 +46,7 @@ final readonly class UnitEconomicsQuery
                 'COUNT(*) AS snapshots_count',
             )
             ->from('listing_daily_snapshots', 's')
-            ->innerJoin('s', 'marketplace_listings', 'l', 'l.id = s.listing_id AND l.company_id = s.company_id')
+            ->innerJoin('s', 'marketplace_listings', 'l', 'l.id = s.listing_id AND l.company_id = s.company_id AND l.is_active = true')
             ->where('s.company_id = :companyId')
             ->andWhere('s.snapshot_date BETWEEN :dateFrom AND :dateTo')
             ->setParameter('companyId', $companyId)
@@ -55,6 +55,7 @@ final readonly class UnitEconomicsQuery
             ->groupBy('s.listing_id')
             ->addGroupBy('l.name')
             ->addGroupBy('l.marketplace_sku')
+            ->having('SUM(s.sales_quantity) > 0 OR SUM(s.revenue) > 0')
             ->orderBy('SUM(s.revenue)', 'DESC');
 
         if ($marketplace !== null) {

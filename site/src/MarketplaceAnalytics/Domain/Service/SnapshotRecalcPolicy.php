@@ -40,6 +40,7 @@ final readonly class SnapshotRecalcPolicy
                     $companyId,
                     $listing->id,
                     $current,
+                    $listing->marketplace,
                 );
             }
 
