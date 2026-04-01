@@ -58,7 +58,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
             ->method('save')
             ->with($this->isInstanceOf(ListingDailySnapshot::class));
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $this->assertSame(self::COMPANY_ID, $snapshot->getCompanyId());
         $this->assertSame(self::LISTING_ID, $snapshot->getListingId());
@@ -79,7 +79,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
             ->method('save')
             ->with($this->identicalTo($existing));
 
-        $result = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $result = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $this->assertSame($existing->getId(), $result->getId());
     }
@@ -118,7 +118,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $cb = CostBreakdown::fromArray($snapshot->getCostBreakdown());
         $this->assertSame('50.00', $cb->logisticsTo);
@@ -155,7 +155,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $ad = $snapshot->getAdvertisingDetails();
         $this->assertSame('75.50', $ad['cpc']['spend']);
@@ -173,7 +173,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $this->assertContains('cost_price_missing', $snapshot->getDataQuality());
     }
@@ -190,7 +190,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $this->assertContains('api_advertising_missing', $snapshot->getDataQuality());
     }
@@ -225,7 +225,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         // costPrice=100.00, salesQuantity=3 → totalCostPrice=300.00
         $this->assertSame('300.00', $snapshot->getTotalCostPrice());
@@ -261,7 +261,7 @@ final class SnapshotCalculationPolicyTest extends TestCase
 
         $this->snapshotRepository->method('findOneByUniqueKey')->willReturn(null);
 
-        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date);
+        $snapshot = $this->policy->calculateForListingDay(self::COMPANY_ID, self::LISTING_ID, $this->date, 'wildberries');
 
         $ad = $snapshot->getAdvertisingDetails();
         $cb = CostBreakdown::fromArray($snapshot->getCostBreakdown());
