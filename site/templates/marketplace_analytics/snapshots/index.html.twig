@@ -8,6 +8,45 @@
     <div class="page-body">
         <div class="container-xl">
 
+            {# TODO: Удалить после использования #}
+            <div class="card mb-3 border-warning">
+                <div class="card-header">
+                    <h3 class="card-title text-warning">
+                        ⚠️ Служебные операции
+                        <small class="text-muted ms-2">— удалить после использования</small>
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row g-2 align-items-end">
+
+                        <div class="col-auto">
+                            <label class="form-label">Маркетплейс для очистки</label>
+                            <select id="cleanup-marketplace" class="form-select">
+                                {% for mp in available_marketplaces %}
+                                    <option value="{{ mp.value }}">{{ mp.getDisplayName() }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-auto">
+                            <button
+                                class="btn btn-outline-warning"
+                                onclick="cleanupPhantomSnapshots(true)"
+                            >Проверить (dry-run)</button>
+                        </div>
+
+                        <div class="col-auto">
+                            <button
+                                class="btn btn-danger"
+                                onclick="cleanupPhantomSnapshots(false)"
+                            >Удалить фантомные снапшоты</button>
+                        </div>
+
+                    </div>
+                    <div id="cleanup-result" class="mt-2 text-muted"></div>
+                </div>
+            </div>
+
             <div class="card mb-3">
                 <div class="card-body">
                     <form method="GET"
@@ -174,4 +213,56 @@
         </div>
     </div>
 
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+    const CLEANUP_URL = '{{ path('marketplace_analytics_api_cleanup_phantom_snapshots') }}';
+
+    async function cleanupPhantomSnapshots(dryRun) {
+        const marketplace = document.getElementById('cleanup-marketplace').value;
+
+        const confirmMsg = dryRun
+            ? 'Проверить сколько фантомных снапшотов для ' + marketplace + '?'
+            : 'ВНИМАНИЕ! Удалить все снапшоты для ' + marketplace + '?\n'
+                + 'Это действие необратимо!';
+
+        if (!confirm(confirmMsg)) return;
+
+        const resultEl = document.getElementById('cleanup-result');
+        resultEl.textContent = 'Выполняется...';
+        resultEl.className = 'mt-2 text-muted';
+
+        try {
+            const res = await fetch(CLEANUP_URL, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    marketplace: marketplace,
+                    dry_run:     dryRun,
+                }),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                resultEl.textContent = '❌ ' + (data.message ?? 'Ошибка');
+                resultEl.className = 'mt-2 text-danger';
+                return;
+            }
+
+            resultEl.textContent = '✅ ' + data.message;
+            resultEl.className = dryRun ? 'mt-2 text-warning' : 'mt-2 text-success';
+
+            if (!dryRun && data.deleted > 0) {
+                resultEl.textContent += '. Не забудьте запустить пересчёт!';
+            }
+
+        } catch (e) {
+            resultEl.textContent = '❌ Ошибка сети';
+            resultEl.className = 'mt-2 text-danger';
+        }
+    }
+    </script>
 {% endblock %}
