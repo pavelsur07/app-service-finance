@@ -8,6 +8,7 @@ use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistry;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use PHPUnit\Framework\TestCase;
 
 final class MarketplaceRawProcessorRegistryTest extends TestCase
@@ -28,6 +29,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
             public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void {}
         };
 
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $registry = new MarketplaceRawProcessorRegistry([
             new class implements MarketplaceRawProcessorInterface {
                 public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool
@@ -43,14 +45,15 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                 public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void {}
             },
             $target,
-        ]);
+        ], $repo);
 
         self::assertSame($target, $registry->get('ozon', MarketplaceType::OZON, 'sales'));
     }
 
     public function testThrowsWhenNoProcessorFound(): void
     {
-        $registry = new MarketplaceRawProcessorRegistry([]);
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $registry = new MarketplaceRawProcessorRegistry([], $repo);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Processor not found for type "ozon"');
