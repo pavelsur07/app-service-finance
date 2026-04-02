@@ -42,53 +42,55 @@ final class RunPipelineAction
             );
         }
 
-        // 2. Найти или создать ProcessingPipelineRun
-        $run = $this->repository->findByCompanyAndMarketplace($companyId, $marketplace);
+        try {
+            // 2. Найти или создать ProcessingPipelineRun
+            $run = $this->repository->findByCompanyAndMarketplace($companyId, $marketplace);
 
-        if ($run === null) {
-            $run = new ProcessingPipelineRun(
-                Uuid::uuid7()->toString(),
-                $companyId,
-                $marketplace,
-                $triggeredBy,
-            );
-            $this->repository->save($run);
-        } else {
-            $run->restart($triggeredBy);
-        }
-
-        $this->entityManager->flush();
-
-        // 3. Выполнить шаги последовательно
-        $steps = [
-            PipelineStep::SALES   => ProcessingKind::SALES,
-            PipelineStep::RETURNS => ProcessingKind::RETURNS,
-            PipelineStep::COSTS   => ProcessingKind::COSTS,
-        ];
-
-        foreach ($steps as $step => $kind) {
-            try {
-                $run->markRunning($step);
-                $this->entityManager->flush();
-
-                $count = $this->processorRegistry->process($companyId, $marketplace, $kind);
-
-                $run->markStepCompleted($step, $count);
-                $this->entityManager->flush();
-            } catch (\Throwable $e) {
-                $run->markFailed($step, $e->getMessage());
-                $this->entityManager->flush();
-                $lock->release();
-
-                return $run;
+            if ($run === null) {
+                $run = new ProcessingPipelineRun(
+                    Uuid::uuid7()->toString(),
+                    $companyId,
+                    $marketplace,
+                    $triggeredBy,
+                );
+                $this->repository->save($run);
+            } else {
+                $run->restart($triggeredBy);
             }
+
+            $this->entityManager->flush();
+
+            // 3. Выполнить шаги последовательно
+            $steps = [
+                PipelineStep::SALES   => ProcessingKind::SALES,
+                PipelineStep::RETURNS => ProcessingKind::RETURNS,
+                PipelineStep::COSTS   => ProcessingKind::COSTS,
+            ];
+
+            foreach ($steps as $step => $kind) {
+                try {
+                    $run->markRunning($step);
+                    $this->entityManager->flush();
+
+                    $count = $this->processorRegistry->process($companyId, $marketplace, $kind);
+
+                    $run->markStepCompleted($step, $count);
+                    $this->entityManager->flush();
+                } catch (\Throwable $e) {
+                    $run->markFailed($step, $e->getMessage());
+                    $this->entityManager->flush();
+
+                    return $run;
+                }
+            }
+
+            // 4. Завершить
+            $run->markCompleted();
+            $this->entityManager->flush();
+
+            return $run;
+        } finally {
+            $lock->release();
         }
-
-        // 4. Завершить
-        $run->markCompleted();
-        $this->entityManager->flush();
-        $lock->release();
-
-        return $run;
     }
 }
