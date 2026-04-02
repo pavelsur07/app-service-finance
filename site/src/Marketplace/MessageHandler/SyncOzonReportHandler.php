@@ -87,8 +87,11 @@ final class SyncOzonReportHandler
 
         try {
             $adapter  = $this->adapterRegistry->get(MarketplaceType::OZON);
-            $fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
-            $toDate   = new \DateTimeImmutable();
+            //$fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
+            //$toDate   = new \DateTimeImmutable();
+            // SYNC_PERIOD_DAYS = 3 — оставить как страховка
+            $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
+            $fromDate = $toDate;
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
