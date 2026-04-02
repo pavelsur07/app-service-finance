@@ -32,6 +32,29 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Найти все raw-документы компании по маркетплейсу (без фильтра периода).
+     *
+     * @return MarketplaceRawDocument[]
+     */
+    public function findByCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $documentType = 'sales_report',
+    ): array {
+        return $this->createQueryBuilder('d')
+            ->join('d.company', 'c')
+            ->where('c.id = :companyId')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->orderBy('d.syncedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Найти raw-документы за период для переобработки.
      *
      * Используется в ReprocessMarketplaceCommand.
