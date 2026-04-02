@@ -21,6 +21,8 @@ final class ProcessingPipelineRunBuilder
     private PipelineTrigger $triggeredBy = PipelineTrigger::AUTO;
     private PipelineStatus $status       = PipelineStatus::PENDING;
     private ?PipelineStep $failedStep    = null;
+    private ?PipelineStep $currentStep   = null;
+    private string $errorMessage         = '(no message)';
     private int $salesCount              = 0;
     private int $returnsCount            = 0;
     private int $costsCount              = 0;
@@ -66,6 +68,22 @@ final class ProcessingPipelineRunBuilder
         return $clone;
     }
 
+    public function withCurrentStep(PipelineStep $currentStep): self
+    {
+        $clone = clone $this;
+        $clone->currentStep = $currentStep;
+
+        return $clone;
+    }
+
+    public function withErrorMessage(string $errorMessage): self
+    {
+        $clone = clone $this;
+        $clone->errorMessage = $errorMessage;
+
+        return $clone;
+    }
+
     public function withCounts(int $sales, int $returns, int $costs): self
     {
         $clone = clone $this;
@@ -85,12 +103,16 @@ final class ProcessingPipelineRunBuilder
             triggeredBy: $this->triggeredBy,
         );
 
+        if ($this->status === PipelineStatus::FAILED && $this->failedStep === null) {
+            throw new \LogicException('withFailedStep() обязателен при withStatus(FAILED)');
+        }
+
         if ($this->status === PipelineStatus::RUNNING) {
-            $run->markRunning(PipelineStep::SALES);
+            $run->markRunning($this->currentStep ?? PipelineStep::SALES);
         } elseif ($this->status === PipelineStatus::COMPLETED) {
             $run->markCompleted();
-        } elseif ($this->status === PipelineStatus::FAILED && $this->failedStep !== null) {
-            $run->markFailed($this->failedStep, '');
+        } elseif ($this->status === PipelineStatus::FAILED) {
+            $run->markFailed($this->failedStep, $this->errorMessage);
         }
 
         if ($this->salesCount > 0) {

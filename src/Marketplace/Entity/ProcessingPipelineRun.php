@@ -18,11 +18,10 @@ use Webmozart\Assert\Assert;
     columns: ['company_id', 'marketplace']
 )]
 #[ORM\Index(columns: ['company_id'], name: 'idx_pipeline_run_company')]
-#[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_pipeline_run_company_marketplace')]
 class ProcessingPipelineRun
 {
     #[ORM\Id]
-    #[ORM\Column(type: 'guid', unique: true)]
+    #[ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\Column(type: 'guid')]
