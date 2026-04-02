@@ -19,10 +19,13 @@ framework:
 
         buses:
             messenger.bus.default: []
+            event.bus:
+                default_middleware: allow_no_handlers
 
         routing:
             'App\Message\ApplyAutoRulesForTransaction': async
             'App\Message\EnqueueAutoRulesForRange': async
+            'App\Marketplace\Message\TriggerProcessingPipelineMessage': async
             'App\Marketplace\Message\SyncWbReportMessage': async
             'App\Marketplace\Message\SyncOzonReportMessage': async
             'App\Marketplace\Message\InitialSyncMessage': async

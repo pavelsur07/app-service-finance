@@ -69,6 +69,7 @@ services:
 
     App\Catalog\Domain\ProductSkuUniquenessChecker: '@App\Catalog\Infrastructure\ProductSkuUniquenessCheckerDoctrine'
 
+    App\Marketplace\Repository\ProcessingPipelineRunRepositoryInterface: '@App\Marketplace\Repository\ProcessingPipelineRunRepository'
     App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface: '@App\Marketplace\Repository\MarketplaceAdvertisingCostRepository'
     App\Marketplace\Repository\MarketplaceOrderRepositoryInterface: '@App\Marketplace\Repository\MarketplaceOrderRepository'
     App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface: '@App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepository'
