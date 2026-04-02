@@ -261,6 +261,56 @@ enum SnapshotRecalcScope: string
 }
 ```
 
+### `src/Marketplace/Enum/ProcessingKind.php`
+```php
+enum ProcessingKind: string
+{
+    case SALES   = 'sales';
+    case RETURNS = 'returns';
+    case COSTS   = 'costs';
+
+    public function getLabel(): string; // Продажи / Возвраты / Затраты
+}
+```
+
+### `src/Marketplace/Enum/PipelineStatus.php`
+```php
+enum PipelineStatus: string
+{
+    case PENDING   = 'pending';
+    case RUNNING   = 'running';
+    case COMPLETED = 'completed';
+    case FAILED    = 'failed';
+
+    public function getLabel(): string;     // Ожидает / Выполняется / Завершён / Ошибка
+    public function isTerminal(): bool;     // true для COMPLETED, FAILED
+    public function isRunning(): bool;      // true для RUNNING
+}
+```
+
+### `src/Marketplace/Enum/PipelineStep.php`
+```php
+enum PipelineStep: string
+{
+    case SALES   = 'sales';
+    case RETURNS = 'returns';
+    case COSTS   = 'costs';
+
+    public function getLabel(): string; // Продажи / Возвраты / Затраты
+}
+```
+
+### `src/Marketplace/Enum/PipelineTrigger.php`
+```php
+enum PipelineTrigger: string
+{
+    case AUTO   = 'auto';
+    case MANUAL = 'manual';
+
+    public function getLabel(): string; // Автоматически / Вручную
+}
+```
+
 > **Остальные Enum** (ProductStatus, TransactionType, MarketplaceType и др.) добавлять сюда по мере реализации.
 > Не угадывать значения — спрашивать или смотреть в исходниках.
 
