@@ -32,31 +32,35 @@ final readonly class OzonFetcher implements MarketplaceFetcherInterface
     public function fetch(string $companyId, \DateTimeImmutable $dateFrom): \Generator
     {
         $credentials = $this->credentialsQuery->getCredentials($companyId, MarketplaceType::OZON);
-        $apiKey = $credentials['api_key'] ?? null;
-        $clientId = $credentials['client_id'] ?? null;
+        $apiKey      = $credentials['api_key'] ?? null;
+        $clientId    = $credentials['client_id'] ?? null;
 
         if (null === $apiKey || '' === $apiKey || null === $clientId || '' === $clientId) {
             throw new \RuntimeException('Ozon API credentials were not found.');
         }
 
-        $page = 1;
+        $utc  = new \DateTimeZone('UTC');
+        $from = $dateFrom->setTime(0, 0, 0)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+        $to   = $dateFrom->setTime(23, 59, 59)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+
+        $page      = 1;
         $pageCount = 1;
 
         do {
-            $response = $this->httpClient->request('POST', self::BASE_URL.'/v2/finance/transaction/list', [
+            $response = $this->httpClient->request('POST', self::BASE_URL . '/v2/finance/transaction/list', [
                 'headers' => [
-                    'Client-Id' => $clientId,
-                    'Api-Key' => $apiKey,
+                    'Client-Id'    => $clientId,
+                    'Api-Key'      => $apiKey,
                     'Content-Type' => 'application/json',
                 ],
                 'json' => [
                     'filter' => [
                         'date' => [
-                            'from' => $dateFrom->format('Y-m-d\T00:00:00\Z'),
-                            'to' => $dateFrom->format('Y-m-d\T23:59:59\Z'),
+                            'from' => $from,
+                            'to'   => $to,
                         ],
                     ],
-                    'page' => $page,
+                    'page'      => $page,
                     'page_size' => 1000,
                 ],
                 'timeout' => 120,
