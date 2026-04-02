@@ -91,6 +91,9 @@ class ProcessingPipelineRun
             PipelineStep::SALES   => $this->salesCount   = $count,
             PipelineStep::RETURNS => $this->returnsCount = $count,
             PipelineStep::COSTS   => $this->costsCount   = $count,
+            default               => throw new \UnexpectedValueException(
+                sprintf('Unhandled PipelineStep: %s', $step->value)
+            ),
         };
     }
 
