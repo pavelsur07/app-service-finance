@@ -11,7 +11,7 @@ use App\Marketplace\Enum\PipelineTrigger;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: \App\Marketplace\Repository\ProcessingPipelineRunRepository::class)]
 #[ORM\Table(name: 'marketplace_pipeline_runs')]
 #[ORM\UniqueConstraint(
     name: 'uq_pipeline_run_company_marketplace',
@@ -91,9 +91,6 @@ class ProcessingPipelineRun
             PipelineStep::SALES   => $this->salesCount   = $count,
             PipelineStep::RETURNS => $this->returnsCount = $count,
             PipelineStep::COSTS   => $this->costsCount   = $count,
-            default               => throw new \UnexpectedValueException(
-                sprintf('Unhandled PipelineStep: %s', $step->value)
-            ),
         };
     }
 
