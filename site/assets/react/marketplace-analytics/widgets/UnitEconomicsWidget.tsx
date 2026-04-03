@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useUnitEconomics } from '../hooks/useUnitEconomics';
 import { useRecalculate } from '../hooks/useRecalculate';
-import { getDefaultDateRange } from '../utils/utils';
+import { getMonthRange } from '../utils/utils';
 import type { MarketplaceOption } from '../types/analytics.types';
 import UnitEconomicsView from '../views/UnitEconomicsView';
 
@@ -17,11 +17,11 @@ interface Filters {
 
 function getFiltersFromUrl(): Filters {
     const params = new URLSearchParams(window.location.search);
-    const defaults = getDefaultDateRange();
+    const currentMonth = getMonthRange(0);
     return {
         marketplace: params.get('marketplace') ?? '',
-        dateFrom: params.get('from') ?? defaults.dateFrom,
-        dateTo: params.get('to') ?? defaults.dateTo,
+        dateFrom: params.get('from') ?? currentMonth.from,
+        dateTo: params.get('to') ?? currentMonth.to,
     };
 }
 
