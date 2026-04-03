@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useUnitEconomics } from '../hooks/useUnitEconomics';
 import { useRecalculate } from '../hooks/useRecalculate';
 import { getDefaultDateRange } from '../utils/utils';
