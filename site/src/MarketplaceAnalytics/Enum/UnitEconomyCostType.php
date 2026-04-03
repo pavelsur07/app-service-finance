@@ -13,6 +13,9 @@ enum UnitEconomyCostType: string
     case ADVERTISING_OTHER = 'advertising_other';
     case ADVERTISING_EXTERNAL = 'advertising_external';
     case COMMISSION = 'commission';
+    case ACQUIRING = 'acquiring';
+    case PENALTIES = 'penalties';
+    case ACCEPTANCE = 'acceptance';
     case OTHER = 'other';
 
     public function getLabel(): string
@@ -25,6 +28,9 @@ enum UnitEconomyCostType: string
             self::ADVERTISING_OTHER    => 'Реклама (прочая)',
             self::ADVERTISING_EXTERNAL => 'Реклама (внешняя)',
             self::COMMISSION           => 'Комиссия',
+            self::ACQUIRING            => 'Эквайринг',
+            self::PENALTIES            => 'Штрафы',
+            self::ACCEPTANCE           => 'Приемка',
             self::OTHER                => 'Прочее',
         };
     }
