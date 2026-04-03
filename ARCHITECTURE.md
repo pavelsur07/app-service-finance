@@ -227,18 +227,19 @@ enum OrderStatus: string
 ```php
 enum UnitEconomyCostType: string
 {
-    case LOGISTICS_TO = 'logistics_to';
-    case LOGISTICS_BACK = 'logistics_back';
-    case STORAGE = 'storage';
-    case ADVERTISING_CPC = 'advertising_cpc';
-    case ADVERTISING_OTHER = 'advertising_other';
+    case LOGISTICS_TO         = 'logistics_to';
+    case LOGISTICS_BACK       = 'logistics_back';
+    case STORAGE              = 'storage';
+    case ADVERTISING_CPC      = 'advertising_cpc';
+    case ADVERTISING_OTHER    = 'advertising_other';
     case ADVERTISING_EXTERNAL = 'advertising_external';
-    case COMMISSION = 'commission';
-    case ACQUIRING = 'acquiring';
-    case PENALTIES = 'penalties';
-    case ACCEPTANCE = 'acceptance';
-    case OTHER = 'other';
+    case COMMISSION           = 'commission';
+    case ACQUIRING            = 'acquiring';   // Эквайринг
+    case PENALTIES            = 'penalties';   // Штрафы
+    case ACCEPTANCE           = 'acceptance';  // Приемка
+    case OTHER                = 'other';
 
+    public function getLabel(): string; // человекочитаемое название
     public function isAdvertising(): bool; // true для ADVERTISING_CPC, ADVERTISING_OTHER, ADVERTISING_EXTERNAL
 }
 ```
