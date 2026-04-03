@@ -62,7 +62,7 @@
 | `id` | `string` (UUID v7) | PK |
 | `companyId` | `string` (UUID) | Неизменяем, без setter |
 | `marketplace` | `MarketplaceType` | WB, Ozon и др. |
-| `unitEconomyCostType` | `UnitEconomyCostType` | Статья юнит-экономики (8 фиксированных) |
+| `unitEconomyCostType` | `UnitEconomyCostType` | Статья юнит-экономики (11 фиксированных) |
 | `costCategoryId` | `string` (UUID) | ID категории затрат МП (из `marketplace_cost_categories`) |
 | `costCategoryName` | `string` | Название для отображения |
 | `createdAt` | `DateTimeImmutable` | — |
@@ -234,6 +234,9 @@ enum UnitEconomyCostType: string
     case ADVERTISING_OTHER = 'advertising_other';
     case ADVERTISING_EXTERNAL = 'advertising_external';
     case COMMISSION = 'commission';
+    case ACQUIRING = 'acquiring';
+    case PENALTIES = 'penalties';
+    case ACCEPTANCE = 'acceptance';
     case OTHER = 'other';
 
     public function isAdvertising(): bool; // true для ADVERTISING_CPC, ADVERTISING_OTHER, ADVERTISING_EXTERNAL
