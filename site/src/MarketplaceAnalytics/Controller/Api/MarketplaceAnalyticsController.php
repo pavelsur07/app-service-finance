@@ -25,9 +25,9 @@ final class MarketplaceAnalyticsController extends AbstractController
     public function create(
         #[MapRequestPayload] CreateMarketplaceAnalyticsRequest $request,
     ): JsonResponse {
-        $this->activeCompanyService->getActiveCompany();
+        $company = $this->activeCompanyService->getActiveCompany();
 
-        ($this->createAction)($request);
+        ($this->createAction)($company->getId(), $request);
 
         return $this->json(['status' => 'success'], 201);
     }
