@@ -18,6 +18,9 @@ export interface UnitEconomicsRow {
     advertising_other: string;
     advertising_external: string;
     commission: string;
+    acquiring: string;
+    penalties: string;
+    acceptance: string;
     other_costs: string;
     has_quality_issues: boolean;
     snapshots_count: number;

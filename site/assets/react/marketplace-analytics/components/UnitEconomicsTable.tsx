@@ -21,15 +21,92 @@ function calcProfit(row: UnitEconomicsRow): number | null {
         - parseFloat(row.advertising_other)
         - parseFloat(row.advertising_external)
         - parseFloat(row.commission)
+        - parseFloat(row.acquiring)
+        - parseFloat(row.penalties)
+        - parseFloat(row.acceptance)
         - parseFloat(row.other_costs)
     );
 }
 
-function calcBuyoutRate(row: UnitEconomicsRow): string {
-    if (row.orders_quantity === 0) return '\u2014';
-    const rate = (row.delivered_quantity / row.orders_quantity) * 100;
-    return rate.toFixed(1) + '%';
+interface Totals {
+    revenue: number;
+    refunds: number;
+    total_cost_price: number | null;
+    commission: number;
+    logistics: number;
+    storage: number;
+    advertising: number;
+    acquiring: number;
+    acceptance: number;
+    penalties: number;
+    other_costs: number;
+    profit: number | null;
 }
+
+function calcTotals(items: UnitEconomicsRow[]): Totals {
+    let profitSum = 0;
+    let hasMissingData = false;
+    let costSum = 0;
+
+    let revenue = 0;
+    let refunds = 0;
+    let commission = 0;
+    let logistics = 0;
+    let storage = 0;
+    let advertising = 0;
+    let acquiring = 0;
+    let acceptance = 0;
+    let penalties = 0;
+    let other_costs = 0;
+
+    for (const row of items) {
+        revenue += parseFloat(row.revenue);
+        refunds += parseFloat(row.refunds);
+        commission += parseFloat(row.commission);
+        logistics += parseFloat(row.logistics_to) + parseFloat(row.logistics_back);
+        storage += parseFloat(row.storage);
+        advertising += parseFloat(row.advertising_cpc) + parseFloat(row.advertising_other) + parseFloat(row.advertising_external);
+        acquiring += parseFloat(row.acquiring);
+        acceptance += parseFloat(row.acceptance);
+        penalties += parseFloat(row.penalties);
+        other_costs += parseFloat(row.other_costs);
+
+        if (row.total_cost_price !== null) {
+            costSum += parseFloat(row.total_cost_price);
+        } else {
+            hasMissingData = true;
+        }
+
+        const rowProfit = calcProfit(row);
+        if (rowProfit !== null) {
+            profitSum += rowProfit;
+        } else {
+            hasMissingData = true;
+        }
+    }
+
+    return {
+        revenue,
+        refunds,
+        total_cost_price: hasMissingData ? null : costSum,
+        commission,
+        logistics,
+        storage,
+        advertising,
+        acquiring,
+        acceptance,
+        penalties,
+        other_costs,
+        profit: hasMissingData ? null : profitSum,
+    };
+}
+
+const stickyStyle: React.CSSProperties = {
+    position: 'sticky',
+    left: 0,
+    background: 'var(--tblr-bg-surface)',
+    zIndex: 1,
+};
 
 const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoading }) => {
     if (isLoading) {
@@ -53,18 +130,25 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
         );
     }
 
+    const totals = calcTotals(items);
+
     return (
         <div className="table-responsive">
             <table className="table table-vcenter card-table">
                 <thead>
                     <tr>
-                        <th>Товар</th>
+                        <th style={stickyStyle}>Товар</th>
                         <th className="text-end">Выручка</th>
                         <th className="text-end">Возвраты</th>
-                        <th className="text-end">Продажи, шт</th>
-                        <th className="text-end">% выкупа</th>
-                        <th className="text-end">Себестоимость</th>
+                        <th className="text-end">Себест. итого</th>
+                        <th className="text-end">Комиссия МП</th>
+                        <th className="text-end">Логистика</th>
+                        <th className="text-end">Хранение</th>
                         <th className="text-end">Реклама</th>
+                        <th className="text-end">Эквайринг</th>
+                        <th className="text-end">Приёмка</th>
+                        <th className="text-end">Штрафы</th>
+                        <th className="text-end">Прочие</th>
                         <th className="text-end">Прибыль</th>
                         <th className="w-1"></th>
                     </tr>
@@ -72,25 +156,31 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                 <tbody>
                     {items.map((row) => {
                         const profit = calcProfit(row);
+                        const logistics = parseFloat(row.logistics_to) + parseFloat(row.logistics_back);
                         const advertising = parseFloat(row.advertising_cpc) + parseFloat(row.advertising_other) + parseFloat(row.advertising_external);
 
                         return (
                             <tr key={row.listing_id}>
-                                <td>
+                                <td style={stickyStyle}>
                                     <div>{row.listing_name || '\u2014'}</div>
                                     <div className="text-muted small">{row.marketplace_sku}</div>
                                 </td>
                                 <td className="text-end">{formatMoney(row.revenue)}</td>
                                 <td className="text-end text-red">{formatMoney(row.refunds)}</td>
-                                <td className="text-end">{row.sales_quantity.toLocaleString('ru-RU')}</td>
-                                <td className="text-end">{calcBuyoutRate(row)}</td>
                                 <td className="text-end">
-                                    {row.avg_cost_price !== null
-                                        ? formatMoney(row.avg_cost_price, 2)
+                                    {row.total_cost_price !== null
+                                        ? formatMoney(row.total_cost_price)
                                         : <span className="badge bg-muted-lt text-muted">Нет данных</span>
                                     }
                                 </td>
+                                <td className="text-end">{formatMoney(row.commission)}</td>
+                                <td className="text-end">{formatMoney(logistics)}</td>
+                                <td className="text-end">{formatMoney(row.storage)}</td>
                                 <td className="text-end">{formatMoney(advertising)}</td>
+                                <td className="text-end">{formatMoney(row.acquiring)}</td>
+                                <td className="text-end">{formatMoney(row.acceptance)}</td>
+                                <td className="text-end">{formatMoney(row.penalties)}</td>
+                                <td className="text-end">{formatMoney(row.other_costs)}</td>
                                 <td className="text-end">
                                     {profit !== null
                                         ? <span className={profit >= 0 ? 'text-green' : 'text-red'}>{formatMoney(profit)}</span>
@@ -106,6 +196,34 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                         );
                     })}
                 </tbody>
+                <tfoot>
+                    <tr className="fw-bold">
+                        <td style={stickyStyle}>Итого</td>
+                        <td className="text-end">{formatMoney(totals.revenue)}</td>
+                        <td className="text-end text-red">{formatMoney(totals.refunds)}</td>
+                        <td className="text-end">
+                            {totals.total_cost_price !== null
+                                ? formatMoney(totals.total_cost_price)
+                                : <span className="text-muted">{'\u2014'}</span>
+                            }
+                        </td>
+                        <td className="text-end">{formatMoney(totals.commission)}</td>
+                        <td className="text-end">{formatMoney(totals.logistics)}</td>
+                        <td className="text-end">{formatMoney(totals.storage)}</td>
+                        <td className="text-end">{formatMoney(totals.advertising)}</td>
+                        <td className="text-end">{formatMoney(totals.acquiring)}</td>
+                        <td className="text-end">{formatMoney(totals.acceptance)}</td>
+                        <td className="text-end">{formatMoney(totals.penalties)}</td>
+                        <td className="text-end">{formatMoney(totals.other_costs)}</td>
+                        <td className="text-end">
+                            {totals.profit !== null
+                                ? <span className={totals.profit >= 0 ? 'text-green' : 'text-red'}>{formatMoney(totals.profit)}</span>
+                                : <span className="text-muted">{'\u2014'}</span>
+                            }
+                        </td>
+                        <td></td>
+                    </tr>
+                </tfoot>
             </table>
         </div>
     );
