@@ -41,6 +41,16 @@ export function getDefaultDateRange(): { dateFrom: string; dateTo: string } {
     };
 }
 
+/**
+ * Диапазон дат для месяца: offset=0 → текущий, -1 → прошлый и т.д.
+ */
+export function getMonthRange(offset: number): { from: string; to: string } {
+    const today = new Date();
+    const first = new Date(today.getFullYear(), today.getMonth() + offset, 1);
+    const last = new Date(today.getFullYear(), today.getMonth() + offset + 1, 0);
+    return { from: toISODate(first), to: toISODate(last) };
+}
+
 function toISODate(d: Date): string {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');

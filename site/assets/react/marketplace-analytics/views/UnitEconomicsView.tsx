@@ -3,6 +3,7 @@ import type { UnitEconomicsRow, PortfolioSummary, UnitEconomicsMeta } from '../t
 import type { MarketplaceOption, RecalculateJobResponse } from '../types/analytics.types';
 import KpiCards from '../components/KpiCards';
 import UnitEconomicsTable from '../components/UnitEconomicsTable';
+import PeriodPresets from '../components/PeriodPresets';
 import RecalcModal from '../components/RecalcModal';
 
 interface UnitEconomicsViewProps {
@@ -47,6 +48,15 @@ const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
                     </div>
                 </div>
             </div>
+
+            <PeriodPresets
+                onSelect={(from, to) => {
+                    props.onDateFromChange(from);
+                    props.onDateToChange(to);
+                }}
+                currentFrom={props.dateFrom}
+                currentTo={props.dateTo}
+            />
 
             <div className="row g-2 mb-3">
                 <div className="col-auto">
