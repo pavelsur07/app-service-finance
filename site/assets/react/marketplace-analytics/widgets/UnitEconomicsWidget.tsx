@@ -30,7 +30,8 @@ function setFiltersToUrl(filters: Filters): void {
     if (filters.marketplace) params.set('marketplace', filters.marketplace);
     if (filters.dateFrom) params.set('from', filters.dateFrom);
     if (filters.dateTo) params.set('to', filters.dateTo);
-    window.history.replaceState(null, '', window.location.pathname + '?' + params.toString());
+    const search = params.toString();
+    window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
 }
 
 const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
@@ -39,6 +40,10 @@ const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
     const [filters, setFilters] = useState<Filters>(getFiltersFromUrl);
     const [page, setPage] = useState(1);
     const [recalcModalOpen, setRecalcModalOpen] = useState(false);
+
+    useEffect(() => {
+        setFiltersToUrl(filters);
+    }, [filters]);
 
     const { items, summary, meta, isLoading, isError } = useUnitEconomics({
         marketplace: filters.marketplace,
@@ -50,29 +55,17 @@ const UnitEconomicsWidget: React.FC<UnitEconomicsWidgetProps> = ({
     const recalc = useRecalculate();
 
     const handleMarketplaceChange = useCallback((mp: string) => {
-        setFilters((prev) => {
-            const next = { ...prev, marketplace: mp };
-            setFiltersToUrl(next);
-            return next;
-        });
+        setFilters((prev) => ({ ...prev, marketplace: mp }));
         setPage(1);
     }, []);
 
     const handleDateFromChange = useCallback((date: string) => {
-        setFilters((prev) => {
-            const next = { ...prev, dateFrom: date };
-            setFiltersToUrl(next);
-            return next;
-        });
+        setFilters((prev) => ({ ...prev, dateFrom: date }));
         setPage(1);
     }, []);
 
     const handleDateToChange = useCallback((date: string) => {
-        setFilters((prev) => {
-            const next = { ...prev, dateTo: date };
-            setFiltersToUrl(next);
-            return next;
-        });
+        setFilters((prev) => ({ ...prev, dateTo: date }));
         setPage(1);
     }, []);
 

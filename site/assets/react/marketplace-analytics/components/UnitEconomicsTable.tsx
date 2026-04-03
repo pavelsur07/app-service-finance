@@ -44,7 +44,6 @@ interface Totals {
 }
 
 function calcTotals(items: UnitEconomicsRow[]): Totals {
-    let profitSum = 0;
     let hasMissingData = false;
     let costSum = 0;
 
@@ -76,14 +75,9 @@ function calcTotals(items: UnitEconomicsRow[]): Totals {
         } else {
             hasMissingData = true;
         }
-
-        const rowProfit = calcProfit(row);
-        if (rowProfit !== null) {
-            profitSum += rowProfit;
-        } else {
-            hasMissingData = true;
-        }
     }
+
+    const profitSum = revenue - refunds - costSum - commission - logistics - storage - advertising - acquiring - acceptance - penalties - other_costs;
 
     return {
         revenue,
