@@ -94,8 +94,8 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 'json' => [
                     'filter' => [
                         'date' => [
-                            'from' => $fromDate->format('Y-m-d\TH:i:s.000\Z'),
-                            'to' => $toDate->format('Y-m-d\TH:i:s.000\Z'),
+                            'from' => $fromDate->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z'),
+                            'to' => $toDate->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z'),
                         ],
                         'transaction_type' => 'all',
                         'operation_type' => [],

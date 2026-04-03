@@ -90,8 +90,9 @@ final class SyncOzonReportHandler
             //$fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
             //$toDate   = new \DateTimeImmutable();
             // SYNC_PERIOD_DAYS = 3 — оставить как страховка
-            $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
-            $fromDate = $toDate;
+            $moscow   = new \DateTimeZone('Europe/Moscow');
+            $fromDate = new \DateTimeImmutable('yesterday', $moscow)->setTime(0, 0, 0);
+            $toDate   = new \DateTimeImmutable('yesterday', $moscow)->setTime(23, 59, 59);
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
