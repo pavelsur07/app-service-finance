@@ -85,6 +85,10 @@ class OzonAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Ozon connection not found');
         }
 
+        $utc           = new \DateTimeZone('UTC');
+        $fromFormatted = $fromDate->setTimezone($utc)->format('Y-m-d\TH:i:s.000\Z');
+        $toFormatted   = $toDate->setTimezone($utc)->format('Y-m-d\TH:i:s.000\Z');
+
         $allOperations = [];
         $page = 1;
 
@@ -94,8 +98,8 @@ class OzonAdapter implements MarketplaceAdapterInterface
                 'json' => [
                     'filter' => [
                         'date' => [
-                            'from' => $fromDate->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z'),
-                            'to' => $toDate->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d\TH:i:s.000\Z'),
+                            'from' => $fromFormatted,
+                            'to'   => $toFormatted,
                         ],
                         'transaction_type' => 'all',
                         'operation_type' => [],
