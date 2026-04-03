@@ -16,8 +16,8 @@ final class CreateMarketplaceAnalyticsAction
         // inject repositories, policies, etc.
     ) {}
 
-    public function __invoke(CreateMarketplaceAnalyticsRequest $request): void
+    public function __invoke(string $companyId, CreateMarketplaceAnalyticsRequest $request): void
     {
-        // TODO: Implement domain logic orchestration using $request
+        // TODO: Implement domain logic orchestration using $companyId and $request
     }
 }
