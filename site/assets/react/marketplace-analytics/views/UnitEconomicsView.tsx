@@ -24,6 +24,7 @@ interface UnitEconomicsViewProps {
     onMarketplaceChange: (mp: string) => void;
     onDateFromChange: (date: string) => void;
     onDateToChange: (date: string) => void;
+    onDateRangeChange: (from: string, to: string) => void;
     onPageChange: (page: number) => void;
     onOpenRecalcModal: () => void;
     onCloseRecalcModal: () => void;
@@ -50,10 +51,7 @@ const UnitEconomicsView: React.FC<UnitEconomicsViewProps> = (props) => {
             </div>
 
             <PeriodPresets
-                onSelect={(from, to) => {
-                    props.onDateFromChange(from);
-                    props.onDateToChange(to);
-                }}
+                onSelect={props.onDateRangeChange}
                 currentFrom={props.dateFrom}
                 currentTo={props.dateTo}
             />
