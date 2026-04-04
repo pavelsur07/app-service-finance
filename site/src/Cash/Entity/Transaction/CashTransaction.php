@@ -110,6 +110,9 @@ class CashTransaction
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $deleteReason = null;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $hasViolatedDocument = false;
+
     public function __construct(
         string $id,
         Company $company,
@@ -480,6 +483,16 @@ class CashTransaction
         $this->deletedAt = null;
         $this->deletedBy = null;
         $this->deleteReason = null;
+    }
+
+    public function isHasViolatedDocument(): bool
+    {
+        return $this->hasViolatedDocument;
+    }
+
+    public function markAsHavingViolatedDocument(): void
+    {
+        $this->hasViolatedDocument = true;
     }
 
     private function calculateRemainingAmount(?Document $excludingDocument): float
