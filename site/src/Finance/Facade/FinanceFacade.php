@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace App\Finance\Facade;
 
-use App\Finance\Enum\DocumentType;
+use App\Cash\Application\DTO\CreateDocumentCommand;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
+use App\Company\Repository\CounterpartyRepository;
+use App\Company\Repository\ProjectDirectionRepository;
 use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
 use App\Finance\Application\DeletePLDocumentAction;
+use App\Finance\Entity\Document;
+use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentStatus;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Repository\PLCategoryRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Публичный API модуля Finance для других модулей.
@@ -26,6 +35,11 @@ final class FinanceFacade
     public function __construct(
         private readonly CreatePLDocumentAction $createAction,
         private readonly DeletePLDocumentAction $deleteAction,
+        private readonly CashTransactionRepository $cashTransactionRepository,
+        private readonly CounterpartyRepository $counterpartyRepository,
+        private readonly ProjectDirectionRepository $projectDirectionRepository,
+        private readonly PLCategoryRepository $plCategoryRepository,
+        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -106,5 +120,74 @@ final class FinanceFacade
     public function deletePLDocument(string $companyId, string $documentId): void
     {
         ($this->deleteAction)($companyId, $documentId);
+    }
+
+    /**
+     * Создаёт Document + DocumentOperation из транзакции ДДС.
+     *
+     * Без flush() — flush выполняется в вызывающем Action.
+     *
+     * @throws \DomainException если транзакция не найдена или не принадлежит компании
+     * @throws \DomainException при IDOR-нарушении по контрагенту, проекту или категории
+     */
+    public function createDocumentFromCashTransaction(
+        string $companyId,
+        CreateDocumentCommand $command,
+    ): string {
+        $tx = $this->cashTransactionRepository->find($command->cashTransactionId);
+
+        if (!$tx || $tx->getCompany()->getId() !== $companyId) {
+            throw new \DomainException('Транзакция ДДС не найдена или не принадлежит компании.');
+        }
+
+        $counterparty = null;
+        if ($command->counterpartyId !== null) {
+            $counterparty = $this->counterpartyRepository->find($command->counterpartyId);
+            if (!$counterparty || $counterparty->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Контрагент не найден или не принадлежит компании.');
+            }
+        }
+
+        $projectDirection = null;
+        if ($command->projectDirectionId !== null) {
+            $projectDirection = $this->projectDirectionRepository->find($command->projectDirectionId);
+            if (!$projectDirection || $projectDirection->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Направление проекта не найдено или не принадлежит компании.');
+            }
+        }
+
+        $plCategory = null;
+        if ($command->plCategoryId !== null) {
+            $plCategory = $this->plCategoryRepository->find($command->plCategoryId);
+            if (!$plCategory || $plCategory->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Категория ОПиУ не найдена или не принадлежит компании.');
+            }
+        }
+
+        $document = new Document(Uuid::uuid4()->toString(), $tx->getCompany());
+        $document->setDate($command->occurredAt);
+        $document->setDescription($tx->getDescription());
+        $document->setCounterparty($counterparty);
+        $document->setProjectDirection($projectDirection);
+
+        if ($command->createdWithViolation) {
+            $document->markAsCreatedWithViolation();
+            $tx->markAsHavingViolatedDocument();
+        }
+
+        $operation = new DocumentOperation();
+        $operation->setAmount($command->amount);
+        $operation->setCounterparty($counterparty);
+        $operation->setProjectDirection($projectDirection);
+        $operation->setCategory($plCategory);
+        $document->addOperation($operation);
+
+        $tx->assertCanAllocateAmount((float) $command->amount);
+
+        $tx->addDocument($document);
+
+        $this->entityManager->persist($document);
+
+        return $document->getId();
     }
 }
