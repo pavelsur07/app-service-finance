@@ -182,6 +182,8 @@ final class FinanceFacade
         $operation->setCategory($plCategory);
         $document->addOperation($operation);
 
+        $tx->assertCanAllocateAmount((float) $command->amount);
+
         $tx->addDocument($document);
 
         $this->entityManager->persist($document);
