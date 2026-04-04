@@ -143,24 +143,24 @@ final class FinanceFacade
         $counterparty = null;
         if ($command->counterpartyId !== null) {
             $counterparty = $this->counterpartyRepository->find($command->counterpartyId);
-            if ($counterparty && $counterparty->getCompany()->getId() !== $companyId) {
-                throw new \DomainException('Контрагент не принадлежит компании.');
+            if (!$counterparty || $counterparty->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Контрагент не найден или не принадлежит компании.');
             }
         }
 
         $projectDirection = null;
         if ($command->projectDirectionId !== null) {
             $projectDirection = $this->projectDirectionRepository->find($command->projectDirectionId);
-            if ($projectDirection && $projectDirection->getCompany()->getId() !== $companyId) {
-                throw new \DomainException('Направление проекта не принадлежит компании.');
+            if (!$projectDirection || $projectDirection->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Направление проекта не найдено или не принадлежит компании.');
             }
         }
 
         $plCategory = null;
         if ($command->plCategoryId !== null) {
             $plCategory = $this->plCategoryRepository->find($command->plCategoryId);
-            if ($plCategory && $plCategory->getCompany()->getId() !== $companyId) {
-                throw new \DomainException('Категория ОПиУ не принадлежит компании.');
+            if (!$plCategory || $plCategory->getCompany()->getId() !== $companyId) {
+                throw new \DomainException('Категория ОПиУ не найдена или не принадлежит компании.');
             }
         }
 
@@ -172,6 +172,7 @@ final class FinanceFacade
 
         if ($command->createdWithViolation) {
             $document->markAsCreatedWithViolation();
+            $tx->markAsHavingViolatedDocument();
         }
 
         $operation = new DocumentOperation();
