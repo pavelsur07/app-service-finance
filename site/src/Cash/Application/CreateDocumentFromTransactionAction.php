@@ -87,8 +87,6 @@ final class CreateDocumentFromTransactionAction
             $command,
         );
 
-        $tx->markAsHavingViolatedDocument();
-
         $this->entityManager->flush();
 
         return new CreateDocumentResult(
