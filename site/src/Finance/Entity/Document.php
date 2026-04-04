@@ -66,6 +66,9 @@ class Document
     #[ORM\Column(enumType: PLDocumentStream::class, nullable: true)]
     private ?PLDocumentStream $stream = null;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $createdWithViolation = false;
+
     public function __construct(string $id, Company $company)
     {
         Assert::uuid($id);
@@ -241,5 +244,15 @@ class Document
     {
         $this->stream = $stream;
         return $this;
+    }
+
+    public function isCreatedWithViolation(): bool
+    {
+        return $this->createdWithViolation;
+    }
+
+    public function markAsCreatedWithViolation(): void
+    {
+        $this->createdWithViolation = true;
     }
 }
