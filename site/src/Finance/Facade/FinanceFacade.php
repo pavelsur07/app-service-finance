@@ -12,12 +12,14 @@ use App\Finance\Application\Command\CreatePLDocumentCommand;
 use App\Finance\Application\Command\CreatePLDocumentOperationCommand;
 use App\Finance\Application\CreatePLDocumentAction;
 use App\Finance\Application\DeletePLDocumentAction;
+use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Entity\Document;
 use App\Finance\Entity\DocumentOperation;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PLDocumentSource;
 use App\Finance\Enum\PLDocumentStream;
+use App\Finance\Repository\DocumentRepository;
 use App\Finance\Repository\PLCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
@@ -39,6 +41,8 @@ final class FinanceFacade
         private readonly CounterpartyRepository $counterpartyRepository,
         private readonly ProjectDirectionRepository $projectDirectionRepository,
         private readonly PLCategoryRepository $plCategoryRepository,
+        private readonly DocumentRepository $documentRepository,
+        private readonly PLRegisterUpdater $plRegisterUpdater,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -166,6 +170,7 @@ final class FinanceFacade
 
         $document = new Document(Uuid::uuid4()->toString(), $tx->getCompany());
         $document->setDate($command->occurredAt);
+        $document->setType(DocumentType::CASHFLOW_EXPENSE);
         $document->setDescription($tx->getDescription());
         $document->setCounterparty($counterparty);
         $document->setProjectDirection($projectDirection);
@@ -189,5 +194,22 @@ final class FinanceFacade
         $this->entityManager->persist($document);
 
         return $document->getId();
+    }
+
+    /**
+     * Обновляет PL-регистр за день документа.
+     * Вызывать после flush() в Action.
+     *
+     * @throws \DomainException если документ не найден
+     */
+    public function updatePLRegisterForDocument(string $documentId): void
+    {
+        $document = $this->documentRepository->find($documentId);
+
+        if (!$document) {
+            throw new \DomainException('Документ не найден.');
+        }
+
+        $this->plRegisterUpdater->updateForDocument($document);
     }
 }
