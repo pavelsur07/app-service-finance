@@ -120,6 +120,13 @@ createPLDocument(
 
 // Удалить PL-документ
 deletePLDocument(string $companyId, string $documentId): void
+
+// Создать Document + DocumentOperation из транзакции ДДС (без flush)
+// Бросает DomainException если tx не найдена / IDOR по любой из сущностей
+createDocumentFromCashTransaction(
+    string $companyId,
+    CreateDocumentCommand $command,  // App\Cash\Application\DTO\CreateDocumentCommand
+): string  // ID созданного Document
 ```
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
