@@ -127,6 +127,9 @@ createDocumentFromCashTransaction(
     string $companyId,
     CreateDocumentCommand $command,  // App\Cash\Application\DTO\CreateDocumentCommand
 ): string  // ID созданного Document
+
+// Обновить PL-регистр за день документа (вызывать после flush в Action)
+updatePLRegisterForDocument(string $documentId): void
 ```
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.

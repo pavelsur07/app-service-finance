@@ -51,6 +51,7 @@ final class CreateDocumentFromTransactionAction
             );
 
             $this->entityManager->flush();
+            $this->financeFacade->updatePLRegisterForDocument($documentId);
 
             return new CreateDocumentResult(
                 needsConfirmation: false,
@@ -88,6 +89,7 @@ final class CreateDocumentFromTransactionAction
         );
 
         $this->entityManager->flush();
+        $this->financeFacade->updatePLRegisterForDocument($documentId);
 
         return new CreateDocumentResult(
             needsConfirmation: false,
