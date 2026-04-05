@@ -91,7 +91,8 @@
 
 <div class="row g-3 mt-2 mb-4">
     <div class="col-12">
-        <div class="card cashflow-ops">
+        <div class="card cashflow-ops"
+             data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
             <div class="table-responsive">
                 <table class="table card-table table-vcenter">
                     <thead class="sticky-top">
@@ -110,11 +111,16 @@
                         <tr>
                             <td>{{ tx.occurredAt|date('d.m.Y') }}</td>
                             <td>{{ tx.moneyAccount ? tx.moneyAccount.name : '' }}</td>
-                            <td class="text-center text-nowrap">
-                                {% if tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
-                                    <i class="ti ti-file-plus" title="Создать документ ОПиУ на основании этой транзакции"></i>
-                                {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount == 0 and tx.documents is not empty %}
-                                    <i class="ti ti-file-check text-success" title="Документы ОПиУ уже созданы на всю сумму"></i>
+                            <td class="text-center text-nowrap" data-tx-id="{{ tx.id }}">
+                                {% if tx.isHasViolatedDocument %}
+                                    <i class="ti ti-alert-triangle text-warning"
+                                       title="Документ создан без полного маппинга категорий ОПиУ"></i>
+                                {% elseif tx.remainingAmount == 0 and tx.documents is not empty %}
+                                    <i class="ti ti-file-check text-success"
+                                       title="Документы ОПиУ созданы на всю сумму"></i>
+                                {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                                    <i class="ti ti-file-plus"
+                                       title="Можно создать документ ОПиУ"></i>
                                 {% else %}
                                     &nbsp;
                                 {% endif %}
@@ -161,6 +167,20 @@
                                         <i class="ti ti-settings-automation me-2"></i> Автоправило
                                         </button>
 
+                                        {% if not tx.isTransfer and tx.cashflowCategory and tx.cashflowCategory.allowPlDocument %}
+                                          {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
+                                          <button type="button"
+                                                  class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ createFromDisabled ? 'disabled' : '' }}"
+                                                  data-transaction-id="{{ tx.id }}"
+                                                  data-url="{{ path('cash_transaction_create_from', {id: tx.id}) }}"
+                                                  {% if createFromDisabled %}
+                                                    title="{{ tx.isHasViolatedDocument ? 'Сначала исправьте маппинг категорий ОПиУ' : 'Транзакция уже полностью разнесена' }}"
+                                                    disabled
+                                                  {% endif %}>
+                                            <i class="ti ti-copy"></i> Создать на основании
+                                          </button>
+                                        {% endif %}
+
                                         <div class="dropdown-divider"></div>
 
                                         <button type="button"
@@ -201,6 +221,36 @@
       </div>
       <div class="modal-body" id="autoRuleModalBody">
         <div class="text-muted">Загрузка…</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="createFromWarningModal"
+     tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="ti ti-alert-triangle text-warning me-2"></i>
+          Создание без маппинга категории ОПиУ
+        </h5>
+        <button type="button" class="btn-close"
+                data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p id="createFromWarningBody" class="mb-0"></p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary"
+                data-bs-dismiss="modal">Отмена</button>
+        <form id="createFromConfirmForm" method="post" class="d-inline">
+          <input type="hidden" name="_token" id="createFromCsrfToken">
+          <input type="hidden" name="confirmed" value="1">
+          <button type="submit" class="btn btn-warning">
+            Продолжить
+          </button>
+        </form>
       </div>
     </div>
   </div>
@@ -282,5 +332,141 @@
         }
       }, { once: true });
     });
+    </script>
+    <script>
+    (function () {
+      const csrfContainer = document.querySelector('.cashflow-ops');
+      const csrfToken = csrfContainer ? csrfContainer.dataset.csrfToken : '';
+
+      // --- helpers ---
+
+      function showFlash(message, type = 'success') {
+        const card = document.querySelector('.cashflow-ops');
+        if (!card) return;
+        const div = document.createElement('div');
+        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3';
+        const text = document.createElement('span');
+        text.textContent = message;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.setAttribute('data-bs-dismiss', 'alert');
+        div.appendChild(text);
+        div.appendChild(closeBtn);
+        card.before(div);
+      }
+
+      function updateRowIcon(txId, state) {
+        const td = document.querySelector('[data-tx-id="' + txId + '"]');
+        if (!td) return;
+        if (state === 'success') {
+          td.innerHTML = '<i class="ti ti-file-check text-success"'
+            + ' title="Документы ОПиУ созданы на всю сумму"></i>';
+        } else if (state === 'warning') {
+          td.innerHTML = '<i class="ti ti-alert-triangle text-warning"'
+            + ' title="Документ создан без полного маппинга категорий ОПиУ"></i>';
+        }
+      }
+
+      function disableCreateFromButton(txId) {
+        const btn = document.querySelector(
+          '.js-create-from[data-transaction-id="' + txId + '"]'
+        );
+        if (btn) {
+          btn.classList.add('disabled');
+          btn.disabled = true;
+        }
+      }
+
+      // --- клик "Создать на основании" (event delegation) ---
+
+      document.addEventListener('click', async function (e) {
+        const btn = e.target.closest('.js-create-from');
+        if (!btn || btn.classList.contains('disabled')) return;
+        e.preventDefault();
+
+        const url  = btn.dataset.url;
+        const txId = btn.dataset.transactionId;
+
+        let data;
+        try {
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            body: new URLSearchParams({ _token: csrfToken, confirmed: '0' }),
+          });
+          data = await res.json();
+        } catch (err) {
+          showFlash('Ошибка: не удалось выполнить запрос.', 'danger');
+          return;
+        }
+
+        if (data.error) {
+          showFlash('Ошибка: ' + data.message, 'danger');
+          return;
+        }
+
+        if (data.needsConfirmation) {
+          document.getElementById('createFromWarningBody').textContent =
+            data.warningMessage;
+          document.getElementById('createFromConfirmForm').action = url;
+          document.getElementById('createFromCsrfToken').value = csrfToken;
+          document.getElementById('createFromConfirmForm')
+            .dataset.txId = txId;
+          bootstrap.Modal.getOrCreateInstance(
+            document.getElementById('createFromWarningModal')
+          ).show();
+          return;
+        }
+
+        // Сценарий A — тихое создание
+        if (data.success) {
+          showFlash(data.flash ?? 'Документ ОПиУ создан.');
+          updateRowIcon(txId, 'success');
+          disableCreateFromButton(txId);
+        }
+      });
+
+      // --- submit формы подтверждения (сценарий B) ---
+
+      document.getElementById('createFromConfirmForm')
+        .addEventListener('submit', async function (e) {
+          e.preventDefault();
+          const form = e.target;
+          const txId = form.dataset.txId;
+
+          let data;
+          try {
+            const res = await fetch(form.action, {
+              method: 'POST',
+              headers: { 'X-Requested-With': 'XMLHttpRequest' },
+              body: new FormData(form),
+            });
+            data = await res.json();
+          } catch (err) {
+            bootstrap.Modal.getOrCreateInstance(
+              document.getElementById('createFromWarningModal')
+            ).hide();
+            showFlash('Ошибка: не удалось создать документ.', 'danger');
+            return;
+          }
+
+          bootstrap.Modal.getOrCreateInstance(
+            document.getElementById('createFromWarningModal')
+          ).hide();
+
+          if (data.error) {
+            showFlash('Ошибка: ' + data.message, 'danger');
+            return;
+          }
+
+          if (data.redirect) {
+            updateRowIcon(txId, 'warning');
+            disableCreateFromButton(txId);
+            window.open(data.redirect, '_blank');
+          }
+        });
+
+    }());
     </script>
 {% endblock %}
