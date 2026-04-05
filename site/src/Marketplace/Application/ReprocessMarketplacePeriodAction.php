@@ -23,6 +23,12 @@ use Psr\Log\LoggerInterface;
  *   'sales_report' — только продажи / возвраты / затраты
  *   'realization'  — только реализация Ozon
  *
+ * Daily pipeline-контракт:
+ *   - обязательные шаги daily run: sales, returns, costs;
+ *   - документ считается полностью проведённым только при успехе всех обязательных шагов;
+ *   - failure любого шага означает неполное проведение документа;
+ *   - текущий ручной reprocess-flow сохраняется как fallback/admin.
+ *
  * НЕ снимает pl_document_id у ozon_realizations автоматически —
  * это задача ReopenMonthStageAction при переоткрытии месяца.
  * Команда только переобрабатывает сырые данные.

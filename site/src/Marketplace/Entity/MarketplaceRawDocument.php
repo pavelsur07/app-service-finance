@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
@@ -8,6 +10,15 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
 
+/**
+ * Baseline-контракт источника данных Marketplace pipeline.
+ *
+ * Raw document = неизменяемый снимок ответа API маркетплейса за период,
+ * из которого запускаются попытки обработки (processing runs).
+ *
+ * Для daily raw pipeline используются только документы типа sales_report.
+ * Документы типа realization остаются в отдельном (monthly/fallback) потоке.
+ */
 #[ORM\Entity(repositoryClass: MarketplaceRawDocumentRepository::class)]
 #[ORM\Table(name: 'marketplace_raw_documents')]
 #[ORM\Index(columns: ['company_id', 'synced_at'], name: 'idx_company_synced')]

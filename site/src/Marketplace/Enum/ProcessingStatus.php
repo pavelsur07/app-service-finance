@@ -1,9 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Enum;
 
 /**
  * ProcessingStatus - статусы обработки staging записей
+ *
+ * Инвариант контракта pipeline:
+ * failed step означает, что raw document не проведён полностью.
  */
 enum ProcessingStatus: string
 {
