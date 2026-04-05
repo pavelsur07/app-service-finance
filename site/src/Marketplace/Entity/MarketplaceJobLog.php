@@ -16,6 +16,11 @@ use Webmozart\Assert\Assert;
  *
  * summary — краткая статистика: {created: 3, skipped: 0, errors: 1}
  * details — список проблемных записей: [{sku: '123', reason: 'not found'}, ...]
+ *
+ * Контракт baseline/target:
+ * - processing run = одна попытка полного проведения raw document в рамках pipeline;
+ * - step run = один шаг внутри processing run (sales|returns|costs);
+ * - failed step => processing run считается неуспешным.
  */
 #[ORM\Entity(repositoryClass: MarketplaceJobLogRepository::class)]
 #[ORM\Table(name: 'marketplace_job_logs')]

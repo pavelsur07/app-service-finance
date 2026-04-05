@@ -379,10 +379,12 @@
         modalEl.classList.add('show');
         modalEl.style.display = 'block';
         document.body.classList.add('modal-open');
-        const backdrop = document.createElement('div');
-        backdrop.className = 'modal-backdrop fade show';
-        backdrop.id = 'createFromBackdrop';
-        document.body.appendChild(backdrop);
+        if (!document.getElementById('createFromBackdrop')) {
+          const backdrop = document.createElement('div');
+          backdrop.className = 'modal-backdrop fade show';
+          backdrop.id = 'createFromBackdrop';
+          document.body.appendChild(backdrop);
+        }
       }
 
       function hideCreateFromModal() {
@@ -394,9 +396,9 @@
         document.getElementById('createFromBackdrop')?.remove();
       }
 
-      document.querySelector(
+      document.querySelectorAll(
         '#createFromWarningModal [data-bs-dismiss="modal"]'
-      )?.addEventListener('click', hideCreateFromModal);
+      ).forEach(el => el.addEventListener('click', hideCreateFromModal));
 
       function disableCreateFromButton(txId) {
         const btn = document.querySelector(
