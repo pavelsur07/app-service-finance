@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Domain\ValueObject;
 
 use App\Marketplace\Enum\PipelineStep;
+use Webmozart\Assert\Assert;
 
 /**
  * Профиль обработки raw-документа маркетплейса.
@@ -33,6 +34,9 @@ final readonly class MarketplaceRawProcessingProfile
      */
     public static function daily(array $requiredSteps): self
     {
+        Assert::notEmpty($requiredSteps);
+        Assert::allIsInstanceOf($requiredSteps, PipelineStep::class);
+
         return new self(
             isDailyPipeline: true,
             requiredSteps: $requiredSteps,

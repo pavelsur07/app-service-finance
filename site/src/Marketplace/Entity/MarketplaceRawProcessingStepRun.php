@@ -33,8 +33,8 @@ class MarketplaceRawProcessingStepRun
     #[ORM\Column(type: 'string', enumType: PipelineStatus::class)]
     private PipelineStatus $status;
 
-    #[ORM\Column(type: 'datetime_immutable')]
-    private \DateTimeImmutable $startedAt;
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $startedAt = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $finishedAt = null;
@@ -73,7 +73,6 @@ class MarketplaceRawProcessingStepRun
         $this->processingRunId = $processingRunId;
         $this->step = $step;
         $this->status = PipelineStatus::PENDING;
-        $this->startedAt = new \DateTimeImmutable();
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -94,6 +93,14 @@ class MarketplaceRawProcessingStepRun
         ?array $createdEntitiesJson = null,
         ?array $detailsJson = null,
     ): void {
+        if ($this->status !== PipelineStatus::RUNNING) {
+            throw new \DomainException('Step run must be in RUNNING state to be marked completed.');
+        }
+
+        Assert::greaterThanEq($processedCount, 0);
+        Assert::greaterThanEq($failedCount, 0);
+        Assert::greaterThanEq($skippedCount, 0);
+
         $this->status = PipelineStatus::COMPLETED;
         $this->finishedAt = new \DateTimeImmutable();
         $this->processedCount = $processedCount;
@@ -111,7 +118,14 @@ class MarketplaceRawProcessingStepRun
         int $skippedCount = 0,
         ?array $detailsJson = null,
     ): void {
+        if ($this->status->isTerminal()) {
+            throw new \DomainException('Cannot fail a terminal step run.');
+        }
+
         Assert::notEmpty($errorMessage);
+        Assert::greaterThanEq($processedCount, 0);
+        Assert::greaterThanEq($failedCount, 0);
+        Assert::greaterThanEq($skippedCount, 0);
 
         $this->status = PipelineStatus::FAILED;
         $this->finishedAt = new \DateTimeImmutable();
@@ -127,7 +141,7 @@ class MarketplaceRawProcessingStepRun
     public function getProcessingRunId(): string { return $this->processingRunId; }
     public function getStep(): PipelineStep { return $this->step; }
     public function getStatus(): PipelineStatus { return $this->status; }
-    public function getStartedAt(): \DateTimeImmutable { return $this->startedAt; }
+    public function getStartedAt(): ?\DateTimeImmutable { return $this->startedAt; }
     public function getFinishedAt(): ?\DateTimeImmutable { return $this->finishedAt; }
     public function getProcessedCount(): int { return $this->processedCount; }
     public function getFailedCount(): int { return $this->failedCount; }

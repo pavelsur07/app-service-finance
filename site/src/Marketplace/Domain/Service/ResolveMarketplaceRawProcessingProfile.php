@@ -23,6 +23,10 @@ final readonly class ResolveMarketplaceRawProcessingProfile
     private const DOCUMENT_TYPE_SALES_REPORT = 'sales_report';
     private const DOCUMENT_TYPE_REALIZATION  = 'realization';
 
+    /**
+     * @param MarketplaceType $marketplace Reserved for marketplace-specific profile overrides in the future.
+     *                                     Currently all marketplaces share the same profile per documentType.
+     */
     public function resolve(MarketplaceType $marketplace, string $documentType): MarketplaceRawProcessingProfile
     {
         return match ($documentType) {
