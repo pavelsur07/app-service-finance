@@ -112,6 +112,19 @@ class MarketplaceRawProcessingRun
         $this->details = $details;
     }
 
+    public function resetForRetry(): void
+    {
+        if ($this->status !== PipelineStatus::FAILED) {
+            throw new \DomainException('Only FAILED runs can be reset for retry.');
+        }
+
+        $this->status = PipelineStatus::RUNNING;
+        $this->finishedAt = null;
+        $this->lastErrorMessage = null;
+        $this->summary = null;
+        $this->details = null;
+    }
+
     public function getId(): string { return $this->id; }
     public function getCompanyId(): string { return $this->companyId; }
     public function getRawDocumentId(): string { return $this->rawDocumentId; }
