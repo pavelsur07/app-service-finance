@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Message\StartMarketplaceRawProcessingMessage;
 use App\Marketplace\Repository\MarketplaceRawProcessingRunRepository;
 use App\Marketplace\Repository\MarketplaceRawProcessingStepRunRepository;
@@ -62,6 +63,10 @@ final class StartMarketplaceRawProcessingHandler
         }
 
         foreach ($stepRuns as $stepRun) {
+            if ($stepRun->getStatus() !== PipelineStatus::PENDING) {
+                continue;
+            }
+
             try {
                 $stepRun->markRunning();
                 $this->bus->dispatch(new ProcessMarketplaceRawDocumentCommand(
