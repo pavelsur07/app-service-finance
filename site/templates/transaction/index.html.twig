@@ -168,7 +168,7 @@
                                         <i class="ti ti-settings-automation me-2"></i> Автоправило
                                         </button>
 
-                                        {% if not tx.isTransfer %}
+                                        {% if not tx.isTransfer and tx.cashflowCategory and tx.cashflowCategory.allowPlDocument %}
                                           <button type="button"
                                                   class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ tx.remainingAmount <= 0 ? 'disabled' : '' }}"
                                                   data-transaction-id="{{ tx.id }}"
