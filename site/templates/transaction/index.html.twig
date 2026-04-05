@@ -118,7 +118,7 @@
                                 {% elseif tx.remainingAmount == 0 and tx.documents is not empty %}
                                     <i class="ti ti-file-check text-success"
                                        title="Документы ОПиУ созданы на всю сумму"></i>
-                                {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                                {% elseif not tx.isTransfer and tx.remainingAmount > 0 %}
                                     <i class="ti ti-file-plus"
                                        title="Можно создать документ ОПиУ"></i>
                                 {% else %}
