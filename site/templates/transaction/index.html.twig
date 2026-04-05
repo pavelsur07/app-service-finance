@@ -167,7 +167,7 @@
                                         <i class="ti ti-settings-automation me-2"></i> Автоправило
                                         </button>
 
-                                        {% if not tx.isTransfer and tx.cashflowCategory and tx.cashflowCategory.allowPlDocument %}
+                                        {% if not tx.isTransfer %}
                                           {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
                                           <button type="button"
                                                   class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ createFromDisabled ? 'disabled' : '' }}"
