@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\Command\RetryMarketplaceRawProcessingCommand;
+use App\Marketplace\Application\Command\RetryMarketplaceRawProcessingStepCommand;
 use App\Marketplace\Application\ProcessOzonRealizationAction;
 use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
+use App\Marketplace\Application\RetryMarketplaceRawProcessingAction;
+use App\Marketplace\Application\RetryMarketplaceRawProcessingStepAction;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -455,6 +459,50 @@ class MarketplaceController extends AbstractController
             }
         } catch (\Exception $e) {
             $this->addFlash('error', 'Ошибка обработки реализации: ' . $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/run/{runId}/retry', name: 'marketplace_run_retry', methods: ['POST'])]
+    public function retryRun(
+        string $runId,
+        RetryMarketplaceRawProcessingAction $action,
+    ): Response {
+        $company = $this->companyService->getActiveCompany();
+
+        try {
+            ($action)(new RetryMarketplaceRawProcessingCommand(
+                companyId:       (string) $company->getId(),
+                processingRunId: $runId,
+            ));
+
+            $this->addFlash('success', 'Повторный запуск pipeline запущен.');
+        } catch (\DomainException $e) {
+            $this->addFlash('error', $e->getMessage());
+        }
+
+        return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/run/{runId}/step/{stepId}/retry', name: 'marketplace_run_step_retry', methods: ['POST'])]
+    public function retryRunStep(
+        string $runId,
+        string $stepId,
+        RetryMarketplaceRawProcessingStepAction $action,
+    ): Response {
+        $company = $this->companyService->getActiveCompany();
+
+        try {
+            ($action)(new RetryMarketplaceRawProcessingStepCommand(
+                companyId:       (string) $company->getId(),
+                processingRunId: $runId,
+                stepRunId:       $stepId,
+            ));
+
+            $this->addFlash('success', 'Повторный запуск шага запущен.');
+        } catch (\DomainException $e) {
+            $this->addFlash('error', $e->getMessage());
         }
 
         return $this->redirectToRoute('marketplace_index');

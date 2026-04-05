@@ -136,6 +136,21 @@ class MarketplaceRawProcessingStepRun
         $this->detailsJson = $detailsJson;
     }
 
+    public function resetForRetry(): void
+    {
+        if ($this->status !== PipelineStatus::FAILED) {
+            throw new \DomainException('Only FAILED step runs can be retried.');
+        }
+
+        $this->status = PipelineStatus::PENDING;
+        $this->startedAt = null;
+        $this->finishedAt = null;
+        $this->errorMessage = null;
+        $this->processedCount = 0;
+        $this->failedCount = 0;
+        $this->skippedCount = 0;
+    }
+
     public function getId(): string { return $this->id; }
     public function getCompanyId(): string { return $this->companyId; }
     public function getProcessingRunId(): string { return $this->processingRunId; }
