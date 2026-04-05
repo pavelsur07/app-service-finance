@@ -36,6 +36,7 @@
                 {% if run.status == 'failed' %}
                     <div class="card-actions">
                         <form method="post" action="{{ path('marketplace_run_retry', {runId: run.id}) }}">
+                            <input type="hidden" name="_token" value="{{ csrf_token('retry' ~ run.id) }}">
                             <button type="submit" class="btn btn-danger btn-sm"
                                     onclick="return confirm('Повторить весь pipeline? Будут перезапущены только FAILED шаги.')">
                                 Повторить весь run
@@ -145,6 +146,7 @@
                                         <form method="post"
                                               action="{{ path('marketplace_run_step_retry', {runId: run.id, stepId: step.id}) }}"
                                               style="display:inline">
+                                            <input type="hidden" name="_token" value="{{ csrf_token('retry_step' ~ step.id) }}">
                                             <button type="submit" class="btn btn-sm btn-danger"
                                                     onclick="return confirm('Повторить шаг {{ step_label[step.step] ?? step.step }}?')">
                                                 Retry

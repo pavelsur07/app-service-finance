@@ -496,9 +496,14 @@ class MarketplaceController extends AbstractController
     #[Route('/run/{runId}/retry', name: 'marketplace_run_retry', methods: ['POST'])]
     public function retryRun(
         string $runId,
+        Request $request,
         RetryMarketplaceRawProcessingAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('retry' . $runId, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
 
         try {
             ($action)(new RetryMarketplaceRawProcessingCommand(
@@ -518,9 +523,14 @@ class MarketplaceController extends AbstractController
     public function retryRunStep(
         string $runId,
         string $stepId,
+        Request $request,
         RetryMarketplaceRawProcessingStepAction $action,
     ): Response {
         $company = $this->companyService->getActiveCompany();
+
+        if (!$this->isCsrfTokenValid('retry_step' . $stepId, $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
 
         try {
             ($action)(new RetryMarketplaceRawProcessingStepCommand(
