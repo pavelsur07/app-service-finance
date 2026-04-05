@@ -31,6 +31,9 @@ framework:
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\StartMarketplaceRawProcessingMessage': async
+            # ProcessMarketplaceRawDocumentCommand dispatched async из StartMarketplaceRawProcessingHandler.
+            # Ручной flow (ReprocessMarketplacePeriodAction) вызывает ProcessMarketplaceRawDocumentAction
+            # напрямую, минуя bus — это изменение не влияет на ручной flow.
             'App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand': async
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
             'App\Catalog\Message\ImportProductsMessage': async

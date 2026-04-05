@@ -71,7 +71,7 @@ final class StartMarketplaceRawProcessingAction
             $doc->getMarketplace(),
             $doc->getDocumentType(),
             $cmd->trigger,
-            $doc->getDocumentType(),
+            $doc->getDocumentType(), // profileCode: для daily flow совпадает с documentType
         );
         $this->entityManager->persist($run);
 
