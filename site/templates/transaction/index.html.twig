@@ -296,7 +296,7 @@
       bodyEl.innerHTML = '<div class="text-muted">Загрузка…</div>';
 
       // Показ модалки (Tabler/Bootstrap 5)
-      const modal = window.bootstrap?.Modal.getOrCreateInstance(modalEl);
+      const modal = window.bootstrap?.Modal?.getOrCreateInstance(modalEl);
       modal?.show();
 
       try {
