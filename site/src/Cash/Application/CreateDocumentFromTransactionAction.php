@@ -29,6 +29,9 @@ final class CreateDocumentFromTransactionAction
         }
 
         $category = $tx->getCashflowCategory();
+        if ($category !== null && !$category->isAllowPlDocument()) {
+            throw new \DomainException('Для этой категории ДДС создание документов ОПиУ запрещено.');
+        }
         $plCategory = $category?->getPlCategory();
         $hasPLCategory = ($plCategory !== null);
 
