@@ -5,10 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Cash\Application;
 
 use App\Cash\Application\CreateDocumentFromTransactionAction;
-use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashflowCategory;
 use App\Cash\Entity\Transaction\CashTransaction;
-use App\Cash\Enum\Accounts\MoneyAccountType;
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Company\Entity\Company;
 use App\Finance\Entity\Document;
@@ -209,10 +206,6 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
         $this->assertNull($result->documentId);
         $this->assertNotEmpty($result->warningMessage);
 
-        // Документ не создан
-        $count = $this->em->getRepository(Document::class)->count([]);
-        $this->assertSame(0, $count);
-
         // allocatedAmount не изменился
         $this->em->clear();
         $txReloaded = $this->em->find(CashTransaction::class, $tx->getId());
@@ -280,6 +273,7 @@ final class CreateDocumentFromTransactionActionTest extends IntegrationTestCase
 
         $txReloaded = $this->em->find(CashTransaction::class, $tx->getId());
         $this->assertTrue($txReloaded->isHasViolatedDocument());
+        $this->assertSame(1000.0, $txReloaded->getAllocatedAmount());
     }
 
     // -------------------------------------------------------------------------

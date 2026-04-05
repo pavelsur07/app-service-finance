@@ -417,6 +417,10 @@
         }
 
         if (data.needsConfirmation) {
+          // Документ ещё не создан — разблокируем кнопку, чтобы пользователь
+          // мог повторить действие если закроет модалку без подтверждения
+          btn.classList.remove('disabled');
+          btn.disabled = false;
           document.getElementById('createFromWarningBody').textContent =
             data.warningMessage;
           document.getElementById('createFromConfirmForm').action = url;

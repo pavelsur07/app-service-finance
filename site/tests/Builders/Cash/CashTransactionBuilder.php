@@ -59,6 +59,11 @@ final class CashTransactionBuilder
     {
         $clone = clone $this;
         $clone->company = $company;
+        // пересоздаём account чтобы он принадлежал той же компании
+        $clone->moneyAccount = MoneyAccountBuilder::aMoneyAccount()
+            ->withId(Uuid::uuid4()->toString())
+            ->forCompany($company)
+            ->build();
 
         return $clone;
     }
