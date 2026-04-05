@@ -13,6 +13,14 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
+/**
+ * Выполняет один step run для указанного raw document.
+ *
+ * Целевой контракт daily pipeline:
+ * - покрывает только шаги sales / returns / costs;
+ * - реализация (realization) намеренно исключена из daily pipeline;
+ * - retry шага допустим и не должен менять контракт существующего ручного flow.
+ */
 #[AsMessageHandler]
 final readonly class ProcessMarketplaceRawDocumentAction
 {

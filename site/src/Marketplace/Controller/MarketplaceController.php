@@ -326,6 +326,12 @@ class MarketplaceController extends AbstractController
         return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => JSON_PRETTY_PRINT]);
     }
 
+    /**
+     * Ручные шаги проведения raw документа.
+     *
+     * В рамках целевого daily pipeline эти кнопки остаются fallback/admin flow
+     * и не удаляются до отдельного решения по миграции UX.
+     */
     #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
     public function processSales(
         string $id,

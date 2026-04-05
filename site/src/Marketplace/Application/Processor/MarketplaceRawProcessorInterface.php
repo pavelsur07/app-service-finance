@@ -11,6 +11,10 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 #[AutoconfigureTag('app.marketplace.raw_processor')]
 interface MarketplaceRawProcessorInterface
 {
+    /**
+     * Контракт не меняем: существующие raw processors остаются совместимыми.
+     * Daily pipeline оркестрирует уже имеющиеся процессоры без изменения их runtime-поведения.
+     */
     public function supports(string|StagingRecordType $type, MarketplaceType $marketplace, string $kind = ''): bool;
 
     public function process(string $companyId, string $rawDocId): int;

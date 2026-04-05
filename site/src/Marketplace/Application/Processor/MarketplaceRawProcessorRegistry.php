@@ -42,6 +42,8 @@ final readonly class MarketplaceRawProcessorRegistry implements MarketplaceRawPr
         MarketplaceType $marketplace,
         ProcessingKind $kind,
     ): int {
+        // Baseline: ретраи и повторные запуски используют тот же registry-контракт,
+        // без переключения на альтернативные processor-реализации.
         $docs = $this->rawDocumentRepository->findByCompanyAndMarketplace($companyId, $marketplace);
 
         if ($docs === []) {
