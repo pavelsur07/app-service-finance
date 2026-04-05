@@ -58,18 +58,6 @@ final class FinalizeMarketplaceRawProcessingAction
         // 3. Загрузить все шаги run
         $stepRuns = $this->stepRunRepository->findByRunId($cmd->companyId, $cmd->processingRunId);
 
-        if (empty($stepRuns)) {
-            // Шагов нет — run тривиально завершён (warning, но не ошибка)
-            $this->logger->warning('[Finalize] No step runs found, completing run immediately', [
-                'processing_run_id' => $cmd->processingRunId,
-            ]);
-
-            $run->markCompleted(['steps_total' => 0, 'steps_completed' => 0, 'steps_failed' => 0]);
-            $this->entityManager->flush();
-
-            return;
-        }
-
         // 4. Проверить: все ли шаги в terminal-статусе?
         foreach ($stepRuns as $stepRun) {
             if (!$stepRun->getStatus()->isTerminal()) {
@@ -125,19 +113,20 @@ final class FinalizeMarketplaceRawProcessingAction
      */
     private function buildSummary(array $stepRuns, array $failedStepRuns): array
     {
+        $totals = array_reduce(
+            $stepRuns,
+            static function (array $carry, MarketplaceRawProcessingStepRun $sr): array {
+                $carry['total_processed'] += $sr->getProcessedCount();
+                $carry['total_failed']    += $sr->getFailedCount();
+                $carry['total_skipped']   += $sr->getSkippedCount();
+
+                return $carry;
+            },
+            ['total_processed' => 0, 'total_failed' => 0, 'total_skipped' => 0],
+        );
+
         return [
-            'total_processed' => (int) array_sum(array_map(
-                static fn(MarketplaceRawProcessingStepRun $sr) => $sr->getProcessedCount(),
-                $stepRuns,
-            )),
-            'total_failed' => (int) array_sum(array_map(
-                static fn(MarketplaceRawProcessingStepRun $sr) => $sr->getFailedCount(),
-                $stepRuns,
-            )),
-            'total_skipped' => (int) array_sum(array_map(
-                static fn(MarketplaceRawProcessingStepRun $sr) => $sr->getSkippedCount(),
-                $stepRuns,
-            )),
+            ...$totals,
             'steps_total'     => count($stepRuns),
             'steps_completed' => count($stepRuns) - count($failedStepRuns),
             'steps_failed'    => count($failedStepRuns),
