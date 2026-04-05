@@ -175,6 +175,7 @@
                                                   data-url="{{ path('cash_transaction_create_from', {id: tx.id}) }}"
                                                   {% if tx.remainingAmount <= 0 %}
                                                     title="Транзакция уже полностью разнесена"
+                                                    disabled
                                                   {% endif %}>
                                             <i class="ti ti-copy"></i> Создать на основании
                                           </button>
@@ -339,14 +340,19 @@
 
       // --- helpers ---
 
-      function showFlash(message) {
+      function showFlash(message, type = 'success') {
         const card = document.querySelector('.cashflow-ops');
         if (!card) return;
         const div = document.createElement('div');
-        div.className = 'alert alert-success alert-dismissible fade show mb-3';
-        div.innerHTML = message
-          + '<button type="button" class="btn-close"'
-          + ' data-bs-dismiss="alert"></button>';
+        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3';
+        const text = document.createElement('span');
+        text.textContent = message;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'btn-close';
+        closeBtn.setAttribute('data-bs-dismiss', 'alert');
+        div.appendChild(text);
+        div.appendChild(closeBtn);
         card.before(div);
       }
 
@@ -366,7 +372,10 @@
         const btn = document.querySelector(
           '.js-create-from[data-transaction-id="' + txId + '"]'
         );
-        if (btn) btn.classList.add('disabled');
+        if (btn) {
+          btn.classList.add('disabled');
+          btn.disabled = true;
+        }
       }
 
       // --- клик "Создать на основании" (event delegation) ---
@@ -388,12 +397,12 @@
           });
           data = await res.json();
         } catch (err) {
-          showFlash('<strong>Ошибка:</strong> не удалось выполнить запрос.');
+          showFlash('Ошибка: не удалось выполнить запрос.', 'danger');
           return;
         }
 
         if (data.error) {
-          showFlash('<strong>Ошибка:</strong> ' + data.message);
+          showFlash('Ошибка: ' + data.message, 'danger');
           return;
         }
 
@@ -438,7 +447,7 @@
             bootstrap.Modal.getOrCreateInstance(
               document.getElementById('createFromWarningModal')
             ).hide();
-            showFlash('<strong>Ошибка:</strong> не удалось создать документ.');
+            showFlash('Ошибка: не удалось создать документ.', 'danger');
             return;
           }
 
@@ -447,14 +456,14 @@
           ).hide();
 
           if (data.error) {
-            showFlash('<strong>Ошибка:</strong> ' + data.message);
+            showFlash('Ошибка: ' + data.message, 'danger');
             return;
           }
 
           if (data.redirect) {
             updateRowIcon(txId, 'warning');
             disableCreateFromButton(txId);
-            window.open(data.redirect, '_blank');
+            location.href = data.redirect;
           }
         });
 
