@@ -118,7 +118,7 @@
                                 {% elseif tx.remainingAmount == 0 and tx.documents is not empty %}
                                     <i class="ti ti-file-check text-success"
                                        title="Документы ОПиУ созданы на всю сумму"></i>
-                                {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
+                                {% elseif not tx.isTransfer and tx.remainingAmount > 0 %}
                                     <i class="ti ti-file-plus"
                                        title="Можно создать документ ОПиУ"></i>
                                 {% else %}
@@ -296,7 +296,7 @@
       bodyEl.innerHTML = '<div class="text-muted">Загрузка…</div>';
 
       // Показ модалки (Tabler/Bootstrap 5)
-      const modal = window.bootstrap?.Modal.getOrCreateInstance(modalEl);
+      const modal = window.bootstrap?.Modal?.getOrCreateInstance(modalEl);
       modal?.show();
 
       try {
@@ -427,9 +427,9 @@
           document.getElementById('createFromCsrfToken').value = csrfToken;
           document.getElementById('createFromConfirmForm')
             .dataset.txId = txId;
-          bootstrap.Modal.getOrCreateInstance(
+          window.bootstrap?.Modal?.getOrCreateInstance(
             document.getElementById('createFromWarningModal')
-          ).show();
+          )?.show();
           return;
         }
 
@@ -458,16 +458,16 @@
             });
             data = await res.json();
           } catch (err) {
-            bootstrap.Modal.getOrCreateInstance(
+            window.bootstrap?.Modal?.getOrCreateInstance(
               document.getElementById('createFromWarningModal')
-            ).hide();
+            )?.hide();
             showFlash('Ошибка: не удалось создать документ.', 'danger');
             return;
           }
 
-          bootstrap.Modal.getOrCreateInstance(
+          window.bootstrap?.Modal?.getOrCreateInstance(
             document.getElementById('createFromWarningModal')
-          ).hide();
+          )?.hide();
 
           if (data.error) {
             showFlash('Ошибка: ' + data.message, 'danger');
