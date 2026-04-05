@@ -133,13 +133,14 @@
                         <th>Создано</th>
                         <th>Пропущено</th>
                         <th>Дата</th>
+                        <th>Pipeline</th>
                         <th></th>
                     </tr>
                     </thead>
                     <tbody>
                     {% if rawDocumentsPager.nbResults == 0 %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted">Нет данных</td>
+                            <td colspan="9" class="text-center text-muted">Нет данных</td>
                         </tr>
                     {% else %}
                         {% for doc in rawDocumentsPager.currentPageResults %}
@@ -151,6 +152,22 @@
                                 <td><span class="badge bg-success text-success-fg">{{ doc.recordsCreated }}</span></td>
                                 <td><span class="badge bg-secondary">{{ doc.recordsSkipped }}</span></td>
                                 <td><small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small></td>
+                                <td>
+                                    {% set run = runStatusesByDocId[doc.id] ?? null %}
+                                    {% if run %}
+                                        {% set badge = {pending: 'warning', running: 'info', completed: 'success', failed: 'danger'} %}
+                                        {% set label = {pending: 'Ожидает', running: 'Выполняется', completed: 'Завершён', failed: 'Ошибка'} %}
+                                        <a href="{{ path('marketplace_run_detail', {runId: run.id}) }}"
+                                           class="badge bg-{{ badge[run.status] ?? 'secondary' }} text-decoration-none">
+                                            {% if run.status == 'running' %}
+                                                <span class="spinner-border spinner-border-sm me-1" style="width:.6rem;height:.6rem"></span>
+                                            {% endif %}
+                                            {{ label[run.status] ?? run.status }}
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
                                 <td class="text-end">
                                     <div class="btn-list">
                                         <a href="{{ path('marketplace_raw_view', {id: doc.id}) }}" class="btn btn-sm btn-ghost-primary" target="_blank">JSON</a>
@@ -172,7 +189,7 @@
                             </tr>
                             {% if doc.unprocessedCostsCount is defined and doc.unprocessedCostsCount > 0 %}
                                 <tr class="bg-warning-lt">
-                                    <td colspan="8">
+                                    <td colspan="9">
                                         <div class="d-flex align-items-center">
                                             <div>
                                                 <strong>Нераспознано затрат: {{ doc.unprocessedCostsCount }}</strong>

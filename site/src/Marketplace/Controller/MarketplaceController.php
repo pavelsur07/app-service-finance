@@ -19,6 +19,8 @@ use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
+use App\Marketplace\Infrastructure\Query\RawProcessingRunDetailsQuery;
+use App\Marketplace\Infrastructure\Query\RawProcessingRunsListQuery;
 use App\Marketplace\Message\SyncOzonRealizationMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -49,6 +51,7 @@ class MarketplaceController extends AbstractController
         private readonly MarketplaceAdapterRegistry       $adapterRegistry,
         private readonly OzonRealizationStatusQuery       $realizationStatusQuery,
         private readonly RawDocumentsListQuery            $rawDocumentsListQuery,
+        private readonly RawProcessingRunsListQuery       $runListQuery,
         private readonly ProjectDirectionRepository       $projectDirectionRepository,
         private readonly EntityManagerInterface           $em,
         private readonly MessageBusInterface              $messageBus,
@@ -74,10 +77,20 @@ class MarketplaceController extends AbstractController
             50,
         );
 
+        $docIds = array_map(
+            static fn($doc) => $doc->getId(),
+            iterator_to_array($rawDocumentsPager->getCurrentPageResults()),
+        );
+        $runStatusesByDocId = $this->runListQuery->fetchLatestForDocuments(
+            (string) $company->getId(),
+            $docIds,
+        );
+
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,
             'rawDocumentsPager'     => $rawDocumentsPager,
             'availableMarketplaces' => MarketplaceType::cases(),
+            'runStatusesByDocId'    => $runStatusesByDocId,
         ]);
     }
 
@@ -462,6 +475,22 @@ class MarketplaceController extends AbstractController
         }
 
         return $this->redirectToRoute('marketplace_index');
+    }
+
+    #[Route('/run/{runId}', name: 'marketplace_run_detail', methods: ['GET'])]
+    public function runDetail(string $runId, RawProcessingRunDetailsQuery $query): Response
+    {
+        $company = $this->companyService->getActiveCompany();
+
+        $run = $query->fetch((string) $company->getId(), $runId);
+
+        if ($run === null) {
+            throw $this->createNotFoundException('Processing run not found.');
+        }
+
+        return $this->render('marketplace/raw_processing_run_detail.html.twig', [
+            'run' => $run,
+        ]);
     }
 
     #[Route('/run/{runId}/retry', name: 'marketplace_run_retry', methods: ['POST'])]
