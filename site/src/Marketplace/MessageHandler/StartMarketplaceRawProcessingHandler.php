@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Marketplace\MessageHandler;
 
-use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Entity\MarketplaceRawProcessingStepRun;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Message\RunMarketplaceRawProcessingStepMessage;
 use App\Marketplace\Message\StartMarketplaceRawProcessingMessage;
 use App\Marketplace\Repository\MarketplaceRawProcessingRunRepository;
 use App\Marketplace\Repository\MarketplaceRawProcessingStepRunRepository;
@@ -20,7 +20,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *
  * Для каждого step run в состоянии PENDING:
  *   1. Переводит в RUNNING.
- *   2. Dispatch ProcessMarketplaceRawDocumentCommand → async worker.
+ *   2. Dispatch RunMarketplaceRawProcessingStepMessage → async worker.
  *
  * Worker-safe: нет Request, Session, Security.
  * companyId передан через Message — не из сессии.
@@ -81,20 +81,21 @@ final class StartMarketplaceRawProcessingHandler
         // а не только в памяти текущего процесса.
         $this->entityManager->flush();
 
-        // Phase 2: dispatch команды обработки для каждого шага
+        // Phase 2: dispatch сообщение выполнения для каждого шага
         $dispatched = 0;
         foreach ($toDispatch as $stepRun) {
             try {
-                $this->bus->dispatch(new ProcessMarketplaceRawDocumentCommand(
+                $this->bus->dispatch(new RunMarketplaceRawProcessingStepMessage(
                     $companyId,
-                    $run->getRawDocumentId(),
-                    $stepRun->getStep()->value,
+                    $processingRunId,
+                    $stepRun->getId(),
                 ));
                 $dispatched++;
             } catch (\Throwable $e) {
-                $this->logger->error('[StartProcessing] Failed to dispatch step command', [
+                $this->logger->error('[StartProcessing] Failed to dispatch step message', [
                     'processing_run_id' => $processingRunId,
                     'step'              => $stepRun->getStep()->value,
+                    'step_run_id'       => $stepRun->getId(),
                     'error'             => $e->getMessage(),
                 ]);
 
@@ -102,7 +103,7 @@ final class StartMarketplaceRawProcessingHandler
             }
         }
 
-        $this->logger->info('[StartProcessing] Dispatched step commands', [
+        $this->logger->info('[StartProcessing] Dispatched step messages', [
             'processing_run_id' => $processingRunId,
             'dispatched'        => $dispatched,
             'steps'             => array_map(
