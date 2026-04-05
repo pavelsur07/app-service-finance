@@ -143,6 +143,8 @@
                             <td colspan="9" class="text-center text-muted">Нет данных</td>
                         </tr>
                     {% else %}
+                        {% set run_badge = {pending: 'warning', running: 'info', completed: 'success', failed: 'danger'} %}
+                        {% set run_label = {pending: 'Ожидает', running: 'Выполняется', completed: 'Завершён', failed: 'Ошибка'} %}
                         {% for doc in rawDocumentsPager.currentPageResults %}
                             <tr>
                                 <td><span class="badge bg-azure text-azure-fg">{{ doc.marketplace.displayName }}</span></td>
@@ -155,14 +157,12 @@
                                 <td>
                                     {% set run = runStatusesByDocId[doc.id] ?? null %}
                                     {% if run %}
-                                        {% set badge = {pending: 'warning', running: 'info', completed: 'success', failed: 'danger'} %}
-                                        {% set label = {pending: 'Ожидает', running: 'Выполняется', completed: 'Завершён', failed: 'Ошибка'} %}
                                         <a href="{{ path('marketplace_run_detail', {runId: run.id}) }}"
-                                           class="badge bg-{{ badge[run.status] ?? 'secondary' }} text-decoration-none">
+                                           class="badge bg-{{ run_badge[run.status] ?? 'secondary' }} text-decoration-none">
                                             {% if run.status == 'running' %}
                                                 <span class="spinner-border spinner-border-sm me-1" style="width:.6rem;height:.6rem"></span>
                                             {% endif %}
-                                            {{ label[run.status] ?? run.status }}
+                                            {{ run_label[run.status] ?? run.status }}
                                         </a>
                                     {% else %}
                                         <span class="text-muted small">—</span>

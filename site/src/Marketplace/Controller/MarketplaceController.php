@@ -516,7 +516,7 @@ class MarketplaceController extends AbstractController
             $this->addFlash('error', $e->getMessage());
         }
 
-        return $this->redirectToRoute('marketplace_index');
+        return $this->redirectToRoute('marketplace_run_detail', ['runId' => $runId]);
     }
 
     #[Route('/run/{runId}/step/{stepId}/retry', name: 'marketplace_run_step_retry', methods: ['POST'])]
@@ -544,7 +544,7 @@ class MarketplaceController extends AbstractController
             $this->addFlash('error', $e->getMessage());
         }
 
-        return $this->redirectToRoute('marketplace_index');
+        return $this->redirectToRoute('marketplace_run_detail', ['runId' => $runId]);
     }
 
     #[Route('/reprocess', name: 'marketplace_reprocess', methods: ['POST'])]

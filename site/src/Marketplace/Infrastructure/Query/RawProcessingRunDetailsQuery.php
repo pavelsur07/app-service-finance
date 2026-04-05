@@ -55,8 +55,10 @@ final class RawProcessingRunDetailsQuery
             return null;
         }
 
-        $run['summary'] = $run['summary'] !== null ? json_decode($run['summary'], true) : null;
-        $run['details'] = $run['details'] !== null ? json_decode($run['details'], true) : null;
+        $run['summary'] = $run['summary'] !== null
+            ? json_decode($run['summary'], true, 512, JSON_THROW_ON_ERROR) : null;
+        $run['details'] = $run['details'] !== null
+            ? json_decode($run['details'], true, 512, JSON_THROW_ON_ERROR) : null;
 
         $steps = $this->connection->executeQuery(
             'SELECT id, step, status, started_at, finished_at,
