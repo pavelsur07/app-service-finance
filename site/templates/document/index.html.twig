@@ -83,7 +83,15 @@
                                     <span class="badge {{ statusClass }} mt-1">{{ statusLabel }}</span>
                                 </td>
                                 <td>
-                                    <div class="fw-semibold">{{ typeShortLabels[item.type.value] ?? item.type.label() }}</div>
+                                    <div class="fw-semibold">
+                                        {{ typeShortLabels[item.type.value] ?? item.type.label() }}
+                                        {% if item.isCreatedWithViolation %}
+                                          <span class="badge bg-warning text-dark ms-1"
+                                                title="Документ создан без полного маппинга категорий ОПиУ">
+                                            <i class="ti ti-alert-triangle me-1"></i>Без маппинга
+                                          </span>
+                                        {% endif %}
+                                    </div>
                                     <div class="text-muted small">{{ item.description }}</div>
                                 </td>
                                 <td class="text-nowrap">{{ item.number ?: '—' }}</td>
