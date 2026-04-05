@@ -38,6 +38,7 @@ final class CashTransactionBuilder
         $this->cashflowCategory = null;
         $this->moneyAccount = MoneyAccountBuilder::aMoneyAccount()
             ->withId(Uuid::uuid4()->toString())
+            ->forCompany($this->company)
             ->build();
     }
 
