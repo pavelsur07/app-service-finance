@@ -135,8 +135,9 @@ final class RunMarketplaceRawProcessingStepAction
             ]);
 
             return $processedCount;
-        } catch (\Throwable $e) {
-            $this->logger->error('[RunStep] Step failed', [
+        } catch (\DomainException $e) {
+            // Бизнес-ошибка: данные невалидны, retry не поможет — помечаем FAILED.
+            $this->logger->error('[RunStep] Step failed (domain error, no retry)', [
                 'step_run_id' => $cmd->stepRunId,
                 'step'        => $stepRun->getStep()->value,
                 'error'       => $e->getMessage(),
@@ -151,6 +152,17 @@ final class RunMarketplaceRawProcessingStepAction
                     'error'       => $flushError->getMessage(),
                 ]);
             }
+
+            throw $e;
+        } catch (\Throwable $e) {
+            // Инфраструктурная ошибка (DB, сеть и т.д.) — шаг остаётся в RUNNING,
+            // Messenger выполнит retry согласно retry_strategy.
+            // Не помечаем FAILED: terminal-статус заблокировал бы повторное выполнение.
+            $this->logger->error('[RunStep] Step failed (infra error, will retry)', [
+                'step_run_id' => $cmd->stepRunId,
+                'step'        => $stepRun->getStep()->value,
+                'error'       => $e->getMessage(),
+            ]);
 
             throw $e;
         }
