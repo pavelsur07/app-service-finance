@@ -34,6 +34,9 @@
         <testsuite name="marketplace-analytics">
             <directory>tests/MarketplaceAnalytics</directory>
         </testsuite>
+        <testsuite name="cash">
+            <directory>tests/Cash</directory>
+        </testsuite>
     </testsuites>
 
     <source>
