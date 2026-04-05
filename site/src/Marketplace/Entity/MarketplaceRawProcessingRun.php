@@ -121,6 +121,8 @@ class MarketplaceRawProcessingRun
         $this->status = PipelineStatus::RUNNING;
         $this->finishedAt = null;
         $this->lastErrorMessage = null;
+        $this->summary = null;
+        $this->details = null;
     }
 
     public function getId(): string { return $this->id; }

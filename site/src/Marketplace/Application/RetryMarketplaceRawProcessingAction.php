@@ -36,26 +36,28 @@ final class RetryMarketplaceRawProcessingAction
             throw new \DomainException('Processing run not found.');
         }
 
-        // Guard: только FAILED run можно ретраить
-        $run->resetForRetry();
-
         $stepRuns = $this->stepRunRepository->findByRunId($command->companyId, $command->processingRunId);
 
-        $resetStepIds = [];
-        foreach ($stepRuns as $stepRun) {
-            if ($stepRun->getStatus() === PipelineStatus::FAILED) {
-                $stepRun->resetForRetry();
-                $resetStepIds[] = $stepRun->getId();
-            }
+        $failedSteps = array_filter($stepRuns, static fn($s) => $s->getStatus() === PipelineStatus::FAILED);
+
+        if (empty($failedSteps)) {
+            throw new \DomainException('No failed steps found to retry.');
+        }
+
+        // Guard: только FAILED run можно ретраить (проверяется после того как known FAILED шаги)
+        $run->resetForRetry();
+
+        foreach ($failedSteps as $stepRun) {
+            $stepRun->resetForRetry();
         }
 
         $this->em->flush();
 
-        foreach ($resetStepIds as $stepRunId) {
+        foreach ($failedSteps as $stepRun) {
             $this->messageBus->dispatch(new RunMarketplaceRawProcessingStepMessage(
                 companyId:       $command->companyId,
                 processingRunId: $command->processingRunId,
-                stepRunId:       $stepRunId,
+                stepRunId:       $stepRun->getId(),
             ));
         }
     }

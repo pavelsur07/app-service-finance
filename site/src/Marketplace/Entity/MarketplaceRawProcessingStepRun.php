@@ -149,6 +149,8 @@ class MarketplaceRawProcessingStepRun
         $this->processedCount = 0;
         $this->failedCount = 0;
         $this->skippedCount = 0;
+        $this->createdEntitiesJson = null;
+        $this->detailsJson = null;
     }
 
     public function getId(): string { return $this->id; }

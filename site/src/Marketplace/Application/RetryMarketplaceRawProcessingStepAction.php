@@ -45,13 +45,18 @@ final class RetryMarketplaceRawProcessingStepAction
             throw new \DomainException('Step run does not belong to the given processing run.');
         }
 
-        // Guard: только FAILED шаг можно ретраить
-        $stepRun->resetForRetry();
-
         // Если run был FAILED — перевести в RUNNING чтобы финализатор мог завершить run
         if ($run->getStatus() === PipelineStatus::FAILED) {
             $run->resetForRetry();
         }
+
+        // Run должен быть RUNNING (изначально или после сброса выше)
+        if ($run->getStatus() !== PipelineStatus::RUNNING) {
+            throw new \DomainException('Cannot retry a step for a run that is not in RUNNING or FAILED state.');
+        }
+
+        // Guard: только FAILED шаг можно ретраить
+        $stepRun->resetForRetry();
 
         $this->em->flush();
 
