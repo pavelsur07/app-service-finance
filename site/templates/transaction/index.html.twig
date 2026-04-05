@@ -12,8 +12,6 @@
 {% endblock %}#}
 
 {% block content %}
-<meta name="csrf-create-from"
-      content="{{ csrf_token('cash_transaction_create_from') }}">
 <style>
   .payments-card,
   .payments-card .card-body {
@@ -93,7 +91,8 @@
 
 <div class="row g-3 mt-2 mb-4">
     <div class="col-12">
-        <div class="card cashflow-ops">
+        <div class="card cashflow-ops"
+             data-csrf-token="{{ csrf_token('cash_transaction_create_from') }}">
             <div class="table-responsive">
                 <table class="table card-table table-vcenter">
                     <thead class="sticky-top">
@@ -120,7 +119,7 @@
                                     <i class="ti ti-file-check text-success"
                                        title="Документы ОПиУ созданы на всю сумму"></i>
                                 {% elseif tx.cashflowCategory and tx.cashflowCategory.allowPlDocument and tx.remainingAmount > 0 %}
-                                    <i class="ti ti-file-plus text-muted"
+                                    <i class="ti ti-file-plus"
                                        title="Можно создать документ ОПиУ"></i>
                                 {% else %}
                                     &nbsp;
@@ -169,12 +168,13 @@
                                         </button>
 
                                         {% if not tx.isTransfer and tx.cashflowCategory and tx.cashflowCategory.allowPlDocument %}
+                                          {% set createFromDisabled = tx.isHasViolatedDocument or tx.remainingAmount <= 0 %}
                                           <button type="button"
-                                                  class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ tx.remainingAmount <= 0 ? 'disabled' : '' }}"
+                                                  class="dropdown-item d-flex align-items-center gap-2 js-create-from {{ createFromDisabled ? 'disabled' : '' }}"
                                                   data-transaction-id="{{ tx.id }}"
                                                   data-url="{{ path('cash_transaction_create_from', {id: tx.id}) }}"
-                                                  {% if tx.remainingAmount <= 0 %}
-                                                    title="Транзакция уже полностью разнесена"
+                                                  {% if createFromDisabled %}
+                                                    title="{{ tx.isHasViolatedDocument ? 'Сначала исправьте маппинг категорий ОПиУ' : 'Транзакция уже полностью разнесена' }}"
                                                     disabled
                                                   {% endif %}>
                                             <i class="ti ti-copy"></i> Создать на основании
@@ -335,8 +335,8 @@
     </script>
     <script>
     (function () {
-      const csrfMeta = document.querySelector('meta[name="csrf-create-from"]');
-      const csrfToken = csrfMeta ? csrfMeta.content : '';
+      const csrfContainer = document.querySelector('.cashflow-ops');
+      const csrfToken = csrfContainer ? csrfContainer.dataset.csrfToken : '';
 
       // --- helpers ---
 
@@ -421,7 +421,7 @@
 
         // Сценарий A — тихое создание
         if (data.success) {
-          showFlash(data.flash);
+          showFlash(data.flash ?? 'Документ ОПиУ создан.');
           updateRowIcon(txId, 'success');
           disableCreateFromButton(txId);
         }
@@ -463,7 +463,7 @@
           if (data.redirect) {
             updateRowIcon(txId, 'warning');
             disableCreateFromButton(txId);
-            location.href = data.redirect;
+            window.open(data.redirect, '_blank');
           }
         });
 
