@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.0 / 2026-03-28
+> Версия: 1.1 / 2026-04-05
 
 ---
 
@@ -54,6 +54,18 @@
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
 | `AuditLog` | Shared | `string $companyId` ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
+
+### `Document` — новые поля (Finance)
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `createdWithViolation` | `bool`, default `false` | Исторический флаг: документ создан без маппинга PLCategory. Только `markAsCreatedWithViolation()` — снятия нет. |
+
+### `CashTransaction` — новые поля (Cash)
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `hasViolatedDocument` | `bool`, default `false` | Есть хотя бы один связанный документ с нарушением. Только `markAsHavingViolatedDocument()` — снятия нет. |
 
 ### `UnitEconomyCostMapping` — поля
 
