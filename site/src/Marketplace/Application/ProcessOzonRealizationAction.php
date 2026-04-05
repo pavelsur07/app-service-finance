@@ -42,6 +42,9 @@ use Ramsey\Uuid\Uuid;
  *   которые отсутствовали до добавления фичи «Возврат с СПП».
  *   Строки с pl_document_id (уже закрытые) также обновляются —
  *   данные нужны для корректного закрытия следующих периодов.
+ *
+ * Важно: realization НЕ входит в daily raw pipeline (sales/returns/costs)
+ * и остаётся отдельным monthly/realization flow.
  */
 final class ProcessOzonRealizationAction
 {
