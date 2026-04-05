@@ -343,8 +343,10 @@
       function showFlash(message, type = 'success') {
         const card = document.querySelector('.cashflow-ops');
         if (!card) return;
+        card.parentElement.querySelectorAll('.alert.js-create-from-flash')
+          .forEach(el => el.remove());
         const div = document.createElement('div');
-        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3';
+        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3 js-create-from-flash';
         const text = document.createElement('span');
         text.textContent = message;
         const closeBtn = document.createElement('button');
@@ -385,6 +387,10 @@
         if (!btn || btn.classList.contains('disabled')) return;
         e.preventDefault();
 
+        // Блокируем немедленно, до запроса — защита от двойного клика
+        btn.classList.add('disabled');
+        btn.disabled = true;
+
         const url  = btn.dataset.url;
         const txId = btn.dataset.transactionId;
 
@@ -397,11 +403,15 @@
           });
           data = await res.json();
         } catch (err) {
+          btn.classList.remove('disabled');
+          btn.disabled = false;
           showFlash('Ошибка: не удалось выполнить запрос.', 'danger');
           return;
         }
 
         if (data.error) {
+          btn.classList.remove('disabled');
+          btn.disabled = false;
           showFlash('Ошибка: ' + data.message, 'danger');
           return;
         }
