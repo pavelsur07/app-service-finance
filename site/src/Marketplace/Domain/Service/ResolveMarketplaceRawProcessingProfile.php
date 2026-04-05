@@ -25,22 +25,18 @@ final readonly class ResolveMarketplaceRawProcessingProfile
 
     public function resolve(MarketplaceType $marketplace, string $documentType): MarketplaceRawProcessingProfile
     {
-        if ($documentType === self::DOCUMENT_TYPE_SALES_REPORT) {
-            return MarketplaceRawProcessingProfile::daily([
+        return match ($documentType) {
+            self::DOCUMENT_TYPE_SALES_REPORT => MarketplaceRawProcessingProfile::daily([
                 PipelineStep::SALES,
                 PipelineStep::RETURNS,
                 PipelineStep::COSTS,
-            ]);
-        }
-
-        if ($documentType === self::DOCUMENT_TYPE_REALIZATION) {
-            return MarketplaceRawProcessingProfile::outsideDailyFlow(
+            ]),
+            self::DOCUMENT_TYPE_REALIZATION => MarketplaceRawProcessingProfile::outsideDailyFlow(
                 'realization documents are processed via the monthly realization flow, not the daily raw pipeline',
-            );
-        }
-
-        return MarketplaceRawProcessingProfile::outsideDailyFlow(
-            sprintf('documentType "%s" is not supported by the daily raw pipeline', $documentType),
-        );
+            ),
+            default => MarketplaceRawProcessingProfile::outsideDailyFlow(
+                sprintf('documentType "%s" is not supported by the daily raw pipeline', $documentType),
+            ),
+        };
     }
 }
