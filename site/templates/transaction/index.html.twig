@@ -427,9 +427,9 @@
           document.getElementById('createFromCsrfToken').value = csrfToken;
           document.getElementById('createFromConfirmForm')
             .dataset.txId = txId;
-          bootstrap.Modal.getOrCreateInstance(
+          window.bootstrap?.Modal.getOrCreateInstance(
             document.getElementById('createFromWarningModal')
-          ).show();
+          )?.show();
           return;
         }
 
@@ -458,16 +458,16 @@
             });
             data = await res.json();
           } catch (err) {
-            bootstrap.Modal.getOrCreateInstance(
+            window.bootstrap?.Modal.getOrCreateInstance(
               document.getElementById('createFromWarningModal')
-            ).hide();
+            )?.hide();
             showFlash('Ошибка: не удалось создать документ.', 'danger');
             return;
           }
 
-          bootstrap.Modal.getOrCreateInstance(
+          window.bootstrap?.Modal.getOrCreateInstance(
             document.getElementById('createFromWarningModal')
-          ).hide();
+          )?.hide();
 
           if (data.error) {
             showFlash('Ошибка: ' + data.message, 'danger');
