@@ -343,8 +343,10 @@
       function showFlash(message, type = 'success') {
         const card = document.querySelector('.cashflow-ops');
         if (!card) return;
+        card.parentElement.querySelectorAll('.alert.js-create-from-flash')
+          .forEach(el => el.remove());
         const div = document.createElement('div');
-        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3';
+        div.className = 'alert alert-' + type + ' alert-dismissible fade show mb-3 js-create-from-flash';
         const text = document.createElement('span');
         text.textContent = message;
         const closeBtn = document.createElement('button');
