@@ -14,7 +14,6 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MarketplaceRawProcessingStepRunRepository::class)]
 #[ORM\Table(name: 'marketplace_raw_processing_step_runs')]
 #[ORM\Index(columns: ['company_id', 'processing_run_id'], name: 'idx_step_run_company_run')]
-#[ORM\Index(columns: ['processing_run_id', 'step'], name: 'idx_step_run_run_step')]
 #[ORM\UniqueConstraint(name: 'uniq_step_run_per_run', columns: ['processing_run_id', 'step'])]
 class MarketplaceRawProcessingStepRun
 {
@@ -80,6 +79,10 @@ class MarketplaceRawProcessingStepRun
 
     public function markRunning(): void
     {
+        if ($this->status->isTerminal()) {
+            throw new \DomainException('Cannot restart a terminal step run.');
+        }
+
         $this->status = PipelineStatus::RUNNING;
         $this->startedAt = new \DateTimeImmutable();
     }
@@ -98,6 +101,7 @@ class MarketplaceRawProcessingStepRun
         $this->skippedCount = $skippedCount;
         $this->createdEntitiesJson = $createdEntitiesJson;
         $this->detailsJson = $detailsJson;
+        $this->errorMessage = null;
     }
 
     public function markFailed(

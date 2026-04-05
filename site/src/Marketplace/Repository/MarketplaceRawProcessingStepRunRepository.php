@@ -29,14 +29,10 @@ final class MarketplaceRawProcessingStepRunRepository extends ServiceEntityRepos
      */
     public function findByRunId(string $companyId, string $processingRunId): array
     {
-        return $this->createQueryBuilder('s')
-            ->where('s.companyId = :companyId')
-            ->andWhere('s.processingRunId = :processingRunId')
-            ->setParameter('companyId', $companyId)
-            ->setParameter('processingRunId', $processingRunId)
-            ->orderBy('s.startedAt', 'ASC')
-            ->getQuery()
-            ->getResult();
+        return $this->findBy(
+            ['companyId' => $companyId, 'processingRunId' => $processingRunId],
+            ['startedAt' => 'ASC'],
+        );
     }
 
     public function findByRunIdAndStep(

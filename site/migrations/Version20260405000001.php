@@ -42,11 +42,6 @@ final class Version20260405000001 extends AbstractMigration
         SQL);
 
         $this->addSql(<<<'SQL'
-            CREATE INDEX idx_step_run_run_step
-            ON marketplace_raw_processing_step_runs (processing_run_id, step)
-        SQL);
-
-        $this->addSql(<<<'SQL'
             CREATE UNIQUE INDEX uniq_step_run_per_run
             ON marketplace_raw_processing_step_runs (processing_run_id, step)
         SQL);
