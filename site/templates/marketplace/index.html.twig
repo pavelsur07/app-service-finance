@@ -443,7 +443,6 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <input type="hidden" id="bulk-csrf-token" value="{{ csrf_token('bulk_process') }}">
                     <div class="mb-3">
                         <label class="form-label required">Маркетплейс</label>
                         <select id="bulk-marketplace" class="form-select" required>
@@ -557,7 +556,7 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-Token': document.getElementById('bulk-csrf-token').value,
+                    'X-CSRF-TOKEN': '{{ csrf_token("bulk_process") }}',
                 },
                 body: JSON.stringify({marketplace: marketplace, year: year, month: month})
             })

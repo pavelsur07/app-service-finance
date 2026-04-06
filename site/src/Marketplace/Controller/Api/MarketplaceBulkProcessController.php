@@ -13,6 +13,8 @@ use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Csrf\CsrfToken;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
@@ -27,13 +29,15 @@ final class MarketplaceBulkProcessController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly DispatchBulkProcessingAction $action,
         private readonly LoggerInterface $logger,
+        private readonly CsrfTokenManagerInterface $csrfTokenManager,
     ) {
     }
 
     #[Route('/bulk-process', name: 'marketplace_bulk_process', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
-        if (!$this->isCsrfTokenValid('bulk_process', $request->headers->get('X-CSRF-Token'))) {
+        $token = $request->headers->get('X-CSRF-TOKEN', '');
+        if (!$this->csrfTokenManager->isTokenValid(new CsrfToken('bulk_process', $token))) {
             return new JsonResponse(['error' => 'Invalid CSRF token'], 403);
         }
 
