@@ -545,7 +545,7 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Запуск...';
 
-            fetch('/api/marketplace/bulk-process', {
+            fetch('{{ path('marketplace_bulk_process') }}', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
                 body: JSON.stringify({marketplace: marketplace, year: year, month: month})

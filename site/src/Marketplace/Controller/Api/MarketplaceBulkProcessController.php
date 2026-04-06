@@ -51,8 +51,8 @@ final class MarketplaceBulkProcessController extends AbstractController
 
         $year = is_numeric($yearRaw) ? (int) $yearRaw : null;
 
-        if ($year === null || $year < 2020 || $year > 2030) {
-            return new JsonResponse(['error' => 'Invalid or missing year. Allowed range: 2020–2030'], 422);
+        if ($year === null || $year < 2000 || $year > 2100) {
+            return new JsonResponse(['error' => 'Invalid or missing year. Allowed range: 2000–2100'], 422);
         }
 
         $month = is_numeric($monthRaw) ? (int) $monthRaw : null;
