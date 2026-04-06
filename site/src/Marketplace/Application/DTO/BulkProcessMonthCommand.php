@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\DTO;
 
+use App\Marketplace\Enum\MarketplaceType;
+
 /**
  * Команда запуска пакетной обработки всех RawDocument за указанный месяц
  * по конкретному маркетплейсу компании.
@@ -11,10 +13,10 @@ namespace App\Marketplace\Application\DTO;
 final readonly class BulkProcessMonthCommand
 {
     public function __construct(
-        public string $companyId,
-        public string $marketplace,
-        public int    $year,
-        public int    $month,
+        public string          $companyId,
+        public MarketplaceType $marketplace,
+        public int             $year,
+        public int             $month,
     ) {
     }
 }
