@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\DTO\BulkProcessMonthCommand;
+use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -37,23 +38,13 @@ final class DispatchBulkProcessingAction
         foreach ($documents as $doc) {
             $doc->resetProcessingStatus();
 
-            $this->bus->dispatch(new ProcessRawDocumentStepMessage(
-                rawDocumentId: (string) $doc->getId(),
-                step: 'sales',
-                companyId: $cmd->companyId,
-            ));
-
-            $this->bus->dispatch(new ProcessRawDocumentStepMessage(
-                rawDocumentId: (string) $doc->getId(),
-                step: 'returns',
-                companyId: $cmd->companyId,
-            ));
-
-            $this->bus->dispatch(new ProcessRawDocumentStepMessage(
-                rawDocumentId: (string) $doc->getId(),
-                step: 'costs',
-                companyId: $cmd->companyId,
-            ));
+            foreach (PipelineStep::cases() as $step) {
+                $this->bus->dispatch(new ProcessRawDocumentStepMessage(
+                    rawDocumentId: (string) $doc->getId(),
+                    step: $step->value,
+                    companyId: $cmd->companyId,
+                ));
+            }
         }
 
         $this->entityManager->flush();
