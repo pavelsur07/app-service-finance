@@ -33,6 +33,10 @@ final class MarketplaceBulkProcessController extends AbstractController
     #[Route('/bulk-process', name: 'marketplace_bulk_process', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('bulk_process', $request->headers->get('X-CSRF-Token'))) {
+            return new JsonResponse(['error' => 'Invalid CSRF token'], 403);
+        }
+
         $company = $this->activeCompanyService->getActiveCompany();
 
         $data = json_decode($request->getContent(), true) ?? [];
@@ -51,8 +55,8 @@ final class MarketplaceBulkProcessController extends AbstractController
 
         $year = is_numeric($yearRaw) ? (int) $yearRaw : null;
 
-        if ($year === null || $year < 2020 || $year > 2030) {
-            return new JsonResponse(['error' => 'Invalid or missing year. Allowed range: 2020–2030'], 422);
+        if ($year === null || $year < 2000 || $year > 2100) {
+            return new JsonResponse(['error' => 'Invalid or missing year. Allowed range: 2000–2100'], 422);
         }
 
         $month = is_numeric($monthRaw) ? (int) $monthRaw : null;

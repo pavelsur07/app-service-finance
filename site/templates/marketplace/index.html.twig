@@ -121,6 +121,11 @@
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">История синхронизаций</h3>
+                <div class="card-actions">
+                    <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#bulkProcessModal">
+                        Обработать месяц
+                    </button>
+                </div>
             </div>
             <div class="table-responsive">
                 <table class="table card-table table-vcenter">
@@ -133,13 +138,14 @@
                         <th>Создано</th>
                         <th>Пропущено</th>
                         <th>Дата</th>
+                        <th>Обработка</th>
                         <th></th>
                     </tr>
                     </thead>
                     <tbody>
                     {% if rawDocumentsPager.nbResults == 0 %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted">Нет данных</td>
+                            <td colspan="9" class="text-center text-muted">Нет данных</td>
                         </tr>
                     {% else %}
                         {% for doc in rawDocumentsPager.currentPageResults %}
@@ -151,6 +157,19 @@
                                 <td><span class="badge bg-success text-success-fg">{{ doc.recordsCreated }}</span></td>
                                 <td><span class="badge bg-secondary">{{ doc.recordsSkipped }}</span></td>
                                 <td><small>{{ doc.syncedAt|date('d.m.Y H:i') }}</small></td>
+                                <td>
+                                    {% if doc.processingStatus is not null %}
+                                        {% if doc.processingStatus.value == 'completed' %}
+                                            <span class="badge bg-success">Готово</span>
+                                        {% elseif doc.processingStatus.value == 'running' %}
+                                            <span class="badge bg-info">В работе</span>
+                                        {% elseif doc.processingStatus.value == 'failed' %}
+                                            <span class="badge bg-danger">Ошибка</span>
+                                        {% elseif doc.processingStatus.value == 'pending' %}
+                                            <span class="badge bg-secondary">Очередь</span>
+                                        {% endif %}
+                                    {% endif %}
+                                </td>
                                 <td class="text-end">
                                     <div class="btn-list">
                                         <a href="{{ path('marketplace_raw_view', {id: doc.id}) }}" class="btn btn-sm btn-ghost-primary" target="_blank">JSON</a>
@@ -172,7 +191,7 @@
                             </tr>
                             {% if doc.unprocessedCostsCount is defined and doc.unprocessedCostsCount > 0 %}
                                 <tr class="bg-warning-lt">
-                                    <td colspan="8">
+                                    <td colspan="9">
                                         <div class="d-flex align-items-center">
                                             <div>
                                                 <strong>Нераспознано затрат: {{ doc.unprocessedCostsCount }}</strong>
@@ -415,6 +434,41 @@
         </div>
     </div>
 
+    {# Modal: Пакетная обработка за месяц #}
+    <div class="modal modal-blur fade" id="bulkProcessModal" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Обработать месяц</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="bulk-csrf-token" value="{{ csrf_token('bulk_process') }}">
+                    <div class="mb-3">
+                        <label class="form-label required">Маркетплейс</label>
+                        <select id="bulk-marketplace" class="form-select" required>
+                            <option value="">Выберите маркетплейс</option>
+                            {% for marketplace in availableMarketplaces %}
+                                <option value="{{ marketplace.value }}">{{ marketplace.displayName }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Месяц</label>
+                        <input type="month" id="bulk-month" class="form-control" required
+                               value="{{ 'now'|date_modify('first day of last month')|date('Y-m') }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-warning" id="bulk-process-btn">
+                        Запустить обработку
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Показ/скрытие поля Client-Id в зависимости от маркетплейса
         document.getElementById('connection-marketplace').addEventListener('change', function () {
@@ -472,6 +526,59 @@
         // modal-apply-realization — подставляем href из data-action кнопки
         document.getElementById('modal-apply-realization').addEventListener('show.bs.modal', function (event) {
             document.getElementById('btn-apply-realization').href = event.relatedTarget.getAttribute('data-action');
+        });
+
+        // Пакетная обработка месяца — сброс кнопки при открытии модала
+        document.getElementById('bulkProcessModal').addEventListener('show.bs.modal', function () {
+            var btn = document.getElementById('bulk-process-btn');
+            btn.disabled = false;
+            btn.innerHTML = 'Запустить обработку';
+        });
+
+        document.getElementById('bulk-process-btn').addEventListener('click', function () {
+            var marketplace = document.getElementById('bulk-marketplace').value;
+            var monthVal    = document.getElementById('bulk-month').value;
+
+            if (!marketplace || !monthVal) {
+                alert('Выберите маркетплейс и месяц');
+                return;
+            }
+
+            var parts = monthVal.split('-');
+            var year  = parseInt(parts[0], 10);
+            var month = parseInt(parts[1], 10);
+
+            var btn = this;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Запуск...';
+
+            fetch('{{ path('marketplace_bulk_process') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.getElementById('bulk-csrf-token').value,
+                },
+                body: JSON.stringify({marketplace: marketplace, year: year, month: month})
+            })
+                .then(function (r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); })
+                .then(function (res) {
+                    var modal = bootstrap.Modal.getInstance(document.getElementById('bulkProcessModal'));
+                    if (modal) { modal.hide(); }
+                    if (res.ok) {
+                        alert('Запущено документов: ' + res.data.dispatched);
+                        window.location.reload();
+                    } else {
+                        alert('Ошибка: ' + (res.data.error ?? 'Неизвестная ошибка'));
+                        btn.disabled = false;
+                        btn.innerHTML = 'Запустить обработку';
+                    }
+                })
+                .catch(function () {
+                    alert('Ошибка сети. Попробуйте ещё раз.');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Запустить обработку';
+                });
         });
 
         // Опрос статуса первичной загрузки
