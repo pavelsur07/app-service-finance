@@ -6,6 +6,8 @@ namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -71,6 +73,21 @@ class MarketplaceRawDocument
 
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $unprocessedCostTypes = null; // {"Платная приёмка": 3, "Доплата": 2}
+
+    #[ORM\Column(length: 20, nullable: true)]
+    private ?string $processingStatus = null;
+    // значения из PipelineStatus: 'pending','running','completed','failed'
+
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $processedAt = null;
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $failedSteps = null;
+    // ['sales', 'costs'] — из PipelineStep values
+
+    #[ORM\Column(type: 'json', nullable: true)]
+    private ?array $succeededSteps = null;
+    // ['sales', 'returns'] — какие шаги прошли успешно
 
     public function __construct(
         string $id,
@@ -254,5 +271,85 @@ class MarketplaceRawDocument
         $this->unprocessedCostTypes = $types;
 
         return $this;
+    }
+
+    public function getProcessingStatus(): ?PipelineStatus
+    {
+        return $this->processingStatus !== null
+            ? PipelineStatus::from($this->processingStatus)
+            : null;
+    }
+
+    public function getProcessedAt(): ?\DateTimeImmutable
+    {
+        return $this->processedAt;
+    }
+
+    public function getFailedSteps(): array
+    {
+        return $this->failedSteps ?? [];
+    }
+
+    public function getSucceededSteps(): array
+    {
+        return $this->succeededSteps ?? [];
+    }
+
+    public function markStepFailed(PipelineStep $step): self
+    {
+        $failed = $this->failedSteps ?? [];
+
+        if (!in_array($step->value, $failed, true)) {
+            $failed[] = $step->value;
+        }
+
+        $this->failedSteps      = $failed;
+        $this->processingStatus = PipelineStatus::FAILED->value;
+
+        return $this;
+    }
+
+    public function markStepSucceeded(PipelineStep $step): self
+    {
+        $succeeded = $this->succeededSteps ?? [];
+
+        if (!in_array($step->value, $succeeded, true)) {
+            $succeeded[] = $step->value;
+        }
+
+        $this->succeededSteps = $succeeded;
+
+        $failed = $this->failedSteps ?? [];
+        $failed = array_values(array_filter($failed, static fn(string $s) => $s !== $step->value));
+        $this->failedSteps = $failed;
+
+        if (count($succeeded) === count(PipelineStep::cases()) && count($failed) === 0) {
+            $this->markCompleted();
+        }
+
+        return $this;
+    }
+
+    public function markCompleted(): self
+    {
+        $this->processingStatus = PipelineStatus::COMPLETED->value;
+        $this->processedAt      = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function resetProcessingStatus(): self
+    {
+        $this->processingStatus = PipelineStatus::PENDING->value;
+        $this->processedAt      = null;
+        $this->failedSteps      = [];
+        $this->succeededSteps   = [];
+
+        return $this;
+    }
+
+    public function isFullyProcessed(): bool
+    {
+        return $this->processingStatus === PipelineStatus::COMPLETED->value;
     }
 }
