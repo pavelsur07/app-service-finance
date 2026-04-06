@@ -89,6 +89,9 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
                 ->setParameter('documentType', $documentType);
         }
 
+        return $qb->getQuery()->getResult();
+    }
+
     /**
      * Найти raw-документы типа sales_report за конкретный месяц для пакетной обработки.
      *
