@@ -74,9 +74,8 @@ class MarketplaceRawDocument
     #[ORM\Column(type: 'json', nullable: true)]
     private ?array $unprocessedCostTypes = null; // {"Платная приёмка": 3, "Доплата": 2}
 
-    #[ORM\Column(length: 20, nullable: true)]
-    private ?string $processingStatus = null;
-    // значения из PipelineStatus: 'pending','running','completed','failed'
+    #[ORM\Column(type: 'string', length: 20, nullable: true, enumType: PipelineStatus::class)]
+    private ?PipelineStatus $processingStatus = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $processedAt = null;
@@ -275,9 +274,7 @@ class MarketplaceRawDocument
 
     public function getProcessingStatus(): ?PipelineStatus
     {
-        return $this->processingStatus !== null
-            ? PipelineStatus::from($this->processingStatus)
-            : null;
+        return $this->processingStatus;
     }
 
     public function getProcessedAt(): ?\DateTimeImmutable
@@ -304,7 +301,7 @@ class MarketplaceRawDocument
         }
 
         $this->failedSteps      = $failed;
-        $this->processingStatus = PipelineStatus::FAILED->value;
+        $this->processingStatus = PipelineStatus::FAILED;
 
         return $this;
     }
@@ -332,7 +329,7 @@ class MarketplaceRawDocument
 
     public function markCompleted(): self
     {
-        $this->processingStatus = PipelineStatus::COMPLETED->value;
+        $this->processingStatus = PipelineStatus::COMPLETED;
         $this->processedAt      = new \DateTimeImmutable();
 
         return $this;
@@ -340,7 +337,7 @@ class MarketplaceRawDocument
 
     public function resetProcessingStatus(): self
     {
-        $this->processingStatus = PipelineStatus::PENDING->value;
+        $this->processingStatus = PipelineStatus::PENDING;
         $this->processedAt      = null;
         $this->failedSteps      = [];
         $this->succeededSteps   = [];
@@ -350,6 +347,6 @@ class MarketplaceRawDocument
 
     public function isFullyProcessed(): bool
     {
-        return $this->processingStatus === PipelineStatus::COMPLETED->value;
+        return $this->processingStatus === PipelineStatus::COMPLETED;
     }
 }
