@@ -89,6 +89,37 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
                 ->setParameter('documentType', $documentType);
         }
 
-        return $qb->getQuery()->getResult();
+    /**
+     * Найти raw-документы типа sales_report за конкретный месяц для пакетной обработки.
+     *
+     * Документ включается если его период полностью входит в запрошенный месяц:
+     * periodFrom >= первый день месяца AND periodTo <= последний день месяца.
+     *
+     * @return MarketplaceRawDocument[]
+     */
+    public function findForBulkProcessing(
+        string $companyId,
+        MarketplaceType $marketplace,
+        int $year,
+        int $month,
+    ): array {
+        $firstDay = new \DateTimeImmutable(sprintf('%d-%02d-01', $year, $month));
+        $lastDay  = $firstDay->modify('last day of this month');
+
+        return $this->createQueryBuilder('d')
+            ->join('d.company', 'c')
+            ->where('c.id = :companyId')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.periodFrom >= :firstDay')
+            ->andWhere('d.periodTo <= :lastDay')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', 'sales_report')
+            ->setParameter('firstDay', $firstDay)
+            ->setParameter('lastDay', $lastDay)
+            ->orderBy('d.periodFrom', 'ASC')
+            ->getQuery()
+            ->getResult();
     }
 }
