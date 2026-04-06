@@ -563,7 +563,7 @@
             })
                 .then(function (r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); })
                 .then(function (res) {
-                    document.querySelector('#bulkProcessModal [data-bs-dismiss="modal"]').click();
+                    bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkProcessModal')).hide();
                     if (res.ok) {
                         window.location.reload();
                     } else {
