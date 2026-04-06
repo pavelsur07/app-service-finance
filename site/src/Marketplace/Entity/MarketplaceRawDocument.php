@@ -273,9 +273,11 @@ class MarketplaceRawDocument
         return $this;
     }
 
-    public function getProcessingStatus(): ?string
+    public function getProcessingStatus(): ?PipelineStatus
     {
-        return $this->processingStatus;
+        return $this->processingStatus !== null
+            ? PipelineStatus::from($this->processingStatus)
+            : null;
     }
 
     public function getProcessedAt(): ?\DateTimeImmutable
@@ -283,14 +285,14 @@ class MarketplaceRawDocument
         return $this->processedAt;
     }
 
-    public function getFailedSteps(): ?array
+    public function getFailedSteps(): array
     {
-        return $this->failedSteps;
+        return $this->failedSteps ?? [];
     }
 
-    public function getSucceededSteps(): ?array
+    public function getSucceededSteps(): array
     {
-        return $this->succeededSteps;
+        return $this->succeededSteps ?? [];
     }
 
     public function markStepFailed(PipelineStep $step): self
@@ -321,7 +323,7 @@ class MarketplaceRawDocument
         $failed = array_values(array_filter($failed, static fn(string $s) => $s !== $step->value));
         $this->failedSteps = $failed;
 
-        if (count($this->succeededSteps) === 3 && count($failed) === 0) {
+        if (count($succeeded) === count(PipelineStep::cases()) && count($failed) === 0) {
             $this->markCompleted();
         }
 
