@@ -33,6 +33,10 @@ final class MarketplaceBulkProcessController extends AbstractController
     #[Route('/bulk-process', name: 'marketplace_bulk_process', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
+        if (!$this->isCsrfTokenValid('bulk_process', $request->headers->get('X-CSRF-Token'))) {
+            return new JsonResponse(['error' => 'Invalid CSRF token'], 403);
+        }
+
         $company = $this->activeCompanyService->getActiveCompany();
 
         $data = json_decode($request->getContent(), true) ?? [];

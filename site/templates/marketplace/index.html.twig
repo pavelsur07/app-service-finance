@@ -443,6 +443,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
+                    <input type="hidden" id="bulk-csrf-token" value="{{ csrf_token('bulk_process') }}">
                     <div class="mb-3">
                         <label class="form-label required">Маркетплейс</label>
                         <select id="bulk-marketplace" class="form-select" required>
@@ -527,7 +528,13 @@
             document.getElementById('btn-apply-realization').href = event.relatedTarget.getAttribute('data-action');
         });
 
-        // Пакетная обработка месяца
+        // Пакетная обработка месяца — сброс кнопки при открытии модала
+        document.getElementById('bulkProcessModal').addEventListener('show.bs.modal', function () {
+            var btn = document.getElementById('bulk-process-btn');
+            btn.disabled = false;
+            btn.innerHTML = 'Запустить обработку';
+        });
+
         document.getElementById('bulk-process-btn').addEventListener('click', function () {
             var marketplace = document.getElementById('bulk-marketplace').value;
             var monthVal    = document.getElementById('bulk-month').value;
@@ -547,7 +554,11 @@
 
             fetch('{{ path('marketplace_bulk_process') }}', {
                 method: 'POST',
-                headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-Token': document.getElementById('bulk-csrf-token').value,
+                },
                 body: JSON.stringify({marketplace: marketplace, year: year, month: month})
             })
                 .then(function (r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); })
