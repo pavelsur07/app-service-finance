@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\SyncConnectionCommand;
-use App\Marketplace\Application\Service\MarketplacePipelineAutoStarter;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
@@ -27,7 +26,6 @@ final class SyncConnectionAction
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly EntityManagerInterface $em,
-        private readonly MarketplacePipelineAutoStarter $pipelineAutoStarter,
     ) {
     }
 
@@ -63,9 +61,6 @@ final class SyncConnectionAction
             $this->em->persist($rawDoc);
             $connection->markSyncSuccess();
             $this->em->flush();
-
-            // Автозапуск daily pipeline (best-effort — не прерывает import flow)
-            $this->pipelineAutoStarter->tryStart($command->companyId, $rawDoc->getId());
 
             return $recordsCount;
         } catch (\Exception $e) {

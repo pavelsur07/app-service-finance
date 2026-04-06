@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
-use App\Marketplace\Application\Service\MarketplacePipelineAutoStarter;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
@@ -32,7 +31,6 @@ final class SyncOzonReportHandler
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
-        private readonly MarketplacePipelineAutoStarter $pipelineAutoStarter,
     ) {
     }
 
@@ -134,9 +132,6 @@ final class SyncOzonReportHandler
             $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
             $connection->markSyncSuccess();
             $this->em->flush();
-
-            // Автозапуск daily pipeline (best-effort — не прерывает import flow)
-            $this->pipelineAutoStarter->tryStart($companyId, $rawDoc->getId());
         } catch (\Throwable $e) {
             $this->logger->error('Ozon daily sync failed', [
                 'company_id'    => $companyId,
