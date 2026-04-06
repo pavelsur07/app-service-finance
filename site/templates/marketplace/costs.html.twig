@@ -74,7 +74,7 @@
                 {% for cost in pager.currentPageResults %}
                     <tr>
                         <td>{{ cost.costDate|date('d.m.Y') }}</td>
-                        <td><span class="badge bg-purple-lt">{{ cost.category.name }}</span></td>
+                        <td><span class="badge bg-purple-lt">{{ cost.category ? cost.category.name : '—' }}</span></td>
                         <td>
                             {% if cost.listing %}
                                 <div class="fw-semibold">{{ cost.listing.name ?? ('WB #' ~ cost.listing.marketplaceSku) }}</div>

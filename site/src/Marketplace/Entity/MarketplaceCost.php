@@ -29,8 +29,8 @@ class MarketplaceCost
     private MarketplaceType $marketplace;
 
     #[ORM\ManyToOne(targetEntity: MarketplaceCostCategory::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private MarketplaceCostCategory $category;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MarketplaceCostCategory $category = null;
 
     #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -98,7 +98,7 @@ class MarketplaceCost
         return $this->marketplace;
     }
 
-    public function getCategory(): MarketplaceCostCategory
+    public function getCategory(): ?MarketplaceCostCategory
     {
         return $this->category;
     }
