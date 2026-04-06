@@ -72,7 +72,7 @@ class MarketplaceCost
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        MarketplaceCostCategory $category,
+        ?MarketplaceCostCategory $category = null,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -103,7 +103,7 @@ class MarketplaceCost
         return $this->category;
     }
 
-    public function setCategory(MarketplaceCostCategory $category): self
+    public function setCategory(?MarketplaceCostCategory $category): self
     {
         $this->category = $category;
         $this->updatedAt = new \DateTimeImmutable();
