@@ -27,6 +27,7 @@ final class DispatchBulkProcessingActionTest extends IntegrationTestCase
 
         $this->action    = self::getContainer()->get(DispatchBulkProcessingAction::class);
         $this->transport = self::getContainer()->get('messenger.transport.async');
+        $this->transport->reset();
     }
 
     /**
