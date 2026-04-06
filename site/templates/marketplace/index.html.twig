@@ -563,10 +563,8 @@
             })
                 .then(function (r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); })
                 .then(function (res) {
-                    var modal = bootstrap.Modal.getInstance(document.getElementById('bulkProcessModal'));
-                    if (modal) { modal.hide(); }
+                    document.querySelector('#bulkProcessModal [data-bs-dismiss="modal"]').click();
                     if (res.ok) {
-                        alert('Запущено документов: ' + res.data.dispatched);
                         window.location.reload();
                     } else {
                         alert('Ошибка: ' + (res.data.error ?? 'Неизвестная ошибка'));
