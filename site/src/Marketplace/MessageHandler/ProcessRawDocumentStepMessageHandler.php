@@ -11,6 +11,7 @@ use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * Выполняет один шаг обработки (sales/returns/costs) для одного RawDocument.
@@ -32,13 +33,13 @@ final class ProcessRawDocumentStepMessageHandler
         $doc = $this->repository->find($message->rawDocumentId);
 
         if ($doc === null) {
-            throw new \RuntimeException(
+            throw new UnrecoverableMessageHandlingException(
                 sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId),
             );
         }
 
         if ((string) $doc->getCompany()->getId() !== $message->companyId) {
-            throw new \RuntimeException(
+            throw new UnrecoverableMessageHandlingException(
                 sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
             );
         }
@@ -53,8 +54,12 @@ final class ProcessRawDocumentStepMessageHandler
 
         try {
             ($this->processAction)($cmd);
-            $doc->markStepSucceeded($step);
+            // Re-fetch: ProcessMarketplaceRawDocumentAction calls em->clear() after each batch,
+            // which detaches $doc. Without re-fetch markStepSucceeded() would modify a ghost object.
+            $doc = $this->repository->find($message->rawDocumentId);
+            $doc?->markStepSucceeded($step);
         } catch (\Throwable $e) {
+            $doc = $this->repository->find($message->rawDocumentId) ?? $doc;
             $doc->markStepFailed($step);
             $this->entityManager->flush();
             throw $e;
