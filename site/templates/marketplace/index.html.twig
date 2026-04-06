@@ -507,7 +507,8 @@
             btn.disabled = true;
             btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Обработка...';
             // Закрываем модал чтобы пользователь видел страницу во время обработки
-            var modal = bootstrap.Modal.getInstance(document.getElementById('modal-reprocess'));
+            var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+            var modal = BootstrapModal ? BootstrapModal.getInstance(document.getElementById('modal-reprocess')) : null;
             if (modal) { modal.hide(); }
         });
 
@@ -570,14 +571,21 @@
                     });
                 })
                 .then(function (res) {
+                    var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
                     if (res.ok) {
-                        var modalEl = document.getElementById('bulkProcessModal');
-                        modalEl.addEventListener('hidden.bs.modal', function () {
+                        if (BootstrapModal) {
+                            var modalEl = document.getElementById('bulkProcessModal');
+                            modalEl.addEventListener('hidden.bs.modal', function () {
+                                window.location.reload();
+                            }, {once: true});
+                            BootstrapModal.getOrCreateInstance(modalEl).hide();
+                        } else {
                             window.location.reload();
-                        }, {once: true});
-                        bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+                        }
                     } else {
-                        bootstrap.Modal.getOrCreateInstance(document.getElementById('bulkProcessModal')).hide();
+                        if (BootstrapModal) {
+                            BootstrapModal.getOrCreateInstance(document.getElementById('bulkProcessModal')).hide();
+                        }
                         alert('Ошибка: ' + (res.data.error ?? 'Неизвестная ошибка'));
                         btn.disabled = false;
                         btn.innerHTML = 'Запустить обработку';
