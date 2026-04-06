@@ -50,14 +50,24 @@ final class ProcessRawDocumentStepMessageHandler
             kind:      $message->step,
         );
 
-        $step = PipelineStep::from($message->step);
+        $step = PipelineStep::tryFrom($message->step);
+        if ($step === null) {
+            throw new UnrecoverableMessageHandlingException(
+                sprintf('Invalid pipeline step "%s"', $message->step),
+            );
+        }
 
         try {
             ($this->processAction)($cmd);
             // Re-fetch: ProcessMarketplaceRawDocumentAction calls em->clear() after each batch,
             // which detaches $doc. Without re-fetch markStepSucceeded() would modify a ghost object.
             $doc = $this->repository->find($message->rawDocumentId);
-            $doc?->markStepSucceeded($step);
+            if ($doc === null) {
+                throw new UnrecoverableMessageHandlingException(
+                    sprintf('MarketplaceRawDocument vanished after processing: %s', $message->rawDocumentId),
+                );
+            }
+            $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
             $doc = $this->repository->find($message->rawDocumentId) ?? $doc;
             $doc->markStepFailed($step);
