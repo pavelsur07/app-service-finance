@@ -553,14 +553,22 @@
 
             fetch('{{ path('marketplace_bulk_process') }}', {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN': '{{ csrf_token("bulk_process") }}',
                 },
                 body: JSON.stringify({marketplace: marketplace, year: year, month: month})
             })
-                .then(function (r) { return r.json().then(function (data) { return {ok: r.ok, data: data}; }); })
+                .then(function (r) {
+                    var contentType = r.headers.get('content-type') || '';
+                    if (contentType.indexOf('application/json') !== -1) {
+                        return r.json().then(function (data) { return {ok: r.ok, status: r.status, data: data}; });
+                    }
+                    return r.text().then(function (text) {
+                        return {ok: false, status: r.status, data: {error: 'HTTP ' + r.status + ': сервер вернул не-JSON ответ'}};
+                    });
+                })
                 .then(function (res) {
                     if (res.ok) {
                         var modalEl = document.getElementById('bulkProcessModal');
@@ -575,8 +583,8 @@
                         btn.innerHTML = 'Запустить обработку';
                     }
                 })
-                .catch(function () {
-                    alert('Ошибка сети. Попробуйте ещё раз.');
+                .catch(function (err) {
+                    alert('Ошибка сети: ' + err.message);
                     btn.disabled = false;
                     btn.innerHTML = 'Запустить обработку';
                 });
