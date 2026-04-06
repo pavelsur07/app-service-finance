@@ -31,6 +31,9 @@
         <testsuite name="telegram">
             <directory>tests/Telegram</directory>
         </testsuite>
+        <testsuite name="marketplace">
+            <directory>tests/Marketplace</directory>
+        </testsuite>
         <testsuite name="marketplace-analytics">
             <directory>tests/MarketplaceAnalytics</directory>
         </testsuite>
