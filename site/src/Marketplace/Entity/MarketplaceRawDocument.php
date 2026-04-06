@@ -6,6 +6,8 @@ namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Webmozart\Assert\Assert;
@@ -291,32 +293,32 @@ class MarketplaceRawDocument
         return $this->succeededSteps;
     }
 
-    public function markStepFailed(string $step): self
+    public function markStepFailed(PipelineStep $step): self
     {
         $failed = $this->failedSteps ?? [];
 
-        if (!in_array($step, $failed, true)) {
-            $failed[] = $step;
+        if (!in_array($step->value, $failed, true)) {
+            $failed[] = $step->value;
         }
 
-        $this->failedSteps       = $failed;
-        $this->processingStatus  = 'failed';
+        $this->failedSteps      = $failed;
+        $this->processingStatus = PipelineStatus::FAILED->value;
 
         return $this;
     }
 
-    public function markStepSucceeded(string $step): self
+    public function markStepSucceeded(PipelineStep $step): self
     {
         $succeeded = $this->succeededSteps ?? [];
 
-        if (!in_array($step, $succeeded, true)) {
-            $succeeded[] = $step;
+        if (!in_array($step->value, $succeeded, true)) {
+            $succeeded[] = $step->value;
         }
 
         $this->succeededSteps = $succeeded;
 
         $failed = $this->failedSteps ?? [];
-        $failed = array_values(array_filter($failed, static fn(string $s) => $s !== $step));
+        $failed = array_values(array_filter($failed, static fn(string $s) => $s !== $step->value));
         $this->failedSteps = $failed;
 
         if (count($this->succeededSteps) === 3 && count($failed) === 0) {
@@ -328,7 +330,7 @@ class MarketplaceRawDocument
 
     public function markCompleted(): self
     {
-        $this->processingStatus = 'completed';
+        $this->processingStatus = PipelineStatus::COMPLETED->value;
         $this->processedAt      = new \DateTimeImmutable();
 
         return $this;
@@ -336,15 +338,16 @@ class MarketplaceRawDocument
 
     public function resetProcessingStatus(): self
     {
-        $this->processingStatus = 'pending';
+        $this->processingStatus = PipelineStatus::PENDING->value;
         $this->processedAt      = null;
         $this->failedSteps      = [];
+        $this->succeededSteps   = [];
 
         return $this;
     }
 
     public function isFullyProcessed(): bool
     {
-        return $this->processingStatus === 'completed';
+        return $this->processingStatus === PipelineStatus::COMPLETED->value;
     }
 }
