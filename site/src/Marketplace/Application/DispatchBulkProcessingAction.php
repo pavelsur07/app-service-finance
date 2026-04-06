@@ -37,7 +37,13 @@ final class DispatchBulkProcessingAction
 
         foreach ($documents as $doc) {
             $doc->resetProcessingStatus();
+        }
 
+        // Persist before dispatching: async worker must not pick up a message
+        // before resetProcessingStatus() is visible in the database.
+        $this->entityManager->flush();
+
+        foreach ($documents as $doc) {
             foreach (PipelineStep::cases() as $step) {
                 $this->bus->dispatch(new ProcessRawDocumentStepMessage(
                     rawDocumentId: (string) $doc->getId(),
@@ -46,8 +52,6 @@ final class DispatchBulkProcessingAction
                 ));
             }
         }
-
-        $this->entityManager->flush();
 
         return count($documents);
     }
