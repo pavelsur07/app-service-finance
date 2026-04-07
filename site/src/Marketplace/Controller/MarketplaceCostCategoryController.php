@@ -115,7 +115,7 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/edit', name: 'marketplace_cost_categories_edit', methods: ['POST'])]
+    #[Route('/{id}/edit', name: 'marketplace_cost_categories_edit', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function edit(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
@@ -152,7 +152,7 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle', methods: ['POST'])]
+    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function toggle(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
@@ -175,7 +175,7 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function delete(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
