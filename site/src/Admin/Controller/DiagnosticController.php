@@ -7,6 +7,7 @@ namespace App\Admin\Controller;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -160,5 +161,46 @@ final class DiagnosticController extends AbstractController
         );
 
         return new JsonResponse($rows);
+    }
+
+    #[Route('/delete-wb-costs-no-listing/{companyId}', name: 'delete_wb_costs_no_listing', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function deleteWbCostsNoListing(string $companyId, Request $request, Connection $connection): JsonResponse
+    {
+        $confirm = $request->query->get('confirm') === '1';
+        $dateFrom = $request->query->get('date_from');
+        $dateTo = $request->query->get('date_to');
+
+        if ($dateFrom === null || $dateTo === null) {
+            return new JsonResponse(['error' => 'date_from and date_to query parameters are required'], 400);
+        }
+
+        $params = [
+            'companyId' => $companyId,
+            'marketplace' => 'wildberries',
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+        ];
+
+        $where = 'company_id = :companyId
+              AND marketplace = :marketplace
+              AND listing_id IS NULL
+              AND document_id IS NULL
+              AND cost_date BETWEEN :dateFrom AND :dateTo';
+
+        if (!$confirm) {
+            $count = (int) $connection->fetchOne(
+                "SELECT COUNT(*) FROM marketplace_costs WHERE {$where}",
+                $params,
+            );
+
+            return new JsonResponse(['action' => 'preview', 'count' => $count]);
+        }
+
+        $deleted = $connection->executeStatement(
+            "DELETE FROM marketplace_costs WHERE {$where}",
+            $params,
+        );
+
+        return new JsonResponse(['action' => 'deleted', 'count' => $deleted]);
     }
 }
