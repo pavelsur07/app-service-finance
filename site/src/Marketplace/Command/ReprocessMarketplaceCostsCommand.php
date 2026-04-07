@@ -14,6 +14,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Webmozart\Assert\Assert;
 
 /**
  * Переобработка затрат через process()-путь (DELETE + reinsert)
@@ -51,6 +52,16 @@ final class ReprocessMarketplaceCostsCommand extends Command
         $companyId = $input->getOption('company-id');
         $dryRun = $input->getOption('dry-run');
 
+        if ($companyId !== null) {
+            try {
+                Assert::uuid($companyId);
+            } catch (\InvalidArgumentException) {
+                $io->error('Некорректный формат --company-id, ожидается UUID.');
+
+                return Command::FAILURE;
+            }
+        }
+
         $io->title('Переобработка затрат с неправильными категориями' . ($dryRun ? ' [DRY-RUN]' : ''));
 
         $documents = $this->findDocumentsWithMismatchedCategories($companyId);
@@ -80,13 +91,17 @@ final class ReprocessMarketplaceCostsCommand extends Command
             return Command::SUCCESS;
         }
 
+        if (!$io->confirm(sprintf('Будет переобработано %d документов. Продолжить?', count($documents)), false)) {
+            return Command::SUCCESS;
+        }
+
         $progressBar = new ProgressBar($output, count($documents));
         $progressBar->setFormat(' %current%/%max% [%bar%] %percent:3s%% %elapsed:6s% — %message%');
         $progressBar->setMessage('Начинаем...');
         $progressBar->start();
 
         $processed = 0;
-        $errors = 0;
+        $failedDocs = [];
 
         foreach ($documents as $row) {
             $progressBar->setMessage($row['id']);
@@ -95,9 +110,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
                 $this->syncFacade->processCostsFromRaw($row['company_id'], $row['id']);
                 $processed++;
             } catch (\Throwable $e) {
-                $errors++;
-                $io->newLine();
-                $io->error(sprintf('Ошибка для %s: %s', $row['id'], $e->getMessage()));
+                $failedDocs[] = sprintf('%s: %s', $row['id'], $e->getMessage());
             }
 
             $progressBar->advance();
@@ -109,13 +122,17 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
         $io->section('Итог');
         $io->text(sprintf('  Обработано: %d', $processed));
-        if ($errors > 0) {
-            $io->text(sprintf('  Ошибок:     %d', $errors));
+
+        if ($failedDocs !== []) {
+            $io->text(sprintf('  Ошибок:     %d', count($failedDocs)));
+            $io->newLine();
+            $io->warning('Документы с ошибками:');
+            $io->listing($failedDocs);
         }
 
         $io->success('Переобработка затрат завершена.');
 
-        return $errors > 0 ? Command::FAILURE : Command::SUCCESS;
+        return $failedDocs !== [] ? Command::FAILURE : Command::SUCCESS;
     }
 
     /**
