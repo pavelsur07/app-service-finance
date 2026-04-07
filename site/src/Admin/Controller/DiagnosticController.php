@@ -32,17 +32,16 @@ final class DiagnosticController extends AbstractController
     {
         $rows = $connection->fetchAllAssociative(
             'SELECT
-                mc.id,
-                mc.company_id,
-                mc.cost_date,
-                mc.description,
-                mc.amount,
-                mc.raw_document_id,
-                mrd.marketplace
-             FROM marketplace_costs mc
-             LEFT JOIN marketplace_raw_documents mrd ON mc.raw_document_id = mrd.id
-             WHERE mc.cost_category_id IS NULL
-             ORDER BY mc.cost_date DESC
+                id,
+                company_id,
+                cost_date,
+                description,
+                amount,
+                raw_document_id,
+                marketplace
+             FROM marketplace_costs
+             WHERE category_id IS NULL
+             ORDER BY cost_date DESC
              LIMIT 50'
         );
 
