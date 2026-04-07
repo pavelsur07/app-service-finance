@@ -13,12 +13,14 @@ use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
- * Восстанавливает/создаёт категории затрат из предопределённого списка OzonServiceCategoryMap.
+ * Восстанавливает/создаёт категории затрат из предопределённого списка.
  *
  * Для каждого известного кода:
  * - soft-deleted → восстанавливает (deletedAt = null, isActive = true)
  * - isActive = false → активирует
  * - не найдена → создаёт новую
+ *
+ * Поддерживает Ozon и Wildberries.
  */
 final class RestoreMarketplaceCostCategoriesAction
 {
@@ -30,11 +32,11 @@ final class RestoreMarketplaceCostCategoriesAction
 
     public function __invoke(Company $company, MarketplaceType $marketplace): int
     {
-        if ($marketplace !== MarketplaceType::OZON) {
+        $allCodes = $this->getCategoriesForMarketplace($marketplace);
+        if ($allCodes === []) {
             return 0;
         }
 
-        $allCodes = OzonServiceCategoryMap::getAllCategoryCodes();
         $restored = 0;
 
         // Single query: load all categories (including soft-deleted) for this company+marketplace
@@ -78,5 +80,28 @@ final class RestoreMarketplaceCostCategoriesAction
         $this->em->flush();
 
         return $restored;
+    }
+
+    /**
+     * @return array<string, string> code => name
+     */
+    private function getCategoriesForMarketplace(MarketplaceType $marketplace): array
+    {
+        return match ($marketplace) {
+            MarketplaceType::OZON => OzonServiceCategoryMap::getAllCategoryCodes(),
+            MarketplaceType::WILDBERRIES => [
+                'commission' => 'Комиссия маркетплейса',
+                'logistics_delivery' => 'Логистика до покупателя',
+                'logistics_return' => 'Логистика возврат',
+                'warehouse_logistics' => 'Логистика складские операции',
+                'storage' => 'Хранение WB',
+                'acquiring' => 'Эквайринг',
+                'penalty' => 'Штраф WB',
+                'pvz_processing' => 'Логистика обработка на ПВЗ',
+                'product_processing' => 'Обработка товара WB',
+                'wb_loyalty_discount_compensation' => 'Компенсация скидки по программе лояльности WB',
+            ],
+            MarketplaceType::YANDEX_MARKET, MarketplaceType::SBER_MEGAMARKET => [],
+        };
     }
 }
