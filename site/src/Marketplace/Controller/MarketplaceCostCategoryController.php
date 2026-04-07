@@ -2,6 +2,7 @@
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\RestoreMarketplaceCostCategoriesAction;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
@@ -85,7 +86,36 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/edit', name: 'marketplace_cost_categories_edit', methods: ['POST'])]
+    #[Route('/restore/{marketplace}', name: 'marketplace_cost_categories_restore', methods: ['POST'])]
+    public function restore(
+        Request $request,
+        MarketplaceType $marketplace,
+        RestoreMarketplaceCostCategoriesAction $restoreAction,
+    ): Response {
+        $company = $this->companyContext->getCompany();
+
+        if (!$this->isCsrfTokenValid('marketplace_cost_categories_restore', $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        if ($marketplace !== MarketplaceType::OZON) {
+            $this->addFlash('error', sprintf('Восстановление категорий для %s пока не поддерживается', $marketplace->displayName));
+
+            return $this->redirectToRoute('marketplace_cost_categories_index');
+        }
+
+        $count = ($restoreAction)($company, $marketplace);
+
+        if ($count > 0) {
+            $this->addFlash('success', sprintf('Восстановлено/создано категорий: %d', $count));
+        } else {
+            $this->addFlash('info', 'Все категории уже существуют и активны');
+        }
+
+        return $this->redirectToRoute('marketplace_cost_categories_index');
+    }
+
+    #[Route('/{id}/edit', name: 'marketplace_cost_categories_edit', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function edit(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
@@ -122,7 +152,7 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle', methods: ['POST'])]
+    #[Route('/{id}/toggle', name: 'marketplace_cost_categories_toggle', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function toggle(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
@@ -145,7 +175,7 @@ class MarketplaceCostCategoryController extends AbstractController
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
 
-    #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'])]
+    #[Route('/{id}/delete', name: 'marketplace_cost_categories_delete', methods: ['POST'], requirements: ['id' => '[0-9a-f-]{36}'])]
     public function delete(string $id, Request $request): Response
     {
         $company = $this->companyContext->getCompany();
