@@ -53,8 +53,6 @@ final class Version20260406000001 extends AbstractMigration
                 NOT DEFERRABLE INITIALLY IMMEDIATE
         SQL);
 
-        // Delete orphaned costs where category was removed via ON DELETE SET NULL
-        $this->addSql('DELETE FROM marketplace_costs WHERE category_id IS NULL');
         $this->addSql('ALTER TABLE marketplace_costs ALTER COLUMN category_id SET NOT NULL');
     }
 }
