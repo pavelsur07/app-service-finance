@@ -26,4 +26,25 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse($rows);
     }
+
+    #[Route('/costs-without-category', name: 'costs_without_category', methods: ['GET'])]
+    public function costsWithoutCategory(Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            'SELECT
+                id,
+                company_id,
+                cost_date,
+                description,
+                amount,
+                raw_document_id,
+                marketplace
+             FROM marketplace_costs
+             WHERE category_id IS NULL
+             ORDER BY cost_date DESC
+             LIMIT 50'
+        );
+
+        return new JsonResponse($rows);
+    }
 }
