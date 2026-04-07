@@ -15,6 +15,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['category_id'], name: 'idx_cost_category')]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_cost_listing')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_cost_sale')]
+#[ORM\Index(columns: ['raw_document_id'], name: 'idx_cost_raw_document')]
 class MarketplaceCost
 {
     #[ORM\Id]

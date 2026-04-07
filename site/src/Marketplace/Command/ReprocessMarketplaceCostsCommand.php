@@ -141,7 +141,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
     private function findDocumentsWithMismatchedCategories(?string $companyId): array
     {
         $sql = <<<'SQL'
-            SELECT DISTINCT mrd.id, mrd.company_id, mrd.period_from, mrd.period_to
+            SELECT mrd.id, mrd.company_id, mrd.period_from, mrd.period_to
             FROM marketplace_raw_documents mrd
             WHERE mrd.processing_status = :status
               AND EXISTS (
