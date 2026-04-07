@@ -6,6 +6,7 @@ namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
@@ -29,6 +30,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private MarketplaceRawProcessorRegistryInterface $processorRegistry,
         private MarketplaceRawDocumentRepository $repository,
         private EntityManagerInterface $entityManager,
+        private MarketplaceCostCategoryResolver $costCategoryResolver,
     ) {
     }
 
@@ -89,6 +91,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
                     $processor->processBatch($command->companyId, $marketplace, $buckets[$bucketKey]);
                     $totalProcessed += count($buckets[$bucketKey]);
                     $this->entityManager->clear();
+                    $this->costCategoryResolver->resetCache();
                 }
 
                 $buckets[$bucketKey] = [];
@@ -109,7 +112,10 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $processor->processBatch($command->companyId, $marketplace, $bucketRows);
             $totalProcessed += count($bucketRows);
             $this->entityManager->clear();
+            $this->costCategoryResolver->resetCache();
         }
+
+        $this->costCategoryResolver->clearCache();
 
         return $totalProcessed;
     }
