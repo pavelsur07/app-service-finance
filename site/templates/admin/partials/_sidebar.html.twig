@@ -68,6 +68,12 @@
                                     <span class="nav-link-title">Неизвестные затраты</span>
                                 </a>
                             </li>
+                            <li class="nav-item">
+                                <a class="nav-link {% if app.request.get('_route') starts with 'admin_marketplace_reprocess_' %}active{% endif %}"
+                                   href="{{ path('admin_marketplace_reprocess_index') }}">
+                                    <span class="nav-link-title">Переобработка затрат</span>
+                                </a>
+                            </li>
                         </ul>
                     </div>
                 </li>
