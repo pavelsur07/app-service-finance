@@ -13,6 +13,7 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +33,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -169,6 +171,19 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
 
                 $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                 $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+            } else {
+                // nm_id пустой но есть barcode — ищем листинг напрямую
+                $barcode = trim((string) ($item['barcode'] ?? ''));
+                if ($barcode !== '') {
+                    $barcodeEntity = $this->barcodeRepository->findByBarcode(
+                        $companyId,
+                        $barcode,
+                        MarketplaceType::WILDBERRIES,
+                    );
+                    if ($barcodeEntity !== null) {
+                        $listing = $barcodeEntity->getListing();
+                    }
+                }
             }
 
             foreach ($this->costCalculators as $calculator) {
