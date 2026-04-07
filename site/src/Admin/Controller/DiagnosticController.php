@@ -48,10 +48,9 @@ final class DiagnosticController extends AbstractController
         return new JsonResponse($rows);
     }
 
-    #[Route('/fix-wb-costs-categories', name: 'fix_wb_costs', methods: ['GET'])]
-    public function fixWbCostsCategories(Connection $connection): JsonResponse
+    #[Route('/fix-wb-costs-categories/{companyId}', name: 'fix_wb_costs', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function fixWbCostsCategories(string $companyId, Connection $connection): JsonResponse
     {
-        $companyId = '19621cff-b028-45d9-9193-11f47ad9a8b2';
 
         $categories = $connection->fetchAllAssociative(
             'SELECT id, code
