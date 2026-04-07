@@ -194,6 +194,7 @@ final class ProcessWbCostsAction
                 $cost->setCostDate($costData['cost_date']);
                 $cost->setAmount($costData['amount']);
                 $cost->setDescription($costData['description']);
+                $cost->setRawDocumentId($rawDocId);
 
                 // ПРИВЯЗКА К LISTING (если есть)
                 if ($listing) {
