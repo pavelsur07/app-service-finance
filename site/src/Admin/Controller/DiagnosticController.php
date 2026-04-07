@@ -78,6 +78,8 @@ final class DiagnosticController extends AbstractController
             'Логистика обработка на ПВЗ' => 'pvz_processing',
             'Обработка товара WB' => 'product_processing',
             'Компенсация скидки по программе лояльности WB' => 'wb_loyalty_discount_compensation',
+            'Оказание услуг «WB Продвижение»' => 'wb_okazanie_uslug_wb_prodvizhenie',
+            'Списание за отзыв' => 'wb_spisanie_za_otzyv',
         ];
 
         $results = [];
