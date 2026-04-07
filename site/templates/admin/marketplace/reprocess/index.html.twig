@@ -1,0 +1,92 @@
+{% extends 'admin/base.html.twig' %}
+
+{% block title %}Admin · Переобработка затрат{% endblock %}
+
+{% block body %}
+  <div class="page-header d-print-none">
+    <div class="row align-items-center">
+      <div class="col">
+        <h2 class="page-title">Переобработка затрат маркетплейсов</h2>
+      </div>
+    </div>
+  </div>
+
+  {% for message in app.flashes('success') %}
+    <div class="alert alert-success alert-dismissible mt-3" role="alert">
+      <div>{{ message|nl2br }}</div>
+      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+    </div>
+  {% endfor %}
+
+  {% for message in app.flashes('error') %}
+    <div class="alert alert-danger alert-dismissible mt-3" role="alert">
+      <div>{{ message|nl2br }}</div>
+      <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+    </div>
+  {% endfor %}
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Документы с некорректными категориями затрат</h3>
+    </div>
+    <div class="card-body">
+      {% if documents is not empty %}
+        <div class="table-responsive">
+          <table class="table table-vcenter">
+            <thead>
+              <tr>
+                <th scope="col">ID документа</th>
+                <th scope="col">Company ID</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for doc in documents %}
+                <tr>
+                  <td><code>{{ doc.id }}</code></td>
+                  <td><code>{{ doc.company_id }}</code></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="mt-2 text-muted">
+          Найдено документов: {{ documents|length }}
+        </div>
+      {% else %}
+        <div class="alert alert-success mb-0">
+          Нарушений не обнаружено
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card mt-3">
+    <div class="card-header">
+      <h3 class="card-title">Переобработать затраты</h3>
+    </div>
+    <div class="card-body">
+      <form action="{{ path('admin_marketplace_reprocess_run') }}" method="POST">
+        <input type="hidden" name="_token" value="{{ csrf_token('admin_marketplace_reprocess') }}">
+
+        <div class="mb-3">
+          <label class="form-label" for="company_id">Company ID</label>
+          <input
+            type="text"
+            class="form-control"
+            id="company_id"
+            name="company_id"
+            placeholder="UUID компании, опционально"
+          >
+        </div>
+
+        <button type="submit" class="btn btn-danger">
+          Запустить переобработку
+        </button>
+      </form>
+
+      <div class="alert alert-warning mt-3 mb-0">
+        Операция удалит и пересоздаст затраты не привязанные к финансовым документам
+      </div>
+    </div>
+  </div>
+{% endblock %}
