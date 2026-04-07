@@ -181,6 +181,15 @@ class MarketplaceCostCategory
         return $this;
     }
 
+    public function restore(): self
+    {
+        $this->deletedAt = null;
+        $this->isActive = true;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
     public function isDeleted(): bool
     {
         return $this->deletedAt !== null;

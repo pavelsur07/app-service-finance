@@ -186,6 +186,31 @@ final class OzonServiceCategoryMap
         return array_key_exists($serviceName, self::MAP) && self::MAP[$serviceName] === null;
     }
 
+    /**
+     * Все уникальные category codes — из MAP + коды, генерируемые в extractCostEntries().
+     *
+     * @return array<string, string> code => human-readable name
+     */
+    public static function getAllCategoryCodes(): array
+    {
+        $codes = [];
+
+        foreach (self::MAP as $code) {
+            if ($code !== null && !isset($codes[$code])) {
+                $codes[$code] = self::getCategoryName($code);
+            }
+        }
+
+        // Коды, генерируемые в OzonCostsRawProcessor::extractCostEntries() напрямую
+        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery'] as $extra) {
+            if (!isset($codes[$extra])) {
+                $codes[$extra] = self::getCategoryName($extra);
+            }
+        }
+
+        return $codes;
+    }
+
     public static function getCategoryName(string $categoryCode): string
     {
         return match ($categoryCode) {
