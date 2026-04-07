@@ -37,6 +37,7 @@ final class MarketplaceCostCategoryResolverTest extends TestCase
             });
 
         $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
 
         $resolver = new MarketplaceCostCategoryResolver($repository, $em);
 
@@ -45,6 +46,7 @@ final class MarketplaceCostCategoryResolverTest extends TestCase
 
         self::assertSame($categoryA, $resultA);
         self::assertNotSame($resultA, $resultB);
+        self::assertSame($companyB, $resultB->getCompany());
     }
 
     public function testClearCacheResetsAllEntries(): void
@@ -64,8 +66,8 @@ final class MarketplaceCostCategoryResolverTest extends TestCase
 
         $resolver = new MarketplaceCostCategoryResolver($repository, $em);
 
-        $resolver->resolve($company, MarketplaceType::OZON, 'logistics', 'Логистика');
+        self::assertSame($category, $resolver->resolve($company, MarketplaceType::OZON, 'logistics', 'Логистика'));
         $resolver->clearCache();
-        $resolver->resolve($company, MarketplaceType::OZON, 'logistics', 'Логистика');
+        self::assertSame($category, $resolver->resolve($company, MarketplaceType::OZON, 'logistics', 'Логистика'));
     }
 }
