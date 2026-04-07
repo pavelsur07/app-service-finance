@@ -13,6 +13,7 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -32,6 +33,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingIdsQuery,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -90,6 +92,19 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             MarketplaceType::WILDBERRIES,
             array_keys($allBarcodes),
         );
+
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
 
         // Предзагрузка листингов
         $allNmIdsMap = [];
@@ -169,6 +184,12 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
 
                 $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                 $listing = $listingsCache[$nmId . '_' . $size] ?? null;
+            } else {
+                // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
+                $barcode = trim((string) ($item['barcode'] ?? ''));
+                if ($barcode !== '' && isset($barcodeListingMap[$barcode])) {
+                    $listing = $barcodeListingMap[$barcode];
+                }
             }
 
             foreach ($this->costCalculators as $calculator) {

@@ -13,6 +13,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +32,7 @@ final class ProcessWbCostsAction
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
+        private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -101,6 +103,19 @@ final class ProcessWbCostsAction
             MarketplaceType::WILDBERRIES,
             array_keys($allBarcodes),
         );
+
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
 
         $listingsCache = [];
         if (!empty($allNmIds)) {
@@ -272,11 +287,14 @@ final class ProcessWbCostsAction
 
                     // Получаем listing из кэша по nm_id + size (с barcode fallback)
                     $nmId = trim((string) ($item['nm_id'] ?? ''));
+                    $barcode = trim((string) ($item['barcode'] ?? ''));
                     if ($nmId === '' || $nmId === '0') {
-                        $listing = null;
+                        // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
+                        $listing = $barcode !== '' && isset($barcodeListingMap[$barcode])
+                            ? $barcodeListingMap[$barcode]
+                            : null;
                     } else {
                         $tsName = $item['ts_name'] ?? null;
-                        $barcode = trim((string) ($item['barcode'] ?? ''));
 
                         if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
                             $tsName = $barcodeSizeMap[$barcode];
