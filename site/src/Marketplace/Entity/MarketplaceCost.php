@@ -29,8 +29,8 @@ class MarketplaceCost
     private MarketplaceType $marketplace;
 
     #[ORM\ManyToOne(targetEntity: MarketplaceCostCategory::class)]
-    #[ORM\JoinColumn(nullable: false, onDelete: 'RESTRICT')]
-    private MarketplaceCostCategory $category;
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?MarketplaceCostCategory $category = null;
 
     #[ORM\ManyToOne(targetEntity: MarketplaceListing::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
@@ -72,7 +72,7 @@ class MarketplaceCost
         string $id,
         Company $company,
         MarketplaceType $marketplace,
-        MarketplaceCostCategory $category,
+        ?MarketplaceCostCategory $category = null,
     ) {
         Assert::uuid($id);
         $this->id = $id;
@@ -98,12 +98,12 @@ class MarketplaceCost
         return $this->marketplace;
     }
 
-    public function getCategory(): MarketplaceCostCategory
+    public function getCategory(): ?MarketplaceCostCategory
     {
         return $this->category;
     }
 
-    public function setCategory(MarketplaceCostCategory $category): self
+    public function setCategory(?MarketplaceCostCategory $category): self
     {
         $this->category = $category;
         $this->updatedAt = new \DateTimeImmutable();
