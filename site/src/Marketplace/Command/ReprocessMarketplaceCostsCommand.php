@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Command;
 
-use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
-use Doctrine\DBAL\Connection;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\ProgressBar;
@@ -32,7 +31,7 @@ use Webmozart\Assert\Assert;
 final class ReprocessMarketplaceCostsCommand extends Command
 {
     public function __construct(
-        private readonly Connection $connection,
+        private readonly MarketplaceRawDocumentRepository $repository,
         private readonly MarketplaceSyncFacade $syncFacade,
     ) {
         parent::__construct();
@@ -64,7 +63,7 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
         $io->title('Переобработка затрат с неправильными категориями' . ($dryRun ? ' [DRY-RUN]' : ''));
 
-        $documents = $this->findDocumentsWithMismatchedCategories($companyId);
+        $documents = $this->repository->findDocsWithCrossCompanyCosts($companyId);
 
         if ($documents === []) {
             $io->success('Не найдено документов с неправильными категориями.');
@@ -77,11 +76,11 @@ final class ReprocessMarketplaceCostsCommand extends Command
 
         $io->table(
             ['Raw Document ID', 'Company ID', 'Period From', 'Period To'],
-            array_map(static fn(array $row): array => [
-                $row['id'],
-                $row['company_id'],
-                $row['period_from'],
-                $row['period_to'],
+            array_map(static fn($doc): array => [
+                $doc->getId(),
+                (string) $doc->getCompany()->getId(),
+                $doc->getPeriodFrom()->format('Y-m-d'),
+                $doc->getPeriodTo()->format('Y-m-d'),
             ], $documents),
         );
 
@@ -103,14 +102,16 @@ final class ReprocessMarketplaceCostsCommand extends Command
         $processed = 0;
         $failedDocs = [];
 
-        foreach ($documents as $row) {
-            $progressBar->setMessage($row['id']);
+        foreach ($documents as $doc) {
+            $docId = $doc->getId();
+            $docCompanyId = (string) $doc->getCompany()->getId();
+            $progressBar->setMessage($docId);
 
             try {
-                $this->syncFacade->processCostsFromRaw($row['company_id'], $row['id']);
+                $this->syncFacade->processCostsFromRaw($docCompanyId, $docId);
                 $processed++;
             } catch (\Throwable $e) {
-                $failedDocs[] = sprintf('%s: %s', $row['id'], $e->getMessage());
+                $failedDocs[] = sprintf('%s: %s', $docId, $e->getMessage());
             }
 
             $progressBar->advance();
@@ -133,35 +134,5 @@ final class ReprocessMarketplaceCostsCommand extends Command
         $io->success('Переобработка затрат завершена.');
 
         return $failedDocs !== [] ? Command::FAILURE : Command::SUCCESS;
-    }
-
-    /**
-     * @return array<int, array{id: string, company_id: string, period_from: string, period_to: string}>
-     */
-    private function findDocumentsWithMismatchedCategories(?string $companyId): array
-    {
-        $sql = <<<'SQL'
-            SELECT mrd.id, mrd.company_id, mrd.period_from, mrd.period_to
-            FROM marketplace_raw_documents mrd
-            WHERE mrd.processing_status = :status
-              AND EXISTS (
-                  SELECT 1
-                  FROM marketplace_costs mc
-                  JOIN marketplace_cost_categories mcc ON mc.category_id = mcc.id
-                  WHERE mc.raw_document_id = mrd.id
-                    AND mc.company_id != mcc.company_id
-              )
-            SQL;
-
-        $params = ['status' => PipelineStatus::COMPLETED->value];
-
-        if ($companyId !== null) {
-            $sql .= ' AND mrd.company_id = :companyId';
-            $params['companyId'] = $companyId;
-        }
-
-        $sql .= ' ORDER BY mrd.company_id, mrd.period_from';
-
-        return $this->connection->fetchAllAssociative($sql, $params);
     }
 }

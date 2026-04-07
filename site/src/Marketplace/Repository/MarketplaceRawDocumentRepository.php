@@ -7,7 +7,9 @@ namespace App\Marketplace\Repository;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\Persistence\ManagerRegistry;
 
 class MarketplaceRawDocumentRepository extends ServiceEntityRepository
@@ -90,6 +92,52 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         }
 
         return $qb->getQuery()->getResult();
+    }
+
+    /**
+     * Найти COMPLETED raw-документы, у которых marketplace_costs
+     * ссылаются на категории другой компании.
+     *
+     * @return MarketplaceRawDocument[]
+     */
+    public function findDocsWithCrossCompanyCosts(?string $companyId = null): array
+    {
+        /** @var Connection $conn */
+        $conn = $this->getEntityManager()->getConnection();
+
+        $sql = <<<'SQL'
+            SELECT mrd.id
+            FROM marketplace_raw_documents mrd
+            WHERE mrd.processing_status = :status
+              AND EXISTS (
+                  SELECT 1
+                  FROM marketplace_costs mc
+                  JOIN marketplace_cost_categories mcc ON mc.category_id = mcc.id
+                  WHERE mc.raw_document_id = mrd.id
+                    AND mc.company_id != mcc.company_id
+              )
+            SQL;
+
+        $params = ['status' => PipelineStatus::COMPLETED->value];
+
+        if ($companyId !== null) {
+            $sql .= ' AND mrd.company_id = :companyId';
+            $params['companyId'] = $companyId;
+        }
+
+        $ids = $conn->fetchFirstColumn($sql, $params);
+
+        if ($ids === []) {
+            return [];
+        }
+
+        return $this->createQueryBuilder('mrd')
+            ->addSelect('c')
+            ->join('mrd.company', 'c')
+            ->where('mrd.id IN (:ids)')
+            ->setParameter('ids', $ids)
+            ->getQuery()
+            ->getResult();
     }
 
     /**
