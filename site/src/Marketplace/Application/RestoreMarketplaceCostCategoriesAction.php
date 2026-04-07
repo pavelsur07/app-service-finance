@@ -30,6 +30,10 @@ final class RestoreMarketplaceCostCategoriesAction
 
     public function __invoke(Company $company, MarketplaceType $marketplace): int
     {
+        if ($marketplace !== MarketplaceType::OZON) {
+            return 0;
+        }
+
         $allCodes = OzonServiceCategoryMap::getAllCategoryCodes();
         $restored = 0;
 

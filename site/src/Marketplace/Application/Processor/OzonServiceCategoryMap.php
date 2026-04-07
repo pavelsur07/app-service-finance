@@ -202,7 +202,8 @@ final class OzonServiceCategoryMap
         }
 
         // Коды, генерируемые в OzonCostsRawProcessor::extractCostEntries() напрямую
-        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery'] as $extra) {
+        // + ozon_other_service — fallback для неизвестных service names
+        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery', 'ozon_other_service'] as $extra) {
             if (!isset($codes[$extra])) {
                 $codes[$extra] = self::getCategoryName($extra);
             }
