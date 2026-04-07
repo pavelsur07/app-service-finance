@@ -120,4 +120,20 @@ final class DiagnosticController extends AbstractController
             'wb_costs_without_category_total' => (int) ($counts['wildberries'] ?? 0),
         ]);
     }
+
+    #[Route('/wb-costs-sample/{companyId}', name: 'wb_costs_sample', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function wbCostsSample(string $companyId, Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            'SELECT id, marketplace, category_id, description, company_id
+             FROM marketplace_costs
+             WHERE company_id = :companyId
+               AND marketplace = :marketplace
+               AND category_id IS NULL
+             LIMIT 5',
+            ['companyId' => $companyId, 'marketplace' => 'wildberries'],
+        );
+
+        return new JsonResponse($rows);
+    }
 }
