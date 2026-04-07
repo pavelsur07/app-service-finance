@@ -47,7 +47,7 @@ final class MarketplaceCostCategoryResolver
 
         if ($category === null) {
             $category = new MarketplaceCostCategory(
-                Uuid::uuid4()->toString(),
+                Uuid::uuid7()->toString(),
                 $company,
                 $marketplace,
             );
