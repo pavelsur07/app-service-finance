@@ -145,4 +145,20 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse($rows);
     }
+
+    #[Route('/wb-barcodes/{companyId}', name: 'wb_barcodes', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function wbBarcodes(string $companyId, Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            'SELECT barcode, listing_id
+             FROM marketplace_listing_barcodes
+             WHERE company_id = :companyId
+               AND marketplace = :marketplace
+             ORDER BY barcode
+             LIMIT 100',
+            ['companyId' => $companyId, 'marketplace' => 'wildberries'],
+        );
+
+        return new JsonResponse($rows);
+    }
 }
