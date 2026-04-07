@@ -104,6 +104,19 @@ final class ProcessWbCostsAction
             array_keys($allBarcodes),
         );
 
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
+
         $listingsCache = [];
         if (!empty($allNmIds)) {
             // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: используем ту же логику индексации что и для продаж/возвратов
@@ -276,18 +289,10 @@ final class ProcessWbCostsAction
                     $nmId = trim((string) ($item['nm_id'] ?? ''));
                     $barcode = trim((string) ($item['barcode'] ?? ''));
                     if ($nmId === '' || $nmId === '0') {
-                        // nm_id пустой — пробуем найти листинг по barcode
-                        $listing = null;
-                        if ($barcode !== '') {
-                            $barcodeEntity = $this->barcodeRepository->findByBarcode(
-                                $companyId,
-                                $barcode,
-                                MarketplaceType::WILDBERRIES,
-                            );
-                            if ($barcodeEntity !== null) {
-                                $listing = $barcodeEntity->getListing();
-                            }
-                        }
+                        // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
+                        $listing = $barcode !== '' && isset($barcodeListingMap[$barcode])
+                            ? $barcodeListingMap[$barcode]
+                            : null;
                     } else {
                         $tsName = $item['ts_name'] ?? null;
 

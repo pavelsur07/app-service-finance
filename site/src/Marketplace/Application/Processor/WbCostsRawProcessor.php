@@ -93,6 +93,19 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             array_keys($allBarcodes),
         );
 
+        // Предзагрузка barcode→listing для items с пустым nm_id
+        $barcodeListingMap = [];
+        if (!empty($allBarcodes)) {
+            $barcodeEntities = $this->barcodeRepository->findByBarcodesIndexed(
+                $companyId,
+                array_keys($allBarcodes),
+                MarketplaceType::WILDBERRIES,
+            );
+            foreach ($barcodeEntities as $bc => $barcodeEntity) {
+                $barcodeListingMap[$bc] = $barcodeEntity->getListing();
+            }
+        }
+
         // Предзагрузка листингов
         $allNmIdsMap = [];
         foreach ($costsData as $item) {
@@ -172,17 +185,10 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
                 $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                 $listing = $listingsCache[$nmId . '_' . $size] ?? null;
             } else {
-                // nm_id пустой но есть barcode — ищем листинг напрямую
+                // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
                 $barcode = trim((string) ($item['barcode'] ?? ''));
-                if ($barcode !== '') {
-                    $barcodeEntity = $this->barcodeRepository->findByBarcode(
-                        $companyId,
-                        $barcode,
-                        MarketplaceType::WILDBERRIES,
-                    );
-                    if ($barcodeEntity !== null) {
-                        $listing = $barcodeEntity->getListing();
-                    }
+                if ($barcode !== '' && isset($barcodeListingMap[$barcode])) {
+                    $listing = $barcodeListingMap[$barcode];
                 }
             }
 
