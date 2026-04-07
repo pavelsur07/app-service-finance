@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Admin\Controller;
 
+use App\Marketplace\Message\ReprocessCostsMessage;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Process\Process;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Annotation\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
@@ -16,79 +18,49 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class MarketplaceReprocessController extends AbstractController
 {
     #[Route('', name: 'index', methods: ['GET'])]
-    public function index(): Response
+    public function index(MarketplaceRawDocumentRepository $repository): Response
     {
-        $process = new Process([
-            'php', 'bin/console', 'marketplace:costs:reprocess', '--dry-run', '--no-interaction',
-        ]);
-        $process->setWorkingDirectory($this->getParameter('kernel.project_dir'));
-        $process->run();
-
-        $output = $process->getOutput();
-        $documents = $this->parseDryRunOutput($output);
+        $documents = $repository->findDocsWithCrossCompanyCosts();
 
         return $this->render('admin/marketplace/reprocess/index.html.twig', [
-            'documents' => $documents,
-            'rawOutput' => $output,
+            'documents' => array_map(static fn($doc): array => [
+                'id' => $doc->getId(),
+                'company_id' => (string) $doc->getCompany()->getId(),
+            ], $documents),
         ]);
     }
 
     #[Route('/run', name: 'run', methods: ['POST'])]
-    public function run(Request $request): Response
-    {
+    public function run(
+        Request $request,
+        MarketplaceRawDocumentRepository $repository,
+        MessageBusInterface $bus,
+    ): Response {
         $csrfToken = (string) $request->request->get('_token', '');
         if (!$this->isCsrfTokenValid('admin_marketplace_reprocess', $csrfToken)) {
             throw $this->createAccessDeniedException('Недействительный CSRF токен.');
         }
 
         $companyId = trim((string) $request->request->get('company_id', ''));
+        $filterCompanyId = $companyId !== '' ? $companyId : null;
 
-        $command = ['php', 'bin/console', 'marketplace:costs:reprocess', '--no-interaction'];
-        if ($companyId !== '') {
-            $command[] = '--company-id=' . $companyId;
+        $documents = $repository->findDocsWithCrossCompanyCosts($filterCompanyId);
+
+        if ($documents === []) {
+            $this->addFlash('success', 'Нет документов для переобработки.');
+
+            return $this->redirectToRoute('admin_marketplace_reprocess_index');
         }
 
-        $process = new Process($command);
-        $process->setWorkingDirectory($this->getParameter('kernel.project_dir'));
-        $process->setTimeout(300);
-        $process->run();
-
-        if ($process->isSuccessful()) {
-            $this->addFlash('success', 'Переобработка затрат завершена.' . "\n" . $process->getOutput());
-        } else {
-            $this->addFlash('error', 'Ошибка переобработки: ' . $process->getErrorOutput());
+        foreach ($documents as $doc) {
+            $bus->dispatch(new ReprocessCostsMessage(
+                companyId: (string) $doc->getCompany()->getId(),
+                rawDocumentId: $doc->getId(),
+            ));
         }
+
+        $this->addFlash('success', sprintf('Отправлено в очередь: %d документов.', count($documents)));
 
         return $this->redirectToRoute('admin_marketplace_reprocess_index');
-    }
-
-    /**
-     * @return array<int, array{id: string, company_id: string}>
-     */
-    private function parseDryRunOutput(string $output): array
-    {
-        $documents = [];
-        $lines = explode("\n", $output);
-
-        foreach ($lines as $line) {
-            $line = trim($line);
-            // Table rows from SymfonyStyle: "| <uuid> | <uuid> | <date> | <date> |"
-            if (!str_starts_with($line, '|') || str_contains($line, '---') || str_contains($line, 'Raw Document ID')) {
-                continue;
-            }
-
-            $cells = array_map('trim', explode('|', $line));
-            // After split: ['', cell1, cell2, cell3, cell4, '']
-            $cells = array_values(array_filter($cells, static fn(string $s): bool => $s !== ''));
-
-            if (count($cells) >= 2) {
-                $documents[] = [
-                    'id' => $cells[0],
-                    'company_id' => $cells[1],
-                ];
-            }
-        }
-
-        return $documents;
     }
 }

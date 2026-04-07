@@ -31,6 +31,7 @@ framework:
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\ProcessRawDocumentStepMessage': async
+            'App\Marketplace\Message\ReprocessCostsMessage': async
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
             'App\Catalog\Message\ImportProductsMessage': async
             #App\Message\ApplyAutoRulesForTransaction: async
