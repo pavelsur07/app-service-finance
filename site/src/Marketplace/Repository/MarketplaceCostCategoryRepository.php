@@ -48,14 +48,14 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    public function findByIdAndCompany(string $id, Company $company): ?MarketplaceCostCategory
+    public function findByIdAndCompany(Company $company, string $id): ?MarketplaceCostCategory
     {
         return $this->createQueryBuilder('c')
-            ->where('c.id = :id')
-            ->andWhere('c.company = :company')
+            ->where('c.company = :company')
+            ->andWhere('c.id = :id')
             ->andWhere('c.deletedAt IS NULL')
-            ->setParameter('id', $id)
             ->setParameter('company', $company)
+            ->setParameter('id', $id)
             ->getQuery()
             ->getOneOrNullResult();
     }
