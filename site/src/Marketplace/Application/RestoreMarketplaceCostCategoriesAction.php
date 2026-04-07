@@ -33,12 +33,19 @@ final class RestoreMarketplaceCostCategoriesAction
         $allCodes = OzonServiceCategoryMap::getAllCategoryCodes();
         $restored = 0;
 
+        // Single query: load all categories (including soft-deleted) for this company+marketplace
+        $existingCategories = $this->repository->findBy([
+            'company' => $company,
+            'marketplace' => $marketplace,
+        ]);
+
+        $existingMap = [];
+        foreach ($existingCategories as $cat) {
+            $existingMap[$cat->getCode()] = $cat;
+        }
+
         foreach ($allCodes as $code => $name) {
-            $category = $this->repository->findOneBy([
-                'company' => $company,
-                'marketplace' => $marketplace,
-                'code' => $code,
-            ]);
+            $category = $existingMap[$code] ?? null;
 
             if ($category !== null) {
                 if ($category->isDeleted()) {
