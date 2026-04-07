@@ -91,6 +91,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
                     $processor->processBatch($command->companyId, $marketplace, $buckets[$bucketKey]);
                     $totalProcessed += count($buckets[$bucketKey]);
                     $this->entityManager->clear();
+                    $this->costCategoryResolver->resetCache();
                 }
 
                 $buckets[$bucketKey] = [];
@@ -111,6 +112,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
             $processor->processBatch($command->companyId, $marketplace, $bucketRows);
             $totalProcessed += count($bucketRows);
             $this->entityManager->clear();
+            $this->costCategoryResolver->resetCache();
         }
 
         $this->costCategoryResolver->clearCache();

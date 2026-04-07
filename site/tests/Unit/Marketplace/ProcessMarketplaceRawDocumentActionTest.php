@@ -8,6 +8,7 @@ use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorInterface;
 use App\Marketplace\Application\Processor\MarketplaceRawProcessorRegistryInterface;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -29,6 +30,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
             $this->createMock(EntityManagerInterface::class),
+            $this->createMock(MarketplaceCostCategoryResolver::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -55,6 +57,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
             $this->createMock(EntityManagerInterface::class),
+            $this->createMock(MarketplaceCostCategoryResolver::class),
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -99,6 +102,7 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $processorRegistry,
             $repository,
             $em,
+            $this->createMock(MarketplaceCostCategoryResolver::class),
         );
 
         $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
