@@ -98,12 +98,6 @@ class MarketplaceCostCategoryController extends AbstractController
             throw $this->createAccessDeniedException('Invalid CSRF token.');
         }
 
-        if ($marketplace !== MarketplaceType::OZON) {
-            $this->addFlash('error', sprintf('Восстановление категорий для %s пока не поддерживается', $marketplace->displayName));
-
-            return $this->redirectToRoute('marketplace_cost_categories_index');
-        }
-
         $count = ($restoreAction)($company, $marketplace);
 
         if ($count > 0) {
