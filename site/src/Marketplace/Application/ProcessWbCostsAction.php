@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Application;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
@@ -29,6 +30,7 @@ final class ProcessWbCostsAction
         private readonly MarketplaceCostExistingExternalIdsQuery $costExistingExternalIdsQuery,
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
+        private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -85,6 +87,21 @@ final class ProcessWbCostsAction
         }
         $allNmIds = array_keys($allNmIdsMap);
 
+        // Собираем все barcodes для barcode→size lookup
+        $allBarcodes = [];
+        foreach ($costsData as $item) {
+            $barcode = trim((string) ($item['barcode'] ?? ''));
+            if ($barcode !== '') {
+                $allBarcodes[$barcode] = true;
+            }
+        }
+
+        $barcodeSizeMap = $this->barcodeCatalog->findSizesByBarcodes(
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            array_keys($allBarcodes),
+        );
+
         $listingsCache = [];
         if (!empty($allNmIds)) {
             // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: используем ту же логику индексации что и для продаж/возвратов
@@ -107,6 +124,12 @@ final class ProcessWbCostsAction
             }
 
             $tsName = $item['ts_name'] ?? null;
+            $barcode = trim((string) ($item['barcode'] ?? ''));
+
+            if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                $tsName = $barcodeSizeMap[$barcode];
+            }
+
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
@@ -119,7 +142,7 @@ final class ProcessWbCostsAction
                 'brand_name'   => (string) ($item['brand_name'] ?? ''),
                 'subject_name' => (string) ($item['subject_name'] ?? ''),
                 'retail_price' => (string) ($item['retail_price'] ?? '0'),
-            ]);
+            ], $barcode);
 
             $listingsCache[$cacheKey] = $listing;
             $newListingsCreated++;
@@ -127,6 +150,7 @@ final class ProcessWbCostsAction
 
         if ($newListingsCreated > 0) {
             $this->em->flush();
+            $this->listingResolver->flushBarcodes();
             $this->logger->info('Created missing listings for costs in bulk', [
                 'new_listings' => $newListingsCreated,
             ]);
@@ -246,12 +270,18 @@ final class ProcessWbCostsAction
 
                     $processed = true;
 
-                    // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: получаем listing из кэша по nm_id + ts_name
+                    // Получаем listing из кэша по nm_id + size (с barcode fallback)
                     $nmId = trim((string) ($item['nm_id'] ?? ''));
                     if ($nmId === '' || $nmId === '0') {
                         $listing = null;
                     } else {
                         $tsName = $item['ts_name'] ?? null;
+                        $barcode = trim((string) ($item['barcode'] ?? ''));
+
+                        if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
+                            $tsName = $barcodeSizeMap[$barcode];
+                        }
+
                         $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                         $cacheKey = $nmId . '_' . $size;
                         $listing = $listingsCache[$cacheKey] ?? null;
