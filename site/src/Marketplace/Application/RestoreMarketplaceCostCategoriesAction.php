@@ -100,6 +100,9 @@ final class RestoreMarketplaceCostCategoriesAction
                 'pvz_processing' => 'Логистика обработка на ПВЗ',
                 'product_processing' => 'Обработка товара WB',
                 'wb_loyalty_discount_compensation' => 'Компенсация скидки по программе лояльности WB',
+                'advertising' => 'Реклама',
+                'wb_okazanie_uslug_wb_prodvizhenie' => 'Оказание услуг «WB Продвижение»',
+                'wb_spisanie_za_otzyv' => 'Списание за отзыв',
             ],
             MarketplaceType::YANDEX_MARKET, MarketplaceType::SBER_MEGAMARKET => [],
         };
