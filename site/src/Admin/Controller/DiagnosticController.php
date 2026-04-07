@@ -47,4 +47,58 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse($rows);
     }
+
+    #[Route('/fix-wb-costs-categories/{companyId}', name: 'fix_wb_costs', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function fixWbCostsCategories(string $companyId, Connection $connection): JsonResponse
+    {
+
+        $categories = $connection->fetchAllAssociative(
+            'SELECT id, code
+             FROM marketplace_cost_categories
+             WHERE company_id = :companyId
+               AND marketplace = :marketplace
+               AND is_active = true
+               AND deleted_at IS NULL',
+            ['companyId' => $companyId, 'marketplace' => 'wildberries'],
+        );
+
+        $codeToId = [];
+        foreach ($categories as $cat) {
+            $codeToId[$cat['code']] = $cat['id'];
+        }
+
+        $descriptionToCode = [
+            'Логистика до покупателя' => 'logistics_delivery',
+            'Логистика возврат' => 'logistics_return',
+            'Логистика складские операции' => 'warehouse_logistics',
+        ];
+
+        $results = [];
+        foreach ($descriptionToCode as $description => $code) {
+            $categoryId = $codeToId[$code] ?? null;
+            if ($categoryId === null) {
+                $results[$description] = ['error' => "Category with code '{$code}' not found"];
+                continue;
+            }
+
+            $updated = $connection->executeStatement(
+                'UPDATE marketplace_costs
+                 SET category_id = :categoryId
+                 WHERE company_id = :companyId
+                   AND marketplace = :marketplace
+                   AND category_id IS NULL
+                   AND description = :description',
+                [
+                    'categoryId' => $categoryId,
+                    'companyId' => $companyId,
+                    'marketplace' => 'wildberries',
+                    'description' => $description,
+                ],
+            );
+
+            $results[$description] = ['updated' => $updated, 'category_code' => $code];
+        }
+
+        return new JsonResponse($results);
+    }
 }
