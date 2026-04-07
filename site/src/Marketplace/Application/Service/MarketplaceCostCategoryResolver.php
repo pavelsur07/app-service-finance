@@ -77,6 +77,14 @@ final class MarketplaceCostCategoryResolver
     }
 
     /**
+     * Полный сброс кеша — вызывать между сообщениями Messenger.
+     */
+    public function clearCache(): void
+    {
+        $this->cache = [];
+    }
+
+    /**
      * Предзагрузить все существующие категории компании одним запросом.
      * Вызывать один раз в начале Action до обработки батчей.
      */
