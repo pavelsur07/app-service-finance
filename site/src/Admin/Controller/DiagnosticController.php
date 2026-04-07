@@ -101,4 +101,30 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse($results);
     }
+
+    #[Route('/wb-costs-check/{companyId}', name: 'wb_costs_check', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function wbCostsCheck(string $companyId, Connection $connection): JsonResponse
+    {
+        $byMarketplace = $connection->fetchAllAssociative(
+            'SELECT marketplace, COUNT(*) as cnt
+             FROM marketplace_costs
+             WHERE company_id = :companyId AND category_id IS NULL
+             GROUP BY marketplace',
+            ['companyId' => $companyId],
+        );
+
+        $wbTotal = $connection->fetchOne(
+            'SELECT COUNT(*) as total
+             FROM marketplace_costs
+             WHERE company_id = :companyId
+               AND marketplace = :marketplace
+               AND category_id IS NULL',
+            ['companyId' => $companyId, 'marketplace' => 'wildberries'],
+        );
+
+        return new JsonResponse([
+            'costs_without_category_by_marketplace' => $byMarketplace,
+            'wb_costs_without_category_total' => (int) $wbTotal,
+        ]);
+    }
 }
