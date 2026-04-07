@@ -113,18 +113,11 @@ final class DiagnosticController extends AbstractController
             ['companyId' => $companyId],
         );
 
-        $wbTotal = $connection->fetchOne(
-            'SELECT COUNT(*) as total
-             FROM marketplace_costs
-             WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND category_id IS NULL',
-            ['companyId' => $companyId, 'marketplace' => 'wildberries'],
-        );
+        $counts = array_column($byMarketplace, 'cnt', 'marketplace');
 
         return new JsonResponse([
             'costs_without_category_by_marketplace' => $byMarketplace,
-            'wb_costs_without_category_total' => (int) $wbTotal,
+            'wb_costs_without_category_total' => (int) ($counts['wildberries'] ?? 0),
         ]);
     }
 }
