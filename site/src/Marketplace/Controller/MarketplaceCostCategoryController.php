@@ -90,9 +90,8 @@ class MarketplaceCostCategoryController extends AbstractController
     {
         $company = $this->companyContext->getCompany();
 
-        $category = $this->repository->find($id);
-
-        if (!$category || $category->getCompany()->getId() !== $company->getId()) {
+        $category = $this->repository->findByIdAndCompany($company, $id);
+        if (!$category) {
             throw $this->createNotFoundException();
         }
 
@@ -128,9 +127,8 @@ class MarketplaceCostCategoryController extends AbstractController
     {
         $company = $this->companyContext->getCompany();
 
-        $category = $this->repository->find($id);
-
-        if (!$category || $category->getCompany()->getId() !== $company->getId()) {
+        $category = $this->repository->findByIdAndCompany($company, $id);
+        if (!$category) {
             throw $this->createNotFoundException();
         }
 
@@ -152,9 +150,8 @@ class MarketplaceCostCategoryController extends AbstractController
     {
         $company = $this->companyContext->getCompany();
 
-        $category = $this->repository->find($id);
-
-        if (!$category || $category->getCompany()->getId() !== $company->getId()) {
+        $category = $this->repository->findByIdAndCompany($company, $id);
+        if (!$category) {
             throw $this->createNotFoundException();
         }
 
