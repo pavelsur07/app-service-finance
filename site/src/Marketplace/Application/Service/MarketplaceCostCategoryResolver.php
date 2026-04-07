@@ -32,7 +32,7 @@ final class MarketplaceCostCategoryResolver
         string $code,
         string $name,
     ): MarketplaceCostCategory {
-        $cacheKey = $marketplace->value . '_' . $code;
+        $cacheKey = $company->getId() . '_' . $marketplace->value . '_' . $code;
 
         if (isset($this->cache[$cacheKey])) {
             return $this->cache[$cacheKey];
@@ -89,7 +89,7 @@ final class MarketplaceCostCategoryResolver
         ]);
 
         foreach ($categories as $category) {
-            $cacheKey = $marketplace->value . '_' . $category->getCode();
+            $cacheKey = $company->getId() . '_' . $marketplace->value . '_' . $category->getCode();
             $this->cache[$cacheKey] = $category;
         }
     }
