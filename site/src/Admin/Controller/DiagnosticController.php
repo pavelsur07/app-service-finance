@@ -71,6 +71,13 @@ final class DiagnosticController extends AbstractController
             'Логистика до покупателя' => 'logistics_delivery',
             'Логистика возврат' => 'logistics_return',
             'Логистика складские операции' => 'warehouse_logistics',
+            'Хранение WB' => 'storage',
+            'Штраф WB' => 'penalty',
+            'Эквайринг' => 'acquiring',
+            'Комиссия маркетплейса' => 'commission',
+            'Логистика обработка на ПВЗ' => 'pvz_processing',
+            'Обработка товара WB' => 'product_processing',
+            'Компенсация скидки по программе лояльности WB' => 'wb_loyalty_discount_compensation',
         ];
 
         $results = [];
