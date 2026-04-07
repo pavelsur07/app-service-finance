@@ -2,6 +2,7 @@
 
 namespace App\Marketplace\Controller;
 
+use App\Marketplace\Application\RestoreMarketplaceCostCategoriesAction;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
@@ -183,6 +184,29 @@ class MarketplaceCostCategoryController extends AbstractController
         $this->em->flush();
 
         $this->addFlash('success', sprintf('Категория "%s" удалена', $category->getName()));
+
+        return $this->redirectToRoute('marketplace_cost_categories_index');
+    }
+
+    #[Route('/restore/{marketplace}', name: 'marketplace_cost_categories_restore', methods: ['POST'])]
+    public function restore(
+        Request $request,
+        MarketplaceType $marketplace,
+        RestoreMarketplaceCostCategoriesAction $restoreAction,
+    ): Response {
+        $company = $this->companyContext->getCompany();
+
+        if (!$this->isCsrfTokenValid('marketplace_cost_categories_restore', $request->request->get('_token'))) {
+            throw $this->createAccessDeniedException('Invalid CSRF token.');
+        }
+
+        $count = ($restoreAction)($company, $marketplace);
+
+        if ($count > 0) {
+            $this->addFlash('success', sprintf('Восстановлено/создано категорий: %d', $count));
+        } else {
+            $this->addFlash('info', 'Все категории уже существуют и активны');
+        }
 
         return $this->redirectToRoute('marketplace_cost_categories_index');
     }
