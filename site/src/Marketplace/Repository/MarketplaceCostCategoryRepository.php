@@ -48,6 +48,18 @@ class MarketplaceCostCategoryRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findByIdAndCompany(string $id, Company $company): ?MarketplaceCostCategory
+    {
+        return $this->createQueryBuilder('c')
+            ->where('c.id = :id')
+            ->andWhere('c.company = :company')
+            ->andWhere('c.deletedAt IS NULL')
+            ->setParameter('id', $id)
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     /**
      * Массовая загрузка категорий по кодам с индексацией (для bulk import)
      * Возвращает массив: ['category_code' => Category]
