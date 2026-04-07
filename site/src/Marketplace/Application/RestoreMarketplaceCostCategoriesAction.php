@@ -101,7 +101,7 @@ final class RestoreMarketplaceCostCategoriesAction
                 'product_processing' => 'Обработка товара WB',
                 'wb_loyalty_discount_compensation' => 'Компенсация скидки по программе лояльности WB',
             ],
-            default => [],
+            MarketplaceType::YANDEX_MARKET, MarketplaceType::SBER_MEGAMARKET => [],
         };
     }
 }
