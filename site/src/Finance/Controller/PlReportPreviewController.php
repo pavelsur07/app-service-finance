@@ -359,17 +359,15 @@ final class PlReportPreviewController extends AbstractController
     }
 
     /**
-     * Возвращает [from, to] с дефолтным диапазоном = текущий квартал.
+     * Возвращает [from, to] с дефолтным диапазоном = текущий год (01.01 — 31.12).
      *
      * @return array{\DateTimeImmutable, \DateTimeImmutable}
      */
     private function resolveDateRange(?string $fromInput, ?string $toInput): array
     {
-        $currentMonth = new \DateTimeImmutable('first day of this month');
-        $quarterStartMonth = ((int) $currentMonth->format('n') - 1) - (((int) $currentMonth->format('n') - 1) % 3) + 1;
-        $quarterStart = $currentMonth->setDate((int) $currentMonth->format('Y'), $quarterStartMonth, 1);
-        $defaultStart = $quarterStart->setTime(0, 0, 0);
-        $defaultEnd = $quarterStart->modify('+2 months')->modify('last day of this month')->setTime(0, 0, 0);
+        $now = new \DateTimeImmutable('today');
+        $defaultStart = $now->setDate((int) $now->format('Y'), 1, 1)->setTime(0, 0, 0);
+        $defaultEnd = $now->setDate((int) $now->format('Y'), 12, 31)->setTime(0, 0, 0);
 
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
