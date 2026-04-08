@@ -341,6 +341,23 @@ final class DiagnosticController extends AbstractController
         ]);
     }
 
+    #[Route('/tmp-ozon-costs-sample', name: 'tmp_ozon_costs_sample', methods: ['GET'])]
+    public function tmpOzonCostsSample(Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT external_id, cost_date, description, raw_document_id, document_id
+            FROM marketplace_costs
+            WHERE company_id = 'b57d7682-505f-4b74-86f8-953d32d59874'
+              AND marketplace = 'ozon'
+              AND cost_date BETWEEN '2026-03-01' AND '2026-03-31'
+            LIMIT 10
+            SQL,
+        );
+
+        return new JsonResponse($rows);
+    }
+
     #[Route('/fix-ozon-other-service/{companyId}', name: 'fix_ozon_other_service', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
     public function fixOzonOtherService(string $companyId, Request $request, Connection $connection): JsonResponse
     {
