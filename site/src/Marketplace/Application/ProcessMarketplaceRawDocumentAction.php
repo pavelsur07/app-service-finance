@@ -11,6 +11,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -33,6 +34,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
         private Connection $connection,
+        private AppLogger $appLogger,
     ) {
     }
 
@@ -78,6 +80,12 @@ final readonly class ProcessMarketplaceRawDocumentAction
         $marketplace = $document->getMarketplace();
         $totalProcessed = 0;
 
+        $this->appLogger->info('ProcessMarketplaceRawDocumentAction called', [
+            'rawDocId'       => $command->rawDocId,
+            'kind'           => $command->kind,
+            'forceReprocess' => $command->forceReprocess,
+        ]);
+
         if ($command->forceReprocess && $command->kind === 'costs') {
             $this->connection->executeStatement(
                 'DELETE FROM marketplace_costs
@@ -85,6 +93,12 @@ final readonly class ProcessMarketplaceRawDocumentAction
                    AND document_id IS NULL',
                 ['rawDocId' => $command->rawDocId],
             );
+
+            $this->appLogger->info('forceReprocess DELETE executed', [
+                'rawDocId' => $command->rawDocId,
+                'kind'     => $command->kind,
+                'deleted'  => true,
+            ]);
         }
 
         foreach ($rows as $row) {
