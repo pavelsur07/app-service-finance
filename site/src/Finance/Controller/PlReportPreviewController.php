@@ -359,7 +359,7 @@ final class PlReportPreviewController extends AbstractController
     }
 
     /**
-     * Возвращает [from, to] с дефолтным диапазоном = текущий год (01.01 — 31.12).
+     * Возвращает [from, to] с дефолтным диапазоном = 01.01 — последний день текущего квартала.
      *
      * @return array{\DateTimeImmutable, \DateTimeImmutable}
      */
@@ -367,7 +367,10 @@ final class PlReportPreviewController extends AbstractController
     {
         $now = new \DateTimeImmutable('today');
         $defaultStart = $now->setDate((int) $now->format('Y'), 1, 1)->setTime(0, 0, 0);
-        $defaultEnd = $now->setDate((int) $now->format('Y'), 12, 31)->setTime(0, 0, 0);
+        $currentQuarter = (int) ceil((int) $now->format('n') / 3);
+        $quarterLastMonth = $currentQuarter * 3;
+        $defaultEnd = $now->setDate((int) $now->format('Y'), $quarterLastMonth, 1)
+            ->modify('last day of this month')->setTime(0, 0, 0);
 
         $from = $this->parseDate($fromInput) ?? $defaultStart;
         $to = $this->parseDate($toInput) ?? $defaultEnd;
