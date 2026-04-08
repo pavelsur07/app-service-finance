@@ -19,6 +19,8 @@ interface MarketplaceRawProcessorInterface
 
     public function process(string $companyId, string $rawDocId): int;
 
+    // TODO: передавать rawDocId через интерфейс processBatch() — отдельная задача
+
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
