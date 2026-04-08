@@ -86,7 +86,8 @@ final class SyncWbReportHandler
 
         try {
             $adapter   = $this->adapterRegistry->get(MarketplaceType::WILDBERRIES);
-            $yesterday = new \DateTimeImmutable('yesterday');
+            $msk       = new \DateTimeZone('Europe/Moscow');
+            $yesterday = new \DateTimeImmutable('yesterday', $msk);
             $fromDate  = $yesterday->setTime(0, 0, 0);
             $toDate    = $yesterday->setTime(23, 59, 59);
 
