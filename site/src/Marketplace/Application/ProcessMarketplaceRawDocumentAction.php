@@ -86,19 +86,17 @@ final readonly class ProcessMarketplaceRawDocumentAction
             'forceReprocess' => $command->forceReprocess,
         ]);
 
-        if ($command->forceReprocess && $command->kind === 'costs') {
-            $this->connection->executeStatement(
-                'DELETE FROM marketplace_costs
-                 WHERE raw_document_id = :rawDocId
-                   AND document_id IS NULL',
-                ['rawDocId' => $command->rawDocId],
-            );
+        // Costs step: use process() directly instead of classifier + processBatch().
+        // The classifier sends type=orders rows to SALE bucket, but they contain
+        // commissions, delivery charges, and logistics services that are costs.
+        // process() reads ALL operations from the raw document and handles them correctly,
+        // including cleanup of old costs and rawDocId linking.
+        if ($command->kind === 'costs') {
+            $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace);
+            $result = $processor->process($command->companyId, $command->rawDocId);
+            $this->costCategoryResolver->clearCache();
 
-            $this->appLogger->info('forceReprocess DELETE executed', [
-                'rawDocId' => $command->rawDocId,
-                'kind'     => $command->kind,
-                'deleted'  => true,
-            ]);
+            return $result;
         }
 
         foreach ($rows as $row) {

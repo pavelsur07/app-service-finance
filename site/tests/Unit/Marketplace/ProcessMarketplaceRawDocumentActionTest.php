@@ -14,12 +14,23 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\Contract\RowClassifierInterface;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
+use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Shared\Service\AppLogger;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 
 final class ProcessMarketplaceRawDocumentActionTest extends TestCase
 {
+    private function createCostCategoryResolver(): MarketplaceCostCategoryResolver
+    {
+        return new MarketplaceCostCategoryResolver(
+            $this->createMock(MarketplaceCostCategoryRepository::class),
+            $this->createMock(EntityManagerInterface::class),
+        );
+    }
+
     public function testThrowsWhenDocumentNotFound(): void
     {
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
@@ -30,7 +41,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
             $this->createMock(EntityManagerInterface::class),
-            $this->createMock(MarketplaceCostCategoryResolver::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
         );
 
         $this->expectException(\RuntimeException::class);
@@ -57,7 +70,9 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
             $this->createMock(MarketplaceRawProcessorRegistryInterface::class),
             $repository,
             $this->createMock(EntityManagerInterface::class),
-            $this->createMock(MarketplaceCostCategoryResolver::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -66,47 +81,44 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'unknown'));
     }
 
-    public function testProcessesCostRows(): void
+    public function testCostsKindUsesProcessDirectly(): void
     {
-        $rows = [
-            ['operation_id' => '1', 'type' => 'services'],
-            ['operation_id' => '2', 'type' => 'services'],
-        ];
-
         $document = $this->createMock(MarketplaceRawDocument::class);
-        $document->method('getRawData')->willReturn($rows);
+        $document->method('getRawData')->willReturn([]);
         $document->method('getMarketplace')->willReturn(MarketplaceType::OZON);
 
         $repository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $repository->method('find')->willReturn($document);
 
-        $classifier = $this->createMock(RowClassifierInterface::class);
-        $classifier->method('classify')->willReturn(StagingRecordType::COST);
-
-        $classifierRegistry = $this->createMock(RowClassifierRegistryInterface::class);
-        $classifierRegistry->method('get')->willReturn($classifier);
-
         $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
         $processor
             ->expects(self::once())
-            ->method('processBatch')
-            ->with('company-1', MarketplaceType::OZON, $rows);
+            ->method('process')
+            ->with('company-1', 'doc-1')
+            ->willReturn(42);
+        $processor
+            ->expects(self::never())
+            ->method('processBatch');
 
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
-        $processorRegistry->method('get')->willReturn($processor);
-
-        $em = $this->createMock(EntityManagerInterface::class);
+        $processorRegistry
+            ->expects(self::once())
+            ->method('get')
+            ->with(StagingRecordType::COST, MarketplaceType::OZON)
+            ->willReturn($processor);
 
         $action = new ProcessMarketplaceRawDocumentAction(
-            $classifierRegistry,
+            $this->createMock(RowClassifierRegistryInterface::class),
             $processorRegistry,
             $repository,
-            $em,
-            $this->createMock(MarketplaceCostCategoryResolver::class),
+            $this->createMock(EntityManagerInterface::class),
+            $this->createCostCategoryResolver(),
+            $this->createMock(Connection::class),
+            $this->createMock(AppLogger::class),
         );
 
         $result = $action(new ProcessMarketplaceRawDocumentCommand('company-1', 'doc-1', 'costs'));
 
-        self::assertSame(2, $result);
+        self::assertSame(42, $result);
     }
 }
