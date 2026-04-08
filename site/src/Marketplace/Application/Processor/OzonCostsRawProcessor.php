@@ -97,8 +97,13 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+        bool $forceReprocess = false,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -106,6 +111,15 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $company = $this->em->find(Company::class, $companyId);
         if (!$company instanceof Company) {
             throw new \RuntimeException('Company not found: ' . $companyId);
+        }
+
+        if ($forceReprocess && $rawDocId !== null) {
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $rawDocId],
+            );
         }
 
         // Определяем период из первой строки для логирования ошибок маппинга
