@@ -187,6 +187,13 @@ final class DiagnosticController extends AbstractController
             SQL,
         );
 
+        foreach ($rows as &$row) {
+            if (isset($row['sample_raw_json'])) {
+                $row['sample_raw_json'] = json_decode($row['sample_raw_json'], true);
+            }
+        }
+        unset($row);
+
         return new JsonResponse($rows);
     }
 
