@@ -323,11 +323,20 @@
                         const icon = check.passed
                             ? '<span class="text-success">✓</span>'
                             : (check.blocking ? '<span class="text-danger">✗</span>' : '<span class="text-warning">⚠</span>');
+                        let detailsHtml = '';
+                        if (check.details && check.details.length > 0) {
+                            detailsHtml = '<ul class="mt-1 mb-0 small text-muted">';
+                            check.details.forEach(item => {
+                                detailsHtml += `<li>${item.category_name} (${item.costs_count} шт.)</li>`;
+                            });
+                            detailsHtml += '</ul>';
+                        }
                         html += `<div class="list-group-item px-0 py-2 d-flex gap-2 align-items-start">
                         ${icon}
                         <div>
                             <div class="fw-medium small">${check.label}</div>
                             <div class="text-muted small">${check.message}</div>
+                            ${detailsHtml}
                         </div>
                      </div>`;
                     });
