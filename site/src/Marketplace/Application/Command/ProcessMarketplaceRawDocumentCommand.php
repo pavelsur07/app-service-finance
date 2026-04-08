@@ -15,6 +15,7 @@ final class ProcessMarketplaceRawDocumentCommand
         public readonly string $companyId,
         public readonly string $rawDocId,
         public readonly string $kind,
+        public readonly bool $forceReprocess = false,
     ) {}
 }
 

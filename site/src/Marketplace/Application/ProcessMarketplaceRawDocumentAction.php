@@ -11,6 +11,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
@@ -31,6 +32,7 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private MarketplaceRawDocumentRepository $repository,
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
+        private Connection $connection,
     ) {
     }
 
@@ -75,6 +77,15 @@ final readonly class ProcessMarketplaceRawDocumentAction
         $classifier = $this->classifierRegistry->get($document->getMarketplace());
         $marketplace = $document->getMarketplace();
         $totalProcessed = 0;
+
+        if ($command->forceReprocess && $command->kind === 'costs') {
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $command->rawDocId],
+            );
+        }
 
         foreach ($rows as $row) {
             if (!is_array($row)) {

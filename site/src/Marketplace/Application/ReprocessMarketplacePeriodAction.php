@@ -94,7 +94,7 @@ final class ReprocessMarketplacePeriodAction
                 $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'returns');
                 $stats['returns'] += ($this->processRawAction)($cmd);
 
-                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'costs');
+                $cmd = new ProcessMarketplaceRawDocumentCommand($companyId, $docId, 'costs', forceReprocess: true);
                 $stats['costs'] += ($this->processRawAction)($cmd);
             }
 
