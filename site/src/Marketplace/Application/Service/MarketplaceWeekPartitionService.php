@@ -63,8 +63,8 @@ final readonly class MarketplaceWeekPartitionService
             ];
         }
 
-        // Последний день месяца начала
-        $lastDayOfMonth = new \DateTimeImmutable($start->format('Y-m-t'));
+        // Последний день месяца начала (modify сохраняет timezone $start)
+        $lastDayOfMonth = $start->modify('last day of this month');
 
         // Первый день следующего месяца
         $firstDayOfNextMonth = $lastDayOfMonth->modify('+1 day');
