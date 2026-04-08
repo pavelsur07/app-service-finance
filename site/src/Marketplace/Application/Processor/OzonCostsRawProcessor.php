@@ -393,9 +393,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
     private function resolveServiceCategoryCode(string $serviceName, ?array $rawOp = null): string
     {
-        $code = OzonServiceCategoryMap::resolve($serviceName, $this->logger);
-
-        if ($code === null) {
+        if (!OzonServiceCategoryMap::isKnown($serviceName) && !OzonServiceCategoryMap::isZeroMarker($serviceName)) {
             // Неизвестный service_name — логируем для мониторинга в админке
             $this->mappingErrorLogger->log(
                 companyId:     $this->currentCompanyId,
@@ -407,11 +405,11 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 amount:        abs((float) ($rawOp['amount'] ?? 0)),
                 sampleRaw:     $rawOp,
             );
-
-            return 'ozon_other_service';
         }
 
-        return $code;
+        $code = OzonServiceCategoryMap::resolve($serviceName, $this->logger);
+
+        return $code ?? 'ozon_other_service';
     }
 
     private function resolveCategoryName(string $categoryCode): string
