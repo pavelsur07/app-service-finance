@@ -15,7 +15,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Ежедневная загрузка сырых данных WB за последние 7 дней.
+ * Ежедневная загрузка сырых данных WB за предыдущий день.
  *
  * Cron: 0 3 * * * php bin/console app:marketplace:wb-daily-sync
  *
@@ -26,7 +26,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 #[AsCommand(
     name: 'app:marketplace:wb-daily-sync',
-    description: 'Ежедневная загрузка сырых данных WB за последние 7 дней',
+    description: 'Ежедневная загрузка сырых данных WB за предыдущий день',
 )]
 final class MarketplaceNightlySyncCommand extends Command
 {

@@ -17,13 +17,12 @@ use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
- * Загружает сырые данные WB за последние 7 дней и сохраняет MarketplaceRawDocument.
+ * Загружает сырые данные WB за предыдущий день и сохраняет MarketplaceRawDocument.
  * Без обработки продаж/возвратов/затрат — только загрузка.
  */
 #[AsMessageHandler]
 final class SyncWbReportHandler
 {
-    private const SYNC_PERIOD_DAYS = 7;
     private const LOCK_TTL_SECONDS = 600;
 
     public function __construct(
@@ -86,9 +85,10 @@ final class SyncWbReportHandler
         $this->em->flush();
 
         try {
-            $adapter  = $this->adapterRegistry->get(MarketplaceType::WILDBERRIES);
-            $fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
-            $toDate   = new \DateTimeImmutable();
+            $adapter   = $this->adapterRegistry->get(MarketplaceType::WILDBERRIES);
+            $yesterday = new \DateTimeImmutable('yesterday');
+            $fromDate  = $yesterday->setTime(0, 0, 0);
+            $toDate    = $yesterday->setTime(23, 59, 59);
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
