@@ -64,6 +64,7 @@ final class PreflightResult
                 'blocking' => $c->blocking,
                 'message'  => $c->message,
                 'value'    => $c->value,
+                'details'  => $c->details,
             ],
             $this->checks,
         );
