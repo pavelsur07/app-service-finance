@@ -261,4 +261,30 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse(['action' => 'deleted', 'count' => $deleted]);
     }
+
+    #[Route('/ozon-other-service-with-doc/{companyId}', name: 'ozon_other_with_doc', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function ozonOtherServiceWithDoc(string $companyId, Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                mc.id,
+                mc.raw_document_id,
+                mc.document_id,
+                mc.cost_date,
+                mc.description,
+                mcc.code as category_code
+            FROM marketplace_costs mc
+            JOIN marketplace_cost_categories mcc ON mc.cost_category_id = mcc.id
+            WHERE mc.company_id = :companyId
+              AND mc.marketplace = 'ozon'
+              AND mcc.code = 'ozon_other_service'
+              AND mc.cost_date BETWEEN '2026-03-01' AND '2026-03-31'
+            LIMIT 20
+            SQL,
+            ['companyId' => $companyId],
+        );
+
+        return new JsonResponse($rows);
+    }
 }
