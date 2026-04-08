@@ -288,6 +288,59 @@ final class DiagnosticController extends AbstractController
         return new JsonResponse($rows);
     }
 
+    #[Route('/delete-costs-for-reprocess', name: 'delete_costs_for_reprocess', methods: ['GET'])]
+    public function deleteCostsForReprocess(Request $request, Connection $connection): JsonResponse
+    {
+        $confirm = $request->query->get('confirm') === '1';
+        $marketplace = $request->query->get('marketplace');
+        $dateFrom = $request->query->get('date_from');
+        $dateTo = $request->query->get('date_to');
+
+        if ($marketplace === null || $dateFrom === null || $dateTo === null) {
+            return new JsonResponse(['error' => 'marketplace, date_from and date_to query parameters are required'], 400);
+        }
+
+        $params = [
+            'marketplace' => $marketplace,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+        ];
+
+        $breakdown = $connection->fetchAllAssociative(
+            'SELECT company_id, COUNT(*) as cnt
+             FROM marketplace_costs
+             WHERE marketplace = :marketplace
+               AND cost_date BETWEEN :dateFrom AND :dateTo
+               AND document_id IS NULL
+             GROUP BY company_id',
+            $params,
+        );
+
+        $total = array_sum(array_column($breakdown, 'cnt'));
+
+        if (!$confirm) {
+            return new JsonResponse([
+                'action' => 'preview',
+                'total' => $total,
+                'breakdown' => $breakdown,
+            ]);
+        }
+
+        $deleted = $connection->executeStatement(
+            'DELETE FROM marketplace_costs
+             WHERE marketplace = :marketplace
+               AND cost_date BETWEEN :dateFrom AND :dateTo
+               AND document_id IS NULL',
+            $params,
+        );
+
+        return new JsonResponse([
+            'action' => 'deleted',
+            'total' => $deleted,
+            'breakdown' => $breakdown,
+        ]);
+    }
+
     #[Route('/fix-ozon-other-service/{companyId}', name: 'fix_ozon_other_service', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
     public function fixOzonOtherService(string $companyId, Request $request, Connection $connection): JsonResponse
     {
