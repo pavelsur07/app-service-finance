@@ -163,6 +163,33 @@ final class DiagnosticController extends AbstractController
         return new JsonResponse($rows);
     }
 
+    #[Route('/mapping-errors', name: 'mapping_errors', methods: ['GET'])]
+    public function mappingErrors(Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                company_id,
+                marketplace,
+                year,
+                month,
+                service_name,
+                operation_type,
+                rows_count,
+                total_amount,
+                sample_raw_json,
+                detected_at,
+                resolved_at
+            FROM marketplace_mapping_errors
+            WHERE resolved_at IS NULL
+            ORDER BY detected_at DESC
+            LIMIT 50
+            SQL,
+        );
+
+        return new JsonResponse($rows);
+    }
+
     #[Route('/delete-wb-costs-no-listing/{companyId}', name: 'delete_wb_costs_no_listing', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
     public function deleteWbCostsNoListing(string $companyId, Request $request, Connection $connection): JsonResponse
     {
