@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
@@ -31,6 +32,7 @@ final class InitialSyncHandler
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
+        private readonly MarketplaceWeekPartitionService $partitionService,
     ) {
     }
 
@@ -56,7 +58,7 @@ final class InitialSyncHandler
 
         $marketplace = MarketplaceType::from($message->marketplace);
         $fromDate    = new \DateTimeImmutable($message->dateFrom);
-        $toDate      = new \DateTimeImmutable($message->dateTo . ' 23:59:59');
+        $toDate      = new \DateTimeImmutable($message->dateTo);
 
         try {
             $adapter = $this->adapterRegistry->get($marketplace);
@@ -97,16 +99,21 @@ final class InitialSyncHandler
             // Диспатчим следующую партию если она есть
             if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
                 // Вычисляем партию после следующей чтобы передать её в nextDate
-                $nextFrom   = new \DateTimeImmutable($message->nextDateFrom);
-                $afterFrom  = $nextFrom->modify('+7 days');
-                $afterTo    = $afterFrom->modify('+6 days');
                 $today      = new \DateTimeImmutable('today');
+                $nextFrom   = new \DateTimeImmutable($message->nextDateFrom);
+                // Следующее воскресенье или сегодня
+                $nextSunday = $nextFrom->modify('sunday this week');
+                $nextTo     = $nextSunday > $today ? $today : $nextSunday;
 
-                $hasAfter       = $afterFrom <= $today;
-                $afterFromStr   = $hasAfter ? $afterFrom->format('Y-m-d') : null;
-                $afterToStr     = $hasAfter
-                    ? ($afterTo > $today ? $today->format('Y-m-d') : $afterTo->format('Y-m-d'))
-                    : null;
+                // Партия после следующей — через сервис
+                $afterStart      = $nextTo->modify('+1 day')->setTime(0, 0, 0);
+                $hasAfter        = $afterStart <= $today;
+                $afterPartitions = $hasAfter
+                    ? $this->partitionService->buildPartitions($afterStart, $today)
+                    : [];
+
+                $afterFromStr = !empty($afterPartitions) ? $afterPartitions[0]['from'] : null;
+                $afterToStr   = !empty($afterPartitions) ? $afterPartitions[0]['to']   : null;
 
                 $this->messageBus->dispatch(new InitialSyncMessage(
                     companyId:    $message->companyId,
