@@ -60,6 +60,37 @@ final readonly class ProcessMarketplaceRawDocumentAction
             );
         }
 
+        $marketplace = $document->getMarketplace();
+
+        $this->appLogger->info('ProcessMarketplaceRawDocumentAction called', [
+            'rawDocId'       => $command->rawDocId,
+            'kind'           => $command->kind,
+            'forceReprocess' => $command->forceReprocess,
+        ]);
+
+        // Costs step: use process() directly instead of classifier + processBatch().
+        // The classifier sends type=orders rows to SALE bucket, but they contain
+        // commissions, delivery charges, and logistics services that are costs.
+        // process() reads ALL operations from the raw document and handles them correctly.
+        if ($command->kind === 'costs') {
+            // Delete existing unfiled costs before reprocessing (WB needs this;
+            // Ozon's process() also does its own DELETE, the double-delete is a safe no-op).
+            $this->connection->executeStatement(
+                'DELETE FROM marketplace_costs
+                 WHERE raw_document_id = :rawDocId
+                   AND document_id IS NULL',
+                ['rawDocId' => $command->rawDocId],
+            );
+
+            $processor = $this->processorRegistry->get(StagingRecordType::COST, $marketplace);
+            $result = $processor->process($command->companyId, $command->rawDocId);
+            $this->costCategoryResolver->clearCache();
+
+            return $result;
+        }
+
+        // --- Sales / Returns path ---
+
         $buckets = [
             StagingRecordType::SALE->value => [],
             StagingRecordType::RETURN->value => [],
@@ -69,37 +100,15 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
         $rows = $document->getRawData();
         if (
-            $document->getMarketplace() === MarketplaceType::OZON
+            $marketplace === MarketplaceType::OZON
             && isset($rows['result']['operations'])
             && is_array($rows['result']['operations'])
         ) {
             $rows = $rows['result']['operations'];
         }
 
-        $classifier = $this->classifierRegistry->get($document->getMarketplace());
-        $marketplace = $document->getMarketplace();
+        $classifier = $this->classifierRegistry->get($marketplace);
         $totalProcessed = 0;
-
-        $this->appLogger->info('ProcessMarketplaceRawDocumentAction called', [
-            'rawDocId'       => $command->rawDocId,
-            'kind'           => $command->kind,
-            'forceReprocess' => $command->forceReprocess,
-        ]);
-
-        if ($command->forceReprocess && $command->kind === 'costs') {
-            $this->connection->executeStatement(
-                'DELETE FROM marketplace_costs
-                 WHERE raw_document_id = :rawDocId
-                   AND document_id IS NULL',
-                ['rawDocId' => $command->rawDocId],
-            );
-
-            $this->appLogger->info('forceReprocess DELETE executed', [
-                'rawDocId' => $command->rawDocId,
-                'kind'     => $command->kind,
-                'deleted'  => true,
-            ]);
-        }
 
         foreach ($rows as $row) {
             if (!is_array($row)) {
