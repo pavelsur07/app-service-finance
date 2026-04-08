@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-03-23.6';
+    public const VERSION = '2026-04-08.1';
 
     /**
      * @var array<string, string|null>
@@ -105,6 +105,9 @@ final class OzonServiceCategoryMap
         // === ШТРАФЫ / УДЕРЖАНИЯ ===
         'OperationMarketplaceWithHoldingForUndeliverableGoods'   => 'ozon_penalty_undeliverable',
 
+        // === КОМИССИИ ===
+        'MarketplaceServiceBrandCommission'                      => 'ozon_brand_commission',
+
         // === ПРОЧЕЕ ===
         'MarketplaceServiceItemMarkingItems'                     => 'ozon_marking',
         'MarketplaceServiceItemReturnFromStock'                  => 'ozon_return_from_stock',
@@ -139,6 +142,8 @@ final class OzonServiceCategoryMap
         'Обработка операционных ошибок продавца: отгрузка в нерекомендованный слот' => 'ozon_penalty_undeliverable',
         'Обработка брака с приемки'                              => 'ozon_supply_additional',
         'Временное размещение товара партнерами'                  => 'ozon_storage_partner',
+        'Корректировка суммы акта о премии'                      => 'ozon_premium_correction',
+        'Корректировки стоимости услуг'                          => 'ozon_service_correction',
     ];
 
     /**
@@ -265,6 +270,9 @@ final class OzonServiceCategoryMap
             'ozon_return_from_stock'     => 'Комплектация для вывоза продавцом Ozon',
             'ozon_agency_fee'            => 'Агентская услуга 3PL Global Ozon',
             'ozon_disposal'              => 'Утилизация товара Ozon',
+            'ozon_brand_commission'      => 'Брендовая комиссия Ozon',
+            'ozon_premium_correction'    => 'Корректировка премии Ozon',
+            'ozon_service_correction'    => 'Корректировка стоимости услуг Ozon',
             default                      => 'Прочие услуги Ozon',
         };
     }
