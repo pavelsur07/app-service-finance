@@ -287,4 +287,74 @@ final class DiagnosticController extends AbstractController
 
         return new JsonResponse($rows);
     }
+
+    #[Route('/fix-ozon-other-service/{companyId}', name: 'fix_ozon_other_service', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
+    public function fixOzonOtherService(string $companyId, Request $request, Connection $connection): JsonResponse
+    {
+        $confirm = $request->query->get('confirm') === '1';
+
+        $categories = $connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT id, code
+            FROM marketplace_cost_categories
+            WHERE company_id = :companyId
+              AND marketplace = 'ozon'
+              AND is_active = true
+              AND deleted_at IS NULL
+              AND code IN ('ozon_brand_commission', 'ozon_premium_correction', 'ozon_service_correction')
+            SQL,
+            ['companyId' => $companyId],
+        );
+
+        $codeToId = [];
+        foreach ($categories as $cat) {
+            $codeToId[$cat['code']] = $cat['id'];
+        }
+
+        $descriptionToCode = [
+            'MarketplaceServiceBrandCommission' => 'ozon_brand_commission',
+            'Корректировка суммы акта о премии' => 'ozon_premium_correction',
+            'Корректировки стоимости услуг'     => 'ozon_service_correction',
+        ];
+
+        $where = <<<'SQL'
+            company_id = :companyId
+              AND marketplace = 'ozon'
+              AND category_id = (
+                  SELECT id FROM marketplace_cost_categories
+                  WHERE company_id = :companyId
+                    AND marketplace = 'ozon'
+                    AND code = 'ozon_other_service'
+              )
+              AND description = :description
+              AND document_id IS NULL
+            SQL;
+
+        $results = [];
+        foreach ($descriptionToCode as $description => $code) {
+            $categoryId = $codeToId[$code] ?? null;
+            if ($categoryId === null) {
+                $results[$description] = ['error' => "Category with code '{$code}' not found"];
+                continue;
+            }
+
+            $params = ['companyId' => $companyId, 'description' => $description];
+
+            if (!$confirm) {
+                $count = (int) $connection->fetchOne(
+                    "SELECT COUNT(*) FROM marketplace_costs WHERE {$where}",
+                    $params,
+                );
+                $results[$description] = ['action' => 'preview', 'count' => $count, 'target_code' => $code];
+            } else {
+                $updated = $connection->executeStatement(
+                    "UPDATE marketplace_costs SET category_id = :categoryId WHERE {$where}",
+                    array_merge($params, ['categoryId' => $categoryId]),
+                );
+                $results[$description] = ['action' => 'updated', 'count' => $updated, 'target_code' => $code];
+            }
+        }
+
+        return new JsonResponse($results);
+    }
 }
