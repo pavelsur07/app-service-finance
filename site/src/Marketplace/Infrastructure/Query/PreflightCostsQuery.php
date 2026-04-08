@@ -100,6 +100,46 @@ final class PreflightCostsQuery
     }
 
     /**
+     * Категории затрат без маппинга к ОПиУ за период.
+     * Используется для отображения пользователю что именно нужно замапить.
+     *
+     * @return array<int, array{category_id: string, category_name: string, category_code: string, costs_count: int|string}>
+     */
+    public function getCategoriesWithoutMapping(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): array {
+        return $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                cc.id   AS category_id,
+                cc.name AS category_name,
+                cc.code AS category_code,
+                COUNT(mc.id) AS costs_count
+            FROM marketplace_costs mc
+            JOIN marketplace_cost_categories cc ON mc.category_id = cc.id
+            LEFT JOIN marketplace_cost_pl_mappings m
+                ON m.cost_category_id = cc.id
+                AND m.company_id = mc.company_id
+            WHERE mc.company_id  = :companyId
+              AND mc.marketplace = :marketplace
+              AND mc.cost_date BETWEEN :periodFrom AND :periodTo
+              AND (m.id IS NULL OR m.pl_category_id IS NULL)
+            GROUP BY cc.id, cc.name, cc.code
+            ORDER BY costs_count DESC
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+    }
+
+    /**
      * Детализация по категориям которые войдут в PLDocument.
      * Используется для debug эндпоинта — показывает что именно будет создано.
      */
