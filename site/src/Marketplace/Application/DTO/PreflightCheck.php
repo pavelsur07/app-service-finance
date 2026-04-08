@@ -16,6 +16,7 @@ final class PreflightCheck
         public readonly bool   $blocking,   // true — блокирует закрытие
         public readonly string $message,
         public readonly mixed  $value = null, // дополнительные данные (счётчик и т.п.)
+        public readonly array  $details = [], // структурированные данные для UI (список элементов и т.п.)
     ) {
     }
 
@@ -24,9 +25,9 @@ final class PreflightCheck
         return new self($key, $label, passed: true, blocking: false, message: $message, value: $value);
     }
 
-    public static function warning(string $key, string $label, string $message, mixed $value = null): self
+    public static function warning(string $key, string $label, string $message, mixed $value = null, array $details = []): self
     {
-        return new self($key, $label, passed: false, blocking: false, message: $message, value: $value);
+        return new self($key, $label, passed: false, blocking: false, message: $message, value: $value, details: $details);
     }
 
     public static function error(string $key, string $label, string $message, mixed $value = null): self

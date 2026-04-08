@@ -125,10 +125,11 @@ final class PreflightCostsQuery
                 AND m.company_id = mc.company_id
             WHERE mc.company_id  = :companyId
               AND mc.marketplace = :marketplace
-              AND mc.cost_date BETWEEN :periodFrom AND :periodTo
+              AND mc.cost_date >= :periodFrom
+              AND mc.cost_date <= :periodTo
               AND (m.id IS NULL OR m.pl_category_id IS NULL)
             GROUP BY cc.id, cc.name, cc.code
-            ORDER BY costs_count DESC
+            ORDER BY COUNT(mc.id) DESC
             SQL,
             [
                 'companyId'   => $companyId,
