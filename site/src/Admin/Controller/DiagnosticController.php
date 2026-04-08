@@ -275,7 +275,7 @@ final class DiagnosticController extends AbstractController
                 mc.description,
                 mcc.code as category_code
             FROM marketplace_costs mc
-            JOIN marketplace_cost_categories mcc ON mc.cost_category_id = mcc.id
+            JOIN marketplace_cost_categories mcc ON mc.category_id = mcc.id
             WHERE mc.company_id = :companyId
               AND mc.marketplace = 'ozon'
               AND mcc.code = 'ozon_other_service'
