@@ -197,6 +197,30 @@ final class DiagnosticController extends AbstractController
         return new JsonResponse($rows);
     }
 
+    #[Route('/ozon-unknown-services', name: 'ozon_unknown_services', methods: ['GET'])]
+    public function ozonUnknownServices(Connection $connection): JsonResponse
+    {
+        $rows = $connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                mc.description,
+                COUNT(*)        AS cnt,
+                SUM(mc.amount)  AS total_amount,
+                MIN(mc.cost_date)::text AS first_seen,
+                MAX(mc.cost_date)::text AS last_seen
+            FROM marketplace_costs mc
+            JOIN marketplace_cost_categories mcc ON mcc.id = mc.category_id
+            WHERE mcc.code      = 'ozon_other_service'
+              AND mc.marketplace = 'ozon'
+            GROUP BY mc.description
+            ORDER BY cnt DESC
+            LIMIT 50
+            SQL,
+        );
+
+        return new JsonResponse($rows);
+    }
+
     #[Route('/delete-wb-costs-no-listing/{companyId}', name: 'delete_wb_costs_no_listing', methods: ['GET'], requirements: ['companyId' => '[0-9a-f-]{36}'])]
     public function deleteWbCostsNoListing(string $companyId, Request $request, Connection $connection): JsonResponse
     {
