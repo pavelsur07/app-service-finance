@@ -215,11 +215,15 @@ final class MonthClosePreflightAction
 
         // Проверка 4: затраты без маппинга к ОПиУ (ПРЕДУПРЕЖДЕНИЕ — не блокирует)
         if ($withoutMapping > 0) {
+            $categoriesWithoutMapping = $this->costsQuery->getCategoriesWithoutMapping(
+                $command->companyId, $command->marketplace, $periodFrom, $periodTo,
+            );
             $checks[] = PreflightCheck::warning(
                 'costs_without_mapping',
                 'Маппинг затрат к ОПиУ',
                 sprintf('Затрат без маппинга к ОПиУ: %d шт. Они не попадут в ОПиУ. Настройте маппинг в разделе "Себестоимость".', $withoutMapping),
                 $withoutMapping,
+                details: $categoriesWithoutMapping,
             );
         } else {
             $checks[] = PreflightCheck::ok('costs_without_mapping', 'Маппинг затрат к ОПиУ', 'Все затраты имеют маппинг к ОПиУ');
