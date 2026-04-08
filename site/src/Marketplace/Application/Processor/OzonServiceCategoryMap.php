@@ -191,6 +191,12 @@ final class OzonServiceCategoryMap
         return array_key_exists($serviceName, self::MAP) && self::MAP[$serviceName] === null;
     }
 
+    public static function isKnown(string $serviceName): bool
+    {
+        return array_key_exists($serviceName, self::MAP)
+            && self::MAP[$serviceName] !== null;
+    }
+
     /**
      * Все уникальные category codes — из MAP + коды, генерируемые в extractCostEntries().
      *
