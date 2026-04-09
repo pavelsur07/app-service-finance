@@ -109,6 +109,11 @@ body {
     margin: 0;
 }
 
+/* Резервируем место под скроллбар, чтобы layout не прыгал */
+html {
+    scrollbar-gutter: stable;
+}
+
 /* Улучшаем контрастность модалок с эффектом blur, чтобы данные оставались читаемыми */
 .modal.modal-blur .modal-content {
     background-color: var(--tblr-bg-surface);
