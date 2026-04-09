@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var hasChildren = childrenMap[id] && childrenMap[id].length > 0;
 
         if (hasChildren) {
-            toggle.innerHTML = level < 2 ? '&#9660;' : '&#9654;';
+            toggle.innerHTML = '&#9654;';
             toggle.style.cursor = 'pointer';
             toggle.setAttribute('data-target', id);
         }
