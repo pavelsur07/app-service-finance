@@ -46,16 +46,25 @@
     <span class="{{ class }}">{{ sign }}{{ value|abs|number_format(2, ',', ' ') }}</span>
 {% endmacro %}
 
-{% macro render_category(cat, totals, currency, periodCount) %}
-<tr>
-    <td style="padding-left: {{ (cat.level - 1) * 20 }}px">{{ cat.name }}</td>
+{% macro render_category(cat, totals, currency, periodCount, parentId) %}
+{% set hasChildren = cat.children|length > 0 %}
+{% set hidden = cat.level >= 2 %}
+<tr data-id="{{ cat.id }}" data-parent="{{ parentId }}" data-level="{{ cat.level }}"{% if hidden %} style="display:none"{% endif %}>
+    <td style="padding-left: {{ (cat.level - 1) * 20 }}px; white-space: nowrap;">
+        {%- if hasChildren -%}
+            <span class="cf-toggle" data-target="{{ cat.id }}" style="cursor:pointer; display:inline-block; width:16px; text-align:center; margin-right:4px;">&#9654;</span>
+        {%- else -%}
+            <span style="display:inline-block; width:16px; margin-right:4px;"></span>
+        {%- endif -%}
+        {{ cat.name }}
+    </td>
     {% for i in 0..periodCount-1 %}
         {% set val = totals[cat.id].totals[currency][i] ?? 0 %}
         <td class="text-end">{{ _self.format_amount(val)|raw }}</td>
     {% endfor %}
 </tr>
 {% for child in cat.children %}
-    {{ _self.render_category(child, totals, currency, periodCount) }}
+    {{ _self.render_category(child, totals, currency, periodCount, cat.id) }}
 {% endfor %}
 {% endmacro %}
 
@@ -82,7 +91,7 @@
                         {% endfor %}
                     </tr>
                     {% for cat in categories %}
-                        {{ macros.render_category(cat, categoryTotals, currency, periodCount) }}
+                        {{ macros.render_category(cat, categoryTotals, currency, periodCount, '') }}
                     {% endfor %}
                     <tr class="fw-bold">
                         <td>Сальдо на конец</td>
@@ -95,4 +104,45 @@
         </div>
     </div>
 {% endfor %}
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.cf-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var parentId = btn.getAttribute('data-target');
+            var expanded = btn.textContent.trim() === '\u25BC';
+
+            if (expanded) {
+                btn.innerHTML = '&#9654;';
+                hideDescendants(parentId);
+            } else {
+                btn.innerHTML = '&#9660;';
+                showDirectChildren(parentId);
+            }
+        });
+    });
+
+    function showDirectChildren(parentId) {
+        document.querySelectorAll('tr[data-parent="' + parentId + '"]').forEach(function (row) {
+            row.style.display = '';
+            var toggle = row.querySelector('.cf-toggle');
+            if (toggle) {
+                toggle.innerHTML = '&#9654;';
+            }
+        });
+    }
+
+    function hideDescendants(parentId) {
+        document.querySelectorAll('tr[data-parent="' + parentId + '"]').forEach(function (row) {
+            row.style.display = 'none';
+            var childId = row.getAttribute('data-id');
+            var toggle = row.querySelector('.cf-toggle');
+            if (toggle) {
+                toggle.innerHTML = '&#9654;';
+            }
+            hideDescendants(childId);
+        });
+    }
+});
+</script>
 {% endblock %}
