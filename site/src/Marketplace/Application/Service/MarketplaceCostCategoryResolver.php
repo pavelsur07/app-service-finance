@@ -55,6 +55,7 @@ final class MarketplaceCostCategoryResolver
             $category->setName($name);
 
             $this->em->persist($category);
+            $this->em->flush();
         }
 
         $this->cache[$cacheKey] = $category;
