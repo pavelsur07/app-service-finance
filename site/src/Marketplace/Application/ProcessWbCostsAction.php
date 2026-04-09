@@ -190,6 +190,7 @@ final class ProcessWbCostsAction
             &$synced,
             &$lastFlushedCounter,
             &$listingsCache,
+            &$barcodeListingMap,
             &$company,
             $companyId,
             $rawDocId,
@@ -259,6 +260,13 @@ final class ProcessWbCostsAction
                     $listingsCache[$k] = $this->em->getReference(
                         MarketplaceListing::class,
                         $cachedListing->getId(),
+                    );
+                }
+
+                foreach ($barcodeListingMap as $bc => $bcListing) {
+                    $barcodeListingMap[$bc] = $this->em->getReference(
+                        MarketplaceListing::class,
+                        $bcListing->getId(),
                     );
                 }
 
