@@ -192,6 +192,7 @@ final class ProcessWbCostsAction
             &$listingsCache,
             &$company,
             $companyId,
+            $rawDocId,
             $batchSize,
         ): void {
             if (empty($pendingIds)) {
