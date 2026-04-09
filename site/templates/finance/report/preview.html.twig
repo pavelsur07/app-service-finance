@@ -159,8 +159,11 @@
                             </thead>
                             <tbody>
                             {% for r in rows %}
-                                <tr>
-                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
+                                <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
+                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px; white-space: nowrap;">
+                                        <span class="pl-toggle" style="display:inline-block; width:16px; text-align:center; margin-right:4px;"></span>
+                                        {{ r.name }}
+                                    </td>
                                     {% if showMetaColumns %}
                                         <td><code>{{ r.code ?? '—' }}</code></td>
                                         <td>{{ r.type }}</td>
@@ -191,8 +194,11 @@
                             </thead>
                             <tbody>
                             {% for r in rows %}
-                                <tr>
-                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px">{{ r.name }}</td>
+                                <tr class="pl-row" data-row-id="{{ r.id }}" data-level="{{ r.level }}">
+                                    <td style="padding-left: {{ (r.level - 1) * 20 }}px; white-space: nowrap;">
+                                        <span class="pl-toggle" style="display:inline-block; width:16px; text-align:center; margin-right:4px;"></span>
+                                        {{ r.name }}
+                                    </td>
                                     {% if showMetaColumns %}
                                         <td><code>{{ r.code ?? '—' }}</code></td>
                                         <td>{{ r.type }}</td>
@@ -213,4 +219,88 @@
             </div>
         </div>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var rows = Array.from(document.querySelectorAll('tr.pl-row'));
+    if (!rows.length) return;
+
+    var childrenMap = {};
+    var levelStack = [];
+
+    rows.forEach(function (row) {
+        var id = row.getAttribute('data-row-id');
+        var level = parseInt(row.getAttribute('data-level'), 10);
+
+        while (levelStack.length && levelStack[levelStack.length - 1].level >= level) {
+            levelStack.pop();
+        }
+
+        var parentId = levelStack.length ? levelStack[levelStack.length - 1].id : null;
+
+        if (parentId) {
+            if (!childrenMap[parentId]) childrenMap[parentId] = [];
+            childrenMap[parentId].push(id);
+        }
+
+        levelStack.push({ id: id, level: level });
+    });
+
+    rows.forEach(function (row) {
+        var id = row.getAttribute('data-row-id');
+        var level = parseInt(row.getAttribute('data-level'), 10);
+        var toggle = row.querySelector('.pl-toggle');
+        var hasChildren = childrenMap[id] && childrenMap[id].length > 0;
+
+        if (hasChildren) {
+            toggle.innerHTML = level < 2 ? '&#9660;' : '&#9654;';
+            toggle.style.cursor = 'pointer';
+            toggle.setAttribute('data-target', id);
+        }
+
+        if (level >= 2) {
+            row.style.display = 'none';
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        var toggle = e.target.closest('.pl-toggle[data-target]');
+        if (!toggle) return;
+
+        var targetId = toggle.getAttribute('data-target');
+        var expanded = toggle.textContent.trim() === '\u25BC';
+
+        if (expanded) {
+            toggle.innerHTML = '&#9654;';
+            hideDescendants(targetId);
+        } else {
+            toggle.innerHTML = '&#9660;';
+            showDirectChildren(targetId);
+        }
+    });
+
+    function showDirectChildren(parentId) {
+        (childrenMap[parentId] || []).forEach(function (childId) {
+            var row = document.querySelector('tr[data-row-id="' + childId + '"]');
+            if (row) {
+                row.style.display = '';
+                var toggle = row.querySelector('.pl-toggle[data-target]');
+                if (toggle) toggle.innerHTML = '&#9654;';
+            }
+        });
+    }
+
+    function hideDescendants(parentId) {
+        (childrenMap[parentId] || []).forEach(function (childId) {
+            var row = document.querySelector('tr[data-row-id="' + childId + '"]');
+            if (row) {
+                row.style.display = 'none';
+                var toggle = row.querySelector('.pl-toggle[data-target]');
+                if (toggle) toggle.innerHTML = '&#9654;';
+            }
+            hideDescendants(childId);
+        });
+    }
+});
+</script>
 {% endblock %}
