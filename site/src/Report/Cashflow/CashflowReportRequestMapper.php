@@ -14,10 +14,10 @@ final class CashflowReportRequestMapper
         $toParam = $request->query->get('to');
 
         $today = new \DateTimeImmutable('today');
-        $currentQuarter = (int) floor(((int) $today->format('n') - 1) / 3);
-        $quarterStartMonth = $currentQuarter * 3 + 1;
-        $defaultFrom = new \DateTimeImmutable($today->format('Y').'-'.sprintf('%02d', $quarterStartMonth).'-01');
-        $defaultTo = $defaultFrom->modify('+3 months -1 day');
+        $currentQuarter = (int) ceil((int) $today->format('n') / 3);
+        $quarterLastMonth = $currentQuarter * 3;
+        $defaultFrom = new \DateTimeImmutable($today->format('Y').'-01-01');
+        $defaultTo = $today->setDate((int) $today->format('Y'), $quarterLastMonth, 1)->modify('last day of this month');
 
         $from = $fromParam ? new \DateTimeImmutable($fromParam) : $defaultFrom;
         $to = $toParam ? new \DateTimeImmutable($toParam) : $defaultTo;
