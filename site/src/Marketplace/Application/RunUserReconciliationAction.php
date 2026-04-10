@@ -7,6 +7,7 @@ namespace App\Marketplace\Application;
 use App\Marketplace\Application\Reconciliation\OzonReportParserFacade;
 use App\Marketplace\Entity\ReconciliationSession;
 use App\Marketplace\Infrastructure\Query\CostReconciliationQuery;
+use App\Marketplace\Infrastructure\Query\SalesReturnsTotalQuery;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -20,6 +21,7 @@ final class RunUserReconciliationAction
     public function __construct(
         private readonly OzonReportParserFacade $parserFacade,
         private readonly CostReconciliationQuery $reconciliationQuery,
+        private readonly SalesReturnsTotalQuery $salesReturnsTotalQuery,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -39,6 +41,22 @@ final class RunUserReconciliationAction
                 $reportResult,
             );
 
+            $salesTotal = $this->salesReturnsTotalQuery->getSalesTotal(
+                $companyId,
+                $session->getMarketplace(),
+                $session->getPeriodFrom()->format('Y-m-d'),
+                $session->getPeriodTo()->format('Y-m-d'),
+            );
+
+            // return_revenue is already computed by CostReconciliationQuery — reuse it
+            $returnsTotal = (string) ($reconcileResult['return_revenue'] ?? 0);
+
+            $reconcileResult = $this->enrichWithSalesAndReturns(
+                $reconcileResult,
+                $salesTotal,
+                $returnsTotal,
+            );
+
             $session->markCompleted($reconcileResult);
             $this->em->flush();
         } catch (\Throwable $e) {
@@ -53,5 +71,51 @@ final class RunUserReconciliationAction
 
             throw $e;
         }
+    }
+
+    /**
+     * Enrich group_comparison with sales and returns totals from dedicated tables.
+     *
+     * CostReconciliationQuery only covers marketplace_costs.
+     * Groups "Продажи" and "Возвраты" in the xlsx have no matching cost categories,
+     * so their api_net is 0. This method fills in the real amounts from
+     * marketplace_sales.total_revenue and marketplace_returns.refund_amount.
+     *
+     * @param array<string, mixed> $reconcileResult
+     */
+    private function enrichWithSalesAndReturns(
+        array $reconcileResult,
+        string $salesTotal,
+        string $returnsTotal,
+    ): array {
+        $groupComparison = $reconcileResult['group_comparison'] ?? [];
+
+        foreach ($groupComparison as &$group) {
+            if ($group['service_group'] === 'Продажи') {
+                $group['api_net'] = (float) $salesTotal;
+                $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $salesTotal), 2);
+                $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
+            }
+            if ($group['service_group'] === 'Возвраты') {
+                $group['api_net'] = (float) $returnsTotal;
+                $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $returnsTotal), 2);
+                $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
+            }
+        }
+        unset($group);
+
+        $reconcileResult['group_comparison'] = $groupComparison;
+
+        // Update overall status: mismatch if any group has mismatch
+        $hasMismatch = false;
+        foreach ($groupComparison as $g) {
+            if ($g['status'] === 'mismatch') {
+                $hasMismatch = true;
+                break;
+            }
+        }
+        $reconcileResult['status'] = $hasMismatch ? 'mismatch' : 'matched';
+
+        return $reconcileResult;
     }
 }
