@@ -303,6 +303,20 @@ enum PipelineStatus: string
 }
 ```
 
+### `src/Marketplace/Enum/ReconciliationSessionStatus.php`
+```php
+enum ReconciliationSessionStatus: string
+{
+    case PENDING   = 'pending';
+    case COMPLETED = 'completed';
+    case FAILED    = 'failed';
+
+    public function getLabel(): string;    // Ожидает / Завершена / Ошибка
+    public function isPending(): bool;     // true для PENDING
+    public function isTerminal(): bool;    // true для COMPLETED, FAILED
+}
+```
+
 ### `src/Marketplace/Enum/PipelineStep.php`
 ```php
 enum PipelineStep: string
