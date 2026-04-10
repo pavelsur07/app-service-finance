@@ -69,3 +69,34 @@ export interface ReconciliationHistoryResponse {
     page: number;
     limit: number;
 }
+
+/**
+ * TEMPORARY: типы для debug-эндпоинта category-breakdown.
+ * Удалить после завершения отладки сверки.
+ */
+
+/** Одна категория из debug category-breakdown */
+export interface CategoryBreakdownItem {
+    category_code: string;
+    category_name: string;
+    service_group: string | null;
+    net_amount: number;
+    costs_amount: number;
+    storno_amount: number;
+}
+
+/** Группа услуг с вложенными категориями */
+export interface ServiceGroupBreakdown {
+    service_group: string;
+    net_amount: number;
+    costs_amount: number;
+    storno_amount: number;
+    categories: CategoryBreakdownItem[];
+}
+
+/** Ответ POST /api/marketplace/reconciliation/debug/category-breakdown */
+export interface CategoryBreakdownResponse {
+    categories: CategoryBreakdownItem[];
+    by_service_group: ServiceGroupBreakdown[];
+    unmapped: CategoryBreakdownItem[];
+}
