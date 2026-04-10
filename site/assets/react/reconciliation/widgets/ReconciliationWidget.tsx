@@ -1,4 +1,5 @@
 import React, { useState, useCallback } from "react";
+import { httpJson } from "../../shared/http/client";
 import { useUploadReconciliation } from "../hooks/useUploadReconciliation";
 import { useSessionResult } from "../hooks/useSessionResult";
 import { useReconciliationHistory } from "../hooks/useReconciliationHistory";
@@ -14,6 +15,22 @@ const ReconciliationWidget: React.FC = () => {
     const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
     const [lastUploadResult, setLastUploadResult] = useState<ReconciliationSession | null>(null);
     const [historyPage, setHistoryPage] = useState(1);
+
+    // TEMPORARY — удалить после проверки миграции OVH
+    const [ovhResult, setOvhResult] = useState<unknown>(null);
+    const [ovhLoading, setOvhLoading] = useState(false);
+
+    const handleOvhCheck = useCallback(async () => {
+        setOvhLoading(true);
+        try {
+            const data = await httpJson("/api/marketplace/reconciliation/debug/ovh-check");
+            setOvhResult(data);
+        } catch (e: any) {
+            setOvhResult({ error: e?.message ?? "Ошибка" });
+        } finally {
+            setOvhLoading(false);
+        }
+    }, []);
 
     const uploadHook = useUploadReconciliation();
     const sessionQuery = useSessionResult(activeSessionId);
@@ -101,10 +118,25 @@ const ReconciliationWidget: React.FC = () => {
             {/* Result view */}
             {view === "result" && (
                 <div>
-                    <button className="btn btn-ghost-secondary btn-sm mb-3" onClick={handleBack}>
-                        <i className="ti ti-arrow-left me-1" />
-                        Назад к сверке
-                    </button>
+                    <div className="d-flex align-items-center mb-3">
+                        <button className="btn btn-ghost-secondary btn-sm" onClick={handleBack}>
+                            <i className="ti ti-arrow-left me-1" />
+                            Назад к сверке
+                        </button>
+                        {/* TEMPORARY — удалить после проверки миграции OVH */}
+                        <button
+                            className="btn btn-outline-warning btn-sm ms-2"
+                            onClick={handleOvhCheck}
+                            disabled={ovhLoading}
+                        >
+                            {ovhLoading ? "Загрузка..." : "OVH Check"}
+                        </button>
+                    </div>
+                    {ovhResult && (
+                        <pre className="bg-dark text-light p-3 rounded mb-3" style={{ fontSize: "0.8rem", maxHeight: "400px", overflow: "auto" }}>
+                            {JSON.stringify(ovhResult, null, 2)}
+                        </pre>
+                    )}
 
                     {sessionQuery.isLoading && (
                         <div className="card card-body">
