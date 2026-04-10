@@ -86,6 +86,10 @@ class ReconciliationSession
      */
     public function markCompleted(array $reconcileResult): void
     {
+        if ($this->status !== 'pending') {
+            throw new \DomainException('Only pending session can be completed.');
+        }
+
         $this->resultJson  = json_encode($reconcileResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
         $this->status      = 'completed';
         $this->completedAt = new \DateTimeImmutable();
@@ -93,6 +97,10 @@ class ReconciliationSession
 
     public function markFailed(string $errorMessage): void
     {
+        if ($this->status !== 'pending') {
+            throw new \DomainException('Only pending session can be failed.');
+        }
+
         $this->status       = 'failed';
         $this->errorMessage = $errorMessage;
         $this->completedAt  = new \DateTimeImmutable();
