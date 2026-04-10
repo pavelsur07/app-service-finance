@@ -1,5 +1,10 @@
 import React, { useState } from "react";
-import type { ReconciliationSession } from "../reconciliation.types";
+import { httpJson } from "../../shared/http/client";
+import type {
+    ReconciliationSession,
+    CategoryBreakdownResponse,
+    ServiceGroupBreakdown,
+} from "../reconciliation.types";
 
 interface ReconciliationTableProps {
     session: ReconciliationSession;
@@ -15,6 +20,148 @@ function formatRub(value: number): string {
         maximumFractionDigits: 2,
     }).format(value);
 }
+
+/**
+ * TEMPORARY: Debug-панель для детализации по категориям.
+ * Удалить после завершения отладки сверки.
+ */
+const CategoryBreakdownPanel: React.FC<{ sessionId: string }> = ({ sessionId }) => {
+    const [data, setData] = useState<CategoryBreakdownResponse | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
+    const handleLoad = async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const resp = await httpJson<CategoryBreakdownResponse>(
+                "/api/marketplace/reconciliation/debug/category-breakdown",
+                { method: "POST", body: { sessionId } },
+            );
+            setData(resp);
+        } catch (e: any) {
+            setError(e?.message ?? "Ошибка загрузки");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleGroup = (group: string) => {
+        setExpandedGroups((prev) => {
+            const next = new Set(prev);
+            if (next.has(group)) {
+                next.delete(group);
+            } else {
+                next.add(group);
+            }
+            return next;
+        });
+    };
+
+    if (!data) {
+        return (
+            <div className="mt-3">
+                <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={handleLoad}
+                    disabled={loading}
+                >
+                    {loading ? (
+                        <>
+                            <span className="spinner-border spinner-border-sm me-1" />
+                            Загрузка...
+                        </>
+                    ) : (
+                        <>
+                            <i className="ti ti-bug me-1" />
+                            Диагностика по категориям
+                        </>
+                    )}
+                </button>
+                {error && <div className="text-danger small mt-1">{error}</div>}
+            </div>
+        );
+    }
+
+    return (
+        <div className="mt-4">
+            <h4 className="mb-3">
+                <i className="ti ti-bug me-1" />
+                Детализация по категориям (debug)
+            </h4>
+
+            {data.unmapped.length > 0 && (
+                <div className="alert alert-warning mb-3">
+                    <div className="fw-semibold mb-1">
+                        Немаппированные категории ({data.unmapped.length})
+                    </div>
+                    {data.unmapped.map((u) => (
+                        <div key={u.category_code} className="small">
+                            <code>{u.category_code}</code> — {u.category_name}: {formatRub(u.net_amount)}
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            <div className="table-responsive">
+                <table className="table table-sm table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>Группа / Категория</th>
+                            <th className="text-end">Costs</th>
+                            <th className="text-end">Storno</th>
+                            <th className="text-end">Нетто</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {data.by_service_group.map((g: ServiceGroupBreakdown) => (
+                            <React.Fragment key={g.service_group}>
+                                <tr
+                                    className="table-active"
+                                    style={{ cursor: "pointer" }}
+                                    onClick={() => toggleGroup(g.service_group)}
+                                >
+                                    <td className="fw-semibold">
+                                        <i
+                                            className={`ti ti-chevron-${expandedGroups.has(g.service_group) ? "down" : "right"} me-1`}
+                                        />
+                                        {g.service_group}
+                                        <span className="text-muted ms-1 small">
+                                            ({g.categories.length})
+                                        </span>
+                                    </td>
+                                    <td className="text-end text-danger">{formatRub(g.costs_amount)}</td>
+                                    <td className="text-end text-success">{formatRub(g.storno_amount)}</td>
+                                    <td className="text-end fw-semibold">{formatRub(g.net_amount)}</td>
+                                </tr>
+                                {expandedGroups.has(g.service_group) &&
+                                    g.categories.map((c) => (
+                                        <tr key={c.category_code}>
+                                            <td className="ps-4">
+                                                <code className="small">{c.category_code}</code>
+                                                <span className="text-muted ms-1 small">{c.category_name}</span>
+                                            </td>
+                                            <td className="text-end text-danger small">{formatRub(c.costs_amount)}</td>
+                                            <td className="text-end text-success small">{formatRub(c.storno_amount)}</td>
+                                            <td className="text-end small">{formatRub(c.net_amount)}</td>
+                                        </tr>
+                                    ))}
+                            </React.Fragment>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+
+            <button
+                className="btn btn-ghost-secondary btn-sm mt-2"
+                onClick={() => setData(null)}
+            >
+                Скрыть детализацию
+            </button>
+        </div>
+    );
+};
 
 const ReconciliationTable: React.FC<ReconciliationTableProps> = ({ session }) => {
     const [showOnlyMismatch, setShowOnlyMismatch] = useState(false);
@@ -150,6 +297,9 @@ const ReconciliationTable: React.FC<ReconciliationTableProps> = ({ session }) =>
                         </tbody>
                     </table>
                 </div>
+
+                {/* TEMPORARY: debug category breakdown */}
+                <CategoryBreakdownPanel sessionId={session.id} />
             </div>
         </div>
     );
