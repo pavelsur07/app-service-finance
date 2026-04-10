@@ -7,6 +7,7 @@ namespace App\Marketplace\Controller\Api;
 use App\Marketplace\Application\RunUserReconciliationAction;
 use App\Marketplace\Entity\ReconciliationSession;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\ReconciliationSessionStatus;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -114,7 +115,7 @@ final class ReconciliationUploadController extends AbstractController
             return $this->json(['error' => 'Unexpected state: session still pending.'], 500);
         }
 
-        if ($session->getStatus() === \App\Marketplace\Enum\ReconciliationSessionStatus::FAILED) {
+        if ($session->getStatus() === ReconciliationSessionStatus::FAILED) {
             return $this->json([
                 'id'           => $session->getId(),
                 'status'       => $session->getStatus()->value,
