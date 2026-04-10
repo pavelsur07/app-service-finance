@@ -41,20 +41,20 @@ final class RunUserReconciliationAction
                 $reportResult,
             );
 
+            $salesTotal = $this->salesReturnsTotalQuery->getSalesTotal(
+                $companyId,
+                $session->getMarketplace(),
+                $session->getPeriodFrom()->format('Y-m-d'),
+                $session->getPeriodTo()->format('Y-m-d'),
+            );
+
+            // return_revenue is already computed by CostReconciliationQuery — reuse it
+            $returnsTotal = (string) ($reconcileResult['return_revenue'] ?? 0);
+
             $reconcileResult = $this->enrichWithSalesAndReturns(
                 $reconcileResult,
-                $this->salesReturnsTotalQuery->getSalesTotal(
-                    $companyId,
-                    $session->getMarketplace(),
-                    $session->getPeriodFrom()->format('Y-m-d'),
-                    $session->getPeriodTo()->format('Y-m-d'),
-                ),
-                $this->salesReturnsTotalQuery->getReturnsTotal(
-                    $companyId,
-                    $session->getMarketplace(),
-                    $session->getPeriodFrom()->format('Y-m-d'),
-                    $session->getPeriodTo()->format('Y-m-d'),
-                ),
+                $salesTotal,
+                $returnsTotal,
             );
 
             $session->markCompleted($reconcileResult);
@@ -93,12 +93,12 @@ final class RunUserReconciliationAction
         foreach ($groupComparison as &$group) {
             if ($group['service_group'] === 'Продажи') {
                 $group['api_net'] = (float) $salesTotal;
-                $group['delta'] = round(abs((float) $salesTotal) - abs($group['xlsx_net']), 2);
+                $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $salesTotal), 2);
                 $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
             }
             if ($group['service_group'] === 'Возвраты') {
                 $group['api_net'] = (float) $returnsTotal;
-                $group['delta'] = round(abs((float) $returnsTotal) - abs($group['xlsx_net']), 2);
+                $group['delta'] = round(abs($group['xlsx_net']) - abs((float) $returnsTotal), 2);
                 $group['status'] = abs($group['delta']) < 0.01 ? 'matched' : 'mismatch';
             }
         }
