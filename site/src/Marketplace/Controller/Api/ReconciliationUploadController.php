@@ -41,9 +41,9 @@ final class ReconciliationUploadController extends AbstractController
         $companyId = (string) $company->getId();
 
         $file        = $request->files->get('file');
-        $periodFrom  = $request->request->get('periodFrom', '');
-        $periodTo    = $request->request->get('periodTo', '');
-        $marketplace = $request->request->get('marketplace', 'ozon');
+        $periodFrom  = (string) $request->request->get('periodFrom', '');
+        $periodTo    = (string) $request->request->get('periodTo', '');
+        $marketplace = (string) $request->request->get('marketplace', 'ozon');
 
         // --- Валидация ---
 
