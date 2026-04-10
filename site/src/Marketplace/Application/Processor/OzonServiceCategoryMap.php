@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-08.1';
+    public const VERSION = '2026-04-10.1';
 
     /**
      * @var array<string, string|null>
@@ -115,7 +115,7 @@ final class OzonServiceCategoryMap
         'OperationMarketplaceAgencyFeeAggregator3PLGlobal'       => 'ozon_agency_fee',
         'MarketplaceServiceItemDisposalDetailed'                 => 'ozon_disposal',
         'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
-        'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_supply_additional',
+        'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_ovh_processing',
 
         // === АНГЛИЙСКИЕ operation_type ДЛЯ ОПЕРАЦИЙ БЕЗ services[] ===
         // Эти operation_type приходят в поле op['operation_type'] когда services[] пустой
@@ -279,6 +279,7 @@ final class OzonServiceCategoryMap
             'ozon_brand_commission'      => 'Брендовая комиссия Ozon',
             'ozon_premium_correction'    => 'Корректировка премии Ozon',
             'ozon_service_correction'    => 'Корректировка стоимости услуг Ozon',
+            'ozon_ovh_processing'        => 'Дополнительная обработка ОВХ Ozon',
             default                      => 'Прочие услуги Ozon',
         };
     }
