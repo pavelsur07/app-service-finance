@@ -6,6 +6,7 @@ namespace App\Marketplace\Controller\Api;
 
 use App\Marketplace\Application\RunUserReconciliationAction;
 use App\Marketplace\Entity\ReconciliationSession;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,23 +51,27 @@ final class ReconciliationUploadController extends AbstractController
         }
 
         $extension = strtolower($file->getClientOriginalExtension());
-        if (!in_array($extension, ['xls', 'xlsx'], true)) {
-            return $this->json(['error' => 'Допустимые форматы: .xls, .xlsx'], 400);
+        if ($extension !== 'xlsx') {
+            return $this->json(['error' => 'Допустимый формат: .xlsx'], 400);
         }
 
         if ($file->getSize() > 50 * 1024 * 1024) {
             return $this->json(['error' => 'Максимальный размер файла: 50 МБ.'], 400);
         }
 
-        try {
-            $dateFrom = new \DateTimeImmutable($periodFrom);
-            $dateTo   = new \DateTimeImmutable($periodTo);
-        } catch (\Exception) {
+        $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodFrom);
+        $dateTo   = \DateTimeImmutable::createFromFormat('!Y-m-d', $periodTo);
+
+        if ($dateFrom === false || $dateTo === false) {
             return $this->json(['error' => 'Некорректный формат дат. Ожидается Y-m-d.'], 400);
         }
 
         if ($dateFrom >= $dateTo) {
             return $this->json(['error' => 'periodFrom должен быть раньше periodTo.'], 400);
+        }
+
+        if (MarketplaceType::tryFrom($marketplace) === null) {
+            return $this->json(['error' => 'Неизвестный маркетплейс.'], 400);
         }
 
         // --- Сохранение файла ---
