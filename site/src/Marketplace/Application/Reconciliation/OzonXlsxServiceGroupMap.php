@@ -110,9 +110,9 @@ final class OzonXlsxServiceGroupMap
             'ozon_service_correction'    => 'Другие услуги и штрафы',
             'ozon_other_service'         => 'Другие услуги и штрафы',
 
-            // Компенсации и декомпенсации — не маппятся.
-            // Операции типа 'compensation' не загружаются в marketplace_costs (фильтр в OzonCostsRawProcessor).
-            // Расхождение по этой группе при сверке ожидаемо.
+            // === Компенсации и декомпенсации ===
+            // Типы: Компенсация, Декомпенсация
+            'ozon_compensation'          => 'Компенсации и декомпенсации',
         ];
     }
 }
