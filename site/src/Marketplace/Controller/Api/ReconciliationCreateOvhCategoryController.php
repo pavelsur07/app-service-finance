@@ -39,16 +39,20 @@ final class ReconciliationCreateOvhCategoryController extends AbstractController
         $company   = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        // Проверяем существует ли уже (учитываем soft delete как в MarketplaceCostCategoryResolver)
+        // Проверяем существует ли уже (marketplace + deleted_at как в MarketplaceCostCategoryResolver)
         $existing = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT id, code, name
             FROM marketplace_cost_categories
             WHERE code = 'ozon_ovh_processing'
               AND company_id = :companyId
+              AND marketplace = :marketplace
               AND deleted_at IS NULL
             SQL,
-            ['companyId' => $companyId],
+            [
+                'companyId'   => $companyId,
+                'marketplace' => MarketplaceType::OZON->value,
+            ],
         );
 
         if ($existing !== false) {
