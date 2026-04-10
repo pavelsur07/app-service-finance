@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Entity;
 
-use App\Marketplace\Enum\ReconciliationSessionStatus;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -42,8 +41,8 @@ class ReconciliationSession
     #[ORM\Column(type: 'string', length: 512)]
     private string $storedFilePath;
 
-    #[ORM\Column(type: 'string', length: 16, enumType: ReconciliationSessionStatus::class)]
-    private ReconciliationSessionStatus $status = ReconciliationSessionStatus::PENDING;
+    #[ORM\Column(type: 'string', length: 16)]
+    private string $status = 'pending';
 
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $resultJson = null;
@@ -87,22 +86,14 @@ class ReconciliationSession
      */
     public function markCompleted(array $reconcileResult): void
     {
-        if (!$this->status->isPending()) {
-            throw new \DomainException('Only pending session can be completed.');
-        }
-
         $this->resultJson  = json_encode($reconcileResult, JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
-        $this->status      = ReconciliationSessionStatus::COMPLETED;
+        $this->status      = 'completed';
         $this->completedAt = new \DateTimeImmutable();
     }
 
     public function markFailed(string $errorMessage): void
     {
-        if (!$this->status->isPending()) {
-            throw new \DomainException('Only pending session can be failed.');
-        }
-
-        $this->status       = ReconciliationSessionStatus::FAILED;
+        $this->status       = 'failed';
         $this->errorMessage = $errorMessage;
         $this->completedAt  = new \DateTimeImmutable();
     }
@@ -128,7 +119,7 @@ class ReconciliationSession
     public function getPeriodTo(): \DateTimeImmutable { return $this->periodTo; }
     public function getOriginalFilename(): string { return $this->originalFilename; }
     public function getStoredFilePath(): string { return $this->storedFilePath; }
-    public function getStatus(): ReconciliationSessionStatus { return $this->status; }
+    public function getStatus(): string { return $this->status; }
     public function getResultJson(): ?string { return $this->resultJson; }
     public function getErrorMessage(): ?string { return $this->errorMessage; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
