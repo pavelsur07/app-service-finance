@@ -57,6 +57,8 @@ final class RunUserReconciliationAction
                 $returnsTotal,
             );
 
+            $reconcileResult = $this->recalculateTotals($reconcileResult);
+
             $session->markCompleted($reconcileResult);
             $this->em->flush();
         } catch (\Throwable $e) {
@@ -106,14 +108,34 @@ final class RunUserReconciliationAction
 
         $reconcileResult['group_comparison'] = $groupComparison;
 
-        // Update overall status: mismatch if any group has mismatch
+        return $reconcileResult;
+    }
+
+    /**
+     * Пересчитать итоговые поля (xlsx_total, delta, status) на основе group_comparison.
+     *
+     * CostReconciliationQuery считает xlsx_total только из отрицательных xlsx-групп,
+     * поэтому положительные группы (компенсации) выпадают. Здесь мы пересчитываем
+     * итоги как сумму дельт по всем группам — если каждая группа совпала, итог тоже 0.
+     *
+     * @param array<string, mixed> $reconcileResult
+     * @return array<string, mixed>
+     */
+    private function recalculateTotals(array $reconcileResult): array
+    {
+        $groupComparison = $reconcileResult['group_comparison'] ?? [];
+
+        $totalDelta  = 0.0;
         $hasMismatch = false;
-        foreach ($groupComparison as $g) {
-            if ($g['status'] === 'mismatch') {
+
+        foreach ($groupComparison as $group) {
+            $totalDelta += abs($group['delta'] ?? 0);
+            if (($group['status'] ?? '') === 'mismatch') {
                 $hasMismatch = true;
-                break;
             }
         }
+
+        $reconcileResult['delta']  = round($totalDelta, 2);
         $reconcileResult['status'] = $hasMismatch ? 'mismatch' : 'matched';
 
         return $reconcileResult;
