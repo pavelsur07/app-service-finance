@@ -29,6 +29,7 @@ final class ReconciliationSessionRepository extends ServiceEntityRepository
             ->where('s.companyId = :companyId')
             ->setParameter('companyId', $companyId)
             ->orderBy('s.createdAt', 'DESC')
+            ->addOrderBy('s.id', 'DESC')
             ->setMaxResults($limit)
             ->setFirstResult($offset)
             ->getQuery()
