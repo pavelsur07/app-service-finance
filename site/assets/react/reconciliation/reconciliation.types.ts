@@ -6,12 +6,13 @@
 
 /** Сверка одной serviceGroup (из поля group_comparison) */
 export interface GroupComparison {
-    serviceGroup: string;
-    apiAmount: number;
-    xlsAmount: number;
+    service_group: string;
+    api_net: number;
+    xlsx_net: number;
+    api_costs: number;
+    api_storno: number;
     delta: number;
     status: "matched" | "mismatch";
-    apiCategories: string[];
 }
 
 /** Полный результат reconcile() — поле result в ответе API */
