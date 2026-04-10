@@ -373,9 +373,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             // Пропускаем только продажи (не затраты)
             if ($opAmount > 0.001 && $opType !== 'orders') {
                 if ($opType === 'compensation') {
-                    // Компенсации: принудительно ozon_compensation, сохраняем оригинальный знак
+                    // Компенсации: принудительно ozon_compensation, сохраняем оригинальный знак.
                     // Положительный amount = компенсация от Ozon (доход)
                     // Отрицательный amount = декомпенсация (расход)
+                    // NB: Знак НЕ инвертирован (в отличие от services[]):
+                    // в API положительный amount = доход, отрицательный = расход.
+                    // Сохраняем as-is чтобы SUM(amount) совпадал с xlsx net для сверки.
                     $categoryCode = 'ozon_compensation';
                     $storedAmount = $rawAmount;
                 } else {
