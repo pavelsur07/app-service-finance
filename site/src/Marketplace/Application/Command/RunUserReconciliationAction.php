@@ -42,8 +42,10 @@ final class RunUserReconciliationAction
             $session->markCompleted($reconcileResult);
             $this->em->flush();
         } catch (\Throwable $e) {
-            $session->markFailed(mb_substr($e->getMessage(), 0, 1024));
-            $this->em->flush();
+            if ($session->getStatus()->isPending()) {
+                $session->markFailed(mb_substr($e->getMessage(), 0, 1024));
+                $this->em->flush();
+            }
 
             throw $e;
         }
