@@ -484,4 +484,4 @@ paths:
 |---|---|---|
 | 1.0 | 2026-03-28 | Инициализация на основе архитектурного документа v1.3 |
 | 1.1 | 2026-03-31 | MarketplaceAnalytics: рефакторинг маппинга затрат — статья фиксированная (UnitEconomyCostType), категория МП выбирается из справочника (marketplace_cost_categories), убраны isSystem и costCategoryCode. Из Facade удалены remapCostMapping, resetCostMapping. |
-| 1.2 | 2026-04-10 | Marketplace: автозапуск daily pipeline после загрузки sales_report. Новый Message `ProcessDayReportMessage` (companyId, marketplace, date) → `ProcessDayReportHandler` диспатчит существующие `ProcessRawDocumentStepMessage` для каждого шага. SyncWb/OzonReportHandler диспатчат `ProcessDayReportMessage` после успешной загрузки. |
+| 1.2 | 2026-04-10 | Marketplace: автозапуск daily pipeline после загрузки sales_report. Новый Message `ProcessDayReportMessage` (companyId, rawDocumentId) → `ProcessDayReportHandler` сбрасывает статус конкретного документа и диспатчит `ProcessRawDocumentStepMessage` для каждого шага. SyncWb/OzonReportHandler диспатчат `ProcessDayReportMessage` после успешной загрузки. |

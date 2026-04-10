@@ -87,6 +87,8 @@ final class SyncWbReportHandler
         $connection->markSyncStarted();
         $this->em->flush();
 
+        $rawDocId = null;
+
         try {
             $adapter   = $this->adapterRegistry->get(MarketplaceType::WILDBERRIES);
             $msk       = new \DateTimeZone('Europe/Moscow');
@@ -122,27 +124,18 @@ final class SyncWbReportHandler
             $this->em->persist($rawDoc);
             $this->em->flush();
 
+            $rawDocId = $rawDoc->getId();
+
             $this->logger->info('WB raw report saved', [
                 'company_id'    => $companyId,
                 'connection_id' => $connectionId,
-                'raw_doc_id'    => $rawDoc->getId(),
+                'raw_doc_id'    => $rawDocId,
                 'records_count' => count($rawData),
                 'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
             ]);
 
             $connection->markSyncSuccess();
             $this->em->flush();
-
-            $this->messageBus->dispatch(new ProcessDayReportMessage(
-                companyId: $companyId,
-                marketplace: MarketplaceType::WILDBERRIES->value,
-                date: $yesterday->format('Y-m-d'),
-            ));
-
-            $this->logger->info('Dispatched auto-processing for WB day report', [
-                'company_id' => $companyId,
-                'date'       => $yesterday->format('Y-m-d'),
-            ]);
         } catch (\Throwable $e) {
             $this->logger->error('WB daily sync failed', [
                 'company_id'    => $companyId,
@@ -161,6 +154,26 @@ final class SyncWbReportHandler
                     'error' => $inner->getMessage(),
                 ]);
             }
+
+            return;
+        }
+
+        try {
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                rawDocumentId: $rawDocId,
+            ));
+
+            $this->logger->info('Dispatched auto-processing for WB day report', [
+                'company_id'     => $companyId,
+                'raw_document_id' => $rawDocId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to dispatch auto-processing for WB', [
+                'company_id'      => $companyId,
+                'raw_document_id' => $rawDocId,
+                'error'           => $e->getMessage(),
+            ]);
         }
     }
 }

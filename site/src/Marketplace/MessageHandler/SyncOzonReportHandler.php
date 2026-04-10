@@ -88,6 +88,8 @@ final class SyncOzonReportHandler
         $connection->markSyncStarted();
         $this->em->flush();
 
+        $rawDocId = null;
+
         try {
             $adapter  = $this->adapterRegistry->get(MarketplaceType::OZON);
             //$fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
@@ -124,10 +126,12 @@ final class SyncOzonReportHandler
             $this->em->persist($rawDoc);
             $this->em->flush();
 
+            $rawDocId = $rawDoc->getId();
+
             $this->logger->info('Ozon raw report saved', [
                 'company_id'    => $companyId,
                 'connection_id' => $connectionId,
-                'raw_doc_id'    => $rawDoc->getId(),
+                'raw_doc_id'    => $rawDocId,
                 'records_count' => count($rawData),
                 'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
             ]);
@@ -135,17 +139,6 @@ final class SyncOzonReportHandler
             $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
             $connection->markSyncSuccess();
             $this->em->flush();
-
-            $this->messageBus->dispatch(new ProcessDayReportMessage(
-                companyId: $companyId,
-                marketplace: MarketplaceType::OZON->value,
-                date: $toDate->format('Y-m-d'),
-            ));
-
-            $this->logger->info('Dispatched auto-processing for Ozon day report', [
-                'company_id' => $companyId,
-                'date'       => $toDate->format('Y-m-d'),
-            ]);
         } catch (\Throwable $e) {
             $this->logger->error('Ozon daily sync failed', [
                 'company_id'    => $companyId,
@@ -164,6 +157,26 @@ final class SyncOzonReportHandler
                     'error' => $inner->getMessage(),
                 ]);
             }
+
+            return;
+        }
+
+        try {
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                rawDocumentId: $rawDocId,
+            ));
+
+            $this->logger->info('Dispatched auto-processing for Ozon day report', [
+                'company_id'      => $companyId,
+                'raw_document_id' => $rawDocId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to dispatch auto-processing for Ozon', [
+                'company_id'      => $companyId,
+                'raw_document_id' => $rawDocId,
+                'error'           => $e->getMessage(),
+            ]);
         }
     }
 }

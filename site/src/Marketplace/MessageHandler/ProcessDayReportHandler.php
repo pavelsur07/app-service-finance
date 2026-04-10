@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Marketplace\MessageHandler;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
@@ -12,13 +11,14 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Запускает daily pipeline (sales/returns/costs) для всех sales_report
- * документов за указанную дату компании+маркетплейса.
+ * Запускает daily pipeline (sales/returns/costs) для конкретного
+ * MarketplaceRawDocument после его загрузки.
  *
- * Идемпотентен: перезапускает pipeline даже если за эту дату уже был запуск.
+ * Идемпотентен: перезапускает pipeline даже если документ уже был обработан.
  */
 #[AsMessageHandler]
 final class ProcessDayReportHandler
@@ -33,48 +33,35 @@ final class ProcessDayReportHandler
 
     public function __invoke(ProcessDayReportMessage $message): void
     {
-        $marketplace = MarketplaceType::from($message->marketplace);
-        $date = new \DateTimeImmutable($message->date, new \DateTimeZone('Europe/Moscow'));
+        $doc = $this->repository->find($message->rawDocumentId);
 
-        $documents = $this->repository->findByCompanyAndPeriod(
-            $message->companyId,
-            $marketplace,
-            $date,
-            $date,
-            'sales_report',
-        );
-
-        if ($documents === []) {
-            $this->logger->warning('No sales_report documents found for auto-processing', [
-                'company_id'  => $message->companyId,
-                'marketplace' => $message->marketplace,
-                'date'        => $message->date,
-            ]);
-
-            return;
+        if ($doc === null) {
+            throw new UnrecoverableMessageHandlingException(
+                sprintf('MarketplaceRawDocument not found: %s', $message->rawDocumentId),
+            );
         }
 
-        foreach ($documents as $doc) {
-            $doc->resetProcessingStatus();
+        if ((string) $doc->getCompany()->getId() !== $message->companyId) {
+            throw new UnrecoverableMessageHandlingException(
+                sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
+            );
         }
 
+        $doc->resetProcessingStatus();
         $this->entityManager->flush();
 
-        foreach ($documents as $doc) {
-            foreach (PipelineStep::cases() as $step) {
-                $this->bus->dispatch(new ProcessRawDocumentStepMessage(
-                    rawDocumentId: $doc->getId(),
-                    step: $step->value,
-                    companyId: $message->companyId,
-                ));
-            }
+        foreach (PipelineStep::cases() as $step) {
+            $this->bus->dispatch(new ProcessRawDocumentStepMessage(
+                rawDocumentId: $doc->getId(),
+                step: $step->value,
+                companyId: $message->companyId,
+            ));
         }
 
-        $this->logger->info('Auto-dispatched pipeline for day report', [
+        $this->logger->info('Auto-dispatched pipeline for raw document', [
             'company_id'      => $message->companyId,
-            'marketplace'     => $message->marketplace,
-            'date'            => $message->date,
-            'documents_count' => count($documents),
+            'raw_document_id' => $message->rawDocumentId,
+            'marketplace'     => $doc->getMarketplace()->value,
         ]);
     }
 }
