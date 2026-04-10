@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Marketplace\Application\Command;
+namespace App\Marketplace\Application;
 
 use App\Marketplace\Application\Reconciliation\OzonReportParserFacade;
 use App\Marketplace\Entity\ReconciliationSession;
@@ -43,8 +43,12 @@ final class RunUserReconciliationAction
             $this->em->flush();
         } catch (\Throwable $e) {
             if ($session->getStatus()->isPending()) {
-                $session->markFailed(mb_substr($e->getMessage(), 0, 1024));
-                $this->em->flush();
+                try {
+                    $session->markFailed(mb_substr($e->getMessage(), 0, 1024));
+                    $this->em->flush();
+                } catch (\Throwable) {
+                    // Не маскируем оригинальную ошибку
+                }
             }
 
             throw $e;
