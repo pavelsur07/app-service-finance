@@ -47,6 +47,7 @@
 | `MarketplaceCostPLMapping` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
+| `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
