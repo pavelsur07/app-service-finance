@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Entity;
 
 use App\Marketplace\Enum\ReconciliationSessionStatus;
+use App\Marketplace\Repository\ReconciliationSessionRepository;
 use Doctrine\ORM\Mapping as ORM;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -15,7 +16,7 @@ use Webmozart\Assert\Assert;
  * Хранит результат CostReconciliationQuery::reconcile() целиком в JSON (resultJson),
  * чтобы не плодить колонки при изменении структуры ответа Query.
  */
-#[ORM\Entity]
+#[ORM\Entity(repositoryClass: ReconciliationSessionRepository::class)]
 #[ORM\Table(name: 'marketplace_reconciliation_sessions')]
 #[ORM\Index(columns: ['company_id', 'marketplace', 'created_at'], name: 'idx_recon_session_lookup')]
 class ReconciliationSession
