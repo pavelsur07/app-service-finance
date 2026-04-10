@@ -50,7 +50,7 @@ final class ReconciliationUploadController extends AbstractController
             return $this->json(['error' => 'Файл не загружен.'], 400);
         }
 
-        $extension = strtolower($file->getClientOriginalExtension());
+        $extension = $file->guessExtension();
         if ($extension !== 'xlsx') {
             return $this->json(['error' => 'Допустимый формат: .xlsx'], 400);
         }
