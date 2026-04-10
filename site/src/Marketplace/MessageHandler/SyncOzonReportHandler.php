@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,10 +16,11 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Загружает сырые данные Ozon за последние 3 дня и сохраняет MarketplaceRawDocument.
- * Без обработки продаж/возвратов — только загрузка.
+ * После успешной загрузки диспатчит ProcessDayReportMessage для автозапуска pipeline.
  */
 #[AsMessageHandler]
 final class SyncOzonReportHandler
@@ -31,6 +33,7 @@ final class SyncOzonReportHandler
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
@@ -85,6 +88,8 @@ final class SyncOzonReportHandler
         $connection->markSyncStarted();
         $this->em->flush();
 
+        $rawDocId = null;
+
         try {
             $adapter  = $this->adapterRegistry->get(MarketplaceType::OZON);
             //$fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
@@ -121,10 +126,12 @@ final class SyncOzonReportHandler
             $this->em->persist($rawDoc);
             $this->em->flush();
 
+            $rawDocId = $rawDoc->getId();
+
             $this->logger->info('Ozon raw report saved', [
                 'company_id'    => $companyId,
                 'connection_id' => $connectionId,
-                'raw_doc_id'    => $rawDoc->getId(),
+                'raw_doc_id'    => $rawDocId,
                 'records_count' => count($rawData),
                 'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
             ]);
@@ -150,6 +157,26 @@ final class SyncOzonReportHandler
                     'error' => $inner->getMessage(),
                 ]);
             }
+
+            return;
+        }
+
+        try {
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                rawDocumentId: $rawDocId,
+            ));
+
+            $this->logger->info('Dispatched auto-processing for Ozon day report', [
+                'company_id'      => $companyId,
+                'raw_document_id' => $rawDocId,
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Failed to dispatch auto-processing for Ozon', [
+                'company_id'      => $companyId,
+                'raw_document_id' => $rawDocId,
+                'error'           => $e->getMessage(),
+            ]);
         }
     }
 }
