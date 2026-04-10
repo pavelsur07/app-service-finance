@@ -121,17 +121,10 @@ const ReconciliationTable: React.FC<ReconciliationTableProps> = ({ session }) =>
                                 </tr>
                             )}
                             {groups.map((g) => (
-                                <tr key={g.serviceGroup}>
-                                    <td>
-                                        <div>{g.serviceGroup}</div>
-                                        {g.apiCategories.length > 0 && (
-                                            <div className="text-muted small">
-                                                {g.apiCategories.join(", ")}
-                                            </div>
-                                        )}
-                                    </td>
-                                    <td className="text-end">{formatRub(g.apiAmount)}</td>
-                                    <td className="text-end">{formatRub(g.xlsAmount)}</td>
+                                <tr key={g.service_group}>
+                                    <td>{g.service_group}</td>
+                                    <td className="text-end">{formatRub(g.api_net)}</td>
+                                    <td className="text-end">{formatRub(g.xlsx_net)}</td>
                                     <td
                                         className={`text-end ${
                                             g.delta !== 0 ? "text-red fw-bold" : ""
