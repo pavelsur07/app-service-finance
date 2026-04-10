@@ -47,6 +47,7 @@
 | `MarketplaceCostPLMapping` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
+| `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
@@ -299,6 +300,20 @@ enum PipelineStatus: string
     public function getLabel(): string;     // Ожидает / Выполняется / Завершён / Ошибка
     public function isTerminal(): bool;     // true для COMPLETED, FAILED
     public function isRunning(): bool;      // true для RUNNING
+}
+```
+
+### `src/Marketplace/Enum/ReconciliationSessionStatus.php`
+```php
+enum ReconciliationSessionStatus: string
+{
+    case PENDING   = 'pending';
+    case COMPLETED = 'completed';
+    case FAILED    = 'failed';
+
+    public function getLabel(): string;    // Ожидает / Завершена / Ошибка
+    public function isPending(): bool;     // true для PENDING
+    public function isTerminal(): bool;    // true для COMPLETED, FAILED
 }
 ```
 
