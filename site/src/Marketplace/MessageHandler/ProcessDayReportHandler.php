@@ -34,7 +34,7 @@ final class ProcessDayReportHandler
     public function __invoke(ProcessDayReportMessage $message): void
     {
         $marketplace = MarketplaceType::from($message->marketplace);
-        $date = new \DateTimeImmutable($message->date);
+        $date = new \DateTimeImmutable($message->date, new \DateTimeZone('Europe/Moscow'));
 
         $documents = $this->repository->findByCompanyAndPeriod(
             $message->companyId,
