@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-10.1';
+    public const VERSION = '2026-04-10.2';
 
     /**
      * @var array<string, string|null>
@@ -214,7 +214,8 @@ final class OzonServiceCategoryMap
 
         // Коды, генерируемые в OzonCostsRawProcessor::extractCostEntries() напрямую
         // + ozon_other_service — fallback для неизвестных service names
-        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery', 'ozon_other_service'] as $extra) {
+        // + ozon_compensation — принудительно для opType=compensation
+        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery', 'ozon_other_service', 'ozon_compensation'] as $extra) {
             if (!isset($codes[$extra])) {
                 $codes[$extra] = self::getCategoryName($extra);
             }
@@ -280,6 +281,7 @@ final class OzonServiceCategoryMap
             'ozon_premium_correction'    => 'Корректировка премии Ozon',
             'ozon_service_correction'    => 'Корректировка стоимости услуг Ozon',
             'ozon_ovh_processing'        => 'Дополнительная обработка ОВХ Ozon',
+            'ozon_compensation'          => 'Компенсации и декомпенсации Ozon',
             default                      => 'Прочие услуги Ozon',
         };
     }

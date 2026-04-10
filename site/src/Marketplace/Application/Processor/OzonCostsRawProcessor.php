@@ -364,25 +364,33 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         // 5. Если services[] пустой — затраты в op['amount'] напрямую
-        // Применимо к: реклама, хранение, кросс-докинг, поставка, досрочная выплата и т.д.
+        // Применимо к: реклама, хранение, кросс-докинг, поставка, досрочная выплата, компенсации и т.д.
         if (empty($services)) {
-            $opAmount = abs((float) ($op['amount'] ?? 0));
-            $opType   = $op['type'] ?? '';
+            $rawAmount = (float) ($op['amount'] ?? 0);
+            $opAmount  = abs($rawAmount);
+            $opType    = $op['type'] ?? '';
 
-            // Пропускаем продажи и компенсации (не затраты)
-            // type=compensation включает как компенсации от Ozon (доход) так и декомпенсации (расход),
-            // но они учитываются нетто на стороне Ozon — в ОПиУ не включаем.
-            if ($opAmount > 0.001 && !in_array($opType, ['orders', 'compensation'], true)) {
-                $operationType = $op['operation_type'] ?? '';
-                $categoryCode  = $this->resolveServiceCategoryCode($operationType);
+            // Пропускаем только продажи (не затраты)
+            if ($opAmount > 0.001 && $opType !== 'orders') {
+                if ($opType === 'compensation') {
+                    // Компенсации: принудительно ozon_compensation, сохраняем оригинальный знак
+                    // Положительный amount = компенсация от Ozon (доход)
+                    // Отрицательный amount = декомпенсация (расход)
+                    $categoryCode = 'ozon_compensation';
+                    $storedAmount = $rawAmount;
+                } else {
+                    $operationType = $op['operation_type'] ?? '';
+                    $categoryCode  = $this->resolveServiceCategoryCode($operationType);
+                    $storedAmount  = $opAmount;
+                }
 
                 $entries[] = [
                     'external_id'   => $operationId . '_main',
                     'category_code' => $categoryCode,
                     'category_name' => $this->resolveCategoryName($categoryCode),
-                    'amount'        => (string) $opAmount,
+                    'amount'        => (string) $storedAmount,
                     'cost_date'     => $operationDate,
-                    'description'   => $op['operation_type_name'] ?? $operationType,
+                    'description'   => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
                     '_item_idx'     => 0,
                 ];
             }
