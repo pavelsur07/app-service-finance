@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,10 +16,11 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Загружает сырые данные Ozon за последние 3 дня и сохраняет MarketplaceRawDocument.
- * Без обработки продаж/возвратов — только загрузка.
+ * После успешной загрузки диспатчит ProcessDayReportMessage для автозапуска pipeline.
  */
 #[AsMessageHandler]
 final class SyncOzonReportHandler
@@ -31,6 +33,7 @@ final class SyncOzonReportHandler
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
@@ -132,6 +135,17 @@ final class SyncOzonReportHandler
             $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
             $connection->markSyncSuccess();
             $this->em->flush();
+
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                marketplace: MarketplaceType::OZON->value,
+                date: $toDate->format('Y-m-d'),
+            ));
+
+            $this->logger->info('Dispatched auto-processing for Ozon day report', [
+                'company_id' => $companyId,
+                'date'       => $toDate->format('Y-m-d'),
+            ]);
         } catch (\Throwable $e) {
             $this->logger->error('Ozon daily sync failed', [
                 'company_id'    => $companyId,

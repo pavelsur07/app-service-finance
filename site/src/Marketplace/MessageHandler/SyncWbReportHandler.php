@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbReportMessage;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
@@ -15,10 +16,11 @@ use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Загружает сырые данные WB за предыдущий день и сохраняет MarketplaceRawDocument.
- * Без обработки продаж/возвратов/затрат — только загрузка.
+ * После успешной загрузки диспатчит ProcessDayReportMessage для автозапуска pipeline.
  */
 #[AsMessageHandler]
 final class SyncWbReportHandler
@@ -30,6 +32,7 @@ final class SyncWbReportHandler
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
+        private readonly MessageBusInterface $messageBus,
     ) {
     }
 
@@ -129,6 +132,17 @@ final class SyncWbReportHandler
 
             $connection->markSyncSuccess();
             $this->em->flush();
+
+            $this->messageBus->dispatch(new ProcessDayReportMessage(
+                companyId: $companyId,
+                marketplace: MarketplaceType::WILDBERRIES->value,
+                date: $yesterday->format('Y-m-d'),
+            ));
+
+            $this->logger->info('Dispatched auto-processing for WB day report', [
+                'company_id' => $companyId,
+                'date'       => $yesterday->format('Y-m-d'),
+            ]);
         } catch (\Throwable $e) {
             $this->logger->error('WB daily sync failed', [
                 'company_id'    => $companyId,

@@ -30,6 +30,7 @@ framework:
             'App\Marketplace\Message\SyncOzonRealizationMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
             'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
+            'App\Marketplace\Message\ProcessDayReportMessage': async
             'App\Marketplace\Message\ProcessRawDocumentStepMessage': async
             'App\Marketplace\Message\ReprocessCostsMessage': async
             'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
