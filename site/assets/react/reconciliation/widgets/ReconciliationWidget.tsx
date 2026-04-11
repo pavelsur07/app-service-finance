@@ -20,6 +20,10 @@ const ReconciliationWidget: React.FC = () => {
     const [ovhResult, setOvhResult] = useState<unknown>(null);
     const [ovhLoading, setOvhLoading] = useState(false);
 
+    // TEMPORARY — удалить после диагностики продаж
+    const [salesCheckResult, setSalesCheckResult] = useState<unknown>(null);
+    const [salesCheckLoading, setSalesCheckLoading] = useState(false);
+
     const handleOvhCheck = useCallback(async () => {
         setOvhLoading(true);
         try {
@@ -29,6 +33,26 @@ const ReconciliationWidget: React.FC = () => {
             setOvhResult({ error: e?.message ?? "Ошибка" });
         } finally {
             setOvhLoading(false);
+        }
+    }, []);
+
+    // TEMPORARY — удалить после диагностики продаж
+    const handleSalesCheck = useCallback(async (session: ReconciliationSession) => {
+        setSalesCheckLoading(true);
+        try {
+            const data = await httpJson("/api/marketplace/reconciliation/debug/sales-check", {
+                method: "POST",
+                body: JSON.stringify({
+                    periodFrom: session.periodFrom,
+                    periodTo: session.periodTo,
+                    marketplace: session.marketplace,
+                }),
+            });
+            setSalesCheckResult(data);
+        } catch (e: any) {
+            setSalesCheckResult({ error: e?.message ?? "Ошибка" });
+        } finally {
+            setSalesCheckLoading(false);
         }
     }, []);
 
@@ -131,10 +155,25 @@ const ReconciliationWidget: React.FC = () => {
                         >
                             {ovhLoading ? "Загрузка..." : "OVH Check"}
                         </button>
+                        {/* TEMPORARY — удалить после диагностики продаж */}
+                        {displaySession && (
+                            <button
+                                className="btn btn-outline-info btn-sm ms-2"
+                                onClick={() => handleSalesCheck(displaySession)}
+                                disabled={salesCheckLoading}
+                            >
+                                {salesCheckLoading ? "Загрузка..." : "Sales Check"}
+                            </button>
+                        )}
                     </div>
                     {ovhResult && (
                         <pre className="bg-dark text-light p-3 rounded mb-3" style={{ fontSize: "0.8rem", maxHeight: "400px", overflow: "auto" }}>
                             {JSON.stringify(ovhResult, null, 2)}
+                        </pre>
+                    )}
+                    {salesCheckResult && (
+                        <pre className="bg-dark text-light p-3 rounded mb-3" style={{ fontSize: "0.8rem", maxHeight: "400px", overflow: "auto" }}>
+                            {JSON.stringify(salesCheckResult, null, 2)}
                         </pre>
                     )}
 
