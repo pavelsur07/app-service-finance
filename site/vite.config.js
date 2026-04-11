@@ -17,6 +17,7 @@ export default defineConfig({
                 marketplace_analytics_kpi: "./assets/react/marketplace_analytics_kpi.tsx",
                 marketplace_analytics_page: "./assets/react/marketplace-analytics-page.tsx",
                 reconciliation_page: "./assets/react/reconciliation-page.tsx",
+                unit_extended_page: "./assets/react/unit-extended-page.tsx",
             },
         }
     },
