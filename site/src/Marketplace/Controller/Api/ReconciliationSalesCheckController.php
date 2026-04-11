@@ -34,6 +34,9 @@ final class ReconciliationSalesCheckController extends AbstractController
     )]
     public function __invoke(Request $request): JsonResponse
     {
+        // TEMPORARY DEBUG — удалить после диагностики
+        return new JsonResponse(['debug' => 'reached', 'method' => $request->getMethod(), 'content' => $request->getContent()]);
+
         $company   = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
