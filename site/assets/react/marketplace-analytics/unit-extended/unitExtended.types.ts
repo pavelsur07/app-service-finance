@@ -29,6 +29,8 @@ export interface UnitExtendedItem {
     otherCosts: number;
     totalCosts: number;
     profit: number;
+    marginPercent: number | null;
+    roiPercent: number | null;
     otherCostsBreakdown: CostGroupBreakdown[];
     allCostsBreakdown: CostGroupBreakdown[];
 }
@@ -43,6 +45,8 @@ export interface UnitExtendedTotals {
     otherCosts: number;
     totalCosts: number;
     profit: number;
+    marginPercent: number | null;
+    roiPercent: number | null;
 }
 
 export interface UnitExtendedResponse {
