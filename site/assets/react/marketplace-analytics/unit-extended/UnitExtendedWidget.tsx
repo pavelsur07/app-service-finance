@@ -19,7 +19,7 @@ function getFiltersFromUrl(): Filters {
     const params = new URLSearchParams(window.location.search);
     const currentMonth = getMonthRange(0);
     return {
-        marketplace: params.get('marketplace') ?? '',
+        marketplace: params.get('marketplace') ?? 'ozon',
         dateFrom: params.get('from') ?? currentMonth.from,
         dateTo: params.get('to') ?? currentMonth.to,
     };
