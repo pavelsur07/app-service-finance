@@ -75,6 +75,16 @@ final class RunUserReconciliationAction
         }
     }
 
+    // TODO: P3 — Расхождение в продажах (~2 402 ₽ за февраль 2026, 0.04%).
+    // Наш SUM(total_revenue) из marketplace_sales = 5 796 711,01
+    // xlsx группа «Продажи» (Выручка + Баллы за скидки + Программы партнёров) = 5 794 309,01
+    // Гипотезы:
+    //   1. Граничные операции — разная дата привязки в API (operation_date) vs xlsx
+    //   2. Дедупликация — один заказ с разными operation_id но одним posting_number
+    //   3. Фильтрация — процессор берёт type=orders && accruals_for_sale>0, xlsx может учитывать шире
+    // Решение: построчная сверка продаж API vs xlsx (отдельный Query, отдельный UI).
+    // См. GitHub Issue #1480.
+
     /**
      * Enrich group_comparison with sales and returns totals from dedicated tables.
      *
