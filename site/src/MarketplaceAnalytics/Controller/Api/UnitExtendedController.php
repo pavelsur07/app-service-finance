@@ -18,7 +18,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
     name: 'marketplace_analytics_api_unit_extended',
     methods: ['GET'],
 )]
-#[IsGranted('ROLE_USER')]
+#[IsGranted('ROLE_COMPANY_USER')]
 final class UnitExtendedController extends AbstractController
 {
     public function __construct(
