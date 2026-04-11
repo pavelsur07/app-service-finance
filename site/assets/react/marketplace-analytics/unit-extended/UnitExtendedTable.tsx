@@ -60,7 +60,10 @@ function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField):
     if (field === 'title') {
         return a.title.localeCompare(b.title, 'ru');
     }
-    return ((a[field] as number | null) ?? -Infinity) - ((b[field] as number | null) ?? -Infinity);
+    const valA = (a[field] as number | null) ?? -Infinity;
+    const valB = (b[field] as number | null) ?? -Infinity;
+    if (valA === valB) return 0;
+    return valA - valB;
 }
 
 function marginColor(v: number | null): string {
@@ -68,6 +71,10 @@ function marginColor(v: number | null): string {
     if (v < 5) return 'text-red';
     if (v <= 15) return 'text-yellow';
     return 'text-green';
+}
+
+function roiColor(v: number | null): string {
+    return v !== null && v < 0 ? 'text-red' : '';
 }
 
 function formatPercent(v: number | null): React.ReactNode {
@@ -190,7 +197,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                     <td className={`text-end ${marginColor(row.marginPercent)}`}>
                                         {formatPercent(row.marginPercent)}
                                     </td>
-                                    <td className={`text-end ${row.roiPercent !== null && row.roiPercent < 0 ? 'text-red' : ''}`}>
+                                    <td className={`text-end ${roiColor(row.roiPercent)}`}>
                                         {formatPercent(row.roiPercent)}
                                     </td>
                                     <td className="text-end">
@@ -249,7 +256,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                             <td className={`text-end ${marginColor(totals.marginPercent)}`}>
                                 {formatPercent(totals.marginPercent)}
                             </td>
-                            <td className={`text-end ${totals.roiPercent !== null && totals.roiPercent < 0 ? 'text-red' : ''}`}>
+                            <td className={`text-end ${roiColor(totals.roiPercent)}`}>
                                 {formatPercent(totals.roiPercent)}
                             </td>
                             <td></td>
