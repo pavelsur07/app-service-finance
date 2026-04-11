@@ -46,6 +46,24 @@ final class ReconciliationSalesCheckController extends AbstractController
             return $this->json(['error' => 'periodFrom and periodTo are required'], 400);
         }
 
+        try {
+            return $this->buildResponse($companyId, $marketplace, $periodFrom, $periodTo);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'error' => $e->getMessage(),
+                'file'  => $e->getFile() . ':' . $e->getLine(),
+                'trace' => array_slice(explode("\n", $e->getTraceAsString()), 0, 5),
+            ], 500);
+        }
+    }
+
+    private function buildResponse(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): JsonResponse {
+
         $params = [
             'companyId'   => $companyId,
             'marketplace' => $marketplace,
