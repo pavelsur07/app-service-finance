@@ -14,7 +14,9 @@ type SortField =
     | 'logistics'
     | 'otherCosts'
     | 'totalCosts'
-    | 'profit';
+    | 'profit'
+    | 'marginPercent'
+    | 'roiPercent';
 
 type SortDir = 'asc' | 'desc';
 
@@ -50,13 +52,34 @@ const HEADERS: { field: SortField; label: string; align?: string }[] = [
     { field: 'otherCosts', label: 'Прочие затраты', align: 'text-end' },
     { field: 'totalCosts', label: 'Итого затрат', align: 'text-end' },
     { field: 'profit', label: 'Прибыль', align: 'text-end' },
+    { field: 'marginPercent', label: 'Маржа %', align: 'text-end' },
+    { field: 'roiPercent', label: 'ROI %', align: 'text-end' },
 ];
 
 function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField): number {
     if (field === 'title') {
         return a.title.localeCompare(b.title, 'ru');
     }
-    return (a[field] as number) - (b[field] as number);
+    const valA = (a[field] as number | null) ?? -Infinity;
+    const valB = (b[field] as number | null) ?? -Infinity;
+    if (valA === valB) return 0;
+    return valA - valB;
+}
+
+function marginColor(v: number | null): string {
+    if (v === null) return '';
+    if (v < 5) return 'text-red';
+    if (v <= 15) return 'text-yellow';
+    return 'text-green';
+}
+
+function roiColor(v: number | null): string {
+    return v !== null && v < 0 ? 'text-red' : '';
+}
+
+function formatPercent(v: number | null): React.ReactNode {
+    if (v === null) return '\u2014';
+    return `${v.toFixed(1)}%`;
 }
 
 const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, isLoading }) => {
@@ -112,7 +135,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         );
     }
 
-    const colCount = HEADERS.length + 1; // +1 for "Все затраты" column
+    const colCount = HEADERS.length + 1; // +1 for "Все затраты" button column
 
     return (
         <div className="table-responsive">
@@ -171,6 +194,12 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                             {formatMoney(row.profit)}
                                         </span>
                                     </td>
+                                    <td className={`text-end ${marginColor(row.marginPercent)}`}>
+                                        {formatPercent(row.marginPercent)}
+                                    </td>
+                                    <td className={`text-end ${roiColor(row.roiPercent)}`}>
+                                        {formatPercent(row.roiPercent)}
+                                    </td>
                                     <td className="text-end">
                                         <button
                                             type="button"
@@ -223,6 +252,12 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                 <span className={totals.profit >= 0 ? 'text-green' : 'text-red'}>
                                     {formatMoney(totals.profit)}
                                 </span>
+                            </td>
+                            <td className={`text-end ${marginColor(totals.marginPercent)}`}>
+                                {formatPercent(totals.marginPercent)}
+                            </td>
+                            <td className={`text-end ${roiColor(totals.roiPercent)}`}>
+                                {formatPercent(totals.roiPercent)}
                             </td>
                             <td></td>
                         </tr>

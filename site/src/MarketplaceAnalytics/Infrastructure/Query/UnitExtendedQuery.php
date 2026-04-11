@@ -137,6 +137,8 @@ final readonly class UnitExtendedQuery
                 'otherCosts' => $otherCosts,
                 'totalCosts' => $totalCostsVal,
                 'profit' => $profit,
+                'marginPercent' => $revenue > 0 ? round($profit / $revenue * 100, 1) : null,
+                'roiPercent' => $costPriceTotal > 0 ? round($profit / $costPriceTotal * 100, 1) : null,
                 'otherCostsBreakdown' => $otherBreakdown,
                 'allCostsBreakdown' => $allBreakdown,
             ];
@@ -160,6 +162,13 @@ final readonly class UnitExtendedQuery
         foreach ($totals as $key => $val) {
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
         }
+
+        $totals['marginPercent'] = $totals['revenue'] > 0
+            ? round($totals['profit'] / $totals['revenue'] * 100, 1)
+            : null;
+        $totals['roiPercent'] = $totals['costPriceTotal'] > 0
+            ? round($totals['profit'] / $totals['costPriceTotal'] * 100, 1)
+            : null;
 
         // Limit items for response; totals remain complete
         $items = \array_slice($items, 0, $limit);
