@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Application\Reconciliation\OzonXlsxServiceGroupMap;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class UnitExtendedQuery
@@ -28,10 +29,23 @@ final readonly class UnitExtendedQuery
         ?string $marketplace,
         string $periodFrom,
         string $periodTo,
+        int $limit = 500,
     ): array {
         $sales = $this->fetchSales($companyId, $marketplace, $periodFrom, $periodTo);
         $returns = $this->fetchReturns($companyId, $marketplace, $periodFrom, $periodTo);
         $costs = $this->fetchCosts($companyId, $marketplace, $periodFrom, $periodTo);
+
+        // Merge all unique listing IDs from three sources so listings
+        // with only returns or costs are not lost
+        $allListingIds = array_unique(array_merge(
+            array_keys($sales),
+            array_keys($returns),
+            array_keys($costs),
+        ));
+
+        // Fetch metadata (title, sku, marketplace) for listings not present in sales
+        $nonSalesIds = array_diff($allListingIds, array_keys($sales));
+        $listingMeta = $this->fetchListingMeta($nonSalesIds);
 
         $categoryToGroup = OzonXlsxServiceGroupMap::getCategoryToServiceGroup();
         $logisticsCodes = $this->getLogisticsCodes($categoryToGroup);
@@ -49,18 +63,25 @@ final readonly class UnitExtendedQuery
             'profit' => 0.0,
         ];
 
-        foreach ($sales as $listingId => $sale) {
-            $ret = $returns[$listingId] ?? ['returns_total' => 0, 'returns_quantity' => 0];
+        foreach ($allListingIds as $listingId) {
+            $sale = $sales[$listingId] ?? null;
+            $ret = $returns[$listingId] ?? null;
             $listingCosts = $costs[$listingId] ?? [];
+            $meta = $listingMeta[$listingId] ?? null;
 
-            $revenue = (float) $sale['revenue'];
-            $quantity = (int) $sale['quantity'];
-            $returnsTotal = (float) $ret['returns_total'];
-            $costPriceTotal = (float) $sale['cost_price_total'];
-            $costPriceQuantity = (int) $sale['cost_price_quantity'];
+            $revenue = $sale !== null ? (float) $sale['revenue'] : 0.0;
+            $quantity = $sale !== null ? (int) $sale['quantity'] : 0;
+            $returnsTotal = $ret !== null ? (float) $ret['returns_total'] : 0.0;
+            $costPriceTotal = $sale !== null ? (float) $sale['cost_price_total'] : 0.0;
+            $costPriceQuantity = $sale !== null ? (int) $sale['cost_price_quantity'] : 0;
             $costPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
                 : 0.0;
+
+            // Listing metadata: prefer sales source, fallback to listings table
+            $title = $sale['listing_title'] ?? $meta['listing_title'] ?? '';
+            $sku = $sale['listing_sku'] ?? $meta['listing_sku'] ?? '';
+            $mp = $sale['listing_marketplace'] ?? $meta['listing_marketplace'] ?? '';
 
             // Classify costs
             $commission = 0.0;
@@ -103,9 +124,9 @@ final readonly class UnitExtendedQuery
 
             $items[] = [
                 'listingId' => $listingId,
-                'title' => $sale['listing_title'] ?? '',
-                'sku' => $sale['listing_sku'] ?? '',
-                'marketplace' => $sale['listing_marketplace'] ?? '',
+                'title' => $title,
+                'sku' => $sku,
+                'marketplace' => $mp,
                 'revenue' => round($revenue, 2),
                 'quantity' => $quantity,
                 'returnsTotal' => round($returnsTotal, 2),
@@ -120,6 +141,7 @@ final readonly class UnitExtendedQuery
                 'allCostsBreakdown' => $allBreakdown,
             ];
 
+            // Totals accumulate across ALL listings (not limited)
             $totals['revenue'] += $revenue;
             $totals['quantity'] += $quantity;
             $totals['returnsTotal'] += $returnsTotal;
@@ -134,10 +156,13 @@ final readonly class UnitExtendedQuery
         // Sort by revenue DESC
         usort($items, static fn (array $a, array $b): int => $b['revenue'] <=> $a['revenue']);
 
-        // Round totals
+        // Round totals (computed from ALL listings before limit)
         foreach ($totals as $key => $val) {
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
         }
+
+        // Limit items for response; totals remain complete
+        $items = \array_slice($items, 0, $limit);
 
         return ['items' => $items, 'totals' => $totals];
     }
@@ -256,6 +281,40 @@ final readonly class UnitExtendedQuery
         $result = [];
         foreach ($rows as $row) {
             $result[$row['listing_id']][] = $row;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Fetch listing metadata (title, sku, marketplace) for listings not present in the sales result.
+     *
+     * @param list<string> $listingIds
+     * @return array<string, array{listing_title: string, listing_sku: string, listing_marketplace: string}>
+     */
+    private function fetchListingMeta(array $listingIds): array
+    {
+        if ($listingIds === []) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            <<<SQL
+            SELECT
+                l.id,
+                l.name           AS listing_title,
+                l.marketplace_sku AS listing_sku,
+                l.marketplace    AS listing_marketplace
+            FROM marketplace_listings l
+            WHERE l.id IN (:ids)
+            SQL,
+            ['ids' => array_values($listingIds)],
+            ['ids' => ArrayParameterType::STRING],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['id']] = $row;
         }
 
         return $result;
