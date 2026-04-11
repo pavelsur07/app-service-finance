@@ -59,7 +59,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         $salesData = array_filter($rawRows, static function (array $op): bool {
             return ($op['type'] ?? '') === 'orders'
-                && (float) ($op['accruals_for_sale'] ?? 0) > 0;
+                && (float) ($op['accruals_for_sale'] ?? 0) != 0;
         });
 
         if (empty($salesData)) {
@@ -83,7 +83,12 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         $allExternalIds = array_values(array_map(
             static function (array $op): string {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
-                return $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                // Storno operations get a suffix to avoid UNIQUE constraint conflict
+                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                    $externalId .= '_storno';
+                }
+                return $externalId;
             },
             $salesData,
         ));
@@ -92,6 +97,14 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         foreach ($salesData as $op) {
             $postingNumber = $op['posting']['posting_number'] ?? '';
             $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+
+            $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
+            $isStorno = $accrual < 0;
+
+            // Storno operations get a suffix to avoid UNIQUE constraint conflict
+            if ($isStorno) {
+                $externalId .= '_storno';
+            }
 
             if ($externalId === '' || isset($existingMap[$externalId])) {
                 continue;
@@ -109,7 +122,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
             $saleDate = new \DateTimeImmutable($op['operation_date']);
 
             $sale = new MarketplaceSale(
@@ -124,7 +136,8 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             $sale->setQuantity(count($op['items'] ?? []) ?: 1);
             $sale->setPricePerUnit((string) $accrual);
             $sale->setTotalRevenue((string) $accrual);
-            $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
+            // Storno: no goods shipped, cost_price must be null
+            $sale->setCostPrice($isStorno ? null : $this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($op);
 
             $this->em->persist($sale);
