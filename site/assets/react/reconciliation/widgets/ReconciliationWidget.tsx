@@ -42,11 +42,11 @@ const ReconciliationWidget: React.FC = () => {
         try {
             const data = await httpJson("/api/marketplace/reconciliation/debug/sales-check", {
                 method: "POST",
-                body: JSON.stringify({
+                body: {
                     periodFrom: session.periodFrom,
                     periodTo: session.periodTo,
                     marketplace: session.marketplace,
-                }),
+                },
             });
             setSalesCheckResult(data);
         } catch (e: any) {
