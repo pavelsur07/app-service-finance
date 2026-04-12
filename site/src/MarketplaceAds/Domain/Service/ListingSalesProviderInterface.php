@@ -7,18 +7,21 @@ namespace App\MarketplaceAds\Domain\Service;
 interface ListingSalesProviderInterface
 {
     /**
-     * Получить количество продаж листинга за дату.
+     * Bulk-получение количества продаж для набора листингов за дату.
+     * Листинги без продаж отсутствуют в результате (caller получает 0 по умолчанию).
      *
-     * @return int количество проданных единиц
+     * @param  string[]           $listingIds
+     * @return array<string, int> listingId => количество продаж
      */
-    public function getSalesQuantityForDate(
+    public function getSalesQuantitiesByListings(
         string $companyId,
-        string $listingId,
+        array $listingIds,
         \DateTimeImmutable $date,
-    ): int;
+    ): array;
 
     /**
-     * Получить все листинги по родительскому SKU и площадке.
+     * Получить все листинги (включая неактивные) по родительскому SKU и площадке.
+     * Необходимо для корректной обработки исторических отчётов.
      *
      * @return list<array{id: string, parentSku: string}>
      */

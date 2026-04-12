@@ -13,41 +13,28 @@ final readonly class ListingSalesProviderMarketplace implements ListingSalesProv
         private MarketplaceFacade $marketplaceFacade,
     ) {}
 
-    public function getSalesQuantityForDate(
+    /**
+     * {@inheritdoc}
+     */
+    public function getSalesQuantitiesByListings(
         string $companyId,
-        string $listingId,
+        array $listingIds,
         \DateTimeImmutable $date,
-    ): int {
-        $sales = $this->marketplaceFacade->getSalesForListingAndDate($companyId, $listingId, $date);
-
-        $total = 0;
-        foreach ($sales as $sale) {
-            $total += $sale->quantity;
-        }
-
-        return $total;
+    ): array {
+        return $this->marketplaceFacade->getSalesQuantitiesForListings($companyId, $listingIds, $date);
     }
 
     /**
-     * Находит все активные листинги с данным marketplaceSku (nm_id) на указанной площадке.
+     * Находит все листинги (включая неактивные) с данным marketplaceSku на указанной площадке.
      * В WB nm_id — родительский артикул, общий для всех размеров одного товара.
      *
-     * @return list<array{id: string, parentSku: string}>
+     * {@inheritdoc}
      */
     public function findListingsByParentSku(
         string $companyId,
         string $marketplace,
         string $parentSku,
     ): array {
-        $allListings = $this->marketplaceFacade->getActiveListings($companyId, $marketplace);
-
-        $result = [];
-        foreach ($allListings as $listing) {
-            if ($listing->marketplaceSku === $parentSku) {
-                $result[] = ['id' => $listing->id, 'parentSku' => $listing->marketplaceSku];
-            }
-        }
-
-        return $result;
+        return $this->marketplaceFacade->findListingsByMarketplaceSku($companyId, $marketplace, $parentSku);
     }
 }

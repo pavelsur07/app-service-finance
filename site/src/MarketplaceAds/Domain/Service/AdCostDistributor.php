@@ -36,14 +36,12 @@ final class AdCostDistributor
 
         $count = count($listings);
 
-        // Шаг 1: Получаем продажи по каждому листингу
-        $salesByListing = [];
+        // Шаг 1: Получаем продажи по всем листингам одним запросом
+        $listingIds     = array_column($listings, 'id');
+        $salesByListing = $this->salesProvider->getSalesQuantitiesByListings($companyId, $listingIds, $date);
+        // Листинги без продаж отсутствуют в ответе — проставляем 0
         foreach ($listings as $listing) {
-            $salesByListing[$listing['id']] = $this->salesProvider->getSalesQuantityForDate(
-                $companyId,
-                $listing['id'],
-                $date,
-            );
+            $salesByListing[$listing['id']] ??= 0;
         }
 
         $totalSales = (int) array_sum($salesByListing);

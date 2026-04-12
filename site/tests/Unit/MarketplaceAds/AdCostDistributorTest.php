@@ -29,9 +29,18 @@ final class AdCostDistributorTest extends TestCase
     {
         $provider = $this->createMock(ListingSalesProviderInterface::class);
         $provider
-            ->method('getSalesQuantityForDate')
+            ->method('getSalesQuantitiesByListings')
             ->willReturnCallback(
-                static fn(string $companyId, string $listingId) => $salesByListingId[$listingId] ?? 0,
+                static function (string $companyId, array $listingIds, \DateTimeImmutable $date) use ($salesByListingId): array {
+                    $result = [];
+                    foreach ($listingIds as $id) {
+                        if (isset($salesByListingId[$id])) {
+                            $result[$id] = $salesByListingId[$id];
+                        }
+                    }
+
+                    return $result;
+                },
             );
 
         return $provider;
