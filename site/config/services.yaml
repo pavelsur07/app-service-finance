@@ -228,3 +228,7 @@ services:
     App\Shared\Security\Contract\SecretKeyProviderInterface: '@App\Shared\Security\Service\FileBasedSecretKeyProvider'
     App\Shared\Security\Contract\FieldEncryptionServiceInterface: '@App\Shared\Security\Service\SodiumFieldEncryptionService'
     App\Shared\Security\Contract\SecretRotationServiceInterface: '@App\Shared\Security\Service\SecretRotationService'
+
+    # ---------- MarketplaceAds ---------- #
+    App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface:
+        '@App\MarketplaceAds\Infrastructure\ListingSalesProviderMarketplace'
