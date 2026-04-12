@@ -73,6 +73,7 @@ final class Version20260412053206 extends AbstractMigration
                 impressions INT NOT NULL,
                 clicks INT NOT NULL,
                 PRIMARY KEY(id),
+                CONSTRAINT uq_ad_document_line_document_listing UNIQUE (ad_document_id, listing_id),
                 CONSTRAINT fk_ad_document_line_document
                     FOREIGN KEY (ad_document_id)
                     REFERENCES marketplace_ad_documents (id)

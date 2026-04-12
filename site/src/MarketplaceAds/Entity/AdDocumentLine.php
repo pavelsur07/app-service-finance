@@ -11,6 +11,10 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: AdDocumentLineRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_document_lines')]
+#[ORM\UniqueConstraint(
+    name: 'uq_ad_document_line_document_listing',
+    columns: ['ad_document_id', 'listing_id'],
+)]
 #[ORM\Index(columns: ['ad_document_id'], name: 'idx_ad_document_line_document')]
 #[ORM\Index(columns: ['listing_id'], name: 'idx_ad_document_line_listing')]
 class AdDocumentLine
