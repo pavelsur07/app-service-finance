@@ -232,3 +232,17 @@ services:
     # ---------- MarketplaceAds ---------- #
     App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface:
         '@App\MarketplaceAds\Infrastructure\ListingSalesProviderMarketplace'
+
+    # Парсеры raw-данных рекламных отчётов
+    App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdRawDataParser:
+        tags: ['marketplace_ads.raw_data_parser']
+
+    App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdRawDataParser:
+        tags: ['marketplace_ads.raw_data_parser']
+
+    # API-клиенты рекламных платформ
+    App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient:
+        tags: ['marketplace_ads.platform_client']
+
+    App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient:
+        tags: ['marketplace_ads.platform_client']
