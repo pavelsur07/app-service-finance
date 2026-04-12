@@ -28,6 +28,15 @@ class AppLogger
     }
 
     /**
+     * Предупреждение: нештатная, но не фатальная ситуация (пишется в файл/консоль).
+     * Не отправляется в Sentry автоматически.
+     */
+    public function warning(string $message, array $context = []): void
+    {
+        $this->logger->warning($message, $context);
+    }
+
+    /**
      * Фиксация ошибок с отправкой в Sentry
      */
     public function error(string $message, \Throwable $exception = null, array $context = []): void

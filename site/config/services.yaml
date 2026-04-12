@@ -246,3 +246,8 @@ services:
 
     App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdClient:
         tags: ['marketplace_ads.platform_client']
+
+    # Обработка AdRawDocument → AdDocument + AdDocumentLine
+    App\MarketplaceAds\Application\ProcessAdRawDocumentAction:
+        arguments:
+            $parsers: !tagged_iterator marketplace_ads.raw_data_parser
