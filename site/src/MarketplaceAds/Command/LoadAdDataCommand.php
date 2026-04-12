@@ -240,7 +240,10 @@ final class LoadAdDataCommand extends Command
         }
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
-        if ($date === false) {
+        // createFromFormat нормализует несуществующие даты (например, 2026-02-31 → 2026-03-03)
+        // и возвращает DateTimeImmutable, а не false. Roundtrip-проверка отсекает такие
+        // случаи: валидная дата должна сериализоваться обратно в исходную строку.
+        if ($date === false || $date->format('Y-m-d') !== $value) {
             throw new \InvalidArgumentException(sprintf('Invalid date: %s', $value));
         }
 

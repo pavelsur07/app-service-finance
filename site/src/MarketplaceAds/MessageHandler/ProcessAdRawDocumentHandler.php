@@ -57,6 +57,20 @@ final class ProcessAdRawDocumentHandler
 
         try {
             ($this->processAction)($message->companyId, $message->adRawDocumentId);
+        } catch (\DomainException $e) {
+            // DomainException из Action означает гонку состояний: другой worker/диспатч успел
+            // обработать документ (status != DRAFT) или сам документ удалили между pre-check
+            // и вызовом Action. Ретрай Messenger здесь только шумит в failed-queue — поглощаем.
+            $this->logger->info(
+                'AdRawDocument обработан параллельно или удалён, повтор не нужен',
+                [
+                    'companyId'       => $message->companyId,
+                    'adRawDocumentId' => $message->adRawDocumentId,
+                    'reason'          => $e->getMessage(),
+                ],
+            );
+
+            return;
         } catch (\Throwable $e) {
             $this->logger->error(
                 'Ошибка обработки AdRawDocument',

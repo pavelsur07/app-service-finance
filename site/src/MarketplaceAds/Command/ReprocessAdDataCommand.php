@@ -76,8 +76,12 @@ final class ReprocessAdDataCommand extends Command
         $dateOption = $input->getOption('date');
         $reportDate = null;
         if ($dateOption !== null && $dateOption !== '') {
-            $reportDate = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $dateOption);
-            if ($reportDate === false) {
+            $dateValue  = (string) $dateOption;
+            $reportDate = \DateTimeImmutable::createFromFormat('!Y-m-d', $dateValue);
+            // createFromFormat нормализует несуществующие даты (например, 2026-02-31 → 2026-03-03)
+            // и возвращает DateTimeImmutable, а не false. Roundtrip-проверка отсекает такие
+            // случаи: валидная дата должна сериализоваться обратно в исходную строку.
+            if ($reportDate === false || $reportDate->format('Y-m-d') !== $dateValue) {
                 $output->writeln('<error>Неверный формат --date. Ожидается YYYY-MM-DD.</error>');
 
                 return Command::FAILURE;
@@ -116,15 +120,20 @@ final class ReprocessAdDataCommand extends Command
             return Command::SUCCESS;
         }
 
-        $dispatched = 0;
-
+        // Сначала обновляем статусы всех документов, затем один flush,
+        // и только потом диспатч — это снимает N flush'ей на N документов
+        // и гарантирует, что статусы согласованно лежат в БД до того,
+        // как воркеры начнут их забирать.
         foreach ($documents as $document) {
             if ($document->getStatus() !== AdRawDocumentStatus::DRAFT) {
                 $document->resetToDraft();
             }
+        }
 
-            $this->entityManager->flush();
+        $this->entityManager->flush();
 
+        $dispatched = 0;
+        foreach ($documents as $document) {
             $this->bus->dispatch(new ProcessAdRawDocumentMessage(
                 companyId:       $document->getCompanyId(),
                 adRawDocumentId: $document->getId(),
