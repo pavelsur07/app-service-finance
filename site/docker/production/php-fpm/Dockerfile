@@ -43,10 +43,14 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 # --- ЭТАП 3: Финальный FPM ---
 FROM php:8.3-fpm-alpine
 
-RUN apk add --no-cache libpq-dev libzip-dev fcgi \
+RUN apk add --no-cache libpq-dev libzip-dev fcgi tzdata \
+    && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath zip
+
+ENV TZ=Europe/Moscow
 
 # ⬇️ Добавляем ext-redis для рантайма PHP-FPM
 RUN apk add --no-cache $PHPIZE_DEPS \

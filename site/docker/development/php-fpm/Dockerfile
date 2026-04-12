@@ -2,12 +2,16 @@ FROM php:8.3-fpm-alpine
 
 ENV XDEBUG_VERSION 3.4.1
 
-RUN apk add --no-cache libpq-dev libzip-dev fcgi git linux-headers \
+RUN apk add --no-cache libpq-dev libzip-dev fcgi git linux-headers tzdata \
+    && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && git clone --branch $XDEBUG_VERSION --depth 1 https://github.com/xdebug/xdebug.git /usr/src/php/ext/xdebug \
     && docker-php-ext-configure xdebug --enable-xdebug-dev \
     && docker-php-ext-install pdo_pgsql xdebug bcmath zip \
     && apk del git linux-headers
+
+ENV TZ=Europe/Moscow
 
 # ✅ Добавляем расширение phpredis, чтобы dev-окружение соответствовало требованиям транспорта Redis
 RUN apk add --no-cache $PHPIZE_DEPS \

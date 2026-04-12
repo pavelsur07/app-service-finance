@@ -9,7 +9,10 @@ RUN npm run build
 
 # --- ЭТАП 2: Финальный Nginx ---
 FROM nginx:1.27-alpine3.21
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl tzdata \
+    && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone
+ENV TZ=Europe/Moscow
 COPY ./docker/common/nginx/conf.d /etc/nginx/conf.d
 WORKDIR /app
 
