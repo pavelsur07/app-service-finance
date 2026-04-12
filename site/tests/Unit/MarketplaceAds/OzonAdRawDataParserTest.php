@@ -8,6 +8,8 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdRawDataParser;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\AbstractLogger;
+use Psr\Log\LoggerInterface;
 
 final class OzonAdRawDataParserTest extends TestCase
 {
@@ -16,6 +18,19 @@ final class OzonAdRawDataParserTest extends TestCase
     protected function setUp(): void
     {
         $this->parser = new OzonAdRawDataParser();
+    }
+
+    private function createTestLogger(): LoggerInterface
+    {
+        return new class extends AbstractLogger {
+            /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
+            public array $records = [];
+
+            public function log($level, \Stringable|string $message, array $context = []): void
+            {
+                $this->records[] = ['level' => (string) $level, 'message' => (string) $message, 'context' => $context];
+            }
+        };
     }
 
     public function testSupportsOzonMarketplace(): void
@@ -164,5 +179,54 @@ final class OzonAdRawDataParserTest extends TestCase
     {
         $this->expectException(\JsonException::class);
         $this->parser->parse('not a json');
+    }
+
+    public function testLogsWarningForEachSkippedRowAndSummary(): void
+    {
+        $logger = $this->createTestLogger();
+        $parser = new OzonAdRawDataParser($logger);
+
+        $json = json_encode([
+            'rows' => [
+                ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
+                 'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+                ['campaign_name' => 'no id', 'sku' => 'Y',
+                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                ['campaign_id' => '2', 'campaign_name' => 'no sku',
+                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                'not-an-array',
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $parser->parse($json);
+
+        $warnings = array_filter($logger->records, static fn(array $r) => $r['level'] === 'warning');
+        self::assertCount(2, $warnings, 'Each skipped row with missing fields must emit a warning');
+
+        $summaries = array_filter($logger->records, static fn(array $r) => $r['level'] === 'info');
+        self::assertCount(1, $summaries, 'Exactly one summary info-log must be emitted when rows were skipped');
+
+        $summary = array_values($summaries)[0];
+        self::assertSame(4, $summary['context']['total_rows']);
+        self::assertSame(1, $summary['context']['skipped_non_array']);
+        self::assertSame(2, $summary['context']['skipped_missing_fields']);
+        self::assertSame(1, $summary['context']['aggregated_entries']);
+    }
+
+    public function testDoesNotLogWhenAllRowsAreValid(): void
+    {
+        $logger = $this->createTestLogger();
+        $parser = new OzonAdRawDataParser($logger);
+
+        $json = json_encode([
+            'rows' => [
+                ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
+                 'spend' => 10.00, 'views' => 100, 'clicks' => 5],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $parser->parse($json);
+
+        self::assertSame([], $logger->records);
     }
 }

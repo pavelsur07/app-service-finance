@@ -7,6 +7,8 @@ namespace App\MarketplaceAds\Infrastructure\Api\Ozon;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdRawDataParserInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Парсер rawPayload рекламной статистики Ozon.
@@ -28,6 +30,13 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
     /** Финальная точность cost в AdRawEntry — округление HALF-UP применяется только один раз. */
     private const FINAL_SCALE = 2;
 
+    private readonly LoggerInterface $logger;
+
+    public function __construct(?LoggerInterface $logger = null)
+    {
+        $this->logger = $logger ?? new NullLogger();
+    }
+
     public function supports(string $marketplace): bool
     {
         return $marketplace === MarketplaceType::OZON->value;
@@ -47,15 +56,28 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
 
         /** @var array<string, array{campaignId: string, campaignName: string, parentSku: string, cost: string, impressions: int, clicks: int}> $aggregated */
         $aggregated = [];
+        $skippedNonArray = 0;
+        $skippedMissingFields = 0;
 
-        foreach ($rows as $row) {
+        foreach ($rows as $index => $row) {
             if (!is_array($row)) {
+                ++$skippedNonArray;
                 continue;
             }
 
             $campaignId = isset($row['campaign_id']) ? (string) $row['campaign_id'] : '';
             $parentSku  = isset($row['sku']) ? (string) $row['sku'] : '';
             if ($campaignId === '' || $parentSku === '') {
+                ++$skippedMissingFields;
+                $this->logger->warning(
+                    'Ozon ad raw row skipped: missing required fields campaign_id/sku',
+                    [
+                        'index'              => $index,
+                        'has_campaign_id'    => $campaignId !== '',
+                        'has_sku'            => $parentSku !== '',
+                        'marketplace'        => MarketplaceType::OZON->value,
+                    ],
+                );
                 continue;
             }
 
@@ -80,6 +102,19 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
             $aggregated[$key]['cost']        = bcadd($aggregated[$key]['cost'], $cost, self::AGGREGATION_SCALE);
             $aggregated[$key]['impressions'] += $impressions;
             $aggregated[$key]['clicks']      += $clicks;
+        }
+
+        if ($skippedNonArray > 0 || $skippedMissingFields > 0) {
+            $this->logger->info(
+                'Ozon ad raw payload: some rows were skipped during parsing',
+                [
+                    'total_rows'             => count($rows),
+                    'skipped_non_array'      => $skippedNonArray,
+                    'skipped_missing_fields' => $skippedMissingFields,
+                    'aggregated_entries'     => count($aggregated),
+                    'marketplace'            => MarketplaceType::OZON->value,
+                ],
+            );
         }
 
         return array_map(
