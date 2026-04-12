@@ -234,4 +234,74 @@ final readonly class MarketplaceFacade
     ): array {
         return $this->costCategoriesQuery->fetchForCompanyAndMarketplace($companyId, $marketplace);
     }
+
+    /**
+     * Находит все листинги (включая неактивные) по marketplace SKU (родительский артикул / nm_id в WB).
+     * Без фильтра is_active — нужен при обработке исторических отчётов, когда листинг мог быть
+     * деактивирован после даты отчёта.
+     *
+     * @return list<array{id: string, parentSku: string}>
+     */
+    public function findListingsByMarketplaceSku(
+        string $companyId,
+        string $marketplace,
+        string $marketplaceSku,
+    ): array {
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id, l.marketplace_sku AS parent_sku
+             FROM marketplace_listings l
+             WHERE l.company_id = :companyId
+               AND l.marketplace = :marketplace
+               AND l.marketplace_sku = :marketplaceSku',
+            [
+                'companyId'     => $companyId,
+                'marketplace'   => $marketplace,
+                'marketplaceSku' => $marketplaceSku,
+            ],
+        );
+
+        return array_map(static fn(array $row) => [
+            'id'        => $row['id'],
+            'parentSku' => $row['parent_sku'],
+        ], $rows);
+    }
+
+    /**
+     * Bulk-запрос продаж для набора листингов за одну дату.
+     * Листинги без продаж в результате отсутствуют (caller должен подставить 0 самостоятельно).
+     *
+     * @param  string[]           $listingIds
+     * @return array<string, int> listingId => суммарное количество продаж
+     */
+    public function getSalesQuantitiesForListings(
+        string $companyId,
+        array $listingIds,
+        \DateTimeImmutable $date,
+    ): array {
+        if ($listingIds === []) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT s.listing_id, SUM(s.quantity) AS total_quantity
+             FROM marketplace_sales s
+             WHERE s.company_id = :companyId
+               AND s.listing_id IN (:listingIds)
+               AND s.sale_date = :date
+             GROUP BY s.listing_id',
+            [
+                'companyId'  => $companyId,
+                'listingIds' => $listingIds,
+                'date'       => $date->format('Y-m-d'),
+            ],
+            ['listingIds' => Connection::PARAM_STR_ARRAY],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['listing_id']] = (int) $row['total_quantity'];
+        }
+
+        return $result;
+    }
 }
