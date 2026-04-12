@@ -27,7 +27,10 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Для каждой пары (company × marketplace):
  *   1) берём JSON через AdPlatformClientInterface;
  *   2) upsert-им AdRawDocument (уникальный ключ company + marketplace + report_date);
- *   3) отправляем ProcessAdRawDocumentMessage в async-транспорт.
+ *   3) копим подготовленный документ, а единый flush делаем в конце прохода по всем парам,
+ *      чтобы на N компаниях × M площадках не получить N*M отдельных транзакций.
+ *   4) только после успешного flush отправляем ProcessAdRawDocumentMessage в async-транспорт —
+ *      иначе воркер заберёт сообщение до того, как документ появится в БД.
  *
  * Ошибки API/отсутствия клиента/подключения логируются, но не прерывают цикл —
  * cron должен попробовать обработать всё, что может.
@@ -42,9 +45,9 @@ final class LoadAdDataCommand extends Command
 
     /** @var array<string, MarketplaceType> псевдонимы CLI → MarketplaceType */
     private const MARKETPLACE_ALIASES = [
-        'wb'          => MarketplaceType::WILDBERRIES,
+        'wb' => MarketplaceType::WILDBERRIES,
         'wildberries' => MarketplaceType::WILDBERRIES,
-        'ozon'        => MarketplaceType::OZON,
+        'ozon' => MarketplaceType::OZON,
     ];
 
     /**
@@ -107,30 +110,63 @@ final class LoadAdDataCommand extends Command
         }
 
         $companyIdOption = $input->getOption('company-id');
-        $companyIds      = $companyIdOption !== null && $companyIdOption !== ''
-            ? [(string) $companyIdOption]
-            : $this->companyFacade->getAllActiveCompanyIds();
+        if (null !== $companyIdOption && '' !== $companyIdOption) {
+            $companyId = (string) $companyIdOption;
+            // Валидируем наличие компании на границе CLI → иначе при опечатке UUID
+            // команда молча напишет «нет активного подключения» по каждому маркетплейсу,
+            // и оператор не поймёт, что ошибка в аргументе.
+            if (null === $this->companyFacade->findById($companyId)) {
+                $output->writeln(sprintf(
+                    '<error>Компания не найдена: --company-id=%s.</error>',
+                    $companyId,
+                ));
 
-        if ($companyIds === []) {
+                return Command::FAILURE;
+            }
+            $companyIds = [$companyId];
+        } else {
+            $companyIds = $this->companyFacade->getAllActiveCompanyIds();
+        }
+
+        if ([] === $companyIds) {
             $output->writeln('<comment>Нет компаний для загрузки.</comment>');
 
             return Command::SUCCESS;
         }
 
-        $loaded  = 0;
+        /** @var list<AdRawDocument> $preparedDocuments */
+        $preparedDocuments = [];
         $skipped = 0;
-        $failed  = 0;
+        $failed = 0;
 
         foreach ($companyIds as $companyId) {
             foreach ($marketplaces as $marketplace) {
-                $result = $this->loadForCompanyAndMarketplace($companyId, $marketplace, $reportDate, $output);
+                $result = $this->prepareForCompanyAndMarketplace($companyId, $marketplace, $reportDate, $output);
 
-                match ($result) {
-                    'loaded'  => ++$loaded,
-                    'skipped' => ++$skipped,
-                    'failed'  => ++$failed,
-                };
+                if ($result instanceof AdRawDocument) {
+                    $preparedDocuments[] = $result;
+                } elseif ('failed' === $result) {
+                    ++$failed;
+                } else {
+                    ++$skipped;
+                }
             }
+        }
+
+        // Один flush на весь прогон — N*M подготовленных документов фиксируются
+        // в единой транзакции. Если flush упадёт, ни одно сообщение не уйдёт
+        // в очередь, и следующий cron повторит цикл чисто.
+        if ([] !== $preparedDocuments) {
+            $this->entityManager->flush();
+        }
+
+        $loaded = 0;
+        foreach ($preparedDocuments as $document) {
+            $this->bus->dispatch(new ProcessAdRawDocumentMessage(
+                companyId: $document->getCompanyId(),
+                adRawDocumentId: $document->getId(),
+            ));
+            ++$loaded;
         }
 
         $output->writeln(sprintf(
@@ -140,21 +176,30 @@ final class LoadAdDataCommand extends Command
             $failed,
         ));
 
-        return $failed > 0 ? Command::FAILURE : Command::SUCCESS;
+        // Частичный провал (есть и успехи, и ошибки) не поднимаем до FAILURE —
+        // cron-мониторинг не должен алертить, если 1 компания из 100 провалилась.
+        // FAILURE возвращаем только когда всё упало и нечего было загружать.
+        if ($failed > 0 && 0 === $loaded) {
+            return Command::FAILURE;
+        }
+
+        return Command::SUCCESS;
     }
 
     /**
-     * @return 'loaded'|'skipped'|'failed'
+     * Готовит (persist/updatePayload) AdRawDocument без flush.
+     *
+     * @return AdRawDocument|'skipped'|'failed'
      */
-    private function loadForCompanyAndMarketplace(
+    private function prepareForCompanyAndMarketplace(
         string $companyId,
         MarketplaceType $marketplace,
         \DateTimeImmutable $reportDate,
         OutputInterface $output,
-    ): string {
+    ): AdRawDocument|string {
         $connection = $this->connectionRepository->findByCompanyIdAndMarketplace($companyId, $marketplace);
 
-        if ($connection === null || !$connection->isActive()) {
+        if (null === $connection || !$connection->isActive()) {
             $output->writeln(sprintf(
                 '<comment>[%s / %s] пропуск: нет активного подключения.</comment>',
                 $companyId,
@@ -166,9 +211,9 @@ final class LoadAdDataCommand extends Command
 
         $client = $this->selectClient($marketplace->value);
 
-        if ($client === null) {
+        if (null === $client) {
             $this->logger->warning('Отсутствует AdPlatformClient для маркетплейса', [
-                'companyId'   => $companyId,
+                'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
             ]);
 
@@ -182,9 +227,9 @@ final class LoadAdDataCommand extends Command
                 'Ошибка загрузки рекламной статистики',
                 $e,
                 [
-                    'companyId'   => $companyId,
+                    'companyId' => $companyId,
                     'marketplace' => $marketplace->value,
-                    'reportDate'  => $reportDate->format('Y-m-d'),
+                    'reportDate' => $reportDate->format('Y-m-d'),
                 ],
             );
             $output->writeln(sprintf(
@@ -203,39 +248,32 @@ final class LoadAdDataCommand extends Command
             $reportDate,
         );
 
-        if ($existing !== null) {
+        if (null !== $existing) {
             $existing->updatePayload($payload);
             $rawDocument = $existing;
         } else {
             $rawDocument = new AdRawDocument(
-                companyId:   $companyId,
+                companyId: $companyId,
                 marketplace: $marketplace,
-                reportDate:  $reportDate,
-                rawPayload:  $payload,
+                reportDate: $reportDate,
+                rawPayload: $payload,
             );
             $this->rawDocumentRepository->save($rawDocument);
         }
 
-        $this->entityManager->flush();
-
-        $this->bus->dispatch(new ProcessAdRawDocumentMessage(
-            companyId:       $companyId,
-            adRawDocumentId: $rawDocument->getId(),
-        ));
-
         $output->writeln(sprintf(
-            '<info>[%s / %s] загружено (doc=%s).</info>',
+            '<info>[%s / %s] подготовлен (doc=%s).</info>',
             $companyId,
             $marketplace->value,
             $rawDocument->getId(),
         ));
 
-        return 'loaded';
+        return $rawDocument;
     }
 
     private function parseDate(string $value): \DateTimeImmutable
     {
-        if ($value === 'yesterday' || $value === '') {
+        if ('yesterday' === $value || '' === $value) {
             return new \DateTimeImmutable('yesterday');
         }
 
@@ -243,7 +281,7 @@ final class LoadAdDataCommand extends Command
         // createFromFormat нормализует несуществующие даты (например, 2026-02-31 → 2026-03-03)
         // и возвращает DateTimeImmutable, а не false. Roundtrip-проверка отсекает такие
         // случаи: валидная дата должна сериализоваться обратно в исходную строку.
-        if ($date === false || $date->format('Y-m-d') !== $value) {
+        if (false === $date || $date->format('Y-m-d') !== $value) {
             throw new \InvalidArgumentException(sprintf('Invalid date: %s', $value));
         }
 
@@ -257,15 +295,12 @@ final class LoadAdDataCommand extends Command
     {
         $value = strtolower($value);
 
-        if ($value === self::MARKETPLACE_ALL) {
+        if (self::MARKETPLACE_ALL === $value) {
             return [MarketplaceType::WILDBERRIES, MarketplaceType::OZON];
         }
 
         if (!isset(self::MARKETPLACE_ALIASES[$value])) {
-            throw new \InvalidArgumentException(sprintf(
-                'Неизвестный --marketplace=%s. Допустимо: wb, ozon, all.',
-                $value,
-            ));
+            throw new \InvalidArgumentException(sprintf('Неизвестный --marketplace=%s. Допустимо: wb, ozon, all.', $value));
         }
 
         return [self::MARKETPLACE_ALIASES[$value]];
