@@ -94,6 +94,39 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         self::assertSame('CAMP-1', $adDocuments[0]->getCampaignId());
     }
 
+    public function testSkipsEntriesWithEmptyCampaignNameWithoutAbortingWholeDocument(): void
+    {
+        $company = $this->seedCompany();
+        $this->seedListing($company, 'SKU-GOOD', 'UNKNOWN', '55555555-5555-5555-5555-000000000040');
+        $this->seedListing($company, 'SKU-NONAME', 'UNKNOWN', '55555555-5555-5555-5555-000000000041');
+        $this->em->flush();
+
+        // Вторая запись без campaign_name — парсер отдаст AdRawEntry с пустым campaignName,
+        // который не пройдёт Assert::notEmpty в конструкторе AdDocument. Проверяем, что
+        // Action это ловит и не ломает обработку первой записи.
+        $rawDocumentId = $this->seedOzonRawDocument([
+            ['campaign_id' => 'CAMP-OK', 'campaign_name' => 'OK', 'sku' => 'SKU-GOOD',
+             'spend' => 30.00, 'views' => 300, 'clicks' => 10],
+            ['campaign_id' => 'CAMP-NONAME', 'sku' => 'SKU-NONAME',
+             'spend' => 40.00, 'views' => 400, 'clicks' => 20],
+        ]);
+
+        ($this->action())(self::COMPANY_ID, $rawDocumentId);
+
+        $this->em->clear();
+
+        $rawDocument = $this->em->getRepository(AdRawDocument::class)->find($rawDocumentId);
+        self::assertSame(
+            AdRawDocumentStatus::DRAFT,
+            $rawDocument->getStatus(),
+            'При пропущенных записях raw-документ должен остаться в DRAFT',
+        );
+
+        $adDocuments = $this->em->getRepository(AdDocument::class)->findBy(['adRawDocumentId' => $rawDocumentId]);
+        self::assertCount(1, $adDocuments, 'Запись без campaignName пропущена, валидная обработана');
+        self::assertSame('CAMP-OK', $adDocuments[0]->getCampaignId());
+    }
+
     public function testIdempotentReprocessDeletesPreviousAdDocuments(): void
     {
         $company = $this->seedCompany();

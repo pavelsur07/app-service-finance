@@ -82,6 +82,26 @@ final readonly class ProcessAdRawDocumentAction
             $this->adDocumentRepository->deleteByRawDocumentId($companyId, $adRawDocumentId);
 
             foreach ($entries as $entry) {
+                // AdDocument требует непустой campaignName (Assert::notEmpty). Если парсер отдал
+                // пустое имя (поле отсутствовало в payload), пропускаем запись: без проверки
+                // здесь конструктор AdDocument выбросит исключение и откатит всю транзакцию,
+                // убив частичный успех для остальных записей.
+                if ($entry->campaignName === '') {
+                    $hasErrors = true;
+                    ++$skippedEntries;
+                    $this->logger->warning(
+                        'AdRawEntry пропущена: отсутствует campaignName',
+                        [
+                            'adRawDocumentId' => $adRawDocumentId,
+                            'companyId'       => $companyId,
+                            'marketplace'     => $marketplace->value,
+                            'campaignId'      => $entry->campaignId,
+                            'parentSku'       => $entry->parentSku,
+                        ],
+                    );
+                    continue;
+                }
+
                 $listings = $this->listingSalesProvider->findListingsByParentSku(
                     $companyId,
                     $marketplace->value,
@@ -141,11 +161,10 @@ final readonly class ProcessAdRawDocumentAction
                 ++$processedCount;
             }
 
-            $this->entityManager->flush();
-
+            // wrapInTransaction сам вызовет flush() и commit() после выхода из closure;
+            // изменение статуса rawDocument попадёт в тот же flush, т.к. сущность managed.
             if (!$hasErrors) {
                 $rawDocument->markAsProcessed();
-                $this->entityManager->flush();
             }
         });
 
