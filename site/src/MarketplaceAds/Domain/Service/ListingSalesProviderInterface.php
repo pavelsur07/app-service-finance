@@ -30,4 +30,18 @@ interface ListingSalesProviderInterface
         string $marketplace,
         string $parentSku,
     ): array;
+
+    /**
+     * Bulk-вариант {@see self::findListingsByParentSku()}: одним запросом возвращает листинги
+     * для всех переданных parentSku, сгруппированные по parentSku. SKU без листингов в ключах
+     * результата отсутствуют.
+     *
+     * @param  string[] $parentSkus
+     * @return array<string, list<array{id: string, parentSku: string}>>
+     */
+    public function findListingsByParentSkus(
+        string $companyId,
+        string $marketplace,
+        array $parentSkus,
+    ): array;
 }

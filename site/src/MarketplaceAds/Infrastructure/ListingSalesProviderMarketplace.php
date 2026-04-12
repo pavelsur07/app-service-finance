@@ -37,4 +37,15 @@ final readonly class ListingSalesProviderMarketplace implements ListingSalesProv
     ): array {
         return $this->marketplaceFacade->findListingsByMarketplaceSku($companyId, $marketplace, $parentSku);
     }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function findListingsByParentSkus(
+        string $companyId,
+        string $marketplace,
+        array $parentSkus,
+    ): array {
+        return $this->marketplaceFacade->findListingsByMarketplaceSkus($companyId, $marketplace, $parentSkus);
+    }
 }

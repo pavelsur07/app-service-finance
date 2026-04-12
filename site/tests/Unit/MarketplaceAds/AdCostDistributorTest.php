@@ -6,45 +6,20 @@ namespace App\Tests\Unit\MarketplaceAds;
 
 use App\MarketplaceAds\Application\DTO\CostDistributionResult;
 use App\MarketplaceAds\Domain\Service\AdCostDistributor;
-use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
 use PHPUnit\Framework\TestCase;
 
 final class AdCostDistributorTest extends TestCase
 {
-    private readonly \DateTimeImmutable $date;
+    private AdCostDistributor $distributor;
 
     protected function setUp(): void
     {
-        $this->date = new \DateTimeImmutable('2026-04-01');
+        $this->distributor = new AdCostDistributor();
     }
 
     // -------------------------------------------------------------------------
     // Вспомогательные методы
     // -------------------------------------------------------------------------
-
-    /**
-     * @param array<string, int> $salesByListingId  listingId => quantity
-     */
-    private function buildProvider(array $salesByListingId): ListingSalesProviderInterface
-    {
-        $provider = $this->createMock(ListingSalesProviderInterface::class);
-        $provider
-            ->method('getSalesQuantitiesByListings')
-            ->willReturnCallback(
-                static function (string $companyId, array $listingIds, \DateTimeImmutable $date) use ($salesByListingId): array {
-                    $result = [];
-                    foreach ($listingIds as $id) {
-                        if (isset($salesByListingId[$id])) {
-                            $result[$id] = $salesByListingId[$id];
-                        }
-                    }
-
-                    return $result;
-                },
-            );
-
-        return $provider;
-    }
 
     private function makeListing(string $id, string $parentSku = 'SKU-1'): array
     {
@@ -87,21 +62,16 @@ final class AdCostDistributorTest extends TestCase
 
     public function testEmptyListingsReturnsEmpty(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider([]));
-
-        $result = $distributor->distribute('company-1', [], $this->date, '100.00', 1000, 50);
+        $result = $this->distributor->distribute([], [], '100.00', 1000, 50);
 
         self::assertSame([], $result);
     }
 
     public function testSingleListingGetsFullAmount(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider(['A' => 5]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A')],
-            $this->date,
+            ['A' => 5],
             '99.99',
             500,
             30,
@@ -117,12 +87,9 @@ final class AdCostDistributorTest extends TestCase
 
     public function testSingleListingNoSalesGetsFullAmount(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider([]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A')],
-            $this->date,
+            [],
             '50.00',
             200,
             10,
@@ -137,12 +104,9 @@ final class AdCostDistributorTest extends TestCase
 
     public function testTwoListingsEqualSalesGetFiftyPercent(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider(['A' => 10, 'B' => 10]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A'), $this->makeListing('B')],
-            $this->date,
+            ['A' => 10, 'B' => 10],
             '100.00',
             1000,
             100,
@@ -160,12 +124,9 @@ final class AdCostDistributorTest extends TestCase
     public function testProportionalDistributionBySales(): void
     {
         // A:2 sales, B:1 sale → 2/3 and 1/3
-        $distributor = new AdCostDistributor($this->buildProvider(['A' => 2, 'B' => 1]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A'), $this->makeListing('B')],
-            $this->date,
+            ['A' => 2, 'B' => 1],
             '30.00',
             300,
             60,
@@ -184,12 +145,9 @@ final class AdCostDistributorTest extends TestCase
 
     public function testEqualDistributionWhenNoSales(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider([]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
-            $this->date,
+            [],
             '10.00',
             100,
             30,
@@ -206,12 +164,9 @@ final class AdCostDistributorTest extends TestCase
     public function testRoundingCorrectionOnCostSum(): void
     {
         // 3 equal listings, cost = '10.00' — 10/3 cannot divide evenly
-        $distributor = new AdCostDistributor($this->buildProvider([]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
-            $this->date,
+            [],
             '10.00',
             100,
             30,
@@ -227,17 +182,14 @@ final class AdCostDistributorTest extends TestCase
     public function testRoundingCorrectionOnLargerSet(): void
     {
         // 7 equal listings, cost = '100.00' — 100/7 repeating decimal
-        $distributor = new AdCostDistributor($this->buildProvider([]));
-
         $listings = [];
         for ($i = 1; $i <= 7; $i++) {
             $listings[] = $this->makeListing("L{$i}");
         }
 
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             $listings,
-            $this->date,
+            [],
             '100.00',
             700,
             70,
@@ -252,12 +204,9 @@ final class AdCostDistributorTest extends TestCase
 
     public function testZeroCostProducesZeroDistribution(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider(['A' => 5, 'B' => 5]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A'), $this->makeListing('B')],
-            $this->date,
+            ['A' => 5, 'B' => 5],
             '0.00',
             0,
             0,
@@ -271,17 +220,34 @@ final class AdCostDistributorTest extends TestCase
 
     public function testReturnTypeIsArrayOfCostDistributionResult(): void
     {
-        $distributor = new AdCostDistributor($this->buildProvider(['A' => 1]));
-
-        $results = $distributor->distribute(
-            'company-1',
+        $results = $this->distributor->distribute(
             [$this->makeListing('A')],
-            $this->date,
+            ['A' => 1],
             '10.00',
             100,
             10,
         );
 
         self::assertContainsOnlyInstancesOf(CostDistributionResult::class, $results);
+    }
+
+    public function testListingWithoutSalesEntryTreatedAsZero(): void
+    {
+        // Один листинг с продажами, другой отсутствует в карте — должен получить 0 продаж.
+        $results = $this->distributor->distribute(
+            [$this->makeListing('A'), $this->makeListing('B')],
+            ['A' => 10],
+            '50.00',
+            100,
+            20,
+        );
+
+        self::assertCount(2, $results);
+        self::assertSame('A', $results[0]->listingId);
+        self::assertSame('50.00', $results[0]->cost);
+        self::assertSame('100.00', $results[0]->sharePercent);
+        self::assertSame('B', $results[1]->listingId);
+        self::assertSame('0.00', $results[1]->cost);
+        self::assertSame('0.00', $results[1]->sharePercent);
     }
 }

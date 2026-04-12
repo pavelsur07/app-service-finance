@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Application;
 
+use App\MarketplaceAds\Application\DTO\AdRawEntry;
 use App\MarketplaceAds\Domain\Service\AdCostDistributor;
 use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
 use App\MarketplaceAds\Entity\AdDocument;
@@ -23,7 +24,8 @@ use Doctrine\ORM\EntityManagerInterface;
  * - идемпотентность: повторный запуск удаляет ранее созданные AdDocument и создаёт заново;
  * - частичный успех: если часть SKU не найдена, остальные записи обрабатываются,
  *   raw-документ остаётся в DRAFT для ручного разбора;
- * - статус PROCESSED ставится только при полной обработке без пропусков.
+ * - статус PROCESSED ставится только при полной обработке без пропусков;
+ * - bulk-fetch листингов и продаж: два запроса на весь документ вместо N+1.
  */
 final readonly class ProcessAdRawDocumentAction
 {
@@ -63,6 +65,43 @@ final readonly class ProcessAdRawDocumentAction
         $entries    = $parser->parse($rawDocument->getRawPayload());
         $reportDate = $rawDocument->getReportDate();
 
+        // Шаг 1: bulk-prefetch листингов по всем уникальным parentSku из валидных записей.
+        // Записи с пустым campaignName конструктор AdDocument отвергнет (Assert::notEmpty);
+        // их тоже исключаем из предзагрузки, чтобы не тянуть лишние данные.
+        $validEntries = array_values(array_filter(
+            $entries,
+            static fn(AdRawEntry $e) => $e->campaignName !== '',
+        ));
+
+        $parentSkus = array_values(array_unique(array_map(
+            static fn(AdRawEntry $e) => $e->parentSku,
+            $validEntries,
+        )));
+
+        $listingsByParentSku = $parentSkus === []
+            ? []
+            : $this->listingSalesProvider->findListingsByParentSkus(
+                $companyId,
+                $marketplace->value,
+                $parentSkus,
+            );
+
+        // Шаг 2: bulk-prefetch продаж по всем найденным листингам за дату отчёта.
+        $allListingIds = [];
+        foreach ($listingsByParentSku as $listings) {
+            foreach ($listings as $listing) {
+                $allListingIds[] = $listing['id'];
+            }
+        }
+
+        $salesByListing = $allListingIds === []
+            ? []
+            : $this->listingSalesProvider->getSalesQuantitiesByListings(
+                $companyId,
+                $allListingIds,
+                $reportDate,
+            );
+
         $hasErrors       = false;
         $skippedEntries  = 0;
         $processedCount  = 0;
@@ -74,6 +113,8 @@ final readonly class ProcessAdRawDocumentAction
             $marketplace,
             $reportDate,
             $entries,
+            $listingsByParentSku,
+            $salesByListing,
             &$hasErrors,
             &$skippedEntries,
             &$processedCount,
@@ -102,11 +143,7 @@ final readonly class ProcessAdRawDocumentAction
                     continue;
                 }
 
-                $listings = $this->listingSalesProvider->findListingsByParentSku(
-                    $companyId,
-                    $marketplace->value,
-                    $entry->parentSku,
-                );
+                $listings = $listingsByParentSku[$entry->parentSku] ?? [];
 
                 if ($listings === []) {
                     $hasErrors = true;
@@ -125,9 +162,8 @@ final readonly class ProcessAdRawDocumentAction
                 }
 
                 $distribution = $this->costDistributor->distribute(
-                    companyId:        $companyId,
                     listings:         $listings,
-                    date:             $reportDate,
+                    salesByListing:   $salesByListing,
                     totalCost:        $entry->cost,
                     totalImpressions: $entry->impressions,
                     totalClicks:      $entry->clicks,
