@@ -24,6 +24,7 @@
 | `MoySklad` | Интеграция с МойСклад | `string $companyId` ✅ |
 | `Analytics` | Аналитические запросы и дашборды | — |
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
+| `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -50,6 +51,9 @@
 | `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
+| `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
+| `AdDocument` | MarketplaceAds | `string $companyId` ✅ |
+| `AdDocumentLine` | MarketplaceAds | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -188,6 +192,17 @@ getActiveListings(string $companyId, ?string $marketplace): array
 
 // Найти листинг по ID и компании
 findListingById(string $companyId, string $listingId): ?ActiveListingDTO
+
+// Все листинги (включая неактивные) по marketplace SKU (родительский артикул / nm_id в WB)
+// Нужен для исторических рекламных отчётов, где листинг мог быть деактивирован позже
+// @return list<array{id: string, parentSku: string}>
+findListingsByMarketplaceSku(string $companyId, string $marketplace, string $marketplaceSku): array
+
+// Bulk-запрос продаж для набора листингов за одну дату (GROUP BY listing_id)
+// Листинги без продаж отсутствуют в результате (caller сам подставляет 0)
+// @param  string[]           $listingIds
+// @return array<string, int> listingId => суммарное количество
+getSalesQuantitiesForListings(string $companyId, array $listingIds, \DateTimeImmutable $date): array
 
 // Себестоимость по листингу и дате (null если не задана)
 getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable $date): ?string
@@ -337,6 +352,18 @@ enum PipelineTrigger: string
     case MANUAL = 'manual';
 
     public function getLabel(): string; // Автоматически / Вручную
+}
+```
+
+### `src/MarketplaceAds/Enum/AdRawDocumentStatus.php`
+```php
+enum AdRawDocumentStatus: string
+{
+    case DRAFT     = 'draft';
+    case PROCESSED = 'processed';
+
+    public function getLabel(): string; // Черновик / Обработан
+    public function isDraft(): bool;    // true для DRAFT
 }
 ```
 
@@ -500,3 +527,4 @@ paths:
 | 1.0 | 2026-03-28 | Инициализация на основе архитектурного документа v1.3 |
 | 1.1 | 2026-03-31 | MarketplaceAnalytics: рефакторинг маппинга затрат — статья фиксированная (UnitEconomyCostType), категория МП выбирается из справочника (marketplace_cost_categories), убраны isSystem и costCategoryCode. Из Facade удалены remapCostMapping, resetCostMapping. |
 | 1.2 | 2026-04-10 | Marketplace: автозапуск daily pipeline после загрузки sales_report. Новый Message `ProcessDayReportMessage` (companyId, rawDocumentId) → `ProcessDayReportHandler` сбрасывает статус конкретного документа и диспатчит `ProcessRawDocumentStepMessage` для каждого шага. SyncWb/OzonReportHandler диспатчат `ProcessDayReportMessage` после успешной загрузки. |
+| 1.3 | 2026-04-12 | MarketplaceAds: новый модуль обработки рекламных отчётов. Entity: `AdRawDocument` (raw JSONB + status DRAFT/PROCESSED), `AdDocument` (кампания × parent SKU за дату), `AdDocumentLine` (распределение на листинг). Domain Port `ListingSalesProviderInterface` с bulk `getSalesQuantitiesByListings` + реализация `ListingSalesProviderMarketplace` через Facade. Domain `AdCostDistributor`: распределение bcmath, при 0 продажах — равномерно, поправка округления на максимальную долю. В `MarketplaceFacade` добавлены `findListingsByMarketplaceSku` (без фильтра `is_active`, для исторических отчётов) и `getSalesQuantitiesForListings` (bulk GROUP BY, убирает N+1). |
