@@ -35,10 +35,14 @@ FROM php:8.3-cli-alpine
 
 # su-exec нужен, чтобы стартовать контейнер как root (инициализация volume),
 # а затем "уронить" права до пользователя app для запуска воркера
-RUN apk add --no-cache libpq-dev libzip-dev bash coreutils su-exec \
+RUN apk add --no-cache libpq-dev libzip-dev bash coreutils su-exec tzdata \
+    && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
+    && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
     && docker-php-ext-install pdo_pgsql opcache bcmath zip
+
+ENV TZ=Europe/Moscow
 
 # ext-redis для рантайма (CLI-воркер)
 RUN apk add --no-cache $PHPIZE_DEPS \
