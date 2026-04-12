@@ -198,6 +198,12 @@ findListingById(string $companyId, string $listingId): ?ActiveListingDTO
 // @return list<array{id: string, parentSku: string}>
 findListingsByMarketplaceSku(string $companyId, string $marketplace, string $marketplaceSku): array
 
+// Bulk-вариант findListingsByMarketplaceSku: один запрос на набор SKU, сгруппирован по parentSku.
+// SKU без листингов в результате отсутствуют.
+// @param  string[] $marketplaceSkus
+// @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
+findListingsByMarketplaceSkus(string $companyId, string $marketplace, array $marketplaceSkus): array
+
 // Bulk-запрос продаж для набора листингов за одну дату (GROUP BY listing_id)
 // Листинги без продаж отсутствуют в результате (caller сам подставляет 0)
 // @param  string[]           $listingIds
@@ -528,3 +534,4 @@ paths:
 | 1.1 | 2026-03-31 | MarketplaceAnalytics: рефакторинг маппинга затрат — статья фиксированная (UnitEconomyCostType), категория МП выбирается из справочника (marketplace_cost_categories), убраны isSystem и costCategoryCode. Из Facade удалены remapCostMapping, resetCostMapping. |
 | 1.2 | 2026-04-10 | Marketplace: автозапуск daily pipeline после загрузки sales_report. Новый Message `ProcessDayReportMessage` (companyId, rawDocumentId) → `ProcessDayReportHandler` сбрасывает статус конкретного документа и диспатчит `ProcessRawDocumentStepMessage` для каждого шага. SyncWb/OzonReportHandler диспатчат `ProcessDayReportMessage` после успешной загрузки. |
 | 1.3 | 2026-04-12 | MarketplaceAds: новый модуль обработки рекламных отчётов. Entity: `AdRawDocument` (raw JSONB + status DRAFT/PROCESSED), `AdDocument` (кампания × parent SKU за дату), `AdDocumentLine` (распределение на листинг). Domain Port `ListingSalesProviderInterface` с bulk `getSalesQuantitiesByListings` + реализация `ListingSalesProviderMarketplace` через Facade. Domain `AdCostDistributor`: распределение bcmath, при 0 продажах — равномерно, поправка округления на максимальную долю. В `MarketplaceFacade` добавлены `findListingsByMarketplaceSku` (без фильтра `is_active`, для исторических отчётов) и `getSalesQuantitiesForListings` (bulk GROUP BY, убирает N+1). |
+| 1.4 | 2026-04-12 | MarketplaceAds: `ProcessAdRawDocumentAction` — загрузка AdRawDocument (DRAFT) и конвертация в AdDocument + AdDocumentLine. Идемпотентность через `deleteByRawDocumentId`, частичный успех оставляет статус DRAFT. Bulk-prefetch листингов и продаж на уровне Action (2 запроса на документ), `AdCostDistributor` стал чистой функцией без DI. В `MarketplaceFacade` добавлен `findListingsByMarketplaceSkus` (bulk, сгруппирован по parentSku), в `ListingSalesProviderInterface` — `findListingsByParentSkus`. |

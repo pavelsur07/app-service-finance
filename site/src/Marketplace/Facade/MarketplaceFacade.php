@@ -267,6 +267,48 @@ final readonly class MarketplaceFacade
     }
 
     /**
+     * Bulk-вариант {@see self::findListingsByMarketplaceSku()}: один запрос на набор SKU.
+     * Результат сгруппирован по parentSku; SKU без листингов в ключах отсутствуют
+     * (caller должен обработать их отдельно).
+     *
+     * @param  string[] $marketplaceSkus
+     * @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
+     */
+    public function findListingsByMarketplaceSkus(
+        string $companyId,
+        string $marketplace,
+        array $marketplaceSkus,
+    ): array {
+        if ($marketplaceSkus === []) {
+            return [];
+        }
+
+        $rows = $this->connection->fetchAllAssociative(
+            'SELECT l.id, l.marketplace_sku AS parent_sku
+             FROM marketplace_listings l
+             WHERE l.company_id = :companyId
+               AND l.marketplace = :marketplace
+               AND l.marketplace_sku IN (:marketplaceSkus)',
+            [
+                'companyId'       => $companyId,
+                'marketplace'     => $marketplace,
+                'marketplaceSkus' => array_values(array_unique($marketplaceSkus)),
+            ],
+            ['marketplaceSkus' => Connection::PARAM_STR_ARRAY],
+        );
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row['parent_sku']][] = [
+                'id'        => $row['id'],
+                'parentSku' => $row['parent_sku'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Bulk-запрос продаж для набора листингов за одну дату.
      * Листинги без продаж в результате отсутствуют (caller должен подставить 0 самостоятельно).
      *

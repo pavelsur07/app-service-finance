@@ -6,13 +6,14 @@ namespace App\MarketplaceAds\Domain\Service;
 
 use App\MarketplaceAds\Application\DTO\CostDistributionResult;
 
-final class AdCostDistributor
+/**
+ * Чистая функция распределения рекламных затрат по листингам.
+ * Данные о продажах передаются снаружи — это позволяет caller'у выполнить один bulk-запрос
+ * для всех листингов сразу и избежать N+1 при обработке большого количества кампаний.
+ */
+final readonly class AdCostDistributor
 {
     private const WEIGHT_SCALE = 10;
-
-    public function __construct(
-        private readonly ListingSalesProviderInterface $salesProvider,
-    ) {}
 
     /**
      * Распределить рекламные затраты по листингам пропорционально продажам.
@@ -20,12 +21,12 @@ final class AdCostDistributor
      * Контроль округления: разница прибавляется к строке с наибольшей долей.
      *
      * @param  array{id: string, parentSku: string}[] $listings
+     * @param  array<string, int>                     $salesByListing listingId => quantity (отсутствующие = 0)
      * @return CostDistributionResult[]
      */
     public function distribute(
-        string $companyId,
         array $listings,
-        \DateTimeImmutable $date,
+        array $salesByListing,
         string $totalCost,
         int $totalImpressions,
         int $totalClicks,
@@ -36,22 +37,20 @@ final class AdCostDistributor
 
         $count = count($listings);
 
-        // Шаг 1: Получаем продажи по всем листингам одним запросом
-        $listingIds     = array_column($listings, 'id');
-        $salesByListing = $this->salesProvider->getSalesQuantitiesByListings($companyId, $listingIds, $date);
-        // Листинги без продаж отсутствуют в ответе — проставляем 0
+        // Нормализуем продажи: листинги без записи получают 0.
+        $sales = [];
         foreach ($listings as $listing) {
-            $salesByListing[$listing['id']] ??= 0;
+            $sales[$listing['id']] = $salesByListing[$listing['id']] ?? 0;
         }
 
-        $totalSales = (int) array_sum($salesByListing);
+        $totalSales = (int) array_sum($sales);
 
-        // Шаг 2: Вычисляем веса с высокой точностью
+        // Шаг 1: Вычисляем веса с высокой точностью
         if ($totalSales > 0) {
             $weights = [];
             foreach ($listings as $listing) {
                 $weights[$listing['id']] = bcdiv(
-                    (string) $salesByListing[$listing['id']],
+                    (string) $sales[$listing['id']],
                     (string) $totalSales,
                     self::WEIGHT_SCALE,
                 );
@@ -65,7 +64,7 @@ final class AdCostDistributor
             }
         }
 
-        // Шаг 3: Найти листинг с наибольшим весом для поправки округления
+        // Шаг 2: Найти листинг с наибольшим весом для поправки округления
         $maxWeightId = array_key_first($weights);
         foreach ($weights as $id => $w) {
             if (bccomp($w, $weights[$maxWeightId], self::WEIGHT_SCALE) > 0) {
@@ -73,7 +72,7 @@ final class AdCostDistributor
             }
         }
 
-        // Шаг 4: Вычислить значения по каждому листингу (с усечением до нужной точности)
+        // Шаг 3: Вычислить значения по каждому листингу (с усечением до нужной точности)
         $results        = [];
         $sumCost        = '0.00';
         $sumShare       = '0.00';
@@ -103,7 +102,7 @@ final class AdCostDistributor
             );
         }
 
-        // Шаг 5: Поправка округления — добавляем разницу к строке с наибольшей долей
+        // Шаг 4: Поправка округления — добавляем разницу к строке с наибольшей долей
         $maxItem = $results[$maxWeightId];
 
         $results[$maxWeightId] = new CostDistributionResult(
