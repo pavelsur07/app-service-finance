@@ -97,27 +97,27 @@ services:
             - "5173:5173" # <-- ДОБАВИТЬ ЭТО (проброс порта Vite)
         command: sh -c "yarn install && yarn dev"
     site-php-cli-worker:
-      build:
-        context: site/docker
-        dockerfile: development/php-cli/Dockerfile
-      working_dir: /app
-      restart: unless-stopped
-      environment:
-        <<: *tz-env
-      depends_on:
-        site-postgres:
-          condition: service_healthy
-        site-redis:
-          condition: service_healthy
-      volumes:
-        - ./site:/app
-      command: php bin/console messenger:consume async --time-limit=3600 --memory-limit=256M -vv
+        build:
+            context: site/docker
+            dockerfile: development/php-cli/Dockerfile
+        working_dir: /app
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - ./site:/app
+        command: php bin/console messenger:consume async --time-limit=3600 --memory-limit=256M -vv
     site-postgres:
         image: postgres:15-alpine
         container_name: symfony-postgres
         restart: always
         environment:
-            TZ: Europe/Moscow
+            <<: *tz-env
             POSTGRES_DB: app
             POSTGRES_USER: app
             POSTGRES_PASSWORD: secret
