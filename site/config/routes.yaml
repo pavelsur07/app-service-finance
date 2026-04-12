@@ -91,6 +91,12 @@ marketplace_analytics_controllers:
         namespace: App\MarketplaceAnalytics\Controller
     type: attribute
 
+marketplace_ads_controllers:
+    resource:
+        path: ../src/MarketplaceAds/Controller/
+        namespace: App\MarketplaceAds\Controller
+    type: attribute
+
 admin:
     resource: routes/admin.yaml
 
