@@ -24,6 +24,12 @@ use App\MarketplaceAds\Infrastructure\Api\Contract\AdRawDataParserInterface;
  */
 final class WildberriesAdRawDataParser implements AdRawDataParserInterface
 {
+    /** Точность хранения cost при агрегации — избегаем кумулятивной ошибки округления. */
+    private const AGGREGATION_SCALE = 8;
+
+    /** Финальная точность cost в AdRawEntry — округление HALF-UP применяется только один раз. */
+    private const FINAL_SCALE = 2;
+
     public function supports(string $marketplace): bool
     {
         return $marketplace === MarketplaceType::WILDBERRIES->value;
@@ -55,7 +61,7 @@ final class WildberriesAdRawDataParser implements AdRawDataParserInterface
                 continue;
             }
 
-            $cost        = number_format((float) ($row['sum'] ?? 0), 2, '.', '');
+            $cost        = number_format((float) ($row['sum'] ?? 0), self::AGGREGATION_SCALE, '.', '');
             $impressions = (int) ($row['views'] ?? 0);
             $clicks      = (int) ($row['clicks'] ?? 0);
             $key         = $campaignId . '|' . $parentSku;
@@ -73,7 +79,7 @@ final class WildberriesAdRawDataParser implements AdRawDataParserInterface
                 continue;
             }
 
-            $aggregated[$key]['cost']        = bcadd($aggregated[$key]['cost'], $cost, 2);
+            $aggregated[$key]['cost']        = bcadd($aggregated[$key]['cost'], $cost, self::AGGREGATION_SCALE);
             $aggregated[$key]['impressions'] += $impressions;
             $aggregated[$key]['clicks']      += $clicks;
         }
@@ -83,7 +89,9 @@ final class WildberriesAdRawDataParser implements AdRawDataParserInterface
                 campaignId:   $r['campaignId'],
                 campaignName: $r['campaignName'],
                 parentSku:    $r['parentSku'],
-                cost:         $r['cost'],
+                // HALF-UP round до FINAL_SCALE применяется один раз к агрегату
+                // (ad cost не бывает отрицательным, поэтому достаточно +0.005).
+                cost:         bcadd($r['cost'], '0.005', self::FINAL_SCALE),
                 impressions:  $r['impressions'],
                 clicks:       $r['clicks'],
             ),

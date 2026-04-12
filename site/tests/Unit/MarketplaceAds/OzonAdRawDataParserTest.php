@@ -102,9 +102,8 @@ final class OzonAdRawDataParserTest extends TestCase
         self::assertSame([], $this->parser->parse('{}'));
     }
 
-    public function testRoundingOfFractionalSpend(): void
+    public function testCostIsFormattedAsTwoDecimalString(): void
     {
-        // float → string через number_format с 2 знаками
         $json = json_encode([
             'rows' => [
                 ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
@@ -115,9 +114,31 @@ final class OzonAdRawDataParserTest extends TestCase
         $result = $this->parser->parse($json);
 
         self::assertCount(1, $result);
-        // Важно: результат — string, а не float
         self::assertIsString($result[0]->cost);
         self::assertMatchesRegularExpression('/^\d+\.\d{2}$/', $result[0]->cost);
+    }
+
+    /**
+     * Регрессия на кумулятивную ошибку округления: округление ДО агрегации
+     * дало бы 0.01 + 0.01 + 0.01 = 0.03. Правильный ответ — 0.005 × 3 = 0.015 → 0.02 (HALF-UP).
+     */
+    public function testAggregationPreservesPrecision(): void
+    {
+        $json = json_encode([
+            'rows' => [
+                ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
+                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+                ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
+                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+                ['campaign_id' => '1', 'campaign_name' => 'A', 'sku' => 'X',
+                 'spend' => 0.005, 'views' => 1, 'clicks' => 0],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json);
+
+        self::assertCount(1, $result);
+        self::assertSame('0.02', $result[0]->cost);
     }
 
     public function testSkipsRowsWithMissingRequiredFields(): void
