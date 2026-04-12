@@ -251,3 +251,8 @@ services:
     App\MarketplaceAds\Application\ProcessAdRawDocumentAction:
         arguments:
             $parsers: !tagged_iterator marketplace_ads.raw_data_parser
+
+    # CLI-загрузчик рекламных отчётов получает все API-клиенты через tagged_iterator.
+    App\MarketplaceAds\Command\LoadAdDataCommand:
+        arguments:
+            $platformClients: !tagged_iterator marketplace_ads.platform_client

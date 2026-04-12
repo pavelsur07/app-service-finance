@@ -55,4 +55,33 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Поиск raw-документов по произвольной комбинации фильтров. Все параметры опциональны:
+     * любой из них может быть null — тогда ограничение по этому полю не накладывается.
+     * Используется reprocess-командой для массовой переобработки.
+     *
+     * @return AdRawDocument[]
+     */
+    public function findByFilters(
+        ?string $companyId = null,
+        ?string $marketplace = null,
+        ?\DateTimeImmutable $reportDate = null,
+    ): array {
+        $qb = $this->createQueryBuilder('r')->orderBy('r.reportDate', 'DESC');
+
+        if ($companyId !== null) {
+            $qb->andWhere('r.companyId = :companyId')->setParameter('companyId', $companyId);
+        }
+
+        if ($marketplace !== null) {
+            $qb->andWhere('r.marketplace = :marketplace')->setParameter('marketplace', $marketplace);
+        }
+
+        if ($reportDate !== null) {
+            $qb->andWhere('r.reportDate = :reportDate')->setParameter('reportDate', $reportDate);
+        }
+
+        return $qb->getQuery()->getResult();
+    }
 }
