@@ -23,11 +23,14 @@ final class AdDocumentLineRepository extends ServiceEntityRepository
     /**
      * @return AdDocumentLine[]
      */
-    public function findByAdDocumentId(string $adDocumentId): array
+    public function findByAdDocumentId(string $adDocumentId, string $companyId): array
     {
         return $this->createQueryBuilder('l')
+            ->join('l.adDocument', 'd')
             ->where('l.adDocument = :adDocumentId')
+            ->andWhere('d.companyId = :companyId')
             ->setParameter('adDocumentId', $adDocumentId)
+            ->setParameter('companyId', $companyId)
             ->getQuery()
             ->getResult();
     }

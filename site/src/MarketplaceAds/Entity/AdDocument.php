@@ -75,6 +75,7 @@ class AdDocument
         Assert::uuid($companyId);
         Assert::uuid($adRawDocumentId);
         Assert::notEmpty($campaignId);
+        Assert::notEmpty($campaignName);
         Assert::notEmpty($parentSku);
 
         $this->companyId        = $companyId;

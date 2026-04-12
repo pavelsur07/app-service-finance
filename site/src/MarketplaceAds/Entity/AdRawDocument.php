@@ -58,6 +58,7 @@ class AdRawDocument
         $this->id = Uuid::uuid7()->toString();
         Assert::uuid($this->id);
         Assert::uuid($companyId);
+        Assert::notEmpty($rawPayload);
 
         $this->companyId   = $companyId;
         $this->marketplace = $marketplace;

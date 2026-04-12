@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Repository;
 
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
@@ -49,7 +50,7 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
             ->where('r.companyId = :companyId')
             ->andWhere('r.status = :status')
             ->setParameter('companyId', $companyId)
-            ->setParameter('status', 'draft')
+            ->setParameter('status', AdRawDocumentStatus::DRAFT)
             ->orderBy('r.reportDate', 'DESC')
             ->getQuery()
             ->getResult();

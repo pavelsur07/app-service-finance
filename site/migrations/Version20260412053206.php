@@ -18,8 +18,8 @@ final class Version20260412053206 extends AbstractMigration
     {
         $this->addSql(<<<'SQL'
             CREATE TABLE marketplace_ad_raw_documents (
-                id VARCHAR(36) NOT NULL,
-                company_id VARCHAR(36) NOT NULL,
+                id UUID NOT NULL,
+                company_id UUID NOT NULL,
                 marketplace VARCHAR(50) NOT NULL,
                 report_date DATE NOT NULL,
                 loaded_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
@@ -40,8 +40,8 @@ final class Version20260412053206 extends AbstractMigration
 
         $this->addSql(<<<'SQL'
             CREATE TABLE marketplace_ad_documents (
-                id VARCHAR(36) NOT NULL,
-                company_id VARCHAR(36) NOT NULL,
+                id UUID NOT NULL,
+                company_id UUID NOT NULL,
                 marketplace VARCHAR(50) NOT NULL,
                 report_date DATE NOT NULL,
                 campaign_id VARCHAR(255) NOT NULL,
@@ -50,7 +50,7 @@ final class Version20260412053206 extends AbstractMigration
                 total_cost NUMERIC(14, 2) NOT NULL,
                 total_impressions INT NOT NULL,
                 total_clicks INT NOT NULL,
-                ad_raw_document_id VARCHAR(36) NOT NULL,
+                ad_raw_document_id UUID NOT NULL,
                 created_at TIMESTAMP(0) WITHOUT TIME ZONE NOT NULL,
                 PRIMARY KEY(id),
                 CONSTRAINT uq_ad_document_company_marketplace_date_campaign_sku
@@ -65,9 +65,9 @@ final class Version20260412053206 extends AbstractMigration
 
         $this->addSql(<<<'SQL'
             CREATE TABLE marketplace_ad_document_lines (
-                id VARCHAR(36) NOT NULL,
-                ad_document_id VARCHAR(36) NOT NULL,
-                listing_id VARCHAR(36) NOT NULL,
+                id UUID NOT NULL,
+                ad_document_id UUID NOT NULL,
+                listing_id UUID NOT NULL,
                 share_percent NUMERIC(7, 4) NOT NULL,
                 cost NUMERIC(14, 2) NOT NULL,
                 impressions INT NOT NULL,
