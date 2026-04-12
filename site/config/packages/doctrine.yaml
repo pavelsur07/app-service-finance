@@ -102,6 +102,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/MarketplaceAnalytics/Entity'
                 prefix: 'App\MarketplaceAnalytics\Entity'
                 alias: MarketplaceAnalytics
+            MarketplaceAds:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/MarketplaceAds/Entity'
+                prefix: 'App\MarketplaceAds\Entity'
+                alias: MarketplaceAds
             MoySklad:
                 type: attribute
                 is_bundle: false
