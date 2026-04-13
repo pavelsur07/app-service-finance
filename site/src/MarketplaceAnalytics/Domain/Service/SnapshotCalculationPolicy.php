@@ -87,8 +87,7 @@ final readonly class SnapshotCalculationPolicy
             if ($type->isAdvertising()) {
                 continue;
             }
-            $normalizedAmount = $this->normalizeAmountForCostBreakdown($costDTO->amount);
-            $costMap[$type->value] = bcadd($costMap[$type->value] ?? '0.00', $normalizedAmount, 2);
+            $costMap[$type->value] = bcadd($costMap[$type->value] ?? '0.00', $costDTO->amount, 2);
         }
 
         // 5. Advertising
@@ -103,19 +102,17 @@ final readonly class SnapshotCalculationPolicy
         $otherDetails = [];
 
         foreach ($advCosts as $adv) {
-            $normalizedAmount = $this->normalizeAmountForCostBreakdown($adv->amount);
-
             if ($adv->advertisingType === AdvertisingType::CPC) {
-                $cpcSpend = bcadd($cpcSpend, $normalizedAmount, 2);
+                $cpcSpend = bcadd($cpcSpend, $adv->amount, 2);
                 $cpcImpressions += $adv->analyticsData['impressions'] ?? 0;
                 $cpcClicks += $adv->analyticsData['clicks'] ?? 0;
                 $cpcOrders += $adv->analyticsData['orders'] ?? 0;
                 $cpcRevenue = bcadd($cpcRevenue, $adv->analyticsData['revenue'] ?? '0.00', 2);
             } else {
-                $otherSpend = bcadd($otherSpend, $normalizedAmount, 2);
+                $otherSpend = bcadd($otherSpend, $adv->amount, 2);
                 $otherDetails[] = [
                     'type' => $adv->advertisingType->value,
-                    'amount' => $normalizedAmount,
+                    'amount' => $adv->amount,
                     'campaign' => $adv->externalCampaignId,
                 ];
             }
@@ -201,27 +198,5 @@ final readonly class SnapshotCalculationPolicy
         $this->snapshotRepository->save($snapshot);
 
         return $snapshot;
-    }
-
-    /**
-     * Приводит amount к положительному значению для cost breakdown аналитики.
-     *
-     * Работает для обоих знаковых соглашений MarketplaceCost:
-     *   - legacy (WB, pre-migration Ozon): amount может быть отрицательным
-     *     для storno / возврата комиссии — функция делает abs.
-     *   - post-Phase-2A (Ozon после backfill): amount всегда положительный,
-     *     storno кодируется через operation_type='storno' — функция no-op.
-     *
-     * TODO Phase 2B: после полной миграции WB на always-positive amount
-     * (operation_type обязателен) эта нормализация становится излишней и
-     * может быть удалена вместе с fallback'ами в Query-классах.
-     */
-    private function normalizeAmountForCostBreakdown(string $amount): string
-    {
-        if (bccomp($amount, '0.00', 2) < 0) {
-            return bcmul($amount, '-1', 2);
-        }
-
-        return $amount;
     }
 }

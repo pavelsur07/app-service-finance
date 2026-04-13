@@ -163,28 +163,19 @@ final readonly class MarketplaceFacade
             ],
         );
 
-        // operationType: source of truth post-Phase-2A — берём из c.operation_type;
-        // для legacy rows (WB / pre-backfill Ozon) где колонка NULL — derive из знака amount:
-        //   amount < 0 → 'storno', иначе → 'charge'.
-        // TODO Phase 2B: убрать fallback после полного backfill operation_type для всех marketplace'ов.
-        return array_map(static function (array $row): CostData {
-            $operationType = $row['operation_type'] ?? null;
-            if ($operationType === null) {
-                $operationType = bccomp((string) $row['amount'], '0.00', 2) < 0 ? 'storno' : 'charge';
-            }
-
-            return new CostData(
-                marketplace: MarketplaceType::from($row['marketplace']),
-                categoryCode: $row['category_code'],
-                amount: $row['amount'],
-                costDate: new \DateTimeImmutable($row['cost_date']),
-                categoryId: $row['category_id'],
-                marketplaceSku: $row['marketplace_sku'] ?? null,
-                description: $row['description'],
-                externalId: $row['external_id'],
-                operationType: $operationType,
-            );
-        }, $rows);
+        // operationType — source of truth для классификации charge vs storno.
+        // После Phase 2B колонка гарантированно NOT NULL для всех строк.
+        return array_map(static fn (array $row): CostData => new CostData(
+            marketplace: MarketplaceType::from($row['marketplace']),
+            categoryCode: $row['category_code'],
+            amount: $row['amount'],
+            costDate: new \DateTimeImmutable($row['cost_date']),
+            categoryId: $row['category_id'],
+            marketplaceSku: $row['marketplace_sku'] ?? null,
+            description: $row['description'],
+            externalId: $row['external_id'],
+            operationType: $row['operation_type'],
+        ), $rows);
     }
 
     /**

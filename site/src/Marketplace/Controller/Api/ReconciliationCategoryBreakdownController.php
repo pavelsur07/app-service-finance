@@ -59,7 +59,7 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
         $marketplace = $session->getMarketplace();
 
         // Суммы по каждому category_code.
-        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак amount.
+        // net_amount / costs_amount / storno_amount — классификация по operation_type.
         // Тот же паттерн что в CostsVerifyQuery / CostReconciliationQuery и др.
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
@@ -67,26 +67,17 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
                 cc.code                                                         AS category_code,
                 cc.name                                                         AS category_name,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                            AS net_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                            AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                            AS storno_amount
