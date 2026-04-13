@@ -10,6 +10,7 @@ use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
 use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
@@ -242,6 +243,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             $cost->setCostDate($costData['cost_date']);
             $cost->setAmount($costData['amount']);
             $cost->setDescription($costData['description']);
+            $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
 
             if ($row['listing']) {
                 $cost->setListing($row['listing']);
