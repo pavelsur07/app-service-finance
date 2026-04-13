@@ -20,8 +20,9 @@ final readonly class AdCostDistributor
      * При отсутствии продаж — равномерное распределение.
      * Контроль округления: разница прибавляется к строке с наибольшей долей.
      *
-     * @param  array{id: string, parentSku: string}[] $listings
-     * @param  array<string, int>                     $salesByListing listingId => quantity (отсутствующие = 0)
+     * @param array{id: string, parentSku: string}[] $listings
+     * @param array<string, int> $salesByListing listingId => quantity (отсутствующие = 0)
+     *
      * @return CostDistributionResult[]
      */
     public function distribute(
@@ -58,7 +59,7 @@ final readonly class AdCostDistributor
         } else {
             // Равномерное распределение
             $evenWeight = bcdiv('1', (string) $count, self::WEIGHT_SCALE);
-            $weights    = [];
+            $weights = [];
             foreach ($listings as $listing) {
                 $weights[$listing['id']] = $evenWeight;
             }
@@ -73,32 +74,32 @@ final readonly class AdCostDistributor
         }
 
         // Шаг 3: Вычислить значения по каждому листингу (с усечением до нужной точности)
-        $results        = [];
-        $sumCost        = '0.00';
-        $sumShare       = '0.00';
+        $results = [];
+        $sumCost = '0.00';
+        $sumShare = '0.00';
         $sumImpressions = 0;
-        $sumClicks      = 0;
+        $sumClicks = 0;
 
         foreach ($listings as $listing) {
             $id = $listing['id'];
-            $w  = $weights[$id];
+            $w = $weights[$id];
 
-            $cost         = bcmul($totalCost, $w, 2);
+            $cost = bcmul($totalCost, $w, 2);
             $sharePercent = bcmul($w, '100', 2);
-            $impressions  = (int) bcmul((string) $totalImpressions, $w, 0);
-            $clicks       = (int) bcmul((string) $totalClicks, $w, 0);
+            $impressions = (int) bcmul((string) $totalImpressions, $w, 0);
+            $clicks = (int) bcmul((string) $totalClicks, $w, 0);
 
-            $sumCost        = bcadd($sumCost, $cost, 2);
-            $sumShare       = bcadd($sumShare, $sharePercent, 2);
+            $sumCost = bcadd($sumCost, $cost, 2);
+            $sumShare = bcadd($sumShare, $sharePercent, 2);
             $sumImpressions += $impressions;
-            $sumClicks      += $clicks;
+            $sumClicks += $clicks;
 
             $results[$id] = new CostDistributionResult(
-                listingId:    $id,
+                listingId: $id,
                 sharePercent: $sharePercent,
-                cost:         $cost,
-                impressions:  $impressions,
-                clicks:       $clicks,
+                cost: $cost,
+                impressions: $impressions,
+                clicks: $clicks,
             );
         }
 
@@ -106,11 +107,11 @@ final readonly class AdCostDistributor
         $maxItem = $results[$maxWeightId];
 
         $results[$maxWeightId] = new CostDistributionResult(
-            listingId:    $maxItem->listingId,
+            listingId: $maxItem->listingId,
             sharePercent: bcadd($maxItem->sharePercent, bcsub('100.00', $sumShare, 2), 2),
-            cost:         bcadd($maxItem->cost, bcsub($totalCost, $sumCost, 2), 2),
-            impressions:  $maxItem->impressions + ($totalImpressions - $sumImpressions),
-            clicks:       $maxItem->clicks + ($totalClicks - $sumClicks),
+            cost: bcadd($maxItem->cost, bcsub($totalCost, $sumCost, 2), 2),
+            impressions: $maxItem->impressions + ($totalImpressions - $sumImpressions),
+            clicks: $maxItem->clicks + ($totalClicks - $sumClicks),
         );
 
         return array_values($results);

@@ -54,20 +54,51 @@ class AdDocumentLine
         Assert::uuid($this->id);
         Assert::uuid($listingId);
 
-        $this->adDocument   = $adDocument;
-        $this->listingId    = $listingId;
+        $this->adDocument = $adDocument;
+        $this->listingId = $listingId;
         $this->sharePercent = $sharePercent;
-        $this->cost         = $cost;
-        $this->impressions  = $impressions;
-        $this->clicks       = $clicks;
+        $this->cost = $cost;
+        $this->impressions = $impressions;
+        $this->clicks = $clicks;
     }
 
-    public function getId(): string { return $this->id; }
-    public function getAdDocument(): AdDocument { return $this->adDocument; }
-    public function getAdDocumentId(): string { return $this->adDocument->getId(); }
-    public function getListingId(): string { return $this->listingId; }
-    public function getSharePercent(): string { return $this->sharePercent; }
-    public function getCost(): string { return $this->cost; }
-    public function getImpressions(): int { return $this->impressions; }
-    public function getClicks(): int { return $this->clicks; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getAdDocument(): AdDocument
+    {
+        return $this->adDocument;
+    }
+
+    public function getAdDocumentId(): string
+    {
+        return $this->adDocument->getId();
+    }
+
+    public function getListingId(): string
+    {
+        return $this->listingId;
+    }
+
+    public function getSharePercent(): string
+    {
+        return $this->sharePercent;
+    }
+
+    public function getCost(): string
+    {
+        return $this->cost;
+    }
+
+    public function getImpressions(): int
+    {
+        return $this->impressions;
+    }
+
+    public function getClicks(): int
+    {
+        return $this->clicks;
+    }
 }

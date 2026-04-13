@@ -78,29 +78,76 @@ class AdDocument
         Assert::notEmpty($campaignName);
         Assert::notEmpty($parentSku);
 
-        $this->companyId        = $companyId;
-        $this->marketplace      = $marketplace;
-        $this->reportDate       = $reportDate;
-        $this->campaignId       = $campaignId;
-        $this->campaignName     = $campaignName;
-        $this->parentSku        = $parentSku;
-        $this->totalCost        = $totalCost;
+        $this->companyId = $companyId;
+        $this->marketplace = $marketplace;
+        $this->reportDate = $reportDate;
+        $this->campaignId = $campaignId;
+        $this->campaignName = $campaignName;
+        $this->parentSku = $parentSku;
+        $this->totalCost = $totalCost;
         $this->totalImpressions = $totalImpressions;
-        $this->totalClicks      = $totalClicks;
-        $this->adRawDocumentId  = $adRawDocumentId;
-        $this->createdAt        = new \DateTimeImmutable();
+        $this->totalClicks = $totalClicks;
+        $this->adRawDocumentId = $adRawDocumentId;
+        $this->createdAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getReportDate(): \DateTimeImmutable { return $this->reportDate; }
-    public function getCampaignId(): string { return $this->campaignId; }
-    public function getCampaignName(): string { return $this->campaignName; }
-    public function getParentSku(): string { return $this->parentSku; }
-    public function getTotalCost(): string { return $this->totalCost; }
-    public function getTotalImpressions(): int { return $this->totalImpressions; }
-    public function getTotalClicks(): int { return $this->totalClicks; }
-    public function getAdRawDocumentId(): string { return $this->adRawDocumentId; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getReportDate(): \DateTimeImmutable
+    {
+        return $this->reportDate;
+    }
+
+    public function getCampaignId(): string
+    {
+        return $this->campaignId;
+    }
+
+    public function getCampaignName(): string
+    {
+        return $this->campaignName;
+    }
+
+    public function getParentSku(): string
+    {
+        return $this->parentSku;
+    }
+
+    public function getTotalCost(): string
+    {
+        return $this->totalCost;
+    }
+
+    public function getTotalImpressions(): int
+    {
+        return $this->totalImpressions;
+    }
+
+    public function getTotalClicks(): int
+    {
+        return $this->totalClicks;
+    }
+
+    public function getAdRawDocumentId(): string
+    {
+        return $this->adRawDocumentId;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
 }

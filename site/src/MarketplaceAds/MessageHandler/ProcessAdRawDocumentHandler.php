@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\MessageHandler;
 
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
@@ -27,7 +28,8 @@ final class ProcessAdRawDocumentHandler
         private readonly AdRawDocumentRepository $rawDocumentRepository,
         private readonly ProcessAdRawDocumentAction $processAction,
         private readonly AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(ProcessAdRawDocumentMessage $message): void
     {
@@ -36,20 +38,20 @@ final class ProcessAdRawDocumentHandler
             $message->companyId,
         );
 
-        if ($rawDocument === null) {
+        if (null === $rawDocument) {
             $this->logger->warning('AdRawDocument не найден при async-обработке', [
-                'companyId'       => $message->companyId,
+                'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
             ]);
 
             return;
         }
 
-        if ($rawDocument->getStatus() !== AdRawDocumentStatus::DRAFT) {
+        if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
             $this->logger->info('AdRawDocument уже обработан, повторный запуск пропущен', [
-                'companyId'       => $message->companyId,
+                'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
-                'status'          => $rawDocument->getStatus()->value,
+                'status' => $rawDocument->getStatus()->value,
             ]);
 
             return;
@@ -57,16 +59,19 @@ final class ProcessAdRawDocumentHandler
 
         try {
             ($this->processAction)($message->companyId, $message->adRawDocumentId);
-        } catch (\DomainException $e) {
-            // DomainException из Action означает гонку состояний: другой worker/диспатч успел
-            // обработать документ (status != DRAFT) или сам документ удалили между pre-check
+        } catch (AdRawDocumentAlreadyProcessedException $e) {
+            // Специфическая гонка состояний: другой worker/диспатч успел обработать
+            // документ (status != DRAFT) или сам документ удалили между pre-check
             // и вызовом Action. Ретрай Messenger здесь только шумит в failed-queue — поглощаем.
+            // Ловим именно AdRawDocumentAlreadyProcessedException, а не \DomainException,
+            // чтобы баги конфигурации (например, отсутствие парсера — \RuntimeException)
+            // не поглощались молча, а уходили в retry / failed-queue для видимости.
             $this->logger->info(
                 'AdRawDocument обработан параллельно или удалён, повтор не нужен',
                 [
-                    'companyId'       => $message->companyId,
+                    'companyId' => $message->companyId,
                     'adRawDocumentId' => $message->adRawDocumentId,
-                    'reason'          => $e->getMessage(),
+                    'reason' => $e->getMessage(),
                 ],
             );
 
@@ -76,7 +81,7 @@ final class ProcessAdRawDocumentHandler
                 'Ошибка обработки AdRawDocument',
                 $e,
                 [
-                    'companyId'       => $message->companyId,
+                    'companyId' => $message->companyId,
                     'adRawDocumentId' => $message->adRawDocumentId,
                 ],
             );

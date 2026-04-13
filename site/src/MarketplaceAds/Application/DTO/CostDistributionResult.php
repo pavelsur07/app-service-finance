@@ -12,5 +12,6 @@ final readonly class CostDistributionResult
         public string $cost,
         public int $impressions,
         public int $clicks,
-    ) {}
+    ) {
+    }
 }

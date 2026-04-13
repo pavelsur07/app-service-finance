@@ -24,7 +24,7 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
     public function findByIdAndCompany(string $id, string $companyId): ?AdRawDocument
     {
         return $this->findOneBy([
-            'id'        => $id,
+            'id' => $id,
             'companyId' => $companyId,
         ]);
     }
@@ -35,9 +35,9 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
         \DateTimeImmutable $reportDate,
     ): ?AdRawDocument {
         return $this->findOneBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'reportDate'  => $reportDate,
+            'reportDate' => $reportDate,
         ]);
     }
 
@@ -57,31 +57,39 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
-     * Поиск raw-документов по произвольной комбинации фильтров. Все параметры опциональны:
+     * Стримит raw-документы по произвольной комбинации фильтров. Все параметры опциональны:
      * любой из них может быть null — тогда ограничение по этому полю не накладывается.
      * Используется reprocess-командой для массовой переобработки.
      *
-     * @return AdRawDocument[]
+     * Реализовано через {@see \Doctrine\ORM\AbstractQuery::toIterable()} — Doctrine
+     * читает строки из курсора БД по одной, не материализуя весь результат в памяти.
+     * Это одновременно:
+     *  - ограничивает peak memory usage при `reprocess --all` с десятками тысяч документов;
+     *  - позволяет команде безопасно вызывать EntityManager::clear() между батчами —
+     *    следующая yield-нутая entity будет свежей managed-entity, а не detached-объектом
+     *    из предзагруженного массива (см. issue #1495/codex-review P1).
+     *
+     * @return iterable<AdRawDocument>
      */
-    public function findByFilters(
+    public function streamByFilters(
         ?string $companyId = null,
         ?string $marketplace = null,
         ?\DateTimeImmutable $reportDate = null,
-    ): array {
+    ): iterable {
         $qb = $this->createQueryBuilder('r')->orderBy('r.reportDate', 'DESC');
 
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             $qb->andWhere('r.companyId = :companyId')->setParameter('companyId', $companyId);
         }
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('r.marketplace = :marketplace')->setParameter('marketplace', $marketplace);
         }
 
-        if ($reportDate !== null) {
+        if (null !== $reportDate) {
             $qb->andWhere('r.reportDate = :reportDate')->setParameter('reportDate', $reportDate);
         }
 
-        return $qb->getQuery()->getResult();
+        return $qb->getQuery()->toIterable();
     }
 }

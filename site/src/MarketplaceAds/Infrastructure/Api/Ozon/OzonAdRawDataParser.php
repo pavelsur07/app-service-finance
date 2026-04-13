@@ -42,15 +42,12 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
         return $marketplace === MarketplaceType::OZON->value;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function parse(string $rawPayload): array
     {
-        $data = json_decode($rawPayload, true, flags: JSON_THROW_ON_ERROR);
+        $data = json_decode($rawPayload, true, flags: \JSON_THROW_ON_ERROR);
 
         $rows = $data['rows'] ?? [];
-        if (!is_array($rows) || $rows === []) {
+        if (!is_array($rows) || [] === $rows) {
             return [];
         }
 
@@ -66,67 +63,67 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
             }
 
             $campaignId = isset($row['campaign_id']) ? (string) $row['campaign_id'] : '';
-            $parentSku  = isset($row['sku']) ? (string) $row['sku'] : '';
-            if ($campaignId === '' || $parentSku === '') {
+            $parentSku = isset($row['sku']) ? (string) $row['sku'] : '';
+            if ('' === $campaignId || '' === $parentSku) {
                 ++$skippedMissingFields;
                 $this->logger->warning(
                     'Ozon ad raw row skipped: missing required fields campaign_id/sku',
                     [
-                        'index'              => $index,
-                        'has_campaign_id'    => $campaignId !== '',
-                        'has_sku'            => $parentSku !== '',
-                        'marketplace'        => MarketplaceType::OZON->value,
+                        'index' => $index,
+                        'has_campaign_id' => '' !== $campaignId,
+                        'has_sku' => '' !== $parentSku,
+                        'marketplace' => MarketplaceType::OZON->value,
                     ],
                 );
                 continue;
             }
 
-            $cost        = number_format((float) ($row['spend'] ?? 0), self::AGGREGATION_SCALE, '.', '');
+            $cost = number_format((float) ($row['spend'] ?? 0), self::AGGREGATION_SCALE, '.', '');
             $impressions = (int) ($row['views'] ?? 0);
-            $clicks      = (int) ($row['clicks'] ?? 0);
-            $key         = $campaignId . '|' . $parentSku;
+            $clicks = (int) ($row['clicks'] ?? 0);
+            $key = $campaignId.'|'.$parentSku;
 
             if (!isset($aggregated[$key])) {
                 $aggregated[$key] = [
-                    'campaignId'   => $campaignId,
+                    'campaignId' => $campaignId,
                     'campaignName' => isset($row['campaign_name']) ? (string) $row['campaign_name'] : '',
-                    'parentSku'    => $parentSku,
-                    'cost'         => $cost,
-                    'impressions'  => $impressions,
-                    'clicks'       => $clicks,
+                    'parentSku' => $parentSku,
+                    'cost' => $cost,
+                    'impressions' => $impressions,
+                    'clicks' => $clicks,
                 ];
 
                 continue;
             }
 
-            $aggregated[$key]['cost']        = bcadd($aggregated[$key]['cost'], $cost, self::AGGREGATION_SCALE);
+            $aggregated[$key]['cost'] = bcadd($aggregated[$key]['cost'], $cost, self::AGGREGATION_SCALE);
             $aggregated[$key]['impressions'] += $impressions;
-            $aggregated[$key]['clicks']      += $clicks;
+            $aggregated[$key]['clicks'] += $clicks;
         }
 
         if ($skippedNonArray > 0 || $skippedMissingFields > 0) {
             $this->logger->info(
                 'Ozon ad raw payload: some rows were skipped during parsing',
                 [
-                    'total_rows'             => count($rows),
-                    'skipped_non_array'      => $skippedNonArray,
+                    'total_rows' => count($rows),
+                    'skipped_non_array' => $skippedNonArray,
                     'skipped_missing_fields' => $skippedMissingFields,
-                    'aggregated_entries'     => count($aggregated),
-                    'marketplace'            => MarketplaceType::OZON->value,
+                    'aggregated_entries' => count($aggregated),
+                    'marketplace' => MarketplaceType::OZON->value,
                 ],
             );
         }
 
         return array_map(
-            static fn(array $r) => new AdRawEntry(
-                campaignId:   $r['campaignId'],
+            static fn (array $r) => new AdRawEntry(
+                campaignId: $r['campaignId'],
                 campaignName: $r['campaignName'],
-                parentSku:    $r['parentSku'],
+                parentSku: $r['parentSku'],
                 // HALF-UP round до FINAL_SCALE применяется один раз к агрегату
                 // (ad cost не бывает отрицательным, поэтому достаточно +0.005).
-                cost:         bcadd($r['cost'], '0.005', self::FINAL_SCALE),
-                impressions:  $r['impressions'],
-                clicks:       $r['clicks'],
+                cost: bcadd($r['cost'], '0.005', self::FINAL_SCALE),
+                impressions: $r['impressions'],
+                clicks: $r['clicks'],
             ),
             array_values($aggregated),
         );

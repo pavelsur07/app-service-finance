@@ -13,5 +13,6 @@ final readonly class AdRawEntry
         public string $cost,
         public int $impressions,
         public int $clicks,
-    ) {}
+    ) {
+    }
 }

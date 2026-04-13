@@ -60,50 +60,85 @@ class AdRawDocument
         Assert::uuid($companyId);
         Assert::notEmpty($rawPayload);
 
-        $this->companyId   = $companyId;
+        $this->companyId = $companyId;
         $this->marketplace = $marketplace;
-        $this->reportDate  = $reportDate;
-        $this->rawPayload  = $rawPayload;
-        $this->status      = AdRawDocumentStatus::DRAFT;
-        $this->loadedAt    = new \DateTimeImmutable();
-        $this->createdAt   = new \DateTimeImmutable();
-        $this->updatedAt   = new \DateTimeImmutable();
+        $this->reportDate = $reportDate;
+        $this->rawPayload = $rawPayload;
+        $this->status = AdRawDocumentStatus::DRAFT;
+        $this->loadedAt = new \DateTimeImmutable();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function markAsProcessed(): void
     {
-        if ($this->status === AdRawDocumentStatus::PROCESSED) {
+        if (AdRawDocumentStatus::PROCESSED === $this->status) {
             throw new \DomainException('Документ уже обработан.');
         }
 
-        $this->status    = AdRawDocumentStatus::PROCESSED;
+        $this->status = AdRawDocumentStatus::PROCESSED;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function resetToDraft(): void
     {
-        if ($this->status === AdRawDocumentStatus::DRAFT) {
+        if (AdRawDocumentStatus::DRAFT === $this->status) {
             throw new \DomainException('Документ уже в статусе черновик.');
         }
 
-        $this->status    = AdRawDocumentStatus::DRAFT;
+        $this->status = AdRawDocumentStatus::DRAFT;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function updatePayload(string $rawPayload): void
     {
         $this->rawPayload = $rawPayload;
-        $this->status     = AdRawDocumentStatus::DRAFT;
-        $this->updatedAt  = new \DateTimeImmutable();
+        $this->status = AdRawDocumentStatus::DRAFT;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function getId(): string { return $this->id; }
-    public function getCompanyId(): string { return $this->companyId; }
-    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
-    public function getReportDate(): \DateTimeImmutable { return $this->reportDate; }
-    public function getLoadedAt(): \DateTimeImmutable { return $this->loadedAt; }
-    public function getRawPayload(): string { return $this->rawPayload; }
-    public function getStatus(): AdRawDocumentStatus { return $this->status; }
-    public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
-    public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+    public function getId(): string
+    {
+        return $this->id;
+    }
+
+    public function getCompanyId(): string
+    {
+        return $this->companyId;
+    }
+
+    public function getMarketplace(): MarketplaceType
+    {
+        return $this->marketplace;
+    }
+
+    public function getReportDate(): \DateTimeImmutable
+    {
+        return $this->reportDate;
+    }
+
+    public function getLoadedAt(): \DateTimeImmutable
+    {
+        return $this->loadedAt;
+    }
+
+    public function getRawPayload(): string
+    {
+        return $this->rawPayload;
+    }
+
+    public function getStatus(): AdRawDocumentStatus
+    {
+        return $this->status;
+    }
+
+    public function getCreatedAt(): \DateTimeImmutable
+    {
+        return $this->createdAt;
+    }
+
+    public function getUpdatedAt(): \DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
 }

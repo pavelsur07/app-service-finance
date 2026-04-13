@@ -24,9 +24,6 @@ final class OzonAdClient implements AdPlatformClientInterface
         return $marketplace === MarketplaceType::OZON->value;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function fetchAdStatistics(string $companyId, \DateTimeImmutable $date): string
     {
         // TODO: реализовать загрузку рекламной статистики Ozon

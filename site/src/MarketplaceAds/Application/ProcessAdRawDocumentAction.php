@@ -10,6 +10,7 @@ use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
 use App\MarketplaceAds\Entity\AdDocument;
 use App\MarketplaceAds\Entity\AdDocumentLine;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdRawDataParserInterface;
 use App\MarketplaceAds\Repository\AdDocumentRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
@@ -40,29 +41,26 @@ final readonly class ProcessAdRawDocumentAction
         private AdCostDistributor $costDistributor,
         private EntityManagerInterface $entityManager,
         private AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(string $companyId, string $adRawDocumentId): void
     {
         $rawDocument = $this->rawDocumentRepository->findByIdAndCompany($adRawDocumentId, $companyId)
-            ?? throw new \DomainException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
+            ?? throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
 
-        if ($rawDocument->getStatus() !== AdRawDocumentStatus::DRAFT) {
-            throw new \DomainException(sprintf(
-                'AdRawDocument %s в статусе %s, ожидался draft.',
-                $adRawDocumentId,
-                $rawDocument->getStatus()->value,
-            ));
+        if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
+            throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s в статусе %s, ожидался draft.', $adRawDocumentId, $rawDocument->getStatus()->value));
         }
 
         $marketplace = $rawDocument->getMarketplace();
-        $parser      = $this->selectParser($marketplace->value)
-            ?? throw new \DomainException(sprintf(
-                'Парсер для площадки %s не найден.',
-                $marketplace->value,
-            ));
+        // Отсутствие парсера — ошибка конфигурации/деплоя, НЕ гонка состояний. Бросаем
+        // \RuntimeException, чтобы handler не принял её за идемпотентный пропуск и
+        // отправил сообщение в retry / failed-queue, где проблему заметят.
+        $parser = $this->selectParser($marketplace->value)
+            ?? throw new \RuntimeException(sprintf('Парсер для площадки %s не найден.', $marketplace->value));
 
-        $entries    = $parser->parse($rawDocument->getRawPayload());
+        $entries = $parser->parse($rawDocument->getRawPayload());
         $reportDate = $rawDocument->getReportDate();
 
         // Шаг 1: bulk-prefetch листингов по всем уникальным parentSku из валидных записей.
@@ -70,15 +68,15 @@ final readonly class ProcessAdRawDocumentAction
         // их тоже исключаем из предзагрузки, чтобы не тянуть лишние данные.
         $validEntries = array_values(array_filter(
             $entries,
-            static fn(AdRawEntry $e) => $e->campaignName !== '',
+            static fn (AdRawEntry $e) => '' !== $e->campaignName,
         ));
 
         $parentSkus = array_values(array_unique(array_map(
-            static fn(AdRawEntry $e) => $e->parentSku,
+            static fn (AdRawEntry $e) => $e->parentSku,
             $validEntries,
         )));
 
-        $listingsByParentSku = $parentSkus === []
+        $listingsByParentSku = [] === $parentSkus
             ? []
             : $this->listingSalesProvider->findListingsByParentSkus(
                 $companyId,
@@ -94,7 +92,7 @@ final readonly class ProcessAdRawDocumentAction
             }
         }
 
-        $salesByListing = $allListingIds === []
+        $salesByListing = [] === $allListingIds
             ? []
             : $this->listingSalesProvider->getSalesQuantitiesByListings(
                 $companyId,
@@ -102,9 +100,9 @@ final readonly class ProcessAdRawDocumentAction
                 $reportDate,
             );
 
-        $hasErrors       = false;
-        $skippedEntries  = 0;
-        $processedCount  = 0;
+        $hasErrors = false;
+        $skippedEntries = 0;
+        $processedCount = 0;
 
         $this->entityManager->wrapInTransaction(function () use (
             $rawDocument,
@@ -127,17 +125,17 @@ final readonly class ProcessAdRawDocumentAction
                 // пустое имя (поле отсутствовало в payload), пропускаем запись: без проверки
                 // здесь конструктор AdDocument выбросит исключение и откатит всю транзакцию,
                 // убив частичный успех для остальных записей.
-                if ($entry->campaignName === '') {
+                if ('' === $entry->campaignName) {
                     $hasErrors = true;
                     ++$skippedEntries;
                     $this->logger->warning(
                         'AdRawEntry пропущена: отсутствует campaignName',
                         [
                             'adRawDocumentId' => $adRawDocumentId,
-                            'companyId'       => $companyId,
-                            'marketplace'     => $marketplace->value,
-                            'campaignId'      => $entry->campaignId,
-                            'parentSku'       => $entry->parentSku,
+                            'companyId' => $companyId,
+                            'marketplace' => $marketplace->value,
+                            'campaignId' => $entry->campaignId,
+                            'parentSku' => $entry->parentSku,
                         ],
                     );
                     continue;
@@ -145,52 +143,52 @@ final readonly class ProcessAdRawDocumentAction
 
                 $listings = $listingsByParentSku[$entry->parentSku] ?? [];
 
-                if ($listings === []) {
+                if ([] === $listings) {
                     $hasErrors = true;
                     ++$skippedEntries;
                     $this->logger->warning(
                         'AdRawEntry пропущена: листинги по parentSku не найдены',
                         [
                             'adRawDocumentId' => $adRawDocumentId,
-                            'companyId'       => $companyId,
-                            'marketplace'     => $marketplace->value,
-                            'parentSku'       => $entry->parentSku,
-                            'campaignId'      => $entry->campaignId,
+                            'companyId' => $companyId,
+                            'marketplace' => $marketplace->value,
+                            'parentSku' => $entry->parentSku,
+                            'campaignId' => $entry->campaignId,
                         ],
                     );
                     continue;
                 }
 
                 $distribution = $this->costDistributor->distribute(
-                    listings:         $listings,
-                    salesByListing:   $salesByListing,
-                    totalCost:        $entry->cost,
+                    listings: $listings,
+                    salesByListing: $salesByListing,
+                    totalCost: $entry->cost,
                     totalImpressions: $entry->impressions,
-                    totalClicks:      $entry->clicks,
+                    totalClicks: $entry->clicks,
                 );
 
                 $adDocument = new AdDocument(
-                    companyId:        $companyId,
-                    marketplace:      $marketplace,
-                    reportDate:       $reportDate,
-                    campaignId:       $entry->campaignId,
-                    campaignName:     $entry->campaignName,
-                    parentSku:        $entry->parentSku,
-                    totalCost:        $entry->cost,
+                    companyId: $companyId,
+                    marketplace: $marketplace,
+                    reportDate: $reportDate,
+                    campaignId: $entry->campaignId,
+                    campaignName: $entry->campaignName,
+                    parentSku: $entry->parentSku,
+                    totalCost: $entry->cost,
                     totalImpressions: $entry->impressions,
-                    totalClicks:      $entry->clicks,
-                    adRawDocumentId:  $adRawDocumentId,
+                    totalClicks: $entry->clicks,
+                    adRawDocumentId: $adRawDocumentId,
                 );
                 $this->entityManager->persist($adDocument);
 
                 foreach ($distribution as $line) {
                     $this->entityManager->persist(new AdDocumentLine(
-                        adDocument:   $adDocument,
-                        listingId:    $line->listingId,
+                        adDocument: $adDocument,
+                        listingId: $line->listingId,
                         sharePercent: $line->sharePercent,
-                        cost:         $line->cost,
-                        impressions:  $line->impressions,
-                        clicks:       $line->clicks,
+                        cost: $line->cost,
+                        impressions: $line->impressions,
+                        clicks: $line->clicks,
                     ));
                 }
 
@@ -209,9 +207,9 @@ final readonly class ProcessAdRawDocumentAction
                 'Частичная обработка AdRawDocument: документ остаётся в DRAFT',
                 [
                     'adRawDocumentId' => $adRawDocumentId,
-                    'companyId'       => $companyId,
-                    'processedCount'  => $processedCount,
-                    'skippedCount'    => $skippedEntries,
+                    'companyId' => $companyId,
+                    'processedCount' => $processedCount,
+                    'skippedCount' => $skippedEntries,
                 ],
             );
         }
