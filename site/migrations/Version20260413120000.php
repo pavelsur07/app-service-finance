@@ -46,6 +46,11 @@ final class Version20260413120000 extends AbstractMigration
 
     public function up(Schema $schema): void
     {
+        // Гарантируем доступность gen_random_uuid() на старых PostgreSQL < 13,
+        // где функция требует расширения pgcrypto. На PG 13+ оно уже встроено,
+        // IF NOT EXISTS делает оператор идемпотентным.
+        $this->addSql('CREATE EXTENSION IF NOT EXISTS pgcrypto');
+
         // Step 0 — пре-создать категорию ozon_decompensation для каждой компании,
         // у которой есть ozon_compensation И отрицательные строки в ней.
         // Копируем pl_category_id / description / is_system из ozon_compensation,
@@ -71,7 +76,9 @@ final class Version20260413120000 extends AbstractMigration
             FROM marketplace_cost_categories src
             WHERE src.marketplace = 'ozon'
               AND src.code = 'ozon_compensation'
-              AND src.deleted_at IS NULL
+              -- src.deleted_at НЕ фильтруем: soft-deleted ozon_compensation всё равно
+              -- может иметь исторические marketplace_costs с amount<0, которые Step 3
+              -- должен переложить в ozon_decompensation. Иначе lost_category assert.
               AND NOT EXISTS (
                   SELECT 1 FROM marketplace_cost_categories tgt
                   WHERE tgt.company_id = src.company_id
@@ -111,20 +118,19 @@ final class Version20260413120000 extends AbstractMigration
         //   • смена category_id на target категорию ТОЙ ЖЕ компании (company-scoped);
         //   • abs(amount);
         //   • operation_type = 'charge' (компенсация/декомпенсация — это CHARGE).
+        // INNER JOIN вместо коррелированного подзапроса — быстрее на больших объёмах.
+        // tgt.deleted_at НЕ фильтруем (согласуется со Step 0) — target создаётся Step 0
+        // без deleted_at, и все существующие tgt-кандидаты равноценны.
         $this->addSql(<<<'SQL'
             UPDATE marketplace_costs AS c
-            SET category_id = (
-                    SELECT tgt.id
-                    FROM marketplace_cost_categories AS tgt
-                    WHERE tgt.company_id = c.company_id
-                      AND tgt.marketplace = c.marketplace
-                      AND tgt.code = 'ozon_decompensation'
-                      AND tgt.deleted_at IS NULL
-                    LIMIT 1
-                ),
+            SET category_id = tgt.id,
                 amount = ABS(c.amount),
                 operation_type = 'charge'
             FROM marketplace_cost_categories AS mcc
+            INNER JOIN marketplace_cost_categories AS tgt
+                ON tgt.company_id = mcc.company_id
+               AND tgt.marketplace = mcc.marketplace
+               AND tgt.code = 'ozon_decompensation'
             WHERE c.category_id = mcc.id
               AND c.marketplace = 'ozon'
               AND c.amount < 0
@@ -161,13 +167,20 @@ final class Version20260413120000 extends AbstractMigration
                         remaining_null_op;
                 END IF;
 
+                -- Таргетированная проверка: должны быть 0 рядов, которые Step 3
+                -- должен был переложить (negative ozon_compensation), но не переложил.
+                -- Не проверяем general `category_id IS NULL`, т.к. это легитимное
+                -- состояние с Version20260406000001 (ON DELETE SET NULL).
                 SELECT COUNT(*) INTO lost_category
-                FROM marketplace_costs
-                WHERE marketplace = 'ozon' AND category_id IS NULL;
+                FROM marketplace_costs c
+                JOIN marketplace_cost_categories mcc ON mcc.id = c.category_id
+                WHERE c.marketplace = 'ozon'
+                  AND mcc.code = 'ozon_compensation'
+                  AND c.amount < 0;
 
                 IF lost_category > 0 THEN
                     RAISE EXCEPTION
-                        'Ozon operation_type backfill failed: % Ozon row(s) lost category_id during Step 3 (missing ozon_decompensation target?)',
+                        'Ozon operation_type backfill failed: % negative ozon_compensation row(s) were not migrated to ozon_decompensation (missing target?)',
                         lost_category;
                 END IF;
             END $$;
