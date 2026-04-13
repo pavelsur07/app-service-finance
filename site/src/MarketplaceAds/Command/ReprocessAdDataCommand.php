@@ -27,9 +27,14 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *
  * Обработка идёт батчами: статусы обновляются и flush'атся пачками по BATCH_SIZE,
  * после flush вызывается EntityManager::clear() — это удерживает identity map
- * в ограниченном размере даже при десятках тысяч документов. Сообщения
- * в очередь отправляются только после того, как все статусы закоммичены в БД,
- * иначе воркер мог бы забрать документ раньше, чем увидит его DRAFT-статус.
+ * в ограниченном размере даже при десятках тысяч документов. Выборка из
+ * репозитория получается через {@see AdRawDocumentRepository::streamByFilters()}
+ * (Doctrine toIterable) — документы читаются из курсора по одному и не
+ * материализуются все сразу в память, поэтому clear() между батчами не
+ * оставляет «хвост» detached-сущностей из предзагруженного массива.
+ * Сообщения в очередь отправляются только после того, как все статусы
+ * закоммичены в БД, иначе воркер мог бы забрать документ раньше, чем увидит
+ * его DRAFT-статус.
  */
 #[AsCommand(
     name: 'marketplace-ads:reprocess',
@@ -154,27 +159,23 @@ final class ReprocessAdDataCommand extends Command
             return Command::FAILURE;
         }
 
-        $documents = $this->rawDocumentRepository->findByFilters(
+        // Стримим документы из репозитория через toIterable() — не материализуем
+        // весь результат в памяти и не держим «хвост» detached-сущностей после
+        // EntityManager::clear() (каждая следующая yield-нутая entity приходит
+        // из курсора уже после clear и попадает в identity map свежей managed).
+        $stream = $this->rawDocumentRepository->streamByFilters(
             companyId: $companyId,
             marketplace: $marketplace,
             reportDate: $reportDate,
         );
 
-        if ([] === $documents) {
-            $output->writeln('<comment>Документы по указанным фильтрам не найдены.</comment>');
-
-            return Command::SUCCESS;
-        }
-
-        // Первый проход: сбрасываем статусы и фиксируем пачками. Параллельно
-        // собираем пары (companyId, id) для последующего dispatch — к моменту
-        // очистки identity map объекты Entity станут detached, поэтому
-        // запоминаем scalar-идентификаторы заранее.
+        // Собираем пары (companyId, id) для dispatch — в момент clear() объекты
+        // Entity станут detached, поэтому запоминаем scalar-идентификаторы заранее.
         /** @var list<array{companyId: string, id: string}> $toDispatch */
         $toDispatch = [];
         $batchIndex = 0;
 
-        foreach ($documents as $document) {
+        foreach ($stream as $document) {
             if (AdRawDocumentStatus::DRAFT !== $document->getStatus()) {
                 $document->resetToDraft();
             }
@@ -188,6 +189,12 @@ final class ReprocessAdDataCommand extends Command
                 $this->entityManager->flush();
                 $this->entityManager->clear();
             }
+        }
+
+        if (0 === $batchIndex) {
+            $output->writeln('<comment>Документы по указанным фильтрам не найдены.</comment>');
+
+            return Command::SUCCESS;
         }
 
         // Финальный flush для хвоста последней неполной пачки. clear()

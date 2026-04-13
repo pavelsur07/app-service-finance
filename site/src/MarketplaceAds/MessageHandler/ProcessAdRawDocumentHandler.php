@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\MessageHandler;
 
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
@@ -58,10 +59,13 @@ final class ProcessAdRawDocumentHandler
 
         try {
             ($this->processAction)($message->companyId, $message->adRawDocumentId);
-        } catch (\DomainException $e) {
-            // DomainException из Action означает гонку состояний: другой worker/диспатч успел
-            // обработать документ (status != DRAFT) или сам документ удалили между pre-check
+        } catch (AdRawDocumentAlreadyProcessedException $e) {
+            // Специфическая гонка состояний: другой worker/диспатч успел обработать
+            // документ (status != DRAFT) или сам документ удалили между pre-check
             // и вызовом Action. Ретрай Messenger здесь только шумит в failed-queue — поглощаем.
+            // Ловим именно AdRawDocumentAlreadyProcessedException, а не \DomainException,
+            // чтобы баги конфигурации (например, отсутствие парсера — \RuntimeException)
+            // не поглощались молча, а уходили в retry / failed-queue для видимости.
             $this->logger->info(
                 'AdRawDocument обработан параллельно или удалён, повтор не нужен',
                 [

@@ -99,6 +99,11 @@ final readonly class AdDocumentQuery
                ->setParameter('marketplace', $marketplace);
         }
 
-        return (string) $qb->executeQuery()->fetchOne();
+        // COALESCE в SQL гарантирует NOT NULL из БД, но fetchOne() при пустом
+        // наборе строк вернёт false (не null), а (string) false === "". Явный
+        // fallback удерживает контракт метода: «0» при отсутствии данных.
+        $result = $qb->executeQuery()->fetchOne();
+
+        return false === $result ? '0' : (string) $result;
     }
 }

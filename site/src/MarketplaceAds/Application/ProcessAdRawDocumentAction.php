@@ -10,6 +10,7 @@ use App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface;
 use App\MarketplaceAds\Entity\AdDocument;
 use App\MarketplaceAds\Entity\AdDocumentLine;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdRawDataParserInterface;
 use App\MarketplaceAds\Repository\AdDocumentRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
@@ -46,15 +47,18 @@ final readonly class ProcessAdRawDocumentAction
     public function __invoke(string $companyId, string $adRawDocumentId): void
     {
         $rawDocument = $this->rawDocumentRepository->findByIdAndCompany($adRawDocumentId, $companyId)
-            ?? throw new \DomainException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
+            ?? throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
 
         if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
-            throw new \DomainException(sprintf('AdRawDocument %s в статусе %s, ожидался draft.', $adRawDocumentId, $rawDocument->getStatus()->value));
+            throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s в статусе %s, ожидался draft.', $adRawDocumentId, $rawDocument->getStatus()->value));
         }
 
         $marketplace = $rawDocument->getMarketplace();
+        // Отсутствие парсера — ошибка конфигурации/деплоя, НЕ гонка состояний. Бросаем
+        // \RuntimeException, чтобы handler не принял её за идемпотентный пропуск и
+        // отправил сообщение в retry / failed-queue, где проблему заметят.
         $parser = $this->selectParser($marketplace->value)
-            ?? throw new \DomainException(sprintf('Парсер для площадки %s не найден.', $marketplace->value));
+            ?? throw new \RuntimeException(sprintf('Парсер для площадки %s не найден.', $marketplace->value));
 
         $entries = $parser->parse($rawDocument->getRawPayload());
         $reportDate = $rawDocument->getReportDate();
