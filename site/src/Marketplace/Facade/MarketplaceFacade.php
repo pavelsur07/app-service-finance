@@ -13,6 +13,10 @@ use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
+use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
+use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
+use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
+use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
 use Doctrine\DBAL\Connection;
@@ -25,6 +29,10 @@ final readonly class MarketplaceFacade
         private Connection $connection,
         private CostPriceResolverInterface $costPriceResolver,
         private CostCategoriesQuery $costCategoriesQuery,
+        private ListingSalesAggregateQuery $salesAggregateQuery,
+        private ListingReturnAggregateQuery $returnAggregateQuery,
+        private ListingCostAggregateQuery $costAggregateQuery,
+        private ListingMetaQuery $listingMetaQuery,
     ) {}
 
     /**
@@ -345,5 +353,52 @@ final readonly class MarketplaceFacade
         }
 
         return $result;
+    }
+
+    /**
+     * @return array<string, \App\Marketplace\DTO\ListingSalesAggregateDTO> keyed by listingId
+     */
+    public function getSalesAggregatesByListing(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        return $this->salesAggregateQuery->executeByPeriod($companyId, $marketplace, $from, $to);
+    }
+
+    /**
+     * @return array<string, \App\Marketplace\DTO\ListingReturnAggregateDTO> keyed by listingId
+     */
+    public function getReturnAggregatesByListing(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        return $this->returnAggregateQuery->executeByPeriod($companyId, $marketplace, $from, $to);
+    }
+
+    /**
+     * @return array<string, list<\App\Marketplace\DTO\ListingCostCategoryAggregateDTO>> keyed by listingId
+     */
+    public function getCostAggregatesByListing(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        return $this->costAggregateQuery->executeByPeriod($companyId, $marketplace, $from, $to);
+    }
+
+    /**
+     * @param  list<string> $listingIds
+     * @return array<string, \App\Marketplace\DTO\ListingMetaDTO> keyed by id
+     */
+    public function getListingsMetaByIds(
+        string $companyId,
+        array $listingIds,
+    ): array {
+        return $this->listingMetaQuery->findByIds($companyId, $listingIds);
     }
 }
