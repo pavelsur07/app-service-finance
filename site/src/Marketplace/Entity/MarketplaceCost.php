@@ -71,7 +71,7 @@ class MarketplaceCost
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Document $document = null;
 
-    #[ORM\Column(type: 'string', enumType: MarketplaceCostOperationType::class, nullable: true)]
+    #[ORM\Column(type: 'string', length: 10, enumType: MarketplaceCostOperationType::class, nullable: true)]
     private ?MarketplaceCostOperationType $operationType = null;
 
     public function __construct(
