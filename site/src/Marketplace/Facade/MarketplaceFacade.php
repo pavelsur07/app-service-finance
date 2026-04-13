@@ -170,7 +170,7 @@ final readonly class MarketplaceFacade
         return array_map(static function (array $row): CostData {
             $operationType = $row['operation_type'] ?? null;
             if ($operationType === null) {
-                $operationType = ((float) $row['amount']) < 0 ? 'storno' : 'charge';
+                $operationType = bccomp((string) $row['amount'], '0.00', 2) < 0 ? 'storno' : 'charge';
             }
 
             return new CostData(

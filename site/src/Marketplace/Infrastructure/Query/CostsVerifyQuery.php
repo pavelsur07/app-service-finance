@@ -92,14 +92,21 @@ final class CostsVerifyQuery
                 cc.code                                                         AS category_code,
                 cc.name                                                         AS category_name,
                 COUNT(c.id)                                                     AS count,
-                SUM(c.amount)                                                   AS net_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN -ABS(c.amount)
+                    ELSE ABS(c.amount)
+                END)                                                            AS net_amount,
                 SUM(CASE
                     WHEN (CASE
                             WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
                             ELSE (c.amount < 0)
                          END)
                     THEN 0
-                    ELSE c.amount
+                    ELSE ABS(c.amount)
                 END)                                                            AS costs_amount,
                 SUM(CASE
                     WHEN (CASE
@@ -118,7 +125,14 @@ final class CostsVerifyQuery
               AND c.cost_date  >= :periodFrom
               AND c.cost_date  <= :periodTo
             GROUP BY cc.code, cc.name
-            ORDER BY SUM(c.amount) DESC
+            ORDER BY SUM(CASE
+                        WHEN (CASE
+                                WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                                ELSE (c.amount < 0)
+                             END)
+                        THEN -ABS(c.amount)
+                        ELSE ABS(c.amount)
+                    END) DESC
             SQL,
             [
                 'companyId'   => $companyId,
@@ -162,19 +176,26 @@ final class CostsVerifyQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        // costs_amount / storno_amount — по operation_type с fallback на знак (см. totalsByCategory).
+        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак (см. totalsByCategory).
         $row = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
                 COUNT(c.id)                                            AS total_count,
-                SUM(c.amount)                                          AS net_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN -ABS(c.amount)
+                    ELSE ABS(c.amount)
+                END)                                                   AS net_amount,
                 SUM(CASE
                     WHEN (CASE
                             WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
                             ELSE (c.amount < 0)
                          END)
                     THEN 0
-                    ELSE c.amount
+                    ELSE ABS(c.amount)
                 END)                                                   AS costs_amount,
                 SUM(CASE
                     WHEN (CASE

@@ -26,7 +26,7 @@ final readonly class ListingCostAggregateQuery
     ): array {
         $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
 
-        // costs_amount / storno_amount — по operation_type с fallback на знак amount.
+        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак amount.
         // См. UnprocessedCostsQuery / CostsVerifyQuery для деталей паттерна.
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
@@ -34,14 +34,21 @@ final readonly class ListingCostAggregateQuery
                 c.listing_id,
                 cc.code                                                       AS category_code,
                 cc.name                                                       AS category_name,
-                SUM(c.amount)                                                 AS net_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN -ABS(c.amount)
+                    ELSE ABS(c.amount)
+                END)                                                          AS net_amount,
                 SUM(CASE
                     WHEN (CASE
                             WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
                             ELSE (c.amount < 0)
                          END)
                     THEN 0
-                    ELSE c.amount
+                    ELSE ABS(c.amount)
                 END)                                                          AS costs_amount,
                 SUM(CASE
                     WHEN (CASE

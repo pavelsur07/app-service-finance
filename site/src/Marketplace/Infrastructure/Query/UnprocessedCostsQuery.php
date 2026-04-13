@@ -59,16 +59,17 @@ final class UnprocessedCostsQuery
     ): array {
         // Получаем все строки с разбивкой по категории И знаку (costs vs storno).
         //
-        // is_storno определяется по operation_type с fallback на знак amount:
+        // is_storno / costs_amount / storno_amount классифицируются по operation_type
+        // с fallback на знак amount:
         //   - operation_type IS NOT NULL (новая схема, Ozon post-backfill) → operation_type = 'storno'
         //   - operation_type IS NULL (legacy: WB-строки, unmigrated pre-Phase-2A) → amount < 0
         //
         // Fallback нужен на период перехода: WB ещё эмитирует NULL operation_type,
         // Ozon до бэкфилла тоже NULL. После полной миграции (Phase 2B) fallback снимается.
         //
-        // Note: costs_amount / storno_amount / total_amount используют сырой знак amount —
-        // они семантически корректны для обоих режимов (pre/post-migration), т.к. total_amount
-        // берётся через ABS(SUM()). Полный переход на always-positive amount — Phase 2B.
+        // Важно: все три поля (is_storno / costs_amount / storno_amount) используют одну
+        // и ту же классификацию, иначе для post-migration Ozon (amount > 0, operation_type='storno')
+        // строки помеченные is_storno=true попадут в costs_amount вместо storno_amount.
         $sql = <<<'SQL'
             SELECT
                 mcc.code                                                        AS cost_category_code,
@@ -78,8 +79,22 @@ final class UnprocessedCostsQuery
                     WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
                     ELSE (c.amount < 0)
                 END)                                                            AS is_storno,
-                SUM(CASE WHEN c.amount > 0 THEN c.amount  ELSE 0 END)          AS costs_amount,
-                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END)      AS storno_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN 0
+                    ELSE ABS(c.amount)
+                END)                                                            AS costs_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN ABS(c.amount)
+                    ELSE 0
+                END)                                                            AS storno_amount,
                 ABS(SUM(c.amount))                                              AS total_amount,
                 m.is_negative                                                   AS mapping_is_negative,
                 m.sort_order                                                    AS sort_order,
