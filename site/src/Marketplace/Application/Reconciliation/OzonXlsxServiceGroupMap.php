@@ -113,6 +113,7 @@ final class OzonXlsxServiceGroupMap
             // === Компенсации и декомпенсации ===
             // Типы: Компенсация, Декомпенсация
             'ozon_compensation'          => 'Компенсации и декомпенсации',
+            'ozon_decompensation'        => 'Компенсации и декомпенсации',
         ];
     }
 }
