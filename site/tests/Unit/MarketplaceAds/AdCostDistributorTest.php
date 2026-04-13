@@ -250,4 +250,132 @@ final class AdCostDistributorTest extends TestCase
         self::assertSame('0.00', $results[1]->cost);
         self::assertSame('0.00', $results[1]->sharePercent);
     }
+
+    // -------------------------------------------------------------------------
+    // Обязательные кейсы по спецификации задачи (см. раздел 8.2 в to_do)
+    // -------------------------------------------------------------------------
+
+    public function testDistributesProportionallyBySales(): void
+    {
+        // Три листинга с продажами 10, 25, 15 → доли 20 %, 50 %, 30 %.
+        $results = $this->distributor->distribute(
+            [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
+            ['A' => 10, 'B' => 25, 'C' => 15],
+            '100.00',
+            1000,
+            200,
+        );
+
+        self::assertCount(3, $results);
+
+        $byId = [];
+        foreach ($results as $r) {
+            $byId[$r->listingId] = $r;
+        }
+
+        self::assertSame('20.00', $byId['A']->cost);
+        self::assertSame('50.00', $byId['B']->cost);
+        self::assertSame('30.00', $byId['C']->cost);
+
+        self::assertSame('20.00', $byId['A']->sharePercent);
+        self::assertSame('50.00', $byId['B']->sharePercent);
+        self::assertSame('30.00', $byId['C']->sharePercent);
+
+        self::assertSame('100.00', $this->sumCosts($results));
+        self::assertSame('100.00', $this->sumShares($results));
+        self::assertSame(1000, $this->sumImpressions($results));
+        self::assertSame(200, $this->sumClicks($results));
+    }
+
+    public function testDistributesEvenlyWhenNoSales(): void
+    {
+        // Три листинга, продажи = 0 у всех → каждый получает примерно равную долю.
+        // Проверяем главное свойство: суммы совпадают с исходными totals (без потери копеек).
+        $results = $this->distributor->distribute(
+            [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
+            ['A' => 0, 'B' => 0, 'C' => 0],
+            '30.00',
+            300,
+            30,
+        );
+
+        self::assertCount(3, $results);
+        self::assertSame('30.00', $this->sumCosts($results));
+        self::assertSame('100.00', $this->sumShares($results));
+        self::assertSame(300, $this->sumImpressions($results));
+        self::assertSame(30, $this->sumClicks($results));
+
+        // Разница между максимальным и минимальным cost не превышает одной "поправки"
+        // (все веса равны 1/3, отклонение может быть только от округления bcmul).
+        $costs = array_map(static fn ($r) => (float) $r->cost, $results);
+        self::assertLessThanOrEqual(
+            0.05,
+            max($costs) - min($costs),
+            'Распределение должно быть равномерным',
+        );
+    }
+
+    public function testSingleListingGets100Percent(): void
+    {
+        $results = $this->distributor->distribute(
+            [$this->makeListing('ONLY')],
+            ['ONLY' => 42],
+            '123.45',
+            777,
+            88,
+        );
+
+        self::assertCount(1, $results);
+        self::assertSame('ONLY', $results[0]->listingId);
+        self::assertSame('100.00', $results[0]->sharePercent);
+        self::assertSame('123.45', $results[0]->cost);
+        self::assertSame(777, $results[0]->impressions);
+        self::assertSame(88, $results[0]->clicks);
+    }
+
+    public function testRoundingHandledCorrectly(): void
+    {
+        // Три листинга, cost = '100.00', продажи 1, 1, 1.
+        // 100 / 3 даёт 33.33 на каждого; сумма = 99.99 → поправка приводит к 100.00.
+        $results = $this->distributor->distribute(
+            [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
+            ['A' => 1, 'B' => 1, 'C' => 1],
+            '100.00',
+            300,
+            30,
+        );
+
+        self::assertCount(3, $results);
+        self::assertSame(
+            '100.00',
+            $this->sumCosts($results),
+            'Сумма cost по строкам должна быть ровно 100.00, а не 99.99',
+        );
+        self::assertSame('100.00', $this->sumShares($results));
+    }
+
+    public function testImpressionsAndClicksRoundedCorrectly(): void
+    {
+        // Impressions = 100, три листинга с равными продажами.
+        // 100 * 1/3 (усечение до int) = 33 на каждого; сумма 99 → поправка приводит к 100.
+        $results = $this->distributor->distribute(
+            [$this->makeListing('A'), $this->makeListing('B'), $this->makeListing('C')],
+            ['A' => 5, 'B' => 5, 'C' => 5],
+            '9.00',
+            100,
+            50,
+        );
+
+        self::assertCount(3, $results);
+        self::assertSame(
+            100,
+            $this->sumImpressions($results),
+            'Сумма impressions по строкам должна быть ровно 100, а не 99',
+        );
+        self::assertSame(
+            50,
+            $this->sumClicks($results),
+            'Сумма clicks по строкам должна быть ровно 50',
+        );
+    }
 }
