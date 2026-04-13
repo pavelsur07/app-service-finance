@@ -150,6 +150,8 @@ final class PreflightCostsQuery
         string $periodFrom,
         string $periodTo,
     ): array {
+        // costs_amount / storno_amount — по operation_type с fallback на знак amount.
+        // См. UnprocessedCostsQuery / CostsVerifyQuery для деталей паттерна.
         return $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
@@ -159,8 +161,22 @@ final class PreflightCostsQuery
                 m.include_in_pl                                                 AS include_in_pl,
                 m.is_negative                                                   AS is_negative,
                 COUNT(c.id)                                                     AS count,
-                SUM(CASE WHEN c.amount > 0 THEN c.amount  ELSE 0 END)          AS costs_amount,
-                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END)      AS storno_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN 0
+                    ELSE c.amount
+                END)                                                            AS costs_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN ABS(c.amount)
+                    ELSE 0
+                END)                                                            AS storno_amount,
                 SUM(c.amount)                                                   AS net_amount,
                 COUNT(c.id) FILTER (WHERE c.document_id IS NOT NULL)           AS already_processed
             FROM marketplace_costs c
