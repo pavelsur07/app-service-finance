@@ -8,7 +8,7 @@ final readonly class ListingSalesAggregateDTO
 {
     public function __construct(
         public string $listingId,
-        public string $title,
+        public ?string $title,
         public string $sku,
         public string $marketplace,
         public string $revenue,

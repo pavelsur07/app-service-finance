@@ -8,7 +8,7 @@ final readonly class ListingMetaDTO
 {
     public function __construct(
         public string $id,
-        public string $title,
+        public ?string $title,
         public string $sku,
         public string $marketplace,
     ) {}
