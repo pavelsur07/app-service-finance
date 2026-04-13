@@ -56,7 +56,7 @@ final class Version20260413120000 extends AbstractMigration
                 description, is_system, deleted_at, is_active, created_at, updated_at
             )
             SELECT
-                gen_random_uuid()::text,
+                gen_random_uuid(),
                 src.company_id,
                 'ozon',
                 'Декомпенсация Ozon',
