@@ -238,6 +238,41 @@ getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable 
 // Список категорий затрат для формы маппинга юнит-экономики
 // @return array<array{id: string, code: string, name: string}>
 getCostCategoriesForCompany(string $companyId, string $marketplace): array
+
+// === Aggregate-методы (Phase 1) — для отчётов по периоду ===
+
+// Агрегаты продаж по листингам за период (revenue, quantity, costPriceTotal/Quantity)
+// @return array<string, ListingSalesAggregateDTO>  listingId => DTO
+getSalesAggregatesByListing(
+    string $companyId,
+    ?string $marketplace,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+): array
+
+// Агрегаты возвратов по листингам за период
+// @return array<string, ListingReturnAggregateDTO>  listingId => DTO
+getReturnAggregatesByListing(
+    string $companyId,
+    ?string $marketplace,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+): array
+
+// Агрегаты затрат по листингам и категориям за период (net/costs/storno amounts)
+// @return array<string, list<ListingCostCategoryAggregateDTO>>  listingId => список категорий
+getCostAggregatesByListing(
+    string $companyId,
+    ?string $marketplace,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+): array
+
+// Метаданные листингов batch-запросом (title/sku/marketplace)
+// IDOR: фильтрует по company_id (в отличие от старого fetchListingMeta)
+// @param  list<string> $listingIds
+// @return array<string, ListingMetaDTO>  id => DTO
+getListingsMetaByIds(string $companyId, array $listingIds): array
 ```
 
 ---
@@ -560,3 +595,4 @@ paths:
 | 1.3 | 2026-04-12 | MarketplaceAds: новый модуль обработки рекламных отчётов. Entity: `AdRawDocument` (raw JSONB + status DRAFT/PROCESSED), `AdDocument` (кампания × parent SKU за дату), `AdDocumentLine` (распределение на листинг). Domain Port `ListingSalesProviderInterface` с bulk `getSalesQuantitiesByListings` + реализация `ListingSalesProviderMarketplace` через Facade. Domain `AdCostDistributor`: распределение bcmath, при 0 продажах — равномерно, поправка округления на максимальную долю. В `MarketplaceFacade` добавлены `findListingsByMarketplaceSku` (без фильтра `is_active`, для исторических отчётов) и `getSalesQuantitiesForListings` (bulk GROUP BY, убирает N+1). |
 | 1.4 | 2026-04-12 | MarketplaceAds: `ProcessAdRawDocumentAction` — загрузка AdRawDocument (DRAFT) и конвертация в AdDocument + AdDocumentLine. Идемпотентность через `deleteByRawDocumentId`, частичный успех оставляет статус DRAFT. Bulk-prefetch листингов и продаж на уровне Action (2 запроса на документ), `AdCostDistributor` стал чистой функцией без DI. В `MarketplaceFacade` добавлен `findListingsByMarketplaceSkus` (bulk, сгруппирован по parentSku), в `ListingSalesProviderInterface` — `findListingsByParentSkus`. |
 | 1.5 | 2026-04-13 | MarketplaceAds: CLI-обвязка + Messenger-пайплайн (`marketplace-ads:load`, `marketplace-ads:reprocess`, `ProcessAdRawDocumentMessage`, `ProcessAdRawDocumentHandler`). Batch-flush в Load (единый flush по всему проходу), guardrails в Reprocess (--all / хотя бы один фильтр, batch clear BATCH_SIZE=50). `MarketplaceAdsFacade` — публичный API модуля: `getAdCostsForListingAndDate`, `getTotalAdCostForPeriod`. `AdDocumentQuery` — DBAL-запросы к `marketplace_ad_documents` JOIN `marketplace_ad_document_lines`. `AdCostForListingDTO` для передачи распределённых данных между модулями. |
+| 1.6 | 2026-04-13 | Marketplace ↔ MarketplaceAnalytics: вынесли listing-aggregate-запросы в Marketplace-модуль через Facade (Phase 1). Новые DTO: `ListingSalesAggregateDTO`, `ListingReturnAggregateDTO`, `ListingCostCategoryAggregateDTO`, `ListingMetaDTO`. Новые Query-классы в `Marketplace/Infrastructure/Query/`: `ListingSalesAggregateQuery`, `ListingReturnAggregateQuery`, `ListingCostAggregateQuery`, `ListingMetaQuery`. `MarketplaceFacade` расширен 4 методами: `getSalesAggregatesByListing`, `getReturnAggregatesByListing`, `getCostAggregatesByListing`, `getListingsMetaByIds` (последний добавляет `company_id` фильтр — IDOR fix vs старый `fetchListingMeta`). `UnitExtendedQuery` (MarketplaceAnalytics) переписан на чистую делегацию через `MarketplaceFacade` — больше не лезет напрямую в `marketplace_*` таблицы (-174 строки SQL). |
