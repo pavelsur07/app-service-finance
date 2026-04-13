@@ -16,7 +16,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * ВРЕМЕННЫЙ контроллер для очистки затрат Ozon перед переобработкой.
  *
  * Нужен однократно: старые записи marketplace_costs созданы без raw_document_id,
- * поэтому автоматический DELETE в ProcessOzonCostsAction их не удаляет.
+ * поэтому автоматический DELETE в OzonCostsRawProcessor::process() их не удаляет.
  *
  * После переобработки всех периодов — удалить этот контроллер.
  *

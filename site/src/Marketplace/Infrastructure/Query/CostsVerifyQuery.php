@@ -225,7 +225,7 @@ final class CostsVerifyQuery
      *
      * Если count > 0 — у Ozon появились новые service names которых нет в SERVICE_CATEGORY_MAP.
      * Нужно:
-     *   1. Добавить service name в ProcessOzonCostsAction::SERVICE_CATEGORY_MAP
+     *   1. Добавить service name в OzonServiceCategoryMap::MAP
      *   2. Переобработать затраты через «Переобработка данных за период»
      */
     private function unknownServiceNames(
