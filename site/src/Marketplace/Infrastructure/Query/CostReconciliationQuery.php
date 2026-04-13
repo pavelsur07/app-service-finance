@@ -36,38 +36,26 @@ final class CostReconciliationQuery
         string $periodTo,
         array $reportResult,
     ): array {
-        // net_amount / costs_amount / storno_amount классифицируются по operation_type с fallback на знак amount:
-        //   - operation_type IS NOT NULL (новая схема, Ozon post-backfill) → берём operation_type
-        //   - operation_type IS NULL (legacy: WB, pre-Phase-2A) → падаем на sign амаунта
-        // ABS() применяется безусловно — безопасно в обоих режимах:
-        //   pre-migration storno:  amount < 0 → ABS(amount) > 0
-        //   post-migration storno: amount > 0 → ABS(amount) = amount > 0
-        // net_amount = charges − stornos (через signed-ABS), а не raw SUM —
-        // raw SUM ломается для post-migration: storno с amount > 0 не вычитается.
+        // net_amount / costs_amount / storno_amount классифицируются строго по operation_type.
+        // После Phase 2B operation_type гарантированно NOT NULL для всех строк.
+        // ABS() применяется безусловно: storno всегда имеет amount > 0, charge тоже —
+        // net_amount = charges − stornos вычисляется через signed-ABS (raw SUM не подходит,
+        // т.к. storno с amount > 0 не вычитался бы автоматически).
         $apiStats = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                        AS net_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                        AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                        AS storno_amount,
@@ -165,33 +153,24 @@ final class CostReconciliationQuery
         array $xlsxGroupTotals,
     ): array {
         // Наши суммы по категориям.
-        // net_amount / costs_amount / storno_amount классифицируются по operation_type
-        // (с fallback на знак) — та же логика что в reconcile() выше.
+        // net_amount / costs_amount / storno_amount классифицируются по operation_type —
+        // та же логика что в reconcile() выше.
         $apiByCategory = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
                 cc.code                                                        AS category_code,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                           AS net_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                           AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                           AS storno_amount

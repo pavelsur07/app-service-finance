@@ -150,8 +150,8 @@ final class PreflightCostsQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак amount.
-        // См. UnprocessedCostsQuery / CostsVerifyQuery для деталей паттерна.
+        // net_amount / costs_amount / storno_amount — классификация по operation_type.
+        // После Phase 2B operation_type гарантированно NOT NULL (см. UnprocessedCostsQuery).
         return $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
@@ -162,26 +162,17 @@ final class PreflightCostsQuery
                 m.is_negative                                                   AS is_negative,
                 COUNT(c.id)                                                     AS count,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                            AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                            AS storno_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                            AS net_amount,

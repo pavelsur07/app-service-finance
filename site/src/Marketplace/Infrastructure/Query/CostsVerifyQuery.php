@@ -83,9 +83,8 @@ final class CostsVerifyQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        // costs_amount / storno_amount классифицируются по operation_type с fallback на знак amount.
-        // Fallback нужен на период перехода: WB ещё эмитирует NULL operation_type,
-        // Ozon до бэкфилла — тоже NULL. После полной миграции (Phase 2B) fallback снимается.
+        // costs_amount / storno_amount классифицируются строго по operation_type.
+        // После Phase 2B operation_type гарантированно NOT NULL (см. UnprocessedCostsQuery).
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
@@ -93,26 +92,17 @@ final class CostsVerifyQuery
                 cc.name                                                         AS category_name,
                 COUNT(c.id)                                                     AS count,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                            AS net_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                            AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                            AS storno_amount,
@@ -126,10 +116,7 @@ final class CostsVerifyQuery
               AND c.cost_date  <= :periodTo
             GROUP BY cc.code, cc.name
             ORDER BY SUM(CASE
-                        WHEN (CASE
-                                WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                                ELSE (c.amount < 0)
-                             END)
+                        WHEN (c.operation_type = 'storno')
                         THEN -ABS(c.amount)
                         ELSE ABS(c.amount)
                     END) DESC
@@ -176,32 +163,23 @@ final class CostsVerifyQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак (см. totalsByCategory).
+        // net_amount / costs_amount / storno_amount — по operation_type (см. totalsByCategory).
         $row = $this->connection->fetchAssociative(
             <<<'SQL'
             SELECT
                 COUNT(c.id)                                            AS total_count,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN -ABS(c.amount)
                     ELSE ABS(c.amount)
                 END)                                                   AS net_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN 0
                     ELSE ABS(c.amount)
                 END)                                                   AS costs_amount,
                 SUM(CASE
-                    WHEN (CASE
-                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                            ELSE (c.amount < 0)
-                         END)
+                    WHEN (c.operation_type = 'storno')
                     THEN ABS(c.amount)
                     ELSE 0
                 END)                                                   AS storno_amount,
@@ -417,10 +395,8 @@ final class CostsVerifyQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        // Возвращённая комиссия. Storno определяется по operation_type с fallback на знак amount:
-        //   pre-Phase-2A (operation_type IS NULL): storno = amount < 0
-        //   post-Phase-2A (operation_type IS NOT NULL): storno = operation_type = 'storno'
-        // SUM(ABS(c.amount)) корректен в обоих режимах.
+        // Возвращённая комиссия. Storno определяется по operation_type
+        // (после Phase 2B колонка гарантированно NOT NULL).
         $commissionReturned = (float) ($this->connection->fetchOne(
             <<<'SQL'
             SELECT COALESCE(SUM(ABS(c.amount)), 0)
@@ -431,10 +407,7 @@ final class CostsVerifyQuery
               AND c.cost_date  >= :periodFrom
               AND c.cost_date  <= :periodTo
               AND cc.code       = 'ozon_sale_commission'
-              AND (CASE
-                      WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
-                      ELSE (c.amount < 0)
-                  END)
+              AND c.operation_type = 'storno'
             SQL,
             [
                 'companyId'   => $companyId,

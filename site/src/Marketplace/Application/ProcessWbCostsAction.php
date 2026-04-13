@@ -11,6 +11,7 @@ use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
@@ -235,6 +236,7 @@ final class ProcessWbCostsAction
                 $cost->setCostDate($costData['cost_date']);
                 $cost->setAmount($costData['amount']);
                 $cost->setDescription($costData['description']);
+                $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
                 $cost->setRawDocumentId($rawDocId);
 
                 // ПРИВЯЗКА К LISTING (если есть)
