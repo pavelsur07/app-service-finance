@@ -148,6 +148,7 @@ final readonly class MarketplaceFacade
     ): array {
         $rows = $this->connection->fetchAllAssociative(
             'SELECT c.marketplace, c.amount, c.cost_date, c.description, c.external_id,
+                    c.operation_type,
                     cat.id AS category_id, cat.code AS category_code, l.marketplace_sku
              FROM marketplace_costs c
              JOIN marketplace_cost_categories cat ON c.category_id = cat.id
@@ -162,16 +163,28 @@ final readonly class MarketplaceFacade
             ],
         );
 
-        return array_map(static fn(array $row) => new CostData(
-            marketplace: MarketplaceType::from($row['marketplace']),
-            categoryCode: $row['category_code'],
-            amount: $row['amount'],
-            costDate: new \DateTimeImmutable($row['cost_date']),
-            categoryId: $row['category_id'],
-            marketplaceSku: $row['marketplace_sku'] ?? null,
-            description: $row['description'],
-            externalId: $row['external_id'],
-        ), $rows);
+        // operationType: source of truth post-Phase-2A — берём из c.operation_type;
+        // для legacy rows (WB / pre-backfill Ozon) где колонка NULL — derive из знака amount:
+        //   amount < 0 → 'storno', иначе → 'charge'.
+        // TODO Phase 2B: убрать fallback после полного backfill operation_type для всех marketplace'ов.
+        return array_map(static function (array $row): CostData {
+            $operationType = $row['operation_type'] ?? null;
+            if ($operationType === null) {
+                $operationType = bccomp((string) $row['amount'], '0.00', 2) < 0 ? 'storno' : 'charge';
+            }
+
+            return new CostData(
+                marketplace: MarketplaceType::from($row['marketplace']),
+                categoryCode: $row['category_code'],
+                amount: $row['amount'],
+                costDate: new \DateTimeImmutable($row['cost_date']),
+                categoryId: $row['category_id'],
+                marketplaceSku: $row['marketplace_sku'] ?? null,
+                description: $row['description'],
+                externalId: $row['external_id'],
+                operationType: $operationType,
+            );
+        }, $rows);
     }
 
     /**

@@ -19,6 +19,18 @@ readonly class CostData
         public ?string $nmId = null,
         public ?string $tsName = null,
         public ?string $barcode = null,
+        /**
+         * 'charge' | 'storno' | null.
+         *
+         * Source of truth для классификации "начисление vs сторно" post-Phase-2A.
+         * Populated MarketplaceFacade::getCostsForListingAndDate() с fallback:
+         *   - если в БД c.operation_type IS NOT NULL → берём как есть
+         *   - если NULL (legacy WB / pre-backfill Ozon) → derive из знака amount:
+         *     amount < 0 → 'storno', иначе 'charge'.
+         *
+         * Адаптерам (Ozon/Wildberries) можно не передавать — оставится null.
+         */
+        public ?string $operationType = null,
     ) {
     }
 }

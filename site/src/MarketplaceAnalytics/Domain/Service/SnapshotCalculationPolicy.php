@@ -203,6 +203,19 @@ final readonly class SnapshotCalculationPolicy
         return $snapshot;
     }
 
+    /**
+     * Приводит amount к положительному значению для cost breakdown аналитики.
+     *
+     * Работает для обоих знаковых соглашений MarketplaceCost:
+     *   - legacy (WB, pre-migration Ozon): amount может быть отрицательным
+     *     для storno / возврата комиссии — функция делает abs.
+     *   - post-Phase-2A (Ozon после backfill): amount всегда положительный,
+     *     storno кодируется через operation_type='storno' — функция no-op.
+     *
+     * TODO Phase 2B: после полной миграции WB на always-positive amount
+     * (operation_type обязателен) эта нормализация становится излишней и
+     * может быть удалена вместе с fallback'ами в Query-классах.
+     */
     private function normalizeAmountForCostBreakdown(string $amount): string
     {
         if (bccomp($amount, '0.00', 2) < 0) {
