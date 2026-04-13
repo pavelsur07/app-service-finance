@@ -5,8 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Application\Reconciliation\OzonXlsxServiceGroupMap;
-use Doctrine\DBAL\ArrayParameterType;
-use Doctrine\DBAL\Connection;
+use App\Marketplace\Facade\MarketplaceFacade;
 
 final readonly class UnitExtendedQuery
 {
@@ -17,7 +16,7 @@ final readonly class UnitExtendedQuery
     ];
 
     public function __construct(
-        private Connection $connection,
+        private MarketplaceFacade $marketplaceFacade,
     ) {
     }
 
@@ -31,9 +30,12 @@ final readonly class UnitExtendedQuery
         string $periodTo,
         int $limit = 500,
     ): array {
-        $sales = $this->fetchSales($companyId, $marketplace, $periodFrom, $periodTo);
-        $returns = $this->fetchReturns($companyId, $marketplace, $periodFrom, $periodTo);
-        $costs = $this->fetchCosts($companyId, $marketplace, $periodFrom, $periodTo);
+        $from = new \DateTimeImmutable($periodFrom);
+        $to = new \DateTimeImmutable($periodTo);
+
+        $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $from, $to);
+        $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $from, $to);
+        $costs = $this->marketplaceFacade->getCostAggregatesByListing($companyId, $marketplace, $from, $to);
 
         // Merge all unique listing IDs from three sources so listings
         // with only returns or costs are not lost
@@ -44,8 +46,8 @@ final readonly class UnitExtendedQuery
         ));
 
         // Fetch metadata (title, sku, marketplace) for listings not present in sales
-        $nonSalesIds = array_diff($allListingIds, array_keys($sales));
-        $listingMeta = $this->fetchListingMeta($nonSalesIds);
+        $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
+        $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
 
         $categoryToGroup = OzonXlsxServiceGroupMap::getCategoryToServiceGroup();
         $logisticsCodes = $this->getLogisticsCodes($categoryToGroup);
@@ -69,19 +71,19 @@ final readonly class UnitExtendedQuery
             $listingCosts = $costs[$listingId] ?? [];
             $meta = $listingMeta[$listingId] ?? null;
 
-            $revenue = $sale !== null ? (float) $sale['revenue'] : 0.0;
-            $quantity = $sale !== null ? (int) $sale['quantity'] : 0;
-            $returnsTotal = $ret !== null ? (float) $ret['returns_total'] : 0.0;
-            $costPriceTotal = $sale !== null ? (float) $sale['cost_price_total'] : 0.0;
-            $costPriceQuantity = $sale !== null ? (int) $sale['cost_price_quantity'] : 0;
+            $revenue = $sale !== null ? (float) $sale->revenue : 0.0;
+            $quantity = $sale !== null ? $sale->quantity : 0;
+            $returnsTotal = $ret !== null ? (float) $ret->returnsTotal : 0.0;
+            $costPriceTotal = $sale !== null ? (float) $sale->costPriceTotal : 0.0;
+            $costPriceQuantity = $sale !== null ? $sale->costPriceQuantity : 0;
             $costPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
                 : 0.0;
 
             // Listing metadata: prefer sales source, fallback to listings table
-            $title = $sale['listing_title'] ?? $meta['listing_title'] ?? '';
-            $sku = $sale['listing_sku'] ?? $meta['listing_sku'] ?? '';
-            $mp = $sale['listing_marketplace'] ?? $meta['listing_marketplace'] ?? '';
+            $title = $sale?->title ?? $meta?->title ?? '';
+            $sku = $sale?->sku ?? $meta?->sku ?? '';
+            $mp = $sale?->marketplace ?? $meta?->marketplace ?? '';
 
             // Classify costs
             $commission = 0.0;
@@ -90,14 +92,14 @@ final readonly class UnitExtendedQuery
             $allCategoriesRaw = [];
 
             foreach ($listingCosts as $cat) {
-                $code = $cat['category_code'];
-                $net = (float) $cat['net_amount'];
-                $costsAmt = (float) $cat['costs_amount'];
-                $stornoAmt = (float) $cat['storno_amount'];
+                $code = $cat->categoryCode;
+                $net = (float) $cat->netAmount;
+                $costsAmt = (float) $cat->costsAmount;
+                $stornoAmt = (float) $cat->stornoAmount;
 
                 $allCategoriesRaw[] = [
                     'code' => $code,
-                    'name' => $cat['category_name'],
+                    'name' => $cat->categoryName,
                     'costsAmount' => round($costsAmt, 2),
                     'stornoAmount' => round($stornoAmt, 2),
                     'netAmount' => round($net, 2),
@@ -174,159 +176,6 @@ final readonly class UnitExtendedQuery
         $items = \array_slice($items, 0, $limit);
 
         return ['items' => $items, 'totals' => $totals];
-    }
-
-    /**
-     * @return array<string, array<string, mixed>> listingId → row
-     */
-    private function fetchSales(string $companyId, ?string $marketplace, string $periodFrom, string $periodTo): array
-    {
-        $mpFilter = $marketplace !== null ? 'AND s.marketplace = :marketplace' : '';
-
-        $rows = $this->connection->fetchAllAssociative(
-            <<<SQL
-            SELECT
-                s.listing_id,
-                l.name                AS listing_title,
-                l.marketplace_sku     AS listing_sku,
-                l.marketplace         AS listing_marketplace,
-                SUM(s.total_revenue)  AS revenue,
-                SUM(s.quantity)       AS quantity,
-                SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.cost_price * s.quantity ELSE 0 END) AS cost_price_total,
-                SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.quantity ELSE 0 END) AS cost_price_quantity
-            FROM marketplace_sales s
-            JOIN marketplace_listings l ON l.id = s.listing_id
-            WHERE s.company_id = :companyId
-              AND s.sale_date >= :periodFrom
-              AND s.sale_date <= :periodTo
-              {$mpFilter}
-            GROUP BY s.listing_id, l.name, l.marketplace_sku, l.marketplace
-            SQL,
-            array_filter([
-                'companyId' => $companyId,
-                'periodFrom' => $periodFrom,
-                'periodTo' => $periodTo,
-                'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
-        );
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[$row['listing_id']] = $row;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array<string, array<string, mixed>> listingId → row
-     */
-    private function fetchReturns(string $companyId, ?string $marketplace, string $periodFrom, string $periodTo): array
-    {
-        $mpFilter = $marketplace !== null ? 'AND r.marketplace = :marketplace' : '';
-
-        $rows = $this->connection->fetchAllAssociative(
-            <<<SQL
-            SELECT
-                r.listing_id,
-                SUM(r.refund_amount) AS returns_total,
-                SUM(r.quantity)      AS returns_quantity
-            FROM marketplace_returns r
-            WHERE r.company_id = :companyId
-              AND r.return_date >= :periodFrom
-              AND r.return_date <= :periodTo
-              {$mpFilter}
-            GROUP BY r.listing_id
-            SQL,
-            array_filter([
-                'companyId' => $companyId,
-                'periodFrom' => $periodFrom,
-                'periodTo' => $periodTo,
-                'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
-        );
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[$row['listing_id']] = $row;
-        }
-
-        return $result;
-    }
-
-    /**
-     * @return array<string, list<array<string, mixed>>> listingId → list of category rows
-     */
-    private function fetchCosts(string $companyId, ?string $marketplace, string $periodFrom, string $periodTo): array
-    {
-        $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
-
-        $rows = $this->connection->fetchAllAssociative(
-            <<<SQL
-            SELECT
-                c.listing_id,
-                cc.code                                                        AS category_code,
-                cc.name                                                        AS category_name,
-                SUM(c.amount)                                                  AS net_amount,
-                SUM(CASE WHEN c.amount > 0 THEN c.amount ELSE 0 END)         AS costs_amount,
-                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END)   AS storno_amount
-            FROM marketplace_costs c
-            JOIN marketplace_cost_categories cc ON cc.id = c.category_id
-            WHERE c.company_id = :companyId
-              AND c.cost_date >= :periodFrom
-              AND c.cost_date <= :periodTo
-              AND c.listing_id IS NOT NULL
-              {$mpFilter}
-            GROUP BY c.listing_id, cc.code, cc.name
-            SQL,
-            array_filter([
-                'companyId' => $companyId,
-                'periodFrom' => $periodFrom,
-                'periodTo' => $periodTo,
-                'marketplace' => $marketplace,
-            ], static fn ($v) => $v !== null),
-        );
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[$row['listing_id']][] = $row;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Fetch listing metadata (title, sku, marketplace) for listings not present in the sales result.
-     *
-     * @param list<string> $listingIds
-     * @return array<string, array{listing_title: string, listing_sku: string, listing_marketplace: string}>
-     */
-    private function fetchListingMeta(array $listingIds): array
-    {
-        if ($listingIds === []) {
-            return [];
-        }
-
-        $rows = $this->connection->fetchAllAssociative(
-            <<<SQL
-            SELECT
-                l.id,
-                l.name           AS listing_title,
-                l.marketplace_sku AS listing_sku,
-                l.marketplace    AS listing_marketplace
-            FROM marketplace_listings l
-            WHERE l.id IN (:ids)
-            SQL,
-            ['ids' => array_values($listingIds)],
-            ['ids' => ArrayParameterType::STRING],
-        );
-
-        $result = [];
-        foreach ($rows as $row) {
-            $result[$row['id']] = $row;
-        }
-
-        return $result;
     }
 
     /**
