@@ -4,6 +4,7 @@ namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
 use App\Finance\Entity\Document;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -16,6 +17,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Index(columns: ['listing_id'], name: 'idx_cost_listing')]
 #[ORM\Index(columns: ['sale_id'], name: 'idx_cost_sale')]
 #[ORM\Index(columns: ['raw_document_id'], name: 'idx_cost_raw_document')]
+#[ORM\Index(columns: ['operation_type'], name: 'idx_cost_operation_type')]
 class MarketplaceCost
 {
     #[ORM\Id]
@@ -68,6 +70,9 @@ class MarketplaceCost
     #[ORM\ManyToOne(targetEntity: Document::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?Document $document = null;
+
+    #[ORM\Column(type: 'string', length: 10, enumType: MarketplaceCostOperationType::class, nullable: true)]
+    private ?MarketplaceCostOperationType $operationType = null;
 
     public function __construct(
         string $id,
@@ -235,6 +240,19 @@ class MarketplaceCost
     {
         $this->document = $document;
         $this->updatedAt = new \DateTimeImmutable();
+        return $this;
+    }
+
+    public function getOperationType(): ?MarketplaceCostOperationType
+    {
+        return $this->operationType;
+    }
+
+    public function setOperationType(?MarketplaceCostOperationType $operationType): self
+    {
+        $this->operationType = $operationType;
+        $this->updatedAt = new \DateTimeImmutable();
+
         return $this;
     }
 }

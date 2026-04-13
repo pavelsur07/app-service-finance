@@ -383,6 +383,18 @@ enum PipelineTrigger: string
 }
 ```
 
+### `src/Marketplace/Enum/MarketplaceCostOperationType.php`
+```php
+enum MarketplaceCostOperationType: string
+{
+    case CHARGE = 'charge';   // Начисление
+    case STORNO = 'storno';   // Сторно
+
+    public function getDisplayName(): string; // Начисление / Сторно
+}
+```
+> Явная классификация операции затраты. Заменяет определение типа по знаку `amount`.
+
 ### `src/MarketplaceAds/Enum/AdRawDocumentStatus.php`
 ```php
 enum AdRawDocumentStatus: string
