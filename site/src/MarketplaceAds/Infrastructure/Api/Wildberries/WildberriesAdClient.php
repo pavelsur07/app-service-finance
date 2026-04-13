@@ -25,9 +25,6 @@ final class WildberriesAdClient implements AdPlatformClientInterface
         return $marketplace === MarketplaceType::WILDBERRIES->value;
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function fetchAdStatistics(string $companyId, \DateTimeImmutable $date): string
     {
         // TODO: реализовать загрузку рекламной статистики Wildberries

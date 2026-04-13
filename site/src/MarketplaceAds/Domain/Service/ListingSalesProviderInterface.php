@@ -10,7 +10,8 @@ interface ListingSalesProviderInterface
      * Bulk-получение количества продаж для набора листингов за дату.
      * Листинги без продаж отсутствуют в результате (caller получает 0 по умолчанию).
      *
-     * @param  string[]           $listingIds
+     * @param string[] $listingIds
+     *
      * @return array<string, int> listingId => количество продаж
      */
     public function getSalesQuantitiesByListings(
@@ -36,7 +37,8 @@ interface ListingSalesProviderInterface
      * для всех переданных parentSku, сгруппированные по parentSku. SKU без листингов в ключах
      * результата отсутствуют.
      *
-     * @param  string[] $parentSkus
+     * @param string[] $parentSkus
+     *
      * @return array<string, list<array{id: string, parentSku: string}>>
      */
     public function findListingsByParentSkus(

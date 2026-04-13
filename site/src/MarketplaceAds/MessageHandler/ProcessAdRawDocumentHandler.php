@@ -27,7 +27,8 @@ final class ProcessAdRawDocumentHandler
         private readonly AdRawDocumentRepository $rawDocumentRepository,
         private readonly ProcessAdRawDocumentAction $processAction,
         private readonly AppLogger $logger,
-    ) {}
+    ) {
+    }
 
     public function __invoke(ProcessAdRawDocumentMessage $message): void
     {
@@ -36,20 +37,20 @@ final class ProcessAdRawDocumentHandler
             $message->companyId,
         );
 
-        if ($rawDocument === null) {
+        if (null === $rawDocument) {
             $this->logger->warning('AdRawDocument не найден при async-обработке', [
-                'companyId'       => $message->companyId,
+                'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
             ]);
 
             return;
         }
 
-        if ($rawDocument->getStatus() !== AdRawDocumentStatus::DRAFT) {
+        if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
             $this->logger->info('AdRawDocument уже обработан, повторный запуск пропущен', [
-                'companyId'       => $message->companyId,
+                'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
-                'status'          => $rawDocument->getStatus()->value,
+                'status' => $rawDocument->getStatus()->value,
             ]);
 
             return;
@@ -64,9 +65,9 @@ final class ProcessAdRawDocumentHandler
             $this->logger->info(
                 'AdRawDocument обработан параллельно или удалён, повтор не нужен',
                 [
-                    'companyId'       => $message->companyId,
+                    'companyId' => $message->companyId,
                     'adRawDocumentId' => $message->adRawDocumentId,
-                    'reason'          => $e->getMessage(),
+                    'reason' => $e->getMessage(),
                 ],
             );
 
@@ -76,7 +77,7 @@ final class ProcessAdRawDocumentHandler
                 'Ошибка обработки AdRawDocument',
                 $e,
                 [
-                    'companyId'       => $message->companyId,
+                    'companyId' => $message->companyId,
                     'adRawDocumentId' => $message->adRawDocumentId,
                 ],
             );

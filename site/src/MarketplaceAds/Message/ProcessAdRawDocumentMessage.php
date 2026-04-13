@@ -15,5 +15,6 @@ final readonly class ProcessAdRawDocumentMessage
     public function __construct(
         public string $companyId,
         public string $adRawDocumentId,
-    ) {}
+    ) {
+    }
 }

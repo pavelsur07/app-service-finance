@@ -24,7 +24,7 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
     public function findByIdAndCompany(string $id, string $companyId): ?AdRawDocument
     {
         return $this->findOneBy([
-            'id'        => $id,
+            'id' => $id,
             'companyId' => $companyId,
         ]);
     }
@@ -35,9 +35,9 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
         \DateTimeImmutable $reportDate,
     ): ?AdRawDocument {
         return $this->findOneBy([
-            'companyId'   => $companyId,
+            'companyId' => $companyId,
             'marketplace' => $marketplace,
-            'reportDate'  => $reportDate,
+            'reportDate' => $reportDate,
         ]);
     }
 
@@ -70,15 +70,15 @@ final class AdRawDocumentRepository extends ServiceEntityRepository
     ): array {
         $qb = $this->createQueryBuilder('r')->orderBy('r.reportDate', 'DESC');
 
-        if ($companyId !== null) {
+        if (null !== $companyId) {
             $qb->andWhere('r.companyId = :companyId')->setParameter('companyId', $companyId);
         }
 
-        if ($marketplace !== null) {
+        if (null !== $marketplace) {
             $qb->andWhere('r.marketplace = :marketplace')->setParameter('marketplace', $marketplace);
         }
 
-        if ($reportDate !== null) {
+        if (null !== $reportDate) {
             $qb->andWhere('r.reportDate = :reportDate')->setParameter('reportDate', $reportDate);
         }
 

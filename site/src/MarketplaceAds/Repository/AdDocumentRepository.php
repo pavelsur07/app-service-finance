@@ -23,7 +23,7 @@ final class AdDocumentRepository extends ServiceEntityRepository
     public function findByIdAndCompany(string $id, string $companyId): ?AdDocument
     {
         return $this->findOneBy([
-            'id'        => $id,
+            'id' => $id,
             'companyId' => $companyId,
         ]);
     }

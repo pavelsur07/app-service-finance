@@ -139,6 +139,28 @@ updatePLRegisterForDocument(string $documentId): void
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
 
+### `MarketplaceAdsFacade` (`src/MarketplaceAds/Facade/MarketplaceAdsFacade.php`)
+```php
+// Рекламные затраты, распределённые на листинг за одну дату.
+// Каждый элемент = одна кампания, атрибутированная листингу по доле продаж.
+// @return AdCostForListingDTO[]
+getAdCostsForListingAndDate(
+    string $companyId,
+    string $listingId,
+    \DateTimeImmutable $date,
+): array
+
+// Суммарные рекламные затраты компании за период.
+// $marketplace = MarketplaceType::value ('wildberries', 'ozon') или null (все).
+// Возвращает decimal-строку, например "4567.89"; "0" если данных нет.
+getTotalAdCostForPeriod(
+    string $companyId,
+    \DateTimeImmutable $dateFrom,
+    \DateTimeImmutable $dateTo,
+    ?string $marketplace = null,
+): string
+```
+
 ### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)
 ```php
 // Юнит-экономика по листингам за период
@@ -405,6 +427,8 @@ App\Shared\Service\SecretRotationService
 | `app.balance.value_provider` | Провайдеры значений баланса |
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
+| `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |
+| `marketplace_ads.platform_client` | API-клиенты рекламных площадок (OzonAdClient, WildberriesAdClient) |
 
 ---
 
@@ -535,3 +559,4 @@ paths:
 | 1.2 | 2026-04-10 | Marketplace: автозапуск daily pipeline после загрузки sales_report. Новый Message `ProcessDayReportMessage` (companyId, rawDocumentId) → `ProcessDayReportHandler` сбрасывает статус конкретного документа и диспатчит `ProcessRawDocumentStepMessage` для каждого шага. SyncWb/OzonReportHandler диспатчат `ProcessDayReportMessage` после успешной загрузки. |
 | 1.3 | 2026-04-12 | MarketplaceAds: новый модуль обработки рекламных отчётов. Entity: `AdRawDocument` (raw JSONB + status DRAFT/PROCESSED), `AdDocument` (кампания × parent SKU за дату), `AdDocumentLine` (распределение на листинг). Domain Port `ListingSalesProviderInterface` с bulk `getSalesQuantitiesByListings` + реализация `ListingSalesProviderMarketplace` через Facade. Domain `AdCostDistributor`: распределение bcmath, при 0 продажах — равномерно, поправка округления на максимальную долю. В `MarketplaceFacade` добавлены `findListingsByMarketplaceSku` (без фильтра `is_active`, для исторических отчётов) и `getSalesQuantitiesForListings` (bulk GROUP BY, убирает N+1). |
 | 1.4 | 2026-04-12 | MarketplaceAds: `ProcessAdRawDocumentAction` — загрузка AdRawDocument (DRAFT) и конвертация в AdDocument + AdDocumentLine. Идемпотентность через `deleteByRawDocumentId`, частичный успех оставляет статус DRAFT. Bulk-prefetch листингов и продаж на уровне Action (2 запроса на документ), `AdCostDistributor` стал чистой функцией без DI. В `MarketplaceFacade` добавлен `findListingsByMarketplaceSkus` (bulk, сгруппирован по parentSku), в `ListingSalesProviderInterface` — `findListingsByParentSkus`. |
+| 1.5 | 2026-04-13 | MarketplaceAds: CLI-обвязка + Messenger-пайплайн (`marketplace-ads:load`, `marketplace-ads:reprocess`, `ProcessAdRawDocumentMessage`, `ProcessAdRawDocumentHandler`). Batch-flush в Load (единый flush по всему проходу), guardrails в Reprocess (--all / хотя бы один фильтр, batch clear BATCH_SIZE=50). `MarketplaceAdsFacade` — публичный API модуля: `getAdCostsForListingAndDate`, `getTotalAdCostForPeriod`. `AdDocumentQuery` — DBAL-запросы к `marketplace_ad_documents` JOIN `marketplace_ad_document_lines`. `AdCostForListingDTO` для передачи распределённых данных между модулями. |

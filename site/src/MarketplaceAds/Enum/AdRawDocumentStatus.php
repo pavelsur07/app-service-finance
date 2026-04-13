@@ -22,6 +22,6 @@ enum AdRawDocumentStatus: string
 
     public function isDraft(): bool
     {
-        return $this === self::DRAFT;
+        return self::DRAFT === $this;
     }
 }

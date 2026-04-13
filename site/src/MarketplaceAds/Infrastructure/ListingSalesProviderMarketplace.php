@@ -11,11 +11,9 @@ final readonly class ListingSalesProviderMarketplace implements ListingSalesProv
 {
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
-    ) {}
+    ) {
+    }
 
-    /**
-     * {@inheritdoc}
-     */
     public function getSalesQuantitiesByListings(
         string $companyId,
         array $listingIds,
@@ -38,9 +36,6 @@ final readonly class ListingSalesProviderMarketplace implements ListingSalesProv
         return $this->marketplaceFacade->findListingsByMarketplaceSku($companyId, $marketplace, $parentSku);
     }
 
-    /**
-     * {@inheritdoc}
-     */
     public function findListingsByParentSkus(
         string $companyId,
         string $marketplace,
