@@ -21,7 +21,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000001';
     private const OWNER_ID   = '22222222-2222-2222-2222-000000000001';
 
-    public function testProcessesOzonRawDocumentAndCreatesAdDocuments(): void
+    public function testProcessesRawDocumentAndCreatesAdDocuments(): void
     {
         $company = $this->seedCompany();
         $this->seedListing($company, 'SKU-PARENT-1', 'L', '55555555-5555-5555-5555-000000000001');
@@ -64,7 +64,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         self::assertSame('100.00', $sumCost);
     }
 
-    public function testPartialProcessingLeavesDocumentInDraftWhenSomeSkusNotFound(): void
+    public function testSkipsUnknownSkuAndLeavesRawDocumentInDraft(): void
     {
         $company = $this->seedCompany();
         $this->seedListing($company, 'SKU-KNOWN', 'UNKNOWN', '55555555-5555-5555-5555-000000000010');
@@ -127,7 +127,7 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         self::assertSame('CAMP-OK', $adDocuments[0]->getCampaignId());
     }
 
-    public function testIdempotentReprocessDeletesPreviousAdDocuments(): void
+    public function testIdempotentReprocessing(): void
     {
         $company = $this->seedCompany();
         $this->seedListing($company, 'SKU-IDEM', 'UNKNOWN', '55555555-5555-5555-5555-000000000020');
