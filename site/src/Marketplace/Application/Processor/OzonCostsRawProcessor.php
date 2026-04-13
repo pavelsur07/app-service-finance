@@ -11,6 +11,7 @@ use App\Marketplace\Application\Service\OzonListingEnsureService;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
@@ -153,22 +154,27 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
             // ClientReturnAgentOperation — финансовый возврат покупателю.
             // Сам возврат обрабатывается в OzonReturnsRawProcessor.
-            // Но sale_commission > 0 = возврат комиссии продавцу — это уменьшение затрат.
+            // Но sale_commission > 0 = возврат комиссии продавцу — сторно начисленной комиссии.
             if (($op['operation_type'] ?? '') === 'ClientReturnAgentOperation') {
                 $returnCommission = (float) ($op['sale_commission'] ?? 0);
                 if ($returnCommission > 0) {
-                    $operationId   = (string) ($op['operation_id'] ?? '');
-                    $operationDate = new \DateTimeImmutable($op['operation_date']);
-                    // Отрицательная затрата — уменьшает комиссию
+                    $operationId = (string) ($op['operation_id'] ?? '');
+                    try {
+                        $operationDate = new \DateTimeImmutable($op['operation_date']);
+                    } catch (\Throwable) {
+                        continue;
+                    }
+                    // Положительная сумма + operation_type = STORNO
                     $allEntries[] = [
                         'entry' => [
-                            'external_id'   => $operationId . '_commission_return',
-                            'category_code' => 'ozon_sale_commission',
-                            'category_name' => 'Комиссия Ozon за продажу',
-                            'amount'        => (string) (-$returnCommission),
-                            'cost_date'     => $operationDate,
-                            'description'   => 'Возврат комиссии Ozon',
-                            '_item_idx'     => 0,
+                            'external_id'    => $operationId . '_commission_return',
+                            'category_code'  => 'ozon_sale_commission',
+                            'category_name'  => 'Комиссия Ozon за продажу',
+                            'amount'         => (string) abs($returnCommission),
+                            'cost_date'      => $operationDate,
+                            'description'    => 'Возврат комиссии Ozon',
+                            'operation_type' => MarketplaceCostOperationType::STORNO,
+                            '_item_idx'      => 0,
                         ],
                         'listingId' => null,
                     ];
@@ -232,6 +238,7 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $cost->setCostDate($entry['cost_date']);
             $cost->setAmount($entry['amount']);
             $cost->setDescription($entry['description']);
+            $cost->setOperationType($entry['operation_type']);
 
             if ($row['listingId']) {
                 $cost->setListing($this->em->getReference(MarketplaceListing::class, $row['listingId']));
@@ -253,24 +260,25 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $entries = [];
 
         // 1. Комиссия
-        // sale_commission < 0 — обычная комиссия (затрата, берём abs → положительная)
-        // sale_commission > 0 — возврат/корректировка комиссии продавцу (уменьшение затрат → отрицательная)
+        // sale_commission < 0 — обычная комиссия (затрата) → CHARGE
+        // sale_commission > 0 — возврат/корректировка комиссии продавцу → STORNO
+        // Сумма в обоих случаях сохраняется по модулю (положительная),
+        // знак операции передаётся через operation_type.
         $rawCommission = (float) ($op['sale_commission'] ?? 0);
         if (abs($rawCommission) > 0.001) {
-            $commissionAmount = $rawCommission < 0
-                ? abs($rawCommission)
-                : -$rawCommission;
-
             $entries[] = [
-                'external_id'   => $operationId . '_commission',
-                'category_code' => 'ozon_sale_commission',
-                'category_name' => 'Комиссия Ozon за продажу',
-                'amount'        => (string) $commissionAmount,
-                'cost_date'     => $operationDate,
-                'description'   => $rawCommission > 0
+                'external_id'    => $operationId . '_commission',
+                'category_code'  => 'ozon_sale_commission',
+                'category_name'  => 'Комиссия Ozon за продажу',
+                'amount'         => (string) abs($rawCommission),
+                'cost_date'      => $operationDate,
+                'description'    => $rawCommission > 0
                     ? 'Возврат комиссии Ozon (корректировка)'
                     : 'Комиссия за продажу Ozon',
-                '_item_idx'     => 0,
+                'operation_type' => $rawCommission > 0
+                    ? MarketplaceCostOperationType::STORNO
+                    : MarketplaceCostOperationType::CHARGE,
+                '_item_idx'      => 0,
             ];
         }
 
@@ -278,13 +286,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $delivery = abs((float) ($op['delivery_charge'] ?? 0));
         if ($delivery > 0) {
             $entries[] = [
-                'external_id'   => $operationId . '_delivery',
-                'category_code' => 'ozon_delivery',
-                'category_name' => 'Доставка Ozon',
-                'amount'        => (string) $delivery,
-                'cost_date'     => $operationDate,
-                'description'   => 'Доставка Ozon',
-                '_item_idx'     => 0,
+                'external_id'    => $operationId . '_delivery',
+                'category_code'  => 'ozon_delivery',
+                'category_name'  => 'Доставка Ozon',
+                'amount'         => (string) $delivery,
+                'cost_date'      => $operationDate,
+                'description'    => 'Доставка Ozon',
+                'operation_type' => MarketplaceCostOperationType::CHARGE,
+                '_item_idx'      => 0,
             ];
         }
 
@@ -292,13 +301,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         $returnDelivery = abs((float) ($op['return_delivery_charge'] ?? 0));
         if ($returnDelivery > 0) {
             $entries[] = [
-                'external_id'   => $operationId . '_return_delivery',
-                'category_code' => 'ozon_return_delivery',
-                'category_name' => 'Обратная доставка Ozon',
-                'amount'        => (string) $returnDelivery,
-                'cost_date'     => $operationDate,
-                'description'   => 'Обратная доставка Ozon',
-                '_item_idx'     => 0,
+                'external_id'    => $operationId . '_return_delivery',
+                'category_code'  => 'ozon_return_delivery',
+                'category_name'  => 'Обратная доставка Ozon',
+                'amount'         => (string) $returnDelivery,
+                'cost_date'      => $operationDate,
+                'description'    => 'Обратная доставка Ozon',
+                'operation_type' => MarketplaceCostOperationType::CHARGE,
+                '_item_idx'      => 0,
             ];
         }
 
@@ -322,23 +332,26 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            // Положительный price = возврат затрат (напр. возврат эквайринга при возврате покупателя)
-            // Сохраняем отрицательный знак чтобы уменьшать затраты
-            if ($servicePrice > 0) {
-                $serviceAmount = -$serviceAmount;
-            }
+            // Положительный price = возврат/корректировка услуги (напр. возврат эквайринга
+            // при возврате покупателя) → STORNO.
+            // Отрицательный price = обычная услуга (затрата) → CHARGE.
+            // Сумма всегда по модулю, знак передаётся через operation_type.
+            $serviceOpType = $servicePrice > 0
+                ? MarketplaceCostOperationType::STORNO
+                : MarketplaceCostOperationType::CHARGE;
 
             $categoryCode = $this->resolveServiceCategoryCode($serviceName);
 
             if ($itemCount === 1) {
                 $entries[] = [
-                    'external_id'   => $operationId . '_svc_' . $svcIdx,
-                    'category_code' => $categoryCode,
-                    'category_name' => $this->resolveCategoryName($categoryCode),
-                    'amount'        => (string) $serviceAmount,
-                    'cost_date'     => $operationDate,
-                    'description'   => $serviceName,
-                    '_item_idx'     => 0,
+                    'external_id'    => $operationId . '_svc_' . $svcIdx,
+                    'category_code'  => $categoryCode,
+                    'category_name'  => $this->resolveCategoryName($categoryCode),
+                    'amount'         => (string) $serviceAmount,
+                    'cost_date'      => $operationDate,
+                    'description'    => $serviceName,
+                    'operation_type' => $serviceOpType,
+                    '_item_idx'      => 0,
                 ];
             } else {
                 // Multi-SKU: делим поровну
@@ -351,13 +364,14 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     $distributed += $perItem;
 
                     $entries[] = [
-                        'external_id'   => $operationId . '_svc_' . $svcIdx . '_item_' . $itemIdx,
-                        'category_code' => $categoryCode,
-                        'category_name' => $this->resolveCategoryName($categoryCode),
-                        'amount'        => (string) $amount,
-                        'cost_date'     => $operationDate,
-                        'description'   => $serviceName,
-                        '_item_idx'     => $itemIdx,
+                        'external_id'    => $operationId . '_svc_' . $svcIdx . '_item_' . $itemIdx,
+                        'category_code'  => $categoryCode,
+                        'category_name'  => $this->resolveCategoryName($categoryCode),
+                        'amount'         => (string) $amount,
+                        'cost_date'      => $operationDate,
+                        'description'    => $serviceName,
+                        'operation_type' => $serviceOpType,
+                        '_item_idx'      => $itemIdx,
                     ];
                 }
             }
@@ -373,14 +387,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             // Пропускаем только продажи (не затраты)
             if ($opAmount > 0.001 && $opType !== 'orders') {
                 if ($opType === 'compensation') {
-                    // Компенсации: принудительно ozon_compensation, сохраняем оригинальный знак.
-                    // Положительный amount = компенсация от Ozon (доход)
-                    // Отрицательный amount = декомпенсация (расход)
-                    // NB: Знак НЕ инвертирован (в отличие от services[]):
-                    // в API положительный amount = доход, отрицательный = расход.
-                    // Сохраняем as-is чтобы SUM(amount) совпадал с xlsx net для сверки.
-                    $categoryCode = 'ozon_compensation';
-                    $storedAmount = $rawAmount;
+                    // Компенсации: разделяем по знаку исходного amount на две разные категории.
+                    // rawAmount >= 0 = компенсация от Ozon (доход продавца) → ozon_compensation → STORNO
+                    // rawAmount  < 0 = декомпенсация (Ozon списывает с продавца) → ozon_decompensation → CHARGE
+                    // Сумма всегда по модулю; знак кодируется через operation_type.
+                    $categoryCode = $rawAmount >= 0 ? 'ozon_compensation' : 'ozon_decompensation';
+                    $storedAmount = $opAmount;
                 } else {
                     $operationType = $op['operation_type'] ?? '';
                     $categoryCode  = $this->resolveServiceCategoryCode($operationType);
@@ -388,13 +400,16 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 }
 
                 $entries[] = [
-                    'external_id'   => $operationId . '_main',
-                    'category_code' => $categoryCode,
-                    'category_name' => $this->resolveCategoryName($categoryCode),
-                    'amount'        => (string) $storedAmount,
-                    'cost_date'     => $operationDate,
-                    'description'   => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
-                    '_item_idx'     => 0,
+                    'external_id'    => $operationId . '_main',
+                    'category_code'  => $categoryCode,
+                    'category_name'  => $this->resolveCategoryName($categoryCode),
+                    'amount'         => (string) $storedAmount,
+                    'cost_date'      => $operationDate,
+                    'description'    => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
+                    'operation_type' => $rawAmount > 0
+                        ? MarketplaceCostOperationType::STORNO
+                        : MarketplaceCostOperationType::CHARGE,
+                    '_item_idx'      => 0,
                 ];
             }
         }
