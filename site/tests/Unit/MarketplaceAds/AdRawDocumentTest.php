@@ -17,12 +17,12 @@ final class AdRawDocumentTest extends TestCase
         self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
 
         $updatedAtBefore = $doc->getUpdatedAt();
-        // Даём секунде проскочить, чтобы сравнение updatedAt не было идентичным.
-        usleep(1000);
 
         $doc->markAsProcessed();
 
         self::assertSame(AdRawDocumentStatus::PROCESSED, $doc->getStatus());
+        // updatedAt не должен сдвигаться назад; равенство допустимо, если вызовы
+        // произошли в одну и ту же микросекунду (юнит-тест без клока).
         self::assertGreaterThanOrEqual($updatedAtBefore, $doc->getUpdatedAt());
     }
 
