@@ -148,8 +148,6 @@ services:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
 
-    App\Marketplace\Application\ProcessOzonCostsAction: ~
-
     App\Marketplace\Application\Processor\WbCostsRawProcessor:
         arguments:
             $costCalculators: !tagged_iterator app.marketplace.cost_calculator
