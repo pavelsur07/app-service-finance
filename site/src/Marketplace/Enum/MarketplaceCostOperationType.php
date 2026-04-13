@@ -8,4 +8,12 @@ enum MarketplaceCostOperationType: string
 {
     case CHARGE = 'charge';
     case STORNO = 'storno';
+
+    public function getDisplayName(): string
+    {
+        return match ($this) {
+            self::CHARGE => 'Начисление',
+            self::STORNO => 'Сторно',
+        };
+    }
 }

@@ -103,6 +103,7 @@ Doctrine генерирует proxy-класс наследованием от E
 - `class` — Entity
 - `final class` — Builder, Action, Policy, Controller, Facade, Repository, Query, Handler
 - `final readonly class` — DTO, Message, stateless-сервисы
+- `enum` — без `final`. PHP enum'ы implicitly final, `final enum` — синтаксическая ошибка.
 
 ### Entity — новые модули
 - UUID v7: `Uuid::uuid7()->toString()` — генерируется в **конструкторе Entity**
