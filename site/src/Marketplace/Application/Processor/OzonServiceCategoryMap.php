@@ -214,7 +214,9 @@ final class OzonServiceCategoryMap
 
         // Коды, генерируемые в OzonCostsRawProcessor::extractCostEntries() напрямую
         // + ozon_other_service — fallback для неизвестных service names
-        // + ozon_compensation / ozon_decompensation — принудительно для opType=compensation
+        // + ozon_compensation — принудительно для opType=compensation
+        // + ozon_decompensation — sibling для будущего разделения по знаку amount
+        //   (OzonCostsRawProcessor пока не эмитирует, заведён как известная категория заранее)
         foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery', 'ozon_other_service', 'ozon_compensation', 'ozon_decompensation'] as $extra) {
             if (!isset($codes[$extra])) {
                 $codes[$extra] = self::getCategoryName($extra);
