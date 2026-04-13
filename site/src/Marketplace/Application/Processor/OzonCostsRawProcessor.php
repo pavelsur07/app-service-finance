@@ -158,8 +158,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             if (($op['operation_type'] ?? '') === 'ClientReturnAgentOperation') {
                 $returnCommission = (float) ($op['sale_commission'] ?? 0);
                 if ($returnCommission > 0) {
-                    $operationId   = (string) ($op['operation_id'] ?? '');
-                    $operationDate = new \DateTimeImmutable($op['operation_date']);
+                    $operationId = (string) ($op['operation_id'] ?? '');
+                    try {
+                        $operationDate = new \DateTimeImmutable($op['operation_date']);
+                    } catch (\Throwable) {
+                        continue;
+                    }
                     // Положительная сумма + operation_type = STORNO
                     $allEntries[] = [
                         'entry' => [
@@ -384,10 +388,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             if ($opAmount > 0.001 && $opType !== 'orders') {
                 if ($opType === 'compensation') {
                     // Компенсации: разделяем по знаку исходного amount на две разные категории.
-                    // rawAmount >= 0 = компенсация от Ozon (доход продавца) → ozon_compensation
-                    // rawAmount  < 0 = декомпенсация (Ozon списывает с продавца) → ozon_decompensation
-                    // Сумма всегда по модулю, тип операции — CHARGE (это фактическое
-                    // начисление/списание, а не сторно).
+                    // rawAmount >= 0 = компенсация от Ozon (доход продавца) → ozon_compensation → STORNO
+                    // rawAmount  < 0 = декомпенсация (Ozon списывает с продавца) → ozon_decompensation → CHARGE
+                    // Сумма всегда по модулю; знак кодируется через operation_type.
                     $categoryCode = $rawAmount >= 0 ? 'ozon_compensation' : 'ozon_decompensation';
                     $storedAmount = $opAmount;
                 } else {
@@ -403,7 +406,9 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                     'amount'         => (string) $storedAmount,
                     'cost_date'      => $operationDate,
                     'description'    => $op['operation_type_name'] ?? ($op['operation_type'] ?? ''),
-                    'operation_type' => MarketplaceCostOperationType::CHARGE,
+                    'operation_type' => $rawAmount > 0
+                        ? MarketplaceCostOperationType::STORNO
+                        : MarketplaceCostOperationType::CHARGE,
                     '_item_idx'      => 0,
                 ];
             }

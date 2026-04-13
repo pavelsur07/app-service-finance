@@ -317,7 +317,7 @@ final class OzonCostsRawProcessorTest extends TestCase
         self::assertNotNull($entry, 'Положительная компенсация → ozon_compensation');
         self::assertGreaterThan(0, (float) $entry['amount']);
         self::assertEqualsWithDelta(250.00, (float) $entry['amount'], 0.001);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entry['operation_type']);
         self::assertNull($this->findEntry($entries, 'ozon_decompensation'));
     }
 
