@@ -58,15 +58,38 @@ final class ReconciliationCategoryBreakdownController extends AbstractController
         $periodTo   = $session->getPeriodTo()->format('Y-m-d');
         $marketplace = $session->getMarketplace();
 
-        // Суммы по каждому category_code
+        // Суммы по каждому category_code.
+        // net_amount / costs_amount / storno_amount — по operation_type с fallback на знак amount.
+        // Тот же паттерн что в CostsVerifyQuery / CostReconciliationQuery и др.
         $rows = $this->connection->fetchAllAssociative(
             <<<'SQL'
             SELECT
-                cc.code                                                    AS category_code,
-                cc.name                                                    AS category_name,
-                SUM(c.amount)                                              AS net_amount,
-                SUM(CASE WHEN c.amount > 0 THEN c.amount  ELSE 0 END)     AS costs_amount,
-                SUM(CASE WHEN c.amount < 0 THEN ABS(c.amount) ELSE 0 END) AS storno_amount
+                cc.code                                                         AS category_code,
+                cc.name                                                         AS category_name,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN -ABS(c.amount)
+                    ELSE ABS(c.amount)
+                END)                                                            AS net_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN 0
+                    ELSE ABS(c.amount)
+                END)                                                            AS costs_amount,
+                SUM(CASE
+                    WHEN (CASE
+                            WHEN c.operation_type IS NOT NULL THEN (c.operation_type = 'storno')
+                            ELSE (c.amount < 0)
+                         END)
+                    THEN ABS(c.amount)
+                    ELSE 0
+                END)                                                            AS storno_amount
             FROM marketplace_costs c
             INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
             WHERE c.company_id  = :companyId
