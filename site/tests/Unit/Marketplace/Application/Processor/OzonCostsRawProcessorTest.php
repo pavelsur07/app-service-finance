@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Marketplace\Application\Processor\OzonCostsRawProcessor;
 use App\Marketplace\Application\Processor\OzonServiceCategoryMap;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use PHPUnit\Framework\TestCase;
@@ -14,9 +15,10 @@ use Psr\Log\NullLogger;
 /**
  * Тесты знакового соглашения OzonCostsRawProcessor.
  *
- * Знаковое соглашение MarketplaceCost.amount:
- *   > 0 — затрата (расход продавца: комиссия, логистика, хранение, реклама)
- *   < 0 — сторно/возврат от маркетплейса (уменьшение затрат: возврат комиссии, возврат эквайринга)
+ * Знаковое соглашение MarketplaceCost.amount / operation_type:
+ *   amount всегда положительная (по модулю);
+ *   operation_type = CHARGE  — обычное начисление (комиссия, логистика, хранение, реклама);
+ *   operation_type = STORNO  — сторно/возврат от маркетплейса (возврат комиссии, возврат эквайринга).
  *
  * Эти тесты ловят регрессию если знаковая логика в процессоре изменится.
  */
@@ -59,9 +61,9 @@ final class OzonCostsRawProcessorTest extends TestCase
     // -------------------------------------------------------------------------
 
     /**
-     * Обычная комиссия sale_commission < 0 → затрата → amount > 0.
+     * Обычная комиссия sale_commission < 0 → затрата → amount > 0, operation_type = CHARGE.
      */
-    public function testSaleCommissionNegativeProducesPositiveAmount(): void
+    public function testSaleCommissionNegativeProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1001',
@@ -81,12 +83,13 @@ final class OzonCostsRawProcessorTest extends TestCase
         self::assertNotNull($commission, 'Комиссия должна создать запись');
         self::assertGreaterThan(0, (float) $commission['amount'], 'Затрата: amount > 0');
         self::assertEqualsWithDelta(150.50, (float) $commission['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $commission['operation_type']);
     }
 
     /**
-     * Корректировка комиссии sale_commission > 0 → сторно → amount < 0.
+     * Корректировка комиссии sale_commission > 0 → сторно → amount > 0, operation_type = STORNO.
      */
-    public function testSaleCommissionPositiveProducesNegativeAmount(): void
+    public function testSaleCommissionPositiveProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1002',
@@ -104,14 +107,16 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
         self::assertNotNull($commission, 'Корректировка комиссии должна создать запись');
-        self::assertLessThan(0, (float) $commission['amount'], 'Сторно: amount < 0');
-        self::assertEqualsWithDelta(-75.00, (float) $commission['amount'], 0.001);
+        self::assertGreaterThan(0, (float) $commission['amount'], 'Сторно: amount > 0 (сумма по модулю)');
+        self::assertEqualsWithDelta(75.00, (float) $commission['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $commission['operation_type']);
     }
 
     /**
-     * ClientReturnAgentOperation с sale_commission > 0 → возврат комиссии при возврате покупателя → amount < 0.
+     * ClientReturnAgentOperation с sale_commission > 0 → возврат комиссии при возврате покупателя.
+     * amount > 0, operation_type = STORNO.
      */
-    public function testClientReturnCommissionProducesNegativeAmount(): void
+    public function testClientReturnCommissionProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1003',
@@ -129,9 +134,10 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         $commission = $this->findEntry($entries, 'ozon_sale_commission');
         self::assertNotNull($commission, 'Возврат комиссии должен создать запись');
-        self::assertLessThan(0, (float) $commission['amount'], 'Возврат комиссии: amount < 0');
-        self::assertEqualsWithDelta(-200.00, (float) $commission['amount'], 0.001);
+        self::assertGreaterThan(0, (float) $commission['amount'], 'Возврат комиссии: amount > 0');
+        self::assertEqualsWithDelta(200.00, (float) $commission['amount'], 0.001);
         self::assertStringContainsString('_commission_return', $commission['external_id']);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $commission['operation_type']);
     }
 
     /**
@@ -157,9 +163,9 @@ final class OzonCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * Доставка delivery_charge → затрата → amount > 0.
+     * Доставка delivery_charge → затрата → amount > 0, operation_type = CHARGE.
      */
-    public function testDeliveryChargeProducesPositiveAmount(): void
+    public function testDeliveryChargeProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1005',
@@ -179,12 +185,13 @@ final class OzonCostsRawProcessorTest extends TestCase
         self::assertNotNull($delivery);
         self::assertGreaterThan(0, (float) $delivery['amount'], 'Доставка: amount > 0');
         self::assertEqualsWithDelta(55.00, (float) $delivery['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $delivery['operation_type']);
     }
 
     /**
-     * services[] с price < 0 → затрата → amount > 0.
+     * services[] с price < 0 → затрата → amount > 0, operation_type = CHARGE.
      */
-    public function testServiceNegativePriceProducesPositiveAmount(): void
+    public function testServiceNegativePriceProducesChargeEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1006',
@@ -206,12 +213,13 @@ final class OzonCostsRawProcessorTest extends TestCase
         self::assertNotNull($storage);
         self::assertGreaterThan(0, (float) $storage['amount'], 'Хранение: amount > 0');
         self::assertEqualsWithDelta(120.00, (float) $storage['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $storage['operation_type']);
     }
 
     /**
-     * services[] с price > 0 → возврат услуги → amount < 0.
+     * services[] с price > 0 → возврат услуги → amount > 0, operation_type = STORNO.
      */
-    public function testServicePositivePriceProducesNegativeAmount(): void
+    public function testServicePositivePriceProducesStornoEntry(): void
     {
         $entries = $this->extractEntries([
             'operation_id'        => '1007',
@@ -231,8 +239,9 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         $acquiring = $this->findEntry($entries, 'ozon_acquiring');
         self::assertNotNull($acquiring);
-        self::assertLessThan(0, (float) $acquiring['amount'], 'Возврат эквайринга: amount < 0');
-        self::assertEqualsWithDelta(-30.00, (float) $acquiring['amount'], 0.001);
+        self::assertGreaterThan(0, (float) $acquiring['amount'], 'Возврат эквайринга: amount > 0 (сумма по модулю)');
+        self::assertEqualsWithDelta(30.00, (float) $acquiring['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $acquiring['operation_type']);
     }
 
     /**
@@ -260,7 +269,7 @@ final class OzonCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * Операция без services[] → amount берётся из op['amount'] → затрата → amount > 0.
+     * Операция без services[] → amount берётся из op['amount'] → затрата → amount > 0, CHARGE.
      */
     public function testOperationWithoutServicesUsesOpAmount(): void
     {
@@ -282,6 +291,61 @@ final class OzonCostsRawProcessorTest extends TestCase
         self::assertNotNull($cpc);
         self::assertGreaterThan(0, (float) $cpc['amount'], 'CPC: amount > 0');
         self::assertEqualsWithDelta(500.00, (float) $cpc['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $cpc['operation_type']);
+    }
+
+    /**
+     * Компенсация с положительным amount → ozon_compensation, CHARGE, amount > 0.
+     */
+    public function testCompensationPositiveAmountGoesToCompensation(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '1011',
+            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_type_name' => 'Компенсация',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 250.00,
+            'type'                => 'compensation',
+            'items'               => [],
+            'services'            => [],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_compensation');
+        self::assertNotNull($entry, 'Положительная компенсация → ozon_compensation');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(250.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+        self::assertNull($this->findEntry($entries, 'ozon_decompensation'));
+    }
+
+    /**
+     * Компенсация с отрицательным amount → ozon_decompensation, CHARGE, amount > 0 (по модулю).
+     */
+    public function testCompensationNegativeAmountGoesToDecompensation(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '1012',
+            'operation_type'      => 'MarketplaceSellerCompensationOperation',
+            'operation_type_name' => 'Декомпенсация',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => -180.00,
+            'type'                => 'compensation',
+            'items'               => [],
+            'services'            => [],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_decompensation');
+        self::assertNotNull($entry, 'Отрицательная компенсация → ozon_decompensation');
+        self::assertGreaterThan(0, (float) $entry['amount'], 'Сумма хранится по модулю');
+        self::assertEqualsWithDelta(180.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+        self::assertNull($this->findEntry($entries, 'ozon_compensation'));
     }
 
     /**
@@ -317,6 +381,7 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         foreach ($fulfillment as $entry) {
             self::assertGreaterThan(0, (float) $entry['amount'], 'Каждая часть: amount > 0');
+            self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
         }
     }
 
@@ -361,9 +426,10 @@ final class OzonCostsRawProcessorTest extends TestCase
 
         if ($returnCommission > 0) {
             $entries[] = [
-                'external_id'   => $op['operation_id'] . '_commission_return',
-                'category_code' => 'ozon_sale_commission',
-                'amount'        => (string) (-$returnCommission),
+                'external_id'    => $op['operation_id'] . '_commission_return',
+                'category_code'  => 'ozon_sale_commission',
+                'amount'         => (string) abs($returnCommission),
+                'operation_type' => MarketplaceCostOperationType::STORNO,
             ];
         }
 
