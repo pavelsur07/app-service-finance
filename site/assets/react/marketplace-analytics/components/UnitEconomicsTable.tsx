@@ -212,7 +212,7 @@ const nameColStyle: React.CSSProperties = {
 // к которому и прилипает sticky-шапка и frozen-колонка.
 const TABLE_STYLES = `
 .ue-scroll-wrapper {
-    border: 1px solid var(--tblr-border-color, rgba(0,0,0,0.1));
+    border: 1px solid var(--tblr-border-color);
     border-radius: var(--tblr-border-radius, 4px);
     overflow: hidden;
 }
@@ -231,14 +231,14 @@ const TABLE_STYLES = `
     position: sticky;
     top: 0;
     z-index: 2;
-    background: var(--tblr-bg-surface, #ffffff);
-    border-bottom: 2px solid var(--tblr-border-color, rgba(0,0,0,0.1));
+    background: var(--tblr-bg-surface);
+    border-bottom: 2px solid var(--tblr-border-color);
 }
 .ue-table td.ue-frozen,
 .ue-table th.ue-frozen {
     position: sticky;
     left: 0;
-    background: var(--tblr-bg-surface, #ffffff);
+    background: var(--tblr-bg-surface);
 }
 .ue-table td.ue-frozen { z-index: 1; }
 .ue-table thead th.ue-frozen { z-index: 3; }
@@ -254,10 +254,10 @@ const TABLE_STYLES = `
     pointer-events: none;
 }
 .ue-table tbody tr:hover td {
-    background: var(--tblr-bg-surface-secondary, rgba(0,0,0,0.03));
+    background: var(--tblr-bg-surface-secondary);
 }
 .ue-table tbody tr:hover td.ue-frozen {
-    background: var(--tblr-bg-surface-secondary, rgba(0,0,0,0.03));
+    background: var(--tblr-bg-surface-secondary);
 }
 `;
 
