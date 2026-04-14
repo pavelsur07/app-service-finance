@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
+use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -30,9 +31,38 @@ final class GetWidgetsSummaryController extends AbstractController
     {
         $company = $this->activeCompanyService->getActiveCompany();
 
-        $marketplace = $request->query->get('marketplace') ?: null;
-        $periodFrom = new \DateTimeImmutable($request->query->getString('periodFrom'));
-        $periodTo = new \DateTimeImmutable($request->query->getString('periodTo'));
+        $marketplace = $request->query->get('marketplace');
+        if ($marketplace === null || $marketplace === '') {
+            $marketplace = null;
+        } else {
+            $validValues = array_map(
+                static fn (MarketplaceType $t): string => $t->value,
+                MarketplaceType::cases(),
+            );
+            if (!in_array($marketplace, $validValues, true)) {
+                return $this->json([
+                    'error' => 'Invalid marketplace. Allowed: ' . implode(', ', $validValues),
+                ], 422);
+            }
+        }
+
+        $periodFromStr = $request->query->get('periodFrom', '');
+        $periodToStr   = $request->query->get('periodTo', '');
+
+        if ($periodFromStr === '' || $periodToStr === '') {
+            return $this->json(['error' => 'periodFrom and periodTo are required'], 422);
+        }
+
+        try {
+            $periodFrom = new \DateTimeImmutable($periodFromStr);
+            $periodTo   = new \DateTimeImmutable($periodToStr);
+        } catch (\Exception) {
+            return $this->json(['error' => 'Invalid date format. Expected Y-m-d'], 422);
+        }
+
+        if ($periodFrom > $periodTo) {
+            return $this->json(['error' => 'periodFrom must be <= periodTo'], 422);
+        }
 
         $current = $this->widgetQuery->getSummary(
             $company->getId(),
