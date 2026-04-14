@@ -26,12 +26,59 @@ interface UnitExtendedTableProps {
     isLoading: boolean;
 }
 
-const stickyStyle: React.CSSProperties = {
-    position: 'sticky',
-    left: 0,
-    background: 'var(--tblr-bg-surface)',
-    zIndex: 1,
-};
+// Inline-CSS для sticky шапки + frozen первой колонки.
+// scroll-контейнер .ue-ext-scroll лежит внутри .card — тот уже имеет overflow:hidden
+// и border-radius, которые клипуют внутренний скроллбар, поэтому отдельного wrapper'а нет.
+// max-height рассчитан под текущий layout страницы (topbar + два page-header + табы +
+// фильтры + card-header ≈ 380px).
+const TABLE_STYLES = `
+.ue-ext-scroll {
+    max-height: calc(100vh - 380px);
+    min-height: 240px;
+    overflow: auto;
+}
+.ue-ext-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+.ue-ext-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--tblr-bg-surface);
+    border-bottom: 2px solid var(--tblr-border-color);
+}
+.ue-ext-table td.ue-ext-frozen,
+.ue-ext-table th.ue-ext-frozen {
+    position: sticky;
+    left: 0;
+    background: var(--tblr-bg-surface);
+    min-width: 240px;
+    max-width: 240px;
+}
+.ue-ext-table td.ue-ext-frozen { z-index: 1; }
+.ue-ext-table thead th.ue-ext-frozen { z-index: 3; }
+.ue-ext-table tfoot td.ue-ext-frozen { z-index: 1; }
+.ue-ext-table .ue-ext-frozen::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}
+.ue-ext-table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+.ue-ext-table tbody tr:hover td.ue-ext-frozen {
+    background: var(--tblr-bg-surface-secondary);
+}
+`;
 
 type ExpandedType = 'other' | 'all';
 
@@ -138,26 +185,28 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     const colCount = HEADERS.length + 1; // +1 for "Все затраты" button column
 
     return (
-        <div className="table-responsive">
-            <table className="table table-vcenter card-table">
-                <thead>
-                    <tr>
-                        {HEADERS.map((h) => (
-                            <th
-                                key={h.field}
-                                className={`${h.align ?? ''} ${h.field === 'title' ? '' : ''}`}
-                                style={h.field === 'title' ? { ...stickyStyle, cursor: 'pointer' } : { cursor: 'pointer' }}
-                                onClick={() => handleSort(h.field)}
-                            >
-                                {h.label}
-                                {sortField === h.field && (
-                                    <i className={`ti ti-chevron-${sortDir === 'asc' ? 'up' : 'down'} ms-1`} />
-                                )}
-                            </th>
-                        ))}
-                        <th className="text-end">Все затраты</th>
-                    </tr>
-                </thead>
+        <>
+            <style>{TABLE_STYLES}</style>
+            <div className="ue-ext-scroll">
+                <table className="table table-vcenter card-table ue-ext-table">
+                    <thead>
+                        <tr>
+                            {HEADERS.map((h) => (
+                                <th
+                                    key={h.field}
+                                    className={`${h.align ?? ''} ${h.field === 'title' ? 'ue-ext-frozen' : ''}`}
+                                    style={{ cursor: 'pointer' }}
+                                    onClick={() => handleSort(h.field)}
+                                >
+                                    {h.label}
+                                    {sortField === h.field && (
+                                        <i className={`ti ti-chevron-${sortDir === 'asc' ? 'up' : 'down'} ms-1`} />
+                                    )}
+                                </th>
+                            ))}
+                            <th className="text-end">Все затраты</th>
+                        </tr>
+                    </thead>
                 <tbody>
                     {sorted.map((row) => {
                         const isOtherExpanded = expanded?.listingId === row.listingId && expanded?.type === 'other';
@@ -166,9 +215,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                         return (
                             <React.Fragment key={row.listingId}>
                                 <tr>
-                                    <td style={stickyStyle}>
-                                        <div>{row.title || '\u2014'}</div>
-                                        <div className="text-muted small">{row.sku}</div>
+                                    <td className="ue-ext-frozen">
+                                        <div className="text-truncate">{row.title || '\u2014'}</div>
+                                        <div className="text-muted small text-truncate">{row.sku}</div>
                                     </td>
                                     <td className="text-end">{formatMoney(row.revenue)}</td>
                                     <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
@@ -238,7 +287,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                 {totals && (
                     <tfoot>
                         <tr className="fw-bold">
-                            <td style={stickyStyle}>Итого</td>
+                            <td className="ue-ext-frozen">Итого</td>
                             <td className="text-end">{formatMoney(totals.revenue)}</td>
                             <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                             <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
@@ -263,8 +312,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                         </tr>
                     </tfoot>
                 )}
-            </table>
-        </div>
+                </table>
+            </div>
+        </>
     );
 };
 
