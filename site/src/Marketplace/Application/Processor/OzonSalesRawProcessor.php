@@ -168,20 +168,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         // Идемпотентное создание/загрузка листингов (безопасно при параллельной обработке)
         $listingsCache = $this->listingEnsureService->ensureListings($company, $skusWithNames);
 
-        $allExternalIds = array_values(array_map(
-            static function (array $op): string {
-                $postingNumber = $op['posting']['posting_number'] ?? '';
-                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-                // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
-                    $externalId .= '_storno';
-                }
-                return $externalId;
-            },
-            $salesData,
-        ));
-        $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
-
         // Очистка legacy-записей + вставка идут в одной транзакции.
         // Очистка запускается только один раз для каждого rawDocId
         // (daily pipeline может разбивать один raw документ на несколько батчей).
@@ -197,6 +183,23 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 $this->cleanupLegacySales($companyId, $rawDocId);
                 $this->cleanedUpRawDocId = $rawDocId;
             }
+
+            // existingMap строится ПОСЛЕ cleanup — иначе только что удалённые
+            // external_id попадут в карту и insert-цикл ошибочно пропустит их
+            // как «уже существующие», оставляя пустоты в marketplace_sales.
+            $allExternalIds = array_values(array_map(
+                static function (array $op): string {
+                    $postingNumber = $op['posting']['posting_number'] ?? '';
+                    $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                    // Storno operations get a suffix to avoid UNIQUE constraint conflict
+                    if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                        $externalId .= '_storno';
+                    }
+                    return $externalId;
+                },
+                $salesData,
+            ));
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
 
             foreach ($salesData as $op) {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
