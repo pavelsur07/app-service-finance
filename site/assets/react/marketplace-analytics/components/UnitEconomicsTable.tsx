@@ -9,7 +9,23 @@ interface UnitEconomicsTableProps {
 
 function toNum(v: string | number | null | undefined): number {
     if (v === null || v === undefined) return 0;
-    return typeof v === 'string' ? parseFloat(v) : v;
+    const n = typeof v === 'string' ? parseFloat(v) : v;
+    return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * «Прочие» в таблице: `other_costs` плюс все статьи, у которых нет отдельной колонки.
+ * Нужно для того, чтобы сумма видимых колонок совпадала с «Итого затрат».
+ */
+function calcOtherCostsDisplay(row: UnitEconomicsRow): number {
+    return (
+        toNum(row.other_costs)
+        + toNum(row.advertising_other)
+        + toNum(row.advertising_external)
+        + toNum(row.acquiring)
+        + toNum(row.penalties)
+        + toNum(row.acceptance)
+    );
 }
 
 function sumCosts(row: UnitEconomicsRow): number {
@@ -148,7 +164,10 @@ function calcTotals(items: UnitEconomicsRow[]): Totals {
         logistics_back: acc.logistics_back,
         storage: acc.storage,
         advertising_cpc: acc.advertising_cpc,
-        other_costs: acc.other_costs,
+        // Колонка «Прочие» агрегирует все статьи без собственной колонки —
+        // чтобы сумма видимых колонок совпадала с total_costs.
+        other_costs: acc.other_costs + acc.advertising_other + acc.advertising_external
+            + acc.acquiring + acc.penalties + acc.acceptance,
         total_costs,
         profit,
         margin,
@@ -351,7 +370,7 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                                     <td style={numColStyle(W.logisticsBack)}>{formatMoney(row.logistics_back)}</td>
                                     <td style={numColStyle(W.storage)}>{formatMoney(row.storage)}</td>
                                     <td style={numColStyle(W.advertisingCpc)}>{formatMoney(row.advertising_cpc)}</td>
-                                    <td style={numColStyle(W.otherCosts)}>{formatMoney(row.other_costs)}</td>
+                                    <td style={numColStyle(W.otherCosts)}>{formatMoney(calcOtherCostsDisplay(row))}</td>
                                     <td style={numColStyle(W.totalCosts)}>
                                         {totalCosts === null
                                             ? <span className="text-warning" title="Нет данных о себестоимости">{'\u2014'}</span>
