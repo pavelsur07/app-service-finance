@@ -50,8 +50,12 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -142,6 +146,9 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             $sale->setTotalRevenue((string) abs((float) ($item['retail_amount'] ?? 0)));
             $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($item);
+            if ($rawDocId !== null) {
+                $sale->setRawDocumentId($rawDocId);
+            }
 
             $this->em->persist($sale);
             $existingMap[$srid] = true;

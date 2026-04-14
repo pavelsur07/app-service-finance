@@ -48,8 +48,12 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -135,6 +139,9 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $return->setReturnReason($op['operation_type_name'] ?? null);
             $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $op));
             $return->setRawData($op);
+            if ($rawDocId !== null) {
+                $return->setRawDocumentId($rawDocId);
+            }
 
             $this->em->persist($return);
             $existingMap[$externalId] = true;

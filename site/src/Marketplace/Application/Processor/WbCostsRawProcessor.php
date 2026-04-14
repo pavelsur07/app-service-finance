@@ -59,8 +59,12 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -240,6 +244,9 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $cost->setExternalId($externalId);
+            if ($rawDocId !== null) {
+                $cost->setRawDocumentId($rawDocId);
+            }
             $cost->setCostDate($costData['cost_date']);
             $cost->setAmount($costData['amount']);
             $cost->setDescription($costData['description']);
