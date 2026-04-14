@@ -106,8 +106,9 @@ function calcTotals(items: UnitEconomicsRow[]): Totals {
     for (const row of items) {
         acc.revenue += toNum(row.revenue);
         acc.refunds += toNum(row.refunds);
-        acc.sales_quantity += row.sales_quantity;
-        acc.returns_quantity += row.returns_quantity;
+        // DBAL отдаёт SUM(integer) как строку — без toNum() получим конкатенацию.
+        acc.sales_quantity += toNum(row.sales_quantity);
+        acc.returns_quantity += toNum(row.returns_quantity);
         acc.commission += toNum(row.commission);
         acc.logistics_to += toNum(row.logistics_to);
         acc.logistics_back += toNum(row.logistics_back);
