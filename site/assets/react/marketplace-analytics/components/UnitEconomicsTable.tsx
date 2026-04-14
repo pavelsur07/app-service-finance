@@ -207,12 +207,18 @@ const nameColStyle: React.CSSProperties = {
 };
 
 // Inline-CSS для sticky/frozen. Pseudo-элементы и hover-состояния нельзя выразить через style=.
+// Двойная обёртка: внешний .ue-scroll-wrapper даёт рамку + скругление и клипует скроллбар
+// внутрь радиуса, внутренний .ue-scroll — собственно scroll-контейнер с явной max-height,
+// к которому и прилипает sticky-шапка и frozen-колонка.
 const TABLE_STYLES = `
+.ue-scroll-wrapper {
+    border: 1px solid var(--tblr-border-color);
+    border-radius: var(--tblr-border-radius, 4px);
+    overflow: hidden;
+}
 .ue-scroll {
-    max-height: 70vh;
+    max-height: calc(100vh - 280px);
     overflow: auto;
-    border: 1px solid var(--tblr-border-color, rgba(0,0,0,0.1));
-    border-radius: 4px;
 }
 .ue-table {
     border-collapse: separate;
@@ -226,6 +232,7 @@ const TABLE_STYLES = `
     top: 0;
     z-index: 2;
     background: var(--tblr-bg-surface);
+    border-bottom: 2px solid var(--tblr-border-color);
 }
 .ue-table td.ue-frozen,
 .ue-table th.ue-frozen {
@@ -247,10 +254,10 @@ const TABLE_STYLES = `
     pointer-events: none;
 }
 .ue-table tbody tr:hover td {
-    background: var(--tblr-bg-surface-secondary, rgba(0,0,0,0.03));
+    background: var(--tblr-bg-surface-secondary);
 }
 .ue-table tbody tr:hover td.ue-frozen {
-    background: var(--tblr-bg-surface-secondary, rgba(0,0,0,0.03));
+    background: var(--tblr-bg-surface-secondary);
 }
 `;
 
@@ -284,8 +291,9 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
     return (
         <>
             <style>{TABLE_STYLES}</style>
-            <div className="ue-scroll">
-                <table className="table table-vcenter card-table ue-table">
+            <div className="ue-scroll-wrapper">
+                <div className="ue-scroll">
+                    <table className="table table-vcenter card-table ue-table">
                     <thead>
                         <tr>
                             <th className="ue-frozen" style={nameColStyle}>Наименование</th>
@@ -437,7 +445,8 @@ const UnitEconomicsTable: React.FC<UnitEconomicsTableProps> = ({ items, isLoadin
                             </td>
                         </tr>
                     </tfoot>
-                </table>
+                    </table>
+                </div>
             </div>
         </>
     );
