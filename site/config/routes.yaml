@@ -91,6 +91,12 @@ marketplace_analytics_controllers:
         namespace: App\MarketplaceAnalytics\Controller
     type: attribute
 
+marketplace_analytics_api_controllers:
+    resource:
+        path: ../src/MarketplaceAnalytics/Controller/Api/
+        namespace: App\MarketplaceAnalytics\Controller\Api
+    type: attribute
+
 marketplace_ads_controllers:
     resource:
         path: ../src/MarketplaceAds/Controller/
