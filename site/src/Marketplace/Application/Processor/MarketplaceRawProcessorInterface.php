@@ -19,10 +19,17 @@ interface MarketplaceRawProcessorInterface
 
     public function process(string $companyId, string $rawDocId): int;
 
-    // TODO: передавать rawDocId через интерфейс processBatch() — отдельная задача
-
     /**
+     * Обработка батча из daily pipeline.
+     * rawDocId проставляется на создаваемые entity (raw_document_id)
+     * и используется для очистки legacy-записей перед вставкой.
+     *
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void;
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void;
 }

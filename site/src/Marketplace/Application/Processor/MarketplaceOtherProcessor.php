@@ -21,8 +21,12 @@ final readonly class MarketplaceOtherProcessor implements MarketplaceRawProcesso
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         // TODO: save to staging table for unknown operations
     }
 

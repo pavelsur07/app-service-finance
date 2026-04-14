@@ -20,6 +20,13 @@ use Ramsey\Uuid\Uuid;
 
 final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 {
+    /**
+     * Последний rawDocId, для которого уже выполнена очистка legacy-записей
+     * в рамках текущего жизненного цикла процессора. Нужен для идемпотентности,
+     * когда один rawDocument разбит на несколько батчей (>500 строк).
+     */
+    private ?string $cleanedUpRawDocId = null;
+
     public function __construct(
         private readonly ProcessOzonSalesAction $action,
         private readonly EntityManagerInterface $em,
@@ -48,66 +55,10 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Raw document not found: ' . $rawDocId);
         }
 
-        $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
-        $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
-
         $this->connection->beginTransaction();
 
         try {
-            // 1. Удалить записи этого raw-документа (для повторной обработки).
-            //    document_id IS NULL — не трогаем уже закрытые в ОПиУ.
-            $deletedByDoc = (int) $this->connection->executeStatement(
-                'DELETE FROM marketplace_sales
-                 WHERE raw_document_id = :docId
-                   AND document_id IS NULL',
-                ['docId' => $rawDocId],
-            );
-
-            // 2. Удалить legacy-записи без raw_document_id за тот же период.
-            //    AND price_per_unit > 0 — отсекает storno-записи, которые создаёт
-            //    OzonSalesRawProcessor::processBatch() (negative accruals_for_sale,
-            //    suffix _storno, price_per_unit < 0). ProcessOzonSalesAction их не
-            //    пересоздаёт (фильтр accruals_for_sale > 0), поэтому без этого
-            //    условия DELETE навсегда потерял бы storno. Старый легаси-поток
-            //    (ProcessOzonSalesAction до внедрения raw_document_id) всегда
-            //    создавал записи с положительным price_per_unit — они под фильтр
-            //    попадают.
-            $deletedLegacy = (int) $this->connection->executeStatement(
-                'DELETE FROM marketplace_sales
-                 WHERE raw_document_id IS NULL
-                   AND document_id IS NULL
-                   AND company_id = :companyId
-                   AND marketplace = :marketplace
-                   AND sale_date BETWEEN :periodFrom AND :periodTo
-                   AND price_per_unit > 0',
-                [
-                    'companyId'   => $companyId,
-                    'marketplace' => MarketplaceType::OZON->value,
-                    'periodFrom'  => $periodFrom,
-                    'periodTo'    => $periodTo,
-                ],
-            );
-
-            if ($deletedByDoc > 0 || $deletedLegacy > 0) {
-                $this->logger->info(
-                    sprintf(
-                        '[Ozon] Очищено %d sales (по raw_document_id) + %d legacy sales за период %s—%s перед обработкой документа %s',
-                        $deletedByDoc,
-                        $deletedLegacy,
-                        $periodFrom,
-                        $periodTo,
-                        $rawDocId,
-                    ),
-                    [
-                        'raw_doc_id'     => $rawDocId,
-                        'company_id'     => $companyId,
-                        'deleted_by_doc' => $deletedByDoc,
-                        'deleted_legacy' => $deletedLegacy,
-                        'period_from'    => $periodFrom,
-                        'period_to'      => $periodTo,
-                    ],
-                );
-            }
+            $this->cleanupLegacySales($companyId, $rawDocId);
 
             $result = ($this->action)($companyId, $rawDocId);
 
@@ -123,8 +74,12 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -157,70 +112,166 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         // Идемпотентное создание/загрузка листингов (безопасно при параллельной обработке)
         $listingsCache = $this->listingEnsureService->ensureListings($company, $skusWithNames);
 
-        $allExternalIds = array_values(array_map(
-            static function (array $op): string {
-                $postingNumber = $op['posting']['posting_number'] ?? '';
-                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-                // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
-                    $externalId .= '_storno';
-                }
-                return $externalId;
-            },
-            $salesData,
-        ));
-        $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
+        // Очистка legacy-записей + вставка идут в одной транзакции.
+        // Очистка запускается только один раз для каждого rawDocId
+        // (daily pipeline может разбивать один raw документ на несколько батчей).
+        $shouldCleanup  = $rawDocId !== null && $this->cleanedUpRawDocId !== $rawDocId;
+        $useTransaction = $rawDocId !== null;
 
-        foreach ($salesData as $op) {
-            $postingNumber = $op['posting']['posting_number'] ?? '';
-            $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-
-            $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
-            $isStorno = $accrual < 0;
-
-            // Storno operations get a suffix to avoid UNIQUE constraint conflict
-            if ($isStorno) {
-                $externalId .= '_storno';
-            }
-
-            if ($externalId === '' || isset($existingMap[$externalId])) {
-                continue;
-            }
-
-            $firstItem = ($op['items'] ?? [])[0] ?? null;
-            $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
-            $listing = $listingsCache[$sku] ?? null;
-
-            if (!$listing) {
-                $this->logger->warning('[Ozon] processBatch sales: listing not found', [
-                    'external_id' => $externalId,
-                    'sku'         => $sku,
-                ]);
-                continue;
-            }
-
-            $saleDate = new \DateTimeImmutable($op['operation_date']);
-
-            $sale = new MarketplaceSale(
-                Uuid::uuid4()->toString(),
-                $company,
-                $listing,
-                MarketplaceType::OZON,
-            );
-
-            $sale->setExternalOrderId($externalId);
-            $sale->setSaleDate($saleDate);
-            $sale->setQuantity(count($op['items'] ?? []) ?: 1);
-            $sale->setPricePerUnit((string) $accrual);
-            $sale->setTotalRevenue((string) $accrual);
-            // Storno: no goods shipped, cost_price must be null
-            $sale->setCostPrice($isStorno ? null : $this->costPriceResolver->resolveForSale($listing, $saleDate));
-            $sale->setRawData($op);
-
-            $this->em->persist($sale);
-            $existingMap[$externalId] = true;
+        if ($useTransaction) {
+            $this->connection->beginTransaction();
         }
 
-        $this->em->flush();
+        try {
+            if ($shouldCleanup) {
+                $this->cleanupLegacySales($companyId, $rawDocId);
+                $this->cleanedUpRawDocId = $rawDocId;
+            }
+
+            // existingMap строится ПОСЛЕ cleanup — иначе только что удалённые
+            // external_id попадут в карту и insert-цикл ошибочно пропустит их
+            // как «уже существующие», оставляя пустоты в marketplace_sales.
+            $allExternalIds = array_values(array_map(
+                static function (array $op): string {
+                    $postingNumber = $op['posting']['posting_number'] ?? '';
+                    $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                    // Storno operations get a suffix to avoid UNIQUE constraint conflict
+                    if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                        $externalId .= '_storno';
+                    }
+                    return $externalId;
+                },
+                $salesData,
+            ));
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
+
+            foreach ($salesData as $op) {
+                $postingNumber = $op['posting']['posting_number'] ?? '';
+                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+
+                $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
+                $isStorno = $accrual < 0;
+
+                // Storno operations get a suffix to avoid UNIQUE constraint conflict
+                if ($isStorno) {
+                    $externalId .= '_storno';
+                }
+
+                if ($externalId === '' || isset($existingMap[$externalId])) {
+                    continue;
+                }
+
+                $firstItem = ($op['items'] ?? [])[0] ?? null;
+                $sku = $firstItem ? (string) ($firstItem['sku'] ?? '') : '';
+                $listing = $listingsCache[$sku] ?? null;
+
+                if (!$listing) {
+                    $this->logger->warning('[Ozon] processBatch sales: listing not found', [
+                        'external_id' => $externalId,
+                        'sku'         => $sku,
+                    ]);
+                    continue;
+                }
+
+                $saleDate = new \DateTimeImmutable($op['operation_date']);
+
+                $sale = new MarketplaceSale(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    $listing,
+                    MarketplaceType::OZON,
+                );
+
+                $sale->setExternalOrderId($externalId);
+                $sale->setSaleDate($saleDate);
+                $sale->setQuantity(count($op['items'] ?? []) ?: 1);
+                $sale->setPricePerUnit((string) $accrual);
+                $sale->setTotalRevenue((string) $accrual);
+                // Storno: no goods shipped, cost_price must be null
+                $sale->setCostPrice($isStorno ? null : $this->costPriceResolver->resolveForSale($listing, $saleDate));
+                $sale->setRawData($op);
+                if ($rawDocId !== null) {
+                    $sale->setRawDocumentId($rawDocId);
+                }
+
+                $this->em->persist($sale);
+                $existingMap[$externalId] = true;
+            }
+
+            $this->em->flush();
+
+            if ($useTransaction) {
+                $this->connection->commit();
+            }
+        } catch (\Throwable $e) {
+            if ($useTransaction && $this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
+     * Удаляет записи текущего raw-документа (идемпотентный повтор обработки)
+     * и legacy-записи без raw_document_id за тот же период.
+     *
+     * - `document_id IS NULL` — не трогаем уже закрытые в ОПиУ записи.
+     * - `price_per_unit > 0` в легаси-DELETE — отсекает storno-записи
+     *   (negative accruals_for_sale, суффикс `_storno`, price_per_unit < 0),
+     *   которых у старого потока `ProcessOzonSalesAction` не было.
+     */
+    private function cleanupLegacySales(string $companyId, string $rawDocId): void
+    {
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            return;
+        }
+
+        $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
+        $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
+
+        $deletedByDoc = (int) $this->connection->executeStatement(
+            'DELETE FROM marketplace_sales
+             WHERE raw_document_id = :docId
+               AND document_id IS NULL',
+            ['docId' => $rawDocId],
+        );
+
+        $deletedLegacy = (int) $this->connection->executeStatement(
+            'DELETE FROM marketplace_sales
+             WHERE raw_document_id IS NULL
+               AND document_id IS NULL
+               AND company_id = :companyId
+               AND marketplace = :marketplace
+               AND sale_date BETWEEN :periodFrom AND :periodTo
+               AND price_per_unit > 0',
+            [
+                'companyId'   => $companyId,
+                'marketplace' => MarketplaceType::OZON->value,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        if ($deletedByDoc > 0 || $deletedLegacy > 0) {
+            $this->logger->info(
+                sprintf(
+                    '[Ozon] Очищено %d sales (по raw_document_id) + %d legacy sales за период %s—%s перед обработкой документа %s',
+                    $deletedByDoc,
+                    $deletedLegacy,
+                    $periodFrom,
+                    $periodTo,
+                    $rawDocId,
+                ),
+                [
+                    'raw_doc_id'     => $rawDocId,
+                    'company_id'     => $companyId,
+                    'deleted_by_doc' => $deletedByDoc,
+                    'deleted_legacy' => $deletedLegacy,
+                    'period_from'    => $periodFrom,
+                    'period_to'      => $periodTo,
+                ],
+            );
+        }
     }
 }

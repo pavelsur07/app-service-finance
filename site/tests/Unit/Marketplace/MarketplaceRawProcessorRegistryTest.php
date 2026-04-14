@@ -26,7 +26,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                 return 5;
             }
 
-            public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void {}
+            public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void {}
         };
 
         $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
@@ -42,7 +42,7 @@ final class MarketplaceRawProcessorRegistryTest extends TestCase
                     return 0;
                 }
 
-                public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void {}
+                public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows, ?string $rawDocId = null): void {}
             },
             $target,
         ], $repo);

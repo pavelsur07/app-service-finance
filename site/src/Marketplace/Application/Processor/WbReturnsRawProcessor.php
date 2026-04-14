@@ -52,8 +52,12 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */
-    public function processBatch(string $companyId, MarketplaceType $marketplace, array $rawRows): void
-    {
+    public function processBatch(
+        string $companyId,
+        MarketplaceType $marketplace,
+        array $rawRows,
+        ?string $rawDocId = null,
+    ): void {
         if (empty($rawRows)) {
             return;
         }
@@ -149,6 +153,9 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $return->setReturnReason($item['supplier_oper_name'] ?? '');
             $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $item));
             $return->setRawData($item);
+            if ($rawDocId !== null) {
+                $return->setRawDocumentId($rawDocId);
+            }
 
             if ($sale !== null) {
                 $return->setSale($sale);
