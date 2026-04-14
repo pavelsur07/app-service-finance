@@ -6,13 +6,18 @@ namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Application\Service\WidgetServiceGroupMap;
+use Doctrine\DBAL\Connection;
 
 /**
  * Сводка для виджета MarketplaceAnalytics за период.
  *
- * Повторяет агрегацию UnitExtendedQuery, но без per-listing detail:
- * возвращает только итоговые числа и разбивку затрат по widgetGroup
+ * Возвращает только итоговые числа и разбивку затрат по widgetGroup
  * (5 групп WidgetServiceGroupMap).
+ *
+ * Затраты берутся напрямую из marketplace_costs БЕЗ фильтра listing_id IS NOT NULL,
+ * чтобы захватить категории, не привязанные к листингу (CPC, хранение, кросс-докинг и т.п.).
+ * Sales/returns остаются per-listing через MarketplaceFacade — они всегда
+ * привязаны к товарам.
  */
 final readonly class WidgetSummaryQuery
 {
@@ -29,6 +34,7 @@ final readonly class WidgetSummaryQuery
 
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
+        private Connection $connection,
     ) {
     }
 
@@ -51,7 +57,7 @@ final readonly class WidgetSummaryQuery
     ): array {
         $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
-        $costs = $this->marketplaceFacade->getCostAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
+        $costRows = $this->getCostAggregates($companyId, $marketplace, $dateFrom, $dateTo);
 
         $codeToGroup = WidgetServiceGroupMap::getCategoryToWidgetGroup();
 
@@ -70,55 +76,46 @@ final readonly class WidgetSummaryQuery
             ];
         }
 
-        // Merge all unique listing IDs from three sources so listings
-        // with only returns or costs are not lost
-        $allListingIds = array_unique(array_merge(
-            array_keys($sales),
-            array_keys($returns),
-            array_keys($costs),
-        ));
+        // Sales / returns — суммируем по всем листингам
+        foreach ($sales as $sale) {
+            $revenue += (float) $sale->revenue;
+            $costPriceTotal += (float) $sale->costPriceTotal;
+        }
 
-        foreach ($allListingIds as $listingId) {
-            $sale = $sales[$listingId] ?? null;
-            $ret = $returns[$listingId] ?? null;
-            $listingCosts = $costs[$listingId] ?? [];
+        foreach ($returns as $ret) {
+            $returnsTotal += (float) $ret->returnsTotal;
+        }
 
-            if ($sale !== null) {
-                $revenue += (float) $sale->revenue;
-                $costPriceTotal += (float) $sale->costPriceTotal;
+        // Costs — плоский список категорий (без листингов).
+        // Включает категории с listing_id = NULL (CPC, хранение и т.п.).
+        foreach ($costRows as $row) {
+            $code = (string) $row['category_code'];
+            $name = (string) $row['category_name'];
+            $costsAmt = (float) $row['costs_amount'];
+            $stornoAmt = (float) $row['storno_amount'];
+            $netAmt = (float) $row['net_amount'];
+
+            $group = $codeToGroup[$code] ?? self::FALLBACK_GROUP;
+
+            $groups[$group]['costsAmount'] += $costsAmt;
+            $groups[$group]['stornoAmount'] += $stornoAmt;
+            $groups[$group]['netAmount'] += $netAmt;
+
+            // Агрегируем одинаковые categoryCode внутри группы
+            // (на всякий случай — SQL уже группирует по cc.code, cc.name)
+            if (!isset($groups[$group]['categories'][$code])) {
+                $groups[$group]['categories'][$code] = [
+                    'code'         => $code,
+                    'name'         => $name,
+                    'costsAmount'  => 0.0,
+                    'stornoAmount' => 0.0,
+                    'netAmount'    => 0.0,
+                ];
             }
 
-            if ($ret !== null) {
-                $returnsTotal += (float) $ret->returnsTotal;
-            }
-
-            foreach ($listingCosts as $cat) {
-                $group = $codeToGroup[$cat->categoryCode] ?? self::FALLBACK_GROUP;
-
-                $costsAmt = (float) $cat->costsAmount;
-                $stornoAmt = (float) $cat->stornoAmount;
-                $netAmt = (float) $cat->netAmount;
-
-                $groups[$group]['costsAmount'] += $costsAmt;
-                $groups[$group]['stornoAmount'] += $stornoAmt;
-                $groups[$group]['netAmount'] += $netAmt;
-
-                // Агрегируем одинаковые categoryCode внутри группы
-                $code = $cat->categoryCode;
-                if (!isset($groups[$group]['categories'][$code])) {
-                    $groups[$group]['categories'][$code] = [
-                        'code'         => $code,
-                        'name'         => $cat->categoryName,
-                        'costsAmount'  => 0.0,
-                        'stornoAmount' => 0.0,
-                        'netAmount'    => 0.0,
-                    ];
-                }
-
-                $groups[$group]['categories'][$code]['costsAmount'] += $costsAmt;
-                $groups[$group]['categories'][$code]['stornoAmount'] += $stornoAmt;
-                $groups[$group]['categories'][$code]['netAmount'] += $netAmt;
-            }
+            $groups[$group]['categories'][$code]['costsAmount'] += $costsAmt;
+            $groups[$group]['categories'][$code]['stornoAmount'] += $stornoAmt;
+            $groups[$group]['categories'][$code]['netAmount'] += $netAmt;
         }
 
         // Build widgetGroups list with rounding and sorting
@@ -171,5 +168,74 @@ final readonly class WidgetSummaryQuery
             'marginPercent'  => $marginPercent,
             'widgetGroups'   => $widgetGroups,
         ];
+    }
+
+    /**
+     * Затраты по всем категориям за период — БЕЗ фильтра по listing_id.
+     *
+     * В отличие от ListingCostAggregateQuery (per-listing) сюда попадают
+     * категории затрат с listing_id = NULL (CPC, хранение, кросс-докинг и т.п.).
+     *
+     * @return list<array{
+     *     category_code: string,
+     *     category_name: string,
+     *     net_amount: string,
+     *     costs_amount: string,
+     *     storno_amount: string,
+     * }>
+     */
+    private function getCostAggregates(
+        string $companyId,
+        ?string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
+
+        $rows = $this->connection->fetchAllAssociative(
+            <<<SQL
+            SELECT
+                cc.code                                                       AS category_code,
+                cc.name                                                       AS category_name,
+                SUM(CASE
+                    WHEN (c.operation_type = 'storno')
+                    THEN -ABS(c.amount)
+                    ELSE ABS(c.amount)
+                END)                                                          AS net_amount,
+                SUM(CASE
+                    WHEN (c.operation_type = 'storno')
+                    THEN 0
+                    ELSE ABS(c.amount)
+                END)                                                          AS costs_amount,
+                SUM(CASE
+                    WHEN (c.operation_type = 'storno')
+                    THEN ABS(c.amount)
+                    ELSE 0
+                END)                                                          AS storno_amount
+            FROM marketplace_costs c
+            JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+            WHERE c.company_id = :companyId
+              AND c.cost_date >= :periodFrom
+              AND c.cost_date <= :periodTo
+              {$mpFilter}
+            GROUP BY cc.code, cc.name
+            ORDER BY costs_amount DESC
+            SQL,
+            array_filter([
+                'companyId'   => $companyId,
+                'periodFrom'  => $from->format('Y-m-d'),
+                'periodTo'    => $to->format('Y-m-d'),
+                'marketplace' => $marketplace,
+            ], static fn ($v) => $v !== null),
+        );
+
+        /** @var list<array{
+         *     category_code: string,
+         *     category_name: string,
+         *     net_amount: string,
+         *     costs_amount: string,
+         *     storno_amount: string,
+         * }> $rows */
+        return $rows;
     }
 }
