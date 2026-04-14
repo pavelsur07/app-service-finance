@@ -125,7 +125,6 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         try {
             if ($shouldCleanup) {
                 $this->cleanupLegacySales($companyId, $rawDocId);
-                $this->cleanedUpRawDocId = $rawDocId;
             }
 
             // existingMap строится ПОСЛЕ cleanup — иначе только что удалённые
@@ -202,6 +201,14 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
             if ($useTransaction) {
                 $this->connection->commit();
+            }
+
+            // Marker выставляется ТОЛЬКО после успешного commit — иначе
+            // откат транзакции оставил бы in-memory флаг установленным,
+            // и retry в том же worker-процессе пропустил бы cleanup,
+            // считая стороние legacy-строки валидными через existingMap.
+            if ($shouldCleanup) {
+                $this->cleanedUpRawDocId = $rawDocId;
             }
         } catch (\Throwable $e) {
             if ($useTransaction && $this->connection->isTransactionActive()) {
