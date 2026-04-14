@@ -1,5 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { useUnitExtended } from './useUnitExtended';
+import { useWidgets } from './widgets/useWidgets';
+import WidgetsGrid from './widgets/WidgetsGrid';
+import { ErrorBoundary } from '../../shared/ui/ErrorBoundary';
 import { getMonthRange } from '../utils/utils';
 import type { MarketplaceOption } from '../types/analytics.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
@@ -47,6 +50,12 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
         periodTo: filters.dateTo,
     });
 
+    const widgets = useWidgets({
+        marketplace: filters.marketplace,
+        periodFrom: filters.dateFrom,
+        periodTo: filters.dateTo,
+    });
+
     const handleMarketplaceChange = useCallback((mp: string) => {
         setFilters((prev) => ({ ...prev, marketplace: mp }));
     }, []);
@@ -83,6 +92,17 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                 onDateToChange={handleDateToChange}
                 onDateRangeChange={handleDateRangeChange}
             />
+
+            <ErrorBoundary widgetName="UnitEconomyWidgets">
+                <WidgetsGrid
+                    summary={widgets.summary}
+                    isLoading={widgets.isLoading}
+                    error={widgets.error}
+                    expandedKey={widgets.expandedKey}
+                    expandedGroups={widgets.expandedGroups}
+                    onToggle={widgets.toggleWidget}
+                />
+            </ErrorBoundary>
 
             {isError && (
                 <div className="alert alert-danger mb-3">
