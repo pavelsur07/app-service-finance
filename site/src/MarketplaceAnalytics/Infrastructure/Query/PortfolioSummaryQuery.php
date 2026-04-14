@@ -54,6 +54,9 @@ final readonly class PortfolioSummaryQuery
                          - COALESCE(SUM((cost_breakdown->>'advertising_other')::numeric), 0)
                          - COALESCE(SUM((cost_breakdown->>'advertising_external')::numeric), 0)
                          - COALESCE(SUM((cost_breakdown->>'commission')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'acquiring')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'penalties')::numeric), 0)
+                         - COALESCE(SUM((cost_breakdown->>'acceptance')::numeric), 0)
                          - COALESCE(SUM((cost_breakdown->>'other')::numeric), 0)
                 END AS total_profit
             FROM listing_daily_snapshots
