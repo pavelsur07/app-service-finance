@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAbortableQuery } from '../../../shared/hooks/useAbortableQuery';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ApiError } from '../../../shared/http/client';
 import type { CostGroupBreakdown } from '../unitExtended.types';
+import { fetchWidgetsSummary } from './widgets.api';
 import { WIDGET_KEY_TO_GROUPS } from './widgetsConfig';
 import type { WidgetsApiResponse, WidgetsSummary } from './widgets.types';
 
@@ -21,34 +22,60 @@ interface UseWidgetsResult {
 
 /**
  * Хук для загрузки сводки виджетов и управления раскрытием детализации.
+ *
+ * Использует fetchWidgetsSummary как единую точку входа в API
+ * (URL и query инкапсулированы там). Abort предыдущего запроса при
+ * смене параметров и при unmount.
  */
 export function useWidgets(params: UseWidgetsParams): UseWidgetsResult {
-    const { isLoading, data, error, run } = useAbortableQuery<WidgetsApiResponse>();
+    const [data, setData] = useState<WidgetsApiResponse | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [error, setError] = useState<string | null>(null);
     const [expandedKey, setExpandedKey] = useState<string | null>(null);
+    const abortRef = useRef<AbortController | null>(null);
 
-    const load = useCallback(() => {
+    useEffect(() => {
         if (!params.periodFrom || !params.periodTo) {
             return;
         }
 
-        const query: Record<string, string> = {
-            periodFrom: params.periodFrom,
-            periodTo: params.periodTo,
+        // Отменяем предыдущий запрос
+        abortRef.current?.abort();
+        const ac = new AbortController();
+        abortRef.current = ac;
+
+        setIsLoading(true);
+        setError(null);
+
+        fetchWidgetsSummary(
+            params.marketplace,
+            params.periodFrom,
+            params.periodTo,
+            ac.signal,
+        )
+            .then((response) => {
+                if (ac.signal.aborted) {
+                    return;
+                }
+                setData(response);
+                setIsLoading(false);
+            })
+            .catch((e: unknown) => {
+                // AbortError — не считаем ошибкой
+                if ((e as { name?: string })?.name === 'AbortError' || ac.signal.aborted) {
+                    return;
+                }
+                const message = e instanceof ApiError
+                    ? e.message
+                    : 'Не удалось загрузить данные. Повторите попытку.';
+                setError(message);
+                setIsLoading(false);
+            });
+
+        return () => {
+            ac.abort();
         };
-
-        if (params.marketplace) {
-            query.marketplace = params.marketplace;
-        }
-
-        void run({
-            url: '/api/marketplace-analytics/unit-extended/widgets',
-            query,
-        });
-    }, [params.marketplace, params.periodFrom, params.periodTo, run]);
-
-    useEffect(() => {
-        load();
-    }, [load]);
+    }, [params.marketplace, params.periodFrom, params.periodTo]);
 
     const toggleWidget = useCallback((key: string) => {
         setExpandedKey((prev) => (prev === key ? null : key));

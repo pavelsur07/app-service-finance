@@ -8,6 +8,7 @@ import type { WidgetsApiResponse } from './widgets.types';
 interface WidgetsGridProps {
     summary: WidgetsApiResponse | null;
     isLoading: boolean;
+    error: string | null;
     expandedKey: string | null;
     expandedGroups: CostGroupBreakdown[];
     onToggle: (key: string) => void;
@@ -28,15 +29,30 @@ const WidgetCardSkeleton: React.FC = () => (
 
 /**
  * Сетка из 8 виджетов + детализация под выбранным виджетом.
+ *
+ * Состояния:
+ *  - error                       → alert
+ *  - isLoading                   → 8 skeleton-карточек
+ *  - !summary && !isLoading      → пусто (initial state до первого fetch)
+ *  - summary                     → карточки + опционально WidgetDetailPanel
  */
 const WidgetsGrid: React.FC<WidgetsGridProps> = ({
     summary,
     isLoading,
+    error,
     expandedKey,
     expandedGroups,
     onToggle,
 }) => {
-    if (isLoading || !summary) {
+    if (error) {
+        return (
+            <div className="alert alert-danger mb-3" role="alert">
+                {error}
+            </div>
+        );
+    }
+
+    if (isLoading) {
         return (
             <div className="row row-cards mb-3">
                 {WIDGETS.map((w) => (
@@ -46,6 +62,10 @@ const WidgetsGrid: React.FC<WidgetsGridProps> = ({
                 ))}
             </div>
         );
+    }
+
+    if (!summary) {
+        return null;
     }
 
     const { current, previous } = summary;
