@@ -8,10 +8,12 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessOzonSalesAction;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\OzonListingEnsureService;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -21,6 +23,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
     public function __construct(
         private readonly ProcessOzonSalesAction $action,
         private readonly EntityManagerInterface $em,
+        private readonly Connection $connection,
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly OzonListingEnsureService $listingEnsureService,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
@@ -40,7 +43,73 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
     public function process(string $companyId, string $rawDocId): int
     {
-        return ($this->action)($companyId, $rawDocId);
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            throw new \RuntimeException('Raw document not found: ' . $rawDocId);
+        }
+
+        $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
+        $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
+
+        $this->connection->beginTransaction();
+
+        try {
+            // 1. Удалить записи этого raw-документа (для повторной обработки).
+            //    document_id IS NULL — не трогаем уже закрытые в ОПиУ.
+            $deletedByDoc = (int) $this->connection->executeStatement(
+                'DELETE FROM marketplace_sales
+                 WHERE raw_document_id = :docId
+                   AND document_id IS NULL',
+                ['docId' => $rawDocId],
+            );
+
+            // 2. Удалить legacy-записи без raw_document_id за тот же период
+            //    (результат работы старого ProcessOzonSalesAction до внедрения raw_document_id).
+            $deletedLegacy = (int) $this->connection->executeStatement(
+                'DELETE FROM marketplace_sales
+                 WHERE raw_document_id IS NULL
+                   AND document_id IS NULL
+                   AND company_id = :companyId
+                   AND marketplace = :marketplace
+                   AND sale_date BETWEEN :periodFrom AND :periodTo',
+                [
+                    'companyId'   => $companyId,
+                    'marketplace' => MarketplaceType::OZON->value,
+                    'periodFrom'  => $periodFrom,
+                    'periodTo'    => $periodTo,
+                ],
+            );
+
+            if ($deletedByDoc > 0 || $deletedLegacy > 0) {
+                $this->logger->info(
+                    sprintf(
+                        '[Ozon] Очищено %d sales (по raw_document_id) + %d legacy sales за период %s—%s перед обработкой документа %s',
+                        $deletedByDoc,
+                        $deletedLegacy,
+                        $periodFrom,
+                        $periodTo,
+                        $rawDocId,
+                    ),
+                    [
+                        'raw_doc_id'     => $rawDocId,
+                        'company_id'     => $companyId,
+                        'deleted_by_doc' => $deletedByDoc,
+                        'deleted_legacy' => $deletedLegacy,
+                        'period_from'    => $periodFrom,
+                        'period_to'      => $periodTo,
+                    ],
+                );
+            }
+
+            $result = ($this->action)($companyId, $rawDocId);
+
+            $this->connection->commit();
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->connection->rollBack();
+            throw $e;
+        }
     }
 
     /**
