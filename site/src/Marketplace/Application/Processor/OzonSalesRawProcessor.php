@@ -63,15 +63,23 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 ['docId' => $rawDocId],
             );
 
-            // 2. Удалить legacy-записи без raw_document_id за тот же период
-            //    (результат работы старого ProcessOzonSalesAction до внедрения raw_document_id).
+            // 2. Удалить legacy-записи без raw_document_id за тот же период.
+            //    AND price_per_unit > 0 — отсекает storno-записи, которые создаёт
+            //    OzonSalesRawProcessor::processBatch() (negative accruals_for_sale,
+            //    suffix _storno, price_per_unit < 0). ProcessOzonSalesAction их не
+            //    пересоздаёт (фильтр accruals_for_sale > 0), поэтому без этого
+            //    условия DELETE навсегда потерял бы storno. Старый легаси-поток
+            //    (ProcessOzonSalesAction до внедрения raw_document_id) всегда
+            //    создавал записи с положительным price_per_unit — они под фильтр
+            //    попадают.
             $deletedLegacy = (int) $this->connection->executeStatement(
                 'DELETE FROM marketplace_sales
                  WHERE raw_document_id IS NULL
                    AND document_id IS NULL
                    AND company_id = :companyId
                    AND marketplace = :marketplace
-                   AND sale_date BETWEEN :periodFrom AND :periodTo',
+                   AND sale_date BETWEEN :periodFrom AND :periodTo
+                   AND price_per_unit > 0',
                 [
                     'companyId'   => $companyId,
                     'marketplace' => MarketplaceType::OZON->value,
