@@ -66,15 +66,15 @@ final class DebugOzonReconciliationController extends AbstractController
         $gaps         = $this->buildGaps($salesByDate, $rawDocuments, $orphanCount);
 
         $totalCount   = 0;
-        $totalRevenue = 0.0;
+        $totalRevenue = '0';
         foreach ($salesByDate as $row) {
             $totalCount   += $row['count'];
-            $totalRevenue += $row['revenue'];
+            $totalRevenue = bcadd($totalRevenue, $row['revenue'], 2);
         }
 
-        $stornoRevenue = 0.0;
+        $stornoRevenue = '0';
         foreach ($stornoSales as $s) {
-            $stornoRevenue += $s['totalRevenue'];
+            $stornoRevenue = bcadd($stornoRevenue, $s['totalRevenue'], 2);
         }
 
         return new JsonResponse([
@@ -84,7 +84,7 @@ final class DebugOzonReconciliationController extends AbstractController
             ],
             'sales' => [
                 'count'        => $totalCount,
-                'totalRevenue' => round($totalRevenue, 2),
+                'totalRevenue' => $totalRevenue,
                 'byDate'       => $salesByDate,
             ],
             'rawDocuments' => [
@@ -93,7 +93,7 @@ final class DebugOzonReconciliationController extends AbstractController
             ],
             'stornoSales' => [
                 'count'        => count($stornoSales),
-                'totalRevenue' => round($stornoRevenue, 2),
+                'totalRevenue' => $stornoRevenue,
                 'items'        => $stornoSales,
             ],
             'gaps' => $gaps,
@@ -101,7 +101,7 @@ final class DebugOzonReconciliationController extends AbstractController
     }
 
     /**
-     * @return array<string, array{count: int, revenue: float}>
+     * @return array<string, array{count: int, revenue: string}>
      */
     private function fetchSalesByDate(
         string $companyId,
@@ -133,7 +133,7 @@ final class DebugOzonReconciliationController extends AbstractController
         foreach ($rows as $row) {
             $result[(string) $row['dt']] = [
                 'count'   => (int) $row['cnt'],
-                'revenue' => round((float) $row['revenue'], 2),
+                'revenue' => (string) ($row['revenue'] ?? '0'),
             ];
         }
 
@@ -143,6 +143,7 @@ final class DebugOzonReconciliationController extends AbstractController
     /**
      * Фильтр по перекрытию периодов: документ покрывает хотя бы часть запрошенного диапазона.
      * Используется period_from/period_to документа, а не synced_at.
+     * Ограничен document_type = 'sales_report' — только документы, порождающие строки в marketplace_sales.
      *
      * @return list<array{id: string, status: string|null, syncedAt: string, documentType: string, operationsCount: int, periodFrom: string, periodTo: string}>
      */
@@ -162,10 +163,11 @@ final class DebugOzonReconciliationController extends AbstractController
                 mrd.period_from::text AS period_from,
                 mrd.period_to::text   AS period_to
             FROM marketplace_raw_documents mrd
-            WHERE mrd.company_id  = :companyId
-              AND mrd.marketplace = 'ozon'
-              AND mrd.period_from <= :periodTo
-              AND mrd.period_to   >= :periodFrom
+            WHERE mrd.company_id   = :companyId
+              AND mrd.marketplace  = 'ozon'
+              AND mrd.document_type = 'sales_report'
+              AND mrd.period_from  <= :periodTo
+              AND mrd.period_to    >= :periodFrom
             ORDER BY mrd.period_from, mrd.synced_at
             SQL,
             [
@@ -195,7 +197,7 @@ final class DebugOzonReconciliationController extends AbstractController
      * Сторно-продажи: external_order_id с суффиксом _storno
      * (OzonSalesRawProcessor добавляет суффикс при accruals_for_sale < 0).
      *
-     * @return list<array{externalOrderId: string, totalRevenue: float, saleDate: string}>
+     * @return list<array{externalOrderId: string, totalRevenue: string, saleDate: string}>
      */
     private function fetchStornoSales(
         string $companyId,
@@ -213,7 +215,7 @@ final class DebugOzonReconciliationController extends AbstractController
               AND s.marketplace = 'ozon'
               AND s.sale_date  >= :periodFrom
               AND s.sale_date  <= :periodTo
-              AND s.external_order_id LIKE '%_storno'
+              AND s.external_order_id LIKE '%\_storno' ESCAPE '\'
             ORDER BY s.sale_date, s.external_order_id
             SQL,
             [
@@ -226,7 +228,7 @@ final class DebugOzonReconciliationController extends AbstractController
         return array_map(
             static fn (array $r): array => [
                 'externalOrderId' => (string) $r['external_order_id'],
-                'totalRevenue'    => round((float) $r['total_revenue'], 2),
+                'totalRevenue'    => (string) ($r['total_revenue'] ?? '0'),
                 'saleDate'        => (string) $r['sale_date'],
             ],
             $rows,
@@ -265,7 +267,7 @@ final class DebugOzonReconciliationController extends AbstractController
     /**
      * Пробелы: даты с продажами, для которых нет покрывающего raw-документа.
      *
-     * @param array<string, array{count: int, revenue: float}>              $salesByDate
+     * @param array<string, array{count: int, revenue: string}>             $salesByDate
      * @param list<array{periodFrom: string, periodTo: string, ...}>        $rawDocuments
      *
      * @return array{datesWithoutRawDocuments: list<string>, salesWithoutRawDocument: int}
