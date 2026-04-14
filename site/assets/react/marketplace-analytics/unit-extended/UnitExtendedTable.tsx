@@ -57,6 +57,7 @@ const TABLE_STYLES = `
     left: 0;
     background: var(--tblr-bg-surface);
     min-width: 240px;
+    max-width: 240px;
 }
 .ue-ext-table td.ue-ext-frozen { z-index: 1; }
 .ue-ext-table thead th.ue-ext-frozen { z-index: 3; }
@@ -215,8 +216,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                             <React.Fragment key={row.listingId}>
                                 <tr>
                                     <td className="ue-ext-frozen">
-                                        <div>{row.title || '\u2014'}</div>
-                                        <div className="text-muted small">{row.sku}</div>
+                                        <div className="text-truncate">{row.title || '\u2014'}</div>
+                                        <div className="text-muted small text-truncate">{row.sku}</div>
                                     </td>
                                     <td className="text-end">{formatMoney(row.revenue)}</td>
                                     <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
