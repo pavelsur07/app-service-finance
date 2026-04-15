@@ -36,7 +36,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * cron должен попробовать обработать всё, что может.
  */
 #[AsCommand(
-    name: 'marketplace-ads:load',
+    name: 'app:marketplace-ads:load',
     description: 'Загружает рекламную статистику маркетплейсов за дату и ставит обработку в очередь.',
 )]
 final class LoadAdDataCommand extends Command

@@ -37,7 +37,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * его DRAFT-статус.
  */
 #[AsCommand(
-    name: 'marketplace-ads:reprocess',
+    name: 'app:marketplace-ads:reprocess',
     description: 'Переобрабатывает уже загруженные AdRawDocument по фильтрам (дата, площадка, компания).',
 )]
 final class ReprocessAdDataCommand extends Command
