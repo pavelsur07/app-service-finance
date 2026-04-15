@@ -99,13 +99,17 @@ final class InitialSyncHandler
             // Диспатчим следующую партию если она есть
             if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
                 // Вычисляем партию после следующей чтобы передать её в nextDate
-                $today      = new \DateTimeImmutable('today');
-                $nextFrom   = new \DateTimeImmutable($message->nextDateFrom);
-                // Следующее воскресенье или сегодня
-                $nextSunday = $nextFrom->modify('sunday this week');
-                $nextTo     = $nextSunday > $today ? $today : $nextSunday;
+                $today = new \DateTimeImmutable('today');
 
-                // Партия после следующей — через сервис
+                // Используем nextDateTo как есть — он уже корректно рассчитан buildPartitions
+                // (учитывает границы месяца и недели), поэтому пересчёт через
+                // modify('sunday this week') ломает split-партиции.
+                $nextTo = new \DateTimeImmutable($message->nextDateTo);
+                if ($nextTo > $today) {
+                    $nextTo = $today;
+                }
+
+                // Оставшиеся партиции считаем от конца следующей партии
                 $afterStart      = $nextTo->modify('+1 day')->setTime(0, 0, 0);
                 $hasAfter        = $afterStart <= $today;
                 $afterPartitions = $hasAfter
