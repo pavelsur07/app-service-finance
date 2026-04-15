@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
+use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -27,11 +29,27 @@ final class TriggerInitialSyncHandler
         private readonly LoggerInterface $logger,
         private readonly MarketplaceWeekPartitionService $partitionService,
         private readonly ClockInterface $clock,
+        private readonly MarketplaceConnectionRepository $connectionRepository,
     ) {
     }
 
     public function __invoke(TriggerInitialSyncMessage $message): void
     {
+        // InitialSync — это бэкфилл продаж/возвратов/затрат через Seller API.
+        // Для Performance-подключений исторических данных по этой цепочке нет,
+        // поэтому триггер выполняется только для SELLER.
+        $connection = $this->connectionRepository->find($message->connectionId);
+
+        if (null === $connection || MarketplaceConnectionType::SELLER !== $connection->getConnectionType()) {
+            $this->logger->warning('InitialSync: skipped — connection missing or not SELLER', [
+                'company_id'      => $message->companyId,
+                'connection_id'   => $message->connectionId,
+                'connection_type' => $connection?->getConnectionType()->value,
+            ]);
+
+            return;
+        }
+
         $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
         $yearStart = new \DateTimeImmutable((int) $yesterday->format('Y') . '-01-01 00:00:00');
         $weeks = $this->partitionService->buildPartitions($yearStart, $yesterday);
