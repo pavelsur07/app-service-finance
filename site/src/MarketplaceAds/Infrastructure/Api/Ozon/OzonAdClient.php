@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Infrastructure\Api\Ozon;
 
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 
@@ -22,6 +23,11 @@ final class OzonAdClient implements AdPlatformClientInterface
     public function supports(string $marketplace): bool
     {
         return $marketplace === MarketplaceType::OZON->value;
+    }
+
+    public function getRequiredConnectionType(): MarketplaceConnectionType
+    {
+        return MarketplaceConnectionType::PERFORMANCE;
     }
 
     public function fetchAdStatistics(string $companyId, \DateTimeImmutable $date): string

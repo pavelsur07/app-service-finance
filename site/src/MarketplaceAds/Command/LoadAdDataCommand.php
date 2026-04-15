@@ -5,9 +5,8 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Command;
 
 use App\Company\Facade\CompanyFacade;
-use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
@@ -56,7 +55,7 @@ final class LoadAdDataCommand extends Command
      */
     public function __construct(
         private readonly CompanyFacade $companyFacade,
-        private readonly MarketplaceConnectionRepository $connectionRepository,
+        private readonly MarketplaceFacade $marketplaceFacade,
         private readonly AdRawDocumentRepository $rawDocumentRepository,
         private readonly iterable $platformClients,
         private readonly EntityManagerInterface $entityManager,
@@ -198,22 +197,9 @@ final class LoadAdDataCommand extends Command
         \DateTimeImmutable $reportDate,
         OutputInterface $output,
     ): AdRawDocument|string {
-        $connection = $this->connectionRepository->findByCompanyIdAndMarketplace(
-            $companyId,
-            $marketplace,
-            MarketplaceConnectionType::SELLER,
-        );
-
-        if (null === $connection || !$connection->isActive()) {
-            $output->writeln(sprintf(
-                '<comment>[%s / %s] пропуск: нет активного подключения.</comment>',
-                $companyId,
-                $marketplace->value,
-            ));
-
-            return 'skipped';
-        }
-
+        // Клиент выбирается первым, потому что он определяет тип подключения
+        // для credentials: WB — Seller API (один токен на всё), Ozon — отдельный
+        // Performance API (OAuth). Без клиента знать, какой тип искать, невозможно.
         $client = $this->selectClient($marketplace->value);
 
         if (null === $client) {
@@ -221,6 +207,31 @@ final class LoadAdDataCommand extends Command
                 'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
             ]);
+
+            return 'skipped';
+        }
+
+        $connectionType = $client->getRequiredConnectionType();
+        $credentials = $this->marketplaceFacade->getConnectionCredentials(
+            $companyId,
+            $marketplace,
+            $connectionType,
+        );
+
+        if (null === $credentials) {
+            // getConnectionCredentials возвращает только активные подключения,
+            // так что null = «нет подключения нужного типа или оно отключено».
+            $this->logger->info('Нет активного подключения для загрузки рекламы', [
+                'companyId' => $companyId,
+                'marketplace' => $marketplace->value,
+                'connectionType' => $connectionType->value,
+            ]);
+            $output->writeln(sprintf(
+                '<comment>[%s / %s] пропуск: нет активного подключения (%s).</comment>',
+                $companyId,
+                $marketplace->value,
+                $connectionType->value,
+            ));
 
             return 'skipped';
         }
