@@ -538,7 +538,7 @@
             }
 
             function currentType() {
-                return document.querySelector('input[name="connection_type"]:checked').value;
+                return perfRadio.checked ? 'performance' : 'seller';
             }
 
             function applyConnectionType() {
@@ -581,7 +581,7 @@
                 applyConnectionType();
             });
 
-            document.querySelectorAll('input[name="connection_type"]').forEach(function (radio) {
+            [sellerRadio, perfRadio].forEach(function (radio) {
                 radio.addEventListener('change', applyConnectionType);
             });
 
