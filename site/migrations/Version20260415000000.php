@@ -16,6 +16,13 @@ use Doctrine\Migrations\AbstractMigration;
  * (company_id, marketplace).
  *
  * Существующие записи получают значение 'seller' через DEFAULT.
+ *
+ * ВНИМАНИЕ: down() совместим только с данными, которые укладываются в старое
+ * ограничение уникальности (company_id, marketplace). Если в таблице появились
+ * записи с connection_type = 'performance' для той же пары (company_id, marketplace),
+ * где уже есть 'seller', откат упадёт на CREATE UNIQUE INDEX uniq_company_marketplace
+ * из-за дубликата. Автоматического удаления PERFORMANCE-записей миграция сознательно
+ * не делает — откат при «грязной» БД требует ручной чистки данных оператором.
  */
 final class Version20260415000000 extends AbstractMigration
 {
