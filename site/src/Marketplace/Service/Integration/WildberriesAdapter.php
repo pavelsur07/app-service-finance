@@ -7,6 +7,7 @@ use App\Marketplace\DTO\CostData;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
@@ -293,7 +294,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     {
         return $this->connectionRepository->findByMarketplace(
             $company,
-            MarketplaceType::WILDBERRIES
+            MarketplaceType::WILDBERRIES,
+            MarketplaceConnectionType::SELLER,
         );
     }
 }

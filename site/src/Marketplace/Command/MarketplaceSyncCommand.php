@@ -4,6 +4,7 @@ namespace App\Marketplace\Command;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Facade\MarketplaceSyncFacade;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Company\Facade\CompanyFacade;
@@ -80,7 +81,11 @@ class MarketplaceSyncCommand extends Command
         foreach ($companies as $company) {
             $io->section('Компания: '.$company->getName());
 
-            $connection = $this->connectionRepository->findByMarketplace($company, $marketplace);
+            $connection = $this->connectionRepository->findByMarketplace(
+                $company,
+                $marketplace,
+                MarketplaceConnectionType::SELLER,
+            );
 
             if (!$connection || !$connection->isActive()) {
                 $io->warning('Подключение неактивно, пропускаем');

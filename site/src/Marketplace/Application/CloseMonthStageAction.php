@@ -13,6 +13,7 @@ use App\Marketplace\Application\DTO\PreflightResult;
 use App\Marketplace\Application\Source\MarketplaceDataSourceInterface;
 use App\Marketplace\DTO\PLEntryDTO;
 use App\Marketplace\Enum\CloseStage;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
@@ -114,6 +115,7 @@ final class CloseMonthStageAction
         $connection = $this->connectionRepository->findByCompanyIdAndMarketplace(
             $command->companyId,
             $marketplace,
+            MarketplaceConnectionType::SELLER,
         );
         if ($connection !== null) {
             $projectDirectionId = $connection->getProjectDirectionId();

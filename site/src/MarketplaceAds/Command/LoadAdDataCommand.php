@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Command;
 
 use App\Company\Facade\CompanyFacade;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\MarketplaceAds\Entity\AdRawDocument;
@@ -197,7 +198,11 @@ final class LoadAdDataCommand extends Command
         \DateTimeImmutable $reportDate,
         OutputInterface $output,
     ): AdRawDocument|string {
-        $connection = $this->connectionRepository->findByCompanyIdAndMarketplace($companyId, $marketplace);
+        $connection = $this->connectionRepository->findByCompanyIdAndMarketplace(
+            $companyId,
+            $marketplace,
+            MarketplaceConnectionType::SELLER,
+        );
 
         if (null === $connection || !$connection->isActive()) {
             $output->writeln(sprintf(

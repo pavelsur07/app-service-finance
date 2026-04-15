@@ -7,6 +7,7 @@ use App\Marketplace\DTO\CostData;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
@@ -370,7 +371,8 @@ class OzonAdapter implements MarketplaceAdapterInterface
     {
         return $this->connectionRepository->findByMarketplace(
             $company,
-            MarketplaceType::OZON
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
         );
     }
 }
