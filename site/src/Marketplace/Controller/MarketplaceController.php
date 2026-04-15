@@ -12,6 +12,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\Command\SyncConnectionCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
 use App\Marketplace\Infrastructure\Query\RawDocumentsListQuery;
@@ -86,7 +87,11 @@ class MarketplaceController extends AbstractController
         $apiKey      = $request->request->get('api_key');
         $clientId    = $request->request->get('client_id');
 
-        $existing = $this->connectionRepository->findByMarketplace($company, $marketplace);
+        $existing = $this->connectionRepository->findByMarketplace(
+            $company,
+            $marketplace,
+            MarketplaceConnectionType::SELLER,
+        );
 
         if ($existing) {
             $this->addFlash('error', 'Подключение к ' . $marketplace->getDisplayName() . ' уже существует');
