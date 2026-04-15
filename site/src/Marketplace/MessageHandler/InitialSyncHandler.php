@@ -121,12 +121,16 @@ final class InitialSyncHandler
                 $afterFromStr = !empty($afterPartitions) ? $afterPartitions[0]['from'] : null;
                 $afterToStr   = !empty($afterPartitions) ? $afterPartitions[0]['to']   : null;
 
+                // Используем клампнутый $nextTo — если ограничение по today сработало,
+                // следующая задача не должна тянуть данные за будущий период.
+                $nextToStr = $nextTo->format('Y-m-d H:i:s');
+
                 $this->messageBus->dispatch(new InitialSyncMessage(
                     companyId:    $message->companyId,
                     connectionId: $message->connectionId,
                     marketplace:  $message->marketplace,
                     dateFrom:     $message->nextDateFrom,
-                    dateTo:       $message->nextDateTo,
+                    dateTo:       $nextToStr,
                     nextDateFrom: $afterFromStr,
                     nextDateTo:   $afterToStr,
                 ));
@@ -135,7 +139,7 @@ final class InitialSyncHandler
                     'company_id'  => $message->companyId,
                     'marketplace' => $message->marketplace,
                     'date_from'   => $message->nextDateFrom,
-                    'date_to'     => $message->nextDateTo,
+                    'date_to'     => $nextToStr,
                 ]);
             } else {
                 // Последняя партия — обновляем статус подключения
