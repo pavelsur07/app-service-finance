@@ -57,7 +57,7 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
     },
     {
         key: 'other',
-        label: 'Другие услуги и штрафы',
+        label: 'Прочее и компенсации',
         type: 'expense',
         icon: 'ti ti-alert-triangle',
         getValue: (s) => getGroupNet(s, 'Другие услуги и штрафы'),
@@ -82,5 +82,20 @@ export const WIDGET_KEY_TO_GROUPS: Record<string, string[]> = {
     delivery_fbo: ['Услуги доставки и FBO'],
     partners: ['Услуги партнёров'],
     promo: ['Продвижение и реклама'],
+    // Компенсации и декомпенсации на бэке входят в "Другие услуги и штрафы"
+    // (см. WidgetServiceGroupMap). На фронте они визуально разделяются
+    // на подгруппы в WidgetDetailPanel через COMPENSATION_CODES.
     other: ['Другие услуги и штрафы'],
 };
+
+/**
+ * Коды категорий, относящиеся к компенсациям и декомпенсациям.
+ *
+ * Используется в WidgetDetailPanel для визуального выделения
+ * подгруппы «Компенсации и декомпенсации» внутри группы
+ * «Другие услуги и штрафы».
+ */
+export const COMPENSATION_CODES: readonly string[] = [
+    'ozon_compensation',
+    'ozon_decompensation',
+];
