@@ -100,22 +100,23 @@ final class InitialSyncHandler
 
             // Диспатчим следующую партию если она есть
             if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
-                // Вычисляем партию после следующей чтобы передать её в nextDate
-                $today = $this->clock->now()->setTime(0, 0, 0);
+                // Граница первичной синхронизации — вчера: за сегодня данные
+                // ещё неполные, их загрузит ежедневный cron завтра.
+                $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
 
                 // Используем nextDateTo как есть — он уже корректно рассчитан buildPartitions
                 // (учитывает границы месяца и недели), поэтому пересчёт через
                 // modify('sunday this week') ломает split-партиции.
                 $nextTo = new \DateTimeImmutable($message->nextDateTo);
-                if ($nextTo > $today) {
-                    $nextTo = $today;
+                if ($nextTo > $yesterday) {
+                    $nextTo = $yesterday;
                 }
 
                 // Оставшиеся партиции считаем от конца следующей партии
                 $afterStart      = $nextTo->modify('+1 day')->setTime(0, 0, 0);
-                $hasAfter        = $afterStart <= $today;
+                $hasAfter        = $afterStart <= $yesterday;
                 $afterPartitions = $hasAfter
-                    ? $this->partitionService->buildPartitions($afterStart, $today)
+                    ? $this->partitionService->buildPartitions($afterStart, $yesterday)
                     : [];
 
                 $afterFromStr = !empty($afterPartitions) ? $afterPartitions[0]['from'] : null;
