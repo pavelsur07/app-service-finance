@@ -10,6 +10,7 @@ use App\Marketplace\DTO\CostData;
 use App\Marketplace\DTO\OrderDTO;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Infrastructure\Query\CostCategoriesQuery;
@@ -17,6 +18,7 @@ use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
+use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
 use Doctrine\DBAL\Connection;
@@ -33,7 +35,24 @@ final readonly class MarketplaceFacade
         private ListingReturnAggregateQuery $returnAggregateQuery,
         private ListingCostAggregateQuery $costAggregateQuery,
         private ListingMetaQuery $listingMetaQuery,
+        private MarketplaceCredentialsQuery $credentialsQuery,
     ) {}
+
+    /**
+     * Получить учётные данные подключения к API маркетплейса.
+     *
+     * Используется кросс-модульно (например, из MarketplaceAds для получения
+     * credentials к Performance API).
+     *
+     * @return array{api_key: string, client_id: ?string}|null
+     */
+    public function getConnectionCredentials(
+        string $companyId,
+        MarketplaceType $marketplace,
+        MarketplaceConnectionType $connectionType,
+    ): ?array {
+        return $this->credentialsQuery->getCredentials($companyId, $marketplace, $connectionType);
+    }
 
     /**
      * @return AdvertisingCostDTO[]
