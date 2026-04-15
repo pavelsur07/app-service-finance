@@ -71,13 +71,16 @@ final class InitialSyncHandlerTest extends TestCase
     }
 
     /**
-     * Сценарий: nextDateTo в будущем относительно clock (например, сообщение
+     * Сценарий: nextDateTo в будущем относительно вчера (например, сообщение
      * задержалось в очереди или clock сдвинулся). Handler обязан обрезать
-     * dateTo до текущего дня и завершить цепочку (nextDateFrom/nextDateTo = null).
+     * dateTo до вчерашнего дня и завершить цепочку (nextDateFrom/nextDateTo = null).
+     *
+     * Первичная синхронизация никогда не загружает данные за сегодня —
+     * за них отвечает ежедневный cron на следующий день.
      */
-    public function testNextBatchDateToClampedToToday(): void
+    public function testNextBatchDateToClampedToYesterday(): void
     {
-        // Сегодня = 2026-04-03; nextDateTo в сообщении = 2026-04-05 23:59:59 (будущее).
+        // Сегодня = 2026-04-03; вчера = 2026-04-02; nextDateTo в сообщении = 2026-04-05 23:59:59 (будущее).
         [$handler, $captured] = $this->createHandler(new MockClock('2026-04-03 12:00:00'));
 
         $message = new InitialSyncMessage(
@@ -97,10 +100,10 @@ final class InitialSyncHandlerTest extends TestCase
 
         // dateFrom пробрасывается без изменений.
         self::assertSame('2026-04-01 00:00:00', $dispatched->dateFrom);
-        // dateTo должен быть обрезан до $today (clock midnight).
-        self::assertSame('2026-04-03 00:00:00', $dispatched->dateTo);
+        // dateTo должен быть обрезан до $yesterday (clock midnight - 1 day).
+        self::assertSame('2026-04-02 00:00:00', $dispatched->dateTo);
 
-        // Цепочка должна завершиться — after-start (2026-04-04) > today → партий нет.
+        // Цепочка должна завершиться — after-start (2026-04-03) > yesterday → партий нет.
         self::assertNull($dispatched->nextDateFrom);
         self::assertNull($dispatched->nextDateTo);
     }

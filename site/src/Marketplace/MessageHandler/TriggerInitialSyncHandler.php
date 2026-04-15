@@ -8,6 +8,7 @@ use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -15,7 +16,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * Нарезает текущий год на недельные партии с учётом границ месяца и диспатчит первую.
  * Каждая следующая партия диспатчится из InitialSyncHandler после успеха предыдущей.
  *
- * Период: 01.01 текущего года → сегодня (с времени 00:00:00 → 23:59:59).
+ * Период: 01.01 текущего года → вчера (с времени 00:00:00 → 23:59:59).
+ * За сегодня данные ещё неполные — их загрузит ежедневный cron завтра.
  */
 #[AsMessageHandler]
 final class TriggerInitialSyncHandler
@@ -24,14 +26,15 @@ final class TriggerInitialSyncHandler
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly MarketplaceWeekPartitionService $partitionService,
+        private readonly ClockInterface $clock,
     ) {
     }
 
     public function __invoke(TriggerInitialSyncMessage $message): void
     {
-        $today = new \DateTimeImmutable('today');
-        $yearStart = new \DateTimeImmutable((int) $today->format('Y') . '-01-01 00:00:00');
-        $weeks = $this->partitionService->buildPartitions($yearStart, $today);
+        $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
+        $yearStart = new \DateTimeImmutable((int) $yesterday->format('Y') . '-01-01 00:00:00');
+        $weeks = $this->partitionService->buildPartitions($yearStart, $yesterday);
 
         if (empty($weeks)) {
             $this->logger->warning('InitialSync: no weeks to sync', [
