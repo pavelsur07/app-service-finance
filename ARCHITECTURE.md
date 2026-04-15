@@ -258,6 +258,12 @@ getCostPriceForListing(string $companyId, string $listingId, \DateTimeImmutable 
 // Список категорий затрат для формы маппинга юнит-экономики
 // @return array<array{id: string, code: string, name: string}>
 getCostCategoriesForCompany(string $companyId, string $marketplace): array
+
+// Получить учётные данные подключения к API маркетплейса (для кросс-модульного доступа,
+// например из MarketplaceAds к Ozon Performance API). connectionType обязателен — caller
+// должен явно указать SELLER или PERFORMANCE.
+// @return array{api_key: string, client_id: ?string}|null
+getConnectionCredentials(string $companyId, MarketplaceType $marketplace, MarketplaceConnectionType $connectionType): ?array
 ```
 
 ---
@@ -605,3 +611,4 @@ paths:
 | 1.4 | 2026-04-12 | MarketplaceAds: `ProcessAdRawDocumentAction` — загрузка AdRawDocument (DRAFT) и конвертация в AdDocument + AdDocumentLine. Идемпотентность через `deleteByRawDocumentId`, частичный успех оставляет статус DRAFT. Bulk-prefetch листингов и продаж на уровне Action (2 запроса на документ), `AdCostDistributor` стал чистой функцией без DI. В `MarketplaceFacade` добавлен `findListingsByMarketplaceSkus` (bulk, сгруппирован по parentSku), в `ListingSalesProviderInterface` — `findListingsByParentSkus`. |
 | 1.5 | 2026-04-13 | MarketplaceAds: CLI-обвязка + Messenger-пайплайн (`marketplace-ads:load`, `marketplace-ads:reprocess`, `ProcessAdRawDocumentMessage`, `ProcessAdRawDocumentHandler`). Batch-flush в Load (единый flush по всему проходу), guardrails в Reprocess (--all / хотя бы один фильтр, batch clear BATCH_SIZE=50). `MarketplaceAdsFacade` — публичный API модуля: `getAdCostsForListingAndDate`, `getTotalAdCostForPeriod`. `AdDocumentQuery` — DBAL-запросы к `marketplace_ad_documents` JOIN `marketplace_ad_document_lines`. `AdCostForListingDTO` для передачи распределённых данных между модулями. |
 | 1.6 | 2026-04-15 | Marketplace: новый enum `MarketplaceConnectionType` (`SELLER` / `PERFORMANCE`). Entity `MarketplaceConnection` получила поле `connectionType` (дефолт `SELLER`), `UniqueConstraint` расширен до `(company_id, marketplace, connection_type)`. Позволяет одной компании хранить отдельные подключения к Ozon Seller API и Ozon Performance API. |
+| 1.7 | 2026-04-15 | Marketplace: `MarketplaceCredentialsQuery::getCredentials()` получил опциональный параметр `MarketplaceConnectionType $connectionType = SELLER` с SQL-фильтром `AND mc.connection_type = :connection_type`. В `MarketplaceFacade` добавлен метод `getConnectionCredentials()` для кросс-модульного доступа к credentials (используется из MarketplaceAds для Performance API). Существующие вызовы (WbFetcher, OzonFetcher, OzonProductBarcodeFetcher) продолжают работать без изменений за счёт дефолта. |
