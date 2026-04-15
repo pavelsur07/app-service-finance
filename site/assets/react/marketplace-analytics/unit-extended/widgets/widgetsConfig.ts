@@ -1,6 +1,14 @@
 import type { WidgetCardConfig, WidgetsSummary } from './widgets.types';
 
 /**
+ * Имя serviceGroup «Другие услуги и штрафы» на бэке (см. WidgetServiceGroupMap).
+ * Единая точка правды — используется и в WIDGET_KEY_TO_GROUPS, и в
+ * WidgetDetailPanel для определения группы, внутри которой нужно
+ * показать подгруппы «обычные услуги» + «компенсации».
+ */
+export const OTHER_SERVICES_GROUP = 'Другие услуги и штрафы';
+
+/**
  * Считает сумму netAmount по выбранным widgetGroup.
  */
 function getGroupNet(s: WidgetsSummary, ...names: string[]): number {
@@ -57,10 +65,10 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
     },
     {
         key: 'other',
-        label: 'Другие услуги и штрафы',
+        label: 'Прочее и компенсации',
         type: 'expense',
         icon: 'ti ti-alert-triangle',
-        getValue: (s) => getGroupNet(s, 'Другие услуги и штрафы'),
+        getValue: (s) => getGroupNet(s, OTHER_SERVICES_GROUP),
     },
     {
         key: 'profit',
@@ -82,5 +90,20 @@ export const WIDGET_KEY_TO_GROUPS: Record<string, string[]> = {
     delivery_fbo: ['Услуги доставки и FBO'],
     partners: ['Услуги партнёров'],
     promo: ['Продвижение и реклама'],
-    other: ['Другие услуги и штрафы'],
+    // Компенсации и декомпенсации на бэке входят в "Другие услуги и штрафы"
+    // (см. WidgetServiceGroupMap). На фронте они визуально разделяются
+    // на подгруппы в WidgetDetailPanel через COMPENSATION_CODES.
+    other: [OTHER_SERVICES_GROUP],
 };
+
+/**
+ * Коды категорий, относящиеся к компенсациям и декомпенсациям.
+ *
+ * Используется в WidgetDetailPanel для визуального выделения
+ * подгруппы «Компенсации и декомпенсации» внутри группы
+ * «Другие услуги и штрафы».
+ */
+export const COMPENSATION_CODES: readonly string[] = [
+    'ozon_compensation',
+    'ozon_decompensation',
+];
