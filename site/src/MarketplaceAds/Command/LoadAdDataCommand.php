@@ -203,8 +203,10 @@ final class LoadAdDataCommand extends Command
         $client = $this->selectClient($marketplace->value);
 
         if (null === $client) {
+            // Отсутствие клиента — глобальная DI-проблема (нет сервиса с тегом
+            // marketplace_ads.platform_client для этой площадки), а не данных
+            // конкретной компании. Поэтому companyId в контекст не кладём.
             $this->logger->warning('Отсутствует AdPlatformClient для маркетплейса', [
-                'companyId' => $companyId,
                 'marketplace' => $marketplace->value,
             ]);
 
@@ -212,13 +214,14 @@ final class LoadAdDataCommand extends Command
         }
 
         $connectionType = $client->getRequiredConnectionType();
-        $credentials = $this->marketplaceFacade->getConnectionCredentials(
+
+        // credentials в команде не используются (их возьмёт сам клиент при fetch);
+        // facade-запрос здесь — только проверка «есть ли активное подключение нужного типа».
+        if (null === $this->marketplaceFacade->getConnectionCredentials(
             $companyId,
             $marketplace,
             $connectionType,
-        );
-
-        if (null === $credentials) {
+        )) {
             // getConnectionCredentials возвращает только активные подключения,
             // так что null = «нет подключения нужного типа или оно отключено».
             $this->logger->info('Нет активного подключения для загрузки рекламы', [
