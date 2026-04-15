@@ -54,6 +54,29 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
     }
 
     /**
+     * Найти подключение по компании, маркетплейсу и типу подключения.
+     *
+     * В отличие от {@see self::findByMarketplace()} тип обязателен — вызывающий
+     * должен явно указать SELLER или PERFORMANCE. Используется в контроллерах
+     * создания подключений для проверки отсутствия дубликата по конкретному типу.
+     */
+    public function findByCompanyMarketplaceAndType(
+        Company $company,
+        MarketplaceType $marketplace,
+        MarketplaceConnectionType $connectionType,
+    ): ?MarketplaceConnection {
+        return $this->createQueryBuilder('c')
+            ->where('c.company = :company')
+            ->andWhere('c.marketplace = :marketplace')
+            ->andWhere('c.connectionType = :connectionType')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('connectionType', $connectionType)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return MarketplaceConnection[]
      */
     public function findActiveConnections(Company $company): array
