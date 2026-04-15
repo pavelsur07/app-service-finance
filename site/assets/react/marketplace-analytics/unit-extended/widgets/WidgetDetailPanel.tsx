@@ -1,7 +1,7 @@
 import React from 'react';
 import { formatMoney } from '../../utils/utils';
 import type { CostCategory, CostGroupBreakdown } from '../unitExtended.types';
-import { COMPENSATION_CODES } from './widgetsConfig';
+import { COMPENSATION_CODES, OTHER_SERVICES_GROUP } from './widgetsConfig';
 
 interface WidgetDetailPanelProps {
     groups: CostGroupBreakdown[];
@@ -13,20 +13,16 @@ interface SubgroupTotals {
     netAmount: number;
 }
 
-/**
- * Группа, внутри которой категории дополнительно разбиваются
- * на подгруппы (обычные услуги + компенсации).
- */
-const OTHER_SERVICES_GROUP = 'Другие услуги и штрафы';
 const COMPENSATIONS_SUBGROUP_LABEL = 'Компенсации и декомпенсации';
 
 function sumCategories(categories: CostCategory[]): SubgroupTotals {
     return categories.reduce<SubgroupTotals>(
-        (acc, c) => ({
-            costsAmount: acc.costsAmount + c.costsAmount,
-            stornoAmount: acc.stornoAmount + c.stornoAmount,
-            netAmount: acc.netAmount + c.netAmount,
-        }),
+        (acc, c) => {
+            acc.costsAmount += c.costsAmount;
+            acc.stornoAmount += c.stornoAmount;
+            acc.netAmount += c.netAmount;
+            return acc;
+        },
         { costsAmount: 0, stornoAmount: 0, netAmount: 0 },
     );
 }
@@ -104,6 +100,22 @@ const WidgetDetailPanel: React.FC<WidgetDetailPanelProps> = ({ groups }) => {
                                     (c) => !COMPENSATION_CODES.includes(c.code),
                                 );
 
+                                // Fallback: если категорий нет вовсе — рендерим
+                                // одну строку-заголовок с итогами группы (как
+                                // у остальных виджетов), чтобы не оставлять
+                                // пустое тело таблицы.
+                                if (others.length === 0 && compensations.length === 0) {
+                                    return (
+                                        <SubgroupRows
+                                            key={group.serviceGroup}
+                                            label={group.serviceGroup}
+                                            categories={group.categories}
+                                            totals={group}
+                                            rowKeyPrefix={group.serviceGroup}
+                                        />
+                                    );
+                                }
+
                                 return (
                                     <React.Fragment key={group.serviceGroup}>
                                         {others.length > 0 && (
@@ -131,11 +143,7 @@ const WidgetDetailPanel: React.FC<WidgetDetailPanelProps> = ({ groups }) => {
                                     key={group.serviceGroup}
                                     label={group.serviceGroup}
                                     categories={group.categories}
-                                    totals={{
-                                        costsAmount: group.costsAmount,
-                                        stornoAmount: group.stornoAmount,
-                                        netAmount: group.netAmount,
-                                    }}
+                                    totals={group}
                                     rowKeyPrefix={group.serviceGroup}
                                 />
                             );

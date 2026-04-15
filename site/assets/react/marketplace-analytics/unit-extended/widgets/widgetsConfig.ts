@@ -1,6 +1,14 @@
 import type { WidgetCardConfig, WidgetsSummary } from './widgets.types';
 
 /**
+ * Имя serviceGroup «Другие услуги и штрафы» на бэке (см. WidgetServiceGroupMap).
+ * Единая точка правды — используется и в WIDGET_KEY_TO_GROUPS, и в
+ * WidgetDetailPanel для определения группы, внутри которой нужно
+ * показать подгруппы «обычные услуги» + «компенсации».
+ */
+export const OTHER_SERVICES_GROUP = 'Другие услуги и штрафы';
+
+/**
  * Считает сумму netAmount по выбранным widgetGroup.
  */
 function getGroupNet(s: WidgetsSummary, ...names: string[]): number {
@@ -60,7 +68,7 @@ export const WIDGETS: readonly WidgetCardConfig[] = [
         label: 'Прочее и компенсации',
         type: 'expense',
         icon: 'ti ti-alert-triangle',
-        getValue: (s) => getGroupNet(s, 'Другие услуги и штрафы'),
+        getValue: (s) => getGroupNet(s, OTHER_SERVICES_GROUP),
     },
     {
         key: 'profit',
@@ -85,7 +93,7 @@ export const WIDGET_KEY_TO_GROUPS: Record<string, string[]> = {
     // Компенсации и декомпенсации на бэке входят в "Другие услуги и штрафы"
     // (см. WidgetServiceGroupMap). На фронте они визуально разделяются
     // на подгруппы в WidgetDetailPanel через COMPENSATION_CODES.
-    other: ['Другие услуги и штрафы'],
+    other: [OTHER_SERVICES_GROUP],
 };
 
 /**
