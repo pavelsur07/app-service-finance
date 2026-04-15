@@ -59,6 +59,8 @@
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
 | `AuditLog` | Shared | `string $companyId` ✅ |
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
+| `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
+| `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
 
 ### `UnitEconomyCostMapping` — поля
 
@@ -95,9 +97,6 @@
 | `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
 
 **Уникальность:** `UniqueConstraint` по `(company_id, marketplace, connection_type)` — одна компания может иметь два подключения к одному маркетплейсу (Seller + Performance), но только по одному каждого типа.
-
-| `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
-| `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
 
 ---
 
@@ -478,7 +477,7 @@ App\Shared\Service\SecretRotationService
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 | `marketplace_ads.raw_data_parser` | Парсеры raw-данных рекламных отчётов (Ozon, WB) |
-| `marketplace_ads.platform_client` | API-клиенты рекламных площадок (OzonAdClient, WildberriesAdClient) |
+| `marketplace_ads.platform_client` | API-клиенты рекламных площадок. `OzonAdClient` реализован против Ozon Performance API (OAuth2, async-репорты, CSV). `WildberriesAdClient` — TODO-stub |
 
 ---
 
@@ -612,3 +611,4 @@ paths:
 | 1.5 | 2026-04-13 | MarketplaceAds: CLI-обвязка + Messenger-пайплайн (`marketplace-ads:load`, `marketplace-ads:reprocess`, `ProcessAdRawDocumentMessage`, `ProcessAdRawDocumentHandler`). Batch-flush в Load (единый flush по всему проходу), guardrails в Reprocess (--all / хотя бы один фильтр, batch clear BATCH_SIZE=50). `MarketplaceAdsFacade` — публичный API модуля: `getAdCostsForListingAndDate`, `getTotalAdCostForPeriod`. `AdDocumentQuery` — DBAL-запросы к `marketplace_ad_documents` JOIN `marketplace_ad_document_lines`. `AdCostForListingDTO` для передачи распределённых данных между модулями. |
 | 1.6 | 2026-04-15 | Marketplace: новый enum `MarketplaceConnectionType` (`SELLER` / `PERFORMANCE`). Entity `MarketplaceConnection` получила поле `connectionType` (дефолт `SELLER`), `UniqueConstraint` расширен до `(company_id, marketplace, connection_type)`. Позволяет одной компании хранить отдельные подключения к Ozon Seller API и Ozon Performance API. |
 | 1.7 | 2026-04-15 | Marketplace: `MarketplaceCredentialsQuery::getCredentials()` получил опциональный параметр `MarketplaceConnectionType $connectionType = SELLER` с SQL-фильтром `AND mc.connection_type = :connection_type`. В `MarketplaceFacade` добавлен метод `getConnectionCredentials()` для кросс-модульного доступа к credentials (используется из MarketplaceAds для Performance API). Существующие вызовы (WbFetcher, OzonFetcher, OzonProductBarcodeFetcher) продолжают работать без изменений за счёт дефолта. |
+| 1.8 | 2026-04-15 | MarketplaceAds: `OzonAdClient` реализован против Ozon Performance API (`https://api-performance.ozon.ru`). Credentials забираются через `MarketplaceFacade::getConnectionCredentials(..., PERFORMANCE)`; OAuth2 access-token кэшируется в Symfony Cache с TTL = `expires_in - 300`. Пайплайн `fetchAdStatistics()`: листинг SKU-кампаний → async `/api/client/statistics` батчами по 100 кампаний → polling состояния (5 сек × 36 попыток = 3 мин) → скачивание CSV → парсинг через `fgetcsv` над `php://memory` (RFC 4180, автодетект `,` / `;`) → JSON `{"rows":[{campaign_id, campaign_name, sku, spend, views, clicks}]}`. `withAuthRetry()` один раз ретраит запрос при 401 (через внутренний `OzonAuthExpiredException`), 403 сигнализируется как permanent failure без ретрая. |
