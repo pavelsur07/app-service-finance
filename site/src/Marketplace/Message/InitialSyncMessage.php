@@ -14,10 +14,10 @@ final class InitialSyncMessage
         public readonly string  $companyId,
         public readonly string  $connectionId,
         public readonly string  $marketplace,    // MarketplaceType::value
-        public readonly string  $dateFrom,        // Y-m-d, всегда Пн
-        public readonly string  $dateTo,          // Y-m-d, Вс или сегодня для последней партии
-        public readonly ?string $nextDateFrom,    // null если последняя партия
-        public readonly ?string $nextDateTo,      // null если последняя партия
+        public readonly string  $dateFrom,        // 'Y-m-d H:i:s', начало партии (00:00:00)
+        public readonly string  $dateTo,          // 'Y-m-d H:i:s', конец партии (23:59:59)
+        public readonly ?string $nextDateFrom,    // 'Y-m-d H:i:s' либо null если последняя партия
+        public readonly ?string $nextDateTo,      // 'Y-m-d H:i:s' либо null если последняя партия
     ) {
     }
 }

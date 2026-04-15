@@ -16,6 +16,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -30,14 +31,12 @@ final class InitialSyncHandlerTest extends TestCase
      * Handler не должен пересчитывать nextDateTo через 'sunday this week' —
      * это сломало бы границу месяца. Должен взять nextDateTo как есть и
      * посчитать партию-после-следующей с понедельника 2026-04-01.
+     *
+     * Формат дат в цепочке — 'Y-m-d H:i:s' (как возвращает buildPartitions
+     * и как эмитит TriggerInitialSyncHandler).
      */
     public function testNextBatchPreservesMonthBoundarySplit(): void
     {
-        // Тест зависит от $today — должен быть >= 2026-04-05, иначе afterPartitions обрежется.
-        if (new \DateTimeImmutable('today') < new \DateTimeImmutable('2026-04-05')) {
-            self::markTestSkipped('Test scenario requires today >= 2026-04-05');
-        }
-
         $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(
             self::CONNECTION_ID,
@@ -66,7 +65,7 @@ final class InitialSyncHandlerTest extends TestCase
 
         $registry = new MarketplaceAdapterRegistry([$adapter]);
 
-        $captured  = null;
+        $captured   = null;
         $messageBus = $this->createMock(MessageBusInterface::class);
         $messageBus
             ->expects(self::once())
@@ -83,6 +82,7 @@ final class InitialSyncHandlerTest extends TestCase
             $messageBus,
             new NullLogger(),
             new MarketplaceWeekPartitionService(),
+            new MockClock('2026-04-10 12:00:00'),
         );
 
         // Текущая партия = 2026-03-23 .. 2026-03-29 (полная неделя Пн-Вс).
@@ -92,10 +92,10 @@ final class InitialSyncHandlerTest extends TestCase
             companyId:    self::COMPANY_ID,
             connectionId: self::CONNECTION_ID,
             marketplace:  MarketplaceType::OZON->value,
-            dateFrom:     '2026-03-23',
-            dateTo:       '2026-03-29',
-            nextDateFrom: '2026-03-30',
-            nextDateTo:   '2026-03-31',
+            dateFrom:     '2026-03-23 00:00:00',
+            dateTo:       '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo:   '2026-03-31 23:59:59',
         );
 
         $handler($message);
@@ -106,11 +106,11 @@ final class InitialSyncHandlerTest extends TestCase
         self::assertSame(MarketplaceType::OZON->value, $captured->marketplace);
 
         // Текущая партия следующего сообщения = вторая половина split-недели как есть.
-        self::assertSame('2026-03-30', $captured->dateFrom);
-        self::assertSame('2026-03-31', $captured->dateTo);
+        self::assertSame('2026-03-30 00:00:00', $captured->dateFrom);
+        self::assertSame('2026-03-31 23:59:59', $captured->dateTo);
 
-        // Партия-после-следующей = вторая половина той же исходной недели
-        // (понедельник нового месяца → воскресенье).
+        // Партия-после-следующей = первая партия от 2026-04-01 (понедельник нового месяца)
+        // до ближайшего воскресенья 2026-04-05.
         self::assertSame('2026-04-01 00:00:00', $captured->nextDateFrom);
         self::assertSame('2026-04-05 23:59:59', $captured->nextDateTo);
     }

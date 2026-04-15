@@ -14,6 +14,7 @@ use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -33,6 +34,7 @@ final class InitialSyncHandler
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly MarketplaceWeekPartitionService $partitionService,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -99,7 +101,7 @@ final class InitialSyncHandler
             // Диспатчим следующую партию если она есть
             if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
                 // Вычисляем партию после следующей чтобы передать её в nextDate
-                $today = new \DateTimeImmutable('today');
+                $today = $this->clock->now()->setTime(0, 0, 0);
 
                 // Используем nextDateTo как есть — он уже корректно рассчитан buildPartitions
                 // (учитывает границы месяца и недели), поэтому пересчёт через
