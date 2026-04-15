@@ -76,6 +76,26 @@
 **Логика:** одна категория МП → одна статья (UniqueConstraint по `companyId + marketplace + costCategoryId`).
 Одна статья ← несколько категорий МП.
 Удалено: `isSystem`, `costCategoryCode`.
+
+### `MarketplaceConnection` — поля
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` (UUID) | PK |
+| `company` | `Company` | ManyToOne (legacy паттерн) |
+| `marketplace` | `MarketplaceType` | WB, Ozon и др. |
+| `connectionType` | `MarketplaceConnectionType` | Тип подключения: `SELLER` (финансы/продажи/остатки) или `PERFORMANCE` (реклама). Дефолт — `SELLER` |
+| `apiKey` | `string` | Ключ API (для Ozon Performance — `client_secret`) |
+| `clientId` | `?string` | Client-Id для Ozon Seller API / `client_id` для Ozon Performance |
+| `isActive` | `bool` | Активно ли подключение |
+| `lastSyncAt` | `?DateTimeImmutable` | — |
+| `lastSuccessfulSyncAt` | `?DateTimeImmutable` | — |
+| `lastSyncError` | `?string` | — |
+| `settings` | `?array` | JSON с дополнительными настройками (напр. `project_direction_id`) |
+| `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
+
+**Уникальность:** `UniqueConstraint` по `(company_id, marketplace, connection_type)` — одна компания может иметь два подключения к одному маркетплейсу (Seller + Performance), но только по одному каждого типа.
+
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
 
@@ -395,6 +415,18 @@ enum MarketplaceCostOperationType: string
 ```
 > Явная классификация операции затраты. Заменяет определение типа по знаку `amount`.
 
+### `src/Marketplace/Enum/MarketplaceConnectionType.php`
+```php
+enum MarketplaceConnectionType: string
+{
+    case SELLER      = 'seller';      // Основное (Seller API: финансы, продажи, остатки)
+    case PERFORMANCE = 'performance'; // Реклама (Performance API: OAuth2 Bearer)
+
+    public function getDisplayName(): string; // Основное / Реклама (Performance)
+}
+```
+> Тип подключения к маркетплейсу. У Ozon два независимых API: `api-seller.ozon.ru` (статический Client-Id + Api-Key) и `api-performance.ozon.ru` (OAuth2 client_id + client_secret). Позволяет одной компании иметь два подключения к одному маркетплейсу.
+
 ### `src/MarketplaceAds/Enum/AdRawDocumentStatus.php`
 ```php
 enum AdRawDocumentStatus: string
@@ -572,3 +604,4 @@ paths:
 | 1.3 | 2026-04-12 | MarketplaceAds: новый модуль обработки рекламных отчётов. Entity: `AdRawDocument` (raw JSONB + status DRAFT/PROCESSED), `AdDocument` (кампания × parent SKU за дату), `AdDocumentLine` (распределение на листинг). Domain Port `ListingSalesProviderInterface` с bulk `getSalesQuantitiesByListings` + реализация `ListingSalesProviderMarketplace` через Facade. Domain `AdCostDistributor`: распределение bcmath, при 0 продажах — равномерно, поправка округления на максимальную долю. В `MarketplaceFacade` добавлены `findListingsByMarketplaceSku` (без фильтра `is_active`, для исторических отчётов) и `getSalesQuantitiesForListings` (bulk GROUP BY, убирает N+1). |
 | 1.4 | 2026-04-12 | MarketplaceAds: `ProcessAdRawDocumentAction` — загрузка AdRawDocument (DRAFT) и конвертация в AdDocument + AdDocumentLine. Идемпотентность через `deleteByRawDocumentId`, частичный успех оставляет статус DRAFT. Bulk-prefetch листингов и продаж на уровне Action (2 запроса на документ), `AdCostDistributor` стал чистой функцией без DI. В `MarketplaceFacade` добавлен `findListingsByMarketplaceSkus` (bulk, сгруппирован по parentSku), в `ListingSalesProviderInterface` — `findListingsByParentSkus`. |
 | 1.5 | 2026-04-13 | MarketplaceAds: CLI-обвязка + Messenger-пайплайн (`marketplace-ads:load`, `marketplace-ads:reprocess`, `ProcessAdRawDocumentMessage`, `ProcessAdRawDocumentHandler`). Batch-flush в Load (единый flush по всему проходу), guardrails в Reprocess (--all / хотя бы один фильтр, batch clear BATCH_SIZE=50). `MarketplaceAdsFacade` — публичный API модуля: `getAdCostsForListingAndDate`, `getTotalAdCostForPeriod`. `AdDocumentQuery` — DBAL-запросы к `marketplace_ad_documents` JOIN `marketplace_ad_document_lines`. `AdCostForListingDTO` для передачи распределённых данных между модулями. |
+| 1.6 | 2026-04-15 | Marketplace: новый enum `MarketplaceConnectionType` (`SELLER` / `PERFORMANCE`). Entity `MarketplaceConnection` получила поле `connectionType` (дефолт `SELLER`), `UniqueConstraint` расширен до `(company_id, marketplace, connection_type)`. Позволяет одной компании хранить отдельные подключения к Ozon Seller API и Ozon Performance API. |

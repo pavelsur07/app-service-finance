@@ -3,6 +3,7 @@
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Doctrine\ORM\Mapping as ORM;
@@ -11,7 +12,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Entity(repositoryClass: MarketplaceConnectionRepository::class)]
 #[ORM\Table(name: 'marketplace_connections')]
 #[ORM\Index(columns: ['company_id'], name: 'idx_connection_company')]
-#[ORM\UniqueConstraint(name: 'uniq_company_marketplace', columns: ['company_id', 'marketplace'])]
+#[ORM\UniqueConstraint(name: 'uniq_company_marketplace_type', columns: ['company_id', 'marketplace', 'connection_type'])]
 class MarketplaceConnection
 {
     #[ORM\Id]
@@ -24,6 +25,9 @@ class MarketplaceConnection
 
     #[ORM\Column(type: 'string', enumType: MarketplaceType::class)]
     private MarketplaceType $marketplace;
+
+    #[ORM\Column(type: 'string', length: 20, enumType: MarketplaceConnectionType::class)]
+    private MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER;
 
     #[ORM\Column(type: 'text')]
     private string $apiKey; // TODO: Encrypt in production
@@ -56,11 +60,13 @@ class MarketplaceConnection
         string $id,
         Company $company,
         MarketplaceType $marketplace,
+        MarketplaceConnectionType $connectionType = MarketplaceConnectionType::SELLER,
     ) {
         Assert::uuid($id);
         $this->id = $id;
         $this->company = $company;
         $this->marketplace = $marketplace;
+        $this->connectionType = $connectionType;
         $this->createdAt = new \DateTimeImmutable();
         $this->updatedAt = new \DateTimeImmutable();
     }
@@ -78,6 +84,11 @@ class MarketplaceConnection
     public function getMarketplace(): MarketplaceType
     {
         return $this->marketplace;
+    }
+
+    public function getConnectionType(): MarketplaceConnectionType
+    {
+        return $this->connectionType;
     }
 
     public function getApiKey(): string
