@@ -20,8 +20,8 @@ final class OzonPerformanceValidationException extends \DomainException
         return new self('Невалидные credentials Ozon Performance API. Проверьте client_id и client_secret.');
     }
 
-    public static function apiUnavailable(string $reason): self
+    public static function apiUnavailable(string $reason, ?\Throwable $previous = null): self
     {
-        return new self('Не удалось подключиться к Ozon Performance API: '.$reason);
+        return new self('Не удалось подключиться к Ozon Performance API: '.$reason, 0, $previous);
     }
 }

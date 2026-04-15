@@ -49,7 +49,10 @@ final readonly class OzonPerformanceConnectionValidator
 
             $statusCode = $response->getStatusCode();
         } catch (TransportExceptionInterface $e) {
-            throw OzonPerformanceValidationException::apiUnavailable($e->getMessage());
+            throw OzonPerformanceValidationException::apiUnavailable(
+                'сеть недоступна или превышен таймаут',
+                $e,
+            );
         }
 
         if (401 === $statusCode || 403 === $statusCode) {
@@ -65,10 +68,13 @@ final readonly class OzonPerformanceConnectionValidator
         try {
             $data = $response->toArray(false);
         } catch (\Throwable $e) {
-            throw OzonPerformanceValidationException::apiUnavailable($e->getMessage());
+            throw OzonPerformanceValidationException::apiUnavailable(
+                'некорректный формат ответа',
+                $e,
+            );
         }
 
-        if (!isset($data['access_token']) || '' === $data['access_token']) {
+        if (!isset($data['access_token']) || !is_string($data['access_token']) || '' === $data['access_token']) {
             throw OzonPerformanceValidationException::apiUnavailable('ответ API не содержит access_token');
         }
     }
