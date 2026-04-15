@@ -14,6 +14,7 @@ use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -33,6 +34,7 @@ final class InitialSyncHandler
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly MarketplaceWeekPartitionService $partitionService,
+        private readonly ClockInterface $clock,
     ) {
     }
 
@@ -99,13 +101,17 @@ final class InitialSyncHandler
             // Диспатчим следующую партию если она есть
             if ($message->nextDateFrom !== null && $message->nextDateTo !== null) {
                 // Вычисляем партию после следующей чтобы передать её в nextDate
-                $today      = new \DateTimeImmutable('today');
-                $nextFrom   = new \DateTimeImmutable($message->nextDateFrom);
-                // Следующее воскресенье или сегодня
-                $nextSunday = $nextFrom->modify('sunday this week');
-                $nextTo     = $nextSunday > $today ? $today : $nextSunday;
+                $today = $this->clock->now()->setTime(0, 0, 0);
 
-                // Партия после следующей — через сервис
+                // Используем nextDateTo как есть — он уже корректно рассчитан buildPartitions
+                // (учитывает границы месяца и недели), поэтому пересчёт через
+                // modify('sunday this week') ломает split-партиции.
+                $nextTo = new \DateTimeImmutable($message->nextDateTo);
+                if ($nextTo > $today) {
+                    $nextTo = $today;
+                }
+
+                // Оставшиеся партиции считаем от конца следующей партии
                 $afterStart      = $nextTo->modify('+1 day')->setTime(0, 0, 0);
                 $hasAfter        = $afterStart <= $today;
                 $afterPartitions = $hasAfter
@@ -115,12 +121,16 @@ final class InitialSyncHandler
                 $afterFromStr = !empty($afterPartitions) ? $afterPartitions[0]['from'] : null;
                 $afterToStr   = !empty($afterPartitions) ? $afterPartitions[0]['to']   : null;
 
+                // Используем клампнутый $nextTo — если ограничение по today сработало,
+                // следующая задача не должна тянуть данные за будущий период.
+                $nextToStr = $nextTo->format('Y-m-d H:i:s');
+
                 $this->messageBus->dispatch(new InitialSyncMessage(
                     companyId:    $message->companyId,
                     connectionId: $message->connectionId,
                     marketplace:  $message->marketplace,
                     dateFrom:     $message->nextDateFrom,
-                    dateTo:       $message->nextDateTo,
+                    dateTo:       $nextToStr,
                     nextDateFrom: $afterFromStr,
                     nextDateTo:   $afterToStr,
                 ));
@@ -129,7 +139,7 @@ final class InitialSyncHandler
                     'company_id'  => $message->companyId,
                     'marketplace' => $message->marketplace,
                     'date_from'   => $message->nextDateFrom,
-                    'date_to'     => $message->nextDateTo,
+                    'date_to'     => $nextToStr,
                 ]);
             } else {
                 // Последняя партия — обновляем статус подключения
