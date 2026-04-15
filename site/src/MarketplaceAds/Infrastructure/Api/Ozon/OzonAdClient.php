@@ -20,14 +20,16 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *
  * Жизненный цикл одного fetch:
  *   1) get OAuth-token (cache: ozon_perf_token_{companyId}, TTL = expires_in - 300);
- *   2) GET  /api/client/campaign — список активных SKU-кампаний;
- *   3) POST /api/client/statistics батчами по 10 → UUID отчёта;
+ *   2) GET  /api/client/campaign — все SKU-кампании (без фильтра по state, чтобы
+ *      не терять backfill остановленных/архивных кампаний);
+ *   3) POST /api/client/statistics батчами (до 100 campaignIds) → UUID отчёта;
  *   4) GET  /api/client/statistics/{uuid} — polling до READY (макс. 36 попыток × 5с = 3 мин);
  *   5) GET  /api/client/statistics/report — скачать CSV (либо сразу из state.report.link);
  *   6) преобразовать строки CSV в формат {"rows": [{campaign_id, campaign_name, sku, spend, views, clicks}]}.
  *
  * 401 на любом запросе после получения токена → сбрасываем кэш и пробуем один раз
- * заново (актуально, если кто-то параллельно отозвал токен в ЛК Ozon).
+ * заново (актуально, если кто-то параллельно отозвал токен в ЛК Ozon). 403 трактуется
+ * как permanent denial (нет скоупа «Продвижение») и ретраится не будет.
  */
 final class OzonAdClient implements AdPlatformClientInterface
 {
@@ -40,7 +42,9 @@ final class OzonAdClient implements AdPlatformClientInterface
 
     private const REQUEST_TIMEOUT = 30;
     private const TOKEN_TTL_SAFETY_MARGIN = 300;
-    private const STATISTICS_BATCH_SIZE = 10;
+    // Ozon Performance API принимает до 100 campaignIds в теле /statistics.
+    // При блокирующем sleep-polling чем больше батч, тем меньше суммарное ожидание.
+    private const STATISTICS_BATCH_SIZE = 100;
     private const POLL_MAX_ATTEMPTS = 36;
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
@@ -90,10 +94,10 @@ final class OzonAdClient implements AdPlatformClientInterface
             $companyId,
             $clientId,
             $clientSecret,
-            fn (string $token): array => $this->listActiveSkuCampaigns($token),
+            fn (string $token): array => $this->listSkuCampaigns($token),
         );
 
-        $this->logger->info('Ozon Performance: получены активные SKU-кампании', [
+        $this->logger->info('Ozon Performance: получен список SKU-кампаний', [
             'companyId' => $companyId,
             'count' => count($campaigns),
         ]);
@@ -107,7 +111,8 @@ final class OzonAdClient implements AdPlatformClientInterface
             $campaignIds = array_map(static fn (array $c): string => (string) $c['id'], $batch);
             $namesById = [];
             foreach ($batch as $campaign) {
-                $namesById[(string) $campaign['id']] = (string) ($campaign['title'] ?? $campaign['name'] ?? '');
+                // title уже содержит либо title, либо name (см. listSkuCampaigns).
+                $namesById[(string) $campaign['id']] = (string) $campaign['title'];
             }
 
             $uuid = $this->withAuthRetry(
@@ -226,9 +231,15 @@ final class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Возвращает все SKU-кампании компании — включая остановленные, архивные
+     * и неактивные. Фильтр по state = RUNNING специально снят: для backfill-а
+     * за прошедшую дату нужны и кампании, которые сегодня уже остановлены,
+     * но вчера откручивались. Кампании без активности на $date просто вернут
+     * пустые строки из /statistics и отфильтруются дальше.
+     *
      * @return list<array{id: string, title: string}>
      */
-    private function listActiveSkuCampaigns(string $token): array
+    private function listSkuCampaigns(string $token): array
     {
         $response = $this->authorizedRequest('GET', self::CAMPAIGN_PATH, $token);
         $data = $this->decodeJson($response->getContent(false), 'campaign list');
@@ -243,18 +254,19 @@ final class OzonAdClient implements AdPlatformClientInterface
             if (!is_array($campaign)) {
                 continue;
             }
-            $state = (string) ($campaign['state'] ?? '');
             $advType = (string) ($campaign['advObjectType'] ?? '');
-            if ('CAMPAIGN_STATE_RUNNING' !== $state || 'SKU' !== $advType) {
+            if ('SKU' !== $advType) {
                 continue;
             }
             $id = isset($campaign['id']) ? (string) $campaign['id'] : '';
             if ('' === $id) {
                 continue;
             }
+            // title / name — разные версии API отдают имя кампании в одном из двух полей.
+            // Собираем оба сразу, чтобы не потерять имя в namesById ниже.
             $result[] = [
                 'id' => $id,
-                'title' => (string) ($campaign['title'] ?? ''),
+                'title' => (string) ($campaign['title'] ?? $campaign['name'] ?? ''),
             ];
         }
 
@@ -365,48 +377,64 @@ final class OzonAdClient implements AdPlatformClientInterface
             return [];
         }
 
-        // Ozon отдаёт отчёт с разделителем ';' и заголовком в первой строке;
-        // допускаем и ',' если поменяется формат — определяем по первой строке.
+        // Определяем разделитель по первой строке заголовка. Если в заголовке
+        // нет ';' — считаем CSV стандартным RFC 4180 (разделитель ',').
+        // Для 1-колоночного отчёта выбор делимитера всё равно не влияет на парсинг.
         $firstNewline = strpos($csv, "\n");
         $headerLine = false === $firstNewline ? $csv : substr($csv, 0, $firstNewline);
-        $delimiter = (substr_count($headerLine, ';') >= substr_count($headerLine, ',')) ? ';' : ',';
+        $delimiter = str_contains($headerLine, ';') ? ';' : ',';
 
-        $lines = preg_split('/\r\n|\r|\n/', $csv) ?: [];
-        $header = null;
-        $rows = [];
-
-        foreach ($lines as $line) {
-            if ('' === trim($line)) {
-                continue;
-            }
-            $cols = str_getcsv($line, $delimiter, '"', '\\');
-            if (null === $header) {
-                $header = array_map(static fn ($c): string => strtolower(trim((string) $c)), $cols);
-                continue;
-            }
-
-            $row = [];
-            foreach ($header as $i => $name) {
-                $row[$name] = $cols[$i] ?? '';
-            }
-
-            $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
-            $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
-            if ('' === $campaignId || '' === $sku) {
-                continue;
-            }
-
-            $rows[] = [
-                'campaign_id' => $campaignId,
-                'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
-                'sku' => $sku,
-                'spend' => (float) str_replace(',', '.', (string) ($row['spend'] ?? $row['cost'] ?? '0')),
-                'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
-                'clicks' => (int) ($row['clicks'] ?? 0),
-            ];
+        // Стрим через in-memory FILE*: fgetcsv корректно обрабатывает значения
+        // с переводами строк внутри кавычек и не создаёт отдельный массив строк
+        // в памяти. escape='' — RFC 4180 не знает backslash-экранирования,
+        // экранирование кавычки делается удвоением ("" внутри строкового поля).
+        $fp = fopen('php://memory', 'r+b');
+        if (false === $fp) {
+            throw new \RuntimeException('Ozon Performance: не удалось открыть in-memory поток для CSV');
         }
 
-        return $rows;
+        try {
+            fwrite($fp, $csv);
+            rewind($fp);
+
+            $headerRow = fgetcsv($fp, 0, $delimiter, '"', '');
+            if (false === $headerRow) {
+                return [];
+            }
+            $header = array_map(static fn ($c): string => strtolower(trim((string) $c)), $headerRow);
+
+            $rows = [];
+            while (false !== ($cols = fgetcsv($fp, 0, $delimiter, '"', ''))) {
+                // fgetcsv на полностью пустой строке возвращает [null] — пропускаем.
+                if ([null] === $cols) {
+                    continue;
+                }
+
+                $row = [];
+                foreach ($header as $i => $name) {
+                    $row[$name] = $cols[$i] ?? '';
+                }
+
+                $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+                $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+                if ('' === $campaignId || '' === $sku) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'campaign_id' => $campaignId,
+                    'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
+                    'sku' => $sku,
+                    'spend' => (float) str_replace(',', '.', (string) ($row['spend'] ?? $row['cost'] ?? '0')),
+                    'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
+                    'clicks' => (int) ($row['clicks'] ?? 0),
+                ];
+            }
+
+            return $rows;
+        } finally {
+            fclose($fp);
+        }
     }
 
     /**
@@ -435,8 +463,19 @@ final class OzonAdClient implements AdPlatformClientInterface
             throw new \RuntimeException(sprintf('Ozon Performance: сеть недоступна (%s %s)', $method, $urlOrPath), 0, $e);
         }
 
-        if (401 === $statusCode || 403 === $statusCode) {
+        if (401 === $statusCode) {
             throw new OzonAuthExpiredException();
+        }
+
+        // 403 ≠ «токен истёк»: это permanent denial — нет скоупа «Продвижение»
+        // или client_id заблокирован у Ozon. Ретраиться бессмысленно, падаем
+        // сразу с явным сообщением (а не через общий HTTP %d).
+        if (403 === $statusCode) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: %s %s вернул 403 (недостаточно прав у client_id)',
+                $method,
+                $urlOrPath,
+            ));
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
