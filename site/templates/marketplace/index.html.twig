@@ -265,14 +265,15 @@
                             </select>
                         </div>
 
-                        <div class="mb-3">
+                        {# Блок «Тип подключения» — показывается только для Ozon (Performance API есть только у Ozon). #}
+                        <div class="mb-3" id="field-connection-type" style="display: none;">
                             <label class="form-label required">Тип подключения</label>
                             <div class="form-selectgroup form-selectgroup-pills" id="connection-type-group">
                                 <label class="form-selectgroup-item">
                                     <input type="radio" name="connection_type" value="seller" class="form-selectgroup-input" id="connection-type-seller" checked>
                                     <span class="form-selectgroup-label">Основное (Seller API)</span>
                                 </label>
-                                <label class="form-selectgroup-item" id="connection-type-performance-wrapper" style="display: none;">
+                                <label class="form-selectgroup-item">
                                     <input type="radio" name="connection_type" value="performance" class="form-selectgroup-input" id="connection-type-performance">
                                     <span class="form-selectgroup-label">Реклама (Performance API)</span>
                                 </label>
@@ -521,15 +522,15 @@
         // Управление модалом «Новое подключение»: переключение типа (Seller/Performance),
         // видимость поля Client-Id (для Seller + Ozon), подмена form.action.
         (function () {
-            var form               = document.getElementById('form-add-connection');
-            var marketplaceSelect  = document.getElementById('connection-marketplace');
-            var perfWrapper        = document.getElementById('connection-type-performance-wrapper');
-            var perfRadio          = document.getElementById('connection-type-performance');
-            var sellerRadio        = document.getElementById('connection-type-seller');
-            var sellerBlock        = form.querySelector('[data-connection-type-fields="seller"]');
-            var perfBlock          = form.querySelector('[data-connection-type-fields="performance"]');
-            var sellerClientField  = document.getElementById('field-seller-client-id');
-            var sellerClientInput  = document.getElementById('input-seller-client-id');
+            var form                 = document.getElementById('form-add-connection');
+            var marketplaceSelect    = document.getElementById('connection-marketplace');
+            var connectionTypeField  = document.getElementById('field-connection-type');
+            var perfRadio            = document.getElementById('connection-type-performance');
+            var sellerRadio          = document.getElementById('connection-type-seller');
+            var sellerBlock          = form.querySelector('[data-connection-type-fields="seller"]');
+            var perfBlock            = form.querySelector('[data-connection-type-fields="performance"]');
+            var sellerClientField    = document.getElementById('field-seller-client-id');
+            var sellerClientInput    = document.getElementById('input-seller-client-id');
 
             function setDisabledAll(block, disabled) {
                 block.querySelectorAll('input, select, textarea').forEach(function (el) {
@@ -567,26 +568,30 @@
                 }
             }
 
-            marketplaceSelect.addEventListener('change', function () {
-                // Performance API — только Ozon. Для остальных маркетплейсов
-                // скрываем опцию и откатываемся на Seller, если она была выбрана.
-                if (this.value === 'ozon') {
-                    perfWrapper.style.display = '';
+            function applyMarketplace() {
+                // Блок «Тип подключения» показываем только для Ozon — Performance API
+                // существует только у Ozon. Для остальных маркетплейсов блок скрыт,
+                // а тип принудительно сбрасываем на Seller, чтобы форма отправляла
+                // корректные данные на правильный endpoint.
+                if (marketplaceSelect.value === 'ozon') {
+                    connectionTypeField.style.display = '';
                 } else {
-                    perfWrapper.style.display = 'none';
+                    connectionTypeField.style.display = 'none';
                     if (perfRadio.checked) {
                         sellerRadio.checked = true;
                     }
                 }
                 applyConnectionType();
-            });
+            }
+
+            marketplaceSelect.addEventListener('change', applyMarketplace);
 
             [sellerRadio, perfRadio].forEach(function (radio) {
                 radio.addEventListener('change', applyConnectionType);
             });
 
-            // Инициализация (seller + marketplace не выбран).
-            applyConnectionType();
+            // Инициализация: маркетплейс не выбран → блок скрыт, тип = seller.
+            applyMarketplace();
         })();
 
         // Sync period modal — подставляем action с connectionId
