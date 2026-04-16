@@ -62,11 +62,14 @@ final readonly class OzonMutualSettlementProcessor
             throw new \RuntimeException(sprintf('Файл не найден: %s', $filePath));
         }
 
-        $spreadsheet = IOFactory::load($filePath);
+        $reader = IOFactory::createReaderForFile($filePath);
+        $reader->setReadDataOnly(true);
+        $spreadsheet = $reader->load($filePath);
         $sheet = $spreadsheet->getActiveSheet();
         $sheetTitle = $sheet->getTitle();
         $highestRow = $sheet->getHighestRow();
         $highestColumn = $sheet->getHighestColumn();
+        $maxColIndex = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
 
         $this->appLogger->info('OzonMSProcessor: начало парсинга', [
             'file' => basename($filePath),
@@ -94,7 +97,7 @@ final readonly class OzonMutualSettlementProcessor
             // Проверяем, это итоговая строка?
             $totalKey = $this->matchAnchor($cellANormalized, self::TOTAL_ANCHORS);
             if (null !== $totalKey) {
-                $amount = $this->findAmountInRow($sheet, $row, $highestColumn);
+                $amount = $this->findAmountInRow($sheet, $row, $maxColIndex);
                 $totals[$totalKey] = $amount;
                 continue;
             }
@@ -102,19 +105,18 @@ final readonly class OzonMutualSettlementProcessor
             // Проверяем, это начало новой секции?
             $sectionKey = $this->matchAnchor($cellANormalized, self::SECTION_ANCHORS);
             if (null !== $sectionKey) {
-                // Закрываем предыдущую секцию, начинаем новую
-                $currentSection = [
+                $sections[] = [
                     'name' => $sectionKey,
                     'title' => trim($cellA),
                     'rows' => [],
                 ];
-                $sections[] = &$currentSection;
+                $currentSection = &$sections[array_key_last($sections)];
                 continue;
             }
 
             // Если мы внутри секции — ищем строки name + amount
             if (null !== $currentSection) {
-                $amount = $this->findAmountInRow($sheet, $row, $highestColumn);
+                $amount = $this->findAmountInRow($sheet, $row, $maxColIndex);
 
                 // Пропускаем строки без суммы (подзаголовки, пустые)
                 if (null === $amount) {
@@ -165,16 +167,14 @@ final readonly class OzonMutualSettlementProcessor
     }
 
     /**
-     * Ищет числовое значение (сумму) в строке, сканируя колонки B..последняя.
+     * Ищет числовое значение (сумму) в строке, сканируя колонки B..maxCol.
      * Возвращает последнее найденное число (обычно итог в правой колонке).
      */
-    private function findAmountInRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $row, string $highestColumn): ?float
+    private function findAmountInRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $row, int $maxCol): ?float
     {
         $lastAmount = null;
-        $colIndex = 2; // B = 2
-        $maxCol = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($highestColumn);
 
-        for ($col = $colIndex; $col <= $maxCol; $col++) {
+        for ($col = 2; $col <= $maxCol; $col++) {
             $coordinate = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $row;
             $cell = $sheet->getCell($coordinate);
             $value = $cell->getCalculatedValue();
@@ -187,7 +187,7 @@ final readonly class OzonMutualSettlementProcessor
                 $lastAmount = (float) $value;
             } elseif (is_string($value)) {
                 // Пробуем распарсить строку вида "1 234 567.89" или "1234567,89"
-                $cleaned = str_replace([' ', "\xC2\xA0"], '', $value); // обычный и неразрывный пробел
+                $cleaned = (string) preg_replace('/\s+/u', '', $value);
                 $cleaned = str_replace(',', '.', $cleaned);
                 if (is_numeric($cleaned)) {
                     $lastAmount = (float) $cleaned;

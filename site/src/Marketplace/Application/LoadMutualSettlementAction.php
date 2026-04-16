@@ -9,6 +9,7 @@ use App\Marketplace\Application\Processor\OzonMutualSettlementProcessor;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonMutualSettlementClient;
 use App\Shared\Service\AppLogger;
 use App\Shared\Service\Storage\StorageService;
@@ -119,7 +120,9 @@ final class LoadMutualSettlementAction
         $dir = sprintf('%s/%s', self::STORAGE_DIR, $companyId);
         $this->storageService->ensureDir($dir);
         $absolutePath = $this->storageService->getAbsolutePath($relativePath);
-        file_put_contents($absolutePath, $binaryContent);
+        if (false === file_put_contents($absolutePath, $binaryContent)) {
+            throw new \RuntimeException(sprintf('Не удалось сохранить файл на диск: %s', $relativePath));
+        }
 
         $this->appLogger->info('LoadMutualSettlement: файл сохранён', [
             'companyId' => $companyId,
@@ -161,13 +164,11 @@ final class LoadMutualSettlementAction
         $rawDoc = $this->createRawDocument($company, $periodFrom, $periodTo, $rawData, $recordsCount);
         $rawDoc->resetProcessingStatus();
 
-        if (PipelineStatus::FAILED === $processingStatus) {
-            $rawDoc->setSyncNotes('Parsing failed: ' . ($rawData['parsing_error'] ?? 'unknown'));
-        }
-
-        // Перезаписываем статус после resetProcessingStatus()
         if (PipelineStatus::COMPLETED === $processingStatus) {
             $rawDoc->markCompleted();
+        } elseif (PipelineStatus::FAILED === $processingStatus) {
+            $rawDoc->markStepFailed(PipelineStep::COSTS);
+            $rawDoc->setSyncNotes('Parsing failed: ' . ($rawData['parsing_error'] ?? 'unknown'));
         }
 
         $this->em->persist($rawDoc);
