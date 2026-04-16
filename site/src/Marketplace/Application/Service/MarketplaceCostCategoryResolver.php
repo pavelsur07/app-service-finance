@@ -66,17 +66,42 @@ final class MarketplaceCostCategoryResolver
     }
 
     /**
-     * Вызывать после em->clear() в батче.
-     * Переключает кэш на getReference чтобы не держать detached entity.
+     * Вызывать ТОЛЬКО после em->flush() + em->clear() в батче.
+     * Пересоздаёт кэш через managed entities из БД, отбрасывая категории,
+     * которые не попали в БД (например, созданы persist()-ом, но не flush()-нуты).
      */
     public function resetCache(): void
     {
-        foreach ($this->cache as $key => $category) {
-            $this->cache[$key] = $this->em->getReference(
-                MarketplaceCostCategory::class,
-                $category->getId(),
-            );
+        if ($this->cache === []) {
+            return;
         }
+
+        $ids = [];
+        foreach ($this->cache as $category) {
+            $ids[] = $category->getId();
+        }
+
+        if ($ids === []) {
+            $this->cache = [];
+
+            return;
+        }
+
+        $fresh = $this->costCategoryRepository->findBy(['id' => $ids]);
+        $byId = [];
+        foreach ($fresh as $c) {
+            $byId[$c->getId()] = $c;
+        }
+
+        $newCache = [];
+        foreach ($this->cache as $key => $oldCategory) {
+            $id = $oldCategory->getId();
+            if (isset($byId[$id])) {
+                $newCache[$key] = $byId[$id];
+            }
+            // Иначе — выпадает из кэша, следующий resolve() сделает findOneBy.
+        }
+        $this->cache = $newCache;
     }
 
     /**
