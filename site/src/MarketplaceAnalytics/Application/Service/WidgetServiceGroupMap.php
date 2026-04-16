@@ -60,8 +60,8 @@ final class WidgetServiceGroupMap
             'ozon_supply_surplus'        => 'Услуги доставки и FBO',
             'ozon_storage'               => 'Услуги доставки и FBO',
             'ozon_logistic_pickup'       => 'Услуги доставки и FBO',
-            'ozon_package_materials'     => 'Услуги доставки и FBO',
-            'ozon_package_labor'         => 'Услуги доставки и FBO',
+            'ozon_package_materials'     => 'Другие услуги и штрафы',
+            'ozon_package_labor'         => 'Услуги партнёров',
             'ozon_warehouse_movement'    => 'Услуги доставки и FBO',
 
             // === Услуги партнёров ===
