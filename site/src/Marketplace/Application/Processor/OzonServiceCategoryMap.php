@@ -4,21 +4,18 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\Processor;
 
+use App\Marketplace\Domain\OzonCostCategory;
 use Psr\Log\LoggerInterface;
 
 /**
- * Единственный источник истины для маппинга service name → category code (Ozon).
+ * Тонкий адаптер над OzonCostCategory для обратной совместимости.
  *
- * ПРАВИЛО: все маппинги только здесь. Другие классы используют только через resolve().
- * Никаких локальных копий SERVICE_CATEGORY_MAP в процессорах — это приводит к багам.
+ * Единственный источник истины — OzonCostCategory::all().
+ * Этот класс сохраняет прежние сигнатуры методов, чтобы не менять вызывающий код.
  *
- * Используется в: OzonCostsRawProcessor, OzonSalesRawProcessor.
- * Изменять маппинг только здесь — процессоры подхватят автоматически.
- *
- * Группировка для ОПиУ происходит ТОЛЬКО на уровне маппинга PLCategory.
- * Null = нулевой маркер (price всегда 0), пропустить без создания записи.
- *
- * После изменения маппинга — переобработать затраты за все затронутые периоды.
+ * Используется в: OzonCostsRawProcessor, RestoreMarketplaceCostCategoriesAction,
+ *                 CostsDebugController, ReconciliationCreateOvhCategoryController,
+ *                 DebugUnknownOperationsController.
  */
 final class OzonServiceCategoryMap
 {
@@ -26,150 +23,34 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-16.2';
+    public const VERSION = '2026-04-16.3';
 
     /**
-     * @var array<string, string|null>
+     * Service names из API Ozon, которые являются нулевыми маркерами (price = 0).
+     * Не соответствуют никакой категории — должны быть пропущены.
      */
-    private const MAP = [
-        // === ЛОГИСТИКА ПРЯМАЯ ===
-        'MarketplaceServiceItemDirectFlowLogistic'               => 'ozon_logistic_direct',
-        'MarketplaceServiceItemDirectFlowLogisticVDC'            => 'ozon_logistic_direct_vdc',
-        'MarketplaceServiceItemDirectFlowTrans'                  => 'ozon_logistic_direct_trans',
-        'MarketplaceDeliveryCostItem'                            => 'ozon_logistic_delivery',
-        'MarketplaceServiceItemDelivToCustomer'                  => 'ozon_logistic_last_mile',
-        'MarketplaceServiceItemRedistributionLastMileCourier'    => 'ozon_logistic_last_mile',
-        'MarketplaceServiceItemDeliveryKGT'                      => 'ozon_logistic_kgt',
-
-        // === ЛОГИСТИКА ОБРАТНАЯ ===
-        'MarketplaceServiceItemReturnFlowLogistic'               => 'ozon_logistic_return',
-        'MarketplaceServiceItemReturnFlowTrans'                  => 'ozon_logistic_return_trans',
-
-        // === ЛОГИСТИКА ПОСТАВКИ НА СКЛАД ===
-        'ItemAdvertisementForSupplierLogistic'                   => 'ozon_logistic_inbound',
-        'ItemAdvertisementForSupplierLogisticSeller'             => 'ozon_logistic_inbound_seller',
-        'MarketplaceServiceItemPickup'                           => 'ozon_logistic_pickup',
-
-        // === ОБРАБОТКА ОТПРАВЛЕНИЙ ===
-        'MarketplaceServiceItemFulfillment'                      => 'ozon_fulfillment',
-        'MarketplaceServiceItemDropoffFF'                        => 'ozon_dropoff_ff',
-        'MarketplaceServiceItemDropoffPVZ'                       => 'ozon_dropoff_pvz',
-        'MarketplaceServiceItemRedistributionDropOffApvz'        => 'ozon_dropoff_apvz',
-        'MarketplaceServiceItemDropoffSC'                        => 'ozon_dropoff_sc',
-        'MarketplaceServiceItemDropoffPPZ'                       => 'ozon_dropoff_ppz',
-
-        // === ОБРАБОТКА ВОЗВРАТОВ ===
-        'MarketplaceServiceItemRedistributionReturnsPVZ'         => 'ozon_return_pvz',
-        'MarketplaceServiceItemReturnPartGoodsCustomer'          => 'ozon_return_partial',
-        'MarketplaceNotDeliveredCostItem'                        => 'ozon_return_not_delivered',
-        'MarketplaceReturnAfterDeliveryCostItem'                 => 'ozon_return_after_delivery',
-        'MarketplaceReturnStorageServiceAtThePickupPointFbsItem' => 'ozon_return_storage_pvz',
-        'MarketplaceReturnStorageServiceInTheWarehouseFbsItem'   => 'ozon_return_storage_wh',
-
-        // === НУЛЕВЫЕ МАРКЕРЫ (пропускать, price = 0) ===
-        'MarketplaceServiceItemReturnNotDelivToCustomer'         => null,
-        'MarketplaceServiceItemReturnAfterDelivToCustomer'       => null,
-
-        // === УПАКОВКА ===
-        'MarketplaceServiceItemPackageMaterialsProvision'        => 'ozon_package_materials',
-        'MarketplaceServiceItemPackageRedistribution'            => 'ozon_package_labor',
-
-        // === ХРАНЕНИЕ ===
-        'OperationMarketplaceServiceStorage'                     => 'ozon_storage',
-        'MarketplaceServiceItemTemporaryStorageRedistribution'   => 'ozon_storage_partner',
-        'OperationMarketplaceItemTemporaryStorageRedistribution' => 'ozon_storage_partner',
-
-        // === КРОСС-ДОКИНГ / ПОСТАВКА НА FBO ===
-        'MarketplaceServiceItemCrossdocking'                     => 'ozon_crossdocking',
-        'OperationMarketplaceSupplyAdditional'                   => 'ozon_supply_additional',
-        'OperationMarketplaceServiceSupplyInboundCargoShortage'  => 'ozon_supply_shortage',
-        'OperationMarketplaceServiceSupplyInboundCargoSurplus'   => 'ozon_supply_surplus',
-
-        // === ЭКВАЙРИНГ ===
-        'MarketplaceRedistributionOfAcquiringOperation'          => 'ozon_acquiring',
-
-        // === РЕКЛАМА ===
-        'OperationMarketplaceCostPerClick'                       => 'ozon_cpc',
-        'MarketplaceMarketingActionCostItem'                     => 'ozon_marketing_action',
-        'MarketplaceSaleReviewsItem'                             => 'ozon_reviews',
-
-        // === ПРОДВИЖЕНИЕ / PREMIUM ===
-        'MarketplaceServicePremiumPromotion'                     => 'ozon_premium_promotion',
-        'MarketplaceServicePremiumCashbackIndividualPoints'      => 'ozon_premium_cashback',
-        'MarketplaceServiceItemElectronicServicesPremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
-        'OperationMarketplaceServicePremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
-        'ItemAgentServiceStarsMembership'                        => 'ozon_stars_membership',
-
-        // === ФИНАНСОВЫЕ УСЛУГИ ===
-        'OperationMarketplaceServiceEarlyPaymentAccrual'         => 'ozon_early_payment',
-        'MarketplaceServiceItemFlexiblePaymentSchedule'          => 'ozon_flexible_payment',
-        'MarketplaceServiceItemInstallment'                      => 'ozon_installment',
-
-        // === ШТРАФЫ / УДЕРЖАНИЯ ===
-        'OperationMarketplaceWithHoldingForUndeliverableGoods'   => 'ozon_penalty_undeliverable',
-
-        // === КОМИССИИ ===
-        'MarketplaceServiceBrandCommission'                      => 'ozon_brand_commission',
-
-        // === ПРОЧЕЕ ===
-        'MarketplaceServiceItemMarkingItems'                     => 'ozon_marking',
-        'MarketplaceServiceItemReturnFromStock'                  => 'ozon_return_from_stock',
-        'MarketplaceServiceSellerReturnsCargoAssortment'         => 'ozon_return_from_stock',
-        'OperationMarketplaceAgencyFeeAggregator3PLGlobal'       => 'ozon_agency_fee',
-        'MarketplaceServiceItemDisposalDetailed'                 => 'ozon_disposal',
-        'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
-        'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_ovh_processing',
-        'OperationMarketplaceServiceVolumeWeightCharacsProcessing' => 'ozon_ovh_processing',
-
-        // === АНГЛИЙСКИЕ operation_type ДЛЯ ОПЕРАЦИЙ БЕЗ services[] ===
-        // Эти operation_type приходят в поле op['operation_type'] когда services[] пустой
-        // При добавлении новых кодов — проверить маппинг через debug-эндпоинт
-        // GET /api/marketplace-analytics/debug/unknown-operations
-        'AccrualInternalClaim'                                   => 'ozon_compensation',
-        'DisposalReasonDamagedPackaging'                         => 'ozon_disposal',
-        'DisposalReasonScattered'                                => 'ozon_disposal',
-        'DisposalReasonFailedToPickupOnTime'                     => 'ozon_disposal',
-        'OperationReturnGoodsFBSofRMS'                           => 'ozon_return_delivery',
-        'OperationSellerReturnsCargoAssortmentInvalid'            => 'ozon_return_delivery',
-        'OperationSellerReturnsCargoAssortmentValid'              => 'ozon_return_delivery',
-        'SellerReturnsDeliveryToPickupPoint'                     => 'ozon_return_pvz',
-        'OperationMarketplaceServicePremiumCashbackBonusAccrual' => 'ozon_seller_bonus',
-        'OperationPointsForReviews'                              => 'ozon_reviews',
-        'OperationMarketplaceSupplyExpirationDateProcessing'     => 'ozon_supply_additional',
-        'OperationPromotionWithCostPerOrder'                     => 'ozon_marketing_action',
-        'OperationSubscriptionPremiumPlus'                       => 'ozon_premium_promotion',
-        'DefectRateDetailed'                                     => 'ozon_penalty_undeliverable',
-        'MarketplaceServiceItemReplenishment'                     => 'ozon_warehouse_movement',
-        'OperationMarketplaceWarehouseToWarehouseMovement'       => 'ozon_warehouse_movement',
-        'OperationMarketplaceModerationFine'                     => 'ozon_penalty_undeliverable',
-        'OperationModerationProhibitedContent'                   => 'ozon_penalty_undeliverable',
-        'OperationMarketplaceSupplyDefectProcessing'             => 'ozon_supply_additional',
-        'OperationMarketplaceServiceProcessingSpoilageSurplus'   => 'ozon_supply_additional',
-
-        // === РУССКОЯЗЫЧНЫЕ НАЗВАНИЯ (из op['operation_type_name'] для операций без services[]) ===
-        'Подписка Premium Plus'                                  => 'ozon_premium_promotion',
-        'Бонусы продавца - рассылка'                             => 'ozon_seller_bonus',
-        'Баллы за отзывы'                                        => 'ozon_reviews',
-        'Перемещение товаров между складами Ozon'                => 'ozon_warehouse_movement',
-        'Обработка сроков годности на FBO'                       => 'ozon_supply_additional',
-        'Модерация запрещённого контента'                        => 'ozon_penalty_undeliverable',
-        'Обработка операционных ошибок продавца: отгрузка в нерекомендованный слот' => 'ozon_penalty_undeliverable',
-        'Обработка брака с приемки'                              => 'ozon_supply_additional',
-        'Временное размещение товара партнерами'                  => 'ozon_storage_partner',
-        'Корректировка суммы акта о премии'                      => 'ozon_premium_correction',
-        'Корректировки стоимости услуг'                          => 'ozon_service_correction',
+    private const ZERO_MARKERS = [
+        'MarketplaceServiceItemReturnNotDelivToCustomer',
+        'MarketplaceServiceItemReturnAfterDelivToCustomer',
     ];
 
     /**
-     * Резолвит category code по точному имени service name.
+     * Резолвит category code по точному имени service name / operation type.
      * При неизвестном имени — логирует warning и возвращает fallback через fuzzy.
      *
      * @return string|null null = нулевой маркер, пропустить запись
      */
     public static function resolve(string $serviceName, LoggerInterface $logger): ?string
     {
-        if (array_key_exists($serviceName, self::MAP)) {
-            return self::MAP[$serviceName];
+        if (self::isZeroMarker($serviceName)) {
+            return null;
+        }
+
+        $category = OzonCostCategory::findByServiceName($serviceName)
+            ?? OzonCostCategory::findByOperationType($serviceName);
+
+        if ($category !== null) {
+            return $category->code;
         }
 
         $fallback = self::fuzzy($serviceName);
@@ -177,134 +58,75 @@ final class OzonServiceCategoryMap
         $logger->warning('ozon_unknown_service_name', [
             'service_name' => $serviceName,
             'resolved_to'  => $fallback,
-            'hint'         => 'Add to OzonServiceCategoryMap mapping',
+            'hint'         => 'Add to OzonCostCategory::all()',
         ]);
 
         return $fallback;
     }
 
     /**
-     * Проверяет является ли service name нулевым маркером (price = 0, пропустить).
+     * Статистика справочника для debug-эндпоинта.
      */
     public static function getMapStats(): array
     {
-        $map    = self::MAP;
-        $total  = count($map);
-        $nulls  = count(array_filter($map, static fn ($v) => $v === null));
-        $unique = count(array_unique(array_filter($map)));
+        $allCategories = OzonCostCategory::all();
+        $totalEntries  = count(self::ZERO_MARKERS);
+
+        foreach ($allCategories as $c) {
+            $totalEntries += count($c->serviceNames) + count($c->operationTypes);
+        }
 
         return [
-            'version'         => self::VERSION,
-            'total_entries'   => $total,
-            'zero_markers'    => $nulls,
-            'unique_categories' => $unique,
+            'version'           => self::VERSION,
+            'total_entries'     => $totalEntries,
+            'zero_markers'      => count(self::ZERO_MARKERS),
+            'unique_categories' => count($allCategories),
         ];
     }
 
+    /**
+     * Проверяет является ли service name нулевым маркером (price = 0, пропустить).
+     */
     public static function isZeroMarker(string $serviceName): bool
     {
-        return array_key_exists($serviceName, self::MAP) && self::MAP[$serviceName] === null;
-    }
-
-    public static function isKnown(string $serviceName): bool
-    {
-        return array_key_exists($serviceName, self::MAP)
-            && self::MAP[$serviceName] !== null;
+        return in_array($serviceName, self::ZERO_MARKERS, true);
     }
 
     /**
-     * Все уникальные category codes — из MAP + коды, генерируемые в extractCostEntries().
+     * Проверяет известен ли service name / operation type (не нулевой маркер).
+     */
+    public static function isKnown(string $serviceName): bool
+    {
+        return OzonCostCategory::findByServiceName($serviceName) !== null
+            || OzonCostCategory::findByOperationType($serviceName) !== null;
+    }
+
+    /**
+     * Все уникальные category codes с человекочитаемыми именами.
      *
      * @return array<string, string> code => human-readable name
      */
     public static function getAllCategoryCodes(): array
     {
         $codes = [];
-
-        foreach (self::MAP as $code) {
-            if ($code !== null && !isset($codes[$code])) {
-                $codes[$code] = self::getCategoryName($code);
-            }
-        }
-
-        // Коды, генерируемые в OzonCostsRawProcessor::extractCostEntries() напрямую
-        // + ozon_other_service — fallback для неизвестных service names
-        // + ozon_compensation — принудительно для opType=compensation
-        // + ozon_decompensation — sibling для будущего разделения по знаку amount
-        //   (OzonCostsRawProcessor пока не эмитирует, заведён как известная категория заранее)
-        foreach (['ozon_sale_commission', 'ozon_delivery', 'ozon_return_delivery', 'ozon_other_service', 'ozon_compensation', 'ozon_decompensation'] as $extra) {
-            if (!isset($codes[$extra])) {
-                $codes[$extra] = self::getCategoryName($extra);
-            }
+        foreach (OzonCostCategory::all() as $c) {
+            $codes[$c->code] = $c->name;
         }
 
         return $codes;
     }
 
+    /**
+     * Человекочитаемое имя category code.
+     */
     public static function getCategoryName(string $categoryCode): string
     {
-        return match ($categoryCode) {
-            'ozon_sale_commission'       => 'Комиссия Ozon за продажу',
-            'ozon_delivery'              => 'Доставка Ozon',
-            'ozon_return_delivery'       => 'Обратная доставка Ozon',
-            'ozon_logistic_direct'       => 'Логистика к покупателю Ozon',
-            'ozon_logistic_direct_vdc'   => 'Логистика к покупателю (вРЦ) Ozon',
-            'ozon_logistic_direct_trans' => 'Магистраль к покупателю Ozon',
-            'ozon_logistic_delivery'     => 'Доставка до покупателя Ozon',
-            'ozon_logistic_last_mile'    => 'Last mile Ozon',
-            'ozon_logistic_kgt'          => 'Доставка КГТ Ozon',
-            'ozon_logistic_return'       => 'Обратная логистика Ozon',
-            'ozon_logistic_return_trans' => 'Обратная магистраль Ozon',
-            'ozon_logistic_inbound'      => 'Кросс-докинг (поставка) Ozon',
-            'ozon_logistic_inbound_seller' => 'ТЭУ (поставка продавцом) Ozon',
-            'ozon_logistic_pickup'       => 'Выезд за товаром (Pick-up) Ozon',
-            'ozon_fulfillment'           => 'Сборка заказа Ozon',
-            'ozon_dropoff_ff'            => 'Обработка отправления FF Ozon',
-            'ozon_dropoff_pvz'           => 'Обработка отправления ПВЗ Ozon',
-            'ozon_dropoff_apvz'          => 'Дропофф АПВЗ Ozon',
-            'ozon_dropoff_sc'            => 'Обработка отправления СЦ Ozon',
-            'ozon_dropoff_ppz'           => 'Обработка отправления ППЗ Ozon',
-            'ozon_return_pvz'            => 'Перевыставление возврата ПВЗ Ozon',
-            'ozon_return_partial'        => 'Обработка частичного возврата Ozon',
-            'ozon_return_not_delivered'  => 'Возврат невостребованного товара Ozon',
-            'ozon_return_after_delivery' => 'Возврат после доставки Ozon',
-            'ozon_return_storage_pvz'    => 'Краткосрочное хранение возврата ПВЗ Ozon',
-            'ozon_return_storage_wh'     => 'Долгосрочное хранение возврата склад Ozon',
-            'ozon_package_materials'     => 'Упаковочные материалы Ozon',
-            'ozon_package_labor'         => 'Упаковка партнёрами Ozon',
-            'ozon_storage'               => 'Хранение на складе Ozon',
-            'ozon_storage_partner'       => 'Временное хранение у партнёров Ozon',
-            'ozon_seller_bonus'          => 'Бонусы продавца (рассылки) Ozon',
-            'ozon_warehouse_movement'    => 'Перемещение между складами Ozon',
-            'ozon_crossdocking'          => 'Кросс-докинг Ozon',
-            'ozon_supply_additional'     => 'Обработка товара в грузоместе FBO Ozon',
-            'ozon_supply_shortage'       => 'Бронирование места (неполный состав) Ozon',
-            'ozon_supply_surplus'        => 'Обработка излишков поставки Ozon',
-            'ozon_acquiring'             => 'Эквайринг Ozon',
-            'ozon_cpc'                   => 'Оплата за клик Ozon',
-            'ozon_marketing_action'      => 'Маркетинговые акции Ozon',
-            'ozon_reviews'               => 'Приобретение отзывов Ozon',
-            'ozon_premium_promotion'     => 'Продвижение Premium Ozon',
-            'ozon_premium_cashback'      => 'Бонусы продавца Premium Ozon',
-            'ozon_stars_membership'      => 'Звёздные товары Ozon',
-            'ozon_early_payment'         => 'Досрочная выплата Ozon',
-            'ozon_flexible_payment'      => 'Гибкий график выплат Ozon',
-            'ozon_installment'           => 'Продажа в рассрочку Ozon',
-            'ozon_penalty_undeliverable' => 'Удержание за недовложение Ozon',
-            'ozon_marking'               => 'Обязательная маркировка Ozon',
-            'ozon_return_from_stock'     => 'Комплектация для вывоза продавцом Ozon',
-            'ozon_agency_fee'            => 'Агентская услуга 3PL Global Ozon',
-            'ozon_disposal'              => 'Утилизация товара Ozon',
-            'ozon_brand_commission'      => 'Брендовая комиссия Ozon',
-            'ozon_premium_correction'    => 'Корректировка премии Ozon',
-            'ozon_service_correction'    => 'Корректировка стоимости услуг Ozon',
-            'ozon_ovh_processing'        => 'Дополнительная обработка ОВХ Ozon',
-            'ozon_compensation'          => 'Компенсации и декомпенсации Ozon',
-            'ozon_decompensation'        => 'Декомпенсация Ozon',
-            default                      => 'Прочие услуги Ozon',
-        };
+        return OzonCostCategory::findByCode($categoryCode)?->name ?? 'Прочие услуги Ozon';
     }
 
+    /**
+     * Fuzzy fallback для неизвестных service names.
+     */
     private static function fuzzy(string $serviceName): string
     {
         $lower = mb_strtolower($serviceName);
