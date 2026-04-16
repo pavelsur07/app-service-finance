@@ -6,10 +6,12 @@ namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
@@ -25,6 +27,7 @@ final class ProcessRawDocumentStepMessageHandler
         private readonly MarketplaceRawDocumentRepository $repository,
         private readonly ProcessMarketplaceRawDocumentAction $processAction,
         private readonly EntityManagerInterface $entityManager,
+        private readonly ManagerRegistry $managerRegistry,
     ) {
     }
 
@@ -70,9 +73,19 @@ final class ProcessRawDocumentStepMessageHandler
             }
             $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
-            $doc = $this->repository->find($message->rawDocumentId) ?? $doc;
-            $doc->markStepFailed($step);
-            $this->entityManager->flush();
+            if (!$this->entityManager->isOpen()) {
+                $this->managerRegistry->resetManager();
+            }
+
+            /** @var EntityManagerInterface $em */
+            $em = $this->managerRegistry->getManager();
+            $doc = $em->getRepository(MarketplaceRawDocument::class)->find($message->rawDocumentId);
+
+            if ($doc !== null) {
+                $doc->markStepFailed($step);
+                $em->flush();
+            }
+
             throw $e;
         }
 
