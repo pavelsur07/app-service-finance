@@ -147,7 +147,7 @@ final readonly class OzonMutualSettlementProcessor
 
                 // Ищем ИНН/КПП по меткам в строках после "Плательщик:"
                 for ($sub = $row + 1; $sub <= min($row + 6, 15); $sub++) {
-                    $label = $this->normalize($this->getCellStringValue($sheet, 'B', $sub));
+                    $label = $this->normalizeMixedCyrillic($this->normalize($this->getCellStringValue($sheet, 'B', $sub)));
                     if (str_contains($label, 'инн')) {
                         $info['payer_inn'] = $this->getCellStringValueOrNull($sheet, 'D', $sub);
                         $info['receiver_inn'] = $this->getCellStringValueOrNull($sheet, 'L', $sub);
@@ -316,7 +316,7 @@ final readonly class OzonMutualSettlementProcessor
         $hasData = false;
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
-            $normalizedB = $this->normalize($cellB);
+            $normalizedB = $this->normalizeMixedCyrillic($this->normalize($cellB));
 
             if ('' === $normalizedB) {
                 // Пустая строка после начала данных = конец секции
