@@ -18,6 +18,7 @@
         "pagerfanta/doctrine-orm-adapter": "^4.7.2",
         "pentatrion/vite-bundle": "^8.2",
         "phpdocumentor/reflection-docblock": "^5.6.6",
+        "phpoffice/phpspreadsheet": "*",
         "phpstan/phpdoc-parser": "^2.3.1",
         "predis/predis": "^3.3",
         "ramsey/uuid": "^4.9.2",

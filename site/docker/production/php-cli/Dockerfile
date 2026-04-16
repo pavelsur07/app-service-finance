@@ -1,9 +1,10 @@
 FROM php:8.3-fpm-alpine AS builder
 
-RUN apk add --no-cache libpq-dev libzip-dev \
+RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
 
 # ext-redis для стадии builder (чтобы composer не ругался на ext-redis)
 RUN apk add --no-cache $PHPIZE_DEPS \
@@ -35,12 +36,13 @@ FROM php:8.3-cli-alpine
 
 # su-exec нужен, чтобы стартовать контейнер как root (инициализация volume),
 # а затем "уронить" права до пользователя app для запуска воркера
-RUN apk add --no-cache libpq-dev libzip-dev bash coreutils su-exec tzdata \
+RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev bash coreutils su-exec tzdata \
     && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
 
 ENV TZ=Europe/Moscow
 

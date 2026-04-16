@@ -12,10 +12,11 @@ FROM php:8.3-cli-alpine AS builder
 # После ("щадящий" вариант):
 ENV MAKEFLAGS="-j1"
 
-RUN apk add --no-cache libpq-dev libzip-dev \
+RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
 
 # Install ext-redis for the build stage so that Composer sees the extension
 RUN apk add --no-cache $PHPIZE_DEPS \
@@ -43,12 +44,13 @@ RUN composer install --no-dev --prefer-dist --no-progress --no-scripts --optimiz
 # --- ЭТАП 3: Финальный FPM ---
 FROM php:8.3-fpm-alpine
 
-RUN apk add --no-cache libpq-dev libzip-dev fcgi tzdata \
+RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev fcgi tzdata \
     && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
     && docker-php-ext-configure opcache --disable-opcache-jit \
-    && docker-php-ext-install pdo_pgsql opcache bcmath zip
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_pgsql opcache bcmath zip gd
 
 ENV TZ=Europe/Moscow
 

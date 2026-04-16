@@ -2,13 +2,14 @@ FROM php:8.3-fpm-alpine
 
 ENV XDEBUG_VERSION 3.4.1
 
-RUN apk add --no-cache libpq-dev libzip-dev fcgi git linux-headers tzdata \
+RUN apk add --no-cache libpq-dev libzip-dev libpng-dev libjpeg-turbo-dev freetype-dev fcgi git linux-headers tzdata \
     && cp /usr/share/zoneinfo/Europe/Moscow /etc/localtime \
     && echo "Europe/Moscow" > /etc/timezone \
     && docker-php-ext-configure pgsql -with-pgsql=/usr/local/pgsql \
+    && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && git clone --branch $XDEBUG_VERSION --depth 1 https://github.com/xdebug/xdebug.git /usr/src/php/ext/xdebug \
     && docker-php-ext-configure xdebug --enable-xdebug-dev \
-    && docker-php-ext-install pdo_pgsql xdebug bcmath zip \
+    && docker-php-ext-install pdo_pgsql xdebug bcmath zip gd \
     && apk del git linux-headers
 
 ENV TZ=Europe/Moscow

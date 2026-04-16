@@ -46,13 +46,18 @@ final class DebugViewRawDocumentController extends AbstractController
         }
 
         $rawData = $document->getRawData();
+        $responseData = $rawData;
 
-        // Для бинарных/текстовых данных — показываем метаданные + превью base64
+        // Файл на диске — добавляем URL для скачивания
+        if (isset($rawData['file_path'])) {
+            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
+        }
+
+        // Legacy: бинарные/текстовые данные в base64
         if ((!empty($rawData['_binary']) || !empty($rawData['_text'])) && isset($rawData['content_base64'])) {
-            $rawDataPreview = $rawData;
-            $rawDataPreview['content_base64_preview'] = substr($rawData['content_base64'], 0, 500);
-            unset($rawDataPreview['content_base64']);
-            $rawDataPreview['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
+            $responseData['content_base64_preview'] = substr($rawData['content_base64'], 0, 500);
+            unset($responseData['content_base64']);
+            $responseData['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
         }
 
         return new JsonResponse([
@@ -65,7 +70,8 @@ final class DebugViewRawDocumentController extends AbstractController
             'recordsCount' => $document->getRecordsCount(),
             'processingStatus' => $document->getProcessingStatus()?->value,
             'apiEndpoint' => $document->getApiEndpoint(),
-            'rawData' => $rawDataPreview ?? $rawData,
+            'syncNotes' => $document->getSyncNotes(),
+            'rawData' => $responseData,
         ]);
     }
 }
