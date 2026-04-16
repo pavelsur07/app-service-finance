@@ -69,6 +69,7 @@ final class WidgetServiceGroupMap
             'ozon_acquiring'             => 'Услуги партнёров',
             'ozon_fulfillment'           => 'Услуги партнёров',
             'ozon_package_labor'         => 'Услуги партнёров',
+            'ozon_dropoff_apvz'          => 'Услуги партнёров',
 
             // === Продвижение и реклама ===
             'ozon_cpc'                   => 'Продвижение и реклама',

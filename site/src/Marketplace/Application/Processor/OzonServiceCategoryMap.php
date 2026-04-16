@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-16.1';
+    public const VERSION = '2026-04-16.2';
 
     /**
      * @var array<string, string|null>
@@ -54,7 +54,7 @@ final class OzonServiceCategoryMap
         'MarketplaceServiceItemFulfillment'                      => 'ozon_fulfillment',
         'MarketplaceServiceItemDropoffFF'                        => 'ozon_dropoff_ff',
         'MarketplaceServiceItemDropoffPVZ'                       => 'ozon_dropoff_pvz',
-        'MarketplaceServiceItemRedistributionDropOffApvz'        => 'ozon_dropoff_pvz',
+        'MarketplaceServiceItemRedistributionDropOffApvz'        => 'ozon_dropoff_apvz',
         'MarketplaceServiceItemDropoffSC'                        => 'ozon_dropoff_sc',
         'MarketplaceServiceItemDropoffPPZ'                       => 'ozon_dropoff_ppz',
 
@@ -261,6 +261,7 @@ final class OzonServiceCategoryMap
             'ozon_fulfillment'           => 'Сборка заказа Ozon',
             'ozon_dropoff_ff'            => 'Обработка отправления FF Ozon',
             'ozon_dropoff_pvz'           => 'Обработка отправления ПВЗ Ozon',
+            'ozon_dropoff_apvz'          => 'Дропофф АПВЗ Ozon',
             'ozon_dropoff_sc'            => 'Обработка отправления СЦ Ozon',
             'ozon_dropoff_ppz'           => 'Обработка отправления ППЗ Ozon',
             'ozon_return_pvz'            => 'Перевыставление возврата ПВЗ Ozon',
