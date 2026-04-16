@@ -14,7 +14,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 /**
  * Debug-эндпоинт для просмотра содержимого raw-документа.
  *
- * Возвращает полный raw_data как JSON для анализа структуры ответа Ozon API.
+ * Для JSON-данных возвращает raw_data как есть.
+ * Для бинарных (_binary=true) — метаданные + первые 500 байт base64.
  *
  * Использование:
  *   GET /api/marketplace-analytics/debug/raw-document/{id}
@@ -44,6 +45,16 @@ final class DebugViewRawDocumentController extends AbstractController
             throw $this->createNotFoundException('Raw-документ не найден.');
         }
 
+        $rawData = $document->getRawData();
+
+        // Для бинарных данных — показываем метаданные + превью base64
+        if (!empty($rawData['_binary']) && isset($rawData['content_base64'])) {
+            $rawDataPreview = $rawData;
+            $rawDataPreview['content_base64_preview'] = mb_substr($rawData['content_base64'], 0, 500);
+            unset($rawDataPreview['content_base64']);
+            $rawDataPreview['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
+        }
+
         return new JsonResponse([
             'id' => $document->getId(),
             'documentType' => $document->getDocumentType(),
@@ -54,7 +65,7 @@ final class DebugViewRawDocumentController extends AbstractController
             'recordsCount' => $document->getRecordsCount(),
             'processingStatus' => $document->getProcessingStatus()?->value,
             'apiEndpoint' => $document->getApiEndpoint(),
-            'rawData' => $document->getRawData(),
+            'rawData' => $rawDataPreview ?? $rawData,
         ]);
     }
 }

@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Application\LoadMutualSettlementAction;
 use App\Shared\Service\ActiveCompanyService;
+use App\Shared\Service\AppLogger;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +33,7 @@ final class DebugLoadMutualSettlementController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly LoadMutualSettlementAction $loadAction,
+        private readonly AppLogger $appLogger,
     ) {
     }
 
@@ -55,7 +57,13 @@ final class DebugLoadMutualSettlementController extends AbstractController
 
         try {
             $result = ($this->loadAction)($company, $periodFrom, $periodTo);
-        } catch (\RuntimeException $e) {
+        } catch (\Exception $e) {
+            $this->appLogger->error('LoadMutualSettlement: ошибка', $e, [
+                'companyId' => (string) $company->getId(),
+                'year' => $year,
+                'month' => $month,
+            ]);
+
             return $this->json([
                 'success' => false,
                 'error' => $e->getMessage(),
