@@ -145,11 +145,18 @@ final readonly class OzonMutualSettlementProcessor
                 $info['payer_name'] = $this->getCellStringValueOrNull($sheet, 'B', $row + 1);
                 $info['receiver_name'] = $this->getCellStringValueOrNull($sheet, 'J', $row + 1);
 
-                // ИНН/КПП — через 2 и 3 строки от "Плательщик:"
-                $info['payer_inn'] = $this->getCellStringValueOrNull($sheet, 'D', $row + 2);
-                $info['payer_kpp'] = $this->getCellStringValueOrNull($sheet, 'D', $row + 3);
-                $info['receiver_inn'] = $this->getCellStringValueOrNull($sheet, 'L', $row + 2);
-                $info['receiver_kpp'] = $this->getCellStringValueOrNull($sheet, 'L', $row + 3);
+                // Ищем ИНН/КПП по меткам в строках после "Плательщик:"
+                for ($sub = $row + 1; $sub <= min($row + 6, 15); $sub++) {
+                    $label = $this->normalize($this->getCellStringValue($sheet, 'B', $sub));
+                    if (str_contains($label, 'инн')) {
+                        $info['payer_inn'] = $this->getCellStringValueOrNull($sheet, 'D', $sub);
+                        $info['receiver_inn'] = $this->getCellStringValueOrNull($sheet, 'L', $sub);
+                    }
+                    if (str_contains($label, 'кпп')) {
+                        $info['payer_kpp'] = $this->getCellStringValueOrNull($sheet, 'D', $sub);
+                        $info['receiver_kpp'] = $this->getCellStringValueOrNull($sheet, 'L', $sub);
+                    }
+                }
 
                 break;
             }
@@ -183,7 +190,7 @@ final readonly class OzonMutualSettlementProcessor
         $dataStartRow = null;
         for ($row = 1; $row <= $highestRow; $row++) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
-            if ('наименование' === $this->normalize($cellB)) {
+            if ('наименование' === $this->normalizeMixedCyrillic($this->normalize($cellB))) {
                 $dataStartRow = $row + 1;
                 break;
             }
@@ -203,7 +210,7 @@ final readonly class OzonMutualSettlementProcessor
 
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
-            $normalizedB = $this->normalize($cellB);
+            $normalizedB = $this->normalizeMixedCyrillic($this->normalize($cellB));
 
             if ('' === $normalizedB) {
                 continue;
@@ -306,11 +313,16 @@ final readonly class OzonMutualSettlementProcessor
             return [];
         }
 
+        $hasData = false;
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalize($cellB);
 
             if ('' === $normalizedB) {
+                // Пустая строка после начала данных = конец секции
+                if ($hasData) {
+                    break;
+                }
                 continue;
             }
 
@@ -318,6 +330,8 @@ final readonly class OzonMutualSettlementProcessor
             if ('итого' === $normalizedB) {
                 break;
             }
+
+            $hasData = true;
 
             $compensations[] = [
                 'name' => trim($cellB),

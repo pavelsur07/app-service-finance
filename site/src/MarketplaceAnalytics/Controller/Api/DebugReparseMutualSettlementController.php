@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Application\Processor\OzonMutualSettlementProcessor;
-use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Shared\Service\ActiveCompanyService;
@@ -80,7 +79,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRecordsCount($parsed['meta']['rows_parsed'] ?? $parsed['totals']['rows_count'] ?? 0);
             $document->resetProcessingStatus();
             $document->markCompleted();
-            $document->setSyncNotes('Reparsed at ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s'));
+            $document->addSyncNote('Reparsed at ' . (new \DateTimeImmutable())->format('Y-m-d H:i:s'));
 
             $this->em->flush();
 
@@ -95,7 +94,7 @@ final class DebugReparseMutualSettlementController extends AbstractController
             $document->setRawData($rawData);
             $document->resetProcessingStatus();
             $document->markStepFailed(PipelineStep::COSTS);
-            $document->setSyncNotes('Reparse failed: ' . $e->getMessage());
+            $document->addSyncNote('Reparse failed: ' . $e->getMessage());
 
             $this->em->flush();
 
