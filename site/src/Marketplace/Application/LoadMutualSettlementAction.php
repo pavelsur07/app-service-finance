@@ -144,12 +144,12 @@ final class LoadMutualSettlementAction
         try {
             $parsed = $this->processor->parse($absolutePath);
             $rawData['parsed'] = $parsed;
-            $recordsCount = $parsed['meta']['data_rows_found'] ?? 0;
+            $recordsCount = $parsed['meta']['rows_parsed'] ?? $parsed['totals']['rows_count'] ?? 0;
 
             $this->appLogger->info('LoadMutualSettlement: парсинг успешен', [
                 'companyId' => $companyId,
                 'recordsCount' => $recordsCount,
-                'sections' => count($parsed['sections'] ?? []),
+                'rows_parsed' => $parsed['meta']['rows_parsed'] ?? 0,
             ]);
         } catch (\Throwable $e) {
             $processingStatus = PipelineStatus::FAILED;
