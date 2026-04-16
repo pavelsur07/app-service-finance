@@ -25,8 +25,9 @@ function calcDeltaPercent(current: number, previous: number): number | null {
 /**
  * Цвет дельта-бейджа в зависимости от типа виджета и направления изменения.
  *
+ * P&L-конвенция: расходы < 0, доходы > 0.
  * income / profit: рост (+) = зелёный, падение (-) = красный
- * expense:         рост (+) = красный,  падение (-) = зелёный
+ * expense:         дельта < 0 → расходы выросли → красный; > 0 → зелёный
  */
 function getBadgeColor(type: WidgetType, delta: number): 'green' | 'red' | 'secondary' {
     if (delta === 0) {
@@ -34,7 +35,7 @@ function getBadgeColor(type: WidgetType, delta: number): 'green' | 'red' | 'seco
     }
     const isPositive = delta > 0;
     if (type === 'expense') {
-        return isPositive ? 'red' : 'green';
+        return isPositive ? 'green' : 'red';
     }
     return isPositive ? 'green' : 'red';
 }

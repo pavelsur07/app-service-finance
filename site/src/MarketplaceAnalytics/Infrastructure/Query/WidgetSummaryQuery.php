@@ -11,8 +11,8 @@ use Doctrine\DBAL\Connection;
 /**
  * Сводка для виджета MarketplaceAnalytics за период.
  *
- * Возвращает только итоговые числа и разбивку затрат по widgetGroup
- * (5 групп WidgetServiceGroupMap).
+ * Все суммы возвращаются в P&L-конвенции (как в Ozon ЛК):
+ *   доходы > 0, расходы < 0, profit = revenue + returnsTotal + costPriceTotal + totalCosts.
  *
  * Затраты берутся напрямую из marketplace_costs БЕЗ фильтра listing_id IS NOT NULL,
  * чтобы захватить категории, не привязанные к листингу (CPC, хранение, кросс-докинг и т.п.).
@@ -76,14 +76,13 @@ final readonly class WidgetSummaryQuery
             ];
         }
 
-        // Sales / returns — суммируем по всем листингам
         foreach ($sales as $sale) {
             $revenue += (float) $sale->revenue;
-            $costPriceTotal += (float) $sale->costPriceTotal;
+            $costPriceTotal -= (float) $sale->costPriceTotal;
         }
 
         foreach ($returns as $ret) {
-            $returnsTotal += (float) $ret->returnsTotal;
+            $returnsTotal -= (float) $ret->returnsTotal;
         }
 
         // Costs — плоский список категорий (без листингов).
@@ -133,8 +132,7 @@ final readonly class WidgetSummaryQuery
                 ];
             }
 
-            // Sort categories inside group by costsAmount DESC
-            usort($categories, static fn (array $a, array $b): int => $b['costsAmount'] <=> $a['costsAmount']);
+            usort($categories, static fn (array $a, array $b): int => $a['netAmount'] <=> $b['netAmount']);
 
             $netAmount = round($group['netAmount'], 2);
             $totalCosts += $netAmount;
@@ -148,14 +146,13 @@ final readonly class WidgetSummaryQuery
             ];
         }
 
-        // Sort widgetGroups by netAmount DESC
-        usort($widgetGroups, static fn (array $a, array $b): int => $b['netAmount'] <=> $a['netAmount']);
+        usort($widgetGroups, static fn (array $a, array $b): int => $a['netAmount'] <=> $b['netAmount']);
 
         $totalCosts = round($totalCosts, 2);
         $revenue = round($revenue, 2);
         $returnsTotal = round($returnsTotal, 2);
         $costPriceTotal = round($costPriceTotal, 2);
-        $profit = round($revenue - $returnsTotal - $costPriceTotal - $totalCosts, 2);
+        $profit = round($revenue + $returnsTotal + $costPriceTotal + $totalCosts, 2);
 
         $marginPercent = $revenue > 0 ? round($profit / $revenue * 100, 1) : null;
 
@@ -172,6 +169,7 @@ final readonly class WidgetSummaryQuery
 
     /**
      * Затраты по всем категориям за период — БЕЗ фильтра по listing_id.
+     * Суммы в P&L-конвенции: расходы < 0, сторно > 0.
      *
      * В отличие от ListingCostAggregateQuery (per-listing) сюда попадают
      * категории затрат с listing_id = NULL (CPC, хранение, кросс-докинг и т.п.).
@@ -199,13 +197,13 @@ final readonly class WidgetSummaryQuery
                 cc.name                                                       AS category_name,
                 SUM(CASE
                     WHEN (c.operation_type = 'storno')
-                    THEN -ABS(c.amount)
-                    ELSE ABS(c.amount)
+                    THEN ABS(c.amount)
+                    ELSE -ABS(c.amount)
                 END)                                                          AS net_amount,
                 SUM(CASE
                     WHEN (c.operation_type = 'storno')
                     THEN 0
-                    ELSE ABS(c.amount)
+                    ELSE -ABS(c.amount)
                 END)                                                          AS costs_amount,
                 SUM(CASE
                     WHEN (c.operation_type = 'storno')
@@ -219,7 +217,7 @@ final readonly class WidgetSummaryQuery
               AND c.cost_date <= :periodTo
               {$mpFilter}
             GROUP BY cc.code, cc.name
-            ORDER BY costs_amount DESC
+            ORDER BY costs_amount ASC
             SQL,
             array_filter([
                 'companyId'   => $companyId,
