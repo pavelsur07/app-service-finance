@@ -56,8 +56,8 @@ final class DebugDownloadRawDocumentController extends AbstractController
 
         $rawData = $document->getRawData();
 
-        if (empty($rawData['_binary']) || !isset($rawData['content_base64'])) {
-            throw $this->createNotFoundException('Документ не содержит бинарных данных.');
+        if ((empty($rawData['_binary']) && empty($rawData['_text'])) || !isset($rawData['content_base64'])) {
+            throw $this->createNotFoundException('Документ не содержит данных для скачивания.');
         }
 
         $contentType = $rawData['content_type'] ?? 'application/octet-stream';

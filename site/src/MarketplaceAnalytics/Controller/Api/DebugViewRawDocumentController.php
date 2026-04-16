@@ -47,10 +47,10 @@ final class DebugViewRawDocumentController extends AbstractController
 
         $rawData = $document->getRawData();
 
-        // Для бинарных данных — показываем метаданные + превью base64
-        if (!empty($rawData['_binary']) && isset($rawData['content_base64'])) {
+        // Для бинарных/текстовых данных — показываем метаданные + превью base64
+        if ((!empty($rawData['_binary']) || !empty($rawData['_text'])) && isset($rawData['content_base64'])) {
             $rawDataPreview = $rawData;
-            $rawDataPreview['content_base64_preview'] = mb_substr($rawData['content_base64'], 0, 500);
+            $rawDataPreview['content_base64_preview'] = substr($rawData['content_base64'], 0, 500);
             unset($rawDataPreview['content_base64']);
             $rawDataPreview['download_url'] = '/api/marketplace-analytics/debug/raw-document/' . $id . '/download';
         }

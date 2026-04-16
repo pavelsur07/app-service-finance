@@ -30,8 +30,8 @@ final readonly class OzonMutualSettlementClient
     private const POLL_MAX_WAIT_SECONDS = 60;
     private const POLL_INITIAL_DELAY_SECONDS = 2;
 
-    /** Content-Type подстроки, которые считаем текстовым/JSON ответом */
-    private const TEXT_CONTENT_TYPES = ['json', 'text/', 'xml'];
+    /** Content-Type подстроки, которые пробуем парсить как JSON */
+    private const JSON_CONTENT_TYPES = ['json'];
 
     public function __construct(
         private HttpClientInterface $httpClient,
@@ -109,7 +109,7 @@ final readonly class OzonMutualSettlementClient
             'status' => $statusCode,
             'content_type' => $contentType,
             'content_length' => $responseSize,
-            'body_preview' => mb_substr($responseBody, 0, 200),
+            'body_preview' => substr($responseBody, 0, 200),
         ]);
 
         if ($statusCode !== 200) {
@@ -123,8 +123,8 @@ final readonly class OzonMutualSettlementClient
             throw $exception;
         }
 
-        // Бинарный ответ (XLSX, CSV и т.д.) — сохраняем как base64
-        if (!$this->isTextContentType($contentType)) {
+        // Не-JSON ответ (XLSX, CSV и т.д.) — сохраняем как base64
+        if (!$this->isJsonContentType($contentType)) {
             $this->appLogger->info('Ozon MS: бинарный ответ, сохраняем как base64', [
                 'companyId' => $companyId,
                 'content_type' => $contentType,
@@ -152,11 +152,11 @@ final readonly class OzonMutualSettlementClient
         $data = json_decode($responseBody, true);
 
         if (!is_array($data)) {
-            // Текстовый но не JSON — сохраняем как текст в обёртке
+            // JSON Content-Type, но невалидный JSON — сохраняем как base64
             $data = [
                 '_text' => true,
                 'content_type' => $contentType,
-                'content' => $responseBody,
+                'content_base64' => base64_encode($responseBody),
                 'size_bytes' => $responseSize,
                 'period' => [
                     'from' => $periodFrom->format('Y-m-d'),
@@ -300,14 +300,16 @@ final readonly class OzonMutualSettlementClient
             'size_bytes' => $contentSize,
         ]);
 
-        // Если ответ — JSON
+        // Если ответ — JSON, пробуем распарсить
         if (str_contains($contentType, 'json')) {
             $decoded = json_decode($content, true);
 
-            return is_array($decoded) ? $decoded : ['raw' => $content];
+            if (is_array($decoded)) {
+                return $decoded;
+            }
         }
 
-        // Бинарный/текстовый файл — оборачиваем в base64
+        // Не-JSON или невалидный JSON — оборачиваем в base64
         return [
             '_binary' => true,
             'content_type' => $contentType,
@@ -347,15 +349,15 @@ final readonly class OzonMutualSettlementClient
         return 0;
     }
 
-    private function isTextContentType(string $contentType): bool
+    private function isJsonContentType(string $contentType): bool
     {
         if ('' === $contentType) {
             // Если Content-Type не указан — пробуем как JSON
             return true;
         }
 
-        foreach (self::TEXT_CONTENT_TYPES as $textType) {
-            if (str_contains($contentType, $textType)) {
+        foreach (self::JSON_CONTENT_TYPES as $jsonType) {
+            if (str_contains($contentType, $jsonType)) {
                 return true;
             }
         }
