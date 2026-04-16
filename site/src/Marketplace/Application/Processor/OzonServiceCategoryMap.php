@@ -26,7 +26,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-13.1';
+    public const VERSION = '2026-04-16.1';
 
     /**
      * @var array<string, string|null>
@@ -54,6 +54,7 @@ final class OzonServiceCategoryMap
         'MarketplaceServiceItemFulfillment'                      => 'ozon_fulfillment',
         'MarketplaceServiceItemDropoffFF'                        => 'ozon_dropoff_ff',
         'MarketplaceServiceItemDropoffPVZ'                       => 'ozon_dropoff_pvz',
+        'MarketplaceServiceItemRedistributionDropOffApvz'        => 'ozon_dropoff_pvz',
         'MarketplaceServiceItemDropoffSC'                        => 'ozon_dropoff_sc',
         'MarketplaceServiceItemDropoffPPZ'                       => 'ozon_dropoff_ppz',
 
@@ -76,6 +77,7 @@ final class OzonServiceCategoryMap
         // === ХРАНЕНИЕ ===
         'OperationMarketplaceServiceStorage'                     => 'ozon_storage',
         'MarketplaceServiceItemTemporaryStorageRedistribution'   => 'ozon_storage_partner',
+        'OperationMarketplaceItemTemporaryStorageRedistribution' => 'ozon_storage_partner',
 
         // === КРОСС-ДОКИНГ / ПОСТАВКА НА FBO ===
         'MarketplaceServiceItemCrossdocking'                     => 'ozon_crossdocking',
@@ -95,6 +97,7 @@ final class OzonServiceCategoryMap
         'MarketplaceServicePremiumPromotion'                     => 'ozon_premium_promotion',
         'MarketplaceServicePremiumCashbackIndividualPoints'      => 'ozon_premium_cashback',
         'MarketplaceServiceItemElectronicServicesPremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
+        'OperationMarketplaceServicePremiumCashbackIndividualPoints' => 'ozon_premium_cashback',
         'ItemAgentServiceStarsMembership'                        => 'ozon_stars_membership',
 
         // === ФИНАНСОВЫЕ УСЛУГИ ===
@@ -116,9 +119,20 @@ final class OzonServiceCategoryMap
         'MarketplaceServiceItemDisposalDetailed'                 => 'ozon_disposal',
         'MarketplaceServiceProductMovementFromWarehouse'         => 'ozon_logistic_pickup',
         'MarketplaceServiceVolumeWeightCharacsProcessing'        => 'ozon_ovh_processing',
+        'OperationMarketplaceServiceVolumeWeightCharacsProcessing' => 'ozon_ovh_processing',
 
         // === АНГЛИЙСКИЕ operation_type ДЛЯ ОПЕРАЦИЙ БЕЗ services[] ===
         // Эти operation_type приходят в поле op['operation_type'] когда services[] пустой
+        // При добавлении новых кодов — проверить маппинг через debug-эндпоинт
+        // GET /api/marketplace-analytics/debug/unknown-operations
+        'AccrualInternalClaim'                                   => 'ozon_compensation',
+        'DisposalReasonDamagedPackaging'                         => 'ozon_disposal',
+        'DisposalReasonScattered'                                => 'ozon_disposal',
+        'DisposalReasonFailedToPickupOnTime'                     => 'ozon_disposal',
+        'OperationReturnGoodsFBSofRMS'                           => 'ozon_return_delivery',
+        'OperationSellerReturnsCargoAssortmentInvalid'            => 'ozon_return_delivery',
+        'OperationSellerReturnsCargoAssortmentValid'              => 'ozon_return_delivery',
+        'SellerReturnsDeliveryToPickupPoint'                     => 'ozon_return_pvz',
         'OperationMarketplaceServicePremiumCashbackBonusAccrual' => 'ozon_seller_bonus',
         'OperationPointsForReviews'                              => 'ozon_reviews',
         'OperationMarketplaceSupplyExpirationDateProcessing'     => 'ozon_supply_additional',
@@ -163,6 +177,7 @@ final class OzonServiceCategoryMap
         $logger->warning('ozon_unknown_service_name', [
             'service_name' => $serviceName,
             'resolved_to'  => $fallback,
+            'hint'         => 'Add to OzonServiceCategoryMap mapping',
         ]);
 
         return $fallback;
