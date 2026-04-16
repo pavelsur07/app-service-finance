@@ -141,8 +141,6 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $this->categoryResolver->preload($company, MarketplaceType::OZON);
-        // Сброс кеша после возможного em->clear() между батчами
-        $this->categoryResolver->resetCache();
 
         // Генерируем cost entries
         $allEntries = [];
