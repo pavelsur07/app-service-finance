@@ -110,7 +110,7 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
                 </div>
             )}
 
-            <div className="card">
+            <div className="card" style={{ overflow: 'visible' }}>
                 <div className="card-header">
                     <h3 className="card-title">Юнит-экономика по листингам</h3>
                     {items.length > 0 && (

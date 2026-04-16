@@ -27,15 +27,12 @@ interface UnitExtendedTableProps {
 }
 
 // Inline-CSS для sticky шапки + frozen первой колонки.
-// scroll-контейнер .ue-ext-scroll лежит внутри .card — тот уже имеет overflow:hidden
-// и border-radius, которые клипуют внутренний скроллбар, поэтому отдельного wrapper'а нет.
-// max-height рассчитан под текущий layout страницы (topbar + два page-header + табы +
-// фильтры + card-header ≈ 380px).
+// Вертикальный скролл — глобальный (page-wrapper), горизонтальный — локальный.
+// Родительский .card должен иметь overflow:visible (иначе sticky не работает).
 const TABLE_STYLES = `
 .ue-ext-scroll {
-    max-height: calc(100vh - 380px);
-    min-height: 240px;
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: visible;
 }
 .ue-ext-table {
     border-collapse: separate;
