@@ -55,7 +55,9 @@ final class MarketplaceCostCategoryResolver
             $category->setName($name);
 
             $this->em->persist($category);
-            $this->em->flush();
+            // flush НЕ вызываем — соответствует docblock.
+            // Id сгенерирован на стороне приложения (uuid7), поэтому persist без flush
+            // достаточен для использования в relation.
         }
 
         $this->cache[$cacheKey] = $category;
