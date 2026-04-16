@@ -22,21 +22,11 @@ function calcDeltaPercent(current: number, previous: number): number | null {
     return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-/**
- * Цвет дельта-бейджа в зависимости от типа виджета и направления изменения.
- *
- * income / profit: рост (+) = зелёный, падение (-) = красный
- * expense:         рост (+) = красный,  падение (-) = зелёный
- */
 function getBadgeColor(type: WidgetType, delta: number): 'green' | 'red' | 'secondary' {
     if (delta === 0) {
         return 'secondary';
     }
-    const isPositive = delta > 0;
-    if (type === 'expense') {
-        return isPositive ? 'red' : 'green';
-    }
-    return isPositive ? 'green' : 'red';
+    return delta > 0 ? 'green' : 'red';
 }
 
 const WidgetCard: React.FC<WidgetCardProps> = ({
