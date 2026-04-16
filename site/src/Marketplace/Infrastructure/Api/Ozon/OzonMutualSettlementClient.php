@@ -15,9 +15,10 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * Endpoint: POST /v1/finance/mutual-settlement
  * Авторизация: Client-Id + Api-Key (те же, что для transaction/list).
  *
- * Метод возвращает данные синхронно (JSON).
- * Если API вернёт report_code (асинхронный режим), клиент реализует
- * polling /v1/report/info с exponential backoff до готовности.
+ * Ответ может быть:
+ *   - JSON (синхронный режим)
+ *   - report_code (асинхронный режим → polling → файл)
+ *   - Бинарный файл (CSV/XLSX) — сохраняется как base64
  */
 final readonly class OzonMutualSettlementClient
 {
@@ -29,6 +30,9 @@ final readonly class OzonMutualSettlementClient
     private const POLL_MAX_WAIT_SECONDS = 60;
     private const POLL_INITIAL_DELAY_SECONDS = 2;
 
+    /** Content-Type подстроки, которые пробуем парсить как JSON */
+    private const JSON_CONTENT_TYPES = ['json'];
+
     public function __construct(
         private HttpClientInterface $httpClient,
         private MarketplaceCredentialsQuery $credentialsQuery,
@@ -37,7 +41,7 @@ final readonly class OzonMutualSettlementClient
     }
 
     /**
-     * @return array{data: array, records_count: int, response_size: int} Полный ответ API + количество записей + размер ответа в байтах
+     * @return array{data: array, records_count: int, response_size: int}
      *
      * @throws \RuntimeException если credentials не найдены или API вернул ошибку
      */
@@ -97,11 +101,15 @@ final readonly class OzonMutualSettlementClient
         }
 
         $responseBody = $response->getContent(false);
+        $contentType = $response->getHeaders(false)['content-type'][0] ?? '';
+        $responseSize = strlen($responseBody);
 
-        $this->appLogger->info('Ozon MS response', [
+        $this->appLogger->info('Ozon MS response headers', [
             'companyId' => $companyId,
             'status' => $statusCode,
-            'body' => mb_substr($responseBody, 0, 1000),
+            'content_type' => $contentType,
+            'content_length' => $responseSize,
+            'body_preview' => substr($responseBody, 0, 200),
         ]);
 
         if ($statusCode !== 200) {
@@ -115,15 +123,55 @@ final readonly class OzonMutualSettlementClient
             throw $exception;
         }
 
-        $responseSize = strlen($responseBody);
-        $data = json_decode($responseBody, true, flags: \JSON_THROW_ON_ERROR);
+        // Не-JSON ответ (XLSX, CSV и т.д.) — сохраняем как base64
+        if (!$this->isJsonContentType($contentType)) {
+            $this->appLogger->info('Ozon MS: бинарный ответ, сохраняем как base64', [
+                'companyId' => $companyId,
+                'content_type' => $contentType,
+                'size_bytes' => $responseSize,
+            ]);
 
-        if (!is_array($data)) {
-            throw new \RuntimeException('Ozon mutual settlement: ответ не является JSON-объектом.');
+            $data = [
+                '_binary' => true,
+                'content_type' => $contentType,
+                'content_base64' => base64_encode($responseBody),
+                'size_bytes' => $responseSize,
+                'period' => [
+                    'from' => $periodFrom->format('Y-m-d'),
+                    'to' => $periodTo->format('Y-m-d'),
+                ],
+            ];
+
+            return [
+                'data' => $data,
+                'records_count' => 0,
+                'response_size' => $responseSize,
+            ];
         }
 
-        // Проверяем: если API вернул report_code — это асинхронный режим.
-        // Код может быть на верхнем уровне или внутри result.code.
+        $data = json_decode($responseBody, true);
+
+        if (!is_array($data)) {
+            // JSON Content-Type, но невалидный JSON — сохраняем как base64
+            $data = [
+                '_text' => true,
+                'content_type' => $contentType,
+                'content_base64' => base64_encode($responseBody),
+                'size_bytes' => $responseSize,
+                'period' => [
+                    'from' => $periodFrom->format('Y-m-d'),
+                    'to' => $periodTo->format('Y-m-d'),
+                ],
+            ];
+
+            return [
+                'data' => $data,
+                'records_count' => 0,
+                'response_size' => $responseSize,
+            ];
+        }
+
+        // JSON-ответ — проверяем асинхронный режим
         $reportCode = $data['report_code'] ?? $data['result']['code'] ?? $data['code'] ?? null;
         if (null !== $reportCode && '' !== (string) $reportCode) {
             $this->appLogger->info('Ozon MS: асинхронный режим, polling', [
@@ -131,7 +179,7 @@ final readonly class OzonMutualSettlementClient
                 'reportCode' => $reportCode,
             ]);
 
-            $data = $this->pollReport($headers, (string) $reportCode);
+            $data = $this->pollReport($headers, (string) $reportCode, $companyId, $periodFrom, $periodTo);
         }
 
         $recordsCount = $this->countRecords($data);
@@ -156,8 +204,13 @@ final readonly class OzonMutualSettlementClient
      *
      * @return array Полный ответ API
      */
-    private function pollReport(array $headers, string $reportCode): array
-    {
+    private function pollReport(
+        array $headers,
+        string $reportCode,
+        string $companyId,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): array {
         $delay = self::POLL_INITIAL_DELAY_SECONDS;
         $totalWaited = 0;
 
@@ -191,7 +244,7 @@ final readonly class OzonMutualSettlementClient
             if ('success' === $status || 'completed' === $status) {
                 $fileUrl = (string) ($report['file'] ?? $data['file'] ?? '');
                 if ('' !== $fileUrl) {
-                    return $this->downloadReport($fileUrl);
+                    return $this->downloadReport($fileUrl, $companyId, $periodFrom, $periodTo);
                 }
 
                 return $data;
@@ -220,40 +273,65 @@ final readonly class OzonMutualSettlementClient
     }
 
     /**
-     * Скачивание файла отчёта и попытка преобразования в JSON.
+     * Скачивание файла отчёта.
      *
      * Не передаём API credentials — fileUrl обычно pre-signed ссылка
      * на внешнее хранилище (Yandex Cloud / AWS), авторизация не нужна.
      *
      * @return array Содержимое отчёта в формате массива
      */
-    private function downloadReport(string $fileUrl): array
-    {
+    private function downloadReport(
+        string $fileUrl,
+        string $companyId,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): array {
         $response = $this->httpClient->request('GET', $fileUrl, [
             'timeout' => self::REQUEST_TIMEOUT,
         ]);
 
         $content = $response->getContent();
         $contentType = $response->getHeaders()['content-type'][0] ?? '';
+        $contentSize = strlen($content);
 
-        // Если ответ — JSON
+        $this->appLogger->info('Ozon MS: скачан файл отчёта', [
+            'companyId' => $companyId,
+            'content_type' => $contentType,
+            'size_bytes' => $contentSize,
+        ]);
+
+        // Если ответ — JSON, пробуем распарсить
         if (str_contains($contentType, 'json')) {
-            $decoded = json_decode($content, true, flags: \JSON_THROW_ON_ERROR);
+            $decoded = json_decode($content, true);
 
-            return is_array($decoded) ? $decoded : ['raw' => $content];
+            if (is_array($decoded)) {
+                return $decoded;
+            }
         }
 
-        // CSV или другой формат — оборачиваем в JSON-структуру
-        return ['raw_content' => $content, 'content_type' => $contentType];
+        // Не-JSON или невалидный JSON — оборачиваем в base64
+        return [
+            '_binary' => true,
+            'content_type' => $contentType,
+            'content_base64' => base64_encode($content),
+            'size_bytes' => $contentSize,
+            'period' => [
+                'from' => $periodFrom->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
+            ],
+        ];
     }
 
     /**
      * Подсчитывает количество записей в ответе.
-     *
-     * Структура ответа может варьироваться, пробуем типичные варианты.
      */
     private function countRecords(array $data): int
     {
+        // Бинарные/текстовые обёртки — записей нет
+        if (isset($data['_binary']) || isset($data['_text'])) {
+            return 0;
+        }
+
         // result.rows или result
         if (isset($data['result']) && is_array($data['result'])) {
             if (isset($data['result']['rows']) && is_array($data['result']['rows'])) {
@@ -269,5 +347,21 @@ final readonly class OzonMutualSettlementClient
         }
 
         return 0;
+    }
+
+    private function isJsonContentType(string $contentType): bool
+    {
+        if ('' === $contentType) {
+            // Если Content-Type не указан — пробуем как JSON
+            return true;
+        }
+
+        foreach (self::JSON_CONTENT_TYPES as $jsonType) {
+            if (str_contains($contentType, $jsonType)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

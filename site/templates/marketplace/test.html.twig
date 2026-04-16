@@ -441,13 +441,21 @@
                     method: 'POST',
                     headers: { 'X-Requested-With': 'XMLHttpRequest' }
                 })
-                .then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+                .then(function (resp) {
+                    var ct = resp.headers.get('content-type') || '';
+                    if (ct.indexOf('json') === -1) {
+                        throw new Error('HTTP ' + resp.status + ': сервер вернул не JSON (возможно таймаут или редирект на логин)');
+                    }
+                    return resp.json().then(function (data) { return { ok: resp.ok, data: data }; });
+                })
                 .then(function (res) {
                     resetBtn();
 
                     if (res.ok && res.data.success) {
                         var d = res.data;
-                        var viewUrl = '/api/marketplace-analytics/debug/raw-document/' + encodeURIComponent(d.rawDocumentId);
+                        var docId = encodeURIComponent(d.rawDocumentId);
+                        var viewUrl = '/api/marketplace-analytics/debug/raw-document/' + docId;
+                        var downloadUrl = '/api/marketplace-analytics/debug/raw-document/' + docId + '/download';
 
                         var alert = el('div', {'class': 'alert alert-success'});
                         var header = el('div', {'class': 'd-flex align-items-center'});
@@ -461,13 +469,19 @@
                         table.appendChild(tableRowPlain('Записей', d.recordsCount));
                         table.appendChild(tableRowPlain('Размер ответа', d.responseSize));
 
-                        var link = el('a', {
+                        var viewLink = el('a', {
                             'href': viewUrl,
-                            'class': 'btn btn-sm btn-outline-azure',
+                            'class': 'btn btn-sm btn-outline-azure me-2',
                             'target': '_blank'
                         }, ['Открыть JSON']);
 
-                        var body = el('div', {'class': 'mt-2'}, [table, link]);
+                        var dlLink = el('a', {
+                            'href': downloadUrl,
+                            'class': 'btn btn-sm btn-outline-green',
+                            'target': '_blank'
+                        }, ['Скачать файл']);
+
+                        var body = el('div', {'class': 'mt-2'}, [table, viewLink, dlLink]);
                         alert.appendChild(body);
 
                         msResult.textContent = '';
@@ -480,7 +494,7 @@
                 })
                 .catch(function (err) {
                     resetBtn();
-                    showError('Ошибка сети', err.message);
+                    showError('Ошибка', err.message);
                 });
             });
         })();
