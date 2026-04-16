@@ -111,6 +111,60 @@
             </div>
         </div>
 
+        {# Загрузка взаиморасчётов Ozon #}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title text-azure">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></svg>
+                    Загрузка взаиморасчётов Ozon
+                </h3>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Для получения данных о займах и факторинге (не приходят через <code>transaction_list</code>).
+                    Загружает raw-данные из <code>/v1/finance/mutual-settlement</code> и сохраняет в <code>marketplace_raw_documents</code>.
+                </p>
+                <div class="row g-3 align-items-end mb-3">
+                    <div class="col-auto">
+                        <label class="form-label">Год</label>
+                        <select id="ms-year" class="form-select" style="width:100px">
+                            {% set currentYear = "now"|date("Y") %}
+                            {% for y in range(currentYear - 1, currentYear + 1) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <label class="form-label">Месяц</label>
+                        <select id="ms-month" class="form-select" style="width:140px">
+                            <option value="1">Январь</option>
+                            <option value="2">Февраль</option>
+                            <option value="3">Март</option>
+                            <option value="4">Апрель</option>
+                            <option value="5">Май</option>
+                            <option value="6">Июнь</option>
+                            <option value="7">Июль</option>
+                            <option value="8">Август</option>
+                            <option value="9">Сентябрь</option>
+                            <option value="10">Октябрь</option>
+                            <option value="11">Ноябрь</option>
+                            <option value="12">Декабрь</option>
+                        </select>
+                    </div>
+                    <div class="col-auto">
+                        <button id="ms-load-btn" class="btn btn-azure" type="button">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2 -2v-2"/><path d="M7 11l5 5l5 -5"/><path d="M12 4l0 12"/></svg>
+                            Загрузить
+                        </button>
+                    </div>
+                </div>
+                <div id="ms-result" style="display:none"></div>
+                <div id="ms-placeholder" class="text-muted small">
+                    Результат появится ниже после загрузки.
+                </div>
+            </div>
+        </div>
+
         {# Очистка затрат перед переобработкой #}
         <div class="card mb-3">
             <div class="card-header">
@@ -310,6 +364,125 @@
 
             // Инициализация при загрузке
             updateAll();
+        })();
+
+        // Загрузка взаиморасчётов Ozon
+        (function () {
+            var msYearEl   = document.getElementById('ms-year');
+            var msMonthEl  = document.getElementById('ms-month');
+            var msBtn      = document.getElementById('ms-load-btn');
+            var msResult   = document.getElementById('ms-result');
+            var msPlaceholder = document.getElementById('ms-placeholder');
+            var msBtnOriginalHTML = msBtn.innerHTML;
+
+            // Дефолт: текущий месяц, или предыдущий если сегодня < 5-го
+            var now      = new Date();
+            var defMonth = now.getMonth() + 1; // 1-based
+            var defYear  = now.getFullYear();
+            if (now.getDate() < 5) {
+                defMonth--;
+                if (defMonth < 1) { defMonth = 12; defYear--; }
+            }
+            msYearEl.value  = String(defYear);
+            msMonthEl.value = String(defMonth);
+
+            function el(tag, attrs, children) {
+                var node = document.createElement(tag);
+                if (attrs) Object.keys(attrs).forEach(function (k) { node.setAttribute(k, attrs[k]); });
+                if (children) children.forEach(function (c) {
+                    node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+                });
+                return node;
+            }
+
+            function tableRow(label, value) {
+                var td1 = el('td', {'class': 'text-muted pe-3'}, [label]);
+                var code = el('code', null, [String(value)]);
+                var td2 = el('td', null, [code]);
+                return el('tr', null, [td1, td2]);
+            }
+
+            function tableRowPlain(label, value) {
+                var td1 = el('td', {'class': 'text-muted pe-3'}, [label]);
+                var td2 = el('td', null, [String(value)]);
+                return el('tr', null, [td1, td2]);
+            }
+
+            function showError(title, message) {
+                msResult.textContent = '';
+                var alert = el('div', {'class': 'alert alert-danger'});
+                var h4 = el('h4', {'class': 'alert-title'}, [title]);
+                var msg = el('div', {'class': 'text-muted'}, [message]);
+                alert.appendChild(h4);
+                alert.appendChild(msg);
+                msResult.appendChild(alert);
+                msResult.style.display = 'block';
+            }
+
+            function resetBtn() {
+                msBtn.disabled = false;
+                msBtn.innerHTML = msBtnOriginalHTML;
+            }
+
+            msBtn.addEventListener('click', function () {
+                var year  = msYearEl.value;
+                var month = msMonthEl.value;
+                var url   = '/api/marketplace-analytics/debug/load-mutual-settlement?year=' + encodeURIComponent(year) + '&month=' + encodeURIComponent(month);
+
+                msBtn.disabled = true;
+                msBtn.textContent = '';
+                var spinner = el('span', {'class': 'spinner-border spinner-border-sm me-1'});
+                msBtn.appendChild(spinner);
+                msBtn.appendChild(document.createTextNode(' Загрузка…'));
+                msPlaceholder.style.display = 'none';
+                msResult.style.display = 'none';
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(function (resp) { return resp.json().then(function (data) { return { ok: resp.ok, data: data }; }); })
+                .then(function (res) {
+                    resetBtn();
+
+                    if (res.ok && res.data.success) {
+                        var d = res.data;
+                        var viewUrl = '/api/marketplace-analytics/debug/raw-document/' + encodeURIComponent(d.rawDocumentId);
+
+                        var alert = el('div', {'class': 'alert alert-success'});
+                        var header = el('div', {'class': 'd-flex align-items-center'});
+                        var strong = el('strong', null, ['Загружено!']);
+                        header.appendChild(el('div', null, [strong]));
+                        alert.appendChild(header);
+
+                        var table = el('table', {'class': 'table table-sm table-borderless mb-2', 'style': 'width:auto'});
+                        table.appendChild(tableRow('Raw Document ID', d.rawDocumentId));
+                        table.appendChild(tableRowPlain('Период', d.period.from + ' — ' + d.period.to));
+                        table.appendChild(tableRowPlain('Записей', d.recordsCount));
+                        table.appendChild(tableRowPlain('Размер ответа', d.responseSize));
+
+                        var link = el('a', {
+                            'href': viewUrl,
+                            'class': 'btn btn-sm btn-outline-azure',
+                            'target': '_blank'
+                        }, ['Открыть JSON']);
+
+                        var body = el('div', {'class': 'mt-2'}, [table, link]);
+                        alert.appendChild(body);
+
+                        msResult.textContent = '';
+                        msResult.appendChild(alert);
+                        msResult.style.display = 'block';
+                    } else {
+                        var errMsg = (res.data && (res.data.error || res.data.message)) || 'Неизвестная ошибка';
+                        showError('Ошибка', errMsg);
+                    }
+                })
+                .catch(function (err) {
+                    resetBtn();
+                    showError('Ошибка сети', err.message);
+                });
+            });
         })();
     </script>
 {% endblock %}
