@@ -52,7 +52,7 @@ final class WidgetServiceGroupMap
             'ozon_return_after_delivery' => 'Услуги доставки и FBO',
             'ozon_return_storage_pvz'    => 'Услуги доставки и FBO',
             'ozon_return_storage_wh'     => 'Услуги доставки и FBO',
-            // FBO (10 кодов):
+            // FBO (8 кодов):
             'ozon_crossdocking'          => 'Услуги доставки и FBO',
             'ozon_supply_shortage'       => 'Услуги доставки и FBO',
             'ozon_return_from_stock'     => 'Услуги доставки и FBO',
@@ -60,8 +60,6 @@ final class WidgetServiceGroupMap
             'ozon_supply_surplus'        => 'Услуги доставки и FBO',
             'ozon_storage'               => 'Услуги доставки и FBO',
             'ozon_logistic_pickup'       => 'Услуги доставки и FBO',
-            'ozon_package_materials'     => 'Другие услуги и штрафы',
-            'ozon_package_labor'         => 'Услуги партнёров',
             'ozon_warehouse_movement'    => 'Услуги доставки и FBO',
 
             // === Услуги партнёров ===
@@ -70,6 +68,7 @@ final class WidgetServiceGroupMap
             'ozon_storage_partner'       => 'Услуги партнёров',
             'ozon_acquiring'             => 'Услуги партнёров',
             'ozon_fulfillment'           => 'Услуги партнёров',
+            'ozon_package_labor'         => 'Услуги партнёров',
 
             // === Продвижение и реклама ===
             'ozon_cpc'                   => 'Продвижение и реклама',
@@ -82,6 +81,7 @@ final class WidgetServiceGroupMap
 
             // === Другие услуги и штрафы ===
             // Объединяем "Другие услуги и штрафы" + "Компенсации и декомпенсации"
+            'ozon_package_materials'     => 'Другие услуги и штрафы',
             'ozon_disposal'              => 'Другие услуги и штрафы',
             'ozon_ovh_processing'        => 'Другие услуги и штрафы',
             'ozon_penalty_undeliverable' => 'Другие услуги и штрафы',
