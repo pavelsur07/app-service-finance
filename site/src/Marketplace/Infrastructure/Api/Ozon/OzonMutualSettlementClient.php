@@ -87,7 +87,7 @@ final readonly class OzonMutualSettlementClient
 
             $statusCode = $response->getStatusCode();
         } catch (\Exception $e) {
-            $this->appLogger->error('Ozon MS failed', $e, ['request_body' => $requestBody]);
+            $this->appLogger->error('Ozon MS failed', $e, ['companyId' => $companyId, 'request_body' => $requestBody]);
 
             throw new \RuntimeException(
                 sprintf('Ozon mutual settlement: ошибка соединения: %s', $e->getMessage()),
@@ -110,7 +110,7 @@ final readonly class OzonMutualSettlementClient
                 $statusCode,
                 mb_substr($responseBody, 0, 200),
             ));
-            $this->appLogger->error('Ozon MS failed', $exception, ['request_body' => $requestBody]);
+            $this->appLogger->error('Ozon MS failed', $exception, ['companyId' => $companyId, 'request_body' => $requestBody]);
 
             throw $exception;
         }
