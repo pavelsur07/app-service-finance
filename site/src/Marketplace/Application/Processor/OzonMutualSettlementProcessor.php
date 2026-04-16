@@ -22,7 +22,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 final readonly class OzonMutualSettlementProcessor
 {
     /**
-     * Якоря секций — текст в ячейке (column A), обозначающий начало секции.
+     * Якоря секций — текст в первой текстовой ячейке строки, обозначающий начало секции.
      * Ключ = нормализованный якорь (lowercase, trimmed), значение = имя секции.
      */
     private const SECTION_ANCHORS = [
@@ -85,47 +85,45 @@ final readonly class OzonMutualSettlementProcessor
         $rowsParsed = 0;
 
         for ($row = 1; $row <= $highestRow; $row++) {
-            $cellA = $this->getCellValue($sheet, 'A', $row);
-            $cellANormalized = $this->normalize($cellA);
+            // Ищем первую текстовую ячейку в строке (label) и последнее число (amount)
+            $rowData = $this->scanRow($sheet, $row, $maxColIndex);
 
-            if ('' === $cellANormalized) {
+            if (null === $rowData['label']) {
                 continue;
             }
 
+            $label = $rowData['label'];
+            $labelNormalized = $this->normalize($label);
             $rowsParsed++;
 
             // Проверяем, это итоговая строка?
-            $totalKey = $this->matchAnchor($cellANormalized, self::TOTAL_ANCHORS);
+            $totalKey = $this->matchAnchor($labelNormalized, self::TOTAL_ANCHORS);
             if (null !== $totalKey) {
-                $amount = $this->findAmountInRow($sheet, $row, $maxColIndex);
-                $totals[$totalKey] = $amount;
+                $totals[$totalKey] = $rowData['amount'];
                 continue;
             }
 
             // Проверяем, это начало новой секции?
-            $sectionKey = $this->matchAnchor($cellANormalized, self::SECTION_ANCHORS);
+            $sectionKey = $this->matchAnchor($labelNormalized, self::SECTION_ANCHORS);
             if (null !== $sectionKey) {
                 $sections[] = [
                     'name' => $sectionKey,
-                    'title' => trim($cellA),
+                    'title' => trim($label),
                     'rows' => [],
                 ];
                 $currentSection = &$sections[array_key_last($sections)];
                 continue;
             }
 
-            // Если мы внутри секции — ищем строки name + amount
+            // Если мы внутри секции — ищем строки label + amount
             if (null !== $currentSection) {
-                $amount = $this->findAmountInRow($sheet, $row, $maxColIndex);
-
-                // Пропускаем строки без суммы (подзаголовки, пустые)
-                if (null === $amount) {
+                if (null === $rowData['amount']) {
                     continue;
                 }
 
                 $currentSection['rows'][] = [
-                    'name' => trim($cellA),
-                    'amount' => $amount,
+                    'name' => trim($label),
+                    'amount' => $rowData['amount'],
                 ];
             }
         }
@@ -167,35 +165,73 @@ final readonly class OzonMutualSettlementProcessor
     }
 
     /**
-     * Ищет числовое значение (сумму) в строке, сканируя колонки B..maxCol.
-     * Возвращает последнее найденное число (обычно итог в правой колонке).
+     * Сканирует строку: возвращает первый текстовый label и последнее число (amount).
+     *
+     * Ищет по всем колонкам (не только A), что делает парсер устойчивым
+     * к отчётам, где данные начинаются не с первой колонки.
+     *
+     * @return array{label: ?string, amount: ?float, label_col: ?int}
      */
-    private function findAmountInRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $row, int $maxCol): ?float
+    private function scanRow(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $row, int $maxCol): array
     {
+        $label = null;
+        $labelCol = null;
         $lastAmount = null;
 
-        for ($col = 2; $col <= $maxCol; $col++) {
+        for ($col = 1; $col <= $maxCol; $col++) {
             $coordinate = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::stringFromColumnIndex($col) . $row;
-            $cell = $sheet->getCell($coordinate);
-            $value = $cell->getCalculatedValue();
+            $value = $sheet->getCell($coordinate)->getCalculatedValue();
 
             if (null === $value || '' === $value) {
                 continue;
             }
 
-            if (is_numeric($value)) {
-                $lastAmount = (float) $value;
-            } elseif (is_string($value)) {
-                // Пробуем распарсить строку вида "1 234 567.89" или "1234567,89"
-                $cleaned = (string) preg_replace('/\s+/u', '', $value);
-                $cleaned = str_replace(',', '.', $cleaned);
-                if (is_numeric($cleaned)) {
-                    $lastAmount = (float) $cleaned;
+            // Пробуем как число
+            $numericValue = $this->parseNumeric($value);
+            if (null !== $numericValue) {
+                $lastAmount = $numericValue;
+                continue;
+            }
+
+            // Текстовое значение — берём первое как label
+            if (null === $label && is_string($value)) {
+                $trimmed = trim($value);
+                if ('' !== $trimmed) {
+                    $label = $trimmed;
+                    $labelCol = $col;
                 }
             }
         }
 
-        return $lastAmount;
+        return [
+            'label' => $label,
+            'amount' => $lastAmount,
+            'label_col' => $labelCol,
+        ];
+    }
+
+    /**
+     * Пробует интерпретировать значение как число.
+     */
+    private function parseNumeric(mixed $value): ?float
+    {
+        if (is_int($value) || is_float($value)) {
+            return (float) $value;
+        }
+
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (is_string($value)) {
+            $cleaned = (string) preg_replace('/\s+/u', '', $value);
+            $cleaned = str_replace(',', '.', $cleaned);
+            if ('' !== $cleaned && is_numeric($cleaned)) {
+                return (float) $cleaned;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -218,18 +254,6 @@ final readonly class OzonMutualSettlementProcessor
         }
 
         return null;
-    }
-
-    private function getCellValue(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $column, int $row): string
-    {
-        $cell = $sheet->getCell($column . $row);
-        $value = $cell->getCalculatedValue();
-
-        if (null === $value) {
-            return '';
-        }
-
-        return (string) $value;
     }
 
     private function normalize(string $text): string

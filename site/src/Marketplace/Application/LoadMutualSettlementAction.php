@@ -106,7 +106,7 @@ final class LoadMutualSettlementAction
         string $contentType,
         int $responseSize,
     ): array {
-        $extension = $this->guessExtension($contentType);
+        $extension = $this->guessExtension($contentType, $binaryContent);
         $period = $periodFrom->format('Y-m');
         $relativePath = sprintf(
             '%s/%s/%s.%s',
@@ -211,14 +211,26 @@ final class LoadMutualSettlementAction
         return $rawDoc;
     }
 
-    private function guessExtension(string $contentType): string
+    private function guessExtension(string $contentType, string $content): string
     {
-        return match (true) {
+        $ext = match (true) {
             str_contains($contentType, 'spreadsheetml') => 'xlsx',
             str_contains($contentType, 'ms-excel') => 'xls',
             str_contains($contentType, 'csv') => 'csv',
             str_contains($contentType, 'zip') => 'zip',
-            default => 'bin',
+            default => null,
         };
+
+        if (null !== $ext) {
+            return $ext;
+        }
+
+        // application/octet-stream — определяем по magic bytes
+        if (str_starts_with($content, "PK")) {
+            // ZIP/XLSX (PK\x03\x04)
+            return 'xlsx';
+        }
+
+        return 'bin';
     }
 }
