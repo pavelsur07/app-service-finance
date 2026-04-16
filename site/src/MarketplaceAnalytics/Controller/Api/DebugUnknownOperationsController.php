@@ -89,6 +89,9 @@ final class DebugUnknownOperationsController extends AbstractController
         $serviceNames   = [];
         $totalOperations = 0;
 
+        $periodFromDate = $periodFrom->format('Y-m-d');
+        $periodToDate   = $periodTo->format('Y-m-d');
+
         foreach ($rawDocs as $row) {
             $rawData = $row['raw_data'] ?? null;
             if ($rawData === null || $rawData === '') {
@@ -109,6 +112,15 @@ final class DebugUnknownOperationsController extends AbstractController
             foreach ($operations as $op) {
                 if (!is_array($op)) {
                     continue;
+                }
+
+                // Фильтруем по operation_date — документ может покрывать более широкий период
+                $opDate = (string) ($op['operation_date'] ?? '');
+                if ($opDate !== '') {
+                    $opDay = substr($opDate, 0, 10); // "2026-01-15 10:00:00" → "2026-01-15"
+                    if ($opDay < $periodFromDate || $opDay > $periodToDate) {
+                        continue;
+                    }
                 }
 
                 $totalOperations++;
