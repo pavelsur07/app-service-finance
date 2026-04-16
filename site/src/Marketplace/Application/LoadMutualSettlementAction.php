@@ -49,7 +49,7 @@ final class LoadMutualSettlementAction
 
         $rawData = $result['data'];
         $recordsCount = $result['records_count'];
-        $responseJson = json_encode($rawData, \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+        $responseSize = $result['response_size'];
 
         $rawDoc = new MarketplaceRawDocument(
             Uuid::uuid4()->toString(),
@@ -73,13 +73,13 @@ final class LoadMutualSettlementAction
             'companyId' => $companyId,
             'rawDocumentId' => $rawDoc->getId(),
             'recordsCount' => $recordsCount,
-            'responseSize' => strlen($responseJson),
+            'responseSize' => $responseSize,
         ]);
 
         return [
             'rawDocumentId' => $rawDoc->getId(),
             'recordsCount' => $recordsCount,
-            'responseSize' => strlen($responseJson),
+            'responseSize' => $responseSize,
         ];
     }
 }

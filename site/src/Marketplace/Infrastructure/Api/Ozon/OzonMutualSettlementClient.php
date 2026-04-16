@@ -37,7 +37,7 @@ final readonly class OzonMutualSettlementClient
     }
 
     /**
-     * @return array{data: array, records_count: int} Полный ответ API + количество записей
+     * @return array{data: array, records_count: int, response_size: int} Полный ответ API + количество записей + размер ответа в байтах
      *
      * @throws \RuntimeException если credentials не найдены или API вернул ошибку
      */
@@ -67,8 +67,8 @@ final readonly class OzonMutualSettlementClient
 
         $requestBody = [
             'date' => [
-                'from' => $periodFrom->format('Y-m-d\T00:00:00.000\Z'),
-                'to' => $periodTo->format('Y-m-d\T23:59:59.999\Z'),
+                'from' => $periodFrom->format('Y-m-d'),
+                'to' => $periodTo->format('Y-m-d'),
             ],
             'language' => 'DEFAULT',
         ];
@@ -102,7 +102,13 @@ final readonly class OzonMutualSettlementClient
             ));
         }
 
-        $data = $response->toArray();
+        $rawContent = $response->getContent();
+        $responseSize = strlen($rawContent);
+        $data = json_decode($rawContent, true, flags: \JSON_THROW_ON_ERROR);
+
+        if (!is_array($data)) {
+            throw new \RuntimeException('Ozon mutual settlement: ответ не является JSON-объектом.');
+        }
 
         // Проверяем: если API вернул report_code — это асинхронный режим
         $reportCode = $data['report_code'] ?? null;
@@ -120,12 +126,13 @@ final readonly class OzonMutualSettlementClient
         $this->logger->info('Ozon mutual settlement: загрузка завершена', [
             'companyId' => $companyId,
             'recordsCount' => $recordsCount,
-            'responseSize' => strlen(json_encode($data, \JSON_THROW_ON_ERROR)),
+            'responseSize' => $responseSize,
         ]);
 
         return [
             'data' => $data,
             'records_count' => $recordsCount,
+            'response_size' => $responseSize,
         ];
     }
 
@@ -168,7 +175,7 @@ final readonly class OzonMutualSettlementClient
                 // Если есть ссылка на файл — скачать и вернуть как JSON
                 $fileUrl = (string) ($data['file'] ?? '');
                 if ('' !== $fileUrl) {
-                    return $this->downloadReport($headers, $fileUrl);
+                    return $this->downloadReport($fileUrl);
                 }
 
                 return $data;
@@ -199,14 +206,14 @@ final readonly class OzonMutualSettlementClient
     /**
      * Скачивание файла отчёта и попытка преобразования в JSON.
      *
-     * @param array<string, string> $headers
+     * Не передаём API credentials — fileUrl обычно pre-signed ссылка
+     * на внешнее хранилище (Yandex Cloud / AWS), авторизация не нужна.
      *
      * @return array Содержимое отчёта в формате массива
      */
-    private function downloadReport(array $headers, string $fileUrl): array
+    private function downloadReport(string $fileUrl): array
     {
         $response = $this->httpClient->request('GET', $fileUrl, [
-            'headers' => $headers,
             'timeout' => self::REQUEST_TIMEOUT,
         ]);
 
