@@ -313,11 +313,16 @@ final readonly class OzonMutualSettlementProcessor
             return [];
         }
 
+        $hasData = false;
         for ($row = $dataStartRow; $row <= $highestRow; $row++) {
             $cellB = $this->getCellStringValue($sheet, 'B', $row);
             $normalizedB = $this->normalize($cellB);
 
             if ('' === $normalizedB) {
+                // Пустая строка после начала данных = конец секции
+                if ($hasData) {
+                    break;
+                }
                 continue;
             }
 
@@ -325,6 +330,8 @@ final readonly class OzonMutualSettlementProcessor
             if ('итого' === $normalizedB) {
                 break;
             }
+
+            $hasData = true;
 
             $compensations[] = [
                 'name' => trim($cellB),
