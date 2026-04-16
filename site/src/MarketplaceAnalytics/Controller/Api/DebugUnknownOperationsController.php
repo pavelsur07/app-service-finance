@@ -66,7 +66,7 @@ final class DebugUnknownOperationsController extends AbstractController
         $company   = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $rawDocs = $this->connection->fetchAllAssociative(
+        $rawDocs = $this->connection->iterateAssociative(
             'SELECT id, raw_data
              FROM marketplace_raw_documents
              WHERE company_id = :companyId
@@ -147,9 +147,14 @@ final class DebugUnknownOperationsController extends AbstractController
         [$knownOpTypes, $unknownOpTypes]   = $this->classify($operationTypes, 'totalAmount');
         [$knownSvcNames, $unknownSvcNames] = $this->classify($serviceNames, 'totalPrice');
 
-        $totalUnknownAmount = 0.0;
+        $totalUnknownOpAmount = 0.0;
+        foreach ($unknownOpTypes as $item) {
+            $totalUnknownOpAmount += (float) $item['totalAmount'];
+        }
+
+        $totalUnknownSvcAmount = 0.0;
         foreach ($unknownSvcNames as $item) {
-            $totalUnknownAmount += (float) $item['totalAmount'];
+            $totalUnknownSvcAmount += (float) $item['totalAmount'];
         }
 
         return $this->json([
@@ -157,14 +162,15 @@ final class DebugUnknownOperationsController extends AbstractController
                 'from' => $periodFrom->format('Y-m-d'),
                 'to'   => $periodTo->format('Y-m-d'),
             ],
-            'totalOperations'      => $totalOperations,
-            'knownOperationTypes'  => $knownOpTypes,
+            'totalOperations'       => $totalOperations,
+            'knownOperationTypes'   => $knownOpTypes,
             'unknownOperationTypes' => $unknownOpTypes,
-            'knownServiceNames'    => $knownSvcNames,
-            'unknownServiceNames'  => $unknownSvcNames,
+            'knownServiceNames'     => $knownSvcNames,
+            'unknownServiceNames'   => $unknownSvcNames,
             'summary' => [
-                'totalUnknownAmount' => number_format($totalUnknownAmount, 2, '.', ''),
-                'hint'               => 'Эти operation_type / service_name не маппятся в OzonServiceCategoryMap',
+                'totalUnknownOpAmount'  => number_format($totalUnknownOpAmount, 2, '.', ''),
+                'totalUnknownSvcAmount' => number_format($totalUnknownSvcAmount, 2, '.', ''),
+                'hint'                  => 'Эти operation_type / service_name не маппятся в OzonServiceCategoryMap',
             ],
         ]);
     }
