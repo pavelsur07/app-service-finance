@@ -6,7 +6,7 @@ namespace App\Marketplace\Infrastructure\Api\Ozon;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
-use Psr\Log\LoggerInterface;
+use App\Shared\Service\AppLogger;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -32,7 +32,7 @@ final readonly class OzonMutualSettlementClient
     public function __construct(
         private HttpClientInterface $httpClient,
         private MarketplaceCredentialsQuery $credentialsQuery,
-        private LoggerInterface $logger,
+        private AppLogger $appLogger,
     ) {
     }
 
@@ -66,45 +66,57 @@ final readonly class OzonMutualSettlementClient
         ];
 
         $requestBody = [
-            'date' => [
-                'from' => $periodFrom->format('Y-m-d'),
-                'to' => $periodTo->format('Y-m-d'),
-            ],
+            'date' => $periodFrom->format('Y-m'),
             'language' => 'DEFAULT',
         ];
 
-        $this->logger->info('Ozon mutual settlement: начало загрузки', [
+        $url = self::BASE_URL . self::ENDPOINT;
+
+        $this->appLogger->info('Ozon MS request', [
             'companyId' => $companyId,
-            'periodFrom' => $periodFrom->format('Y-m-d'),
-            'periodTo' => $periodTo->format('Y-m-d'),
+            'url' => $url,
+            'body' => $requestBody,
         ]);
 
-        $response = $this->httpClient->request('POST', self::BASE_URL . self::ENDPOINT, [
-            'headers' => $headers,
-            'json' => $requestBody,
-            'timeout' => self::REQUEST_TIMEOUT,
-        ]);
-
-        $statusCode = $response->getStatusCode();
-
-        if ($statusCode !== 200) {
-            $body = $response->getContent(false);
-            $this->logger->error('Ozon mutual settlement: ошибка API', [
-                'companyId' => $companyId,
-                'statusCode' => $statusCode,
-                'response' => mb_substr($body, 0, 500),
+        try {
+            $response = $this->httpClient->request('POST', $url, [
+                'headers' => $headers,
+                'json' => $requestBody,
+                'timeout' => self::REQUEST_TIMEOUT,
             ]);
 
-            throw new \RuntimeException(sprintf(
-                'Ozon mutual settlement API вернул HTTP %d: %s',
-                $statusCode,
-                mb_substr($body, 0, 200),
-            ));
+            $statusCode = $response->getStatusCode();
+        } catch (\Exception $e) {
+            $this->appLogger->error('Ozon MS failed', $e, ['companyId' => $companyId, 'request_body' => $requestBody]);
+
+            throw new \RuntimeException(
+                sprintf('Ozon mutual settlement: ошибка соединения: %s', $e->getMessage()),
+                0,
+                $e,
+            );
         }
 
-        $rawContent = $response->getContent();
-        $responseSize = strlen($rawContent);
-        $data = json_decode($rawContent, true, flags: \JSON_THROW_ON_ERROR);
+        $responseBody = $response->getContent(false);
+
+        $this->appLogger->info('Ozon MS response', [
+            'companyId' => $companyId,
+            'status' => $statusCode,
+            'body' => mb_substr($responseBody, 0, 1000),
+        ]);
+
+        if ($statusCode !== 200) {
+            $exception = new \RuntimeException(sprintf(
+                'Ozon mutual settlement API вернул HTTP %d: %s',
+                $statusCode,
+                mb_substr($responseBody, 0, 200),
+            ));
+            $this->appLogger->error('Ozon MS failed', $exception, ['companyId' => $companyId, 'request_body' => $requestBody]);
+
+            throw $exception;
+        }
+
+        $responseSize = strlen($responseBody);
+        $data = json_decode($responseBody, true, flags: \JSON_THROW_ON_ERROR);
 
         if (!is_array($data)) {
             throw new \RuntimeException('Ozon mutual settlement: ответ не является JSON-объектом.');
@@ -114,7 +126,7 @@ final readonly class OzonMutualSettlementClient
         // Код может быть на верхнем уровне или внутри result.code.
         $reportCode = $data['report_code'] ?? $data['result']['code'] ?? $data['code'] ?? null;
         if (null !== $reportCode && '' !== (string) $reportCode) {
-            $this->logger->info('Ozon mutual settlement: асинхронный режим, polling', [
+            $this->appLogger->info('Ozon MS: асинхронный режим, polling', [
                 'companyId' => $companyId,
                 'reportCode' => $reportCode,
             ]);
@@ -124,7 +136,7 @@ final readonly class OzonMutualSettlementClient
 
         $recordsCount = $this->countRecords($data);
 
-        $this->logger->info('Ozon mutual settlement: загрузка завершена', [
+        $this->appLogger->info('Ozon MS: загрузка завершена', [
             'companyId' => $companyId,
             'recordsCount' => $recordsCount,
             'responseSize' => $responseSize,

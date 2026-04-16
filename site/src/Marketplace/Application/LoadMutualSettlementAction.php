@@ -8,8 +8,8 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Api\Ozon\OzonMutualSettlementClient;
+use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
-use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
 /**
@@ -25,7 +25,7 @@ final class LoadMutualSettlementAction
     public function __construct(
         private readonly OzonMutualSettlementClient $client,
         private readonly EntityManagerInterface $em,
-        private readonly LoggerInterface $logger,
+        private readonly AppLogger $appLogger,
     ) {
     }
 
@@ -39,7 +39,7 @@ final class LoadMutualSettlementAction
     ): array {
         $companyId = (string) $company->getId();
 
-        $this->logger->info('LoadMutualSettlement: начало', [
+        $this->appLogger->info('LoadMutualSettlement: начало', [
             'companyId' => $companyId,
             'periodFrom' => $periodFrom->format('Y-m-d'),
             'periodTo' => $periodTo->format('Y-m-d'),
@@ -69,7 +69,7 @@ final class LoadMutualSettlementAction
         $this->em->persist($rawDoc);
         $this->em->flush();
 
-        $this->logger->info('LoadMutualSettlement: сохранено', [
+        $this->appLogger->info('LoadMutualSettlement: сохранено', [
             'companyId' => $companyId,
             'rawDocumentId' => $rawDoc->getId(),
             'recordsCount' => $recordsCount,
