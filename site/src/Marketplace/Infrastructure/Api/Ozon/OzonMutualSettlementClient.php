@@ -110,9 +110,10 @@ final readonly class OzonMutualSettlementClient
             throw new \RuntimeException('Ozon mutual settlement: ответ не является JSON-объектом.');
         }
 
-        // Проверяем: если API вернул report_code — это асинхронный режим
-        $reportCode = $data['report_code'] ?? null;
-        if (null !== $reportCode && '' !== $reportCode) {
+        // Проверяем: если API вернул report_code — это асинхронный режим.
+        // Код может быть на верхнем уровне или внутри result.code.
+        $reportCode = $data['report_code'] ?? $data['result']['code'] ?? $data['code'] ?? null;
+        if (null !== $reportCode && '' !== (string) $reportCode) {
             $this->logger->info('Ozon mutual settlement: асинхронный режим, polling', [
                 'companyId' => $companyId,
                 'reportCode' => $reportCode,
@@ -169,11 +170,14 @@ final readonly class OzonMutualSettlementClient
             }
 
             $data = $response->toArray();
-            $status = (string) ($data['status'] ?? '');
+
+            // /v1/report/info возвращает status и file внутри result,
+            // но на всякий случай проверяем и верхний уровень.
+            $report = $data['result'] ?? $data;
+            $status = (string) ($report['status'] ?? $data['status'] ?? '');
 
             if ('success' === $status || 'completed' === $status) {
-                // Если есть ссылка на файл — скачать и вернуть как JSON
-                $fileUrl = (string) ($data['file'] ?? '');
+                $fileUrl = (string) ($report['file'] ?? $data['file'] ?? '');
                 if ('' !== $fileUrl) {
                     return $this->downloadReport($fileUrl);
                 }
@@ -185,7 +189,7 @@ final readonly class OzonMutualSettlementClient
                 throw new \RuntimeException(sprintf(
                     'Ozon отчёт %s завершился с ошибкой: %s',
                     $reportCode,
-                    (string) ($data['error'] ?? 'unknown'),
+                    (string) ($report['error'] ?? $data['error'] ?? 'unknown'),
                 ));
             }
 
