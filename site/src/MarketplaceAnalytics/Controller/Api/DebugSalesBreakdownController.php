@@ -49,10 +49,13 @@ final class DebugSalesBreakdownController extends AbstractController
             return $this->json(['error' => 'from and to are required (YYYY-MM-DD)'], 422);
         }
 
-        try {
-            $from = new \DateTimeImmutable($fromStr);
-            $to = new \DateTimeImmutable($toStr);
-        } catch (\Exception) {
+        $from = \DateTimeImmutable::createFromFormat('Y-m-d', $fromStr);
+        $to = \DateTimeImmutable::createFromFormat('Y-m-d', $toStr);
+
+        if ($from === false || $to === false
+            || $from->format('Y-m-d') !== $fromStr
+            || $to->format('Y-m-d') !== $toStr
+        ) {
             return $this->json(['error' => 'Invalid date format. Expected YYYY-MM-DD'], 422);
         }
 
