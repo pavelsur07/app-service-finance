@@ -169,6 +169,9 @@ final class DebugReprocessPeriodController extends AbstractController
             'periodTo'    => $to->format('Y-m-d'),
         ];
 
+        // document_id IS NULL зеркалит фильтр deleteOrphans() — иначе preview
+        // показывает больше orphan'ов, чем реально будет удалено (закрытые
+        // в ОПиУ записи мы не трогаем).
         $sales = (int) $this->connection->fetchOne(
             <<<'SQL'
             SELECT COUNT(*) FROM marketplace_sales
@@ -176,6 +179,7 @@ final class DebugReprocessPeriodController extends AbstractController
               AND marketplace = :marketplace
               AND sale_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
+              AND document_id IS NULL
             SQL,
             $params,
         );
@@ -187,6 +191,7 @@ final class DebugReprocessPeriodController extends AbstractController
               AND marketplace = :marketplace
               AND return_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
+              AND document_id IS NULL
             SQL,
             $params,
         );
@@ -198,6 +203,7 @@ final class DebugReprocessPeriodController extends AbstractController
               AND marketplace = :marketplace
               AND cost_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
+              AND document_id IS NULL
             SQL,
             $params,
         );
@@ -400,10 +406,10 @@ final class DebugReprocessPeriodController extends AbstractController
                 ] as $step => $processor
             ) {
                 try {
-                    $processor->process($companyId, $doc['id']);
-                    $result[$step] = 'ok';
+                    $count = $processor->process($companyId, $doc['id']);
+                    $result[$step] = ['status' => 'ok', 'processed' => $count];
                 } catch (\Throwable $e) {
-                    $result[$step] = 'error: ' . $e->getMessage();
+                    $result[$step] = ['status' => 'error', 'message' => $e->getMessage()];
                     $this->logger->error('[DebugReprocessPeriod] Processor failed', [
                         'step'        => $step,
                         'raw_doc_id'  => $doc['id'],
