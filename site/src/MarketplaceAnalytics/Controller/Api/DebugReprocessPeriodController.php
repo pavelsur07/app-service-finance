@@ -30,6 +30,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  *   POST /api/marketplace-analytics/debug/reprocess-period
  *        ?marketplace=ozon&from=2026-02-01&to=2026-02-28
  *        [&confirm=1]
+ *        [&force=1]  — удаляет orphan-записи даже с document_id (закрытые в ОПиУ)
  *
  * Без confirm=1 — preview: показывает сколько orphan-записей будет удалено
  * и какие raw-документы будут переобработаны, без внесения изменений.
@@ -58,6 +59,7 @@ final class DebugReprocessPeriodController extends AbstractController
         $fromStr        = (string) $request->query->get('from', '');
         $toStr          = (string) $request->query->get('to', '');
         $confirm        = (string) $request->query->get('confirm', '0') === '1';
+        $force          = (string) $request->query->get('force', '0') === '1';
 
         if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
             return $this->json(['error' => 'marketplace, from, to are required'], 422);
@@ -85,12 +87,13 @@ final class DebugReprocessPeriodController extends AbstractController
         $company   = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $orphans = $this->countOrphans($companyId, $marketplace, $from, $to);
+        $orphans = $this->countOrphans($companyId, $marketplace, $from, $to, $force);
         $rawDocs = $this->findRawDocuments($companyId, $marketplace, $from, $to);
 
         if (!$confirm) {
             return new JsonResponse([
                 'preview'     => true,
+                'force'       => $force,
                 'marketplace' => $marketplace->value,
                 'companyId'   => $companyId,
                 'period'      => [
@@ -102,19 +105,22 @@ final class DebugReprocessPeriodController extends AbstractController
                     'count'     => count($rawDocs),
                     'documents' => $rawDocs,
                 ],
-                'hint' => 'Add &confirm=1 to execute',
+                'hint' => $force
+                    ? 'FORCE MODE: will delete orphans even with document_id. Add &confirm=1 to execute'
+                    : 'Add &confirm=1 to execute. Add &force=1 to include orphans with document_id',
             ]);
         }
 
         $totalsBefore = $this->countTotals($companyId, $marketplace, $from, $to);
 
-        $deleted          = $this->deleteOrphans($companyId, $marketplace, $from, $to);
+        $deleted          = $this->deleteOrphans($companyId, $marketplace, $from, $to, $force);
         $reprocessResults = $this->reprocessDocuments($companyId, $rawDocs);
 
         $totalsAfter = $this->countTotals($companyId, $marketplace, $from, $to);
 
         return new JsonResponse([
             'preview'     => false,
+            'force'       => $force,
             'marketplace' => $marketplace->value,
             'companyId'   => $companyId,
             'period'      => [
@@ -161,6 +167,7 @@ final class DebugReprocessPeriodController extends AbstractController
         MarketplaceType $marketplace,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
+        bool $force = false,
     ): array {
         $params = [
             'companyId'   => $companyId,
@@ -169,41 +176,40 @@ final class DebugReprocessPeriodController extends AbstractController
             'periodTo'    => $to->format('Y-m-d'),
         ];
 
-        // document_id IS NULL зеркалит фильтр deleteOrphans() — иначе preview
-        // показывает больше orphan'ов, чем реально будет удалено (закрытые
-        // в ОПиУ записи мы не трогаем).
+        $documentFilter = $force ? '' : 'AND document_id IS NULL';
+
         $sales = (int) $this->connection->fetchOne(
-            <<<'SQL'
+            <<<SQL
             SELECT COUNT(*) FROM marketplace_sales
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND sale_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
 
         $returns = (int) $this->connection->fetchOne(
-            <<<'SQL'
+            <<<SQL
             SELECT COUNT(*) FROM marketplace_returns
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND return_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
 
         $costs = (int) $this->connection->fetchOne(
-            <<<'SQL'
+            <<<SQL
             SELECT COUNT(*) FROM marketplace_costs
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND cost_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
@@ -320,6 +326,7 @@ final class DebugReprocessPeriodController extends AbstractController
         MarketplaceType $marketplace,
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
+        bool $force = false,
     ): array {
         $params = [
             'companyId'   => $companyId,
@@ -328,39 +335,40 @@ final class DebugReprocessPeriodController extends AbstractController
             'periodTo'    => $to->format('Y-m-d'),
         ];
 
-        // document_id IS NULL — не трогаем уже закрытые в ОПиУ записи.
+        $documentFilter = $force ? '' : 'AND document_id IS NULL';
+
         $sales = (int) $this->connection->executeStatement(
-            <<<'SQL'
+            <<<SQL
             DELETE FROM marketplace_sales
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND sale_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
 
         $returns = (int) $this->connection->executeStatement(
-            <<<'SQL'
+            <<<SQL
             DELETE FROM marketplace_returns
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND return_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
 
         $costs = (int) $this->connection->executeStatement(
-            <<<'SQL'
+            <<<SQL
             DELETE FROM marketplace_costs
             WHERE company_id = :companyId
               AND marketplace = :marketplace
               AND cost_date BETWEEN :periodFrom AND :periodTo
               AND raw_document_id IS NULL
-              AND document_id IS NULL
+              {$documentFilter}
             SQL,
             $params,
         );
@@ -370,6 +378,7 @@ final class DebugReprocessPeriodController extends AbstractController
             'marketplace' => $marketplace->value,
             'period_from' => $from->format('Y-m-d'),
             'period_to'   => $to->format('Y-m-d'),
+            'force'       => $force,
             'sales'       => $sales,
             'returns'     => $returns,
             'costs'       => $costs,
