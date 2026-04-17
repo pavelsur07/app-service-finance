@@ -72,11 +72,10 @@ final class DebugReprocessPeriodController extends AbstractController
             return $this->json(['error' => 'Only ozon is supported at the moment'], 422);
         }
 
-        try {
-            $from = new \DateTimeImmutable($fromStr);
-            $to   = new \DateTimeImmutable($toStr);
-        } catch (\Exception) {
-            return $this->json(['error' => 'Invalid date format (Y-m-d)'], 422);
+        $from = $this->parseStrictDate($fromStr);
+        $to   = $this->parseStrictDate($toStr);
+        if ($from === null || $to === null) {
+            return $this->json(['error' => 'Invalid date format (Y-m-d expected, must be a real calendar date)'], 422);
         }
 
         if ($from > $to) {
@@ -135,6 +134,23 @@ final class DebugReprocessPeriodController extends AbstractController
                 'costs'   => $totalsAfter['costs']   - $totalsBefore['costs'],
             ],
         ]);
+    }
+
+    /**
+     * Строгий парсинг Y-m-d: `new DateTimeImmutable('2026-02-31')` молча
+     * нормализует дату в `2026-03-03`, что для destructive endpoint
+     * означает обработку не того периода. Round-trip по формату ловит такие
+     * нормализации и отвергает их.
+     */
+    private function parseStrictDate(string $value): ?\DateTimeImmutable
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        if ($date === false || $date->format('Y-m-d') !== $value) {
+            return null;
+        }
+
+        return $date;
     }
 
     /**
