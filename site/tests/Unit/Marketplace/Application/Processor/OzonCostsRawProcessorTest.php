@@ -385,6 +385,62 @@ final class OzonCostsRawProcessorTest extends TestCase
         }
     }
 
+    /**
+     * OperationAgentStornoDeliveredToCustomer (сторно продажи) — НЕ должна создавать
+     * _main cost entry, т.к. выручка учитывается в OzonSalesRawProcessor.
+     * Commission/delivery storno обрабатываются отдельными полями и не затрагиваются.
+     */
+    public function testStornoDeliveredToCustomerProducesNoMainEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'           => '2001',
+            'operation_type'         => 'OperationAgentStornoDeliveredToCustomer',
+            'operation_type_name'    => 'Сторно доставки покупателю',
+            'operation_date'         => '2026-02-16 12:00:00',
+            'sale_commission'        => 0,
+            'delivery_charge'        => 0,
+            'return_delivery_charge' => 0,
+            'amount'                 => -1201.00,
+            'accruals_for_sale'      => -1201.00,
+            'type'                   => 'returns',
+            'items'                  => [['sku' => '444', 'name' => 'Товар']],
+            'services'               => [],
+        ]);
+
+        $mainEntry = array_filter($entries, static fn (array $e) => str_ends_with($e['external_id'], '_main'));
+        self::assertEmpty($mainEntry, 'Сторно продажи не должно создавать _main cost entry');
+    }
+
+    /**
+     * OperationAgentStornoDeliveredToCustomer with commission refund —
+     * commission storno SHOULD still be extracted as a separate cost entry.
+     */
+    public function testStornoDeliveredToCustomerStillExtractsCommission(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'           => '2002',
+            'operation_type'         => 'OperationAgentStornoDeliveredToCustomer',
+            'operation_type_name'    => 'Сторно доставки покупателю',
+            'operation_date'         => '2026-02-16 12:00:00',
+            'sale_commission'        => 150.00,
+            'delivery_charge'        => 0,
+            'return_delivery_charge' => 0,
+            'amount'                 => -1051.00,
+            'accruals_for_sale'      => -1201.00,
+            'type'                   => 'returns',
+            'items'                  => [['sku' => '444', 'name' => 'Товар']],
+            'services'               => [],
+        ]);
+
+        $commission = $this->findEntry($entries, 'ozon_sale_commission');
+        self::assertNotNull($commission, 'Возврат комиссии при сторно должен создать запись');
+        self::assertEqualsWithDelta(150.00, (float) $commission['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $commission['operation_type']);
+
+        $mainEntry = array_filter($entries, static fn (array $e) => str_ends_with($e['external_id'], '_main'));
+        self::assertEmpty($mainEntry, 'Сторно продажи не должно создавать _main cost entry даже с комиссией');
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
