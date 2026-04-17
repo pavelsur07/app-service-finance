@@ -286,7 +286,7 @@ class MarketplaceController extends AbstractController
         }
 
         $connectionId = $connection->getId();
-        $now          = new \DateTimeImmutable();
+        $now          = new \DateTimeImmutable('now', new \DateTimeZone('Europe/Moscow'));
         $monthsToSync = $this->resolveRealizationMonths($companyId, $now);
 
         if (empty($monthsToSync)) {
@@ -626,26 +626,20 @@ class MarketplaceController extends AbstractController
     // -------------------------------------------------------------------------
 
     /**
-     * Определяет какие месяцы нужно загрузить для realization:
-     *   - нет документов → все закрытые месяцы с января текущего года
-     *   - есть документы → только прошлый месяц (обновление)
-     *
      * @return array<int, array{0: int, 1: int}>  [[year, month], ...]
      */
     private function resolveRealizationMonths(string $companyId, \DateTimeImmutable $now): array
     {
-        $lastMonth      = $now->modify('first day of last month');
-        $lastMonthYear  = (int) $lastMonth->format('Y');
-        $lastMonthMonth = (int) $lastMonth->format('n');
+        $lastClosed     = $now->modify('first day of last month');
+        $lastClosedYear = (int) $lastClosed->format('Y');
+        $currentYear    = (int) $now->format('Y');
 
-        $hasAny = $this->realizationStatusQuery->hasAny($companyId);
-
-        if ($hasAny) {
-            return [[$lastMonthYear, $lastMonthMonth]];
+        if ($lastClosedYear < $currentYear) {
+            return [];
         }
 
-        $currentYear  = (int) $now->format('Y');
-        $loadedMonths = $this->realizationStatusQuery->loadedMonths($companyId);
+        $lastClosedMonth = (int) $lastClosed->format('n');
+        $loadedMonths    = $this->realizationStatusQuery->loadedMonths($companyId);
 
         $months = [];
         $cursor = new \DateTimeImmutable(sprintf('%d-01-01', $currentYear));
@@ -654,7 +648,7 @@ class MarketplaceController extends AbstractController
             $year  = (int) $cursor->format('Y');
             $month = (int) $cursor->format('n');
 
-            if ($year > $lastMonthYear || ($year === $lastMonthYear && $month > $lastMonthMonth)) {
+            if ($year > $lastClosedYear || ($year === $lastClosedYear && $month > $lastClosedMonth)) {
                 break;
             }
 
