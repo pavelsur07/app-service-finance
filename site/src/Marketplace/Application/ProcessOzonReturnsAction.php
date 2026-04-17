@@ -15,6 +15,9 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
+/**
+ * @deprecated Use OzonReturnsRawProcessor::processBatch() via ProcessMarketplaceRawDocumentAction.
+ */
 final class ProcessOzonReturnsAction
 {
     public function __construct(

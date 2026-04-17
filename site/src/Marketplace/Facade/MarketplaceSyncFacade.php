@@ -72,11 +72,17 @@ final readonly class MarketplaceSyncFacade
         return 0;
     }
 
+    /**
+     * @deprecated No active callers. Use ProcessMarketplaceRawDocumentAction directly.
+     */
     public function processSalesFromRaw(string $companyId, string $rawDocId): int
     {
         return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'sales'));
     }
 
+    /**
+     * @deprecated No active callers. Use ProcessMarketplaceRawDocumentAction directly.
+     */
     public function processReturnsFromRaw(string $companyId, string $rawDocId): int
     {
         return ($this->processRawDocumentAction)(new ProcessMarketplaceRawDocumentCommand($companyId, $rawDocId, 'returns'));

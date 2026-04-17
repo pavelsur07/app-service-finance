@@ -48,6 +48,9 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         return $type === MarketplaceType::OZON->value && $kind === 'sales';
     }
 
+    /**
+     * @deprecated Use processBatch() instead. This method delegates to legacy ProcessOzonSalesAction which lacks storno classification and version suffix logic. No active callers in production.
+     */
     public function process(string $companyId, string $rawDocId): int
     {
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
