@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
-use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -26,14 +25,6 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DebugSalesBreakdownController extends AbstractController
 {
     private const DETAIL_LIMIT = 1000;
-
-    private const COST_SUFFIX_PATTERNS = [
-        '_commission_return' => '_commission_return',
-        '_return_delivery' => '_return_delivery',
-        '_commission' => '_commission',
-        '_delivery' => '_delivery',
-        '_main' => '_main',
-    ];
 
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
@@ -278,12 +269,13 @@ final class DebugSalesBreakdownController extends AbstractController
 
         $response = new StreamedResponse(static function () use ($connection, $headers, $sql, $params): void {
             $out = fopen('php://output', 'wb');
-            fputcsv($out, $headers);
+            fwrite($out, "\xEF\xBB\xBF");
+            fputcsv($out, $headers, ',', '"', '');
 
             $result = $connection->executeQuery($sql, $params);
 
             while (($row = $result->fetchAssociative()) !== false) {
-                fputcsv($out, array_values($row));
+                fputcsv($out, array_values($row), ',', '"', '');
             }
 
             fclose($out);
