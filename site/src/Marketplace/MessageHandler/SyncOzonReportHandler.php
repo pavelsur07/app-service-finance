@@ -41,9 +41,10 @@ final class SyncOzonReportHandler
     {
         $companyId    = $message->companyId;
         $connectionId = $message->connectionId;
+        $dateKey      = $message->date ?? (new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow')))->format('Y-m-d');
 
         $lock = $this->lockFactory->createLock(
-            'marketplace_sync_' . $companyId . '_ozon',
+            'marketplace_sync_' . $companyId . '_ozon_' . $dateKey,
             self::LOCK_TTL_SECONDS,
         );
 

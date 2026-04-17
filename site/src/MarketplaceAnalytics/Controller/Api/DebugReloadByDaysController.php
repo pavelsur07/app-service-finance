@@ -19,13 +19,13 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * @internal Debug controller, to be removed after data recovery.
  *
  * Диспатчит SyncOzonReportMessage для каждого дня в указанном периоде.
- * Каждое сообщение обрабатывается async worker'ом: загрузка из API +
- * автозапуск pipeline (sales/returns/costs).
+ * Поддерживает chunking: параметры offset/chunkSize для порционного dispatch.
  *
  *   GET /api/debug/reload-by-days
  *       ?companyId=UUID&marketplace=ozon&from=2026-01-01&to=2026-01-31
- *       [&preview=1]  — только план (по умолчанию)
- *       [&confirm=1]  — задиспатчить сообщения в очередь
+ *       [&confirm=1]         — задиспатчить сообщения в очередь
+ *       [&chunkSize=30]      — сколько дней диспатчить за один вызов (default 30)
+ *       [&offset=0]          — с какого дня начинать (для последовательных вызовов)
  */
 #[Route(
     path: '/api/debug/reload-by-days',
@@ -35,6 +35,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_COMPANY_USER')]
 final class DebugReloadByDaysController extends AbstractController
 {
+    private const DEFAULT_CHUNK_SIZE = 30;
+
     public function __construct(
         private readonly Connection $connection,
         private readonly MessageBusInterface $messageBus,
@@ -49,6 +51,8 @@ final class DebugReloadByDaysController extends AbstractController
         $fromStr        = (string) $request->query->get('from', '');
         $toStr          = (string) $request->query->get('to', '');
         $confirm        = (string) $request->query->get('confirm', '0') === '1';
+        $chunkSize      = max(1, (int) $request->query->get('chunkSize', (string) self::DEFAULT_CHUNK_SIZE));
+        $offset         = max(0, (int) $request->query->get('offset', '0'));
 
         if ($companyId === '' || $marketplaceStr === '' || $fromStr === '' || $toStr === '') {
             return $this->json(['error' => 'companyId, marketplace, from, to are required'], 422);
@@ -78,29 +82,31 @@ final class DebugReloadByDaysController extends AbstractController
             return $this->json(['error' => 'No active connection found for company ' . $companyId . ' on ' . $marketplace->value], 404);
         }
 
-        $days         = $this->buildDaysList($from, $to);
-        $existingDays = $this->findExistingDays($companyId, $marketplace, $from, $to);
-        $toDispatch   = array_filter($days, static fn (string $d): bool => !isset($existingDays[$d]));
-        $skippedCount = count($days) - count($toDispatch);
+        $allDays        = $this->buildDaysList($from, $to);
+        $existingDays   = $this->findExistingDays($companyId, $marketplace, $from, $to);
+        $toDispatchAll  = array_values(array_filter($allDays, static fn (string $d): bool => !isset($existingDays[$d])));
+        $skippedCount   = count($allDays) - count($toDispatchAll);
+        $totalToDispatch = count($toDispatchAll);
 
         if (!$confirm) {
             return $this->json([
-                'mode'        => 'preview',
-                'companyId'   => $companyId,
-                'marketplace' => $marketplace->value,
-                'from'        => $from->format('Y-m-d'),
-                'to'          => $to->format('Y-m-d'),
-                'plan'        => [
-                    'total_days'       => count($days),
-                    'to_dispatch'      => count($toDispatch),
-                    'skipped_existing' => $skippedCount,
-                ],
+                'mode'               => 'preview',
+                'companyId'          => $companyId,
+                'marketplace'        => $marketplace->value,
+                'from'               => $from->format('Y-m-d'),
+                'to'                 => $to->format('Y-m-d'),
+                'total_days'         => count($allDays),
+                'skipped_existing'   => $skippedCount,
+                'to_dispatch_total'  => $totalToDispatch,
+                'suggested_chunks'   => $totalToDispatch > 0 ? (int) ceil($totalToDispatch / $chunkSize) : 0,
+                'suggested_chunk_size' => $chunkSize,
             ]);
         }
 
+        $chunk      = array_slice($toDispatchAll, $offset, $chunkSize);
         $dispatched = 0;
 
-        foreach ($toDispatch as $dayStr) {
+        foreach ($chunk as $dayStr) {
             $this->messageBus->dispatch(new SyncOzonReportMessage(
                 companyId: $companyId,
                 connectionId: $connectionId,
@@ -109,24 +115,37 @@ final class DebugReloadByDaysController extends AbstractController
             $dispatched++;
         }
 
-        $this->logger->info('[DebugReloadByDays] Messages dispatched', [
+        $nextOffset = $offset + $chunkSize;
+        $hasMore    = $nextOffset < $totalToDispatch;
+
+        $this->logger->info('[DebugReloadByDays] Chunk dispatched', [
             'company_id'  => $companyId,
             'marketplace' => $marketplace->value,
-            'from'        => $from->format('Y-m-d'),
-            'to'          => $to->format('Y-m-d'),
+            'offset'      => $offset,
+            'chunk_size'  => $chunkSize,
             'dispatched'  => $dispatched,
-            'skipped'     => $skippedCount,
+            'has_more'    => $hasMore,
         ]);
 
         return $this->json([
-            'mode'             => 'executed',
-            'companyId'        => $companyId,
-            'marketplace'      => $marketplace->value,
-            'from'             => $from->format('Y-m-d'),
-            'to'               => $to->format('Y-m-d'),
-            'dispatched_days'  => $dispatched,
-            'skipped_existing' => $skippedCount,
-            'note'             => 'Messages dispatched to async queue. Monitor workers for progress.',
+            'mode'              => 'executed',
+            'companyId'         => $companyId,
+            'marketplace'       => $marketplace->value,
+            'from'              => $from->format('Y-m-d'),
+            'to'                => $to->format('Y-m-d'),
+            'total_days'        => count($allDays),
+            'skipped_existing'  => $skippedCount,
+            'to_dispatch_total' => $totalToDispatch,
+            'chunk'             => [
+                'offset'     => $offset,
+                'size'       => $chunkSize,
+                'dispatched' => $dispatched,
+            ],
+            'next_offset' => $hasMore ? $nextOffset : null,
+            'has_more'    => $hasMore,
+            'hint'        => $hasMore
+                ? sprintf('Call again with offset=%d to dispatch next chunk', $nextOffset)
+                : 'All days dispatched',
         ]);
     }
 
