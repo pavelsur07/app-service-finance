@@ -6,37 +6,10 @@ namespace App\Marketplace\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
 
-/**
- * Проверяет наличие загруженных realization-документов Ozon для компании.
- * Используется в контроллере для определения стратегии загрузки:
- *   - нет документов → первичная загрузка с начала года
- *   - есть документы → загрузить только прошлый месяц
- */
 final class OzonRealizationStatusQuery
 {
     public function __construct(private readonly Connection $connection)
     {
-    }
-
-    /**
-     * Есть ли хоть один realization-документ Ozon для компании?
-     */
-    public function hasAny(string $companyId): bool
-    {
-        $count = $this->connection->fetchOne(
-            'SELECT COUNT(*) FROM marketplace_raw_documents
-             WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND document_type = :documentType
-             LIMIT 1',
-            [
-                'companyId'    => $companyId,
-                'marketplace'  => 'ozon',
-                'documentType' => 'realization',
-            ],
-        );
-
-        return (int) $count > 0;
     }
 
     /**
