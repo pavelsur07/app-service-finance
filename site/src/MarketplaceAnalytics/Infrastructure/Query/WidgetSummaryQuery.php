@@ -195,36 +195,37 @@ final readonly class WidgetSummaryQuery
     ): array {
         $mpFilter = $marketplace !== null ? 'AND c.marketplace = :marketplace' : '';
 
+        // Effective op type per строке считается в подзапросе — чтобы не
+        // дублировать логику compensation/decompensation в трёх SUM(CASE ...).
+        // Семантика: ozon_compensation всегда ведёт себя как storno (доход),
+        // ozon_decompensation всегда как charge (расход). Остальные строки —
+        // по фактическому operation_type.
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
             SELECT
-                cc.code                                                       AS category_code,
-                cc.name                                                       AS category_name,
-                SUM(CASE
-                    WHEN cc.code = 'ozon_compensation'   THEN  ABS(c.amount)
-                    WHEN cc.code = 'ozon_decompensation' THEN -ABS(c.amount)
-                    WHEN c.operation_type = 'storno'     THEN  ABS(c.amount)
-                    ELSE                                      -ABS(c.amount)
-                END)                                                          AS net_amount,
-                SUM(CASE
-                    WHEN cc.code = 'ozon_compensation'   THEN 0
-                    WHEN cc.code = 'ozon_decompensation' THEN -ABS(c.amount)
-                    WHEN c.operation_type = 'storno'     THEN 0
-                    ELSE                                      -ABS(c.amount)
-                END)                                                          AS costs_amount,
-                SUM(CASE
-                    WHEN cc.code = 'ozon_compensation'   THEN ABS(c.amount)
-                    WHEN cc.code = 'ozon_decompensation' THEN 0
-                    WHEN c.operation_type = 'storno'     THEN ABS(c.amount)
-                    ELSE                                      0
-                END)                                                          AS storno_amount
-            FROM marketplace_costs c
-            JOIN marketplace_cost_categories cc ON cc.id = c.category_id
-            WHERE c.company_id = :companyId
-              AND c.cost_date >= :periodFrom
-              AND c.cost_date <= :periodTo
-              {$mpFilter}
-            GROUP BY cc.code, cc.name
+                category_code,
+                category_name,
+                SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE -ABS(amount) END) AS net_amount,
+                SUM(CASE WHEN effective_op = 'storno' THEN 0            ELSE -ABS(amount) END) AS costs_amount,
+                SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE 0             END) AS storno_amount
+            FROM (
+                SELECT
+                    cc.code  AS category_code,
+                    cc.name  AS category_name,
+                    c.amount AS amount,
+                    CASE
+                        WHEN cc.code = 'ozon_compensation'   THEN 'storno'
+                        WHEN cc.code = 'ozon_decompensation' THEN 'charge'
+                        ELSE c.operation_type
+                    END AS effective_op
+                FROM marketplace_costs c
+                JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+                WHERE c.company_id = :companyId
+                  AND c.cost_date >= :periodFrom
+                  AND c.cost_date <= :periodTo
+                  {$mpFilter}
+            ) AS normalized
+            GROUP BY category_code, category_name
             ORDER BY costs_amount ASC
             SQL,
             array_filter([

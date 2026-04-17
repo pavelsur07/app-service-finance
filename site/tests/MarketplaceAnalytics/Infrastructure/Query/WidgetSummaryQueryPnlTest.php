@@ -287,6 +287,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         self::assertNotNull($capturedSql);
         self::assertStringContainsString("cc.code = 'ozon_compensation'", $capturedSql);
         self::assertStringContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
+        self::assertStringContainsString('effective_op', $capturedSql);
     }
 
     /**
