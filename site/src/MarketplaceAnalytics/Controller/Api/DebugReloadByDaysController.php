@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\SyncOzonReportMessage;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -22,7 +23,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * Поддерживает chunking: параметры offset/chunkSize для порционного dispatch.
  *
  *   GET /api/debug/reload-by-days
- *       ?companyId=UUID&marketplace=ozon&from=2026-01-01&to=2026-01-31
+ *       ?marketplace=ozon&from=2026-01-01&to=2026-01-31
  *       [&confirm=1]         — задиспатчить сообщения в очередь
  *       [&chunkSize=30]      — сколько дней диспатчить за один вызов (default 30)
  *       [&offset=0]          — с какого дня начинать (для последовательных вызовов)
@@ -38,6 +39,7 @@ final class DebugReloadByDaysController extends AbstractController
     private const DEFAULT_CHUNK_SIZE = 30;
 
     public function __construct(
+        private readonly ActiveCompanyService $activeCompanyService,
         private readonly Connection $connection,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
@@ -46,7 +48,9 @@ final class DebugReloadByDaysController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $companyId      = (string) $request->query->get('companyId', '');
+        $company   = $this->activeCompanyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+
         $marketplaceStr = (string) $request->query->get('marketplace', '');
         $fromStr        = (string) $request->query->get('from', '');
         $toStr          = (string) $request->query->get('to', '');
@@ -54,8 +58,8 @@ final class DebugReloadByDaysController extends AbstractController
         $chunkSize      = max(1, (int) $request->query->get('chunkSize', (string) self::DEFAULT_CHUNK_SIZE));
         $offset         = max(0, (int) $request->query->get('offset', '0'));
 
-        if ($companyId === '' || $marketplaceStr === '' || $fromStr === '' || $toStr === '') {
-            return $this->json(['error' => 'companyId, marketplace, from, to are required'], 422);
+        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+            return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);

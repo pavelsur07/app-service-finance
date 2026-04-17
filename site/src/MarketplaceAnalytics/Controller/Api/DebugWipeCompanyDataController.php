@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -20,7 +21,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * Удаляет sales, returns, costs и raw_documents.
  *
  *   GET /api/debug/wipe-company-data
- *       ?companyId=UUID&marketplace=ozon&from=2026-01-01&to=2026-04-17
+ *       ?marketplace=ozon&from=2026-01-01&to=2026-04-17
  *       [&preview=1]  — только подсчёт (по умолчанию)
  *       [&confirm=1]  — выполнить удаление
  *       [&force=1]    — удалять записи с document_id IS NOT NULL
@@ -34,6 +35,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DebugWipeCompanyDataController extends AbstractController
 {
     public function __construct(
+        private readonly ActiveCompanyService $activeCompanyService,
         private readonly Connection $connection,
         private readonly LoggerInterface $logger,
     ) {
@@ -41,15 +43,17 @@ final class DebugWipeCompanyDataController extends AbstractController
 
     public function __invoke(Request $request): JsonResponse
     {
-        $companyId      = (string) $request->query->get('companyId', '');
+        $company   = $this->activeCompanyService->getActiveCompany();
+        $companyId = (string) $company->getId();
+
         $marketplaceStr = (string) $request->query->get('marketplace', '');
         $fromStr        = (string) $request->query->get('from', '');
         $toStr          = (string) $request->query->get('to', '');
         $confirm        = (string) $request->query->get('confirm', '0') === '1';
         $force          = (string) $request->query->get('force', '0') === '1';
 
-        if ($companyId === '' || $marketplaceStr === '' || $fromStr === '' || $toStr === '') {
-            return $this->json(['error' => 'companyId, marketplace, from, to are required'], 422);
+        if ($marketplaceStr === '' || $fromStr === '' || $toStr === '') {
+            return $this->json(['error' => 'marketplace, from, to are required'], 422);
         }
 
         $marketplace = MarketplaceType::tryFrom($marketplaceStr);
@@ -76,7 +80,7 @@ final class DebugWipeCompanyDataController extends AbstractController
 
         if (!$confirm) {
             $counts        = $this->countRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
-            $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
+            $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0, 'raw_documents' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
 
             return $this->json([
                 'mode'           => 'preview',
@@ -94,7 +98,7 @@ final class DebugWipeCompanyDataController extends AbstractController
 
         try {
             $counts        = $this->deleteRecords($companyId, $marketplace, $periodFrom, $periodTo, $force);
-            $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
+            $skippedClosed = $force ? ['sales' => 0, 'returns' => 0, 'costs' => 0, 'raw_documents' => 0] : $this->countClosed($companyId, $marketplace, $periodFrom, $periodTo);
 
             $this->connection->commit();
         } catch (\Throwable $e) {
@@ -149,17 +153,19 @@ final class DebugWipeCompanyDataController extends AbstractController
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
-        $rawDocs = (int) $this->connection->fetchOne(
-            "SELECT COUNT(*) FROM marketplace_raw_documents
-             WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
-            ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
-        );
+        $rawDocs = $force
+            ? (int) $this->connection->fetchOne(
+                "SELECT COUNT(*) FROM marketplace_raw_documents
+                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+                ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
+            )
+            : 0;
 
         return ['sales' => $sales, 'returns' => $returns, 'costs' => $costs, 'raw_documents' => $rawDocs];
     }
 
     /**
-     * @return array{sales: int, returns: int, costs: int}
+     * @return array{sales: int, returns: int, costs: int, raw_documents: int}
      */
     private function countClosed(string $companyId, MarketplaceType $marketplace, string $from, string $to): array
     {
@@ -183,7 +189,13 @@ final class DebugWipeCompanyDataController extends AbstractController
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
-        return ['sales' => $sales, 'returns' => $returns, 'costs' => $costs];
+        $rawDocs = (int) $this->connection->fetchOne(
+            "SELECT COUNT(*) FROM marketplace_raw_documents
+             WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+            ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
+        );
+
+        return ['sales' => $sales, 'returns' => $returns, 'costs' => $costs, 'raw_documents' => $rawDocs];
     }
 
     /**
@@ -212,11 +224,13 @@ final class DebugWipeCompanyDataController extends AbstractController
             ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
         );
 
-        $rawDocs = (int) $this->connection->executeStatement(
-            "DELETE FROM marketplace_raw_documents
-             WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
-            ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
-        );
+        $rawDocs = $force
+            ? (int) $this->connection->executeStatement(
+                "DELETE FROM marketplace_raw_documents
+                 WHERE company_id = :cid AND marketplace = :mp AND period_from >= :from AND period_to <= :to",
+                ['cid' => $companyId, 'mp' => $mp, 'from' => $from, 'to' => $to],
+            )
+            : 0;
 
         return ['sales' => $sales, 'returns' => $returns, 'costs' => $costs, 'raw_documents' => $rawDocs];
     }
