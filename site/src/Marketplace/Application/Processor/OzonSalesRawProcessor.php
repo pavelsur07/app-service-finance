@@ -137,31 +137,56 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             // existingMap строится ПОСЛЕ cleanup — иначе только что удалённые
             // external_id попадут в карту и insert-цикл ошибочно пропустит их
             // как «уже существующие», оставляя пустоты в marketplace_sales.
-            $allExternalIds = array_values(array_map(
-                static function (array $op): string {
-                    $postingNumber = $op['posting']['posting_number'] ?? '';
-                    $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-                    // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                    if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
-                        $externalId .= '_storno';
-                    }
-                    return $externalId;
-                },
-                $salesData,
-            ));
-            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
 
+            // Сортируем по operation_date ASC для корректного назначения версий
+            // при повторных продажах (sale → storno → re-sale по одному posting_number).
+            usort($salesData, static fn (array $a, array $b): int => ($a['operation_date'] ?? '') <=> ($b['operation_date'] ?? ''));
+
+            // Вычисляем базовые ключи (без версий) для предварительной загрузки existingMap
+            $baseKeys = [];
             foreach ($salesData as $op) {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
-                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                $baseKey = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                    $baseKey .= '_storno';
+                }
+                $baseKeys[] = $baseKey;
+            }
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($baseKeys)));
+
+            // Назначаем версионные externalId с учётом existingMap и повторов внутри батча.
+            // Счётчик для каждого baseKey стартует с учётом уже занятых версий в БД.
+            $counters = [];
+            $computedIds = [];
+            foreach ($salesData as $i => $op) {
+                $postingNumber = $op['posting']['posting_number'] ?? '';
+                $baseKey = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                    $baseKey .= '_storno';
+                }
+
+                if (!isset($counters[$baseKey])) {
+                    $counters[$baseKey] = isset($existingMap[$baseKey]) ? 1 : 0;
+                }
+
+                $counters[$baseKey]++;
+                $computedIds[$i] = $counters[$baseKey] > 1
+                    ? $baseKey . '_v' . $counters[$baseKey]
+                    : $baseKey;
+            }
+
+            // Проверяем версионные ключи _v2, _v3... на существование в БД
+            $versionedKeys = array_filter($computedIds, static fn (string $id): bool => str_contains($id, '_v'));
+            if ($versionedKeys !== []) {
+                $versionedExisting = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($versionedKeys)));
+                $existingMap = array_merge($existingMap, $versionedExisting);
+            }
+
+            foreach ($salesData as $i => $op) {
+                $externalId = $computedIds[$i];
 
                 $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
                 $isStorno = $accrual < 0;
-
-                // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                if ($isStorno) {
-                    $externalId .= '_storno';
-                }
 
                 if ($externalId === '' || isset($existingMap[$externalId])) {
                     continue;
