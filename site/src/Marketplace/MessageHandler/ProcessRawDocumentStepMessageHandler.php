@@ -6,10 +6,13 @@ namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
+use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
@@ -25,6 +28,8 @@ final class ProcessRawDocumentStepMessageHandler
         private readonly MarketplaceRawDocumentRepository $repository,
         private readonly ProcessMarketplaceRawDocumentAction $processAction,
         private readonly EntityManagerInterface $entityManager,
+        private readonly ManagerRegistry $managerRegistry,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -70,12 +75,48 @@ final class ProcessRawDocumentStepMessageHandler
             }
             $doc->markStepSucceeded($step);
         } catch (\Throwable $e) {
-            $doc = $this->repository->find($message->rawDocumentId) ?? $doc;
-            $doc->markStepFailed($step);
-            $this->entityManager->flush();
+            $this->recordStepFailure($message->rawDocumentId, $step, $e);
             throw $e;
         }
 
         $this->entityManager->flush();
+    }
+
+    private function recordStepFailure(
+        string $rawDocumentId,
+        PipelineStep $step,
+        \Throwable $originalException,
+    ): void {
+        try {
+            $em = $this->entityManager;
+            if (!$em->isOpen()) {
+                $this->managerRegistry->resetManager();
+                /** @var EntityManagerInterface $em */
+                $em = $this->managerRegistry->getManager();
+            }
+
+            $repo = $em->getRepository(MarketplaceRawDocument::class);
+            $doc = $repo->find($rawDocumentId);
+
+            if ($doc === null) {
+                $this->logger->error('Cannot mark step failed: raw document not found', [
+                    'rawDocumentId' => $rawDocumentId,
+                    'step' => $step->value,
+                ]);
+
+                return;
+            }
+
+            $doc->markStepFailed($step);
+            $em->flush();
+        } catch (\Throwable $secondary) {
+            // Не маскируем оригинальное исключение — только логируем secondary.
+            $this->logger->error('Failed to record step failure status', [
+                'rawDocumentId' => $rawDocumentId,
+                'step' => $step->value,
+                'originalException' => $originalException->getMessage(),
+                'secondaryException' => $secondary->getMessage(),
+            ]);
+        }
     }
 }
