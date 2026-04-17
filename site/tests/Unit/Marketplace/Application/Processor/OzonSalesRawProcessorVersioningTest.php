@@ -133,6 +133,35 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         self::assertSame(['A_v2', 'A_storno_v2'], $this->persistedExternalIds);
     }
 
+    /**
+     * В БД уже есть A и A_v2 → следующая sale должна получить A_v3, не A_v2.
+     */
+    public function testExistingVersionedInDbBumpsToNextFree(): void
+    {
+        $processor = $this->buildProcessor(existingIds: ['A', 'A_v2']);
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('A', +1584, '2026-02-26 10:00:00'),
+        ]);
+
+        self::assertSame(['A_v3'], $this->persistedExternalIds);
+    }
+
+    /**
+     * В БД A, A_storno, A_v2, A_storno_v2 → следующая пара получает _v3.
+     */
+    public function testFullCycleExistingBumpsToV3(): void
+    {
+        $processor = $this->buildProcessor(existingIds: ['A', 'A_storno', 'A_v2', 'A_storno_v2']);
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('A', +1584, '2026-02-27 10:00:00'),
+            $this->makeOp('A', -1584, '2026-02-27 12:00:00'),
+        ]);
+
+        self::assertSame(['A_v3', 'A_storno_v3'], $this->persistedExternalIds);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------

@@ -142,28 +142,22 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             // при повторных продажах (sale → storno → re-sale по одному posting_number).
             usort($salesData, static fn (array $a, array $b): int => ($a['operation_date'] ?? '') <=> ($b['operation_date'] ?? ''));
 
-            // Вычисляем базовые ключи (без версий) для предварительной загрузки existingMap
-            $baseKeys = [];
-            foreach ($salesData as $op) {
-                $postingNumber = $op['posting']['posting_number'] ?? '';
-                $baseKey = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
-                    $baseKey .= '_storno';
-                }
-                $baseKeys[] = $baseKey;
-            }
-            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($baseKeys)));
-
-            // Назначаем версионные externalId с учётом existingMap и повторов внутри батча.
-            // Счётчик для каждого baseKey стартует с учётом уже занятых версий в БД.
-            $counters = [];
-            $computedIds = [];
+            $baseKeysMap = [];
             foreach ($salesData as $i => $op) {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
                 $baseKey = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
                 if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
                     $baseKey .= '_storno';
                 }
+                $baseKeysMap[$i] = $baseKey;
+            }
+
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($baseKeysMap)));
+
+            $counters = [];
+            $computedIds = [];
+            foreach ($salesData as $i => $op) {
+                $baseKey = $baseKeysMap[$i];
 
                 if (!isset($counters[$baseKey])) {
                     $counters[$baseKey] = isset($existingMap[$baseKey]) ? 1 : 0;
@@ -175,11 +169,23 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                     : $baseKey;
             }
 
-            // Проверяем версионные ключи _v2, _v3... на существование в БД
-            $versionedKeys = array_filter($computedIds, static fn (string $id): bool => str_contains($id, '_v'));
+            $versionedKeys = array_filter($computedIds, static fn (string $id): bool => (bool) preg_match('/_v\d+$/', $id));
             if ($versionedKeys !== []) {
                 $versionedExisting = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($versionedKeys)));
-                $existingMap = array_merge($existingMap, $versionedExisting);
+                if ($versionedExisting !== []) {
+                    $existingMap = array_merge($existingMap, $versionedExisting);
+                    foreach ($computedIds as $i => $id) {
+                        if (!isset($versionedExisting[$id])) {
+                            continue;
+                        }
+                        $baseKey = $baseKeysMap[$i];
+                        while (isset($existingMap[$id])) {
+                            $counters[$baseKey]++;
+                            $id = $baseKey . '_v' . $counters[$baseKey];
+                        }
+                        $computedIds[$i] = $id;
+                    }
+                }
             }
 
             foreach ($salesData as $i => $op) {
