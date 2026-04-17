@@ -90,8 +90,15 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         }
 
         $salesData = array_filter($rawRows, static function (array $op): bool {
-            return ($op['type'] ?? '') === 'orders'
-                && (float) ($op['accruals_for_sale'] ?? 0) != 0;
+            if ((float) ($op['accruals_for_sale'] ?? 0) == 0) {
+                return false;
+            }
+
+            $type = $op['type'] ?? '';
+            $operationType = $op['operation_type'] ?? '';
+
+            return $type === 'orders'
+                || $operationType === 'OperationAgentStornoDeliveredToCustomer';
         });
 
         if (empty($salesData)) {

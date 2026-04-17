@@ -382,8 +382,12 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $opAmount  = abs($rawAmount);
             $opType    = $op['type'] ?? '';
 
-            // Пропускаем только продажи (не затраты)
-            if ($opAmount > 0.001 && $opType !== 'orders') {
+            // Пропускаем продажи и сторно продаж (выручка учитывается в sales, не в costs)
+            $opOperationType = $op['operation_type'] ?? '';
+            if ($opAmount > 0.001
+                && $opType !== 'orders'
+                && $opOperationType !== 'OperationAgentStornoDeliveredToCustomer'
+            ) {
                 if ($opType === 'compensation') {
                     // Компенсации: разделяем по знаку исходного amount на две разные категории.
                     // rawAmount >= 0 = компенсация от Ozon (доход продавца) → ozon_compensation → STORNO

@@ -29,10 +29,15 @@ final readonly class OzonReportRowClassifier implements RowClassifierInterface
 
         // returns:
         // ClientReturnAgentOperation = реальный возврат товара покупателем → RETURN
+        // OperationAgentStornoDeliveredToCustomer = сторно начисления продажи → SALE
         // OperationItemReturn = затраты на обработку возврата (логистика) → COST
         if ($type === 'returns') {
             if ($operationType === 'ClientReturnAgentOperation') {
                 return StagingRecordType::RETURN;
+            }
+
+            if ($operationType === 'OperationAgentStornoDeliveredToCustomer') {
+                return StagingRecordType::SALE;
             }
 
             return StagingRecordType::COST;
