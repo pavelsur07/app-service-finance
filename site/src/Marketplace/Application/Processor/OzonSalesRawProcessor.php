@@ -137,31 +137,62 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             // existingMap строится ПОСЛЕ cleanup — иначе только что удалённые
             // external_id попадут в карту и insert-цикл ошибочно пропустит их
             // как «уже существующие», оставляя пустоты в marketplace_sales.
-            $allExternalIds = array_values(array_map(
-                static function (array $op): string {
-                    $postingNumber = $op['posting']['posting_number'] ?? '';
-                    $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
-                    // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                    if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
-                        $externalId .= '_storno';
-                    }
-                    return $externalId;
-                },
-                $salesData,
-            ));
-            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, $allExternalIds);
 
-            foreach ($salesData as $op) {
+            // Сортируем по operation_date ASC для корректного назначения версий
+            // при повторных продажах (sale → storno → re-sale по одному posting_number).
+            usort($salesData, static fn (array $a, array $b): int => ($a['operation_date'] ?? '') <=> ($b['operation_date'] ?? ''));
+
+            $baseKeysMap = [];
+            foreach ($salesData as $i => $op) {
                 $postingNumber = $op['posting']['posting_number'] ?? '';
-                $externalId = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                $baseKey = $postingNumber !== '' ? $postingNumber : (string) ($op['operation_id'] ?? '');
+                if ((float) ($op['accruals_for_sale'] ?? 0) < 0) {
+                    $baseKey .= '_storno';
+                }
+                $baseKeysMap[$i] = $baseKey;
+            }
+
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($baseKeysMap)));
+
+            $counters = [];
+            $computedIds = [];
+            foreach ($salesData as $i => $op) {
+                $baseKey = $baseKeysMap[$i];
+
+                if (!isset($counters[$baseKey])) {
+                    $counters[$baseKey] = isset($existingMap[$baseKey]) ? 1 : 0;
+                }
+
+                $counters[$baseKey]++;
+                $computedIds[$i] = $counters[$baseKey] > 1
+                    ? $baseKey . '_v' . $counters[$baseKey]
+                    : $baseKey;
+            }
+
+            $versionedKeys = array_filter($computedIds, static fn (string $id): bool => (bool) preg_match('/_v\d+$/', $id));
+            if ($versionedKeys !== []) {
+                $versionedExisting = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($versionedKeys)));
+                if ($versionedExisting !== []) {
+                    $existingMap = array_merge($existingMap, $versionedExisting);
+                    foreach ($computedIds as $i => $id) {
+                        if (!isset($versionedExisting[$id])) {
+                            continue;
+                        }
+                        $baseKey = $baseKeysMap[$i];
+                        while (isset($existingMap[$id])) {
+                            $counters[$baseKey]++;
+                            $id = $baseKey . '_v' . $counters[$baseKey];
+                        }
+                        $computedIds[$i] = $id;
+                    }
+                }
+            }
+
+            foreach ($salesData as $i => $op) {
+                $externalId = $computedIds[$i];
 
                 $accrual  = (float) ($op['accruals_for_sale'] ?? 0);
                 $isStorno = $accrual < 0;
-
-                // Storno operations get a suffix to avoid UNIQUE constraint conflict
-                if ($isStorno) {
-                    $externalId .= '_storno';
-                }
 
                 if ($externalId === '' || isset($existingMap[$externalId])) {
                     continue;
