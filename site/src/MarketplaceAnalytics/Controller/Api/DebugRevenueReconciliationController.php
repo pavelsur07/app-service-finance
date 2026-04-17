@@ -42,8 +42,8 @@ final class DebugRevenueReconciliationController extends AbstractController
     {
         $periodStr = (string) $request->query->get('period', '');
 
-        if ($periodStr === '' || preg_match('/^\d{4}-\d{2}$/', $periodStr) !== 1) {
-            return $this->json(['error' => 'period is required in Y-m format (e.g. 2026-02)'], 422);
+        if ($periodStr === '' || preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $periodStr) !== 1) {
+            return $this->json(['error' => 'period is required in Y-m format with month 01-12 (e.g. 2026-02)'], 422);
         }
 
         try {
@@ -52,10 +52,9 @@ final class DebugRevenueReconciliationController extends AbstractController
             return $this->json(['error' => 'Invalid period value'], 422);
         }
 
-        $periodTo     = $periodFrom->modify('last day of this month');
-        $nextDay1     = $periodTo->modify('+1 day');
-        $nextDay2     = $periodTo->modify('+2 days');
+        $periodTo      = $periodFrom->modify('last day of this month');
         $breakdownFrom = $periodTo->modify('-2 days');
+        $breakdownTo   = $periodTo->modify('+2 days');
 
         $company   = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
@@ -69,7 +68,7 @@ final class DebugRevenueReconciliationController extends AbstractController
             'total_revenue'    => $this->fetchTotalRevenue($companyId, $periodFrom, $periodTo),
             'orphan_rows'      => $this->fetchOrphanRows($companyId, $periodFrom, $periodTo),
             'duplicates'       => $this->fetchDuplicates($companyId, $periodFrom, $periodTo),
-            'daily_breakdown'  => $this->fetchDailyBreakdown($companyId, $breakdownFrom, $nextDay2),
+            'daily_breakdown'  => $this->fetchDailyBreakdown($companyId, $breakdownFrom, $breakdownTo),
             'raw_documents'    => $this->fetchRawDocuments($companyId, $periodFrom, $periodTo),
         ]);
     }
@@ -184,6 +183,8 @@ final class DebugRevenueReconciliationController extends AbstractController
 
     /**
      * Дневная разбивка по sale_date (accrual_date) для выбранного диапазона.
+     * Дни без продаж возвращаются с count=0/sum=0, чтобы оператор мог отличить
+     * «нет данных за день» от «день не попал в выборку».
      *
      * @return list<array{accrual_date: string, count: int, sum: string}>
      */
@@ -204,7 +205,6 @@ final class DebugRevenueReconciliationController extends AbstractController
               AND s.sale_date  >= :periodFrom
               AND s.sale_date  <= :periodTo
             GROUP BY s.sale_date
-            ORDER BY s.sale_date
             SQL,
             [
                 'companyId'  => $companyId,
@@ -213,14 +213,27 @@ final class DebugRevenueReconciliationController extends AbstractController
             ],
         );
 
-        return array_map(
-            static fn (array $r): array => [
-                'accrual_date' => (string) $r['accrual_date'],
-                'count'        => (int) $r['cnt'],
-                'sum'          => (string) ($r['total'] ?? '0'),
-            ],
-            $rows,
-        );
+        $byDate = [];
+        foreach ($rows as $r) {
+            $byDate[(string) $r['accrual_date']] = [
+                'count' => (int) $r['cnt'],
+                'sum'   => (string) ($r['total'] ?? '0'),
+            ];
+        }
+
+        $result = [];
+        $cursor = $from;
+        while ($cursor <= $to) {
+            $date = $cursor->format('Y-m-d');
+            $result[] = [
+                'accrual_date' => $date,
+                'count'        => $byDate[$date]['count'] ?? 0,
+                'sum'          => $byDate[$date]['sum'] ?? '0',
+            ];
+            $cursor = $cursor->modify('+1 day');
+        }
+
+        return $result;
     }
 
     /**
