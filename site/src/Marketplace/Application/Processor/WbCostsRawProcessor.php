@@ -168,9 +168,6 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             $this->listingResolver->flushBarcodes();
         }
 
-        $this->categoryResolver->resetCache();
-
-        // Прогрев категорий
         $this->categoryResolver->preload($company, MarketplaceType::WILDBERRIES);
 
         // Собираем все cost entries

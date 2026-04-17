@@ -10,8 +10,9 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
+use Symfony\Contracts\Service\ResetInterface;
 
-final class MarketplaceCostCategoryResolver
+final class MarketplaceCostCategoryResolver implements ResetInterface
 {
     /** @var array<string, MarketplaceCostCategory> */
     private array $cache = [];
@@ -80,12 +81,7 @@ final class MarketplaceCostCategoryResolver
         foreach ($this->cache as $category) {
             $ids[] = $category->getId();
         }
-
-        if ($ids === []) {
-            $this->cache = [];
-
-            return;
-        }
+        $ids = array_unique($ids);
 
         $fresh = $this->costCategoryRepository->findBy(['id' => $ids]);
         $byId = [];
@@ -110,6 +106,11 @@ final class MarketplaceCostCategoryResolver
     public function clearCache(): void
     {
         $this->cache = [];
+    }
+
+    public function reset(): void
+    {
+        $this->clearCache();
     }
 
     /**
