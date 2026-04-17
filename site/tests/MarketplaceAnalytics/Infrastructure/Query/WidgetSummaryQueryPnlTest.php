@@ -191,6 +191,105 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
+     * Регрессия: бэкфилл-миграция Version20260413120000 сохранила положительные
+     * исторические компенсации как operation_type='charge'. Под P&L-формулой
+     * widget-а (storno=+ABS, charge=-ABS) они стали давать -ABS вместо +ABS.
+     * После фикса SQL спец-кейсит category_code = 'ozon_compensation' →
+     * всегда ABS(amount) как доход. Здесь мы стабим агрегированную строку,
+     * какую возвращает уже пофикшенный SQL: net = +5480 даже если исходный
+     * operation_type был charge.
+     */
+    public function testCompensationChargePositiveAmountShownAsIncome(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
+        ]);
+
+        $result = $this->executeSummary();
+
+        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        self::assertNotNull($group);
+        self::assertSame(5480.0, $group['netAmount']);
+
+        $cat = $group['categories'][0] ?? null;
+        self::assertNotNull($cat);
+        self::assertSame('ozon_compensation', $cat['code']);
+        self::assertSame(5480.0, $cat['netAmount']);
+    }
+
+    /**
+     * Декомпенсация — всегда расход (−ABS) вне зависимости от operation_type.
+     */
+    public function testDecompensationShownAsExpense(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
+        ]);
+
+        $result = $this->executeSummary();
+
+        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        self::assertNotNull($group);
+        self::assertSame(-1274.0, $group['netAmount']);
+
+        $cat = $group['categories'][0] ?? null;
+        self::assertNotNull($cat);
+        self::assertSame('ozon_decompensation', $cat['code']);
+        self::assertSame(-1274.0, $cat['netAmount']);
+    }
+
+    /**
+     * Подгруппа компенсации+декомпенсации (ИП Сухоносов, февраль 2026):
+     *   compensation  +5480  +  decompensation  −1274  =  +4206
+     * После фикса — корректная сумма по группе «Другие услуги и штрафы».
+     */
+    public function testCompensationPlusDecompensationNetsToFourThousand(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
+            ['category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
+        ]);
+
+        $result = $this->executeSummary();
+
+        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        self::assertNotNull($group);
+        self::assertSame(4206.0, $group['netAmount']);
+    }
+
+    /**
+     * SQL-контракт: getCostAggregates обязан спец-кейсить category_code
+     * для ozon_compensation / ozon_decompensation. Это страховка от случайного
+     * отката до pre-fix формулы на чисто-operation_type CASE.
+     */
+    public function testSqlContainsCompensationSpecialCase(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+
+        $capturedSql = null;
+        $this->connection
+            ->method('fetchAllAssociative')
+            ->willReturnCallback(function (string $sql) use (&$capturedSql): array {
+                $capturedSql = $sql;
+
+                return [];
+            });
+
+        $this->executeSummary();
+
+        self::assertNotNull($capturedSql);
+        self::assertStringContainsString("cc.code = 'ozon_compensation'", $capturedSql);
+        self::assertStringContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
+    }
+
+    /**
      * @param list<ListingSalesAggregateDTO> $sales
      */
     private function stubSales(array $sales): void

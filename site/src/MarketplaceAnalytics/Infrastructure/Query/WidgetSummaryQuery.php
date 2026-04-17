@@ -174,6 +174,11 @@ final readonly class WidgetSummaryQuery
      * В отличие от ListingCostAggregateQuery (per-listing) сюда попадают
      * категории затрат с listing_id = NULL (CPC, хранение, кросс-докинг и т.п.).
      *
+     * Знак для ozon_compensation / ozon_decompensation определяется
+     * category_code, а не operation_type: компенсация от Ozon — всегда доход,
+     * декомпенсация — всегда расход. Это закрывает дыру в исторических данных,
+     * где бэкфилл-миграция сохранила положительные компенсации как charge.
+     *
      * @return list<array{
      *     category_code: string,
      *     category_name: string,
@@ -196,19 +201,22 @@ final readonly class WidgetSummaryQuery
                 cc.code                                                       AS category_code,
                 cc.name                                                       AS category_name,
                 SUM(CASE
-                    WHEN (c.operation_type = 'storno')
-                    THEN ABS(c.amount)
-                    ELSE -ABS(c.amount)
+                    WHEN cc.code = 'ozon_compensation'   THEN  ABS(c.amount)
+                    WHEN cc.code = 'ozon_decompensation' THEN -ABS(c.amount)
+                    WHEN c.operation_type = 'storno'     THEN  ABS(c.amount)
+                    ELSE                                      -ABS(c.amount)
                 END)                                                          AS net_amount,
                 SUM(CASE
-                    WHEN (c.operation_type = 'storno')
-                    THEN 0
-                    ELSE -ABS(c.amount)
+                    WHEN cc.code = 'ozon_compensation'   THEN 0
+                    WHEN cc.code = 'ozon_decompensation' THEN -ABS(c.amount)
+                    WHEN c.operation_type = 'storno'     THEN 0
+                    ELSE                                      -ABS(c.amount)
                 END)                                                          AS costs_amount,
                 SUM(CASE
-                    WHEN (c.operation_type = 'storno')
-                    THEN ABS(c.amount)
-                    ELSE 0
+                    WHEN cc.code = 'ozon_compensation'   THEN ABS(c.amount)
+                    WHEN cc.code = 'ozon_decompensation' THEN 0
+                    WHEN c.operation_type = 'storno'     THEN ABS(c.amount)
+                    ELSE                                      0
                 END)                                                          AS storno_amount
             FROM marketplace_costs c
             JOIN marketplace_cost_categories cc ON cc.id = c.category_id
