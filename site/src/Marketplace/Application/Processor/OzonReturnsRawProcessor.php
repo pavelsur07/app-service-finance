@@ -50,6 +50,9 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
         return $type === MarketplaceType::OZON->value && $kind === 'returns';
     }
 
+    /**
+     * @deprecated Use processBatch() instead. This method delegates to legacy ProcessOzonReturnsAction which lacks OperationItemReturn → costs classification. No active callers in production.
+     */
     public function process(string $companyId, string $rawDocId): int
     {
         $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
