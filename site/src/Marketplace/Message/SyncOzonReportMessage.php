@@ -12,8 +12,9 @@ namespace App\Marketplace\Message;
 final class SyncOzonReportMessage
 {
     public function __construct(
-        public readonly string $companyId,    // ✅ scalar string (worker-safe)
-        public readonly string $connectionId, // ✅ scalar string (worker-safe)
+        public readonly string $companyId,     // ✅ scalar string (worker-safe)
+        public readonly string $connectionId,  // ✅ scalar string (worker-safe)
+        public readonly ?string $date = null,  // Y-m-d; null = handler default (yesterday)
     ) {
     }
 }

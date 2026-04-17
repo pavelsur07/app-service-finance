@@ -4,15 +4,10 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
-use App\Company\Entity\Company;
-use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Message\ProcessDayReportMessage;
-use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\Marketplace\Message\SyncOzonReportMessage;
 use Doctrine\DBAL\Connection;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Ramsey\Uuid\Uuid;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -23,13 +18,14 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 /**
  * @internal Debug controller, to be removed after data recovery.
  *
- * Загружает данные из Ozon API по дням (один день — один raw-документ)
- * за указанный период, затем диспатчит pipeline обработки для каждого дня.
+ * Диспатчит SyncOzonReportMessage для каждого дня в указанном периоде.
+ * Каждое сообщение обрабатывается async worker'ом: загрузка из API +
+ * автозапуск pipeline (sales/returns/costs).
  *
  *   GET /api/debug/reload-by-days
  *       ?companyId=UUID&marketplace=ozon&from=2026-01-01&to=2026-01-31
  *       [&preview=1]  — только план (по умолчанию)
- *       [&confirm=1]  — выполнить загрузку + обработку
+ *       [&confirm=1]  — задиспатчить сообщения в очередь
  */
 #[Route(
     path: '/api/debug/reload-by-days',
@@ -40,9 +36,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 final class DebugReloadByDaysController extends AbstractController
 {
     public function __construct(
-        private readonly EntityManagerInterface $em,
         private readonly Connection $connection,
-        private readonly MarketplaceAdapterRegistry $adapterRegistry,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
     ) {
@@ -79,15 +73,15 @@ final class DebugReloadByDaysController extends AbstractController
             return $this->json(['error' => 'from must be <= to'], 422);
         }
 
-        $company = $this->em->find(Company::class, $companyId);
-        if ($company === null) {
-            return $this->json(['error' => 'Company not found: ' . $companyId], 404);
+        $connectionId = $this->findConnectionId($companyId, $marketplace);
+        if ($connectionId === null) {
+            return $this->json(['error' => 'No active connection found for company ' . $companyId . ' on ' . $marketplace->value], 404);
         }
 
-        $days          = $this->buildDaysList($from, $to);
-        $existingDays  = $this->findExistingDays($companyId, $marketplace, $from, $to);
-        $toLoad        = array_filter($days, static fn (string $d): bool => !isset($existingDays[$d]));
-        $skippedCount  = count($days) - count($toLoad);
+        $days         = $this->buildDaysList($from, $to);
+        $existingDays = $this->findExistingDays($companyId, $marketplace, $from, $to);
+        $toDispatch   = array_filter($days, static fn (string $d): bool => !isset($existingDays[$d]));
+        $skippedCount = count($days) - count($toDispatch);
 
         if (!$confirm) {
             return $this->json([
@@ -98,88 +92,58 @@ final class DebugReloadByDaysController extends AbstractController
                 'to'          => $to->format('Y-m-d'),
                 'plan'        => [
                     'total_days'       => count($days),
-                    'to_load'          => count($toLoad),
+                    'to_dispatch'      => count($toDispatch),
                     'skipped_existing' => $skippedCount,
                 ],
-                'dispatched' => 0,
             ]);
         }
 
-        $adapter    = $this->adapterRegistry->get($marketplace);
         $dispatched = 0;
-        $errors     = [];
 
-        foreach ($toLoad as $dayStr) {
-            $dayDate = new \DateTimeImmutable($dayStr);
-
-            try {
-                $rawData = $adapter->fetchRawReport($company, $dayDate, $dayDate);
-
-                if (empty($rawData)) {
-                    $this->logger->info('[DebugReloadByDays] Empty report for day', [
-                        'company_id' => $companyId,
-                        'day'        => $dayStr,
-                    ]);
-                    continue;
-                }
-
-                $rawDoc = new MarketplaceRawDocument(
-                    Uuid::uuid4()->toString(),
-                    $company,
-                    $marketplace,
-                    'sales_report',
-                );
-                $rawDoc->setPeriodFrom($dayDate);
-                $rawDoc->setPeriodTo($dayDate);
-                $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-                $rawDoc->setRawData($rawData);
-                $rawDoc->setRecordsCount(count($rawData));
-
-                $this->em->persist($rawDoc);
-                $this->em->flush();
-
-                $this->messageBus->dispatch(new ProcessDayReportMessage(
-                    companyId: $companyId,
-                    rawDocumentId: $rawDoc->getId(),
-                ));
-
-                $dispatched++;
-
-                $this->em->clear();
-                $company = $this->em->getReference(Company::class, $companyId);
-            } catch (\Throwable $e) {
-                $errors[] = ['day' => $dayStr, 'error' => $e->getMessage()];
-                $this->logger->error('[DebugReloadByDays] Failed to load day', [
-                    'company_id' => $companyId,
-                    'day'        => $dayStr,
-                    'error'      => $e->getMessage(),
-                ]);
-            }
+        foreach ($toDispatch as $dayStr) {
+            $this->messageBus->dispatch(new SyncOzonReportMessage(
+                companyId: $companyId,
+                connectionId: $connectionId,
+                date: $dayStr,
+            ));
+            $dispatched++;
         }
 
-        $response = [
-            'mode'        => 'executed',
-            'companyId'   => $companyId,
+        $this->logger->info('[DebugReloadByDays] Messages dispatched', [
+            'company_id'  => $companyId,
             'marketplace' => $marketplace->value,
             'from'        => $from->format('Y-m-d'),
             'to'          => $to->format('Y-m-d'),
-            'plan'        => [
-                'total_days'       => count($days),
-                'to_load'          => count($toLoad),
-                'skipped_existing' => $skippedCount,
-            ],
-            'dispatched' => $dispatched,
-        ];
+            'dispatched'  => $dispatched,
+            'skipped'     => $skippedCount,
+        ]);
 
-        if ($errors !== []) {
-            $response['errors'] = $errors;
-        }
+        return $this->json([
+            'mode'             => 'executed',
+            'companyId'        => $companyId,
+            'marketplace'      => $marketplace->value,
+            'from'             => $from->format('Y-m-d'),
+            'to'               => $to->format('Y-m-d'),
+            'dispatched_days'  => $dispatched,
+            'skipped_existing' => $skippedCount,
+            'note'             => 'Messages dispatched to async queue. Monitor workers for progress.',
+        ]);
+    }
 
-        return $this->json($response);
+    private function findConnectionId(string $companyId, MarketplaceType $marketplace): ?string
+    {
+        $id = $this->connection->fetchOne(
+            'SELECT id FROM marketplace_connections
+             WHERE company_id = :companyId AND marketplace = :mp AND is_active = true
+             ORDER BY created_at ASC LIMIT 1',
+            ['companyId' => $companyId, 'mp' => $marketplace->value],
+        );
+
+        return $id !== false ? (string) $id : null;
     }
 
     /**
-     * @return list<string> Dates in Y-m-d format
+     * @return list<string>
      */
     private function buildDaysList(\DateTimeImmutable $from, \DateTimeImmutable $to): array
     {
@@ -195,7 +159,7 @@ final class DebugReloadByDaysController extends AbstractController
     }
 
     /**
-     * @return array<string, true> Existing day dates as keys
+     * @return array<string, true>
      */
     private function findExistingDays(
         string $companyId,

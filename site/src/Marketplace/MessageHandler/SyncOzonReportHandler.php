@@ -57,13 +57,13 @@ final class SyncOzonReportHandler
         }
 
         try {
-            $this->process($companyId, $connectionId);
+            $this->process($companyId, $connectionId, $message->date);
         } finally {
             $lock->release();
         }
     }
 
-    private function process(string $companyId, string $connectionId): void
+    private function process(string $companyId, string $connectionId, ?string $date = null): void
     {
         $company = $this->em->find(Company::class, $companyId);
         if (!$company) {
@@ -91,12 +91,15 @@ final class SyncOzonReportHandler
         $rawDocId = null;
 
         try {
-            $adapter  = $this->adapterRegistry->get(MarketplaceType::OZON);
-            //$fromDate = new \DateTimeImmutable(sprintf('-%d days', self::SYNC_PERIOD_DAYS));
-            //$toDate   = new \DateTimeImmutable();
-            // SYNC_PERIOD_DAYS = 3 — оставить как страховка
-            $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
-            $fromDate = $toDate;
+            $adapter = $this->adapterRegistry->get(MarketplaceType::OZON);
+
+            if ($date !== null) {
+                $fromDate = new \DateTimeImmutable($date);
+                $toDate   = $fromDate;
+            } else {
+                $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
+                $fromDate = $toDate;
+            }
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
