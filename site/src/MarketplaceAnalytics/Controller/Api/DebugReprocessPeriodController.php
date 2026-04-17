@@ -4,9 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Controller\Api;
 
-use App\Marketplace\Application\Processor\OzonCostsRawProcessor;
-use App\Marketplace\Application\Processor\OzonReturnsRawProcessor;
-use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
+use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
@@ -21,10 +20,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * Отладочный эндпоинт для чистки orphan-записей и переобработки периода.
  *
  * Удаляет записи из marketplace_sales / marketplace_returns / marketplace_costs,
- * у которых raw_document_id IS NULL (созданы старым ProcessOzonSalesAction или
- * другим legacy-способом), и переобрабатывает все sales_report raw-документы
- * за указанный период через OzonSalesRawProcessor / OzonReturnsRawProcessor /
- * OzonCostsRawProcessor.
+ * у которых raw_document_id IS NULL (созданы legacy-способом), и переобрабатывает
+ * все sales_report raw-документы за указанный период через
+ * ProcessMarketplaceRawDocumentAction (та же логика, что и daily pipeline).
  *
  * Использование:
  *   POST /api/marketplace-analytics/debug/reprocess-period
@@ -46,9 +44,7 @@ final class DebugReprocessPeriodController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly Connection $connection,
-        private readonly OzonSalesRawProcessor $salesProcessor,
-        private readonly OzonReturnsRawProcessor $returnsProcessor,
-        private readonly OzonCostsRawProcessor $costsProcessor,
+        private readonly ProcessMarketplaceRawDocumentAction $processAction,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -388,9 +384,8 @@ final class DebugReprocessPeriodController extends AbstractController
     }
 
     /**
-     * Запускает три процессора (sales/returns/costs) для каждого raw-документа.
-     * Ошибка одного процессора не прерывает обработку остальных — результат
-     * фиксируется в ответе, чтобы можно было разобраться postmortem.
+     * Переобрабатывает каждый raw-документ через ProcessMarketplaceRawDocumentAction
+     * (та же логика, что и daily pipeline: classifier → processBatch).
      *
      * @param list<array{id: string, periodFrom: string, periodTo: string, syncedAt: string, recordsCount: int, processingStatus: string}> $rawDocs
      *
@@ -407,15 +402,15 @@ final class DebugReprocessPeriodController extends AbstractController
                 'periodTo'   => $doc['periodTo'],
             ];
 
-            foreach (
-                [
-                    'sales'   => $this->salesProcessor,
-                    'returns' => $this->returnsProcessor,
-                    'costs'   => $this->costsProcessor,
-                ] as $step => $processor
-            ) {
+            foreach (['sales', 'returns', 'costs'] as $step) {
                 try {
-                    $count = $processor->process($companyId, $doc['id']);
+                    $cmd = new ProcessMarketplaceRawDocumentCommand(
+                        companyId: $companyId,
+                        rawDocId: $doc['id'],
+                        kind: $step,
+                        forceReprocess: $step === 'costs',
+                    );
+                    $count = ($this->processAction)($cmd);
                     $result[$step] = ['status' => 'ok', 'processed' => $count];
                 } catch (\Throwable $e) {
                     $result[$step] = ['status' => 'error', 'message' => $e->getMessage()];
