@@ -28,8 +28,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     на retry — skip (chunksTotal уже выставлен);
  *  5) диспатчит N × FetchOzonAdStatisticsMessage по одному на чанк.
  *
- * Финализация job'а (markCompleted) — ответственность ProcessAdRawDocumentHandler
- * (Коммит 5): как только chunksCompleted == chunksTotal И все документы
+ * Финализация job'а (markCompleted) — ответственность ProcessAdRawDocumentHandler:
+ * как только все чанки зафиксированы в marketplace_ad_chunk_progress И все документы
  * обработаны, он проверяет failed_days и помечает job completed / failed.
  */
 #[AsMessageHandler]
@@ -93,11 +93,6 @@ final class LoadOzonAdStatisticsRangeHandler
             $this->entityManager->flush();
         }
 
-        // TODO(commit 5): защита от дубль-dispatch при retry оркестратора.
-        // AdRawDocument.UniqueConstraint(company_id, marketplace, report_date)
-        // уже защищает документы и loaded_days (created=0 на retry → инкремент=0).
-        // chunks_completed защитим в FetchOzonAdStatisticsHandler детекцией
-        // повтора: created=0 && updated>0 → не инкрементировать (это retry-fetch).
         foreach ($chunks as $chunk) {
             $this->messageBus->dispatch(new FetchOzonAdStatisticsMessage(
                 jobId: $job->getId(),
@@ -116,7 +111,6 @@ final class LoadOzonAdStatisticsRangeHandler
             'chunksCount' => count($chunks),
         ]);
 
-        // TODO(commit 5): ProcessAdRawDocumentHandler finalizes job by chunksCompleted.
     }
 
     /**

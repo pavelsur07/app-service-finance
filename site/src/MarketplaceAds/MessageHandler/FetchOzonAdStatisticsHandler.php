@@ -10,6 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
+use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
@@ -58,6 +59,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
@@ -248,12 +250,24 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
-        // Чанк физически отработан — инкрементим даже на пустом результате Ozon
+        // Чанк физически отработан — фиксируем идемпотентно даже на пустом результате Ozon
         // (ноль документов, ноль dispatch'ей): permanent/transient ошибки до сюда
         // не доходят (rethrow / UnrecoverableMessageHandlingException выше).
-        // Финализация job'а по условию chunksCompleted == chunksTotal — в
-        // ProcessAdRawDocumentHandler (Коммит 5).
-        $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
+        $marked = $this->adChunkProgressRepository->markChunkCompleted(
+            $message->jobId,
+            $message->companyId,
+            $dateFrom,
+            $dateTo,
+        );
+
+        if (!$marked) {
+            $this->logger->info('chunk already marked completed', [
+                'job_id' => $message->jobId,
+                'company_id' => $message->companyId,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+            ]);
+        }
 
         $this->logger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,

@@ -15,9 +15,8 @@ use Webmozart\Assert\Assert;
  * Задание на пакетную загрузку рекламных отчётов за период.
  *
  * Прогресс-счётчики (loadedDays/processedDays/failedDays) инкрементируются
- * параллельными воркерами и сознательно НЕ имеют guard-методов на Entity —
- * изменения идут атомарным `UPDATE ... SET x = x + :delta` через Repository,
- * минуя Doctrine UoW. См. {@see AdLoadJobRepository}.
+ * параллельными воркерами через атомарный `UPDATE ... SET x = x + :delta`
+ * в Repository, минуя Doctrine UoW.
  */
 #[ORM\Entity(repositoryClass: AdLoadJobRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_load_jobs')]
@@ -56,9 +55,6 @@ class AdLoadJob
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $chunksTotal = 0;
-
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    private int $chunksCompleted = 0;
 
     #[ORM\Column(type: 'string', length: 20, enumType: AdLoadJobStatus::class, options: ['default' => 'pending'])]
     private AdLoadJobStatus $status;
@@ -135,14 +131,6 @@ class AdLoadJob
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    /**
-     * Устанавливает общее число чанков для задания. Вызывается из
-     * {@see \App\MarketplaceAds\MessageHandler\LoadOzonAdStatisticsRangeHandler}
-     * один раз на задание — после расчёта числа чанков по диапазону дат.
-     *
-     * chunksCompleted инкрементируется отдельно через Repository-метод
-     * (атомарный SQL UPDATE, параллельные воркеры).
-     */
     public function setChunksTotal(int $total): void
     {
         if ($this->status->isTerminal()) {
@@ -239,11 +227,6 @@ class AdLoadJob
     public function getChunksTotal(): int
     {
         return $this->chunksTotal;
-    }
-
-    public function getChunksCompleted(): int
-    {
-        return $this->chunksCompleted;
     }
 
     public function getStatus(): AdLoadJobStatus
