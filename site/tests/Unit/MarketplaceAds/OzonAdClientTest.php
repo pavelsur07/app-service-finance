@@ -386,6 +386,106 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // Error payload stringify: scalar error → сообщение содержит строку как есть
+    // -----------------------------------------------------------------
+    public function testPollReportWithStringErrorIncludesItVerbatim(): void
+    {
+        $http = $this->buildHttpClientForError(
+            tokenBody: $this->tokenBody('TKN-E1'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-err-1"}',
+            stateBody: json_encode(['state' => 'ERROR', 'error' => 'нет прав'], JSON_THROW_ON_ERROR),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            self::assertStringContainsString('uuid-err-1', $msg);
+            self::assertStringContainsString('ERROR', $msg);
+            self::assertStringContainsString('нет прав', $msg);
+            self::assertStringNotContainsString('Array', $msg);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Error payload stringify: object error → JSON с UNESCAPED_UNICODE/SLASHES
+    // -----------------------------------------------------------------
+    public function testPollReportWithObjectErrorSerializesAsJson(): void
+    {
+        $errorPayload = [
+            'code' => 'FORBIDDEN',
+            'message' => 'Нет доступа к /api/client/statistics',
+            'details' => ['scope' => 'advertising'],
+        ];
+
+        $http = $this->buildHttpClientForError(
+            tokenBody: $this->tokenBody('TKN-E2'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-err-2"}',
+            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            self::assertStringNotContainsString('Array', $msg);
+            self::assertStringContainsString('FORBIDDEN', $msg);
+            // UNESCAPED_UNICODE — кириллица НЕ как \u0420\u0435\u0433...
+            self::assertStringContainsString('Нет доступа', $msg);
+            self::assertStringNotContainsString('\\u04', $msg);
+            // UNESCAPED_SLASHES — /api/client/statistics без \/
+            self::assertStringContainsString('/api/client/statistics', $msg);
+            self::assertStringNotContainsString('\\/', $msg);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Error payload stringify: list-array error → JSON-массив
+    // -----------------------------------------------------------------
+    public function testPollReportWithArrayErrorSerializesAsJson(): void
+    {
+        $errorPayload = ['Первая причина', 'Вторая причина'];
+
+        $http = $this->buildHttpClientForError(
+            tokenBody: $this->tokenBody('TKN-E3'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-err-3"}',
+            stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            self::assertStringNotContainsString('Array', $msg);
+            self::assertStringContainsString('["Первая причина","Вторая причина"]', $msg);
+        }
+    }
+
+    // -----------------------------------------------------------------
     // g) Backward-compat: fetchAdStatistics($companyId, $date) still works
     // -----------------------------------------------------------------
     public function testFetchAdStatisticsLegacyContractRemainsStable(): void
@@ -498,6 +598,24 @@ final class OzonAdClientTest extends TestCase
             new MockResponse($statisticsBody),
             new MockResponse($stateBody),
             new MockResponse($downloadCsv),
+        ]);
+    }
+
+    /**
+     * Error HTTP sequence: token → /campaign → /statistics → /state (state=ERROR).
+     * Нет download-шага — pollReport() бросает исключение до него.
+     */
+    private function buildHttpClientForError(
+        string $tokenBody,
+        string $campaignListBody,
+        string $statisticsBody,
+        string $stateBody,
+    ): MockHttpClient {
+        return new MockHttpClient([
+            new MockResponse($tokenBody),
+            new MockResponse($campaignListBody),
+            new MockResponse($statisticsBody),
+            new MockResponse($stateBody),
         ]);
     }
 
