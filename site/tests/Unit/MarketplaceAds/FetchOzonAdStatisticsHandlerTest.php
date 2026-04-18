@@ -145,6 +145,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
     public function testUpsertCallsUpdatePayloadForExistingDay(): void
     {
+        // Сценарий: единственный день уже есть в БД → upsert идёт по ветке
+        // `updated`, `created` пустой. Это классифицируется как retry оркестратора:
+        // chunks_completed на этом чанке инкрементился в прошлый раз, повторно —
+        // нельзя (иначе chunksCompleted > chunksTotal и ложная финализация).
+        // loaded_days всё равно увеличиваем по coverage чанка — он информационный
+        // и в условие финализации не входит (см. ProcessAdRawDocumentHandler).
         $job = AdLoadJobBuilder::aJob()->asRunning()->build();
 
         $existing = AdRawDocumentBuilder::aRawDocument()
@@ -161,10 +167,8 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('incrementLoadedDays')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 1)
             ->willReturn(1);
-        $jobRepo->expects(self::once())
-            ->method('incrementChunksCompleted')
-            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
-            ->willReturn(1);
+        // Retry-fetch: chunks_completed НЕ инкрементим.
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')->willReturn([
@@ -666,6 +670,132 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
             '2026-02-31',
+            self::DATE_TO,
+        ));
+    }
+
+    public function testRetryOfOrchestratorDoesNotIncrementChunksCompleted(): void
+    {
+        // Сценарий: оркестратор ретраится после частичного dispatch'а. Все 3 дня
+        // диапазона уже есть в БД → upsert классифицирует их как updated,
+        // created пустой. chunks_completed инкрементился на первом fetch'е —
+        // повторно нельзя. Re-dispatch ProcessAdRawDocumentMessage сохраняется
+        // (перепроцессинг идемпотентен на стороне handler'а).
+        $job = AdLoadJobBuilder::aJob()
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $existingByDate = [
+            '2026-03-01' => AdRawDocumentBuilder::aRawDocument()
+                ->withCompanyId(self::COMPANY_ID)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withReportDate(new \DateTimeImmutable('2026-03-01'))
+                ->withRawPayload('{"old":1}')
+                ->build(),
+            '2026-03-02' => AdRawDocumentBuilder::aRawDocument()
+                ->withCompanyId(self::COMPANY_ID)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withReportDate(new \DateTimeImmutable('2026-03-02'))
+                ->withRawPayload('{"old":2}')
+                ->build(),
+            '2026-03-03' => AdRawDocumentBuilder::aRawDocument()
+                ->withCompanyId(self::COMPANY_ID)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withReportDate(new \DateTimeImmutable('2026-03-03'))
+                ->withRawPayload('{"old":3}')
+                ->build(),
+        ];
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 11]]],
+            '2026-03-02' => ['rows' => [['spend' => 22]]],
+            '2026-03-03' => ['rows' => [['spend' => 33]]],
+        ]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')
+            ->willReturnCallback(static function (string $companyId, string $marketplace, \DateTimeImmutable $date) use ($existingByDate): ?AdRawDocument {
+                return $existingByDate[$date->format('Y-m-d')] ?? null;
+            });
+        $rawRepo->expects(self::never())->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        $handler = $this->createHandler($ozonClient, $rawRepo, $jobRepo, $em, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
+    public function testFirstFetchWithMixedCreatedAndUpdatedIncrementsChunksCompleted(): void
+    {
+        // Редкий сценарий: часть документов уже была после ручного/CLI запуска,
+        // часть создаётся впервые. created>0 → это всё ещё первый fetch на этом
+        // chunksCompleted-счётчике, инкрементим его.
+        $job = AdLoadJobBuilder::aJob()
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $existingOnMiddleDay = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-02'))
+            ->withRawPayload('{"old":true}')
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
+            ->willReturn(1);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 1]]],
+            '2026-03-02' => ['rows' => [['spend' => 2]]],
+            '2026-03-03' => ['rows' => [['spend' => 3]]],
+        ]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')
+            ->willReturnCallback(static function (string $c, string $m, \DateTimeImmutable $d) use ($existingOnMiddleDay): ?AdRawDocument {
+                return '2026-03-02' === $d->format('Y-m-d') ? $existingOnMiddleDay : null;
+            });
+        $rawRepo->expects(self::exactly(2))->method('save'); // 2 новых дня
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        $handler = $this->createHandler($ozonClient, $rawRepo, $jobRepo, $em, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
             self::DATE_TO,
         ));
     }

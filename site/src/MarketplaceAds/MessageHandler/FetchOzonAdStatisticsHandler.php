@@ -10,7 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
-use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
@@ -57,7 +57,7 @@ final class FetchOzonAdStatisticsHandler
     public function __construct(
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
-        private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
@@ -169,8 +169,10 @@ final class FetchOzonAdStatisticsHandler
             throw $e;
         }
 
-        /** @var list<AdRawDocument> $documents */
-        $documents = [];
+        /** @var list<AdRawDocument> $created */
+        $created = [];
+        /** @var list<AdRawDocument> $updated */
+        $updated = [];
         $skippedDays = 0;
 
         foreach ($result as $dateString => $payload) {
@@ -208,14 +210,16 @@ final class FetchOzonAdStatisticsHandler
             if (null === $existing) {
                 $doc = new AdRawDocument($message->companyId, MarketplaceType::OZON, $reportDate, $json);
                 $this->adRawDocumentRepository->save($doc);
-                $documents[] = $doc;
+                $created[] = $doc;
             } else {
                 // updatePayload() сам сбрасывает status в DRAFT и обновляет updatedAt —
                 // дополнительный resetToDraft() не нужен и привёл бы к двойному setter'у.
                 $existing->updatePayload($json);
-                $documents[] = $existing;
+                $updated[] = $existing;
             }
         }
+
+        $documents = array_merge($created, $updated);
 
         $this->entityManager->flush();
 
@@ -248,12 +252,31 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
-        // Чанк физически отработан — инкрементим даже на пустом результате Ozon
-        // (ноль документов, ноль dispatch'ей): permanent/transient ошибки до сюда
-        // не доходят (rethrow / UnrecoverableMessageHandlingException выше).
-        // Финализация job'а по условию chunksCompleted == chunksTotal — в
-        // ProcessAdRawDocumentHandler (Коммит 5).
-        $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
+        // Детекция retry оркестратора: если ни одного нового документа не создано,
+        // но есть существующие — тот же чанк уже обрабатывался. chunks_completed
+        // на нём инкрементился в прошлый раз; повторный инкремент привёл бы к
+        // overshoot (chunksCompleted > chunksTotal) и ложной финализации раньше
+        // времени. Матрица:
+        //   created > 0                  → первый fetch (были данные) → increment
+        //   created = 0, updated = 0     → первый fetch (Ozon вернул пусто) → increment
+        //   created = 0, updated > 0     → retry оркестратора → skip
+        // loaded_days тут всё равно overshoot'ит на retry (coverage-based), но
+        // это не критично: финализация в ProcessAdRawDocumentHandler смотрит на
+        // COUNT(AdRawDocument в диапазоне job'а), а он идемпотентен через
+        // UniqueConstraint(company_id, marketplace, report_date).
+        $isRetryOfOrchestrator = [] === $created && [] !== $updated;
+
+        if (!$isRetryOfOrchestrator) {
+            $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
+        } else {
+            $this->logger->info('Ozon ad statistics chunk re-fetch detected, skipping chunks_completed', [
+                'jobId' => $message->jobId,
+                'companyId' => $message->companyId,
+                'dateFrom' => $message->dateFrom,
+                'dateTo' => $message->dateTo,
+                'updatedCount' => count($updated),
+            ]);
+        }
 
         $this->logger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,
@@ -261,7 +284,8 @@ final class FetchOzonAdStatisticsHandler
             'dateFrom' => $message->dateFrom,
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
-            'documentsUpserted' => count($documents),
+            'documentsCreated' => count($created),
+            'documentsUpdated' => count($updated),
             'daysLoaded' => $loadedDelta,
             'daysSkipped' => $skippedDays,
         ]);

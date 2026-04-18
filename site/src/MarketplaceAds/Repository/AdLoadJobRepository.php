@@ -10,7 +10,7 @@ use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class AdLoadJobRepository extends ServiceEntityRepository
+class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRepositoryInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -137,6 +137,37 @@ class AdLoadJobRepository extends ServiceEntityRepository
                 SQL,
             [
                 'delta' => $delta,
+                'jobId' => $jobId,
+                'companyId' => $companyId,
+            ],
+        );
+    }
+
+    /**
+     * Помечает задание как COMPLETED через raw DBAL UPDATE (минуя UoW).
+     *
+     * Условие `status IN ('pending', 'running')` делает операцию идемпотентной:
+     * два воркера, финализирующие job параллельно (последний документ), не
+     * перезапишут finished_at — UPDATE второго затронет 0 строк. Также защита
+     * от случайного «воскрешения» уже FAILED job'а.
+     *
+     * `company_id` в WHERE — встроенный IDOR-guard.
+     *
+     * @return int число обновлённых строк (0 если job уже терминальный или чужой)
+     */
+    public function markCompleted(string $jobId, string $companyId): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_load_jobs
+                SET status = 'completed',
+                    finished_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :jobId
+                  AND company_id = :companyId
+                  AND status IN ('pending', 'running')
+                SQL,
+            [
                 'jobId' => $jobId,
                 'companyId' => $companyId,
             ],

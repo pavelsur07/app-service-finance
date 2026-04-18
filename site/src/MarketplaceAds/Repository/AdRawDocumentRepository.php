@@ -42,6 +42,36 @@ class AdRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Количество AdRawDocument компании по площадке в диапазоне дат включительно.
+     *
+     * Используется для финализации AdLoadJob: condition «все документы обработаны» —
+     * это `COUNT(raw) == processed_days + failed_days`. Счётчик `loaded_days` в
+     * AdLoadJob coverage-based (chunkDays) и может overshoot'ить при retry
+     * оркестратора, поэтому использовать его в условии финализации нельзя.
+     * COUNT по AdRawDocument идемпотентен благодаря UniqueConstraint
+     * (company_id, marketplace, report_date): повторный upsert за ту же дату
+     * не создаст новую строку.
+     */
+    public function countByCompanyMarketplaceAndDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): int {
+        return (int) $this->createQueryBuilder('r')
+            ->select('COUNT(r.id)')
+            ->where('r.companyId = :companyId')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.reportDate BETWEEN :from AND :to')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('from', $from->format('Y-m-d'))
+            ->setParameter('to', $to->format('Y-m-d'))
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * @return AdRawDocument[]
      */
     public function findDrafts(string $companyId): array

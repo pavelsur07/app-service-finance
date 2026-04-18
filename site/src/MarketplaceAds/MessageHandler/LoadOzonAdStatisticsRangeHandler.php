@@ -7,7 +7,7 @@ namespace App\MarketplaceAds\MessageHandler;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage;
-use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -40,7 +40,7 @@ final class LoadOzonAdStatisticsRangeHandler
     private const CHUNK_MAX_DAYS = 62;
 
     public function __construct(
-        private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
         private readonly EntityManagerInterface $entityManager,
@@ -93,11 +93,6 @@ final class LoadOzonAdStatisticsRangeHandler
             $this->entityManager->flush();
         }
 
-        // TODO(commit 5): защита от дубль-dispatch при retry оркестратора.
-        // AdRawDocument.UniqueConstraint(company_id, marketplace, report_date)
-        // уже защищает документы и loaded_days (created=0 на retry → инкремент=0).
-        // chunks_completed защитим в FetchOzonAdStatisticsHandler детекцией
-        // повтора: created=0 && updated>0 → не инкрементировать (это retry-fetch).
         foreach ($chunks as $chunk) {
             $this->messageBus->dispatch(new FetchOzonAdStatisticsMessage(
                 jobId: $job->getId(),
@@ -115,8 +110,6 @@ final class LoadOzonAdStatisticsRangeHandler
             'totalDays' => $job->getTotalDays(),
             'chunksCount' => count($chunks),
         ]);
-
-        // TODO(commit 5): ProcessAdRawDocumentHandler finalizes job by chunksCompleted.
     }
 
     /**
