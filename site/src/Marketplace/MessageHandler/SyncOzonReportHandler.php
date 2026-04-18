@@ -89,11 +89,13 @@ final class SyncOzonReportHandler
             return;
         }
 
+        $timezone = new \DateTimeZone('Europe/Moscow');
+
         if ($date !== null) {
-            $fromDate = new \DateTimeImmutable($date);
+            $fromDate = new \DateTimeImmutable($date, $timezone);
             $toDate   = $fromDate;
         } else {
-            $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
+            $toDate   = new \DateTimeImmutable('yesterday', $timezone);
             $fromDate = $toDate;
         }
 
