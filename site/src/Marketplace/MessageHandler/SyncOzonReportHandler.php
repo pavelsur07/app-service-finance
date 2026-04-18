@@ -8,8 +8,10 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -34,6 +36,7 @@ final class SyncOzonReportHandler
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
         private readonly MessageBusInterface $messageBus,
+        private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
     ) {
     }
 
@@ -86,6 +89,37 @@ final class SyncOzonReportHandler
             return;
         }
 
+        if ($date !== null) {
+            $fromDate = new \DateTimeImmutable($date);
+            $toDate   = $fromDate;
+        } else {
+            $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
+            $fromDate = $toDate;
+        }
+
+        // Idempotency: если за эту дату уже есть completed raw document — skip.
+        // Защищает от повторной загрузки при задвоенных сообщениях messenger,
+        // когда lock успел разойтись (первый воркер завершился до того, как второй взял lock).
+        $existingDoc = $this->rawDocumentRepository->findOneBy([
+            'company'          => $company,
+            'marketplace'      => MarketplaceType::OZON,
+            'documentType'     => 'sales_report',
+            'periodFrom'       => $fromDate,
+            'periodTo'         => $toDate,
+            'processingStatus' => PipelineStatus::COMPLETED,
+        ]);
+
+        if ($existingDoc !== null) {
+            $this->logger->info('Skipping Ozon sync: completed raw document already exists', [
+                'company_id'      => $companyId,
+                'connection_id'   => $connectionId,
+                'date'            => $fromDate->format('Y-m-d'),
+                'existing_doc_id' => $existingDoc->getId(),
+            ]);
+
+            return;
+        }
+
         $connection->markSyncStarted();
         $this->em->flush();
 
@@ -93,14 +127,6 @@ final class SyncOzonReportHandler
 
         try {
             $adapter = $this->adapterRegistry->get(MarketplaceType::OZON);
-
-            if ($date !== null) {
-                $fromDate = new \DateTimeImmutable($date);
-                $toDate   = $fromDate;
-            } else {
-                $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
-                $fromDate = $toDate;
-            }
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
