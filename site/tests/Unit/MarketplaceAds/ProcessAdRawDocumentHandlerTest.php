@@ -6,7 +6,6 @@ namespace App\Tests\Unit\MarketplaceAds;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
-use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
@@ -23,17 +22,17 @@ use Sentry\State\HubInterface;
 /**
  * Unit-тесты ProcessAdRawDocumentHandler.
  *
- * Что проверяем:
- *  - инкремент AdLoadJob.processedDays на PROCESSED-ветке;
- *  - инкремент AdLoadJob.failedDays на ветках Throwable и partial-DRAFT;
- *  - no-op, если по дате документа нет активного job'а (CLI-команда вне job-flow);
- *  - AdRawDocumentAlreadyProcessedException — race idempotency: НЕ инкрементим
- *    (инкремент сделает воркер, который реально обработал документ);
- *  - tryFinalizeJob условие: chunksCompleted>=chunksTotal AND
- *    (processedDays+failedDays) >= COUNT(AdRawDocument в диапазоне);
- *  - markCompleted при failedDays=0, markFailed с reason при failedDays>0;
- *  - финализация идемпотентна: второй tryFinalizeJob на COMPLETED job'е не
- *    вызывает markCompleted повторно.
+ * Инварианты после перехода на per-document FAILED-статус:
+ *  - PROCESSED после Action → сразу tryFinalizeJob по дате документа.
+ *  - Throwable → markFailedWithReason (атомарный SQL) + tryFinalizeJob + rethrow.
+ *  - DRAFT после Action (partial success) → markFailedWithReason + tryFinalizeJob,
+ *    БЕЗ throw (Action транзакцию не откатил, повторять нечего).
+ *  - AdRawDocumentAlreadyProcessedException (гонка воркеров) → silent return,
+ *    без mark и без финализации: документ уже терминален, job финализирует
+ *    другой воркер или retry.
+ *  - Нет активного job'а по дате → ни mark, ни финализации не происходит.
+ *  - Финализация: chunks completed AND total == processed + failed;
+ *    failed == 0 → markCompleted, else markFailed(reason).
  */
 final class ProcessAdRawDocumentHandlerTest extends TestCase
 {
@@ -41,17 +40,20 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
     private const RAW_DOC_ID = '88888888-8888-8888-8888-888888888888';
     private const REPORT_DATE = '2026-03-15';
 
-    public function testProcessedDocumentIncrementsJobProcessedDays(): void
+    public function testProcessedDocumentTriggersFinalizationAttemptWithoutIncrement(): void
     {
         $rawDoc = $this->newDraftDocument();
         $job = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
-            ->withChunksCompleted(1) // чанки ещё не все закрыты — финализации не будет
+            ->withChunksCompleted(1) // ещё не все чанки — финализация выйдет рано
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->wireRawRepoPrePost($rawRepo, $rawDoc, $this->newProcessedDocument());
+        $rawRepo->expects(self::never())->method('markFailedWithReason');
+        $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::never())->method('countTerminalByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke')
@@ -60,13 +62,12 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->expects(self::once())
             ->method('findActiveJobCoveringDate')
-            ->with(self::COMPANY_ID, MarketplaceType::OZON, self::callback(static fn (\DateTimeImmutable $d): bool => self::REPORT_DATE === $d->format('Y-m-d')))
+            ->with(
+                self::COMPANY_ID,
+                MarketplaceType::OZON,
+                self::callback(static fn (\DateTimeImmutable $d): bool => self::REPORT_DATE === $d->format('Y-m-d')),
+            )
             ->willReturn($job);
-        $jobRepo->expects(self::once())
-            ->method('incrementProcessedDays')
-            ->with($job->getId(), self::COMPANY_ID)
-            ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::once())->method('findFresh')->with($job->getId())->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
@@ -75,15 +76,18 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $handler($this->newMessage());
     }
 
-    public function testNoActiveJobForDateSkipsIncrement(): void
+    public function testNoActiveJobForDateSkipsFinalization(): void
     {
         // Документ обработался, но активного job'а, покрывающего его дату, нет
-        // (загружен CLI-командой вне orchestrator-flow). Основная ветка Action
-        // отработала — Handler не должен инкрементить и не должен упасть.
+        // (загружен CLI-командой вне orchestrator-flow). Handler не должен
+        // падать и не должен пытаться финализировать / mark'ать.
         $rawDoc = $this->newDraftDocument();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->wireRawRepoPrePost($rawRepo, $rawDoc, $this->newProcessedDocument());
+        $rawRepo->expects(self::never())->method('markFailedWithReason');
+        $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::never())->method('countTerminalByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
@@ -92,8 +96,6 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo->expects(self::once())
             ->method('findActiveJobCoveringDate')
             ->willReturn(null);
-        $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('findFresh');
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
@@ -102,45 +104,57 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $handler($this->newMessage());
     }
 
-    public function testFailedDocumentIncrementsJobFailedDaysAndRethrows(): void
+    public function testExceptionMarksDocumentFailedFinalizesAndRethrows(): void
     {
-        // Error-ветка: Throwable инкрементит failed_days, но финализацию
-        // tryFinalizeJob() не трогаем — Messenger сделает retry и возможный
-        // overshoot failed_days не должен преждевременно пометить job FAILED.
+        // Error-ветка: Action бросил исключение. Handler должен
+        //  1) атомарно пометить документ FAILED с причиной,
+        //  2) триггерить финализацию (markFailed возможен, если это был
+        //     последний документ и все chunks закрыты),
+        //  3) rethrow'нуть исключение для Messenger retry / failed-queue.
         $rawDoc = $this->newDraftDocument();
-        $job = AdLoadJobBuilder::aJob()
+        $freshJob = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
-            ->withChunksCompleted(5)  // намеренно «закрыты все чанки» — если бы
-            ->withProcessed(9)        // финализация зашла в error-ветке, она бы
-            ->build();                // пометила job FAILED по overshoot'у.
+            ->withChunksCompleted(5) // все chunks закрыты — это последний документ
+            ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
-        // Only pre-read (до Action); после Throwable handler идёт прямо в
-        // incrementFailedOnly по сохранённому marketplace/date (без повторного read).
+        // Pre-read в handler'е (до Action); после Throwable повторного read нет.
         $rawRepo->expects(self::once())
             ->method('findByIdAndCompany')
             ->with(self::RAW_DOC_ID, self::COMPANY_ID)
             ->willReturn($rawDoc);
-        $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::once())
+            ->method('markFailedWithReason')
+            ->with(
+                self::RAW_DOC_ID,
+                self::COMPANY_ID,
+                self::callback(static fn (string $r): bool => str_contains($r, 'parser failure')),
+            )
+            ->willReturn(1);
+        $rawRepo->expects(self::once())
+            ->method('countByCompanyMarketplaceAndDateRange')
+            ->willReturn(10);
+        $rawRepo->expects(self::once())
+            ->method('countTerminalByCompanyMarketplaceAndDateRange')
+            ->willReturn(['processed' => 9, 'failed' => 1]);
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->method('__invoke')->willThrowException(new \RuntimeException('parser failure'));
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $jobRepo->expects(self::once())
-            ->method('findActiveJobCoveringDate')
-            ->willReturn($job);
-        $jobRepo->expects(self::once())
-            ->method('incrementFailedDays')
-            ->with($job->getId(), self::COMPANY_ID)
-            ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        // КЛЮЧЕВОЕ: никаких find/findFresh и markCompleted/markFailed в error-ветке.
-        $jobRepo->expects(self::never())->method('findFresh');
-        $jobRepo->expects(self::never())->method('find');
+        $jobRepo->expects(self::once())->method('findActiveJobCoveringDate')->willReturn($freshJob);
+        $jobRepo->expects(self::once())->method('findFresh')->willReturn($freshJob);
+        // Есть failed документ → markFailed (partial failure), НЕ markCompleted.
         $jobRepo->expects(self::never())->method('markCompleted');
-        $jobRepo->expects(self::never())->method('markFailed');
+        $jobRepo->expects(self::once())
+            ->method('markFailed')
+            ->with(
+                $freshJob->getId(),
+                self::COMPANY_ID,
+                self::callback(static fn (string $r): bool => str_contains($r, '1/10') && str_contains($r, 'Partial failure')),
+            )
+            ->willReturn(1);
 
         $handler = $this->createHandler($rawRepo, $action, $jobRepo);
 
@@ -149,12 +163,12 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $handler($this->newMessage());
     }
 
-    public function testPartialDraftAfterActionIncrementsFailedDays(): void
+    public function testPartialDraftAfterActionMarksDocumentFailedAndReturnsSilently(): void
     {
         // Action не бросил исключение, но оставил документ в DRAFT (частичный
-        // успех в ProcessAdRawDocumentAction: markAsProcessed() вызывается только
-        // когда !hasErrors). С точки зрения job'а это failure — иначе условие
-        // финализации (processed + failed == COUNT(raw)) никогда не сойдётся.
+        // успех в ProcessAdRawDocumentAction: markAsProcessed вызывается только
+        // когда !hasErrors). Handler помечает документ FAILED и идёт на
+        // финализацию, но НЕ throw'ит — Action транзакцию уже закоммитил.
         $rawDoc = $this->newDraftDocument();
         $stillDraftAfter = $this->newDraftDocument();
         $job = AdLoadJobBuilder::aJob()
@@ -165,45 +179,51 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->wireRawRepoPrePost($rawRepo, $rawDoc, $stillDraftAfter);
+        $rawRepo->expects(self::once())
+            ->method('markFailedWithReason')
+            ->with(
+                self::RAW_DOC_ID,
+                self::COMPANY_ID,
+                self::callback(static fn (string $r): bool => str_contains($r, 'Partial processing')),
+            )
+            ->willReturn(1);
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $jobRepo->expects(self::once())
-            ->method('findActiveJobCoveringDate')
-            ->willReturn($job);
-        $jobRepo->expects(self::once())
-            ->method('incrementFailedDays')
-            ->with($job->getId(), self::COMPANY_ID)
-            ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementProcessedDays');
+        $jobRepo->expects(self::once())->method('findActiveJobCoveringDate')->willReturn($job);
         $jobRepo->expects(self::once())->method('findFresh')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markCompleted');
+        $jobRepo->expects(self::never())->method('markFailed');
 
         $handler = $this->createHandler($rawRepo, $action, $jobRepo);
+        // НЕ ожидаем throw — partial success в Action не бросает.
         $handler($this->newMessage());
     }
 
-    public function testAlreadyProcessedExceptionDoesNotIncrementCounters(): void
+    public function testAlreadyProcessedExceptionDoesNotMarkOrFinalize(): void
     {
         // Специфическая гонка: между pre-check в handler'е и вызовом Action
-        // другой воркер успел обработать документ → Action бросает
-        // AdRawDocumentAlreadyProcessedException. Этот воркер НЕ инкрементит
-        // processed/failed — это сделает тот, кто реально обработал.
+        // другой воркер успел обработать/завалить документ → Action бросает
+        // AdRawDocumentAlreadyProcessedException. Этот воркер НЕ должен
+        // переписывать markFailed — статус уже терминален — и не должен
+        // финализировать: другой воркер уже это сделал.
         $rawDoc = $this->newDraftDocument();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $rawRepo->expects(self::once())
             ->method('findByIdAndCompany')
             ->willReturn($rawDoc);
+        $rawRepo->expects(self::never())->method('markFailedWithReason');
+        $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::never())->method('countTerminalByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
-        $action->method('__invoke')->willThrowException(new AdRawDocumentAlreadyProcessedException('already processed'));
+        $action->method('__invoke')->willThrowException(new AdRawDocumentAlreadyProcessedException('already terminal'));
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->expects(self::never())->method('findActiveJobCoveringDate');
-        $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('findFresh');
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
@@ -212,16 +232,42 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $handler($this->newMessage());
     }
 
-    public function testJobFinalizedAsCompletedWhenAllConditionsMet(): void
+    public function testRetryAfterTerminalStatusIsIdempotent(): void
+    {
+        // Handler pre-check: документ уже в PROCESSED/FAILED → silent return.
+        // Эмулируем retry Messenger'а после предыдущей неудачной обработки,
+        // когда markFailedWithReason уже перевёл статус в FAILED.
+        $failedDoc = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable(self::REPORT_DATE))
+            ->asFailed('previous attempt')
+            ->build();
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->expects(self::once())
+            ->method('findByIdAndCompany')
+            ->willReturn($failedDoc);
+        $rawRepo->expects(self::never())->method('markFailedWithReason');
+
+        $action = $this->createMock(ProcessAdRawDocumentAction::class);
+        $action->expects(self::never())->method('__invoke');
+
+        $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $jobRepo->expects(self::never())->method('findActiveJobCoveringDate');
+        $jobRepo->expects(self::never())->method('findFresh');
+
+        $handler = $this->createHandler($rawRepo, $action, $jobRepo);
+        $handler($this->newMessage());
+    }
+
+    public function testJobFinalizedAsCompletedWhenAllTerminalWithoutFailures(): void
     {
         $rawDoc = $this->newDraftDocument();
-        // После incrementProcessedDays → find() возвращает job в свежем состоянии:
-        // chunksCompleted == chunksTotal, processedDays=10, failedDays=0, COUNT(raw)=10.
         $freshJob = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
             ->withChunksCompleted(5)
-            ->withProcessed(10)
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
@@ -229,13 +275,15 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $rawRepo->expects(self::once())
             ->method('countByCompanyMarketplaceAndDateRange')
             ->willReturn(10);
+        $rawRepo->expects(self::once())
+            ->method('countTerminalByCompanyMarketplaceAndDateRange')
+            ->willReturn(['processed' => 10, 'failed' => 0]);
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($freshJob);
-        $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
         $jobRepo->method('findFresh')->with($freshJob->getId())->willReturn($freshJob);
         $jobRepo->expects(self::once())
             ->method('markCompleted')
@@ -254,8 +302,6 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->asRunning()
             ->withChunksTotal(5)
             ->withChunksCompleted(5)
-            ->withProcessed(8)
-            ->withFailed(2)
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
@@ -263,13 +309,15 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $rawRepo->expects(self::once())
             ->method('countByCompanyMarketplaceAndDateRange')
             ->willReturn(10);
+        $rawRepo->expects(self::once())
+            ->method('countTerminalByCompanyMarketplaceAndDateRange')
+            ->willReturn(['processed' => 8, 'failed' => 2]);
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($freshJob);
-        $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
         $jobRepo->method('findFresh')->willReturn($freshJob);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::once())
@@ -292,20 +340,19 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->asRunning()
             ->withChunksTotal(5)
             ->withChunksCompleted(3) // не все чанки закрыты
-            ->withProcessed(10)
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->wireRawRepoPrePost($rawRepo, $rawDoc, $this->newProcessedDocument());
-        // Если chunks incomplete — COUNT не запрашиваем (ранний return).
+        // COUNT и terminal-COUNT не запрашиваем — ранний return по chunks guard'у.
         $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::never())->method('countTerminalByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($job);
-        $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
         $jobRepo->method('findFresh')->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
@@ -317,13 +364,12 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
     public function testJobNotFinalizedWhenDocumentsIncomplete(): void
     {
         $rawDoc = $this->newDraftDocument();
-        // chunks done, но processedDays=8, failedDays=0, COUNT(raw)=10 → ещё не
-        // все документы дошли до PROCESSED (или failed).
+        // chunks done, processed+failed=9 < total=10 → ещё не все документы
+        // дошли до терминального состояния.
         $job = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
             ->withChunksCompleted(5)
-            ->withProcessed(8)
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
@@ -331,13 +377,15 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $rawRepo->expects(self::once())
             ->method('countByCompanyMarketplaceAndDateRange')
             ->willReturn(10);
+        $rawRepo->expects(self::once())
+            ->method('countTerminalByCompanyMarketplaceAndDateRange')
+            ->willReturn(['processed' => 8, 'failed' => 1]); // 9 < 10
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($job);
-        $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
         $jobRepo->method('findFresh')->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
@@ -349,41 +397,32 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
     public function testFinalizationRaceDoesNotDoubleMark(): void
     {
         // Два воркера обрабатывают два последних документа параллельно. Оба
-        // доходят до tryFinalizeJob. Второй увидит job уже в COMPLETED (т.к.
-        // markCompleted первого voркера прошёл и внутри SQL-guard'а второй
-        // UPDATE затронет 0 строк — но до этого мы даже не дойдём, т.к. guard
-        // на статус в начале tryFinalizeJob вернёт рано).
+        // доходят до tryFinalizeJob. findFresh второго уже возвращает COMPLETED
+        // job — ранний return по status guard'у, markCompleted не зовётся.
         $rawDoc = $this->newDraftDocument();
 
         $runningJob = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
             ->withChunksCompleted(5)
-            ->withProcessed(10)
             ->build();
         $completedJob = AdLoadJobBuilder::aJob()
             ->asCompleted()
             ->withChunksTotal(5)
             ->withChunksCompleted(5)
-            ->withProcessed(10)
             ->build();
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->wireRawRepoPrePost($rawRepo, $rawDoc, $this->newProcessedDocument());
-        // countByRange зовётся при первом tryFinalize (status=RUNNING), при
-        // втором (status=COMPLETED) происходит ранний return до COUNT — но мы
-        // тестируем в одном __invoke один воркер, проверяем что find() возвращает
-        // COMPLETED job и markCompleted НЕ зовётся повторно.
+        // При COMPLETED-статусе ранний return → COUNT не запрашивается.
         $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $rawRepo->expects(self::never())->method('countTerminalByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->expects(self::once())->method('__invoke');
 
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($runningJob);
-        $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
-        // Сценарий: пока мы инкрементили, другой воркер уже финализировал job'а.
-        // find() возвращает уже COMPLETED job, tryFinalizeJob делает early return.
         $jobRepo->method('findFresh')->willReturn($completedJob);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');

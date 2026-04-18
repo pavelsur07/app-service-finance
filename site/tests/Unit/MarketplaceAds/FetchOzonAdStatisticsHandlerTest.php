@@ -37,9 +37,9 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *    (который сам сбрасывает status в DRAFT — двойной resetToDraft() сломал бы entity).
  *  - Терминальный job и отсутствующий job — no-op, API Ozon не дёргается.
  *  - Error taxonomy: InvalidArgumentException + 403 → markFailed + Unrecoverable;
- *    прочие 5xx / сеть → incrementFailedDays(chunkDays) + rethrow (Messenger сам делает retry).
- *  - json_encode() === false для одного дня: этот день пропускается и попадает в failedDays,
- *    остальные дни загружаются как обычно. Это устойчивость к «кривой» записи без срыва чанка.
+ *    прочие 5xx / сеть → rethrow (Messenger сам делает retry, прогресс чанка не двигаем).
+ *  - json_encode() === false для одного дня: этот день пропускается, остальные дни
+ *    загружаются как обычно. Это устойчивость к «кривой» записи без срыва чанка.
  */
 final class FetchOzonAdStatisticsHandlerTest extends TestCase
 {
@@ -100,7 +100,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
                 return 1;
             });
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
             ->with(self::JOB_ID, self::COMPANY_ID)
@@ -224,7 +223,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->method('findByIdAndCompany')->willReturn($job);
         $jobRepo->expects(self::never())->method('markFailed');
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -290,7 +288,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
                 self::stringContains('Invalid date range'),
             )
             ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -331,7 +328,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
                 self::stringContains('Ozon API permanent failure'),
             )
             ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -369,7 +365,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('findByIdAndCompany')->willReturn($job);
         $jobRepo->expects(self::never())->method('markFailed');
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
         $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
@@ -422,10 +417,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::once())
             ->method('incrementLoadedDays')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 2)
-            ->willReturn(1);
-        $jobRepo->expects(self::once())
-            ->method('incrementFailedDays')
-            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 1)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('markFailed');
         // Чанк физически отработан (частичный json-fail не срывает чанк) —
@@ -565,7 +556,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('incrementLoadedDays')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3) // chunkDays=3, не count($documents)=1
             ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('markFailed');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
@@ -612,7 +602,6 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('incrementLoadedDays')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3)
             ->willReturn(1);
-        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)

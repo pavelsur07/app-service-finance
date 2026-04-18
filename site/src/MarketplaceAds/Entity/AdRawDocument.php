@@ -43,6 +43,9 @@ class AdRawDocument
     #[ORM\Column(type: 'string', length: 20, enumType: AdRawDocumentStatus::class, options: ['default' => 'draft'])]
     private AdRawDocumentStatus $status;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $processingError = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
@@ -77,6 +80,29 @@ class AdRawDocument
         }
 
         $this->status = AdRawDocumentStatus::PROCESSED;
+        $this->processingError = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Помечает документ как FAILED с сохранением причины.
+     *
+     * Терминальный статус: повторная обработка невозможна без reset/update.
+     * Guard-метод для case'ов, когда AdRawDocument уже managed в UoW. В
+     * async-хендлере ProcessAdRawDocumentHandler используется не этот метод,
+     * а атомарный DBAL-update через Repository::markFailedWithReason — он
+     * идемпотентен и не требует флаша.
+     */
+    public function markFailed(string $reason): void
+    {
+        Assert::notEmpty($reason, 'Причина ошибки не может быть пустой.');
+
+        if (AdRawDocumentStatus::PROCESSED === $this->status) {
+            throw new \DomainException('Нельзя пометить PROCESSED-документ как FAILED.');
+        }
+
+        $this->status = AdRawDocumentStatus::FAILED;
+        $this->processingError = $reason;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -87,6 +113,7 @@ class AdRawDocument
         }
 
         $this->status = AdRawDocumentStatus::DRAFT;
+        $this->processingError = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -94,6 +121,7 @@ class AdRawDocument
     {
         $this->rawPayload = $rawPayload;
         $this->status = AdRawDocumentStatus::DRAFT;
+        $this->processingError = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -130,6 +158,11 @@ class AdRawDocument
     public function getStatus(): AdRawDocumentStatus
     {
         return $this->status;
+    }
+
+    public function getProcessingError(): ?string
+    {
+        return $this->processingError;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

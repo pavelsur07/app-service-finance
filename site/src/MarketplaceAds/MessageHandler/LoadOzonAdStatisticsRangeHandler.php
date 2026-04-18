@@ -30,7 +30,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *
  * Финализация job'а (markCompleted) — ответственность ProcessAdRawDocumentHandler
  * (Коммит 5): как только chunksCompleted == chunksTotal И все документы
- * обработаны, он проверяет failed_days и помечает job completed / failed.
+ * терминальны (AdRawDocument.status ∈ PROCESSED|FAILED), он считает COUNT(FAILED)
+ * и помечает job completed / failed соответственно.
  */
 #[AsMessageHandler]
 final class LoadOzonAdStatisticsRangeHandler

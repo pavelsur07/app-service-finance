@@ -16,9 +16,11 @@ use App\MarketplaceAds\Entity\AdLoadJob;
  *  - зафиксировать явный контракт чтения/мутаций счётчиков и жизненного цикла
  *    для Messenger-хендлеров и Controller/Action'ов.
  *
- * Атомарные инкременты (*_days, chunks_completed) и mark* реализованы на уровне
- * repository через raw DBAL UPDATE — минуя Doctrine UoW, чтобы параллельные
- * воркеры не затирали друг друга. Все мутации идемпотентны через SQL guard'ы.
+ * Атомарные инкременты (loaded_days, chunks_completed) и mark* реализованы на
+ * уровне repository через raw DBAL UPDATE — минуя Doctrine UoW, чтобы
+ * параллельные воркеры не затирали друг друга. Все мутации идемпотентны через
+ * SQL guard'ы. Processed/failed-счётчики удалены: состояние обработки хранится
+ * на AdRawDocument.status, финализация считает терминальные документы.
  */
 interface AdLoadJobRepositoryInterface
 {
@@ -37,11 +39,11 @@ interface AdLoadJobRepositoryInterface
     /**
      * Возвращает job с актуальными значениями счётчиков из БД.
      *
-     * Нужен после атомарных UPDATE через DBAL ({@see self::incrementProcessedDays()}
+     * Нужен после атомарных UPDATE через DBAL ({@see self::incrementChunksCompleted()}
      * и соседи) — они минуют Doctrine UoW, из-за чего обычный find() через
      * identity map вернул бы in-memory instance со СТАРЫМИ значениями счётчиков.
-     * В tryFinalizeJob это критично: на последнем документе стейл-instance
-     * провалил бы условие `processed+failed >= COUNT(raw)` и финализация не
+     * В tryFinalizeJob это критично: на последнем чанке стейл-instance
+     * провалил бы условие `chunksCompleted >= chunksTotal` и финализация не
      * произошла бы, job остался бы в RUNNING навсегда.
      */
     public function findFresh(string $jobId): ?AdLoadJob;
@@ -58,10 +60,6 @@ interface AdLoadJobRepositoryInterface
     ): ?AdLoadJob;
 
     public function incrementLoadedDays(string $jobId, string $companyId, int $delta = 1): int;
-
-    public function incrementProcessedDays(string $jobId, string $companyId, int $delta = 1): int;
-
-    public function incrementFailedDays(string $jobId, string $companyId, int $delta = 1): int;
 
     public function incrementChunksCompleted(string $jobId, string $companyId, int $delta = 1): int;
 

@@ -19,6 +19,7 @@ final class AdRawDocumentBuilder
     private \DateTimeImmutable $reportDate;
     private string $rawPayload = self::DEFAULT_RAW_PAYLOAD;
     private bool $processed = false;
+    private ?string $failureReason = null;
 
     private function __construct()
     {
@@ -74,6 +75,16 @@ final class AdRawDocumentBuilder
     {
         $clone = clone $this;
         $clone->processed = true;
+        $clone->failureReason = null;
+
+        return $clone;
+    }
+
+    public function asFailed(string $reason = 'test failure'): self
+    {
+        $clone = clone $this;
+        $clone->processed = false;
+        $clone->failureReason = $reason;
 
         return $clone;
     }
@@ -95,6 +106,8 @@ final class AdRawDocumentBuilder
 
         if ($this->processed) {
             $doc->markAsProcessed();
+        } elseif (null !== $this->failureReason) {
+            $doc->markFailed($this->failureReason);
         }
 
         return $doc;

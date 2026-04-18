@@ -22,17 +22,23 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *  - Не предполагает Request/Session/Security (CLI worker context).
  *  - Всегда перечитывает AdRawDocument по id + companyId: между dispatch и handler
  *    состояние документа могло измениться.
- *  - Идемпотентен: если документ уже обработан (не в DRAFT) — молча возвращается.
- *  - Инкрементирует AdLoadJob.{processedDays|failedDays} и триггерит финализацию
- *    задания, когда все чанки выгружены и все документы обработаны.
+ *  - Идемпотентен: если документ уже терминален (PROCESSED/FAILED) — молча
+ *    возвращается. На retry Messenger'а ProcessAdRawDocumentAction также ловит
+ *    non-DRAFT и бросает AdRawDocumentAlreadyProcessedException, которое мы
+ *    обрабатываем как skip.
+ *  - На ошибке / частичном успехе помечает документ FAILED с причиной через
+ *    атомарный SQL и триггерит финализацию AdLoadJob. Рекламный retry
+ *    инкрементов не даёт: повторный заход в Action увидит status=FAILED и
+ *    сразу short-circuit'ит, без двойного учёта.
  *
  * Финализация AdLoadJob ({@see self::tryFinalizeJob}) — condition:
  *   chunksCompleted >= chunksTotal
- *   AND COUNT(AdRawDocument в [dateFrom; dateTo]) == processedDays + failedDays
+ *   AND COUNT(total AdRawDocument в [dateFrom; dateTo]) == COUNT(PROCESSED) + COUNT(FAILED)
  *
  * loadedDays в условие не входит: он coverage-based (см. FetchOzonAdStatisticsHandler)
- * и может overshoot'ить при retry оркестратора. COUNT по AdRawDocument идемпотентен
- * благодаря UniqueConstraint(company_id, marketplace, report_date).
+ * и может overshoot'ить при retry оркестратора. COUNT по AdRawDocument
+ * идемпотентен благодаря UniqueConstraint(company_id, marketplace, report_date)
+ * и финальному status (PROCESSED или FAILED, оба терминальны).
  */
 #[AsMessageHandler]
 final class ProcessAdRawDocumentHandler
@@ -62,7 +68,7 @@ final class ProcessAdRawDocumentHandler
         }
 
         if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
-            $this->logger->info('AdRawDocument уже обработан, повторный запуск пропущен', [
+            $this->logger->info('AdRawDocument уже терминален, повторный запуск пропущен', [
                 'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
                 'status' => $rawDocument->getStatus()->value,
@@ -81,10 +87,8 @@ final class ProcessAdRawDocumentHandler
             ($this->processAction)($message->companyId, $message->adRawDocumentId);
         } catch (AdRawDocumentAlreadyProcessedException $e) {
             // Гонка состояний: другой worker обработал документ между pre-check и
-            // вызовом Action (или документ удалили). Мы НЕ инкрементируем
-            // processed/failed — это сделает тот воркер, который реально обработал.
-            // Ловим специфический тип исключения, чтобы баги конфигурации (например,
-            // отсутствие парсера — \RuntimeException) не поглощались молча.
+            // вызовом Action (или документ удалили). Не помечаем FAILED и не
+            // финализируем — это сделает воркер, который реально обработал.
             $this->logger->info(
                 'AdRawDocument обработан параллельно или удалён, повтор не нужен',
                 [
@@ -96,6 +100,12 @@ final class ProcessAdRawDocumentHandler
 
             return;
         } catch (\Throwable $e) {
+            // Помечаем документ FAILED с причиной и финализируем job. Финализация
+            // безопасна: `markFailedWithReason` идемпотентен (WHERE status =
+            // 'draft'), повторный заход из retry сразу short-circuit'ит в Action
+            // через AdRawDocumentAlreadyProcessedException. Rethrow нужен, чтобы
+            // Messenger видел падение — метрики/мониторинг/failed-queue при
+            // исчерпании retries.
             $this->logger->error(
                 'Ошибка обработки AdRawDocument',
                 $e,
@@ -105,20 +115,13 @@ final class ProcessAdRawDocumentHandler
                 ],
             );
 
-            // Инкрементим failed_days ДО rethrow: состояние прогресса job'а
-            // должно отражать факт текущей ошибки (UI/мониторинг), даже если
-            // Messenger уйдёт в retry. На retry счётчик может overshoot'нуть
-            // — принимаем этот UX-компромисс сознательно.
-            //
-            // НО: в error-ветке НЕ вызываем tryFinalizeJob. Иначе overshoot
-            // failed_days мог бы дотянуть (processed+failed) до COUNT(raw)
-            // раньше, чем retry успел отработать, и job был бы помечен FAILED,
-            // даже если последующий retry документа succeed'ит. Финализация
-            // разрешается только из success/partial-branch'ей, где документ
-            // точно вышел из DRAFT (PROCESSED или остался DRAFT после
-            // bez-exception прогона — обе ветки терминальны с точки зрения
-            // дальнейшей обработки сообщения).
-            $this->incrementFailedOnly($message->companyId, $marketplace, $reportDate);
+            $this->markDocumentFailedAndTryFinalize(
+                $message->companyId,
+                $message->adRawDocumentId,
+                $marketplace,
+                $reportDate,
+                $this->truncateReason($e->getMessage()),
+            );
 
             throw $e;
         }
@@ -143,7 +146,7 @@ final class ProcessAdRawDocumentHandler
         }
 
         if (AdRawDocumentStatus::PROCESSED === $afterProcessing->getStatus()) {
-            $this->incrementProcessedAndTryFinalize($message->companyId, $marketplace, $reportDate);
+            $this->tryFinalizeJob($message->companyId, $marketplace, $reportDate);
 
             return;
         }
@@ -151,10 +154,10 @@ final class ProcessAdRawDocumentHandler
         // Action вернулся без исключения, но документ остался DRAFT — это
         // частичный успех (см. ProcessAdRawDocumentAction: markAsProcessed()
         // вызывается только когда !hasErrors). С точки зрения AdLoadJob'а это
-        // failure: документ недообработан, считать как failed, чтобы условие
-        // финализации (processed + failed == COUNT(raw)) обязательно сошлось.
+        // failure: документ не должен оставаться в очереди обработки, считаем
+        // его терминальным через markFailedWithReason.
         $this->logger->warning(
-            'AdRawDocument остался в DRAFT после обработки — считаем как failure',
+            'AdRawDocument остался в DRAFT после обработки — помечаем как FAILED',
             [
                 'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
@@ -162,113 +165,97 @@ final class ProcessAdRawDocumentHandler
             ],
         );
 
-        $this->incrementFailedAndTryFinalize($message->companyId, $marketplace, $reportDate);
+        $this->markDocumentFailedAndTryFinalize(
+            $message->companyId,
+            $message->adRawDocumentId,
+            $marketplace,
+            $reportDate,
+            'Partial processing: document remained in DRAFT after Action',
+        );
     }
 
-    private function incrementProcessedAndTryFinalize(
+    private function markDocumentFailedAndTryFinalize(
         string $companyId,
+        string $adRawDocumentId,
         MarketplaceType $marketplace,
         \DateTimeImmutable $reportDate,
+        string $reason,
     ): void {
-        $job = $this->adLoadJobRepository->findActiveJobCoveringDate($companyId, $marketplace, $reportDate);
-        if (null === $job) {
-            return;
-        }
-
-        $this->adLoadJobRepository->incrementProcessedDays($job->getId(), $companyId);
-        $this->tryFinalizeJob($job->getId(), $companyId);
-    }
-
-    private function incrementFailedAndTryFinalize(
-        string $companyId,
-        MarketplaceType $marketplace,
-        \DateTimeImmutable $reportDate,
-    ): void {
-        $job = $this->adLoadJobRepository->findActiveJobCoveringDate($companyId, $marketplace, $reportDate);
-        if (null === $job) {
-            return;
-        }
-
-        $this->adLoadJobRepository->incrementFailedDays($job->getId(), $companyId);
-        $this->tryFinalizeJob($job->getId(), $companyId);
+        // Идемпотентный SQL UPDATE (WHERE status='draft'): если параллельный
+        // воркер успел обработать документ как PROCESSED, 0 строк затронуто —
+        // финализацию всё равно попробуем, т.к. состояние в БД могло стать
+        // terminal независимо от текущей попытки.
+        $this->rawDocumentRepository->markFailedWithReason($adRawDocumentId, $companyId, $reason);
+        $this->tryFinalizeJob($companyId, $marketplace, $reportDate);
     }
 
     /**
-     * Инкрементит failed_days без попытки финализации.
-     *
-     * Используется только в error-ветке (catch \Throwable): Messenger сделает
-     * retry, и преждевременная финализация по overshoot'нутому счётчику
-     * означала бы markFailed задания, которое могло бы завершиться successful
-     * после последующих retries. Финализация остаётся за success/partial
-     * ветками и за status-endpoint'ом (TODO commit 6).
-     */
-    private function incrementFailedOnly(
-        string $companyId,
-        MarketplaceType $marketplace,
-        \DateTimeImmutable $reportDate,
-    ): void {
-        $job = $this->adLoadJobRepository->findActiveJobCoveringDate($companyId, $marketplace, $reportDate);
-        if (null === $job) {
-            return;
-        }
-
-        $this->adLoadJobRepository->incrementFailedDays($job->getId(), $companyId);
-    }
-
-    /**
-     * Пробует финализировать job после инкремента processed/failed счётчика.
-     *
-     * Важно: после atomic increment (DBAL UPDATE минуя UoW) состояние entity
-     * в Doctrine identity map устарело. Берём job через findFresh() — он
-     * принудительно refresh'ит закэшированный instance либо читает заново.
-     * Без этого на последнем документе `processed+failed` в памяти остался
-     * бы ниже COUNT(raw), финализация бы пропустилась и job застрял бы в
-     * RUNNING до следующего входящего сообщения (которого может и не быть).
+     * Пробует финализировать job по дате текущего документа.
      *
      * Условие финализации:
      *   chunksCompleted >= chunksTotal
-     *   AND COUNT(AdRawDocument в диапазоне job'а) == processedDays + failedDays
+     *   AND COUNT(AdRawDocument в диапазоне job'а) == COUNT(PROCESSED) + COUNT(FAILED)
+     *
+     * Important: после атомарного UPDATE статуса документа (минуя UoW)
+     * состояние job'а в Doctrine identity map может устареть — берём job через
+     * findFresh(), который принудительно refresh'ит закэшированный instance
+     * либо читает заново. Без этого на последнем документе chunksCompleted в
+     * памяти мог бы остаться ниже chunksTotal, и финализация пропустилась бы.
      *
      * Race между воркерами покрывается SQL-guard'ами в markCompleted/markFailed
      * (`WHERE status IN ('pending','running')`) — второй вызов затронет 0 строк.
-     *
-     * TODO(commit 6): status-endpoint должен триггерить tryFinalizeJob, если
-     * состояние финализации достигнуто, но job ещё RUNNING (консумер упал
-     * между инкрементом и tryFinalizeJob).
      */
-    private function tryFinalizeJob(string $jobId, string $companyId): void
-    {
-        $job = $this->adLoadJobRepository->findFresh($jobId);
+    private function tryFinalizeJob(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $reportDate,
+    ): void {
+        $job = $this->adLoadJobRepository->findActiveJobCoveringDate($companyId, $marketplace, $reportDate);
         if (null === $job) {
             return;
         }
 
-        if (AdLoadJobStatus::RUNNING !== $job->getStatus()) {
+        $fresh = $this->adLoadJobRepository->findFresh($job->getId());
+        if (null === $fresh) {
             return;
         }
 
-        if ($job->getChunksCompleted() < $job->getChunksTotal()) {
+        if (AdLoadJobStatus::RUNNING !== $fresh->getStatus()) {
             return;
         }
 
-        $rawDocumentsCount = $this->rawDocumentRepository->countByCompanyMarketplaceAndDateRange(
+        if ($fresh->getChunksCompleted() < $fresh->getChunksTotal()) {
+            return;
+        }
+
+        $total = $this->rawDocumentRepository->countByCompanyMarketplaceAndDateRange(
             $companyId,
-            $job->getMarketplace()->value,
-            $job->getDateFrom(),
-            $job->getDateTo(),
+            $fresh->getMarketplace()->value,
+            $fresh->getDateFrom(),
+            $fresh->getDateTo(),
         );
 
-        if ($job->getProcessedDays() + $job->getFailedDays() < $rawDocumentsCount) {
+        $terminal = $this->rawDocumentRepository->countTerminalByCompanyMarketplaceAndDateRange(
+            $companyId,
+            $fresh->getMarketplace()->value,
+            $fresh->getDateFrom(),
+            $fresh->getDateTo(),
+        );
+
+        $processed = $terminal['processed'];
+        $failed = $terminal['failed'];
+
+        if ($processed + $failed < $total) {
             return;
         }
 
-        if (0 === $job->getFailedDays()) {
-            $this->adLoadJobRepository->markCompleted($jobId, $companyId);
+        if (0 === $failed) {
+            $this->adLoadJobRepository->markCompleted($fresh->getId(), $companyId);
             $this->logger->info('AdLoadJob completed', [
-                'jobId' => $jobId,
+                'jobId' => $fresh->getId(),
                 'companyId' => $companyId,
-                'processedDays' => $job->getProcessedDays(),
-                'rawDocumentsCount' => $rawDocumentsCount,
+                'processedDocs' => $processed,
+                'totalDocs' => $total,
             ]);
 
             return;
@@ -276,16 +263,32 @@ final class ProcessAdRawDocumentHandler
 
         $reason = sprintf(
             'Partial failure: %d/%d documents failed processing',
-            $job->getFailedDays(),
-            $rawDocumentsCount,
+            $failed,
+            $total,
         );
-        $this->adLoadJobRepository->markFailed($jobId, $companyId, $reason);
+        $this->adLoadJobRepository->markFailed($fresh->getId(), $companyId, $reason);
         $this->logger->warning('AdLoadJob finalized with failures', [
-            'jobId' => $jobId,
+            'jobId' => $fresh->getId(),
             'companyId' => $companyId,
-            'failedDays' => $job->getFailedDays(),
-            'processedDays' => $job->getProcessedDays(),
-            'rawDocumentsCount' => $rawDocumentsCount,
+            'failedDocs' => $failed,
+            'processedDocs' => $processed,
+            'totalDocs' => $total,
         ]);
+    }
+
+    /**
+     * Обрезает причину до безопасной длины для TEXT-колонки БД и логов.
+     * PostgreSQL TEXT без лимита, но массивный trace/stack в поле ошибки —
+     * это нагрузка на репликации и UI. Сообщение достаточно идентифицирует
+     * причину, trace остаётся в логе через $this->logger->error.
+     */
+    private function truncateReason(string $reason): string
+    {
+        $max = 2000;
+        if ('' === $reason) {
+            return 'Unknown failure';
+        }
+
+        return mb_strlen($reason) > $max ? mb_substr($reason, 0, $max) : $reason;
     }
 }

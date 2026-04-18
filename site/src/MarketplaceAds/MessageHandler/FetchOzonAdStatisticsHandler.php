@@ -50,9 +50,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *  - OzonPermanentApiException (403, missing credentials): permanent →
  *    markFailed(job) + UnrecoverableMessageHandlingException.
  *  - Прочие \Throwable (5xx, сеть, JSON-ошибки): transient → rethrow
- *    (Messenger ретраит по стратегии async). failed_days здесь НЕ инкрементим:
- *    при max_retries=3 получили бы +chunkDays на каждую попытку (итого 4·chunkDays
- *    для одного реально упавшего чанка), что ломает прогресс. Когда retry'и
+ *    (Messenger ретраит по стратегии async). Прогресс чанка не двигаем: при
+ *    max_retries=3 overshoot'или бы счётчики на каждую попытку. Когда retry'и
  *    исчерпаются, message уйдёт в failed-транспорт — его разбирает оператор.
  *
  * Порядок операций строгий: save() → flush() → incrementLoadedDays() →
@@ -164,7 +163,7 @@ final class FetchOzonAdStatisticsHandler
             );
         } catch (\Throwable $e) {
             // Сетевые сбои / 5xx / JSON-ошибки — transient, Messenger сделает retry.
-            // failed_days НЕ инкрементим: иначе при max_retries=3 одна реальная
+            // loaded_days НЕ инкрементим: иначе при max_retries=3 одна реальная
             // поломка чанка даст +4·chunkDays (после каждого из 4 аттемптов),
             // прогресс задания уйдёт в минус / выше 100%.
             $this->logger->error('Transient failure loading Ozon ad statistics chunk', $e, [
@@ -236,7 +235,7 @@ final class FetchOzonAdStatisticsHandler
         // по count($documents): Ozon легитимно возвращает меньше дней, чем
         // запросили, если за какие-то дни вообще нет кампаний. Если брать
         // count($documents), такие «пустые» дни навсегда останутся
-        // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
+        // непосчитанными в прогрессе выгрузки.
         $loadedDelta = $chunkDays - $skippedDays;
         if ($loadedDelta > 0) {
             $this->adLoadJobRepository->incrementLoadedDays(
@@ -246,12 +245,19 @@ final class FetchOzonAdStatisticsHandler
             );
         }
 
+        // Skipped days (json_encode failure на конкретном дне) больше не
+        // попадают в отдельный счётчик на AdLoadJob: состояние обработки
+        // живёт на AdRawDocument.status, а skipped day НЕ создал документ и,
+        // значит, не влияет на общий total/terminal баланс финализации job'а.
+        // Факт скипа уже логируется выше (logger->warning на json_encode).
         if ($skippedDays > 0) {
-            $this->adLoadJobRepository->incrementFailedDays(
-                $message->jobId,
-                $message->companyId,
-                $skippedDays,
-            );
+            $this->logger->warning('Ozon ad statistics chunk: some days skipped at persistence', [
+                'jobId' => $message->jobId,
+                'companyId' => $message->companyId,
+                'dateFrom' => $message->dateFrom,
+                'dateTo' => $message->dateTo,
+                'skippedDays' => $skippedDays,
+            ]);
         }
 
         foreach ($documents as $doc) {

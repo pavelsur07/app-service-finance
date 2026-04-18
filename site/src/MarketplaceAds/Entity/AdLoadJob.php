@@ -14,10 +14,15 @@ use Webmozart\Assert\Assert;
 /**
  * Задание на пакетную загрузку рекламных отчётов за период.
  *
- * Прогресс-счётчики (loadedDays/processedDays/failedDays) инкрементируются
- * параллельными воркерами и сознательно НЕ имеют guard-методов на Entity —
- * изменения идут атомарным `UPDATE ... SET x = x + :delta` через Repository,
- * минуя Doctrine UoW. См. {@see AdLoadJobRepository}.
+ * Прогресс-счётчик loadedDays и chunksCompleted инкрементируются параллельными
+ * воркерами без guard-методов на Entity: изменения идут атомарным
+ * `UPDATE ... SET x = x + :delta` через Repository, минуя Doctrine UoW. См.
+ * {@see AdLoadJobRepository}.
+ *
+ * Состояние «обработан / не обработан / ошибка» для каждого дня хранится НЕ на
+ * AdLoadJob, а на {@see AdRawDocument} как status (DRAFT / PROCESSED / FAILED).
+ * Финализация job'а считает терминальные документы в его диапазоне — counter-
+ * based поля processedDays/failedDays удалены (см. Version20260418000003).
  */
 #[ORM\Entity(repositoryClass: AdLoadJobRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_load_jobs')]
@@ -47,12 +52,6 @@ class AdLoadJob
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $loadedDays = 0;
-
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    private int $processedDays = 0;
-
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    private int $failedDays = 0;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $chunksTotal = 0;
@@ -176,8 +175,12 @@ class AdLoadJob
     }
 
     /**
-     * Доля выполненных шагов (loaded + failed) относительно totalDays, 0..100.
-     * Округление — до целого процента, чтобы UI не «дёргался» на долях.
+     * Доля выгруженных дней относительно totalDays, 0..100. Округление — до
+     * целого процента, чтобы UI не «дёргался» на долях.
+     *
+     * Считает только loadedDays (faktическая выгрузка из API). Ошибки парсинга
+     * и partial-успехи живут на AdRawDocument.status — для общего прогресса
+     * «скачано» они не релевантны.
      */
     public function getProgress(): int
     {
@@ -185,8 +188,7 @@ class AdLoadJob
             return 0;
         }
 
-        $done = $this->loadedDays + $this->failedDays;
-        $progress = (int) floor(($done * 100) / $this->totalDays);
+        $progress = (int) floor(($this->loadedDays * 100) / $this->totalDays);
 
         return min(100, max(0, $progress));
     }
@@ -224,16 +226,6 @@ class AdLoadJob
     public function getLoadedDays(): int
     {
         return $this->loadedDays;
-    }
-
-    public function getProcessedDays(): int
-    {
-        return $this->processedDays;
-    }
-
-    public function getFailedDays(): int
-    {
-        return $this->failedDays;
     }
 
     public function getChunksTotal(): int

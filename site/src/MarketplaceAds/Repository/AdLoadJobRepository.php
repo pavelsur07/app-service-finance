@@ -122,16 +122,6 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         return $this->atomicIncrement('loaded_days', $jobId, $companyId, $delta);
     }
 
-    public function incrementProcessedDays(string $jobId, string $companyId, int $delta = 1): int
-    {
-        return $this->atomicIncrement('processed_days', $jobId, $companyId, $delta);
-    }
-
-    public function incrementFailedDays(string $jobId, string $companyId, int $delta = 1): int
-    {
-        return $this->atomicIncrement('failed_days', $jobId, $companyId, $delta);
-    }
-
     /**
      * Атомарный UPDATE `chunks_completed = chunks_completed + :delta`.
      *
@@ -238,7 +228,7 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
     {
         // Whitelist — защита от SQL-injection через имя колонки (параметризовать имя
         // колонки нельзя, только значение).
-        if (!in_array($column, ['loaded_days', 'processed_days', 'failed_days'], true)) {
+        if (!in_array($column, ['loaded_days'], true)) {
             throw new \InvalidArgumentException(sprintf('Недопустимое имя колонки: %s', $column));
         }
 

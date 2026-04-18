@@ -50,7 +50,15 @@ final readonly class ProcessAdRawDocumentAction
             ?? throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s не найден.', $adRawDocumentId));
 
         if (AdRawDocumentStatus::DRAFT !== $rawDocument->getStatus()) {
-            throw new AdRawDocumentAlreadyProcessedException(sprintf('AdRawDocument %s в статусе %s, ожидался draft.', $adRawDocumentId, $rawDocument->getStatus()->value));
+            // FAILED попадает сюда на retry после предыдущей неудачной обработки: Handler
+            // уже пометил документ через markFailedWithReason, job финализирован по
+            // COUNT(terminal). Возвращаемся короткой веткой — Handler поймает это
+            // исключение и тихо ACK'нет сообщение, Messenger больше не retry'ит.
+            throw new AdRawDocumentAlreadyProcessedException(sprintf(
+                'AdRawDocument %s в статусе %s, ожидался draft для обработки.',
+                $adRawDocumentId,
+                $rawDocument->getStatus()->value,
+            ));
         }
 
         $marketplace = $rawDocument->getMarketplace();
