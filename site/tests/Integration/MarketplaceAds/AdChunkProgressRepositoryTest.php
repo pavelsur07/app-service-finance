@@ -151,6 +151,44 @@ final class AdChunkProgressRepositoryTest extends IntegrationTestCase
         );
     }
 
+    public function testMarkChunkCompletedAcceptsSingleDayChunk(): void
+    {
+        $job = $this->seedJob(self::COMPANY_ID);
+        $sameDay = new \DateTimeImmutable('2026-03-15');
+
+        $inserted = $this->repository->markChunkCompleted(
+            $job->getId(),
+            self::COMPANY_ID,
+            $sameDay,
+            $sameDay,
+        );
+
+        self::assertTrue($inserted);
+        self::assertSame(1, $this->repository->countCompletedChunks($job->getId(), self::COMPANY_ID));
+    }
+
+    public function testMarkChunkCompletedNormalizesTimeOnDuplicate(): void
+    {
+        $job = $this->seedJob(self::COMPANY_ID);
+
+        $first = $this->repository->markChunkCompleted(
+            $job->getId(),
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01 10:00'),
+            new \DateTimeImmutable('2026-03-03 10:00'),
+        );
+        $second = $this->repository->markChunkCompleted(
+            $job->getId(),
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01 15:30'),
+            new \DateTimeImmutable('2026-03-03 23:59'),
+        );
+
+        self::assertTrue($first);
+        self::assertFalse($second, 'Нормализация времени до 00:00 обязана делать UNIQUE-ключ одинаковым');
+        self::assertSame(1, $this->repository->countCompletedChunks($job->getId(), self::COMPANY_ID));
+    }
+
     public function testMarkChunkCompletedRejectsInvertedDateRange(): void
     {
         $job = $this->seedJob(self::COMPANY_ID);
