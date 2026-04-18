@@ -485,7 +485,7 @@ final class OzonAdClient implements AdPlatformClientInterface
 
         $data = $this->decodeJson($response->getContent(false), 'statistics request');
 
-        $uuid = isset($data['UUID']) ? (string) $data['UUID'] : (string) ($data['uuid'] ?? '');
+        $uuid = isset($data['UUID']) ? $this->stringifyApiField($data['UUID']) : $this->stringifyApiField($data['uuid'] ?? null);
         if ('' === $uuid) {
             throw new \RuntimeException('Ozon Performance: ответ /statistics не содержит UUID');
         }
@@ -509,9 +509,9 @@ final class OzonAdClient implements AdPlatformClientInterface
             );
             $data = $this->decodeJson($response->getContent(false), 'statistics state');
 
-            $state = (string) ($data['state'] ?? '');
+            $state = $this->stringifyApiField($data['state'] ?? null);
             if ('OK' === $state || 'READY' === $state) {
-                $link = (string) ($data['link'] ?? ($data['report']['link'] ?? ''));
+                $link = $this->stringifyApiField($data['link'] ?? ($data['report']['link'] ?? null));
                 if ('' === $link) {
                     // Старые версии API не отдают link отдельно — отчёт скачивается
                     // по фиксированному /report?UUID=…
@@ -528,7 +528,12 @@ final class OzonAdClient implements AdPlatformClientInterface
             }
 
             if ('ERROR' === $state || 'CANCELLED' === $state || 'NOT_FOUND' === $state) {
-                throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s завершился со статусом %s: %s', $uuid, $state, (string) ($data['error'] ?? '')));
+                throw new \RuntimeException(sprintf(
+                    'Ozon Performance: отчёт %s завершился со статусом %s: %s',
+                    $uuid,
+                    $state,
+                    $this->stringifyApiField($data['error'] ?? null),
+                ));
             }
 
             sleep(self::POLL_INTERVAL_SECONDS);
@@ -804,5 +809,27 @@ final class OzonAdClient implements AdPlatformClientInterface
         }
 
         return $data;
+    }
+
+    /**
+     * Безопасный stringify поля ответа Ozon Performance API.
+     *
+     * Ozon может вернуть в поле error структурированное значение ({"code": "...", "details": [...]}).
+     * Прямой `(string) $value` на массиве/объекте даёт литерал "Array" + PHP Warning и теряет
+     * диагностическую информацию в сообщении исключения. Используем json_encode как fallback.
+     */
+    private function stringifyApiField(mixed $value): string
+    {
+        if (null === $value) {
+            return '';
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        $encoded = json_encode($value, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
+
+        return false === $encoded ? 'non-serializable error payload' : $encoded;
     }
 }
