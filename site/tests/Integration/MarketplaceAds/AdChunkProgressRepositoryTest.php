@@ -151,6 +151,48 @@ final class AdChunkProgressRepositoryTest extends IntegrationTestCase
         );
     }
 
+    public function testMarkChunkCompletedRejectsInvertedDateRange(): void
+    {
+        $job = $this->seedJob(self::COMPANY_ID);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/dateFrom не может быть позже dateTo/');
+
+        $this->repository->markChunkCompleted(
+            $job->getId(),
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-10'),
+            new \DateTimeImmutable('2026-03-01'),
+        );
+    }
+
+    public function testMarkChunkCompletedRejectsMalformedUuid(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/не найден или не принадлежит/');
+
+        $this->repository->markChunkCompleted(
+            'not-a-uuid',
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-03'),
+        );
+    }
+
+    public function testCountCompletedChunksRejectsMalformedUuid(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessageMatches('/не найден или не принадлежит/');
+
+        $this->repository->countCompletedChunks('not-a-uuid', self::COMPANY_ID);
+    }
+
     public function testCascadeDeleteRemovesProgressWhenJobIsDeleted(): void
     {
         $job = $this->seedJob(self::COMPANY_ID);

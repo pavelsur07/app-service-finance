@@ -40,6 +40,14 @@ final class AdChunkProgressRepository extends ServiceEntityRepository implements
         $dateFromNorm = $dateFrom->setTime(0, 0)->format('Y-m-d');
         $dateToNorm = $dateTo->setTime(0, 0)->format('Y-m-d');
 
+        // Репозиторий пишет через DBAL в обход UoW и доменного конструктора
+        // AdChunkProgress, поэтому инвариант dateFrom ≤ dateTo обязан быть
+        // продублирован здесь — иначе перевёрнутый диапазон сохранится и
+        // будет накручивать countCompletedChunks.
+        if ($dateFromNorm > $dateToNorm) {
+            throw new \DomainException('dateFrom не может быть позже dateTo.');
+        }
+
         $affected = (int) $this->getEntityManager()->getConnection()->executeStatement(
             <<<'SQL'
                 INSERT INTO marketplace_ad_chunk_progress
@@ -81,6 +89,17 @@ final class AdChunkProgressRepository extends ServiceEntityRepository implements
      */
     private function assertJobBelongsToCompany(string $jobId, string $companyId): void
     {
+        // Ранняя валидация формата UUID: без неё Postgres упадёт на уровне
+        // драйвера (invalid input syntax for type uuid) и превратит IDOR-guard
+        // в 500-ошибку вместо обещанного интерфейсом \DomainException.
+        if (!Uuid::isValid($jobId) || !Uuid::isValid($companyId)) {
+            throw new \DomainException(sprintf(
+                'AdLoadJob %s не найден или не принадлежит компании %s.',
+                $jobId,
+                $companyId,
+            ));
+        }
+
         $found = $this->getEntityManager()->getConnection()->fetchOne(
             'SELECT 1 FROM marketplace_ad_load_jobs WHERE id = :jobId AND company_id = :companyId',
             [
