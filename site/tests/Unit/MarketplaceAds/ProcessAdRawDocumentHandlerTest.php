@@ -67,7 +67,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->with($job->getId(), self::COMPANY_ID)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementFailedDays');
-        $jobRepo->expects(self::once())->method('find')->with($job->getId())->willReturn($job);
+        $jobRepo->expects(self::once())->method('findFresh')->with($job->getId())->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 
@@ -94,7 +94,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->willReturn(null);
         $jobRepo->expects(self::never())->method('incrementProcessedDays');
         $jobRepo->expects(self::never())->method('incrementFailedDays');
-        $jobRepo->expects(self::never())->method('find');
+        $jobRepo->expects(self::never())->method('findFresh');
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 
@@ -131,7 +131,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->with($job->getId(), self::COMPANY_ID)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        $jobRepo->expects(self::once())->method('find')->willReturn($job);
+        $jobRepo->expects(self::once())->method('findFresh')->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed'); // чанки ещё не все закрыты
 
@@ -171,7 +171,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->with($job->getId(), self::COMPANY_ID)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        $jobRepo->expects(self::once())->method('find')->willReturn($job);
+        $jobRepo->expects(self::once())->method('findFresh')->willReturn($job);
 
         $handler = $this->createHandler($rawRepo, $action, $jobRepo);
         $handler($this->newMessage());
@@ -197,7 +197,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('findActiveJobCoveringDate');
         $jobRepo->expects(self::never())->method('incrementProcessedDays');
         $jobRepo->expects(self::never())->method('incrementFailedDays');
-        $jobRepo->expects(self::never())->method('find');
+        $jobRepo->expects(self::never())->method('findFresh');
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 
@@ -229,7 +229,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($freshJob);
         $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
-        $jobRepo->method('find')->with($freshJob->getId())->willReturn($freshJob);
+        $jobRepo->method('findFresh')->with($freshJob->getId())->willReturn($freshJob);
         $jobRepo->expects(self::once())
             ->method('markCompleted')
             ->with($freshJob->getId(), self::COMPANY_ID)
@@ -263,7 +263,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($freshJob);
         $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
-        $jobRepo->method('find')->willReturn($freshJob);
+        $jobRepo->method('findFresh')->willReturn($freshJob);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::once())
             ->method('markFailed')
@@ -299,7 +299,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($job);
         $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
-        $jobRepo->method('find')->willReturn($job);
+        $jobRepo->method('findFresh')->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 
@@ -331,7 +331,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $jobRepo->method('findActiveJobCoveringDate')->willReturn($job);
         $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
-        $jobRepo->method('find')->willReturn($job);
+        $jobRepo->method('findFresh')->willReturn($job);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 
@@ -377,7 +377,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $jobRepo->expects(self::once())->method('incrementProcessedDays')->willReturn(1);
         // Сценарий: пока мы инкрементили, другой воркер уже финализировал job'а.
         // find() возвращает уже COMPLETED job, tryFinalizeJob делает early return.
-        $jobRepo->method('find')->willReturn($completedJob);
+        $jobRepo->method('findFresh')->willReturn($completedJob);
         $jobRepo->expects(self::never())->method('markCompleted');
         $jobRepo->expects(self::never())->method('markFailed');
 

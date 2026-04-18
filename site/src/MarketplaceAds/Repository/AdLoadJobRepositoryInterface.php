@@ -34,6 +34,18 @@ interface AdLoadJobRepositoryInterface
      */
     public function find(string $id): ?AdLoadJob;
 
+    /**
+     * Возвращает job с актуальными значениями счётчиков из БД.
+     *
+     * Нужен после атомарных UPDATE через DBAL ({@see self::incrementProcessedDays()}
+     * и соседи) — они минуют Doctrine UoW, из-за чего обычный find() через
+     * identity map вернул бы in-memory instance со СТАРЫМИ значениями счётчиков.
+     * В tryFinalizeJob это критично: на последнем документе стейл-instance
+     * провалил бы условие `processed+failed >= COUNT(raw)` и финализация не
+     * произошла бы, job остался бы в RUNNING навсегда.
+     */
+    public function findFresh(string $jobId): ?AdLoadJob;
+
     public function findLatestActiveJobByCompanyAndMarketplace(
         string $companyId,
         MarketplaceType $marketplace,

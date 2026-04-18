@@ -188,8 +188,12 @@ final class ProcessAdRawDocumentHandler
     /**
      * Пробует финализировать job после инкремента processed/failed счётчика.
      *
-     * Важно: после atomic increment данные в Doctrine UoW устарели. Читаем job
-     * заново из БД — это разовый SELECT, критичный для корректности.
+     * Важно: после atomic increment (DBAL UPDATE минуя UoW) состояние entity
+     * в Doctrine identity map устарело. Берём job через findFresh() — он
+     * принудительно refresh'ит закэшированный instance либо читает заново.
+     * Без этого на последнем документе `processed+failed` в памяти остался
+     * бы ниже COUNT(raw), финализация бы пропустилась и job застрял бы в
+     * RUNNING до следующего входящего сообщения (которого может и не быть).
      *
      * Условие финализации:
      *   chunksCompleted >= chunksTotal
@@ -204,7 +208,7 @@ final class ProcessAdRawDocumentHandler
      */
     private function tryFinalizeJob(string $jobId, string $companyId): void
     {
-        $job = $this->adLoadJobRepository->find($jobId);
+        $job = $this->adLoadJobRepository->findFresh($jobId);
         if (null === $job) {
             return;
         }

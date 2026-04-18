@@ -43,6 +43,29 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         return parent::find($id, $lockMode, $lockVersion);
     }
 
+    /**
+     * Читает job из БД, игнорируя identity map Doctrine.
+     *
+     * Атомарные инкременты (incrementProcessedDays/FailedDays/ChunksCompleted)
+     * идут через DBAL UPDATE минуя UoW. Обычный find() попадает в identity map
+     * и возвращает уже загруженный ранее instance со СТАРЫМИ значениями
+     * счётчиков — для финализационной проверки это фатально. Метод сначала
+     * refresh'ит закэшированный entity, либо читает его заново.
+     */
+    public function findFresh(string $jobId): ?AdLoadJob
+    {
+        $em = $this->getEntityManager();
+        $cached = $em->getUnitOfWork()->tryGetById($jobId, AdLoadJob::class);
+
+        if ($cached instanceof AdLoadJob) {
+            $em->refresh($cached);
+
+            return $cached;
+        }
+
+        return parent::find($jobId);
+    }
+
     public function findLatestActiveJobByCompanyAndMarketplace(
         string $companyId,
         MarketplaceType $marketplace,
