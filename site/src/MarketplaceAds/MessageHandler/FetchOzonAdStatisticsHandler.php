@@ -10,6 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
+use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
@@ -58,6 +59,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
@@ -219,26 +221,46 @@ final class FetchOzonAdStatisticsHandler
 
         $this->entityManager->flush();
 
-        // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
-        // по count($documents): Ozon легитимно возвращает меньше дней, чем
-        // запросили, если за какие-то дни вообще нет кампаний. Если брать
-        // count($documents), такие «пустые» дни навсегда останутся
-        // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
-        $loadedDelta = $chunkDays - $skippedDays;
-        if ($loadedDelta > 0) {
-            $this->adLoadJobRepository->incrementLoadedDays(
-                $message->jobId,
-                $message->companyId,
-                $loadedDelta,
-            );
-        }
+        // Идемпотентная фиксация чанка — ПЕРЕД инкрементом счётчиков дней.
+        // При Messenger retry markChunkCompleted вернёт false (запись уже есть),
+        // и мы пропустим инкременты, не удвоив loaded/failed days.
+        // permanent/transient ошибки до сюда не доходят (rethrow / Unrecoverable выше).
+        $marked = $this->adChunkProgressRepository->markChunkCompleted(
+            $message->jobId,
+            $message->companyId,
+            $dateFrom,
+            $dateTo,
+        );
 
-        if ($skippedDays > 0) {
-            $this->adLoadJobRepository->incrementFailedDays(
-                $message->jobId,
-                $message->companyId,
-                $skippedDays,
-            );
+        if (!$marked) {
+            $this->logger->info('chunk already marked completed', [
+                'job_id' => $message->jobId,
+                'company_id' => $message->companyId,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+            ]);
+        } else {
+            // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
+            // по count($documents): Ozon легитимно возвращает меньше дней, чем
+            // запросили, если за какие-то дни вообще нет кампаний. Если брать
+            // count($documents), такие «пустые» дни навсегда останутся
+            // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
+            $loadedDelta = $chunkDays - $skippedDays;
+            if ($loadedDelta > 0) {
+                $this->adLoadJobRepository->incrementLoadedDays(
+                    $message->jobId,
+                    $message->companyId,
+                    $loadedDelta,
+                );
+            }
+
+            if ($skippedDays > 0) {
+                $this->adLoadJobRepository->incrementFailedDays(
+                    $message->jobId,
+                    $message->companyId,
+                    $skippedDays,
+                );
+            }
         }
 
         foreach ($documents as $doc) {
@@ -248,13 +270,6 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
-        // Чанк физически отработан — инкрементим даже на пустом результате Ozon
-        // (ноль документов, ноль dispatch'ей): permanent/transient ошибки до сюда
-        // не доходят (rethrow / UnrecoverableMessageHandlingException выше).
-        // Финализация job'а по условию chunksCompleted == chunksTotal — в
-        // ProcessAdRawDocumentHandler (Коммит 5).
-        $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
-
         $this->logger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,
             'companyId' => $message->companyId,
@@ -262,8 +277,9 @@ final class FetchOzonAdStatisticsHandler
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
             'documentsUpserted' => count($documents),
-            'daysLoaded' => $loadedDelta,
+            'daysLoaded' => $marked ? $chunkDays - $skippedDays : 0,
             'daysSkipped' => $skippedDays,
+            'duplicate' => !$marked,
         ]);
     }
 }

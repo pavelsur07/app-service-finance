@@ -197,12 +197,11 @@ final class AdLoadJobTest extends TestCase
         self::assertSame(10, $job->getProgress());
     }
 
-    public function testNewJobHasZeroChunksTotalAndCompleted(): void
+    public function testNewJobHasZeroChunksTotal(): void
     {
         $job = AdLoadJobBuilder::aJob()->build();
 
         self::assertSame(0, $job->getChunksTotal());
-        self::assertSame(0, $job->getChunksCompleted());
     }
 
     public function testSetChunksTotalFromPendingPersistsValue(): void

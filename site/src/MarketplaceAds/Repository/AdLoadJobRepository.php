@@ -110,40 +110,6 @@ class AdLoadJobRepository extends ServiceEntityRepository
     }
 
     /**
-     * Атомарный UPDATE `chunks_completed = chunks_completed + :delta`.
-     *
-     * `company_id` в WHERE — встроенный IDOR-guard, как у остальных инкрементов
-     * ({@see self::incrementLoadedDays}). Если jobId не принадлежит переданной
-     * компании, UPDATE затронет 0 строк.
-     *
-     * @return int число обновлённых строк (0 или 1)
-     */
-    public function incrementChunksCompleted(string $jobId, string $companyId, int $delta = 1): int
-    {
-        if ($delta < 1) {
-            throw new \InvalidArgumentException(sprintf(
-                'Инкремент должен быть >= 1, передано: %d',
-                $delta,
-            ));
-        }
-
-        return (int) $this->getEntityManager()->getConnection()->executeStatement(
-            <<<'SQL'
-                UPDATE marketplace_ad_load_jobs
-                SET chunks_completed = chunks_completed + :delta,
-                    updated_at = NOW()
-                WHERE id = :jobId
-                  AND company_id = :companyId
-                SQL,
-            [
-                'delta' => $delta,
-                'jobId' => $jobId,
-                'companyId' => $companyId,
-            ],
-        );
-    }
-
-    /**
      * Помечает задание как FAILED через raw DBAL UPDATE (минуя UoW).
      *
      * Условие `status IN ('pending', 'running')` делает операцию идемпотентной:

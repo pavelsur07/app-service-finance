@@ -354,64 +354,6 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame(0, $reloaded->getFailedDays());
     }
 
-    public function testIncrementChunksCompletedIsAtomicAndIDORSafe(): void
-    {
-        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
-        $this->seedCompany(self::OTHER_COMPANY_ID, self::OTHER_OWNER_ID, 'b@example.test');
-        $this->em->flush();
-
-        $job = AdLoadJobBuilder::aJob()
-            ->withCompanyId(self::COMPANY_ID)
-            ->withIndex(1)
-            ->build();
-        $this->repository->save($job);
-        $this->em->flush();
-        $jobId = $job->getId();
-        $this->em->clear();
-
-        // 100 последовательных инкрементов: каждый вызов — независимая SQL-транзакция,
-        // read-modify-write race исключён (значение хранится только в БД).
-        for ($i = 0; $i < 100; ++$i) {
-            $affected = $this->repository->incrementChunksCompleted($jobId, self::COMPANY_ID);
-            self::assertSame(1, $affected);
-        }
-
-        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
-        self::assertNotNull($reloaded);
-        self::assertSame(100, $reloaded->getChunksCompleted());
-
-        // IDOR-guard: попытка инкрементить под чужой компанией — 0 затронутых строк.
-        $leaked = $this->repository->incrementChunksCompleted($jobId, self::OTHER_COMPANY_ID);
-        self::assertSame(0, $leaked);
-
-        $this->em->clear();
-        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
-        self::assertNotNull($reloaded);
-        self::assertSame(100, $reloaded->getChunksCompleted(), 'Счётчик не должен измениться от чужого company_id');
-    }
-
-    /**
-     * @dataProvider nonPositiveDeltaProvider
-     */
-    public function testIncrementChunksCompletedRejectsNonPositiveDelta(int $delta): void
-    {
-        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
-        $this->em->flush();
-
-        $job = AdLoadJobBuilder::aJob()
-            ->withCompanyId(self::COMPANY_ID)
-            ->withIndex(1)
-            ->build();
-        $this->repository->save($job);
-        $this->em->flush();
-        $jobId = $job->getId();
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/Инкремент должен быть >= 1/');
-
-        $this->repository->incrementChunksCompleted($jobId, self::COMPANY_ID, $delta);
-    }
-
     public function testFindReturnsJobWithoutCompanyCheck(): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
