@@ -46,6 +46,9 @@ class AdRawDocument
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $createdAt;
 
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $processingError = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
@@ -90,6 +93,20 @@ class AdRawDocument
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function markFailed(string $reason): void
+    {
+        if ($this->status->isTerminal()) {
+            throw new \DomainException(sprintf(
+                'Нельзя пометить документ как ошибочный в статусе %s.',
+                $this->status->value,
+            ));
+        }
+
+        $this->status = AdRawDocumentStatus::FAILED;
+        $this->processingError = $reason;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function updatePayload(string $rawPayload): void
     {
         $this->rawPayload = $rawPayload;
@@ -130,6 +147,11 @@ class AdRawDocument
     public function getStatus(): AdRawDocumentStatus
     {
         return $this->status;
+    }
+
+    public function getProcessingError(): ?string
+    {
+        return $this->processingError;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

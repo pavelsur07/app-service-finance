@@ -16,6 +16,27 @@ class AdRawDocumentRepository extends ServiceEntityRepository
         parent::__construct($registry, AdRawDocument::class);
     }
 
+    /**
+     * Raw-SQL UPDATE минуя UoW — безопасно вызывать из async-обработчика.
+     * Идемпотентно: повторный вызов на уже FAILED документе вернёт 0.
+     *
+     * @return int affected rows (1 — успешно, 0 — уже FAILED или IDOR)
+     */
+    public function markFailedWithReason(string $documentId, string $companyId, string $reason): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            'UPDATE marketplace_ad_raw_documents
+             SET status = :status, processing_error = :reason, updated_at = NOW()
+             WHERE id = :id AND company_id = :company_id AND status != :status',
+            [
+                'status' => AdRawDocumentStatus::FAILED->value,
+                'reason' => $reason,
+                'id' => $documentId,
+                'company_id' => $companyId,
+            ],
+        );
+    }
+
     public function save(AdRawDocument $document): void
     {
         $this->getEntityManager()->persist($document);
