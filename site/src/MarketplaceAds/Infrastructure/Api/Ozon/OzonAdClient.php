@@ -485,7 +485,7 @@ final class OzonAdClient implements AdPlatformClientInterface
 
         $data = $this->decodeJson($response->getContent(false), 'statistics request');
 
-        $uuid = isset($data['UUID']) ? $this->stringifyApiField($data['UUID']) : $this->stringifyApiField($data['uuid'] ?? null);
+        $uuid = $this->stringifyApiField($data['UUID'] ?? $data['uuid'] ?? null);
         if ('' === $uuid) {
             throw new \RuntimeException('Ozon Performance: ответ /statistics не содержит UUID');
         }
@@ -511,7 +511,7 @@ final class OzonAdClient implements AdPlatformClientInterface
 
             $state = $this->stringifyApiField($data['state'] ?? null);
             if ('OK' === $state || 'READY' === $state) {
-                $link = $this->stringifyApiField($data['link'] ?? ($data['report']['link'] ?? null));
+                $link = $this->stringifyApiField($data['link'] ?? $data['report']['link'] ?? null);
                 if ('' === $link) {
                     // Старые версии API не отдают link отдельно — отчёт скачивается
                     // по фиксированному /report?UUID=…
