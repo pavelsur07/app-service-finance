@@ -105,12 +105,20 @@ final class ProcessAdRawDocumentHandler
                 ],
             );
 
-            // Инкрементим failed_days ДО rethrow: даже если Messenger уйдёт в retry
-            // и воркер упадёт, состояние прогресса job'а должно отражать факт ошибки.
-            // После исчерпания retries повторный инкремент будет приходить на тот
-            // же (jobId, companyId) — мы принимаем возможный overshoot failedDays
-            // при долгой retry-эскалации; финализация по COUNT остаётся корректной.
-            $this->incrementFailedAndTryFinalize($message->companyId, $marketplace, $reportDate);
+            // Инкрементим failed_days ДО rethrow: состояние прогресса job'а
+            // должно отражать факт текущей ошибки (UI/мониторинг), даже если
+            // Messenger уйдёт в retry. На retry счётчик может overshoot'нуть
+            // — принимаем этот UX-компромисс сознательно.
+            //
+            // НО: в error-ветке НЕ вызываем tryFinalizeJob. Иначе overshoot
+            // failed_days мог бы дотянуть (processed+failed) до COUNT(raw)
+            // раньше, чем retry успел отработать, и job был бы помечен FAILED,
+            // даже если последующий retry документа succeed'ит. Финализация
+            // разрешается только из success/partial-branch'ей, где документ
+            // точно вышел из DRAFT (PROCESSED или остался DRAFT после
+            // bez-exception прогона — обе ветки терминальны с точки зрения
+            // дальнейшей обработки сообщения).
+            $this->incrementFailedOnly($message->companyId, $marketplace, $reportDate);
 
             throw $e;
         }
@@ -183,6 +191,28 @@ final class ProcessAdRawDocumentHandler
 
         $this->adLoadJobRepository->incrementFailedDays($job->getId(), $companyId);
         $this->tryFinalizeJob($job->getId(), $companyId);
+    }
+
+    /**
+     * Инкрементит failed_days без попытки финализации.
+     *
+     * Используется только в error-ветке (catch \Throwable): Messenger сделает
+     * retry, и преждевременная финализация по overshoot'нутому счётчику
+     * означала бы markFailed задания, которое могло бы завершиться successful
+     * после последующих retries. Финализация остаётся за success/partial
+     * ветками и за status-endpoint'ом (TODO commit 6).
+     */
+    private function incrementFailedOnly(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $reportDate,
+    ): void {
+        $job = $this->adLoadJobRepository->findActiveJobCoveringDate($companyId, $marketplace, $reportDate);
+        if (null === $job) {
+            return;
+        }
+
+        $this->adLoadJobRepository->incrementFailedDays($job->getId(), $companyId);
     }
 
     /**

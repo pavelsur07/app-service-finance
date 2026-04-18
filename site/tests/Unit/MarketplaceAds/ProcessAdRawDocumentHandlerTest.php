@@ -104,20 +104,25 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
 
     public function testFailedDocumentIncrementsJobFailedDaysAndRethrows(): void
     {
+        // Error-ветка: Throwable инкрементит failed_days, но финализацию
+        // tryFinalizeJob() не трогаем — Messenger сделает retry и возможный
+        // overshoot failed_days не должен преждевременно пометить job FAILED.
         $rawDoc = $this->newDraftDocument();
         $job = AdLoadJobBuilder::aJob()
             ->asRunning()
             ->withChunksTotal(5)
-            ->withChunksCompleted(1)
-            ->build();
+            ->withChunksCompleted(5)  // намеренно «закрыты все чанки» — если бы
+            ->withProcessed(9)        // финализация зашла в error-ветке, она бы
+            ->build();                // пометила job FAILED по overshoot'у.
 
         $rawRepo = $this->createMock(AdRawDocumentRepository::class);
-        // Only pre-read (до Action); после Throwable повторного pre/post read нет —
-        // Handler сразу идёт в incrementFailedAndTryFinalize по сохранённому marketplace/date.
+        // Only pre-read (до Action); после Throwable handler идёт прямо в
+        // incrementFailedOnly по сохранённому marketplace/date (без повторного read).
         $rawRepo->expects(self::once())
             ->method('findByIdAndCompany')
             ->with(self::RAW_DOC_ID, self::COMPANY_ID)
             ->willReturn($rawDoc);
+        $rawRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
 
         $action = $this->createMock(ProcessAdRawDocumentAction::class);
         $action->method('__invoke')->willThrowException(new \RuntimeException('parser failure'));
@@ -131,9 +136,11 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->with($job->getId(), self::COMPANY_ID)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementProcessedDays');
-        $jobRepo->expects(self::once())->method('findFresh')->willReturn($job);
+        // КЛЮЧЕВОЕ: никаких find/findFresh и markCompleted/markFailed в error-ветке.
+        $jobRepo->expects(self::never())->method('findFresh');
+        $jobRepo->expects(self::never())->method('find');
         $jobRepo->expects(self::never())->method('markCompleted');
-        $jobRepo->expects(self::never())->method('markFailed'); // чанки ещё не все закрыты
+        $jobRepo->expects(self::never())->method('markFailed');
 
         $handler = $this->createHandler($rawRepo, $action, $jobRepo);
 

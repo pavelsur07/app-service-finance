@@ -10,6 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
+use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
@@ -34,7 +35,14 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     дней, чем запросили (дни без кампаний), и такие «пустые» дни всё равно
  *     должны учитываться как обработанные, иначе прогресс зависнет ниже 100%;
  *  6) dispatch ProcessAdRawDocumentMessage за каждый документ — уже ПОСЛЕ
- *     flush, чтобы следующий handler увидел документ в БД.
+ *     flush, чтобы следующий handler увидел документ в БД;
+ *  7) идемпотентно фиксируем факт завершения чанка в ledger-таблице
+ *     {@see \App\MarketplaceAds\Entity\AdChunkProgress}: INSERT ... ON CONFLICT
+ *     DO NOTHING возвращает true только при ПЕРВОЙ вставке (jobId, range);
+ *     только тогда инкрементим chunks_completed. Это защищает от overshoot
+ *     при retry оркестратора, retry Messenger'а после сбоя пост-flush и от
+ *     CLI-preload'а тех же дней (кейсы, в которых эвристика по created/updated
+ *     из прошлой итерации ломалась).
  *
  * Политика ошибок:
  *  - \InvalidArgumentException (range > 62 дней / from > to): permanent bug
@@ -58,6 +66,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
+        private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
@@ -169,10 +178,10 @@ final class FetchOzonAdStatisticsHandler
             throw $e;
         }
 
-        /** @var list<AdRawDocument> $created */
-        $created = [];
-        /** @var list<AdRawDocument> $updated */
-        $updated = [];
+        /** @var list<AdRawDocument> $documents */
+        $documents = [];
+        $createdCount = 0;
+        $updatedCount = 0;
         $skippedDays = 0;
 
         foreach ($result as $dateString => $payload) {
@@ -210,16 +219,16 @@ final class FetchOzonAdStatisticsHandler
             if (null === $existing) {
                 $doc = new AdRawDocument($message->companyId, MarketplaceType::OZON, $reportDate, $json);
                 $this->adRawDocumentRepository->save($doc);
-                $created[] = $doc;
+                $documents[] = $doc;
+                ++$createdCount;
             } else {
                 // updatePayload() сам сбрасывает status в DRAFT и обновляет updatedAt —
                 // дополнительный resetToDraft() не нужен и привёл бы к двойному setter'у.
                 $existing->updatePayload($json);
-                $updated[] = $existing;
+                $documents[] = $existing;
+                ++$updatedCount;
             }
         }
-
-        $documents = array_merge($created, $updated);
 
         $this->entityManager->flush();
 
@@ -252,29 +261,32 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
-        // Детекция retry оркестратора: если ни одного нового документа не создано,
-        // но есть существующие — тот же чанк уже обрабатывался. chunks_completed
-        // на нём инкрементился в прошлый раз; повторный инкремент привёл бы к
-        // overshoot (chunksCompleted > chunksTotal) и ложной финализации раньше
-        // времени. Матрица:
-        //   created > 0                  → первый fetch (были данные) → increment
-        //   created = 0, updated = 0     → первый fetch (Ozon вернул пусто) → increment
-        //   created = 0, updated > 0     → retry оркестратора → skip
-        // loaded_days тут всё равно overshoot'ит на retry (coverage-based), но
-        // это не критично: финализация в ProcessAdRawDocumentHandler смотрит на
-        // COUNT(AdRawDocument в диапазоне job'а), а он идемпотентен через
-        // UniqueConstraint(company_id, marketplace, report_date).
-        $isRetryOfOrchestrator = [] === $created && [] !== $updated;
+        // Идемпотентный учёт chunks_completed через ledger-таблицу
+        // marketplace_ad_chunk_progress с UNIQUE (job_id, date_from, date_to).
+        // tryMarkCompleted возвращает true только при ПЕРВОЙ вставке пары
+        // (jobId, range). Любой повтор — retry оркестратора, retry Messenger'а
+        // после сбоя пост-flush, новый jobId на уже загруженный период — вернёт
+        // false, и мы не инкрементим chunks_completed (иначе overshoot →
+        // ложная финализация). Решение заменяет старую эвристику по
+        // (created=0 && updated>0), которая ломалась на CLI-preloaded данных
+        // и на кросс-job re-fetch.
+        $chunkNewlyCompleted = $this->adChunkProgressRepository->tryMarkCompleted(
+            $message->jobId,
+            $message->companyId,
+            $dateFrom,
+            $dateTo,
+        );
 
-        if (!$isRetryOfOrchestrator) {
+        if ($chunkNewlyCompleted) {
             $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
         } else {
-            $this->logger->info('Ozon ad statistics chunk re-fetch detected, skipping chunks_completed', [
+            $this->logger->info('Ozon ad statistics chunk already accounted in ledger, chunks_completed skipped', [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
                 'dateFrom' => $message->dateFrom,
                 'dateTo' => $message->dateTo,
-                'updatedCount' => count($updated),
+                'documentsCreated' => $createdCount,
+                'documentsUpdated' => $updatedCount,
             ]);
         }
 
@@ -284,10 +296,11 @@ final class FetchOzonAdStatisticsHandler
             'dateFrom' => $message->dateFrom,
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
-            'documentsCreated' => count($created),
-            'documentsUpdated' => count($updated),
+            'documentsCreated' => $createdCount,
+            'documentsUpdated' => $updatedCount,
             'daysLoaded' => $loadedDelta,
             'daysSkipped' => $skippedDays,
+            'chunkNewlyCompleted' => $chunkNewlyCompleted,
         ]);
     }
 }
