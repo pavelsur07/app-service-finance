@@ -82,6 +82,11 @@ class AdLoadJob
         Assert::uuid($this->id);
         Assert::uuid($companyId);
 
+        // Нормализация до 00:00 — защита от inverted-range при одной и той же дате с разным временем,
+        // от off-by-one в diff()->days (который считает полные сутки) и от UTC-смещений.
+        $dateFrom = $dateFrom->setTime(0, 0);
+        $dateTo = $dateTo->setTime(0, 0);
+
         if ($dateFrom > $dateTo) {
             throw new \DomainException('dateFrom не может быть позже dateTo.');
         }

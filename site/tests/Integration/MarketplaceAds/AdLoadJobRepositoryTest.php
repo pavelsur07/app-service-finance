@@ -290,6 +290,70 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame(0, $reloaded->getLoadedDays());
     }
 
+    /**
+     * @dataProvider nonPositiveDeltaProvider
+     */
+    public function testIncrementRejectsNonPositiveDelta(int $delta): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Инкремент должен быть >= 1/');
+
+        $this->repository->incrementLoadedDays($jobId, self::COMPANY_ID, $delta);
+    }
+
+    public static function nonPositiveDeltaProvider(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-1],
+            'large negative' => [-100],
+        ];
+    }
+
+    public function testIncrementProcessedAndFailedAlsoRejectNonPositiveDelta(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        try {
+            $this->repository->incrementProcessedDays($jobId, self::COMPANY_ID, 0);
+            self::fail('Expected InvalidArgumentException for processed delta = 0');
+        } catch (\InvalidArgumentException) {
+        }
+
+        try {
+            $this->repository->incrementFailedDays($jobId, self::COMPANY_ID, -5);
+            self::fail('Expected InvalidArgumentException for failed delta = -5');
+        } catch (\InvalidArgumentException) {
+        }
+
+        // Счётчики остались по нулям — невалидный вызов не дошёл до SQL.
+        $this->em->clear();
+        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
+        self::assertNotNull($reloaded);
+        self::assertSame(0, $reloaded->getProcessedDays());
+        self::assertSame(0, $reloaded->getFailedDays());
+    }
+
     public function testIncrementBypassesUnitOfWorkAndUpdatesDirectly(): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');

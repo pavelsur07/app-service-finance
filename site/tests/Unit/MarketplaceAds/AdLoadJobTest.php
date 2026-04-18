@@ -37,6 +37,38 @@ final class AdLoadJobTest extends TestCase
         self::assertSame(1, $job->getTotalDays());
     }
 
+    public function testConstructorNormalizesDateTimesToMidnight(): void
+    {
+        // Передаём одну и ту же дату с разным временем в обратном порядке часов —
+        // без нормализации getDate()->diff() выдал бы 0 дней, а проверка `$dateFrom > $dateTo`
+        // вообще упала бы на DomainException (14:30 > 09:15).
+        $job = new AdLoadJob(
+            companyId: AdLoadJobBuilder::DEFAULT_COMPANY_ID,
+            marketplace: MarketplaceType::OZON,
+            dateFrom: new \DateTimeImmutable('2026-03-01 14:30:45'),
+            dateTo: new \DateTimeImmutable('2026-03-01 09:15:00'),
+        );
+
+        self::assertSame('2026-03-01 00:00:00', $job->getDateFrom()->format('Y-m-d H:i:s'));
+        self::assertSame('2026-03-01 00:00:00', $job->getDateTo()->format('Y-m-d H:i:s'));
+        self::assertSame(1, $job->getTotalDays());
+    }
+
+    public function testConstructorNormalizationProducesCorrectTotalDaysAcrossMultiDayRange(): void
+    {
+        // 10 дней включительно, но с «грязным» временем — totalDays не должен сбиться.
+        $job = new AdLoadJob(
+            companyId: AdLoadJobBuilder::DEFAULT_COMPANY_ID,
+            marketplace: MarketplaceType::OZON,
+            dateFrom: new \DateTimeImmutable('2026-03-01 23:59:59'),
+            dateTo: new \DateTimeImmutable('2026-03-10 00:00:01'),
+        );
+
+        self::assertSame(10, $job->getTotalDays());
+        self::assertSame('00:00:00', $job->getDateFrom()->format('H:i:s'));
+        self::assertSame('00:00:00', $job->getDateTo()->format('H:i:s'));
+    }
+
     public function testConstructorRejectsInvertedRange(): void
     {
         $this->expectException(\DomainException::class);
