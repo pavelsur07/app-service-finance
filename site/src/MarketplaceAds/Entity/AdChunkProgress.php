@@ -28,7 +28,6 @@ use Webmozart\Assert\Assert;
     name: 'uq_ad_chunk_progress_job_dates',
     columns: ['job_id', 'date_from', 'date_to'],
 )]
-#[ORM\Index(columns: ['job_id'], name: 'idx_ad_chunk_progress_job')]
 class AdChunkProgress
 {
     #[ORM\Id]

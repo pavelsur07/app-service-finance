@@ -43,7 +43,9 @@ final class Version20260418000002 extends AbstractMigration
                     NOT DEFERRABLE INITIALLY IMMEDIATE
             )
         SQL);
-        $this->addSql('CREATE INDEX idx_ad_chunk_progress_job ON marketplace_ad_chunk_progress (job_id)');
+        // Отдельный индекс по (job_id) не создаём: UNIQUE
+        // (job_id, date_from, date_to) имеет job_id ведущей колонкой
+        // и покрывает lookup'ы `WHERE job_id = ?` без отдельного индекса.
         $this->addSql("COMMENT ON COLUMN marketplace_ad_chunk_progress.date_from IS '(DC2Type:date_immutable)'");
         $this->addSql("COMMENT ON COLUMN marketplace_ad_chunk_progress.date_to IS '(DC2Type:date_immutable)'");
         $this->addSql("COMMENT ON COLUMN marketplace_ad_chunk_progress.completed_at IS '(DC2Type:datetime_immutable)'");
