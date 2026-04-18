@@ -6,6 +6,7 @@ namespace App\Tests\Unit\MarketplaceAds;
 
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AdRawDocumentTest extends TestCase
@@ -72,5 +73,46 @@ final class AdRawDocumentTest extends TestCase
 
         self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
         self::assertSame($newPayload, $doc->getRawPayload());
+    }
+
+    public function testMarkFailedFromDraftSetsStatusAndReason(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->build();
+
+        self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
+        self::assertNull($doc->getProcessingError());
+
+        $doc->markFailed('Парсинг упал: неизвестный формат');
+
+        self::assertSame(AdRawDocumentStatus::FAILED, $doc->getStatus());
+        self::assertSame('Парсинг упал: неизвестный формат', $doc->getProcessingError());
+    }
+
+    /**
+     * @dataProvider terminalStatusProvider
+     */
+    public function testMarkFailedFromTerminalThrows(AdRawDocumentStatus $terminal): void
+    {
+        $builder = AdRawDocumentBuilder::aRawDocument();
+        $doc = match ($terminal) {
+            AdRawDocumentStatus::PROCESSED => $builder->asProcessed()->build(),
+            AdRawDocumentStatus::FAILED    => $builder->asFailed()->build(),
+            default                        => throw new \LogicException('unexpected'),
+        };
+
+        $this->expectException(\DomainException::class);
+
+        $doc->markFailed('повторная попытка');
+    }
+
+    /**
+     * @return array<string, array{AdRawDocumentStatus}>
+     */
+    public static function terminalStatusProvider(): array
+    {
+        return [
+            'already PROCESSED' => [AdRawDocumentStatus::PROCESSED],
+            'already FAILED'    => [AdRawDocumentStatus::FAILED],
+        ];
     }
 }

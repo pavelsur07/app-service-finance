@@ -19,6 +19,8 @@ final class AdRawDocumentBuilder
     private \DateTimeImmutable $reportDate;
     private string $rawPayload = self::DEFAULT_RAW_PAYLOAD;
     private bool $processed = false;
+    private bool $failed = false;
+    private string $processingError = 'Test error';
 
     private function __construct()
     {
@@ -78,6 +80,23 @@ final class AdRawDocumentBuilder
         return $clone;
     }
 
+    public function asFailed(string $reason = 'Test error'): self
+    {
+        $clone = clone $this;
+        $clone->failed = true;
+        $clone->processingError = $reason;
+
+        return $clone;
+    }
+
+    public function withProcessingError(string $error): self
+    {
+        $clone = clone $this;
+        $clone->processingError = $error;
+
+        return $clone;
+    }
+
     public function build(): AdRawDocument
     {
         $doc = new AdRawDocument(
@@ -95,6 +114,10 @@ final class AdRawDocumentBuilder
 
         if ($this->processed) {
             $doc->markAsProcessed();
+        }
+
+        if ($this->failed) {
+            $doc->markFailed($this->processingError);
         }
 
         return $doc;
