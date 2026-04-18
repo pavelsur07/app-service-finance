@@ -1,0 +1,119 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\MarketplaceAds\Repository;
+
+use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Entity\AdLoadJob;
+use App\MarketplaceAds\Enum\AdLoadJobStatus;
+use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\Persistence\ManagerRegistry;
+
+final class AdLoadJobRepository extends ServiceEntityRepository
+{
+    public function __construct(ManagerRegistry $registry)
+    {
+        parent::__construct($registry, AdLoadJob::class);
+    }
+
+    public function save(AdLoadJob $job): void
+    {
+        $this->getEntityManager()->persist($job);
+    }
+
+    public function findByIdAndCompany(string $id, string $companyId): ?AdLoadJob
+    {
+        return $this->findOneBy([
+            'id' => $id,
+            'companyId' => $companyId,
+        ]);
+    }
+
+    public function findLatestActiveJobByCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+    ): ?AdLoadJob {
+        return $this->createQueryBuilder('j')
+            ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
+            ->andWhere('j.status IN (:activeStatuses)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('activeStatuses', [AdLoadJobStatus::PENDING, AdLoadJobStatus::RUNNING])
+            ->orderBy('j.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findActiveJobCoveringDate(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $date,
+    ): ?AdLoadJob {
+        return $this->createQueryBuilder('j')
+            ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
+            ->andWhere('j.status IN (:activeStatuses)')
+            ->andWhere('j.dateFrom <= :date')
+            ->andWhere('j.dateTo >= :date')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('activeStatuses', [AdLoadJobStatus::PENDING, AdLoadJobStatus::RUNNING])
+            ->setParameter('date', $date->format('Y-m-d'))
+            ->orderBy('j.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
+     * Атомарно увеличивает счётчик loaded_days на $delta для задания, принадлежащего компании.
+     *
+     * Реализовано через raw DBAL `UPDATE ... SET loaded_days = loaded_days + :delta`,
+     * минуя Doctrine UoW: параллельные Messenger-воркеры могут безопасно инкрементировать
+     * один и тот же счётчик без read-modify-write race (UoW загрузил бы entity в своё
+     * состояние и перезаписал поле последним значением, потеряв инкременты соседей).
+     *
+     * `company_id` в WHERE — дополнительный IDOR-guard: если jobId не принадлежит
+     * переданной компании, UPDATE затронет 0 строк и метод вернёт 0.
+     *
+     * @return int число обновлённых строк (0 или 1)
+     */
+    public function incrementLoadedDays(string $jobId, string $companyId, int $delta = 1): int
+    {
+        return $this->atomicIncrement('loaded_days', $jobId, $companyId, $delta);
+    }
+
+    public function incrementProcessedDays(string $jobId, string $companyId, int $delta = 1): int
+    {
+        return $this->atomicIncrement('processed_days', $jobId, $companyId, $delta);
+    }
+
+    public function incrementFailedDays(string $jobId, string $companyId, int $delta = 1): int
+    {
+        return $this->atomicIncrement('failed_days', $jobId, $companyId, $delta);
+    }
+
+    private function atomicIncrement(string $column, string $jobId, string $companyId, int $delta): int
+    {
+        // Whitelist — защита от SQL-injection через имя колонки (параметризовать имя
+        // колонки нельзя, только значение).
+        if (!in_array($column, ['loaded_days', 'processed_days', 'failed_days'], true)) {
+            throw new \InvalidArgumentException(sprintf('Недопустимое имя колонки: %s', $column));
+        }
+
+        $sql = sprintf(
+            'UPDATE marketplace_ad_load_jobs SET %1$s = %1$s + :delta, updated_at = NOW() '
+            . 'WHERE id = :jobId AND company_id = :companyId',
+            $column,
+        );
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement($sql, [
+            'delta' => $delta,
+            'jobId' => $jobId,
+            'companyId' => $companyId,
+        ]);
+    }
+}
