@@ -255,6 +255,33 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // Regression: localized ("Дата") header must be found by findDateField
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeHandlesCyrillicHeader(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-1'),
+            campaignListBody: $this->campaignListBody(2),
+            statisticsBody: '{"UUID":"uuid-cyr"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-cyr'),
+            downloadCsv: $this->loadFixture('ozon_range_cyrillic_header.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-02'),
+        );
+
+        self::assertSame(['2026-03-01', '2026-03-02'], array_keys($result));
+        self::assertCount(1, $result['2026-03-01']['campaigns']);
+        self::assertSame('111', $result['2026-03-01']['campaigns'][0]['campaign_id']);
+        self::assertSame('SKU-1', $result['2026-03-01']['campaigns'][0]['rows'][0]['sku']);
+    }
+
+    // -----------------------------------------------------------------
     // g) Backward-compat: fetchAdStatistics($companyId, $date) still works
     // -----------------------------------------------------------------
     public function testFetchAdStatisticsLegacyContractRemainsStable(): void

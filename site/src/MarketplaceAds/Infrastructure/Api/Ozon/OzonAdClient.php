@@ -627,7 +627,10 @@ final class OzonAdClient implements AdPlatformClientInterface
             if (false === $headerRow) {
                 return;
             }
-            $header = array_map(static fn ($c): string => strtolower(trim((string) $c)), $headerRow);
+            // mb_strtolower, а не strtolower — иначе локализованные заголовки
+            // (например, "Дата") останутся в исходном регистре и findDateField()
+            // с ключом "дата" их не найдёт.
+            $header = array_map(static fn ($c): string => mb_strtolower(trim((string) $c), 'UTF-8'), $headerRow);
 
             while (false !== ($cols = fgetcsv($fp, 0, $delimiter, '"', ''))) {
                 // fgetcsv на полностью пустой строке возвращает [null] — пропускаем.
