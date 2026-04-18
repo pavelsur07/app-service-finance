@@ -73,6 +73,7 @@ services:
     App\Marketplace\Repository\MarketplaceOrderRepositoryInterface: '@App\Marketplace\Repository\MarketplaceOrderRepository'
     App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface: '@App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepository'
     App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface: '@App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepository'
+    App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface: '@App\MarketplaceAds\Repository\AdChunkProgressRepository'
 
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:
