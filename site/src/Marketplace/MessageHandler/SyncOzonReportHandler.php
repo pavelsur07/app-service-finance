@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -34,6 +35,7 @@ final class SyncOzonReportHandler
         private readonly LockFactory $lockFactory,
         private readonly LoggerInterface $logger,
         private readonly MessageBusInterface $messageBus,
+        private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
     ) {
     }
 
@@ -86,6 +88,50 @@ final class SyncOzonReportHandler
             return;
         }
 
+        $timezone = new \DateTimeZone('Europe/Moscow');
+
+        if ($date !== null) {
+            $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date, $timezone);
+            if ($parsed === false || $parsed->format('Y-m-d') !== $date) {
+                $this->logger->error('Invalid date in SyncOzonReportMessage, skipping', [
+                    'company_id' => $companyId,
+                    'date'       => $date,
+                ]);
+
+                return;
+            }
+            $fromDate = $parsed;
+            $toDate   = $parsed;
+        } else {
+            $toDate   = new \DateTimeImmutable('yesterday', $timezone);
+            $fromDate = $toDate;
+        }
+
+        // Idempotency: skip если за эту дату уже есть raw_document в любом НЕ-FAILED статусе
+        // (null / pending / running / completed). Закрывает гонку между двумя
+        // SyncOzonReportMessage, когда первый прогон ещё in-flight (raw_document
+        // создан, pipeline не успел проставить completed) — без этого второй воркер
+        // создавал дубль. FAILED-документы в выборку не попадают — для них retry
+        // должен создать новый, что сохраняет существующую retry-семантику.
+        $existingDoc = $this->rawDocumentRepository->findExistingDayDocument(
+            $company,
+            MarketplaceType::OZON,
+            'sales_report',
+            $fromDate,
+        );
+
+        if ($existingDoc !== null) {
+            $this->logger->info('Skipping Ozon sync: raw document already exists for this day', [
+                'company_id'       => $companyId,
+                'connection_id'    => $connectionId,
+                'date'             => $fromDate->format('Y-m-d'),
+                'existing_doc_id'  => $existingDoc->getId(),
+                'existing_status'  => $existingDoc->getProcessingStatus()?->value,
+            ]);
+
+            return;
+        }
+
         $connection->markSyncStarted();
         $this->em->flush();
 
@@ -93,14 +139,6 @@ final class SyncOzonReportHandler
 
         try {
             $adapter = $this->adapterRegistry->get(MarketplaceType::OZON);
-
-            if ($date !== null) {
-                $fromDate = new \DateTimeImmutable($date);
-                $toDate   = $fromDate;
-            } else {
-                $toDate   = new \DateTimeImmutable('yesterday', new \DateTimeZone('Europe/Moscow'));
-                $fromDate = $toDate;
-            }
 
             $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
 
