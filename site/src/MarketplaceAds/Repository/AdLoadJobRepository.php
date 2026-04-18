@@ -10,7 +10,7 @@ use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-final class AdLoadJobRepository extends ServiceEntityRepository
+class AdLoadJobRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -94,6 +94,43 @@ final class AdLoadJobRepository extends ServiceEntityRepository
     public function incrementFailedDays(string $jobId, string $companyId, int $delta = 1): int
     {
         return $this->atomicIncrement('failed_days', $jobId, $companyId, $delta);
+    }
+
+    /**
+     * Помечает задание как FAILED через raw DBAL UPDATE (минуя UoW).
+     *
+     * Условие `status IN ('pending', 'running')` делает операцию идемпотентной:
+     * если задание уже в терминальном статусе (FAILED/COMPLETED), UPDATE затронет
+     * 0 строк и причина не перезапишется — повторные вызовы от разных воркеров
+     * не «сбрасывают» исходную причину ошибки.
+     *
+     * `company_id` в WHERE — встроенный IDOR-guard.
+     *
+     * @return int число обновлённых строк (0 если job уже терминальный или чужой)
+     */
+    public function markFailed(string $jobId, string $companyId, string $reason): int
+    {
+        if ('' === $reason) {
+            throw new \InvalidArgumentException('Причина ошибки не может быть пустой.');
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_load_jobs
+                SET status = 'failed',
+                    failure_reason = :reason,
+                    finished_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :jobId
+                  AND company_id = :companyId
+                  AND status IN ('pending', 'running')
+                SQL,
+            [
+                'reason' => $reason,
+                'jobId' => $jobId,
+                'companyId' => $companyId,
+            ],
+        );
     }
 
     private function atomicIncrement(string $column, string $jobId, string $companyId, int $delta): int
