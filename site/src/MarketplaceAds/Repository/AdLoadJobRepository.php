@@ -110,13 +110,15 @@ class AdLoadJobRepository extends ServiceEntityRepository
     }
 
     /**
-     * Атомарный UPDATE `chunks_completed = chunks_completed + :delta`. В отличие
-     * от остальных счётчиков, company_id в WHERE не добавляем: метод зовётся
-     * только из {@see \App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler}
-     * с jobId из собственного Message — companyId уже «прошит» в job через
-     * LoadOzonAdStatisticsRangeHandler.
+     * Атомарный UPDATE `chunks_completed = chunks_completed + :delta`.
+     *
+     * `company_id` в WHERE — встроенный IDOR-guard, как у остальных инкрементов
+     * ({@see self::incrementLoadedDays}). Если jobId не принадлежит переданной
+     * компании, UPDATE затронет 0 строк.
+     *
+     * @return int число обновлённых строк (0 или 1)
      */
-    public function incrementChunksCompleted(string $jobId, int $delta = 1): int
+    public function incrementChunksCompleted(string $jobId, string $companyId, int $delta = 1): int
     {
         if ($delta < 1) {
             throw new \InvalidArgumentException(sprintf(
@@ -131,10 +133,12 @@ class AdLoadJobRepository extends ServiceEntityRepository
                 SET chunks_completed = chunks_completed + :delta,
                     updated_at = NOW()
                 WHERE id = :jobId
+                  AND company_id = :companyId
                 SQL,
             [
                 'delta' => $delta,
                 'jobId' => $jobId,
+                'companyId' => $companyId,
             ],
         );
     }

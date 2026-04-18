@@ -102,7 +102,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
-            ->with(self::JOB_ID)
+            ->with(self::JOB_ID, self::COMPANY_ID)
             ->willReturnCallback(static function () use (&$callOrder): int {
                 $callOrder[] = 'incrementChunksCompleted';
 
@@ -163,7 +163,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
-            ->with(AdLoadJobBuilder::DEFAULT_ID)
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -420,7 +420,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         // chunksCompleted инкрементится один раз на сообщение.
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
-            ->with(AdLoadJobBuilder::DEFAULT_ID)
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
             ->willReturn(1);
 
         // Невалидный UTF-8 во втором дне — json_encode() без JSON_THROW_ON_ERROR вернёт false.
@@ -557,7 +557,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('markFailed');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
-            ->with(AdLoadJobBuilder::DEFAULT_ID)
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -603,7 +603,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::once())
             ->method('incrementChunksCompleted')
-            ->with(AdLoadJobBuilder::DEFAULT_ID)
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);

@@ -133,9 +133,9 @@ final class LoadOzonAdStatisticsRangeHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('find')->willReturn($job);
 
-        // Два flush ожидаем: после markRunning() и после setChunksTotal().
+        // Один объединённый flush: markRunning() + setChunksTotal() коммитим одним round-trip'ом.
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::exactly(2))->method('flush');
+        $em->expects(self::once())->method('flush');
 
         $messageBus = $this->createMock(MessageBusInterface::class);
         $messageBus->expects(self::exactly(2))

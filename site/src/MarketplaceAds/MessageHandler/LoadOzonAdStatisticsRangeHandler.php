@@ -72,9 +72,10 @@ final class LoadOzonAdStatisticsRangeHandler
 
         // markRunning только из PENDING; RUNNING — идемпотентный retry после сбоя
         // рассылки (например, падение воркера между dispatch'ами).
+        $needsFlush = false;
         if (AdLoadJobStatus::PENDING === $job->getStatus()) {
             $job->markRunning();
-            $this->entityManager->flush();
+            $needsFlush = true;
         }
 
         $chunks = $this->splitIntoChunks($job->getDateFrom(), $job->getDateTo());
@@ -84,6 +85,11 @@ final class LoadOzonAdStatisticsRangeHandler
         // повторный set был бы бессмысленным (и пустым) UPDATE.
         if (0 === $job->getChunksTotal()) {
             $job->setChunksTotal(count($chunks));
+            $needsFlush = true;
+        }
+
+        // Один flush на markRunning + setChunksTotal — меньше round-trip'ов.
+        if ($needsFlush) {
             $this->entityManager->flush();
         }
 
