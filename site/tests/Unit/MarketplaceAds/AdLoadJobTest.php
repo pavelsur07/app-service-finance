@@ -196,4 +196,75 @@ final class AdLoadJobTest extends TestCase
 
         self::assertSame(10, $job->getProgress());
     }
+
+    public function testNewJobHasZeroChunksTotalAndCompleted(): void
+    {
+        $job = AdLoadJobBuilder::aJob()->build();
+
+        self::assertSame(0, $job->getChunksTotal());
+        self::assertSame(0, $job->getChunksCompleted());
+    }
+
+    public function testSetChunksTotalFromPendingPersistsValue(): void
+    {
+        $job = AdLoadJobBuilder::aJob()->build();
+        self::assertSame(AdLoadJobStatus::PENDING, $job->getStatus());
+
+        $job->setChunksTotal(7);
+
+        self::assertSame(7, $job->getChunksTotal());
+    }
+
+    public function testSetChunksTotalFromRunningPersistsValue(): void
+    {
+        // Retry-сценарий: job уже RUNNING, chunksTotal ещё можно поставить
+        // (в продакшн-коде это не произойдёт — handler проверяет chunksTotal === 0,
+        // но guard Entity должен позволять установку из активных статусов).
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $job->setChunksTotal(3);
+
+        self::assertSame(3, $job->getChunksTotal());
+    }
+
+    public function testSetChunksTotalOnCompletedThrows(): void
+    {
+        $job = AdLoadJobBuilder::aJob()->asCompleted()->build();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Нельзя установить chunksTotal на задание в терминальном статусе');
+
+        $job->setChunksTotal(5);
+    }
+
+    public function testSetChunksTotalOnFailedThrows(): void
+    {
+        $job = AdLoadJobBuilder::aJob()->asFailed('test')->build();
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Нельзя установить chunksTotal на задание в терминальном статусе');
+
+        $job->setChunksTotal(5);
+    }
+
+    /**
+     * @dataProvider invalidChunksTotalProvider
+     */
+    public function testSetChunksTotalRejectsZeroOrNegative(int $total): void
+    {
+        $job = AdLoadJobBuilder::aJob()->build();
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $job->setChunksTotal($total);
+    }
+
+    public static function invalidChunksTotalProvider(): array
+    {
+        return [
+            'zero' => [0],
+            'negative' => [-1],
+            'large negative' => [-100],
+        ];
+    }
 }

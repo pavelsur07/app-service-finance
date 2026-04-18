@@ -354,6 +354,86 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame(0, $reloaded->getFailedDays());
     }
 
+    public function testIncrementChunksCompletedIsAtomic(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+        $this->em->clear();
+
+        // 100 последовательных инкрементов: каждый вызов — независимая SQL-транзакция,
+        // read-modify-write race исключён (значение хранится только в БД).
+        for ($i = 0; $i < 100; ++$i) {
+            $affected = $this->repository->incrementChunksCompleted($jobId);
+            self::assertSame(1, $affected);
+        }
+
+        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
+        self::assertNotNull($reloaded);
+        self::assertSame(100, $reloaded->getChunksCompleted());
+    }
+
+    /**
+     * @dataProvider nonPositiveDeltaProvider
+     */
+    public function testIncrementChunksCompletedRejectsNonPositiveDelta(int $delta): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/Инкремент должен быть >= 1/');
+
+        $this->repository->incrementChunksCompleted($jobId, $delta);
+    }
+
+    public function testFindReturnsJobWithoutCompanyCheck(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+        $this->em->clear();
+
+        // find() — trusted-контекст (Messenger-хендлеры); company_id не фигурирует в WHERE.
+        $found = $this->repository->find($jobId);
+
+        self::assertNotNull($found);
+        self::assertSame($jobId, $found->getId());
+        self::assertSame(self::COMPANY_ID, $found->getCompanyId());
+    }
+
+    public function testFindReturnsNullForUnknownId(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $found = $this->repository->find('00000000-0000-0000-0000-000000000000');
+
+        self::assertNull($found);
+    }
+
     public function testIncrementBypassesUnitOfWorkAndUpdatesDirectly(): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');

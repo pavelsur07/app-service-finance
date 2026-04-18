@@ -30,6 +30,19 @@ class AdLoadJobRepository extends ServiceEntityRepository
         ]);
     }
 
+    /**
+     * Находит задание по ID БЕЗ проверки company_id.
+     *
+     * IDOR-safe только в trusted-контексте: Messenger-хендлерах, где ID был
+     * сгенерирован внутри системы (см. LoadOzonAdStatisticsRangeHandler — в
+     * Message приходит только jobId). Для любого вызова, исходящего из
+     * HTTP-запроса, использовать {@see self::findByIdAndCompany()}.
+     */
+    public function find($id, $lockMode = null, $lockVersion = null): ?AdLoadJob
+    {
+        return parent::find($id, $lockMode, $lockVersion);
+    }
+
     public function findLatestActiveJobByCompanyAndMarketplace(
         string $companyId,
         MarketplaceType $marketplace,
@@ -94,6 +107,36 @@ class AdLoadJobRepository extends ServiceEntityRepository
     public function incrementFailedDays(string $jobId, string $companyId, int $delta = 1): int
     {
         return $this->atomicIncrement('failed_days', $jobId, $companyId, $delta);
+    }
+
+    /**
+     * Атомарный UPDATE `chunks_completed = chunks_completed + :delta`. В отличие
+     * от остальных счётчиков, company_id в WHERE не добавляем: метод зовётся
+     * только из {@see \App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler}
+     * с jobId из собственного Message — companyId уже «прошит» в job через
+     * LoadOzonAdStatisticsRangeHandler.
+     */
+    public function incrementChunksCompleted(string $jobId, int $delta = 1): int
+    {
+        if ($delta < 1) {
+            throw new \InvalidArgumentException(sprintf(
+                'Инкремент должен быть >= 1, передано: %d',
+                $delta,
+            ));
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_load_jobs
+                SET chunks_completed = chunks_completed + :delta,
+                    updated_at = NOW()
+                WHERE id = :jobId
+                SQL,
+            [
+                'delta' => $delta,
+                'jobId' => $jobId,
+            ],
+        );
     }
 
     /**
