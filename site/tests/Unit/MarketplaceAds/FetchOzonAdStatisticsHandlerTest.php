@@ -122,6 +122,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('findByIdAndCompany')->willReturn($job);
         $jobRepo->expects(self::never())->method('markFailed');
+        // Duplicate chunk: counters must NOT be incremented to avoid double-counting
+        // on Messenger retry — markChunkCompleted returning false is the guard.
+        $jobRepo->expects(self::never())->method('incrementLoadedDays');
+        $jobRepo->expects(self::never())->method('incrementFailedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')->willReturn([

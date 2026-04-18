@@ -221,38 +221,10 @@ final class FetchOzonAdStatisticsHandler
 
         $this->entityManager->flush();
 
-        // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
-        // по count($documents): Ozon легитимно возвращает меньше дней, чем
-        // запросили, если за какие-то дни вообще нет кампаний. Если брать
-        // count($documents), такие «пустые» дни навсегда останутся
-        // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
-        $loadedDelta = $chunkDays - $skippedDays;
-        if ($loadedDelta > 0) {
-            $this->adLoadJobRepository->incrementLoadedDays(
-                $message->jobId,
-                $message->companyId,
-                $loadedDelta,
-            );
-        }
-
-        if ($skippedDays > 0) {
-            $this->adLoadJobRepository->incrementFailedDays(
-                $message->jobId,
-                $message->companyId,
-                $skippedDays,
-            );
-        }
-
-        foreach ($documents as $doc) {
-            $this->messageBus->dispatch(new ProcessAdRawDocumentMessage(
-                $message->companyId,
-                $doc->getId(),
-            ));
-        }
-
-        // Чанк физически отработан — фиксируем идемпотентно даже на пустом результате Ozon
-        // (ноль документов, ноль dispatch'ей): permanent/transient ошибки до сюда
-        // не доходят (rethrow / UnrecoverableMessageHandlingException выше).
+        // Идемпотентная фиксация чанка — ПЕРЕД инкрементом счётчиков дней.
+        // При Messenger retry markChunkCompleted вернёт false (запись уже есть),
+        // и мы пропустим инкременты, не удвоив loaded/failed days.
+        // permanent/transient ошибки до сюда не доходят (rethrow / Unrecoverable выше).
         $marked = $this->adChunkProgressRepository->markChunkCompleted(
             $message->jobId,
             $message->companyId,
@@ -267,6 +239,35 @@ final class FetchOzonAdStatisticsHandler
                 'date_from' => $message->dateFrom,
                 'date_to' => $message->dateTo,
             ]);
+        } else {
+            // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
+            // по count($documents): Ozon легитимно возвращает меньше дней, чем
+            // запросили, если за какие-то дни вообще нет кампаний. Если брать
+            // count($documents), такие «пустые» дни навсегда останутся
+            // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
+            $loadedDelta = $chunkDays - $skippedDays;
+            if ($loadedDelta > 0) {
+                $this->adLoadJobRepository->incrementLoadedDays(
+                    $message->jobId,
+                    $message->companyId,
+                    $loadedDelta,
+                );
+            }
+
+            if ($skippedDays > 0) {
+                $this->adLoadJobRepository->incrementFailedDays(
+                    $message->jobId,
+                    $message->companyId,
+                    $skippedDays,
+                );
+            }
+        }
+
+        foreach ($documents as $doc) {
+            $this->messageBus->dispatch(new ProcessAdRawDocumentMessage(
+                $message->companyId,
+                $doc->getId(),
+            ));
         }
 
         $this->logger->info('Ozon ad statistics chunk processed', [
@@ -276,8 +277,9 @@ final class FetchOzonAdStatisticsHandler
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
             'documentsUpserted' => count($documents),
-            'daysLoaded' => $loadedDelta,
+            'daysLoaded' => $marked ? $chunkDays - $skippedDays : 0,
             'daysSkipped' => $skippedDays,
+            'duplicate' => !$marked,
         ]);
     }
 }
