@@ -100,6 +100,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
                 return 1;
             });
         $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(self::JOB_ID, self::COMPANY_ID)
+            ->willReturnCallback(static function () use (&$callOrder): int {
+                $callOrder[] = 'incrementChunksCompleted';
+
+                return 1;
+            });
 
         $dispatchedIds = [];
         $messageBus = $this->createMock(MessageBusInterface::class);
@@ -124,9 +132,9 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         self::assertCount(3, $savedDocs);
         self::assertSame(
-            ['flush', 'incrementLoadedDays', 'dispatch', 'dispatch', 'dispatch'],
+            ['flush', 'incrementLoadedDays', 'dispatch', 'dispatch', 'dispatch', 'incrementChunksCompleted'],
             $callOrder,
-            'save→flush→incrementLoadedDays→dispatch — строгий порядок, иначе race с ProcessAdRawDocumentHandler',
+            'save→flush→incrementLoadedDays→dispatch→incrementChunksCompleted — строгий порядок',
         );
         self::assertSame(
             array_map(static fn (AdRawDocument $d): string => $d->getId(), $savedDocs),
@@ -152,6 +160,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::once())
             ->method('incrementLoadedDays')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 1)
+            ->willReturn(1);
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -201,6 +213,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('markFailed');
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
         $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::never())->method('fetchAdStatisticsRange');
@@ -230,6 +243,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('findByIdAndCompany')->willReturn(null);
         $jobRepo->expects(self::never())->method('markFailed');
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::never())->method('fetchAdStatisticsRange');
@@ -265,6 +279,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             )
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')
@@ -305,6 +320,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             )
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')
@@ -343,6 +359,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('markFailed');
         $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $apiException = new \RuntimeException('Ozon 502 Bad Gateway');
 
@@ -399,6 +416,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 1)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('markFailed');
+        // Чанк физически отработан (частичный json-fail не срывает чанк) —
+        // chunksCompleted инкрементится один раз на сообщение.
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
+            ->willReturn(1);
 
         // Невалидный UTF-8 во втором дне — json_encode() без JSON_THROW_ON_ERROR вернёт false.
         $ozonClient = $this->createMock(OzonAdClient::class);
@@ -440,6 +463,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('findByIdAndCompany')->willReturn($job);
         $jobRepo->method('incrementLoadedDays')->willReturn(1);
+        $jobRepo->method('incrementChunksCompleted')->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')->willReturn([
@@ -489,6 +513,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
                 self::stringContains('Invalid date format'),
             )
             ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::never())->method('fetchAdStatisticsRange');
@@ -530,6 +555,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('markFailed');
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
+            ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')->willReturn([
@@ -557,11 +586,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
-    public function testOzonReturnsNoDaysStillCountsEntireChunkAsLoaded(): void
+    public function testOzonReturnsNoDaysStillCountsEntireChunkAsLoadedAndIncrementsChunksCompleted(): void
     {
         // Крайний случай: Ozon вернул пустой массив (ни одной кампании за весь чанк).
         // Чанк отработал успешно → все chunkDays дней должны попасть в loaded_days,
-        // иначе job зависнет в RUNNING с прогрессом < 100%.
+        // а chunksCompleted — вырасти на 1 (иначе chunksTotal никогда не совпадёт
+        // с chunksCompleted и ProcessAdRawDocumentHandler не финализирует job).
         $job = AdLoadJobBuilder::aJob()->asRunning()->build();
 
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
@@ -571,6 +601,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3)
             ->willReturn(1);
         $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::once())
+            ->method('incrementChunksCompleted')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID)
+            ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->method('fetchAdStatisticsRange')->willReturn([]);
@@ -612,6 +646,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
                 self::stringContains('2026-02-31'),
             )
             ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementChunksCompleted');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::never())->method('fetchAdStatisticsRange');

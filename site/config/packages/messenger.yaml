@@ -49,6 +49,7 @@ framework:
             App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage: async
             App\MarketplaceAds\Message\ProcessAdRawDocumentMessage: async
             App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage: async
+            App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage: async
 
             # Route your messages to the transports
             # 'App\Message\YourMessage': async

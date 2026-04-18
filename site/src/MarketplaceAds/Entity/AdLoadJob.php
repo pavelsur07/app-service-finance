@@ -54,6 +54,12 @@ class AdLoadJob
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $failedDays = 0;
 
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $chunksTotal = 0;
+
+    #[ORM\Column(type: 'integer', options: ['default' => 0])]
+    private int $chunksCompleted = 0;
+
     #[ORM\Column(type: 'string', length: 20, enumType: AdLoadJobStatus::class, options: ['default' => 'pending'])]
     private AdLoadJobStatus $status;
 
@@ -126,6 +132,29 @@ class AdLoadJob
 
         $this->status = AdLoadJobStatus::COMPLETED;
         $this->finishedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Устанавливает общее число чанков для задания. Вызывается из
+     * {@see \App\MarketplaceAds\MessageHandler\LoadOzonAdStatisticsRangeHandler}
+     * один раз на задание — после расчёта числа чанков по диапазону дат.
+     *
+     * chunksCompleted инкрементируется отдельно через Repository-метод
+     * (атомарный SQL UPDATE, параллельные воркеры).
+     */
+    public function setChunksTotal(int $total): void
+    {
+        if ($this->status->isTerminal()) {
+            throw new \DomainException(sprintf(
+                'Нельзя установить chunksTotal на задание в терминальном статусе: %s.',
+                $this->status->value,
+            ));
+        }
+
+        Assert::greaterThanEq($total, 1, 'chunksTotal должен быть >= 1.');
+
+        $this->chunksTotal = $total;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -205,6 +234,16 @@ class AdLoadJob
     public function getFailedDays(): int
     {
         return $this->failedDays;
+    }
+
+    public function getChunksTotal(): int
+    {
+        return $this->chunksTotal;
+    }
+
+    public function getChunksCompleted(): int
+    {
+        return $this->chunksCompleted;
     }
 
     public function getStatus(): AdLoadJobStatus

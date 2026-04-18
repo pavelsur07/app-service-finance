@@ -248,6 +248,13 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
+        // Чанк физически отработан — инкрементим даже на пустом результате Ozon
+        // (ноль документов, ноль dispatch'ей): permanent/transient ошибки до сюда
+        // не доходят (rethrow / UnrecoverableMessageHandlingException выше).
+        // Финализация job'а по условию chunksCompleted == chunksTotal — в
+        // ProcessAdRawDocumentHandler (Коммит 5).
+        $this->adLoadJobRepository->incrementChunksCompleted($message->jobId, $message->companyId);
+
         $this->logger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,
             'companyId' => $message->companyId,

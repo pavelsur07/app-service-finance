@@ -23,6 +23,8 @@ final class AdLoadJobBuilder
     private int $loadedDays = 0;
     private int $processedDays = 0;
     private int $failedDays = 0;
+    private int $chunksTotal = 0;
+    private int $chunksCompleted = 0;
 
     private function __construct()
     {
@@ -119,6 +121,22 @@ final class AdLoadJobBuilder
         return $clone;
     }
 
+    public function withChunksTotal(int $total): self
+    {
+        $clone = clone $this;
+        $clone->chunksTotal = $total;
+
+        return $clone;
+    }
+
+    public function withChunksCompleted(int $completed): self
+    {
+        $clone = clone $this;
+        $clone->chunksCompleted = $completed;
+
+        return $clone;
+    }
+
     public function build(): AdLoadJob
     {
         $job = new AdLoadJob(
@@ -141,6 +159,12 @@ final class AdLoadJobBuilder
         }
         if ($this->failedDays !== 0) {
             $this->setProperty($job, 'failedDays', $this->failedDays);
+        }
+        if ($this->chunksTotal !== 0) {
+            $this->setProperty($job, 'chunksTotal', $this->chunksTotal);
+        }
+        if ($this->chunksCompleted !== 0) {
+            $this->setProperty($job, 'chunksCompleted', $this->chunksCompleted);
         }
 
         if (AdLoadJobStatus::PENDING !== $this->status) {
