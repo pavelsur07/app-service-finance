@@ -510,6 +510,131 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
+    public function testOzonReturnsFewerDaysThanChunkStillCountsCoverageAsLoaded(): void
+    {
+        // P1 regression: Ozon легитимно может вернуть меньше дней, чем запросили
+        // (те дни, где не было ни одной активной кампании). Если бы loaded_days
+        // инкрементировался по count($documents), такие «пустые» дни навсегда
+        // оставались бы непосчитанными в прогрессе — (loaded + failed) не
+        // дорастал бы до total_days, и getProgress() не достигал 100%.
+        $job = AdLoadJobBuilder::aJob()
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::once())
+            ->method('incrementLoadedDays')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3) // chunkDays=3, не count($documents)=1
+            ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementFailedDays');
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            // Ozon вернул только 1 день из 3 запрошенных.
+            '2026-03-02' => ['rows' => [['spend' => 200]]],
+        ]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $rawRepo->expects(self::once())->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())->method('dispatch')
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        $handler = $this->createHandler($ozonClient, $rawRepo, $jobRepo, $em, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
+    public function testOzonReturnsNoDaysStillCountsEntireChunkAsLoaded(): void
+    {
+        // Крайний случай: Ozon вернул пустой массив (ни одной кампании за весь чанк).
+        // Чанк отработал успешно → все chunkDays дней должны попасть в loaded_days,
+        // иначе job зависнет в RUNNING с прогрессом < 100%.
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::once())
+            ->method('incrementLoadedDays')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3)
+            ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementFailedDays');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->expects(self::never())->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        // flush всё равно зовём — UoW очищает пустую очередь без вреда, а «пропускать»
+        // flush при пустом результате значило бы размазать условную логику по handler'у.
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $rawRepo, $jobRepo, $em, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
+    public function testCalendarInvalidDateInMessageMarksFailedAndThrowsUnrecoverable(): void
+    {
+        // P2 regression: createFromFormat('!Y-m-d', '2026-02-31') НЕ возвращает false —
+        // тихо нормализует в 2026-03-03. Без round-trip сравнения handler грузил бы
+        // не тот диапазон, а операторский баг молча корраптил бы соседние даты.
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::once())
+            ->method('markFailed')
+            ->with(
+                AdLoadJobBuilder::DEFAULT_ID,
+                self::COMPANY_ID,
+                self::stringContains('2026-02-31'),
+            )
+            ->willReturn(1);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('fetchAdStatisticsRange');
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $rawRepo, $jobRepo, $em, $messageBus);
+
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('2026-02-31');
+
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
+            self::COMPANY_ID,
+            '2026-02-31',
+            self::DATE_TO,
+        ));
+    }
+
     private function createHandler(
         OzonAdClient $ozonClient,
         AdRawDocumentRepository $rawRepo,

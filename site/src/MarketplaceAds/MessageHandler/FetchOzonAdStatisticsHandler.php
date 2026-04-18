@@ -28,8 +28,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *  3) для каждого дня результата — upsert AdRawDocument (новый → save,
  *     существующий → updatePayload() — тот сам сбрасывает status в DRAFT);
  *  4) единый flush на весь чанк;
- *  5) атомарный incrementLoadedDays($jobId, $daysCount) — raw SQL, минуя UoW
- *     (paralell-safe с другими воркерами того же job'а);
+ *  5) атомарный incrementLoadedDays($jobId, chunkDays - skippedDays) — raw SQL,
+ *     минуя UoW (parallel-safe с другими воркерами того же job'а). Считаем
+ *     по покрытию чанка, а не по числу документов: Ozon может вернуть меньше
+ *     дней, чем запросили (дни без кампаний), и такие «пустые» дни всё равно
+ *     должны учитываться как обработанные, иначе прогресс зависнет ниже 100%;
  *  6) dispatch ProcessAdRawDocumentMessage за каждый документ — уже ПОСЛЕ
  *     flush, чтобы следующий handler увидел документ в БД.
  *
@@ -90,7 +93,16 @@ final class FetchOzonAdStatisticsHandler
         $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $message->dateFrom);
         $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $message->dateTo);
 
-        if (false === $dateFrom || false === $dateTo) {
+        // Round-trip сравнение с исходной строкой ловит календарно-невалидные
+        // даты вроде 2026-02-31 — createFromFormat для них молча возвращает
+        // нормализованный DateTimeImmutable (2026-03-03), а не false, из-за
+        // чего без этой проверки handler грузил бы не тот диапазон.
+        if (
+            false === $dateFrom
+            || false === $dateTo
+            || $dateFrom->format('Y-m-d') !== $message->dateFrom
+            || $dateTo->format('Y-m-d') !== $message->dateTo
+        ) {
             $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
@@ -207,11 +219,17 @@ final class FetchOzonAdStatisticsHandler
 
         $this->entityManager->flush();
 
-        if ([] !== $documents) {
+        // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
+        // по count($documents): Ozon легитимно возвращает меньше дней, чем
+        // запросили, если за какие-то дни вообще нет кампаний. Если брать
+        // count($documents), такие «пустые» дни навсегда останутся
+        // непосчитанными в прогрессе, и (loaded + failed) не дорастёт до total.
+        $loadedDelta = $chunkDays - $skippedDays;
+        if ($loadedDelta > 0) {
             $this->adLoadJobRepository->incrementLoadedDays(
                 $message->jobId,
                 $message->companyId,
-                count($documents),
+                $loadedDelta,
             );
         }
 
@@ -236,7 +254,8 @@ final class FetchOzonAdStatisticsHandler
             'dateFrom' => $message->dateFrom,
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
-            'documentsCreated' => count($documents),
+            'documentsUpserted' => count($documents),
+            'daysLoaded' => $loadedDelta,
             'daysSkipped' => $skippedDays,
         ]);
     }
