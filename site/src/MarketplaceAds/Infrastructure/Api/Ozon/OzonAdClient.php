@@ -49,6 +49,13 @@ final class OzonAdClient implements AdPlatformClientInterface
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
 
+    /**
+     * Счётчик итераций последнего pollReport() — используется инструментированием
+     * fetchAdStatisticsRange(), чтобы не ломать публичную сигнатуру pollReport
+     * и не пробрасывать значения через withAuthRetry-замыкания.
+     */
+    private int $lastPollAttempts = 0;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -69,21 +76,9 @@ final class OzonAdClient implements AdPlatformClientInterface
 
     public function fetchAdStatistics(string $companyId, \DateTimeImmutable $date): string
     {
-        $credentials = $this->marketplaceFacade->getConnectionCredentials(
-            $companyId,
-            MarketplaceType::OZON,
-            MarketplaceConnectionType::PERFORMANCE,
-        );
-
-        if (null === $credentials) {
-            throw new \RuntimeException('Ozon Performance не подключен');
-        }
-
-        $clientId = (string) ($credentials['client_id'] ?? '');
-        $clientSecret = (string) ($credentials['api_key'] ?? '');
-        if ('' === $clientId || '' === $clientSecret) {
-            throw new \RuntimeException('Ozon Performance: отсутствует client_id или client_secret');
-        }
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
 
         $this->logger->info('Ozon Performance: начало загрузки статистики', [
             'companyId' => $companyId,
@@ -108,18 +103,13 @@ final class OzonAdClient implements AdPlatformClientInterface
 
         $rows = [];
         foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
-            $campaignIds = array_map(static fn (array $c): string => (string) $c['id'], $batch);
-            $namesById = [];
-            foreach ($batch as $campaign) {
-                // title уже содержит либо title, либо name (см. listSkuCampaigns).
-                $namesById[(string) $campaign['id']] = (string) $campaign['title'];
-            }
+            [$campaignIds, $namesById] = $this->splitBatch($batch);
 
             $uuid = $this->withAuthRetry(
                 $companyId,
                 $clientId,
                 $clientSecret,
-                fn (string $token): string => $this->requestStatistics($token, $campaignIds, $date),
+                fn (string $token): string => $this->requestStatistics($token, $campaignIds, $date, $date, 'NO_GROUP_BY'),
             );
 
             $this->logger->info('Ozon Performance: запрошен отчёт', [
@@ -148,6 +138,206 @@ final class OzonAdClient implements AdPlatformClientInterface
         }
 
         return json_encode(['rows' => $rows], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Статистика Ozon Performance за диапазон дат, сгруппированная по дням.
+     *
+     * Один async-пайплайн на весь диапазон: листинг кампаний → POST /statistics с
+     * groupBy=DATE → polling → скачивание CSV → группировка строк по дате.
+     * Caller обязан передать диапазон ≤ 62 дня (лимит Ozon Performance API).
+     *
+     * @return array<string, array{campaigns: list<array{
+     *     campaign_id: string,
+     *     campaign_name: string,
+     *     rows: list<array{
+     *         sku: string,
+     *         spend: string,
+     *         views: int,
+     *         clicks: int,
+     *     }>,
+     * }>}>
+     *
+     * @throws \InvalidArgumentException если dateFrom > dateTo или диапазон > 62 дня
+     * @throws \RuntimeException         если Performance-подключение не настроено либо API вернул ошибку
+     */
+    public function fetchAdStatisticsRange(
+        string $companyId,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): array {
+        $startedAt = microtime(true);
+        // chunkDays считаем ещё до assertValidRange, чтобы лог ошибки содержал
+        // фактический входной диапазон (даже если он > 62 дней).
+        $chunkDays = (int) $dateFrom->diff($dateTo)->days + 1;
+        $campaignsCount = 0;
+        $rowsCount = 0;
+        $totalPollAttempts = 0;
+
+        try {
+            $this->assertValidRange($dateFrom, $dateTo);
+
+            $credentials = $this->resolveCredentials($companyId);
+            $clientId = $credentials['client_id'];
+            $clientSecret = $credentials['client_secret'];
+
+            $this->logger->info('Ozon Performance: начало загрузки статистики (range)', [
+                'companyId' => $companyId,
+                'dateFrom' => $dateFrom->format('Y-m-d'),
+                'dateTo' => $dateTo->format('Y-m-d'),
+            ]);
+
+            $campaigns = $this->withAuthRetry(
+                $companyId,
+                $clientId,
+                $clientSecret,
+                fn (string $token): array => $this->listSkuCampaigns($token),
+            );
+            $campaignsCount = count($campaigns);
+
+            $this->logger->info('Ozon Performance: получен список SKU-кампаний (range)', [
+                'companyId' => $companyId,
+                'count' => $campaignsCount,
+            ]);
+
+            /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
+            $byDate = [];
+
+            foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
+                [$campaignIds, $namesById] = $this->splitBatch($batch);
+
+                $uuid = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->requestStatistics($token, $campaignIds, $dateFrom, $dateTo, 'DATE'),
+                );
+
+                $this->logger->info('Ozon Performance: запрошен отчёт (range)', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $uuid,
+                    'campaignCount' => count($campaignIds),
+                ]);
+
+                $reportLink = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->pollReport($token, $uuid),
+                );
+                // pollReport не возвращает attempts, чтобы не ломать публичную
+                // сигнатуру — счётчик читаем через $this->lastPollAttempts и
+                // суммируем по всем батчам.
+                $totalPollAttempts += $this->lastPollAttempts;
+
+                $csv = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->downloadReport($token, $reportLink),
+                );
+
+                foreach ($this->convertCsvToRowsByDate($csv, $namesById) as $date => $campaignsForDate) {
+                    // Батчи не пересекаются по campaign_id (array_chunk), поэтому коллизий
+                    // внутри одной даты не будет — просто складываем кампании подряд.
+                    foreach ($campaignsForDate as $campaignId => $campaign) {
+                        $byDate[$date][$campaignId] = $campaign;
+                        $rowsCount += count($campaign['rows']);
+                    }
+                }
+            }
+
+            ksort($byDate);
+
+            $result = [];
+            foreach ($byDate as $date => $campaignsMap) {
+                $result[$date] = ['campaigns' => array_values($campaignsMap)];
+            }
+
+            $this->logger->info('Ozon ad statistics fetched', [
+                'company_id' => $companyId,
+                'date_from' => $dateFrom->format('Y-m-d'),
+                'date_to' => $dateTo->format('Y-m-d'),
+                'chunk_days' => $chunkDays,
+                'campaigns_count' => $campaignsCount,
+                'rows_count' => $rowsCount,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'poll_attempts' => $totalPollAttempts,
+            ]);
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->logger->error('Ozon ad statistics fetch failed', [
+                'company_id' => $companyId,
+                'date_from' => $dateFrom->format('Y-m-d'),
+                'date_to' => $dateTo->format('Y-m-d'),
+                'chunk_days' => $chunkDays,
+                'campaigns_count' => $campaignsCount,
+                'rows_count' => $rowsCount,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'poll_attempts' => $totalPollAttempts,
+                'error_class' => $e::class,
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * @return array{client_id: string, client_secret: string}
+     */
+    private function resolveCredentials(string $companyId): array
+    {
+        $credentials = $this->marketplaceFacade->getConnectionCredentials(
+            $companyId,
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::PERFORMANCE,
+        );
+
+        if (null === $credentials) {
+            throw new \RuntimeException('Ozon Performance не подключен');
+        }
+
+        $clientId = (string) ($credentials['client_id'] ?? '');
+        $clientSecret = (string) ($credentials['api_key'] ?? '');
+        if ('' === $clientId || '' === $clientSecret) {
+            throw new \RuntimeException('Ozon Performance: отсутствует client_id или client_secret');
+        }
+
+        return ['client_id' => $clientId, 'client_secret' => $clientSecret];
+    }
+
+    private function assertValidRange(\DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo): void
+    {
+        if ($dateFrom > $dateTo) {
+            throw new \InvalidArgumentException(sprintf('Ozon Performance: dateFrom (%s) больше dateTo (%s)', $dateFrom->format('Y-m-d'), $dateTo->format('Y-m-d')));
+        }
+
+        // diff->days считает разницу в полных сутках; для одинаковых дат = 0.
+        // Для контракта «до 62 дней включительно» переводим в инклюзивный счёт.
+        $diff = $dateFrom->diff($dateTo);
+        $inclusiveDays = (int) $diff->days + 1;
+        if ($inclusiveDays > 62) {
+            throw new \InvalidArgumentException(sprintf('Ozon Performance API supports max 62 days per request, got %d days', $inclusiveDays));
+        }
+    }
+
+    /**
+     * @param list<array{id: string, title: string}> $batch
+     *
+     * @return array{0: list<string>, 1: array<string, string>}
+     */
+    private function splitBatch(array $batch): array
+    {
+        $campaignIds = array_map(static fn (array $c): string => (string) $c['id'], $batch);
+        $namesById = [];
+        foreach ($batch as $campaign) {
+            // title уже содержит либо title, либо name (см. listSkuCampaigns).
+            $namesById[(string) $campaign['id']] = (string) $campaign['title'];
+        }
+
+        return [$campaignIds, $namesById];
     }
 
     /**
@@ -274,17 +464,22 @@ final class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * @param list<string> $campaignIds
+     * @param list<string>         $campaignIds
+     * @param 'NO_GROUP_BY'|'DATE' $groupBy
      */
-    private function requestStatistics(string $token, array $campaignIds, \DateTimeImmutable $date): string
-    {
-        $dateStr = $date->format('Y-m-d');
+    private function requestStatistics(
+        string $token,
+        array $campaignIds,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        string $groupBy,
+    ): string {
         $response = $this->authorizedRequest('POST', self::STATISTICS_PATH, $token, [
             'json' => [
                 'campaigns' => $campaignIds,
-                'from' => $dateStr,
-                'to' => $dateStr,
-                'groupBy' => 'NO_GROUP_BY',
+                'from' => $dateFrom->format('Y-m-d'),
+                'to' => $dateTo->format('Y-m-d'),
+                'groupBy' => $groupBy,
             ],
         ]);
 
@@ -306,6 +501,7 @@ final class OzonAdClient implements AdPlatformClientInterface
         $startedAt = microtime(true);
 
         for ($attempt = 1; $attempt <= self::POLL_MAX_ATTEMPTS; ++$attempt) {
+            $this->lastPollAttempts = $attempt;
             $response = $this->authorizedRequest(
                 'GET',
                 sprintf(self::STATISTICS_STATE_PATH, rawurlencode($uuid)),
@@ -332,22 +528,13 @@ final class OzonAdClient implements AdPlatformClientInterface
             }
 
             if ('ERROR' === $state || 'CANCELLED' === $state || 'NOT_FOUND' === $state) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon Performance: отчёт %s завершился со статусом %s: %s',
-                    $uuid,
-                    $state,
-                    (string) ($data['error'] ?? ''),
-                ));
+                throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s завершился со статусом %s: %s', $uuid, $state, (string) ($data['error'] ?? '')));
             }
 
             sleep(self::POLL_INTERVAL_SECONDS);
         }
 
-        throw new \RuntimeException(sprintf(
-            'Ozon Performance: отчёт %s не готов за %d секунд',
-            $uuid,
-            self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS,
-        ));
+        throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s не готов за %d секунд', $uuid, self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS));
     }
 
     private function downloadReport(string $token, string $reportLink): string
@@ -363,8 +550,8 @@ final class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * Преобразует CSV отчёта Ozon Performance в плоский список строк формата
-     * {campaign_id, campaign_name, sku, spend, views, clicks}.
+     * Преобразует CSV отчёта Ozon Performance (NO_GROUP_BY) в плоский список строк
+     * формата {campaign_id, campaign_name, sku, spend, views, clicks}.
      *
      * @param array<string, string> $namesById кэш campaign_name по campaign_id
      *
@@ -372,9 +559,94 @@ final class OzonAdClient implements AdPlatformClientInterface
      */
     private function convertCsvToRows(string $csv, array $namesById): array
     {
+        $rows = [];
+        foreach ($this->iterateCsvAssocRows($csv) as $row) {
+            $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+            $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+            if ('' === $campaignId || '' === $sku) {
+                continue;
+            }
+
+            $rows[] = [
+                'campaign_id' => $campaignId,
+                'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
+                'sku' => $sku,
+                'spend' => (float) str_replace(',', '.', (string) ($row['spend'] ?? $row['cost'] ?? '0')),
+                'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
+                'clicks' => (int) ($row['clicks'] ?? 0),
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Преобразует CSV отчёта Ozon Performance (groupBy=DATE) в структуру,
+     * сгруппированную по дате:
+     *   Y-m-d => [campaignId => {campaign_id, campaign_name, rows:[{sku, spend, views, clicks}, ...]}].
+     *
+     * Возвращает промежуточную map (не финальный shape с `array_values`), чтобы caller
+     * мог мёрджить результаты нескольких батчей без лишних O(N) проходов.
+     *
+     * @param array<string, string> $namesById кэш campaign_name по campaign_id
+     *
+     * @return array<string, array<string, array{
+     *     campaign_id: string,
+     *     campaign_name: string,
+     *     rows: list<array{sku: string, spend: string, views: int, clicks: int}>,
+     * }>>
+     *
+     * @throws \RuntimeException если в строке отсутствует или невалидна колонка date
+     */
+    private function convertCsvToRowsByDate(string $csv, array $namesById): array
+    {
+        $result = [];
+        foreach ($this->iterateCsvAssocRows($csv) as $row) {
+            $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+            $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+            if ('' === $campaignId || '' === $sku) {
+                // Пустые/частично заполненные строки пропускаем — как в convertCsvToRows.
+                continue;
+            }
+
+            $rawDate = $this->findDateField($row);
+            if ('' === $rawDate) {
+                throw new \RuntimeException(sprintf('Ozon Performance: в строке отчёта отсутствует поле даты (ожидается одна из колонок: date, day, дата); campaign_id=%s, sku=%s', $campaignId, $sku));
+            }
+            $date = $this->parseDateField($rawDate);
+
+            $campaignName = (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? '');
+
+            if (!isset($result[$date][$campaignId])) {
+                $result[$date][$campaignId] = [
+                    'campaign_id' => $campaignId,
+                    'campaign_name' => $campaignName,
+                    'rows' => [],
+                ];
+            }
+
+            $result[$date][$campaignId]['rows'][] = [
+                'sku' => $sku,
+                'spend' => $this->normalizeDecimal((string) ($row['spend'] ?? $row['cost'] ?? '0')),
+                'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
+                'clicks' => (int) ($row['clicks'] ?? 0),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Единая CSV-итерация: drop BOM, автодетект разделителя, stream через
+     * in-memory FILE*, возврат строк с lowercased-заголовками.
+     *
+     * @return \Generator<int, array<string, string>>
+     */
+    private function iterateCsvAssocRows(string $csv): \Generator
+    {
         $csv = ltrim($csv, "\xEF\xBB\xBF"); // drop UTF-8 BOM
         if ('' === trim($csv)) {
-            return [];
+            return;
         }
 
         // Определяем разделитель по первой строке заголовка. Если в заголовке
@@ -399,11 +671,13 @@ final class OzonAdClient implements AdPlatformClientInterface
 
             $headerRow = fgetcsv($fp, 0, $delimiter, '"', '');
             if (false === $headerRow) {
-                return [];
+                return;
             }
-            $header = array_map(static fn ($c): string => strtolower(trim((string) $c)), $headerRow);
+            // mb_strtolower, а не strtolower — иначе локализованные заголовки
+            // (например, "Дата") останутся в исходном регистре и findDateField()
+            // с ключом "дата" их не найдёт.
+            $header = array_map(static fn ($c): string => mb_strtolower(trim((string) $c), 'UTF-8'), $headerRow);
 
-            $rows = [];
             while (false !== ($cols = fgetcsv($fp, 0, $delimiter, '"', ''))) {
                 // fgetcsv на полностью пустой строке возвращает [null] — пропускаем.
                 if ([null] === $cols) {
@@ -412,29 +686,61 @@ final class OzonAdClient implements AdPlatformClientInterface
 
                 $row = [];
                 foreach ($header as $i => $name) {
-                    $row[$name] = $cols[$i] ?? '';
+                    $row[$name] = (string) ($cols[$i] ?? '');
                 }
 
-                $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
-                $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
-                if ('' === $campaignId || '' === $sku) {
-                    continue;
-                }
-
-                $rows[] = [
-                    'campaign_id' => $campaignId,
-                    'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
-                    'sku' => $sku,
-                    'spend' => (float) str_replace(',', '.', (string) ($row['spend'] ?? $row['cost'] ?? '0')),
-                    'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
-                    'clicks' => (int) ($row['clicks'] ?? 0),
-                ];
+                yield $row;
             }
-
-            return $rows;
         } finally {
             fclose($fp);
         }
+    }
+
+    /**
+     * @param array<string, string> $row
+     */
+    private function findDateField(array $row): string
+    {
+        foreach (['date', 'day', 'дата'] as $key) {
+            if (isset($row[$key])) {
+                $value = trim($row[$key]);
+                if ('' !== $value) {
+                    return $value;
+                }
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Парсит дату из CSV: принимает YYYY-MM-DD или DD.MM.YYYY.
+     * Нормализованный вывод — всегда Y-m-d.
+     *
+     * @throws \RuntimeException если формат не распознан либо дата некорректна
+     */
+    private function parseDateField(string $value): string
+    {
+        // createFromFormat нормализует несуществующие даты (31.02.2026 → 02.03.2026),
+        // поэтому roundtrip-сравнением отсекаем такие случаи.
+        $iso = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if (false !== $iso && $iso->format('Y-m-d') === $value) {
+            return $value;
+        }
+
+        $dmy = \DateTimeImmutable::createFromFormat('!d.m.Y', $value);
+        if (false !== $dmy && $dmy->format('d.m.Y') === $value) {
+            return $dmy->format('Y-m-d');
+        }
+
+        throw new \RuntimeException(sprintf('Ozon Performance: не удалось распарсить дату "%s" (ожидается YYYY-MM-DD или DD.MM.YYYY)', $value));
+    }
+
+    private function normalizeDecimal(string $raw): string
+    {
+        $v = trim(str_replace(',', '.', $raw));
+
+        return '' === $v ? '0' : $v;
     }
 
     /**
@@ -471,20 +777,11 @@ final class OzonAdClient implements AdPlatformClientInterface
         // или client_id заблокирован у Ozon. Ретраиться бессмысленно, падаем
         // сразу с явным сообщением (а не через общий HTTP %d).
         if (403 === $statusCode) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: %s %s вернул 403 (недостаточно прав у client_id)',
-                $method,
-                $urlOrPath,
-            ));
+            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул 403 (недостаточно прав у client_id)', $method, $urlOrPath));
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
-            throw new \RuntimeException(sprintf(
-                'Ozon Performance: %s %s вернул HTTP %d',
-                $method,
-                $urlOrPath,
-                $statusCode,
-            ));
+            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул HTTP %d', $method, $urlOrPath, $statusCode));
         }
 
         return $response;
