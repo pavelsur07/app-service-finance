@@ -88,9 +88,18 @@ final class AdRawDocumentTest extends TestCase
         self::assertSame('Парсинг упал: неизвестный формат', $doc->getProcessingError());
     }
 
-    /**
-     * @dataProvider terminalStatusProvider
-     */
+    public function testMarkAsProcessedFromFailedIsAllowed(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->asFailed()->build();
+
+        self::assertSame(AdRawDocumentStatus::FAILED, $doc->getStatus());
+
+        $doc->markAsProcessed();
+
+        self::assertSame(AdRawDocumentStatus::PROCESSED, $doc->getStatus());
+    }
+
+    #[DataProvider('terminalStatusProvider')]
     public function testMarkFailedFromTerminalThrows(AdRawDocumentStatus $terminal): void
     {
         $builder = AdRawDocumentBuilder::aRawDocument();
