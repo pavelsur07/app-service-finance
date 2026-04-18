@@ -330,18 +330,18 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
-    public function testTransientFailureIncrementsFailedDaysAndRethrows(): void
+    public function testTransientFailureDoesNotTouchCountersAndRethrows(): void
     {
-        // from=2026-03-01, to=2026-03-03 → chunkDays = 3 (inclusive)
+        // Инкремент failed_days здесь был бы багом: Messenger ретраит
+        // сообщение до max_retries раз, так что одна «настоящая» поломка
+        // чанка давала бы failed_days = (max_retries + 1) · chunkDays и
+        // ломала прогресс (сумма счётчиков ушла бы выше total_days).
         $job = AdLoadJobBuilder::aJob()->asRunning()->build();
 
         $jobRepo = $this->createMock(AdLoadJobRepository::class);
         $jobRepo->method('findByIdAndCompany')->willReturn($job);
         $jobRepo->expects(self::never())->method('markFailed');
-        $jobRepo->expects(self::once())
-            ->method('incrementFailedDays')
-            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID, 3)
-            ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementFailedDays');
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $apiException = new \RuntimeException('Ozon 502 Bad Gateway');

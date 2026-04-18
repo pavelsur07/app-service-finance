@@ -38,8 +38,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *    вызывающей стороны → markFailed(job) + UnrecoverableMessageHandlingException.
  *  - OzonPermanentApiException (403, missing credentials): permanent →
  *    markFailed(job) + UnrecoverableMessageHandlingException.
- *  - Прочие \Throwable (5xx, сеть, JSON-ошибки): transient → incrementFailedDays
- *    на размер чанка, rethrow (Messenger ретраит по стратегии async).
+ *  - Прочие \Throwable (5xx, сеть, JSON-ошибки): transient → rethrow
+ *    (Messenger ретраит по стратегии async). failed_days здесь НЕ инкрементим:
+ *    при max_retries=3 получили бы +chunkDays на каждую попытку (итого 4·chunkDays
+ *    для одного реально упавшего чанка), что ломает прогресс. Когда retry'и
+ *    исчерпаются, message уйдёт в failed-транспорт — его разбирает оператор.
  *
  * Порядок операций строгий: save() → flush() → incrementLoadedDays() →
  * dispatch(ProcessAdRawDocumentMessage). Иначе ProcessAdRawDocumentHandler
@@ -140,12 +143,9 @@ final class FetchOzonAdStatisticsHandler
             );
         } catch (\Throwable $e) {
             // Сетевые сбои / 5xx / JSON-ошибки — transient, Messenger сделает retry.
-            $this->adLoadJobRepository->incrementFailedDays(
-                $message->jobId,
-                $message->companyId,
-                $chunkDays,
-            );
-
+            // failed_days НЕ инкрементим: иначе при max_retries=3 одна реальная
+            // поломка чанка даст +4·chunkDays (после каждого из 4 аттемптов),
+            // прогресс задания уйдёт в минус / выше 100%.
             $this->logger->error('Transient failure loading Ozon ad statistics chunk', $e, [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
