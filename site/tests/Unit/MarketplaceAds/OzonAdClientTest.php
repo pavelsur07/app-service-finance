@@ -24,6 +24,8 @@ final class OzonAdClientTest extends TestCase
     private const CLIENT_SECRET = 'super-secret';
 
     private MarketplaceFacade&MockObject $facade;
+
+    /** @var AbstractLogger&object{records: array<int, array{level: string, message: string, context: array<string, mixed>}>} */
     private LoggerInterface $logger;
 
     protected function setUp(): void
@@ -34,10 +36,29 @@ final class OzonAdClientTest extends TestCase
             ->willReturn(['api_key' => self::CLIENT_SECRET, 'client_id' => self::CLIENT_ID]);
 
         $this->logger = new class extends AbstractLogger {
+            /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
+            public array $records = [];
+
             public function log($level, \Stringable|string $message, array $context = []): void
             {
+                $this->records[] = ['level' => (string) $level, 'message' => (string) $message, 'context' => $context];
             }
         };
+    }
+
+    /**
+     * @return array{level: string, message: string, context: array<string, mixed>}
+     */
+    private function findLogRecord(string $message): array
+    {
+        /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> $records */
+        $records = $this->logger->records;
+        foreach ($records as $r) {
+            if ($r['message'] === $message) {
+                return $r;
+            }
+        }
+        self::fail("Log record with message \"$message\" not found. Got: ".implode(', ', array_column($records, 'message')));
     }
 
     // -----------------------------------------------------------------
@@ -279,6 +300,89 @@ final class OzonAdClientTest extends TestCase
         self::assertCount(1, $result['2026-03-01']['campaigns']);
         self::assertSame('111', $result['2026-03-01']['campaigns'][0]['campaign_id']);
         self::assertSame('SKU-1', $result['2026-03-01']['campaigns'][0]['rows'][0]['sku']);
+    }
+
+    // -----------------------------------------------------------------
+    // Instrumentation: success log "Ozon ad statistics fetched" carries
+    // company_id/date_from/date_to/chunk_days/campaigns_count/rows_count/
+    // duration_ms/poll_attempts
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeEmitsInstrumentationLogOnSuccess(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-1'),
+            campaignListBody: $this->campaignListBody(3),
+            statisticsBody: '{"UUID":"uuid-instr"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-instr'),
+            downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-05'),
+        );
+
+        $record = $this->findLogRecord('Ozon ad statistics fetched');
+        self::assertSame('info', $record['level']);
+
+        $ctx = $record['context'];
+        self::assertSame(self::COMPANY_ID, $ctx['company_id']);
+        self::assertSame('2026-03-01', $ctx['date_from']);
+        self::assertSame('2026-03-05', $ctx['date_to']);
+        self::assertSame(5, $ctx['chunk_days']);
+        self::assertSame(3, $ctx['campaigns_count']);
+        self::assertSame(15, $ctx['rows_count'], '3 campaigns × 5 days = 15 rows');
+        self::assertSame(1, $ctx['poll_attempts'], 'State=OK on first poll → 1 attempt');
+        self::assertIsInt($ctx['duration_ms']);
+        self::assertGreaterThanOrEqual(0, $ctx['duration_ms']);
+        self::assertArrayNotHasKey('error_class', $ctx);
+    }
+
+    // -----------------------------------------------------------------
+    // Instrumentation: error log "Ozon ad statistics fetch failed" carries
+    // same context + error_class/error_message, and the original exception
+    // is rethrown
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeEmitsInstrumentationLogOnError(): void
+    {
+        // Инвертированный диапазон — падает в assertValidRange до любого HTTP-запроса.
+        $client = new OzonAdClient(
+            new MockHttpClient([]),
+            $this->facade,
+            new ArrayAdapter(),
+            $this->logger,
+        );
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-10'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected InvalidArgumentException');
+        } catch (\InvalidArgumentException) {
+            // Expected.
+        }
+
+        $record = $this->findLogRecord('Ozon ad statistics fetch failed');
+        self::assertSame('error', $record['level']);
+
+        $ctx = $record['context'];
+        self::assertSame(self::COMPANY_ID, $ctx['company_id']);
+        self::assertSame('2026-03-10', $ctx['date_from']);
+        self::assertSame('2026-03-01', $ctx['date_to']);
+        // chunkDays считается через diff->days — у diff() знак всегда положительный
+        // (invert=1 флагом), поэтому логируем число суток между датами + 1.
+        self::assertSame(10, $ctx['chunk_days']);
+        self::assertSame(0, $ctx['campaigns_count']);
+        self::assertSame(0, $ctx['rows_count']);
+        self::assertSame(0, $ctx['poll_attempts']);
+        self::assertIsInt($ctx['duration_ms']);
+        self::assertSame(\InvalidArgumentException::class, $ctx['error_class']);
+        self::assertStringContainsString('больше', $ctx['error_message']);
     }
 
     // -----------------------------------------------------------------

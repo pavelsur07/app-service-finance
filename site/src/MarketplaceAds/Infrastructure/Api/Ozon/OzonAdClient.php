@@ -49,6 +49,13 @@ final class OzonAdClient implements AdPlatformClientInterface
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
 
+    /**
+     * Счётчик итераций последнего pollReport() — используется инструментированием
+     * fetchAdStatisticsRange(), чтобы не ломать публичную сигнатуру pollReport
+     * и не пробрасывать значения через withAuthRetry-замыкания.
+     */
+    private int $lastPollAttempts = 0;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -159,84 +166,122 @@ final class OzonAdClient implements AdPlatformClientInterface
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
     ): array {
-        $this->assertValidRange($dateFrom, $dateTo);
+        $startedAt = microtime(true);
+        // chunkDays считаем ещё до assertValidRange, чтобы лог ошибки содержал
+        // фактический входной диапазон (даже если он > 62 дней).
+        $chunkDays = (int) $dateFrom->diff($dateTo)->days + 1;
+        $campaignsCount = 0;
+        $rowsCount = 0;
+        $totalPollAttempts = 0;
 
-        $credentials = $this->resolveCredentials($companyId);
-        $clientId = $credentials['client_id'];
-        $clientSecret = $credentials['client_secret'];
+        try {
+            $this->assertValidRange($dateFrom, $dateTo);
 
-        $this->logger->info('Ozon Performance: начало загрузки статистики (range)', [
-            'companyId' => $companyId,
-            'dateFrom' => $dateFrom->format('Y-m-d'),
-            'dateTo' => $dateTo->format('Y-m-d'),
-        ]);
+            $credentials = $this->resolveCredentials($companyId);
+            $clientId = $credentials['client_id'];
+            $clientSecret = $credentials['client_secret'];
 
-        $campaigns = $this->withAuthRetry(
-            $companyId,
-            $clientId,
-            $clientSecret,
-            fn (string $token): array => $this->listSkuCampaigns($token),
-        );
-
-        $this->logger->info('Ozon Performance: получен список SKU-кампаний (range)', [
-            'companyId' => $companyId,
-            'count' => count($campaigns),
-        ]);
-
-        if ([] === $campaigns) {
-            return [];
-        }
-
-        /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
-        $byDate = [];
-
-        foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
-            [$campaignIds, $namesById] = $this->splitBatch($batch);
-
-            $uuid = $this->withAuthRetry(
-                $companyId,
-                $clientId,
-                $clientSecret,
-                fn (string $token): string => $this->requestStatistics($token, $campaignIds, $dateFrom, $dateTo, 'DATE'),
-            );
-
-            $this->logger->info('Ozon Performance: запрошен отчёт (range)', [
+            $this->logger->info('Ozon Performance: начало загрузки статистики (range)', [
                 'companyId' => $companyId,
-                'reportUuid' => $uuid,
-                'campaignCount' => count($campaignIds),
+                'dateFrom' => $dateFrom->format('Y-m-d'),
+                'dateTo' => $dateTo->format('Y-m-d'),
             ]);
 
-            $reportLink = $this->withAuthRetry(
+            $campaigns = $this->withAuthRetry(
                 $companyId,
                 $clientId,
                 $clientSecret,
-                fn (string $token): string => $this->pollReport($token, $uuid),
+                fn (string $token): array => $this->listSkuCampaigns($token),
             );
+            $campaignsCount = count($campaigns);
 
-            $csv = $this->withAuthRetry(
-                $companyId,
-                $clientId,
-                $clientSecret,
-                fn (string $token): string => $this->downloadReport($token, $reportLink),
-            );
+            $this->logger->info('Ozon Performance: получен список SKU-кампаний (range)', [
+                'companyId' => $companyId,
+                'count' => $campaignsCount,
+            ]);
 
-            foreach ($this->convertCsvToRowsByDate($csv, $namesById) as $date => $campaignsForDate) {
-                // Батчи не пересекаются по campaign_id (array_chunk), поэтому коллизий
-                // внутри одной даты не будет — просто складываем кампании подряд.
-                foreach ($campaignsForDate as $campaignId => $campaign) {
-                    $byDate[$date][$campaignId] = $campaign;
+            /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
+            $byDate = [];
+
+            foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
+                [$campaignIds, $namesById] = $this->splitBatch($batch);
+
+                $uuid = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->requestStatistics($token, $campaignIds, $dateFrom, $dateTo, 'DATE'),
+                );
+
+                $this->logger->info('Ozon Performance: запрошен отчёт (range)', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $uuid,
+                    'campaignCount' => count($campaignIds),
+                ]);
+
+                $reportLink = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->pollReport($token, $uuid),
+                );
+                // pollReport не возвращает attempts, чтобы не ломать публичную
+                // сигнатуру — счётчик читаем через $this->lastPollAttempts и
+                // суммируем по всем батчам.
+                $totalPollAttempts += $this->lastPollAttempts;
+
+                $csv = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->downloadReport($token, $reportLink),
+                );
+
+                foreach ($this->convertCsvToRowsByDate($csv, $namesById) as $date => $campaignsForDate) {
+                    // Батчи не пересекаются по campaign_id (array_chunk), поэтому коллизий
+                    // внутри одной даты не будет — просто складываем кампании подряд.
+                    foreach ($campaignsForDate as $campaignId => $campaign) {
+                        $byDate[$date][$campaignId] = $campaign;
+                        $rowsCount += count($campaign['rows']);
+                    }
                 }
             }
+
+            ksort($byDate);
+
+            $result = [];
+            foreach ($byDate as $date => $campaignsMap) {
+                $result[$date] = ['campaigns' => array_values($campaignsMap)];
+            }
+
+            $this->logger->info('Ozon ad statistics fetched', [
+                'company_id' => $companyId,
+                'date_from' => $dateFrom->format('Y-m-d'),
+                'date_to' => $dateTo->format('Y-m-d'),
+                'chunk_days' => $chunkDays,
+                'campaigns_count' => $campaignsCount,
+                'rows_count' => $rowsCount,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'poll_attempts' => $totalPollAttempts,
+            ]);
+
+            return $result;
+        } catch (\Throwable $e) {
+            $this->logger->error('Ozon ad statistics fetch failed', [
+                'company_id' => $companyId,
+                'date_from' => $dateFrom->format('Y-m-d'),
+                'date_to' => $dateTo->format('Y-m-d'),
+                'chunk_days' => $chunkDays,
+                'campaigns_count' => $campaignsCount,
+                'rows_count' => $rowsCount,
+                'duration_ms' => (int) round((microtime(true) - $startedAt) * 1000),
+                'poll_attempts' => $totalPollAttempts,
+                'error_class' => $e::class,
+                'error_message' => $e->getMessage(),
+            ]);
+
+            throw $e;
         }
-
-        ksort($byDate);
-
-        $result = [];
-        foreach ($byDate as $date => $campaignsMap) {
-            $result[$date] = ['campaigns' => array_values($campaignsMap)];
-        }
-
-        return $result;
     }
 
     /**
@@ -456,6 +501,7 @@ final class OzonAdClient implements AdPlatformClientInterface
         $startedAt = microtime(true);
 
         for ($attempt = 1; $attempt <= self::POLL_MAX_ATTEMPTS; ++$attempt) {
+            $this->lastPollAttempts = $attempt;
             $response = $this->authorizedRequest(
                 'GET',
                 sprintf(self::STATISTICS_STATE_PATH, rawurlencode($uuid)),
