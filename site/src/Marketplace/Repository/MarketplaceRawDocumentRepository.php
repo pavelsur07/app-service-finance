@@ -20,6 +20,38 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Idempotency lookup for daily sync: возвращает существующий raw_document
+     * за конкретный день (periodFrom=periodTo), у которого processingStatus
+     * НЕ равен FAILED (т.е. null / PENDING / RUNNING / COMPLETED).
+     *
+     * Используется SyncOzonReportHandler'ом для skip'а повторной загрузки,
+     * пока первый прогон ещё in-flight или уже завершён успешно. FAILED
+     * документы в выборку не попадают, чтобы retry мог создать новый.
+     */
+    public function findExistingDayDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        \DateTimeImmutable $day,
+    ): ?MarketplaceRawDocument {
+        return $this->createQueryBuilder('d')
+            ->where('d.company = :company')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.periodFrom = :day')
+            ->andWhere('d.periodTo = :day')
+            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->setParameter('day', $day)
+            ->setParameter('failed', PipelineStatus::FAILED)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return MarketplaceRawDocument[]
      */
     public function findByCompany(Company $company, int $limit = 20): array
