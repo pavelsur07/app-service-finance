@@ -31,7 +31,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  * заново (актуально, если кто-то параллельно отозвал токен в ЛК Ozon). 403 трактуется
  * как permanent denial (нет скоупа «Продвижение») и ретраится не будет.
  */
-final class OzonAdClient implements AdPlatformClientInterface
+class OzonAdClient implements AdPlatformClientInterface
 {
     private const BASE_URL = 'https://api-performance.ozon.ru';
     private const TOKEN_PATH = '/api/client/token';
@@ -296,13 +296,13 @@ final class OzonAdClient implements AdPlatformClientInterface
         );
 
         if (null === $credentials) {
-            throw new \RuntimeException('Ozon Performance не подключен');
+            throw new OzonPermanentApiException('Ozon Performance не подключен');
         }
 
         $clientId = (string) ($credentials['client_id'] ?? '');
         $clientSecret = (string) ($credentials['api_key'] ?? '');
         if ('' === $clientId || '' === $clientSecret) {
-            throw new \RuntimeException('Ozon Performance: отсутствует client_id или client_secret');
+            throw new OzonPermanentApiException('Ozon Performance: отсутствует client_id или client_secret');
         }
 
         return ['client_id' => $clientId, 'client_secret' => $clientSecret];
@@ -782,7 +782,7 @@ final class OzonAdClient implements AdPlatformClientInterface
         // или client_id заблокирован у Ozon. Ретраиться бессмысленно, падаем
         // сразу с явным сообщением (а не через общий HTTP %d).
         if (403 === $statusCode) {
-            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул 403 (недостаточно прав у client_id)', $method, $urlOrPath));
+            throw new OzonPermanentApiException(sprintf('Ozon Performance: %s %s вернул 403 (недостаточно прав у client_id)', $method, $urlOrPath));
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {

@@ -48,6 +48,7 @@ framework:
             Symfony\Component\Notifier\Message\SmsMessage: async
             App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage: async
             App\MarketplaceAds\Message\ProcessAdRawDocumentMessage: async
+            App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage: async
 
             # Route your messages to the transports
             # 'App\Message\YourMessage': async

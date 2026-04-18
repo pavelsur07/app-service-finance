@@ -9,7 +9,7 @@ use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-final class AdRawDocumentRepository extends ServiceEntityRepository
+class AdRawDocumentRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
     {
