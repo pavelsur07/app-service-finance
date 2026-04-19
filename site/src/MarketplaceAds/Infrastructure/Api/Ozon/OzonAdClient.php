@@ -794,8 +794,15 @@ class OzonAdClient implements AdPlatformClientInterface
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
-            $body = $response->getContent(false);
-            $bodyPreview = mb_strimwidth($body, 0, 2000, '...');
+            try {
+                $body = $response->getContent(false);
+                $bodyPreview = mb_strimwidth($body, 0, 2000, '...');
+            } catch (TransportExceptionInterface) {
+                // Если соединение оборвётся после получения заголовков, но до
+                // дочитывания тела — всё равно отдаём наверх HTTP-код, чтобы
+                // диагностический статус не был подменён TransportException'ом.
+                $bodyPreview = '<body unavailable>';
+            }
             throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул HTTP %d, body: %s', $method, $urlOrPath, $statusCode, $bodyPreview));
         }
 
