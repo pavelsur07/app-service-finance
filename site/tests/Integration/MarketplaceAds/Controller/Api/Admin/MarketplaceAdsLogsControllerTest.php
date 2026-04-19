@@ -11,8 +11,8 @@ use App\Tests\Support\Kernel\WebTestCaseBase;
 final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-a00000000001';
-    private const OWNER_ID = '22222222-2222-2222-2222-a00000000001';
-    private const OTHER_USER_ID = '22222222-2222-2222-2222-a00000000002';
+    private const ADMIN_ID = '22222222-2222-2222-2222-a00000000001';
+    private const OWNER_ID = '22222222-2222-2222-2222-a00000000002';
 
     private const URL = '/api/marketplace-ads/admin/logs';
 
@@ -22,22 +22,23 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         parent::tearDown();
     }
 
-    public function testReturns200AndTailForCompanyOwner(): void
+    public function testReturns200AndTailForSuperAdmin(): void
     {
         $client = static::createClient();
         $this->resetDb();
         $em = $this->em();
 
-        $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
-            ->withEmail('ads-logs-owner@example.test')
+        $admin = UserBuilder::aUser()
+            ->withId(self::ADMIN_ID)
+            ->withEmail('ads-logs-admin@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER', 'ROLE_SUPER_ADMIN'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
-            ->withOwner($owner)
+            ->withOwner($admin)
             ->build();
 
-        $em->persist($owner);
+        $em->persist($admin);
         $em->persist($company);
         $em->flush();
 
@@ -47,7 +48,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
             'line-3',
         ]);
 
-        $this->loginAs($client, $owner, self::COMPANY_ID);
+        $this->loginAs($client, $admin, self::COMPANY_ID);
 
         $client->request('GET', self::URL);
 
@@ -62,7 +63,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         self::assertStringContainsString('line-3', $body);
     }
 
-    public function testReturns403ForCompanyUserWithoutOwnerRole(): void
+    public function testReturns403ForCompanyOwnerWithoutSuperAdmin(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -71,24 +72,18 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         $owner = UserBuilder::aUser()
             ->withId(self::OWNER_ID)
             ->withEmail('ads-logs-403-owner@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
             ->withOwner($owner)
             ->build();
 
-        $regular = UserBuilder::aUser()
-            ->withId(self::OTHER_USER_ID)
-            ->withEmail('ads-logs-403-user@example.test')
-            ->withRoles(['ROLE_COMPANY_USER'])
-            ->build();
-
         $em->persist($owner);
         $em->persist($company);
-        $em->persist($regular);
         $em->flush();
 
-        $this->loginAs($client, $regular, self::COMPANY_ID);
+        $this->loginAs($client, $owner, self::COMPANY_ID);
 
         $client->request('GET', self::URL);
 
@@ -117,20 +112,21 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
 
         $this->cleanupLogFiles();
 
-        $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
+        $admin = UserBuilder::aUser()
+            ->withId(self::ADMIN_ID)
             ->withEmail('ads-logs-nofile@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER', 'ROLE_SUPER_ADMIN'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
-            ->withOwner($owner)
+            ->withOwner($admin)
             ->build();
 
-        $em->persist($owner);
+        $em->persist($admin);
         $em->persist($company);
         $em->flush();
 
-        $this->loginAs($client, $owner, self::COMPANY_ID);
+        $this->loginAs($client, $admin, self::COMPANY_ID);
 
         $client->request('GET', self::URL);
 
@@ -144,16 +140,17 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         $this->resetDb();
         $em = $this->em();
 
-        $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
+        $admin = UserBuilder::aUser()
+            ->withId(self::ADMIN_ID)
             ->withEmail('ads-logs-lines@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER', 'ROLE_SUPER_ADMIN'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
-            ->withOwner($owner)
+            ->withOwner($admin)
             ->build();
 
-        $em->persist($owner);
+        $em->persist($admin);
         $em->persist($company);
         $em->flush();
 
@@ -163,7 +160,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         }
         $this->writeLogFile('marketplace_ads-2026-04-19.log', $rows);
 
-        $this->loginAs($client, $owner, self::COMPANY_ID);
+        $this->loginAs($client, $admin, self::COMPANY_ID);
 
         $client->request('GET', self::URL . '?lines=10');
 
@@ -181,16 +178,17 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         $this->resetDb();
         $em = $this->em();
 
-        $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
+        $admin = UserBuilder::aUser()
+            ->withId(self::ADMIN_ID)
             ->withEmail('ads-logs-search@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER', 'ROLE_SUPER_ADMIN'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
-            ->withOwner($owner)
+            ->withOwner($admin)
             ->build();
 
-        $em->persist($owner);
+        $em->persist($admin);
         $em->persist($company);
         $em->flush();
 
@@ -201,7 +199,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
             'random stuff',
         ]);
 
-        $this->loginAs($client, $owner, self::COMPANY_ID);
+        $this->loginAs($client, $admin, self::COMPANY_ID);
 
         $client->request('GET', self::URL . '?search=ozon');
 
@@ -219,16 +217,17 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         $this->resetDb();
         $em = $this->em();
 
-        $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
+        $admin = UserBuilder::aUser()
+            ->withId(self::ADMIN_ID)
             ->withEmail('ads-logs-latest@example.test')
+            ->withRoles(['ROLE_COMPANY_OWNER', 'ROLE_SUPER_ADMIN'])
             ->build();
         $company = CompanyBuilder::aCompany()
             ->withId(self::COMPANY_ID)
-            ->withOwner($owner)
+            ->withOwner($admin)
             ->build();
 
-        $em->persist($owner);
+        $em->persist($admin);
         $em->persist($company);
         $em->flush();
 
@@ -237,7 +236,7 @@ final class MarketplaceAdsLogsControllerTest extends WebTestCaseBase
         touch($oldPath, time() - 3600);
         touch($newPath, time());
 
-        $this->loginAs($client, $owner, self::COMPANY_ID);
+        $this->loginAs($client, $admin, self::COMPANY_ID);
 
         $client->request('GET', self::URL);
 

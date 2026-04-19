@@ -16,7 +16,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
     name: 'marketplace_ads_admin_logs',
     methods: ['GET'],
 )]
-#[IsGranted('ROLE_COMPANY_OWNER')]
+#[IsGranted('ROLE_SUPER_ADMIN')]
 final class MarketplaceAdsLogsController extends AbstractController
 {
     private const DEFAULT_LINES = 200;
