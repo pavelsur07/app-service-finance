@@ -260,6 +260,8 @@
                             var canMarkFailed = isCompanyOwner && (job.status === 'pending' || job.status === 'running');
                             var actionsCell = canMarkFailed
                                 ? '<td><button type="button" class="btn btn-sm btn-outline-danger" '
+                                    + 'data-bs-toggle="modal" '
+                                    + 'data-bs-target="#modal-mark-ad-load-job-failed" '
                                     + 'data-mark-failed data-job-id="' + escapeHtml(job.id) + '">'
                                     + 'Пометить FAILED</button></td>'
                                 : '<td></td>';
@@ -404,20 +406,26 @@
             var markFailedReasonEl = document.getElementById('mark-failed-reason');
             var markFailedJobId = null;
 
-            var openMarkFailedModal = function (jobId) {
-                markFailedJobId = jobId;
-                if (markFailedReasonEl) markFailedReasonEl.value = '';
+            var hideMarkFailedModal = function () {
+                if (!markFailedModalEl) return;
                 var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
-                if (BootstrapModal && markFailedModalEl) {
-                    BootstrapModal.getOrCreateInstance(markFailedModalEl).show();
+                if (BootstrapModal) {
+                    var instance = BootstrapModal.getInstance(markFailedModalEl)
+                        || BootstrapModal.getOrCreateInstance(markFailedModalEl);
+                    instance.hide();
+                    return;
                 }
+                var closeBtn = markFailedModalEl.querySelector('[data-bs-dismiss="modal"]');
+                if (closeBtn) closeBtn.click();
             };
 
-            document.addEventListener('click', function (e) {
-                var btn = e.target.closest('[data-mark-failed]');
-                if (!btn) return;
-                openMarkFailedModal(btn.dataset.jobId);
-            });
+            if (markFailedModalEl) {
+                markFailedModalEl.addEventListener('show.bs.modal', function (event) {
+                    var trigger = event.relatedTarget;
+                    markFailedJobId = trigger ? trigger.getAttribute('data-job-id') : null;
+                    if (markFailedReasonEl) markFailedReasonEl.value = '';
+                });
+            }
 
             if (markFailedBtn) {
                 markFailedBtn.addEventListener('click', function () {
@@ -441,10 +449,7 @@
                             if (res.ok) {
                                 window.location.reload();
                             } else {
-                                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
-                                if (BootstrapModal && markFailedModalEl) {
-                                    BootstrapModal.getOrCreateInstance(markFailedModalEl).hide();
-                                }
+                                hideMarkFailedModal();
                                 alert('Ошибка: ' + ((res.data && res.data.error) || 'Неизвестная ошибка'));
                                 markFailedBtn.disabled = false;
                                 markFailedBtn.innerHTML = original;
