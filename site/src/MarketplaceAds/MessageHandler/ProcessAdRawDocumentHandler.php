@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\MessageHandler;
 
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
-use App\MarketplaceAds\Enum\AdLoadJobStatus;
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
-use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
 use App\Shared\Service\AppLogger;
@@ -32,11 +31,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
  *
  * Финализация AdLoadJob:
  *  - после любого терминального исхода (PROCESSED/FAILED) handler пытается
- *    финализировать job, который покрывает дату документа: если все чанки
- *    зафиксированы И все документы за период в терминальном статусе, job
- *    переводится в COMPLETED (при отсутствии failed-документов) или FAILED
- *    (если хотя бы один документ failed). Решение принимается по COUNT(*)
- *    в БД, а не по локальным счётчикам — это устойчиво к параллельным воркерам.
+ *    финализировать job, который покрывает дату документа; сама логика
+ *    финализации вынесена в {@see AdLoadJobFinalizer} и шарится с
+ *    FetchOzonAdStatisticsHandler (для кейса «0 документов за чанк»).
  */
 #[AsMessageHandler]
 final class ProcessAdRawDocumentHandler
@@ -45,7 +42,7 @@ final class ProcessAdRawDocumentHandler
         private readonly ProcessAdRawDocumentAction $action,
         private readonly AdRawDocumentRepositoryInterface $adRawDocumentRepository,
         private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
-        private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
+        private readonly AdLoadJobFinalizer $adLoadJobFinalizer,
         private readonly EntityManagerInterface $entityManager,
         private readonly AppLogger $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
@@ -146,7 +143,7 @@ final class ProcessAdRawDocumentHandler
     }
 
     /**
-     * Находит активный job, покрывающий дату документа, и пытается финализировать.
+     * Находит активный job, покрывающий дату документа, и делегирует финализацию.
      *
      * Документ перечитывается заново — статус мог измениться внутри __invoke
      * (DRAFT → FAILED). Если job не найден (например, уже завершён другим воркером
@@ -168,87 +165,6 @@ final class ProcessAdRawDocumentHandler
             return;
         }
 
-        $this->tryFinalizeJob($job->getId(), $companyId);
-    }
-
-    /**
-     * Идемпотентная попытка финализации job'а.
-     *
-     * Все условия проверяются по актуальному состоянию БД (COUNT по чанкам и
-     * документам), что позволяет нескольким параллельным воркерам безопасно
-     * вызывать метод одновременно — markCompleted/markFailed имеют SQL-guard
-     * `status IN (pending, running)` и обновят строку только один раз.
-     */
-    private function tryFinalizeJob(string $jobId, string $companyId): void
-    {
-        $job = $this->adLoadJobRepository->findByIdAndCompany($jobId, $companyId);
-        if (null === $job) {
-            return;
-        }
-
-        if (AdLoadJobStatus::RUNNING !== $job->getStatus()) {
-            return;
-        }
-
-        $completedChunks = $this->adChunkProgressRepository->countCompletedChunks($jobId, $companyId);
-        if ($completedChunks < $job->getChunksTotal()) {
-            return;
-        }
-
-        $marketplaceValue = $job->getMarketplace()->value;
-        $dateFrom = $job->getDateFrom();
-        $dateTo = $job->getDateTo();
-
-        $totalDocs = $this->adRawDocumentRepository->countByCompanyMarketplaceAndDateRange(
-            $companyId,
-            $marketplaceValue,
-            $dateFrom,
-            $dateTo,
-        );
-        $processedDocs = $this->adRawDocumentRepository->countByCompanyMarketplaceAndDateRange(
-            $companyId,
-            $marketplaceValue,
-            $dateFrom,
-            $dateTo,
-            AdRawDocumentStatus::PROCESSED,
-        );
-        $failedDocs = $this->adRawDocumentRepository->countByCompanyMarketplaceAndDateRange(
-            $companyId,
-            $marketplaceValue,
-            $dateFrom,
-            $dateTo,
-            AdRawDocumentStatus::FAILED,
-        );
-
-        // Остались DRAFT-документы — финализацию делать рано: их добьёт
-        // следующий вызов handler'а после обработки оставшихся документов.
-        if ($processedDocs + $failedDocs < $totalDocs) {
-            return;
-        }
-
-        if (0 === $failedDocs) {
-            $affected = $this->adLoadJobRepository->markCompleted($jobId, $companyId);
-            if ($affected > 0) {
-                $this->marketplaceAdsLogger->info('AdLoadJob completed', [
-                    'jobId' => $jobId,
-                    'companyId' => $companyId,
-                    'totalDocs' => $totalDocs,
-                ]);
-            }
-
-            return;
-        }
-
-        $reason = sprintf('Partial failure: %d of %d documents failed', $failedDocs, $totalDocs);
-        $affected = $this->adLoadJobRepository->markFailed($jobId, $companyId, $reason);
-        if ($affected > 0) {
-            $this->marketplaceAdsLogger->warning('AdLoadJob finalized with failures', [
-                'jobId' => $jobId,
-                'companyId' => $companyId,
-                'totalDocs' => $totalDocs,
-                'failedDocs' => $failedDocs,
-                'processedDocs' => $processedDocs,
-            ]);
-        }
+        $this->adLoadJobFinalizer->tryFinalize($job->getId(), $companyId);
     }
 }

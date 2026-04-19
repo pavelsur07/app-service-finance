@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\MessageHandler;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
@@ -49,8 +50,12 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *    message уйдёт в failed-транспорт — его разбирает оператор.
  *
  * Порядок операций строгий: save() → flush() → incrementLoadedDays() →
- * dispatch(ProcessAdRawDocumentMessage). Иначе ProcessAdRawDocumentHandler
- * может стартовать до появления документа в БД.
+ * dispatch(ProcessAdRawDocumentMessage) → tryFinalize. Иначе
+ * ProcessAdRawDocumentHandler может стартовать до появления документа в БД.
+ *
+ * tryFinalize после dispatch — необходимый триггер для случая, когда Ozon
+ * вернул 0 документов за период: per-document handler'ы никогда не
+ * запустятся, и без прямого вызова finalizer здесь job застрянет в RUNNING.
  */
 #[AsMessageHandler]
 final class FetchOzonAdStatisticsHandler
@@ -60,6 +65,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
+        private readonly AdLoadJobFinalizer $adLoadJobFinalizer,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
@@ -272,6 +278,12 @@ final class FetchOzonAdStatisticsHandler
                 $doc->getId(),
             ));
         }
+
+        // Пытаемся финализировать job — покрывает кейс, когда Ozon вернул 0
+        // документов за период: ProcessAdRawDocumentHandler в этом случае
+        // никогда не запустится, и без явной попытки здесь job навечно завис
+        // бы в RUNNING при markChunkCompleted для последнего чанка.
+        $this->adLoadJobFinalizer->tryFinalize($message->jobId, $message->companyId);
 
         $this->marketplaceAdsLogger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,

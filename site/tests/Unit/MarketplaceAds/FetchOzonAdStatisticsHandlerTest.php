@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAds;
 
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
@@ -14,6 +15,7 @@ use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
+use DG\BypassFinals;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -21,6 +23,12 @@ use Sentry\State\HubInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+
+// Bootstrap pins BypassFinals to an allowlist; finalizer is final readonly — extend
+// the allowlist so PHPUnit can double it.
+BypassFinals::allowPaths([
+    '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
+]);
 
 /**
  * Unit-тесты FetchOzonAdStatisticsHandler.
@@ -39,6 +47,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * 11. json_encode() === false для одного дня: день пропускается, остальные загружаются.
  * 12. Невалидный формат даты в Message: markFailed + UnrecoverableMessageHandlingException.
  * 13. Календарно-невалидная дата (2026-02-31): markFailed + UnrecoverableMessageHandlingException.
+ * 14. Happy-path: AdLoadJobFinalizer::tryFinalize вызывается ПОСЛЕ markChunkCompleted —
+ *     без этого job с нулём документов от Ozon навечно залип бы в RUNNING.
  */
 final class FetchOzonAdStatisticsHandlerTest extends TestCase
 {
@@ -172,6 +182,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $rawRepo,
             $jobRepo,
             $chunkProgressRepo,
+            $this->createMock(AdLoadJobFinalizer::class),
             $em,
             $messageBus,
             $logger,
@@ -718,6 +729,69 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
+    /**
+     * Сценарий 14: happy-path вызывает AdLoadJobFinalizer::tryFinalize.
+     *
+     * Без этого вызова задание, по которому Ozon вернул 0 документов за весь
+     * период, зависнет в RUNNING навечно: ProcessAdRawDocumentHandler не
+     * запустится, и триггера финализации не будет.
+     */
+    public function testHappyPathCallsFinalizerAfterMarkChunkCompleted(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+
+        $markedChunk = false;
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')
+            ->willReturnCallback(static function () use (&$markedChunk): bool {
+                $markedChunk = true;
+
+                return true;
+            });
+
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::once())
+            ->method('tryFinalize')
+            ->with(self::JOB_ID, self::COMPANY_ID)
+            ->willReturnCallback(static function () use (&$markedChunk): void {
+                self::assertTrue(
+                    $markedChunk,
+                    'tryFinalize должен вызываться ПОСЛЕ markChunkCompleted',
+                );
+            });
+
+        $handler = $this->createHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $em,
+            $messageBus,
+            $finalizer,
+        );
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
     private function createHandler(
         OzonAdClient $ozonClient,
         AdRawDocumentRepository $rawRepo,
@@ -725,12 +799,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         AdChunkProgressRepositoryInterface $chunkProgressRepo,
         EntityManagerInterface $em,
         MessageBusInterface $messageBus,
+        ?AdLoadJobFinalizer $finalizer = null,
     ): FetchOzonAdStatisticsHandler {
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $rawRepo,
             $jobRepo,
             $chunkProgressRepo,
+            $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
             $em,
             $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),

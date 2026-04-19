@@ -6,11 +6,10 @@ namespace App\Tests\Unit\MarketplaceAds;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\ProcessAdRawDocumentAction;
-use App\MarketplaceAds\Enum\AdRawDocumentStatus;
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Exception\AdRawDocumentAlreadyProcessedException;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\MessageHandler\ProcessAdRawDocumentHandler;
-use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
 use App\Shared\Service\AppLogger;
@@ -23,24 +22,26 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Sentry\State\HubInterface;
 
-// Bootstrap pins BypassFinals to an allowlist; extend it so the action under test
-// can be doubled without touching the global bootstrap configuration.
+// Bootstrap pins BypassFinals to an allowlist; extend it so the action and finalizer
+// under test can be doubled without touching the global bootstrap configuration.
 BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Application/ProcessAdRawDocumentAction.php',
+    '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
 ]);
 
 /**
- * Unit-тесты {@see ProcessAdRawDocumentHandler}: per-document FAILED + финализация job'а.
+ * Unit-тесты {@see ProcessAdRawDocumentHandler}: per-document FAILED + делегирование финализации.
  *
- * Покрываемые инварианты:
- *  - PROCESSED-документ запускает попытку финализации.
+ * Покрываемые инварианты handler'а:
+ *  - PROCESSED-документ → AdLoadJobFinalizer::tryFinalize(jobId) вызывается.
  *  - DRAFT после Action → markFailedWithReason + return без throw.
  *  - Исключение из Action → markFailedWithReason + tryFinalize + rethrow.
- *  - AdRawDocumentAlreadyProcessedException → swallow, без вызова финализации.
- *  - Финализация: COMPLETED, если failed=0; FAILED с reason, если failed>0.
- *  - Финализация пропускается, если completedChunks < chunksTotal или есть DRAFT-документы.
- *  - Нет активного job на дату → tryFinalize выходит молча.
- *  - Race idempotency: markCompleted вернул 0 → info-лог не пишется.
+ *  - AdRawDocumentAlreadyProcessedException → swallow, finalizer не вызывается.
+ *  - Нет активного job на дату → finalizer не вызывается.
+ *  - Secondary exception после Action-failure не маскирует оригинал.
+ *
+ * Сама логика финализации (chunksTotal, COUNT-и, markCompleted/markFailed) живёт
+ * в {@see AdLoadJobFinalizer} и покрыта {@see AdLoadJobFinalizerTest}.
  */
 final class ProcessAdRawDocumentHandlerTest extends TestCase
 {
@@ -54,8 +55,8 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
     private AdRawDocumentRepositoryInterface $rawDocRepo;
     /** @var AdLoadJobRepositoryInterface&MockObject */
     private AdLoadJobRepositoryInterface $jobRepo;
-    /** @var AdChunkProgressRepositoryInterface&MockObject */
-    private AdChunkProgressRepositoryInterface $chunkRepo;
+    /** @var AdLoadJobFinalizer&MockObject */
+    private AdLoadJobFinalizer $finalizer;
     /** @var EntityManagerInterface&MockObject */
     private EntityManagerInterface $entityManager;
     private AppLogger $logger;
@@ -66,7 +67,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->action = $this->createMock(ProcessAdRawDocumentAction::class);
         $this->rawDocRepo = $this->createMock(AdRawDocumentRepositoryInterface::class);
         $this->jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $this->chunkRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $this->finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
         $this->logger = new AppLogger(new NullLogger(), $this->createMock(HubInterface::class));
 
@@ -74,17 +75,17 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             $this->action,
             $this->rawDocRepo,
             $this->jobRepo,
-            $this->chunkRepo,
+            $this->finalizer,
             $this->entityManager,
             $this->logger,
             new NullLogger(),
         );
     }
 
-    public function testProcessedDocumentTriggersFinalizationCheck(): void
+    public function testProcessedDocumentTriggersFinalizer(): void
     {
         $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 1);
+        $job = $this->buildRunningJob();
 
         $this->action->expects(self::once())
             ->method('__invoke')
@@ -102,22 +103,10 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->jobRepo->expects(self::once())
             ->method('findActiveJobCoveringDate')
             ->willReturn($job);
-        $this->jobRepo->expects(self::once())
-            ->method('findByIdAndCompany')
-            ->with(self::JOB_ID, self::COMPANY_ID)
-            ->willReturn($job);
 
-        $this->chunkRepo->expects(self::once())
-            ->method('countCompletedChunks')
-            ->willReturn(1);
-
-        // chunks complete → читаем COUNT по документам.
-        $this->mockDocCounts(total: 1, processed: 1, failed: 0);
-
-        $this->jobRepo->expects(self::once())
-            ->method('markCompleted')
-            ->with(self::JOB_ID, self::COMPANY_ID)
-            ->willReturn(1);
+        $this->finalizer->expects(self::once())
+            ->method('tryFinalize')
+            ->with(self::JOB_ID, self::COMPANY_ID);
 
         ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
     }
@@ -145,10 +134,11 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             )
             ->willReturn(1);
 
-        // Job не найден на дату → tryFinalize выходит no-op'ом, но он реально вызывается.
+        // Job не найден на дату → finalizer не вызывается.
         $this->jobRepo->expects(self::once())
             ->method('findActiveJobCoveringDate')
             ->willReturn(null);
+        $this->finalizer->expects(self::never())->method('tryFinalize');
 
         ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
     }
@@ -176,6 +166,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->rawDocRepo->expects(self::once())
             ->method('findByIdAndCompany')
             ->willReturn(null);
+        $this->finalizer->expects(self::never())->method('tryFinalize');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('boom');
@@ -222,82 +213,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->rawDocRepo->expects(self::never())->method('markFailedWithReason');
         $this->rawDocRepo->expects(self::never())->method('findByIdAndCompany');
         $this->jobRepo->expects(self::never())->method('findActiveJobCoveringDate');
-        $this->jobRepo->expects(self::never())->method('findByIdAndCompany');
-        $this->chunkRepo->expects(self::never())->method('countCompletedChunks');
-
-        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    public function testFinalizationMarksCompletedWhenAllProcessedNoFailures(): void
-    {
-        $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 2);
-
-        $this->primeSuccessPath($document, $job);
-        $this->chunkRepo->method('countCompletedChunks')->willReturn(2);
-        $this->mockDocCounts(total: 5, processed: 5, failed: 0);
-
-        $this->jobRepo->expects(self::once())
-            ->method('markCompleted')
-            ->with(self::JOB_ID, self::COMPANY_ID)
-            ->willReturn(1);
-        $this->jobRepo->expects(self::never())->method('markFailed');
-
-        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    public function testFinalizationMarksFailedWhenSomeDocsFailed(): void
-    {
-        $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 2);
-
-        $this->primeSuccessPath($document, $job);
-        $this->chunkRepo->method('countCompletedChunks')->willReturn(2);
-        $this->mockDocCounts(total: 5, processed: 3, failed: 2);
-
-        $this->jobRepo->expects(self::never())->method('markCompleted');
-        $this->jobRepo->expects(self::once())
-            ->method('markFailed')
-            ->with(
-                self::JOB_ID,
-                self::COMPANY_ID,
-                'Partial failure: 2 of 5 documents failed',
-            )
-            ->willReturn(1);
-
-        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    public function testFinalizationSkippedWhenChunksIncomplete(): void
-    {
-        $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 3);
-
-        $this->primeSuccessPath($document, $job);
-        // Зафиксировано 2 из 3 чанков — рано финализировать.
-        $this->chunkRepo->expects(self::once())
-            ->method('countCompletedChunks')
-            ->willReturn(2);
-
-        $this->rawDocRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
-        $this->jobRepo->expects(self::never())->method('markCompleted');
-        $this->jobRepo->expects(self::never())->method('markFailed');
-
-        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    public function testFinalizationSkippedWhenDraftsRemain(): void
-    {
-        $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 1);
-
-        $this->primeSuccessPath($document, $job);
-        $this->chunkRepo->method('countCompletedChunks')->willReturn(1);
-        // 5 всего, 3 processed + 1 failed = 4 терминальных, остался 1 DRAFT.
-        $this->mockDocCounts(total: 5, processed: 3, failed: 1);
-
-        $this->jobRepo->expects(self::never())->method('markCompleted');
-        $this->jobRepo->expects(self::never())->method('markFailed');
+        $this->finalizer->expects(self::never())->method('tryFinalize');
 
         ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
     }
@@ -316,77 +232,9 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         $this->jobRepo->expects(self::once())
             ->method('findActiveJobCoveringDate')
             ->willReturn(null);
-        $this->jobRepo->expects(self::never())->method('findByIdAndCompany');
-        $this->chunkRepo->expects(self::never())->method('countCompletedChunks');
-        $this->jobRepo->expects(self::never())->method('markCompleted');
-        $this->jobRepo->expects(self::never())->method('markFailed');
+        $this->finalizer->expects(self::never())->method('tryFinalize');
 
         ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    public function testFinalizationRaceIdempotency(): void
-    {
-        // Параллельный воркер уже перевёл job в COMPLETED → markCompleted вернул 0,
-        // info-лог не должен записаться. PHPUnit не умеет ассертить «логгер не вызван»
-        // напрямую через NullLogger, поэтому проверяем конкретную ветку:
-        // markCompleted вернул 0, метод вернулся без исключения, markFailed не вызывался.
-        $document = $this->buildProcessedDocument();
-        $job = $this->buildRunningJob(chunksTotal: 1);
-
-        $this->primeSuccessPath($document, $job);
-        $this->chunkRepo->method('countCompletedChunks')->willReturn(1);
-        $this->mockDocCounts(total: 1, processed: 1, failed: 0);
-
-        $this->jobRepo->expects(self::once())
-            ->method('markCompleted')
-            ->willReturn(0);
-        $this->jobRepo->expects(self::never())->method('markFailed');
-
-        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
-    }
-
-    /**
-     * Подготавливает успешный happy-path: action ок, flush ок, документ перечитан как PROCESSED,
-     * job найден по дате и поднят по ID.
-     */
-    private function primeSuccessPath(object $document, object $job): void
-    {
-        $this->action->expects(self::once())->method('__invoke');
-        $this->entityManager->expects(self::once())->method('flush');
-
-        $this->rawDocRepo->expects(self::exactly(2))
-            ->method('findByIdAndCompany')
-            ->willReturn($document);
-
-        $this->jobRepo->expects(self::once())
-            ->method('findActiveJobCoveringDate')
-            ->willReturn($job);
-        $this->jobRepo->expects(self::once())
-            ->method('findByIdAndCompany')
-            ->with(self::JOB_ID, self::COMPANY_ID)
-            ->willReturn($job);
-    }
-
-    private function mockDocCounts(int $total, int $processed, int $failed): void
-    {
-        $this->rawDocRepo->expects(self::exactly(3))
-            ->method('countByCompanyMarketplaceAndDateRange')
-            ->willReturnCallback(
-                static function (
-                    string $companyId,
-                    string $marketplace,
-                    \DateTimeImmutable $from,
-                    \DateTimeImmutable $to,
-                    ?AdRawDocumentStatus $status = null,
-                ) use ($total, $processed, $failed): int {
-                    return match ($status) {
-                        null => $total,
-                        AdRawDocumentStatus::PROCESSED => $processed,
-                        AdRawDocumentStatus::FAILED => $failed,
-                        default => 0,
-                    };
-                },
-            );
     }
 
     private function buildDraftDocument(): object
@@ -418,7 +266,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             ->build();
     }
 
-    private function buildRunningJob(int $chunksTotal): object
+    private function buildRunningJob(): object
     {
         return AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
@@ -427,7 +275,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
                 new \DateTimeImmutable('2026-03-01'),
                 new \DateTimeImmutable('2026-03-10'),
             )
-            ->withChunksTotal($chunksTotal)
+            ->withChunksTotal(1)
             ->asRunning()
             ->build();
     }
