@@ -57,8 +57,8 @@ final class AdLoadJobFailureSubscriber implements EventSubscriberInterface
             : $throwable;
 
         $reason = $rootCause::class.': '.$rootCause->getMessage();
-        if (\strlen($reason) > self::REASON_MAX_LENGTH) {
-            $reason = substr($reason, 0, self::REASON_MAX_LENGTH);
+        if (mb_strlen($reason, 'UTF-8') > self::REASON_MAX_LENGTH) {
+            $reason = mb_substr($reason, 0, self::REASON_MAX_LENGTH, 'UTF-8');
         }
 
         $this->adLoadJobRepository->markFailed($message->jobId, $message->companyId, $reason);

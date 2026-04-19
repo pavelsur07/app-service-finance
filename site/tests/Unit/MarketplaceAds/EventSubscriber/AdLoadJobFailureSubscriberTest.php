@@ -151,6 +151,38 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
         (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
     }
 
+    public function testReasonTruncationKeepsUtf8Valid(): void
+    {
+        // 5000 повторений кириллической буквы (2 байта UTF-8) = 10 000 байт.
+        // Байтовое substr порвало бы последний символ; mb_substr режет по символам.
+        $longMessage = str_repeat('ё', 5000);
+
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->expects(self::once())
+            ->method('markFailed')
+            ->with(
+                self::JOB_ID,
+                self::COMPANY_ID,
+                self::callback(static function (string $reason): bool {
+                    return mb_strlen($reason, 'UTF-8') <= 1000
+                        && mb_check_encoding($reason, 'UTF-8');
+                }),
+            )
+            ->willReturn(1);
+
+        $logger = $this->createMock(LoggerInterface::class);
+
+        $envelope = new Envelope(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            '2026-03-01',
+            '2026-03-03',
+        ));
+        $event = new WorkerMessageFailedEvent($envelope, 'async', new \RuntimeException($longMessage));
+
+        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+    }
+
     public function testReasonIsTruncatedTo1000Chars(): void
     {
         $longMessage = str_repeat('A', 5000);
@@ -162,7 +194,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
                 self::JOB_ID,
                 self::COMPANY_ID,
                 self::callback(static function (string $reason): bool {
-                    return \strlen($reason) <= 1000;
+                    return mb_strlen($reason, 'UTF-8') <= 1000;
                 }),
             )
             ->willReturn(1);
