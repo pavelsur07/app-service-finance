@@ -9,6 +9,16 @@
                 <div class="col">
                     <h2 class="page-title">Реклама маркетплейсов</h2>
                 </div>
+                {% if is_granted('ROLE_SUPER_ADMIN') %}
+                    <div class="col-auto ms-auto">
+                        <a href="{{ path('marketplace_ads_admin_logs', {'lines': 500}) }}"
+                           target="_blank"
+                           rel="noopener"
+                           class="btn btn-outline-secondary btn-sm">
+                            Открыть логи
+                        </a>
+                    </div>
+                {% endif %}
             </div>
         </div>
     </div>
