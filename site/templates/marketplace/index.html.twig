@@ -71,6 +71,32 @@
                                                 <small>Ошибка: {{ connection.lastSyncError|slice(0, 100) }}</small>
                                             </div>
                                         {% endif %}
+                                        {% if not isSeller and connection.marketplace.value == 'ozon' and activeOzonAdLoadJob is not null %}
+                                            <div class="mt-2" id="ozon-ad-load-widget"
+                                                 data-ad-job-id="{{ activeOzonAdLoadJob.id }}"
+                                                 data-ad-job-status="{{ activeOzonAdLoadJob.status.value }}">
+                                                {% if activeOzonAdLoadJob.status.isTerminal %}
+                                                    {% if activeOzonAdLoadJob.status.value == 'completed' %}
+                                                        <div class="alert alert-success mb-0 py-2">
+                                                            <small>Реклама Ozon загружена</small>
+                                                        </div>
+                                                    {% else %}
+                                                        <div class="alert alert-danger mb-0 py-2">
+                                                            <small>Ошибка загрузки: {{ activeOzonAdLoadJob.failureReason }}</small>
+                                                        </div>
+                                                    {% endif %}
+                                                {% else %}
+                                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                                        <span class="spinner-border spinner-border-sm text-indigo"></span>
+                                                        <small class="text-muted">Загрузка рекламы Ozon...</small>
+                                                    </div>
+                                                    <div class="progress mb-1" style="height:6px;">
+                                                        <div class="progress-bar bg-indigo" id="ozon-ad-progress-bar" style="width:0%"></div>
+                                                    </div>
+                                                    <small class="text-muted" id="ozon-ad-counters">Чанков: —, Документов: —</small>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                     <div class="col-auto">
                                         <span class="badge bg-{{ connection.isActive ? 'success' : 'secondary' }}">
@@ -104,6 +130,20 @@
                                                         data-marketplace="{{ connection.marketplace.value }}">
                                                     Переобработать
                                                 </button>
+                                            {% elseif connection.marketplace.value == 'ozon' %}
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-indigo"
+                                                        data-ozon-initial-load="1">
+                                                    Загрузить рекламу с начала года
+                                                </button>
+                                                {% if is_granted('ROLE_COMPANY_OWNER') %}
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-outline-secondary"
+                                                            data-bs-toggle="modal"
+                                                            data-bs-target="#modal-ozon-ad-load-range">
+                                                        Загрузить за период
+                                                    </button>
+                                                {% endif %}
                                             {% endif %}
                                             <form method="post" action="{{ path('marketplace_connection_toggle', {id: connection.id}) }}" style="display:inline">
                                                 <input type="hidden" name="_token" value="{{ csrf_token('toggle' ~ connection.id) }}">
@@ -484,6 +524,36 @@
         </div>
     </div>
 
+    {# Modal: Загрузить рекламу Ozon за произвольный период (только ROLE_COMPANY_OWNER) #}
+    {% if is_granted('ROLE_COMPANY_OWNER') %}
+    <div class="modal modal-blur fade" id="modal-ozon-ad-load-range" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Загрузить рекламу Ozon за период</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required">Дата начала</label>
+                        <input type="date" id="ozon-ad-range-from" class="form-control" required
+                               value="{{ 'now'|date_modify('first day of last month')|date('Y-m-d') }}">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label required">Дата окончания</label>
+                        <input type="date" id="ozon-ad-range-to" class="form-control" required
+                               value="{{ 'now'|date_modify('last day of last month')|date('Y-m-d') }}">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-indigo" id="btn-ozon-ad-load-range">Загрузить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {# Modal: Пакетная обработка за месяц #}
     <div class="modal modal-blur fade" id="bulkProcessModal" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
@@ -731,6 +801,106 @@
                         .catch(function () { /* сеть недоступна — продолжаем опрос */ });
                 }, 15000);
             });
+        })();
+
+        // Кнопка «Загрузить рекламу с начала года»
+        (function () {
+            var btns = document.querySelectorAll('[data-ozon-initial-load]');
+            btns.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    btn.disabled = true;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
+                    fetch('{{ path('marketplace_ads_ozon_initial_load') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    })
+                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                        .then(function (res) {
+                            if (res.ok) {
+                                window.location.reload();
+                            } else {
+                                alert('Ошибка: ' + (res.data.message ?? 'Неизвестная ошибка'));
+                                btn.disabled = false;
+                                btn.innerHTML = 'Загрузить рекламу с начала года';
+                            }
+                        })
+                        .catch(function (err) {
+                            alert('Ошибка сети: ' + err.message);
+                            btn.disabled = false;
+                            btn.innerHTML = 'Загрузить рекламу с начала года';
+                        });
+                });
+            });
+        })();
+
+        // Кнопка «Загрузить за период» в модалке
+        (function () {
+            var btn = document.getElementById('btn-ozon-ad-load-range');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                var dateFrom = (document.getElementById('ozon-ad-range-from') || {}).value;
+                var dateTo   = (document.getElementById('ozon-ad-range-to') || {}).value;
+                if (!dateFrom || !dateTo) { alert('Укажите обе даты'); return; }
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
+                fetch('{{ path('marketplace_ads_ozon_load_range') }}', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({dateFrom: dateFrom, dateTo: dateTo}),
+                })
+                    .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                    .then(function (res) {
+                        if (res.ok) {
+                            window.location.reload();
+                        } else {
+                            var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+                            if (BootstrapModal) {
+                                BootstrapModal.getOrCreateInstance(document.getElementById('modal-ozon-ad-load-range')).hide();
+                            }
+                            alert('Ошибка: ' + (res.data.message ?? 'Неизвестная ошибка'));
+                            btn.disabled = false;
+                            btn.innerHTML = 'Загрузить';
+                        }
+                    })
+                    .catch(function (err) {
+                        alert('Ошибка сети: ' + err.message);
+                        btn.disabled = false;
+                        btn.innerHTML = 'Загрузить';
+                    });
+            });
+        })();
+
+        // Поллер прогресса загрузки рекламы Ozon (15 сек)
+        (function () {
+            var widget = document.getElementById('ozon-ad-load-widget');
+            if (!widget) return;
+            var status = widget.dataset.adJobStatus;
+            if (status === 'completed' || status === 'failed') return; // терминальный — не поллим
+
+            var jobId    = widget.dataset.adJobId;
+            var statusUrl = '/api/marketplace-ads/ozon/load-jobs/' + jobId + '/status';
+            var bar      = document.getElementById('ozon-ad-progress-bar');
+            var counters = document.getElementById('ozon-ad-counters');
+
+            var interval = setInterval(function () {
+                fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        if (bar) bar.style.width = data.progress + '%';
+                        if (counters) {
+                            counters.textContent = 'Чанков: ' + data.completedChunks + '/' + data.chunksTotal
+                                + ', Документов: ' + data.totalDocs
+                                + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
+                        }
+                        if (data.status === 'completed' || data.status === 'failed') {
+                            clearInterval(interval);
+                            window.location.reload();
+                        }
+                    })
+                    .catch(function () { /* сеть — продолжаем */ });
+            }, 15000);
         })();
     </script>
 {% endblock %}

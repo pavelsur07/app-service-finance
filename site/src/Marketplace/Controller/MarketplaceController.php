@@ -21,6 +21,7 @@ use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\Company\Repository\ProjectDirectionRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -51,6 +52,7 @@ class MarketplaceController extends AbstractController
         private readonly MessageBusInterface              $messageBus,
         private readonly ReprocessMarketplacePeriodAction $reprocessAction,
         private readonly SyncConnectionAction             $syncConnectionAction,
+        private readonly AdLoadJobRepository              $adLoadJobRepository,
     ) {
     }
 
@@ -71,10 +73,16 @@ class MarketplaceController extends AbstractController
             50,
         );
 
+        $activeOzonAdLoadJob = $this->adLoadJobRepository->findLatestActiveJobByCompanyAndMarketplace(
+            $company->getId(),
+            MarketplaceType::OZON,
+        );
+
         return $this->render('marketplace/index.html.twig', [
             'connections'           => $connections,
             'rawDocumentsPager'     => $rawDocumentsPager,
             'availableMarketplaces' => MarketplaceType::cases(),
+            'activeOzonAdLoadJob'   => $activeOzonAdLoadJob,
         ]);
     }
 
