@@ -85,7 +85,8 @@
                     <h3 class="card-title">История загрузок</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table card-table table-vcenter" id="ad-load-jobs-table">
+                    <table class="table card-table table-vcenter" id="ad-load-jobs-table"
+                           data-is-company-owner="{{ is_granted('ROLE_COMPANY_OWNER') ? '1' : '0' }}">
                         <thead>
                         <tr>
                             <th>Период</th>
@@ -94,10 +95,11 @@
                             <th>Создан</th>
                             <th>Завершён</th>
                             <th>Ошибка</th>
+                            <th>Действия</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr><td colspan="6" class="text-center text-muted">Загрузка…</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted">Загрузка…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -144,6 +146,36 @@
 
         </div>
     </div>
+
+    {# ---------- Modal: Пометить AdLoadJob как FAILED ---------- #}
+    {% if is_granted('ROLE_COMPANY_OWNER') %}
+        <div class="modal modal-blur fade" id="modal-mark-ad-load-job-failed" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Пометить задание как FAILED</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted">
+                            Задание будет переведено в статус FAILED. Действие необратимо.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label required">Причина</label>
+                            <textarea id="mark-failed-reason" class="form-control" rows="3" maxlength="1000"
+                                      placeholder="Опишите причину ручной финализации"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-danger" id="btn-mark-ad-load-job-failed">
+                            Пометить FAILED
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 
     {# ---------- Modal: Загрузить рекламу Ozon за произвольный период ---------- #}
     {% if hasPerformanceConnection and is_granted('ROLE_COMPANY_OWNER') %}
@@ -208,6 +240,9 @@
                 return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
             };
 
+            var jobsTable = document.getElementById('ad-load-jobs-table');
+            var isCompanyOwner = jobsTable && jobsTable.dataset.isCompanyOwner === '1';
+
             var loadJobs = function () {
                 var tbody = document.querySelector('#ad-load-jobs-table tbody');
                 fetch('{{ path('marketplace_ads_load_jobs_list') }}', {
@@ -218,10 +253,16 @@
                     .then(function (data) {
                         var items = (data && data.items) || [];
                         if (items.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Нет данных</td></tr>';
+                            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted">Нет данных</td></tr>';
                             return;
                         }
                         tbody.innerHTML = items.map(function (job) {
+                            var canMarkFailed = isCompanyOwner && (job.status === 'pending' || job.status === 'running');
+                            var actionsCell = canMarkFailed
+                                ? '<td><button type="button" class="btn btn-sm btn-outline-danger" '
+                                    + 'data-mark-failed data-job-id="' + escapeHtml(job.id) + '">'
+                                    + 'Пометить FAILED</button></td>'
+                                : '<td></td>';
                             return '<tr>'
                                 + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
                                 + '<td>' + jobStatusBadge(job.status) + '</td>'
@@ -229,11 +270,12 @@
                                 + '<td><small>' + escapeHtml(job.createdAt) + '</small></td>'
                                 + '<td><small>' + escapeHtml(job.finishedAt || '—') + '</small></td>'
                                 + '<td><small class="text-danger">' + escapeHtml(job.lastError || '') + '</small></td>'
+                                + actionsCell
                                 + '</tr>';
                         }).join('');
                     })
                     .catch(function () {
-                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Ошибка загрузки</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Ошибка загрузки</td></tr>';
                     });
             };
 
@@ -352,6 +394,66 @@
                             alert('Ошибка сети: ' + err.message);
                             rangeBtn.disabled = false;
                             rangeBtn.innerHTML = 'Загрузить';
+                        });
+                });
+            }
+
+            // Ручная пометка AdLoadJob как FAILED (только ROLE_COMPANY_OWNER)
+            var markFailedModalEl = document.getElementById('modal-mark-ad-load-job-failed');
+            var markFailedBtn = document.getElementById('btn-mark-ad-load-job-failed');
+            var markFailedReasonEl = document.getElementById('mark-failed-reason');
+            var markFailedJobId = null;
+
+            var openMarkFailedModal = function (jobId) {
+                markFailedJobId = jobId;
+                if (markFailedReasonEl) markFailedReasonEl.value = '';
+                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+                if (BootstrapModal && markFailedModalEl) {
+                    BootstrapModal.getOrCreateInstance(markFailedModalEl).show();
+                }
+            };
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-mark-failed]');
+                if (!btn) return;
+                openMarkFailedModal(btn.dataset.jobId);
+            });
+
+            if (markFailedBtn) {
+                markFailedBtn.addEventListener('click', function () {
+                    if (!markFailedJobId) return;
+                    var reason = (markFailedReasonEl && markFailedReasonEl.value) || '';
+                    if (!reason.trim()) {
+                        alert('Укажите причину');
+                        return;
+                    }
+                    markFailedBtn.disabled = true;
+                    var original = markFailedBtn.innerHTML;
+                    markFailedBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Выполняется...';
+                    fetch('/api/marketplace-ads/admin/load-jobs/' + encodeURIComponent(markFailedJobId) + '/mark-failed', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                        body: JSON.stringify({reason: reason}),
+                    })
+                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                        .then(function (res) {
+                            if (res.ok) {
+                                window.location.reload();
+                            } else {
+                                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+                                if (BootstrapModal && markFailedModalEl) {
+                                    BootstrapModal.getOrCreateInstance(markFailedModalEl).hide();
+                                }
+                                alert('Ошибка: ' + ((res.data && res.data.error) || 'Неизвестная ошибка'));
+                                markFailedBtn.disabled = false;
+                                markFailedBtn.innerHTML = original;
+                            }
+                        })
+                        .catch(function (err) {
+                            alert('Ошибка сети: ' + err.message);
+                            markFailedBtn.disabled = false;
+                            markFailedBtn.innerHTML = original;
                         });
                 });
             }
