@@ -24,6 +24,7 @@ final class AdLoadJobBuilder
     private int $processedDays = 0;
     private int $failedDays = 0;
     private int $chunksTotal = 0;
+    private ?\DateTimeImmutable $createdAt = null;
 
     private function __construct()
     {
@@ -128,6 +129,14 @@ final class AdLoadJobBuilder
         return $clone;
     }
 
+    public function withCreatedAt(\DateTimeImmutable $createdAt): self
+    {
+        $clone = clone $this;
+        $clone->createdAt = $createdAt;
+
+        return $clone;
+    }
+
     public function build(): AdLoadJob
     {
         $job = new AdLoadJob(
@@ -153,6 +162,10 @@ final class AdLoadJobBuilder
         }
         if ($this->chunksTotal !== 0) {
             $this->setProperty($job, 'chunksTotal', $this->chunksTotal);
+        }
+
+        if (null !== $this->createdAt) {
+            $this->setProperty($job, 'createdAt', $this->createdAt);
         }
 
         if (AdLoadJobStatus::PENDING !== $this->status) {

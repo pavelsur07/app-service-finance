@@ -42,4 +42,22 @@ interface AdRawDocumentRepositoryInterface
         \DateTimeImmutable $to,
         ?AdRawDocumentStatus $statusFilter = null,
     ): int;
+
+    /**
+     * Документы компании за период для конкретного маркетплейса, отсортированные по report_date DESC.
+     *
+     * Реализация обязана:
+     *  - ограничивать выборку `company_id = :companyId` (IDOR-guard на уровне SQL);
+     *  - сравнивать `report_date` включительно по обеим границам `[$from, $to]`.
+     *
+     * @param string $marketplace значение {@see \App\Marketplace\Enum\MarketplaceType::value}
+     *
+     * @return list<AdRawDocument>
+     */
+    public function findByCompanyMarketplaceAndDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array;
 }

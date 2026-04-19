@@ -15,6 +15,18 @@ interface AdLoadJobRepositoryInterface
     public function findByIdAndCompany(string $id, string $companyId): ?AdLoadJob;
 
     /**
+     * Последние задания компании по маркетплейсу, отсортированные по createdAt DESC,
+     * ограничение $limit.
+     *
+     * @return list<AdLoadJob>
+     */
+    public function findRecentByCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+        int $limit = 20,
+    ): array;
+
+    /**
      * Возвращает активный (PENDING/RUNNING) job, чей диапазон [dateFrom, dateTo]
      * включает $date. Используется для маппинга обработанного документа на
      * job, которому он принадлежит.
