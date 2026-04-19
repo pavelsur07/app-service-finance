@@ -3,6 +3,7 @@ monolog:
         - deprecation
         - import.bank1c
         - recalc
+        - marketplace_ads
 
 when@dev:
     monolog:
@@ -11,17 +12,25 @@ when@dev:
                 type: stream
                 path: "%kernel.logs_dir%/%kernel.environment%.log"
                 level: debug # В локальный файл пишем подробно
-                channels: ["!event", "!doctrine"]
+                channels: ["!event", "!doctrine", "!marketplace_ads"]
+
+            marketplace_ads:
+                type: rotating_file
+                path: "%kernel.logs_dir%/marketplace_ads.log"
+                level: debug
+                channels: [marketplace_ads]
+                max_files: 14
 
             sentry:
                 type: service
                 id: Sentry\Monolog\Handler
                 level: error # В GlitchTip только ошибки
+                channels: ["!marketplace_ads"]
 
             console:
                 type: console
                 process_psr_3_messages: false
-                channels: ["!event", "!doctrine", "!console"]
+                channels: ["!event", "!doctrine", "!console", "!marketplace_ads"]
 
 when@test:
     monolog:
@@ -46,6 +55,7 @@ when@prod:
                 handler: nested
                 excluded_http_codes: [404, 405]
                 buffer_size: 50
+                channels: ["!marketplace_ads"]
 
             nested:
                 type: stream
@@ -53,15 +63,23 @@ when@prod:
                 level: debug
                 formatter: monolog.formatter.json
 
+            marketplace_ads:
+                type: rotating_file
+                path: "%kernel.logs_dir%/marketplace_ads.log"
+                level: debug
+                channels: [marketplace_ads]
+                max_files: 14
+
             sentry:
                 type: service
                 id: Sentry\Monolog\Handler
                 level: error # В GlitchTip только ошибки
+                channels: ["!marketplace_ads"]
 
             console:
                 type: console
                 process_psr_3_messages: false
-                channels: ["!event", "!doctrine"]
+                channels: ["!event", "!doctrine", "!marketplace_ads"]
 
             deprecation:
                 type: stream

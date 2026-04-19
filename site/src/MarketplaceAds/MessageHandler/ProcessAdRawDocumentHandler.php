@@ -14,6 +14,8 @@ use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
@@ -46,6 +48,8 @@ final class ProcessAdRawDocumentHandler
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly AppLogger $logger,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $marketplaceAdsLogger,
     ) {
     }
 
@@ -59,7 +63,7 @@ final class ProcessAdRawDocumentHandler
             // здесь только шумит в failed-queue. Финализацию job'а тоже не
             // запускаем — документ уже не наша забота, его исход обработает
             // тот воркер, который реально перевёл его в терминальный статус.
-            $this->logger->info(
+            $this->marketplaceAdsLogger->info(
                 'AdRawDocument обработан параллельно или удалён, повтор не нужен',
                 [
                     'companyId' => $message->companyId,
@@ -108,7 +112,7 @@ final class ProcessAdRawDocumentHandler
         );
 
         if (null === $document) {
-            $this->logger->warning('AdRawDocument исчез после успешной обработки', [
+            $this->marketplaceAdsLogger->warning('AdRawDocument исчез после успешной обработки', [
                 'companyId' => $message->companyId,
                 'adRawDocumentId' => $message->adRawDocumentId,
             ]);
@@ -126,7 +130,7 @@ final class ProcessAdRawDocumentHandler
                 $message->companyId,
                 'Action left document in DRAFT (partial processing failure)',
             );
-            $this->logger->warning(
+            $this->marketplaceAdsLogger->warning(
                 'AdRawDocument остался в DRAFT после Action — помечен FAILED',
                 [
                     'companyId' => $message->companyId,
@@ -225,7 +229,7 @@ final class ProcessAdRawDocumentHandler
         if (0 === $failedDocs) {
             $affected = $this->adLoadJobRepository->markCompleted($jobId, $companyId);
             if ($affected > 0) {
-                $this->logger->info('AdLoadJob completed', [
+                $this->marketplaceAdsLogger->info('AdLoadJob completed', [
                     'jobId' => $jobId,
                     'companyId' => $companyId,
                     'totalDocs' => $totalDocs,
@@ -238,7 +242,7 @@ final class ProcessAdRawDocumentHandler
         $reason = sprintf('Partial failure: %d of %d documents failed', $failedDocs, $totalDocs);
         $affected = $this->adLoadJobRepository->markFailed($jobId, $companyId, $reason);
         if ($affected > 0) {
-            $this->logger->warning('AdLoadJob finalized with failures', [
+            $this->marketplaceAdsLogger->warning('AdLoadJob finalized with failures', [
                 'jobId' => $jobId,
                 'companyId' => $companyId,
                 'totalDocs' => $totalDocs,

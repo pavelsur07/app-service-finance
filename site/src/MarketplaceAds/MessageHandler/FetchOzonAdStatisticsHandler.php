@@ -15,6 +15,8 @@ use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -61,6 +63,8 @@ final class FetchOzonAdStatisticsHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $marketplaceAdsLogger,
     ) {
     }
 
@@ -72,7 +76,7 @@ final class FetchOzonAdStatisticsHandler
         );
 
         if (null === $job) {
-            $this->logger->warning('AdLoadJob не найден при загрузке Ozon-чанка, сообщение проигнорировано', [
+            $this->marketplaceAdsLogger->warning('AdLoadJob не найден при загрузке Ozon-чанка, сообщение проигнорировано', [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
             ]);
@@ -81,7 +85,7 @@ final class FetchOzonAdStatisticsHandler
         }
 
         if ($job->getStatus()->isTerminal()) {
-            $this->logger->info('AdLoadJob уже завершён, загрузка чанка пропущена', [
+            $this->marketplaceAdsLogger->info('AdLoadJob уже завершён, загрузка чанка пропущена', [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
                 'status' => $job->getStatus()->value,
@@ -228,7 +232,7 @@ final class FetchOzonAdStatisticsHandler
         );
 
         if (!$marked) {
-            $this->logger->info('chunk already marked completed', [
+            $this->marketplaceAdsLogger->info('chunk already marked completed', [
                 'job_id' => $message->jobId,
                 'company_id' => $message->companyId,
                 'date_from' => $message->dateFrom,
@@ -252,7 +256,7 @@ final class FetchOzonAdStatisticsHandler
             if ($skippedDays > 0) {
                 // Per-document FAILED-статус AdRawDocument — источник правды по
                 // неуспехам; здесь оставляем предупреждение для наблюдаемости чанка.
-                $this->logger->warning('Ozon ad chunk had skipped days', [
+                $this->marketplaceAdsLogger->warning('Ozon ad chunk had skipped days', [
                     'jobId' => $message->jobId,
                     'companyId' => $message->companyId,
                     'dateFrom' => $message->dateFrom,
@@ -269,7 +273,7 @@ final class FetchOzonAdStatisticsHandler
             ));
         }
 
-        $this->logger->info('Ozon ad statistics chunk processed', [
+        $this->marketplaceAdsLogger->info('Ozon ad statistics chunk processed', [
             'jobId' => $message->jobId,
             'companyId' => $message->companyId,
             'dateFrom' => $message->dateFrom,

@@ -8,8 +8,9 @@ use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
-use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -42,7 +43,8 @@ final class LoadOzonAdStatisticsRangeHandler
     public function __construct(
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly MessageBusInterface $messageBus,
-        private readonly AppLogger $logger,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $marketplaceAdsLogger,
         private readonly EntityManagerInterface $entityManager,
     ) {
     }
@@ -53,7 +55,7 @@ final class LoadOzonAdStatisticsRangeHandler
 
         if (null === $job) {
             // Запись удалена / не существует — не ретраим (повторная попытка ничего не исправит).
-            $this->logger->warning('AdLoadJob not found for LoadOzonAdStatisticsRangeMessage', [
+            $this->marketplaceAdsLogger->warning('AdLoadJob not found for LoadOzonAdStatisticsRangeMessage', [
                 'jobId' => $message->jobId,
             ]);
 
@@ -61,7 +63,7 @@ final class LoadOzonAdStatisticsRangeHandler
         }
 
         if ($job->getStatus()->isTerminal()) {
-            $this->logger->info('AdLoadJob already finished, range dispatch skipped', [
+            $this->marketplaceAdsLogger->info('AdLoadJob already finished, range dispatch skipped', [
                 'jobId' => $job->getId(),
                 'companyId' => $job->getCompanyId(),
                 'status' => $job->getStatus()->value,
@@ -102,7 +104,7 @@ final class LoadOzonAdStatisticsRangeHandler
             ));
         }
 
-        $this->logger->info('Ozon ad statistics range dispatched', [
+        $this->marketplaceAdsLogger->info('Ozon ad statistics range dispatched', [
             'jobId' => $job->getId(),
             'companyId' => $job->getCompanyId(),
             'dateFrom' => $job->getDateFrom()->format('Y-m-d'),

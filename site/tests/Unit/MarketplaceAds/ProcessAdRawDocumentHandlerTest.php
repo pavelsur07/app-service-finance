@@ -77,6 +77,7 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
             $this->chunkRepo,
             $this->entityManager,
             $this->logger,
+            new NullLogger(),
         );
     }
 
