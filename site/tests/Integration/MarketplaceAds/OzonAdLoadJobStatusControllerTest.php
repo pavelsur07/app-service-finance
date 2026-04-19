@@ -6,8 +6,6 @@ namespace App\Tests\Integration\MarketplaceAds;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Entity\AdLoadJob;
-use App\MarketplaceAds\Entity\AdRawDocument;
-use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;

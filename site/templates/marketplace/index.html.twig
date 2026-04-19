@@ -72,9 +72,11 @@
                                             </div>
                                         {% endif %}
                                         {% if not isSeller and connection.marketplace.value == 'ozon' and activeOzonAdLoadJob is not null %}
-                                            <div class="mt-2" id="ozon-ad-load-widget"
+                                            <div class="mt-2"
+                                                 id="ozon-ad-load-widget-{{ connection.id }}"
                                                  data-ad-job-id="{{ activeOzonAdLoadJob.id }}"
-                                                 data-ad-job-status="{{ activeOzonAdLoadJob.status.value }}">
+                                                 data-ad-job-status="{{ activeOzonAdLoadJob.status.value }}"
+                                                 data-status-url="{{ path('marketplace_ads_ozon_load_job_status', {jobId: activeOzonAdLoadJob.id}) }}">
                                                 {% if activeOzonAdLoadJob.status.isTerminal %}
                                                     {% if activeOzonAdLoadJob.status.value == 'completed' %}
                                                         <div class="alert alert-success mb-0 py-2">
@@ -91,9 +93,9 @@
                                                         <small class="text-muted">Загрузка рекламы Ozon...</small>
                                                     </div>
                                                     <div class="progress mb-1" style="height:6px;">
-                                                        <div class="progress-bar bg-indigo" id="ozon-ad-progress-bar" style="width:0%"></div>
+                                                        <div class="progress-bar bg-indigo ozon-ad-progress-bar" style="width:0%"></div>
                                                     </div>
-                                                    <small class="text-muted" id="ozon-ad-counters">Чанков: —, Документов: —</small>
+                                                    <small class="text-muted ozon-ad-counters">Чанков: —, Документов: —</small>
                                                 {% endif %}
                                             </div>
                                         {% endif %}
@@ -874,33 +876,32 @@
 
         // Поллер прогресса загрузки рекламы Ozon (15 сек)
         (function () {
-            var widget = document.getElementById('ozon-ad-load-widget');
-            if (!widget) return;
-            var status = widget.dataset.adJobStatus;
-            if (status === 'completed' || status === 'failed') return; // терминальный — не поллим
+            document.querySelectorAll('[data-ad-job-id]').forEach(function (widget) {
+                var status = widget.dataset.adJobStatus;
+                if (status === 'completed' || status === 'failed') return;
 
-            var jobId    = widget.dataset.adJobId;
-            var statusUrl = '/api/marketplace-ads/ozon/load-jobs/' + jobId + '/status';
-            var bar      = document.getElementById('ozon-ad-progress-bar');
-            var counters = document.getElementById('ozon-ad-counters');
+                var statusUrl = widget.dataset.statusUrl;
+                var bar      = widget.querySelector('.ozon-ad-progress-bar');
+                var counters = widget.querySelector('.ozon-ad-counters');
 
-            var interval = setInterval(function () {
-                fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
-                    .then(function (r) { return r.json(); })
-                    .then(function (data) {
-                        if (bar) bar.style.width = data.progress + '%';
-                        if (counters) {
-                            counters.textContent = 'Чанков: ' + data.completedChunks + '/' + data.chunksTotal
-                                + ', Документов: ' + data.totalDocs
-                                + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
-                        }
-                        if (data.status === 'completed' || data.status === 'failed') {
-                            clearInterval(interval);
-                            window.location.reload();
-                        }
-                    })
-                    .catch(function () { /* сеть — продолжаем */ });
-            }, 15000);
+                var interval = setInterval(function () {
+                    fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (bar) bar.style.width = data.progress + '%';
+                            if (counters) {
+                                counters.textContent = 'Чанков: ' + data.completedChunks + '/' + data.chunksTotal
+                                    + ', Документов: ' + data.totalDocs
+                                    + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
+                            }
+                            if (data.status === 'completed' || data.status === 'failed') {
+                                clearInterval(interval);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(function () { /* сеть — продолжаем */ });
+                }, 15000);
+            });
         })();
     </script>
 {% endblock %}

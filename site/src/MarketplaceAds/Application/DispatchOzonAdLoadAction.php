@@ -62,7 +62,13 @@ final class DispatchOzonAdLoadAction
         $this->adLoadJobRepository->save($job);
         $this->entityManager->flush();
 
-        $this->messageBus->dispatch(new LoadOzonAdStatisticsRangeMessage($job->getId()));
+        try {
+            $this->messageBus->dispatch(new LoadOzonAdStatisticsRangeMessage($job->getId()));
+        } catch (\Throwable $e) {
+            $job->markFailed('Dispatch error: ' . $e->getMessage());
+            $this->entityManager->flush();
+            throw new \RuntimeException('Failed to queue ad load job: ' . $e->getMessage(), 0, $e);
+        }
 
         return $job;
     }

@@ -33,7 +33,11 @@ final class OzonAdLoadRangeController extends AbstractController
         $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $dateFromStr);
         $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $dateToStr);
 
-        if (false === $dateFrom || false === $dateTo) {
+        if (false === $dateFrom || $dateFrom->format('Y-m-d') !== $dateFromStr) {
+            return $this->json(['message' => 'Неверный формат даты. Ожидается YYYY-MM-DD.'], 400);
+        }
+
+        if (false === $dateTo || $dateTo->format('Y-m-d') !== $dateToStr) {
             return $this->json(['message' => 'Неверный формат даты. Ожидается YYYY-MM-DD.'], 400);
         }
 
