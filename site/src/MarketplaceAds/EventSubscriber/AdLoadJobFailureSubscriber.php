@@ -7,6 +7,7 @@ namespace App\MarketplaceAds\EventSubscriber;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\Messenger\Event\WorkerMessageFailedEvent;
 use Symfony\Component\Messenger\Exception\HandlerFailedException;
@@ -29,7 +30,8 @@ final class AdLoadJobFailureSubscriber implements EventSubscriberInterface
 
     public function __construct(
         private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
-        private readonly LoggerInterface $logger,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $marketplaceAdsLogger,
     ) {
     }
 
@@ -63,7 +65,7 @@ final class AdLoadJobFailureSubscriber implements EventSubscriberInterface
 
         $this->adLoadJobRepository->markFailed($message->jobId, $message->companyId, $reason);
 
-        $this->logger->warning('AdLoadJob marked as failed after retries exhausted', [
+        $this->marketplaceAdsLogger->warning('AdLoadJob marked as failed after retries exhausted', [
             'job_id' => $message->jobId,
             'company_id' => $message->companyId,
             'message_type' => $message::class,

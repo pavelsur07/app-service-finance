@@ -75,7 +75,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $csv,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -121,7 +121,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_dmy.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $resultDmy = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -137,7 +137,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-b2'),
             downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
         );
-        $clientIso = new OzonAdClient($httpIso, $this->facade, new ArrayAdapter(), $this->logger);
+        $clientIso = new OzonAdClient($httpIso, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
         $resultIso = $clientIso->fetchAdStatisticsRange(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
@@ -160,7 +160,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_invalid_date.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/не удалось распарсить дату/u');
@@ -181,6 +181,7 @@ final class OzonAdClientTest extends TestCase
             new MockHttpClient([]),
             $this->facade,
             new ArrayAdapter(),
+            $this->logger,
             $this->logger,
         );
 
@@ -203,6 +204,7 @@ final class OzonAdClientTest extends TestCase
             new MockHttpClient([]),
             $this->facade,
             new ArrayAdapter(),
+            $this->logger,
             $this->logger,
         );
 
@@ -246,7 +248,7 @@ final class OzonAdClientTest extends TestCase
         ]);
 
         $http = new MockHttpClient($responses);
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -288,7 +290,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_cyrillic_header.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -317,7 +319,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -353,6 +355,7 @@ final class OzonAdClientTest extends TestCase
             new MockHttpClient([]),
             $this->facade,
             new ArrayAdapter(),
+            $this->logger,
             $this->logger,
         );
 
@@ -397,7 +400,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => 'нет прав'], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -433,7 +436,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -469,7 +472,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -500,7 +503,7 @@ final class OzonAdClientTest extends TestCase
             new MockResponse('{"error":"invalid campaign id"}', ['http_code' => 400]),
         ]);
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -529,7 +532,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_single_day_legacy.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
         $json = $client->fetchAdStatistics(self::COMPANY_ID, new \DateTimeImmutable('2026-03-01'));
 

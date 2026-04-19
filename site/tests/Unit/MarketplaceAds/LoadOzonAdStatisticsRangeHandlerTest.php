@@ -10,12 +10,10 @@ use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage;
 use App\MarketplaceAds\MessageHandler\LoadOzonAdStatisticsRangeHandler;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
-use App\Shared\Service\AppLogger;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
-use Sentry\State\HubInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -282,7 +280,7 @@ final class LoadOzonAdStatisticsRangeHandlerTest extends TestCase
         return new LoadOzonAdStatisticsRangeHandler(
             $jobRepo,
             $messageBus,
-            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            new NullLogger(),
             $em,
         );
     }

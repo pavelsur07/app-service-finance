@@ -9,6 +9,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -62,6 +63,8 @@ class OzonAdClient implements AdPlatformClientInterface
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly CacheInterface $cache,
         private readonly LoggerInterface $logger,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $marketplaceAdsLogger,
     ) {
     }
 
@@ -81,7 +84,7 @@ class OzonAdClient implements AdPlatformClientInterface
         $clientId = $credentials['client_id'];
         $clientSecret = $credentials['client_secret'];
 
-        $this->logger->info('Ozon Performance: начало загрузки статистики', [
+        $this->marketplaceAdsLogger->info('Ozon Performance: начало загрузки статистики', [
             'companyId' => $companyId,
             'date' => $date->format('Y-m-d'),
         ]);
@@ -93,7 +96,7 @@ class OzonAdClient implements AdPlatformClientInterface
             fn (string $token): array => $this->listSkuCampaigns($token),
         );
 
-        $this->logger->info('Ozon Performance: получен список SKU-кампаний', [
+        $this->marketplaceAdsLogger->info('Ozon Performance: получен список SKU-кампаний', [
             'companyId' => $companyId,
             'count' => count($campaigns),
         ]);
@@ -113,7 +116,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 fn (string $token): string => $this->requestStatistics($token, $campaignIds, $date, $date, 'NO_GROUP_BY'),
             );
 
-            $this->logger->info('Ozon Performance: запрошен отчёт', [
+            $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт', [
                 'companyId' => $companyId,
                 'reportUuid' => $uuid,
                 'campaignCount' => count($campaignIds),
@@ -182,7 +185,7 @@ class OzonAdClient implements AdPlatformClientInterface
             $clientId = $credentials['client_id'];
             $clientSecret = $credentials['client_secret'];
 
-            $this->logger->info('Ozon Performance: начало загрузки статистики (range)', [
+            $this->marketplaceAdsLogger->info('Ozon Performance: начало загрузки статистики (range)', [
                 'companyId' => $companyId,
                 'dateFrom' => $dateFrom->format('Y-m-d'),
                 'dateTo' => $dateTo->format('Y-m-d'),
@@ -196,7 +199,7 @@ class OzonAdClient implements AdPlatformClientInterface
             );
             $campaignsCount = count($campaigns);
 
-            $this->logger->info('Ozon Performance: получен список SKU-кампаний (range)', [
+            $this->marketplaceAdsLogger->info('Ozon Performance: получен список SKU-кампаний (range)', [
                 'companyId' => $companyId,
                 'count' => $campaignsCount,
             ]);
@@ -214,7 +217,7 @@ class OzonAdClient implements AdPlatformClientInterface
                     fn (string $token): string => $this->requestStatistics($token, $campaignIds, $dateFrom, $dateTo, 'DATE'),
                 );
 
-                $this->logger->info('Ozon Performance: запрошен отчёт (range)', [
+                $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт (range)', [
                     'companyId' => $companyId,
                     'reportUuid' => $uuid,
                     'campaignCount' => count($campaignIds),
@@ -255,7 +258,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 $result[$date] = ['campaigns' => array_values($campaignsMap)];
             }
 
-            $this->logger->info('Ozon ad statistics fetched', [
+            $this->marketplaceAdsLogger->info('Ozon ad statistics fetched', [
                 'company_id' => $companyId,
                 'date_from' => $dateFrom->format('Y-m-d'),
                 'date_to' => $dateTo->format('Y-m-d'),
@@ -361,7 +364,7 @@ class OzonAdClient implements AdPlatformClientInterface
         try {
             return $callback($token);
         } catch (OzonAuthExpiredException) {
-            $this->logger->info('Ozon Performance: токен отклонён (401), повторяю с новым', [
+            $this->marketplaceAdsLogger->info('Ozon Performance: токен отклонён (401), повторяю с новым', [
                 'companyId' => $companyId,
             ]);
             $token = $this->getAccessToken($companyId, $clientId, $clientSecret, forceRefresh: true);
@@ -483,7 +486,7 @@ class OzonAdClient implements AdPlatformClientInterface
         $from = $dateFrom->setTime(0, 0, 0)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
         $to = $dateTo->setTime(23, 59, 59)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
 
-        $this->logger->debug('Ozon Performance POST /statistics payload', [
+        $this->marketplaceAdsLogger->debug('Ozon Performance POST /statistics payload', [
             'campaign_count' => count($campaignIds),
             'from' => $from,
             'to' => $to,
@@ -535,7 +538,7 @@ class OzonAdClient implements AdPlatformClientInterface
                     $link = self::STATISTICS_REPORT_PATH.'?UUID='.rawurlencode($uuid);
                 }
 
-                $this->logger->info('Ozon Performance: отчёт готов', [
+                $this->marketplaceAdsLogger->info('Ozon Performance: отчёт готов', [
                     'reportUuid' => $uuid,
                     'attempts' => $attempt,
                     'waitedSeconds' => round(microtime(true) - $startedAt, 1),

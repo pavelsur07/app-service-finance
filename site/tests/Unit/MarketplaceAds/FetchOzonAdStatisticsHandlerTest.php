@@ -153,13 +153,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('markChunkCompleted')
             ->willReturn(false);
 
-        $hub = $this->createMock(HubInterface::class);
-        $logger = new class(new NullLogger(), $hub) extends AppLogger {
+        $logger = new AppLogger(new NullLogger(), $this->createMock(HubInterface::class));
+
+        $marketplaceAdsLogger = new class extends NullLogger {
             public bool $infoLogged = false;
 
-            public function info(string $message, array $context = []): void
+            public function info(string|\Stringable $message, array $context = []): void
             {
-                if (str_contains($message, 'chunk already marked completed')) {
+                if (str_contains((string) $message, 'chunk already marked completed')) {
                     $this->infoLogged = true;
                 }
                 parent::info($message, $context);
@@ -174,6 +175,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $em,
             $messageBus,
             $logger,
+            $marketplaceAdsLogger,
         );
 
         $handler(new FetchOzonAdStatisticsMessage(
@@ -183,7 +185,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             self::DATE_TO,
         ));
 
-        self::assertTrue($logger->infoLogged, 'info-лог "chunk already marked completed" должен быть записан');
+        self::assertTrue($marketplaceAdsLogger->infoLogged, 'info-лог "chunk already marked completed" должен быть записан');
     }
 
     /**
@@ -732,6 +734,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $em,
             $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            new NullLogger(),
         );
     }
 }
