@@ -411,6 +411,138 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame(7, $dbValue);
     }
 
+    public function testMarkCompletedFromRunningReturnsOneAndPersistsCompleted(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->asRunning()
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+        $this->em->clear();
+
+        $affected = $this->repository->markCompleted($jobId, self::COMPANY_ID);
+
+        self::assertSame(1, $affected);
+
+        $conn = $this->em->getConnection();
+        $row = $conn->fetchAssociative(
+            'SELECT status, finished_at FROM marketplace_ad_load_jobs WHERE id = :id',
+            ['id' => $jobId],
+        );
+        self::assertSame(AdLoadJobStatus::COMPLETED->value, $row['status']);
+        self::assertNotNull($row['finished_at']);
+    }
+
+    public function testMarkCompletedFromPendingReturnsOne(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->build(); // default — PENDING
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        $affected = $this->repository->markCompleted($jobId, self::COMPANY_ID);
+
+        self::assertSame(1, $affected);
+
+        $this->em->clear();
+        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
+        self::assertNotNull($reloaded);
+        self::assertSame(AdLoadJobStatus::COMPLETED, $reloaded->getStatus());
+        self::assertNotNull($reloaded->getFinishedAt());
+    }
+
+    public function testMarkCompletedIsIdempotentOnAlreadyCompleted(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->asCompleted()
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        // finished_at задан билдером — зафиксируем его до повторного вызова,
+        // чтобы проверить неизменность (markCompleted обязан быть идемпотентным).
+        $conn = $this->em->getConnection();
+        $finishedAtBefore = $conn->fetchOne(
+            'SELECT finished_at FROM marketplace_ad_load_jobs WHERE id = :id',
+            ['id' => $jobId],
+        );
+
+        $affected = $this->repository->markCompleted($jobId, self::COMPANY_ID);
+        self::assertSame(0, $affected);
+
+        $finishedAtAfter = $conn->fetchOne(
+            'SELECT finished_at FROM marketplace_ad_load_jobs WHERE id = :id',
+            ['id' => $jobId],
+        );
+        self::assertSame($finishedAtBefore, $finishedAtAfter);
+    }
+
+    public function testMarkCompletedOnFailedIsBlockedByGuard(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->asFailed('something went wrong')
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        $affected = $this->repository->markCompleted($jobId, self::COMPANY_ID);
+        self::assertSame(0, $affected);
+
+        $this->em->clear();
+        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
+        self::assertNotNull($reloaded);
+        self::assertSame(AdLoadJobStatus::FAILED, $reloaded->getStatus());
+        self::assertSame('something went wrong', $reloaded->getFailureReason());
+    }
+
+    public function testMarkCompletedIgnoresWrongCompanyIdIDOR(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->seedCompany(self::OTHER_COMPANY_ID, self::OTHER_OWNER_ID, 'b@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->asRunning()
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+        $jobId = $job->getId();
+
+        $affected = $this->repository->markCompleted($jobId, self::OTHER_COMPANY_ID);
+        self::assertSame(0, $affected);
+
+        $this->em->clear();
+        $reloaded = $this->repository->findByIdAndCompany($jobId, self::COMPANY_ID);
+        self::assertNotNull($reloaded);
+        self::assertSame(AdLoadJobStatus::RUNNING, $reloaded->getStatus());
+    }
+
     private function seedCompany(string $companyId, string $ownerId, string $email): Company
     {
         $owner = UserBuilder::aUser()

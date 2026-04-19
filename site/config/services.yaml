@@ -74,6 +74,8 @@ services:
     App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface: '@App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepository'
     App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface: '@App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepository'
     App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface: '@App\MarketplaceAds\Repository\AdChunkProgressRepository'
+    App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface: '@App\MarketplaceAds\Repository\AdRawDocumentRepository'
+    App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface: '@App\MarketplaceAds\Repository\AdLoadJobRepository'
 
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:

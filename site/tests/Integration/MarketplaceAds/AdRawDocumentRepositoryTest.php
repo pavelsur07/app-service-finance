@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAds;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -114,6 +115,228 @@ final class AdRawDocumentRepositoryTest extends IntegrationTestCase
             ['id' => $doc->getId()],
         );
         self::assertSame(AdRawDocumentStatus::DRAFT->value, $status);
+    }
+
+    public function testCountByCompanyMarketplaceAndDateRangeWithoutFilter(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+
+        $from = new \DateTimeImmutable('2026-03-01');
+        $to = new \DateTimeImmutable('2026-03-10');
+
+        // Три документа OZON в диапазоне с разными статусами
+        $draft = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-02'))
+            ->build();
+
+        $processed = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-05'))
+            ->asProcessed()
+            ->build();
+
+        $failed = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-10'))
+            ->asFailed('oops')
+            ->build();
+
+        foreach ([$draft, $processed, $failed] as $doc) {
+            $this->repository->save($doc);
+        }
+        $this->em->flush();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            $from,
+            $to,
+        );
+
+        self::assertSame(3, $count);
+    }
+
+    public function testCountFilteredByProcessedStatusOnly(): void
+    {
+        $this->seedThreeDocumentsPerStatus();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-31'),
+            AdRawDocumentStatus::PROCESSED,
+        );
+
+        self::assertSame(1, $count);
+    }
+
+    public function testCountFilteredByFailedStatusOnly(): void
+    {
+        $this->seedThreeDocumentsPerStatus();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-31'),
+            AdRawDocumentStatus::FAILED,
+        );
+
+        self::assertSame(1, $count);
+    }
+
+    public function testCountFilteredByDraftStatusOnly(): void
+    {
+        $this->seedThreeDocumentsPerStatus();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-31'),
+            AdRawDocumentStatus::DRAFT,
+        );
+
+        self::assertSame(1, $count);
+    }
+
+    public function testCountReturnsZeroForOtherCompanyIDOR(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->seedCompany(self::OTHER_COMPANY_ID, self::OTHER_OWNER_ID, 'b@example.test');
+
+        $doc = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-05'))
+            ->build();
+
+        $this->repository->save($doc);
+        $this->em->flush();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::OTHER_COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-10'),
+        );
+
+        self::assertSame(0, $count);
+    }
+
+    public function testCountExcludesDocumentsOutsideDateRange(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+
+        $inside = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-15'))
+            ->build();
+
+        $before = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-02-28'))
+            ->build();
+
+        $after = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-04-01'))
+            ->build();
+
+        foreach ([$inside, $before, $after] as $doc) {
+            $this->repository->save($doc);
+        }
+        $this->em->flush();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-31'),
+        );
+
+        self::assertSame(1, $count);
+    }
+
+    public function testCountExcludesDocumentsOfOtherMarketplace(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+
+        $ozon = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-05'))
+            ->build();
+
+        $wb = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withReportDate(new \DateTimeImmutable('2026-03-05'))
+            ->build();
+
+        foreach ([$ozon, $wb] as $doc) {
+            $this->repository->save($doc);
+        }
+        $this->em->flush();
+
+        $count = $this->repository->countByCompanyMarketplaceAndDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-10'),
+        );
+
+        self::assertSame(1, $count);
+    }
+
+    private function seedThreeDocumentsPerStatus(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+
+        $draft = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-02'))
+            ->build();
+
+        $processed = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-05'))
+            ->asProcessed()
+            ->build();
+
+        $failed = AdRawDocumentBuilder::aRawDocument()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withReportDate(new \DateTimeImmutable('2026-03-10'))
+            ->asFailed('oops')
+            ->build();
+
+        foreach ([$draft, $processed, $failed] as $doc) {
+            $this->repository->save($doc);
+        }
+        $this->em->flush();
     }
 
     private function seedCompany(string $companyId, string $ownerId, string $email): Company
