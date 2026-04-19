@@ -262,7 +262,7 @@
                                 ? '<td><button type="button" class="btn btn-sm btn-outline-danger" '
                                     + 'data-bs-toggle="modal" '
                                     + 'data-bs-target="#modal-mark-ad-load-job-failed" '
-                                    + 'data-mark-failed data-job-id="' + escapeHtml(job.id) + '">'
+                                    + 'data-job-id="' + escapeHtml(job.id) + '">'
                                     + 'Пометить FAILED</button></td>'
                                 : '<td></td>';
                             return '<tr>'
@@ -410,9 +410,7 @@
                 if (!markFailedModalEl) return;
                 var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
                 if (BootstrapModal) {
-                    var instance = BootstrapModal.getInstance(markFailedModalEl)
-                        || BootstrapModal.getOrCreateInstance(markFailedModalEl);
-                    instance.hide();
+                    BootstrapModal.getOrCreateInstance(markFailedModalEl).hide();
                     return;
                 }
                 var closeBtn = markFailedModalEl.querySelector('[data-bs-dismiss="modal"]');
