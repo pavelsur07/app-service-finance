@@ -69,6 +69,7 @@ when@prod:
                 level: debug
                 channels: [marketplace_ads]
                 max_files: 14
+                formatter: monolog.formatter.json
 
             sentry:
                 type: service
