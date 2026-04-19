@@ -290,7 +290,6 @@ services:
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
             - ./var/log/cron:/var/log/cron:rw
-            - site_var_log:/app/var/log
         depends_on:
             site-postgres:
                 condition: service_healthy

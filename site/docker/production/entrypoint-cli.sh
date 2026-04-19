@@ -3,10 +3,14 @@ set -eu
 
 STORAGE_DIR="/app/var/storage"
 IMPORT_DIR="$STORAGE_DIR/cash-file-imports"
+LOG_DIR="/app/var/log"
 
 mkdir -p "$IMPORT_DIR"
+mkdir -p "$LOG_DIR"
 chown -R www-data:www-data "$STORAGE_DIR"
 chmod -R 0775 "$STORAGE_DIR"
+chown -R www-data:www-data "$LOG_DIR"
+chmod -R 0775 "$LOG_DIR"
 
 # запуск основной команды контейнера под пользователем app
 exec su-exec app "$@"
