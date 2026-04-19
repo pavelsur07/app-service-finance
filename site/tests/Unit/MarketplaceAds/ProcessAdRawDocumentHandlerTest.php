@@ -182,6 +182,35 @@ final class ProcessAdRawDocumentHandlerTest extends TestCase
         ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
     }
 
+    public function testSecondaryExceptionFromFinalizeDoesNotMaskOriginalOnActionFailure(): void
+    {
+        // Гонка после wrapInTransaction: Doctrine закрыл EntityManager, и ORM-запросы
+        // внутри tryFinalizeJobForDocument кидают "EntityManager is closed". Handler
+        // обязан поглотить secondary и пробросить ОРИГИНАЛЬНОЕ исключение, чтобы
+        // Messenger failed-queue увидел реальную причину, а не маску.
+        $original = new \RuntimeException('db constraint violation');
+
+        $this->action->expects(self::once())
+            ->method('__invoke')
+            ->willThrowException($original);
+
+        $this->entityManager->expects(self::never())->method('flush');
+
+        $this->rawDocRepo->expects(self::once())
+            ->method('markFailedWithReason')
+            ->willReturn(1);
+
+        // tryFinalizeJobForDocument → findByIdAndCompany бросает secondary.
+        $this->rawDocRepo->expects(self::once())
+            ->method('findByIdAndCompany')
+            ->willThrowException(new \RuntimeException('EntityManager is closed'));
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('db constraint violation');
+
+        ($this->handler)(new ProcessAdRawDocumentMessage(self::COMPANY_ID, self::DOCUMENT_ID));
+    }
+
     public function testAlreadyProcessedExceptionIsSwallowedWithoutFinalize(): void
     {
         $this->action->expects(self::once())

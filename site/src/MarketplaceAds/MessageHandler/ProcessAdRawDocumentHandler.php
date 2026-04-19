@@ -70,12 +70,34 @@ final class ProcessAdRawDocumentHandler
 
             return;
         } catch (\Throwable $e) {
+            // markFailedWithReason — raw DBAL минуя UoW: переживает закрытый
+            // после wrapInTransaction EntityManager (Connection остаётся живой).
             $this->adRawDocumentRepository->markFailedWithReason(
                 $message->adRawDocumentId,
                 $message->companyId,
                 $e::class.': '.$e->getMessage(),
             );
-            $this->tryFinalizeJobForDocument($message->companyId, $message->adRawDocumentId);
+
+            // tryFinalizeJobForDocument использует ORM-запросы (findByIdAndCompany,
+            // findActiveJobCoveringDate). Если исходное исключение пришло из
+            // EntityManager::wrapInTransaction, Doctrine закрыл EM — secondary
+            // "EntityManager is closed" замаскировал бы $e и отправил бы в
+            // failed-queue бесполезное сообщение. Глотаем secondary и логируем:
+            // следующий успешный message по документу этого job'а всё равно
+            // добьёт финализацию.
+            try {
+                $this->tryFinalizeJobForDocument($message->companyId, $message->adRawDocumentId);
+            } catch (\Throwable $secondary) {
+                $this->logger->error(
+                    'Финализация job пропущена после ошибки обработки документа',
+                    $secondary,
+                    [
+                        'companyId' => $message->companyId,
+                        'adRawDocumentId' => $message->adRawDocumentId,
+                        'originalException' => $e::class.': '.$e->getMessage(),
+                    ],
+                );
+            }
 
             throw $e;
         }
