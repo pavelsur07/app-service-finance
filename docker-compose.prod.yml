@@ -162,6 +162,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_var_log:/app/var/log
         # ⬇️ FIX: увеличен start_period — даём время на cache:warmup при первом старте
         healthcheck:
             test: ["CMD-SHELL", "REDIRECT_STATUS=true SCRIPT_NAME=/ping SCRIPT_FILENAME=/ping REQUEST_METHOD=GET cgi-fcgi -bind -connect 127.0.0.1:9000 || exit 1"]
@@ -192,6 +193,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_var_log:/app/var/log
 
     site-messenger-worker:
         image: ghcr.io/pavelsur07/site-php-cli:latest
@@ -209,6 +211,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_var_log:/app/var/log
         # ⬇️ FIX: Даём воркеру завершить текущее сообщение при остановке
         stop_grace_period: 60s
         healthcheck:
@@ -296,6 +299,7 @@ services:
 
 volumes:
     site_storage:
+    site_var_log:
     traefik-certs:
     postgres_data:
     site-redis-data:
