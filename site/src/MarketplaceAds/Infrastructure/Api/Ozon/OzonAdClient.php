@@ -22,7 +22,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *   1) get OAuth-token (cache: ozon_perf_token_{companyId}, TTL = expires_in - 300);
  *   2) GET  /api/client/campaign — все SKU-кампании (без фильтра по state, чтобы
  *      не терять backfill остановленных/архивных кампаний);
- *   3) POST /api/client/statistics батчами (до 100 campaignIds) → UUID отчёта;
+ *   3) POST /api/client/statistics батчами (до 10 campaignIds) → UUID отчёта;
  *   4) GET  /api/client/statistics/{uuid} — polling до READY (макс. 36 попыток × 5с = 3 мин);
  *   5) GET  /api/client/statistics/report — скачать CSV (либо сразу из state.report.link);
  *   6) преобразовать строки CSV в формат {"rows": [{campaign_id, campaign_name, sku, spend, views, clicks}]}.
@@ -42,9 +42,10 @@ class OzonAdClient implements AdPlatformClientInterface
 
     private const REQUEST_TIMEOUT = 30;
     private const TOKEN_TTL_SAFETY_MARGIN = 300;
-    // Ozon Performance API принимает до 100 campaignIds в теле /statistics.
-    // При блокирующем sleep-polling чем больше батч, тем меньше суммарное ожидание.
-    private const STATISTICS_BATCH_SIZE = 100;
+    // Ozon Performance API принимает до 10 campaignIds в теле /statistics
+    // (ранее было 100; лимит ужесточён на стороне Ozon, подтверждено ответом
+    // «Превышен лимит по количеству кампаний (максимум 10)»).
+    private const STATISTICS_BATCH_SIZE = 10;
     private const POLL_MAX_ATTEMPTS = 36;
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
