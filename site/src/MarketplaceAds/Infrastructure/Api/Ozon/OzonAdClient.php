@@ -485,8 +485,8 @@ class OzonAdClient implements AdPlatformClientInterface
         $response = $this->authorizedRequest('POST', self::STATISTICS_PATH, $token, [
             'json' => [
                 'campaigns' => $campaignIds,
-                'from' => $dateFrom->format('Y-m-d'),
-                'to' => $dateTo->format('Y-m-d'),
+                'from' => $dateFrom->format('Y-m-d\T00:00:00\Z'),
+                'to' => $dateTo->format('Y-m-d\T23:59:59\Z'),
                 'groupBy' => $groupBy,
             ],
         ]);
