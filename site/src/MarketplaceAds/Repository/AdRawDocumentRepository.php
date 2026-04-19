@@ -64,6 +64,25 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
         );
     }
 
+    public function findByCompanyMarketplaceAndDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        return $this->createQueryBuilder('r')
+            ->where('r.companyId = :companyId')
+            ->andWhere('r.marketplace = :marketplace')
+            ->andWhere('r.reportDate BETWEEN :from AND :to')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('from', $from->format('Y-m-d'))
+            ->setParameter('to', $to->format('Y-m-d'))
+            ->orderBy('r.reportDate', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
     public function save(AdRawDocument $document): void
     {
         $this->getEntityManager()->persist($document);

@@ -1,0 +1,388 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Реклама — Маркетплейсы{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Реклама маркетплейсов</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+
+            {# ---------- Блок «Реклама Ozon» ---------- #}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">Реклама Ozon</h3>
+                </div>
+                <div class="card-body">
+                    {% if not hasPerformanceConnection %}
+                        <div class="alert alert-warning mb-0">
+                            <div class="d-flex">
+                                <div>
+                                    <h4 class="alert-title">Нет подключения к Ozon Performance API</h4>
+                                    <div class="text-muted">
+                                        Настройте Performance-подключение на странице
+                                        <a href="{{ path('marketplace_index') }}">Маркетплейсы</a>.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="btn-list">
+                            <button type="button" class="btn btn-indigo" data-ozon-initial-load="1">
+                                Загрузить с начала года
+                            </button>
+                            {% if is_granted('ROLE_COMPANY_OWNER') %}
+                                <button type="button" class="btn btn-outline-secondary"
+                                        data-bs-toggle="modal" data-bs-target="#modal-ozon-ad-load-range">
+                                    Загрузить за период
+                                </button>
+                            {% endif %}
+                        </div>
+
+                        {% if activeAdLoadJob is not null %}
+                            <div class="mt-3"
+                                 id="ozon-ad-load-widget"
+                                 data-ad-job-id="{{ activeAdLoadJob.id }}"
+                                 data-ad-job-status="{{ activeAdLoadJob.status.value }}"
+                                 data-status-url="{{ path('marketplace_ads_ozon_load_job_status', {jobId: activeAdLoadJob.id}) }}">
+                                {% if activeAdLoadJob.status.isTerminal %}
+                                    {% if activeAdLoadJob.status.value == 'completed' %}
+                                        <div class="alert alert-success mb-0 py-2">
+                                            <small>Реклама Ozon загружена</small>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-danger mb-0 py-2">
+                                            <small>Ошибка загрузки: {{ activeAdLoadJob.failureReason }}</small>
+                                        </div>
+                                    {% endif %}
+                                {% else %}
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="spinner-border spinner-border-sm text-indigo"></span>
+                                        <small class="text-muted">Загрузка рекламы Ozon...</small>
+                                    </div>
+                                    <div class="progress mb-1" style="height:6px;">
+                                        <div class="progress-bar bg-indigo ozon-ad-progress-bar" style="width:0%"></div>
+                                    </div>
+                                    <small class="text-muted ozon-ad-counters">Чанков: —, Документов: —</small>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+
+            {# ---------- Блок «История загрузок» ---------- #}
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">История загрузок</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter" id="ad-load-jobs-table">
+                        <thead>
+                        <tr>
+                            <th>Период</th>
+                            <th>Статус</th>
+                            <th>Чанки</th>
+                            <th>Создан</th>
+                            <th>Завершён</th>
+                            <th>Ошибка</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr><td colspan="6" class="text-center text-muted">Загрузка…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            {# ---------- Блок «Сырые документы» ---------- #}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Сырые документы</h3>
+                </div>
+                <div class="card-body">
+                    <form id="raw-documents-filter" class="row g-2 align-items-end mb-3">
+                        <div class="col-auto">
+                            <label class="form-label">Дата с</label>
+                            <input type="date" id="raw-date-from" class="form-control"
+                                   value="{{ 'now'|date_modify('-30 days')|date('Y-m-d') }}">
+                        </div>
+                        <div class="col-auto">
+                            <label class="form-label">Дата по</label>
+                            <input type="date" id="raw-date-to" class="form-control"
+                                   value="{{ 'now'|date('Y-m-d') }}">
+                        </div>
+                        <div class="col-auto">
+                            <button type="submit" class="btn btn-primary">Показать</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter" id="ad-raw-documents-table">
+                        <thead>
+                        <tr>
+                            <th>Дата отчёта</th>
+                            <th>Статус</th>
+                            <th>Загружен</th>
+                            <th>Ошибка обработки</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr><td colspan="4" class="text-center text-muted">Загрузка…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    {# ---------- Modal: Загрузить рекламу Ozon за произвольный период ---------- #}
+    {% if hasPerformanceConnection and is_granted('ROLE_COMPANY_OWNER') %}
+        <div class="modal modal-blur fade" id="modal-ozon-ad-load-range" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Загрузить рекламу Ozon за период</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label required">Дата начала</label>
+                            <input type="date" id="ozon-ad-range-from" class="form-control" required
+                                   value="{{ 'now'|date_modify('first day of last month')|date('Y-m-d') }}">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label required">Дата окончания</label>
+                            <input type="date" id="ozon-ad-range-to" class="form-control" required
+                                   value="{{ 'now'|date_modify('last day of last month')|date('Y-m-d') }}">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn" data-bs-dismiss="modal">Отмена</button>
+                        <button type="button" class="btn btn-indigo" id="btn-ozon-ad-load-range">Загрузить</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <script>
+        (function () {
+            var escapeHtml = function (value) {
+                if (value === null || value === undefined) return '';
+                return String(value)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            };
+
+            var jobStatusBadge = function (status) {
+                var map = {
+                    pending:   ['bg-secondary', 'Ожидает'],
+                    running:   ['bg-info',      'Выполняется'],
+                    completed: ['bg-success',   'Завершён'],
+                    failed:    ['bg-danger',    'Ошибка'],
+                };
+                var row = map[status] || ['bg-secondary', status];
+                return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
+            };
+
+            var docStatusBadge = function (status) {
+                var map = {
+                    draft:     ['bg-secondary', 'Черновик'],
+                    processed: ['bg-success',   'Обработан'],
+                    failed:    ['bg-danger',    'Ошибка'],
+                };
+                var row = map[status] || ['bg-secondary', status];
+                return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
+            };
+
+            var loadJobs = function () {
+                var tbody = document.querySelector('#ad-load-jobs-table tbody');
+                fetch('{{ path('marketplace_ads_load_jobs_list') }}', {
+                    credentials: 'same-origin',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                })
+                    .then(function (r) { return r.json(); })
+                    .then(function (data) {
+                        var items = (data && data.items) || [];
+                        if (items.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">Нет данных</td></tr>';
+                            return;
+                        }
+                        tbody.innerHTML = items.map(function (job) {
+                            return '<tr>'
+                                + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
+                                + '<td>' + jobStatusBadge(job.status) + '</td>'
+                                + '<td>' + escapeHtml(job.chunksTotal) + '</td>'
+                                + '<td><small>' + escapeHtml(job.createdAt) + '</small></td>'
+                                + '<td><small>' + escapeHtml(job.finishedAt || '—') + '</small></td>'
+                                + '<td><small class="text-danger">' + escapeHtml(job.lastError || '') + '</small></td>'
+                                + '</tr>';
+                        }).join('');
+                    })
+                    .catch(function () {
+                        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Ошибка загрузки</td></tr>';
+                    });
+            };
+
+            var loadRawDocuments = function (dateFrom, dateTo) {
+                var tbody = document.querySelector('#ad-raw-documents-table tbody');
+                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Загрузка…</td></tr>';
+
+                var url = '{{ path('marketplace_ads_raw_documents_list') }}';
+                if (dateFrom && dateTo) {
+                    url += '?dateFrom=' + encodeURIComponent(dateFrom) + '&dateTo=' + encodeURIComponent(dateTo);
+                }
+
+                fetch(url, {
+                    credentials: 'same-origin',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                })
+                    .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">'
+                                + escapeHtml((res.data && res.data.message) || 'Ошибка загрузки') + '</td></tr>';
+                            return;
+                        }
+                        var items = (res.data && res.data.items) || [];
+                        if (items.length === 0) {
+                            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Нет данных</td></tr>';
+                            return;
+                        }
+                        tbody.innerHTML = items.map(function (doc) {
+                            return '<tr>'
+                                + '<td>' + escapeHtml(doc.reportDate) + '</td>'
+                                + '<td>' + docStatusBadge(doc.status) + '</td>'
+                                + '<td><small>' + escapeHtml(doc.loadedAt) + '</small></td>'
+                                + '<td><small class="text-danger">' + escapeHtml(doc.processingError || '') + '</small></td>'
+                                + '</tr>';
+                        }).join('');
+                    })
+                    .catch(function () {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Ошибка загрузки</td></tr>';
+                    });
+            };
+
+            document.addEventListener('DOMContentLoaded', function () {
+                loadJobs();
+
+                var fromEl = document.getElementById('raw-date-from');
+                var toEl   = document.getElementById('raw-date-to');
+                loadRawDocuments(fromEl.value, toEl.value);
+
+                var filterForm = document.getElementById('raw-documents-filter');
+                filterForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    loadRawDocuments(fromEl.value, toEl.value);
+                });
+            });
+
+            // Кнопка «Загрузить с начала года»
+            document.querySelectorAll('[data-ozon-initial-load]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    btn.disabled = true;
+                    var original = btn.innerHTML;
+                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
+                    fetch('{{ path('marketplace_ads_ozon_initial_load') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    })
+                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                        .then(function (res) {
+                            if (res.ok) {
+                                window.location.reload();
+                            } else {
+                                alert('Ошибка: ' + ((res.data && res.data.message) || 'Неизвестная ошибка'));
+                                btn.disabled = false;
+                                btn.innerHTML = original;
+                            }
+                        })
+                        .catch(function (err) {
+                            alert('Ошибка сети: ' + err.message);
+                            btn.disabled = false;
+                            btn.innerHTML = original;
+                        });
+                });
+            });
+
+            // Кнопка «Загрузить за период» в модалке
+            var rangeBtn = document.getElementById('btn-ozon-ad-load-range');
+            if (rangeBtn) {
+                rangeBtn.addEventListener('click', function () {
+                    var dateFrom = (document.getElementById('ozon-ad-range-from') || {}).value;
+                    var dateTo   = (document.getElementById('ozon-ad-range-to') || {}).value;
+                    if (!dateFrom || !dateTo) { alert('Укажите обе даты'); return; }
+                    rangeBtn.disabled = true;
+                    rangeBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
+                    fetch('{{ path('marketplace_ads_ozon_load_range') }}', {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                        body: JSON.stringify({dateFrom: dateFrom, dateTo: dateTo}),
+                    })
+                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                        .then(function (res) {
+                            if (res.ok) {
+                                window.location.reload();
+                            } else {
+                                var BootstrapModal = window.bootstrap && window.bootstrap.Modal;
+                                if (BootstrapModal) {
+                                    BootstrapModal.getOrCreateInstance(document.getElementById('modal-ozon-ad-load-range')).hide();
+                                }
+                                alert('Ошибка: ' + ((res.data && res.data.message) || 'Неизвестная ошибка'));
+                                rangeBtn.disabled = false;
+                                rangeBtn.innerHTML = 'Загрузить';
+                            }
+                        })
+                        .catch(function (err) {
+                            alert('Ошибка сети: ' + err.message);
+                            rangeBtn.disabled = false;
+                            rangeBtn.innerHTML = 'Загрузить';
+                        });
+                });
+            }
+
+            // Поллер прогресса загрузки рекламы Ozon (15 сек)
+            document.querySelectorAll('[data-ad-job-id]').forEach(function (widget) {
+                var status = widget.dataset.adJobStatus;
+                if (status === 'completed' || status === 'failed') return;
+
+                var statusUrl = widget.dataset.statusUrl;
+                var bar       = widget.querySelector('.ozon-ad-progress-bar');
+                var counters  = widget.querySelector('.ozon-ad-counters');
+
+                var interval = setInterval(function () {
+                    fetch(statusUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}})
+                        .then(function (r) { return r.json(); })
+                        .then(function (data) {
+                            if (bar) bar.style.width = data.progress + '%';
+                            if (counters) {
+                                counters.textContent = 'Чанков: ' + data.completedChunks + '/' + data.chunksTotal
+                                    + ', Документов: ' + data.totalDocs
+                                    + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
+                            }
+                            if (data.status === 'completed' || data.status === 'failed') {
+                                clearInterval(interval);
+                                window.location.reload();
+                            }
+                        })
+                        .catch(function () { /* сеть — продолжаем */ });
+                }, 15000);
+            });
+        })();
+    </script>
+{% endblock %}
