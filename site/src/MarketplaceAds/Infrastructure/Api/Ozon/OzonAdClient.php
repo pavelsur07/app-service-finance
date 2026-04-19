@@ -474,10 +474,18 @@ class OzonAdClient implements AdPlatformClientInterface
         \DateTimeImmutable $dateTo,
         string $groupBy,
     ): string {
+        // Caller передаёт DateTimeImmutable в своей TZ (в проде date.timezone=Europe/Moscow).
+        // Ozon ждёт google.protobuf.Timestamp (RFC3339 в UTC), поэтому сначала фиксируем
+        // границы суток в исходной TZ (00:00:00 и 23:59:59), затем конвертируем instant
+        // в UTC — иначе календарный день MSK был бы помечен как UTC и сдвинул окно на 3 часа.
+        $utc = new \DateTimeZone('UTC');
+        $from = $dateFrom->setTime(0, 0, 0)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+        $to = $dateTo->setTime(23, 59, 59)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+
         $this->logger->debug('Ozon Performance POST /statistics payload', [
             'campaign_count' => count($campaignIds),
-            'from' => $dateFrom->format('Y-m-d'),
-            'to' => $dateTo->format('Y-m-d'),
+            'from' => $from,
+            'to' => $to,
             'groupBy' => $groupBy,
             'campaigns' => $campaignIds,
         ]);
@@ -485,8 +493,8 @@ class OzonAdClient implements AdPlatformClientInterface
         $response = $this->authorizedRequest('POST', self::STATISTICS_PATH, $token, [
             'json' => [
                 'campaigns' => $campaignIds,
-                'from' => $dateFrom->format('Y-m-d'),
-                'to' => $dateTo->format('Y-m-d'),
+                'from' => $from,
+                'to' => $to,
                 'groupBy' => $groupBy,
             ],
         ]);
