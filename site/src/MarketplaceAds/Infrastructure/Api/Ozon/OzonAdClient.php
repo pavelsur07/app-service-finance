@@ -474,6 +474,14 @@ class OzonAdClient implements AdPlatformClientInterface
         \DateTimeImmutable $dateTo,
         string $groupBy,
     ): string {
+        $this->logger->debug('Ozon Performance POST /statistics payload', [
+            'campaign_count' => count($campaignIds),
+            'from' => $dateFrom->format('Y-m-d'),
+            'to' => $dateTo->format('Y-m-d'),
+            'groupBy' => $groupBy,
+            'campaigns' => $campaignIds,
+        ]);
+
         $response = $this->authorizedRequest('POST', self::STATISTICS_PATH, $token, [
             'json' => [
                 'campaigns' => $campaignIds,
@@ -786,7 +794,16 @@ class OzonAdClient implements AdPlatformClientInterface
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
-            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул HTTP %d', $method, $urlOrPath, $statusCode));
+            try {
+                $body = $response->getContent(false);
+                $bodyPreview = mb_strimwidth($body, 0, 2000, '...');
+            } catch (TransportExceptionInterface) {
+                // Если соединение оборвётся после получения заголовков, но до
+                // дочитывания тела — всё равно отдаём наверх HTTP-код, чтобы
+                // диагностический статус не был подменён TransportException'ом.
+                $bodyPreview = '<body unavailable>';
+            }
+            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул HTTP %d, body: %s', $method, $urlOrPath, $statusCode, $bodyPreview));
         }
 
         return $response;
