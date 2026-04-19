@@ -88,8 +88,6 @@ final class AdLoadJobTest extends TestCase
 
         self::assertSame(AdLoadJobStatus::PENDING, $job->getStatus());
         self::assertSame(0, $job->getLoadedDays());
-        self::assertSame(0, $job->getProcessedDays());
-        self::assertSame(0, $job->getFailedDays());
         self::assertNull($job->getStartedAt());
         self::assertNull($job->getFinishedAt());
         self::assertNull($job->getFailureReason());
@@ -166,12 +164,11 @@ final class AdLoadJobTest extends TestCase
         $job->markFailed('вторая попытка');
     }
 
-    public function testGetProgressComputesPercentFromLoadedPlusFailed(): void
+    public function testGetProgressComputesPercentFromLoadedDays(): void
     {
-        // 10 дней, 3 loaded + 2 failed = 50%
+        // 10 дней, 5 loaded = 50%
         $job = AdLoadJobBuilder::aJob()
-            ->withLoaded(3)
-            ->withFailed(2)
+            ->withLoaded(5)
             ->build();
 
         self::assertSame(10, $job->getTotalDays());
