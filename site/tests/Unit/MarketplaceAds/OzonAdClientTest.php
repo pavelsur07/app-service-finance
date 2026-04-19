@@ -486,6 +486,37 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // HTTP non-2xx body propagation: RuntimeException message должен
+    // включать и код, и тело ответа (для диагностики 400 от /statistics).
+    // -----------------------------------------------------------------
+    public function testAuthorizedRequestIncludesResponseBodyInExceptionOnHttp400(): void
+    {
+        $http = new MockHttpClient([
+            // 1) token
+            new MockResponse($this->tokenBody('TKN-400')),
+            // 2) GET /campaign
+            new MockResponse($this->campaignListBody(1)),
+            // 3) POST /statistics → 400 с диагностическим телом
+            new MockResponse('{"error":"invalid campaign id"}', ['http_code' => 400]),
+        ]);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected RuntimeException');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            self::assertStringContainsString('HTTP 400', $msg);
+            self::assertStringContainsString('invalid campaign id', $msg);
+        }
+    }
+
+    // -----------------------------------------------------------------
     // g) Backward-compat: fetchAdStatistics($companyId, $date) still works
     // -----------------------------------------------------------------
     public function testFetchAdStatisticsLegacyContractRemainsStable(): void
