@@ -14,9 +14,11 @@ use Webmozart\Assert\Assert;
 /**
  * Задание на пакетную загрузку рекламных отчётов за период.
  *
- * Прогресс-счётчики (loadedDays/processedDays/failedDays) инкрементируются
- * параллельными воркерами через атомарный `UPDATE ... SET x = x + :delta`
- * в Repository, минуя Doctrine UoW.
+ * Счётчик loadedDays инкрементируется параллельными воркерами через атомарный
+ * `UPDATE ... SET x = x + :delta` в Repository, минуя Doctrine UoW.
+ * Финализация (успех / неуспех) считается через COUNT по AdRawDocument:
+ * статус каждого документа (DRAFT/PROCESSED/FAILED) — источник правды, а не
+ * отдельные диагностические счётчики в job'е.
  */
 #[ORM\Entity(repositoryClass: AdLoadJobRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_load_jobs')]
@@ -46,12 +48,6 @@ class AdLoadJob
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $loadedDays = 0;
-
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    private int $processedDays = 0;
-
-    #[ORM\Column(type: 'integer', options: ['default' => 0])]
-    private int $failedDays = 0;
 
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $chunksTotal = 0;
@@ -164,7 +160,7 @@ class AdLoadJob
     }
 
     /**
-     * Доля выполненных шагов (loaded + failed) относительно totalDays, 0..100.
+     * Доля загруженных дней относительно totalDays, 0..100.
      * Округление — до целого процента, чтобы UI не «дёргался» на долях.
      */
     public function getProgress(): int
@@ -173,8 +169,7 @@ class AdLoadJob
             return 0;
         }
 
-        $done = $this->loadedDays + $this->failedDays;
-        $progress = (int) floor(($done * 100) / $this->totalDays);
+        $progress = (int) floor(($this->loadedDays * 100) / $this->totalDays);
 
         return min(100, max(0, $progress));
     }
@@ -212,16 +207,6 @@ class AdLoadJob
     public function getLoadedDays(): int
     {
         return $this->loadedDays;
-    }
-
-    public function getProcessedDays(): int
-    {
-        return $this->processedDays;
-    }
-
-    public function getFailedDays(): int
-    {
-        return $this->failedDays;
     }
 
     public function getChunksTotal(): int

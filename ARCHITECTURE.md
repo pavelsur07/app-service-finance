@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.0 / 2026-03-28
+> Версия: 1.11 / 2026-04-19
 
 ---
 
@@ -54,6 +54,8 @@
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
 | `AdDocument` | MarketplaceAds | `string $companyId` ✅ |
 | `AdDocumentLine` | MarketplaceAds | `string $companyId` ✅ |
+| `AdLoadJob` | MarketplaceAds | `string $companyId` ✅ |
+| `AdChunkProgress` | MarketplaceAds | через `jobId` (IDOR через AdLoadJob) |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -97,6 +99,35 @@
 | `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
 
 **Уникальность:** `UniqueConstraint` по `(company_id, marketplace, connection_type)` — одна компания может иметь два подключения к одному маркетплейсу (Seller + Performance), но только по одному каждого типа.
+
+### `AdLoadJob` — поля
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` (UUID v7) | PK |
+| `companyId` | `string` (UUID) | Неизменяем, без setter |
+| `marketplace` | `MarketplaceType` | WB, Ozon |
+| `dateFrom` / `dateTo` | `DateTimeImmutable` | Диапазон загрузки (нормализован до 00:00, включительно) |
+| `totalDays` | `int` | Автосчёт из diff + 1 в конструкторе |
+| `loadedDays` | `int` | Атомарный счётчик фактически загруженных дней (raw SQL `UPDATE ... SET loaded_days = loaded_days + :delta`, минуя UoW) |
+| `chunksTotal` | `int` | Кол-во чанков по 62 дня, проставляется один раз в `LoadOzonAdStatisticsRangeHandler` |
+| `status` | `AdLoadJobStatus` | `pending` / `running` / `completed` / `failed` |
+| `failureReason` | `?string` | Причина FAILED |
+| `startedAt` / `finishedAt` | `?DateTimeImmutable` | — |
+| `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
+
+**Финализация job'а** выполняется через COUNT по `marketplace_ad_raw_documents`: per-document FAILED-статус `AdRawDocument` — источник правды. Отдельные диагностические счётчики `processed_days` / `failed_days` удалены как мёртвые.
+
+### `AdChunkProgress` — поля
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` (UUID v7) | PK |
+| `jobId` | `string` (UUID) | Ссылка на `AdLoadJob` |
+| `dateFrom` / `dateTo` | `DateTimeImmutable` | Диапазон чанка (нормализован до 00:00) |
+| `completedAt` | `DateTimeImmutable` | Время фиксации успеха |
+
+**Уникальность:** `UniqueConstraint` по `(job_id, date_from, date_to)` — делает фиксацию чанка идемпотентной на уровне БД. При Messenger-retry `FetchOzonAdStatisticsHandler` тот же чанк упрётся в uq-нарушение и не приведёт к двойному инкременту `loadedDays`.
 
 ---
 
@@ -263,6 +294,87 @@ getCostCategoriesForCompany(string $companyId, string $marketplace): array
 // должен явно указать SELLER или PERFORMANCE.
 // @return array{api_key: string, client_id: ?string}|null
 getConnectionCredentials(string $companyId, MarketplaceType $marketplace, MarketplaceConnectionType $connectionType): ?array
+```
+
+---
+
+## Repository — ключевые методы MarketplaceAds
+
+> Контракты репозиториев, используемых handler'ами Ozon Ads pipeline.
+> Все методы — IDOR-safe: `company_id` в WHERE там, где применимо.
+
+### `AdLoadJobRepository` (`src/MarketplaceAds/Repository/AdLoadJobRepository.php`)
+```php
+// Загрузка с IDOR-проверкой по companyId
+findByIdAndCompany(string $id, string $companyId): ?AdLoadJob
+
+// Trusted-контекст (Messenger-хендлеры): ID сгенерирован внутри системы
+find($id, $lockMode = null, $lockVersion = null): ?AdLoadJob
+
+// Последние задания компании по маркетплейсу (DESC по createdAt)
+// @return list<AdLoadJob>
+findRecentByCompanyAndMarketplace(string $companyId, MarketplaceType $marketplace, int $limit = 20): array
+
+// Последний активный (PENDING/RUNNING) job — гейт, чтобы не запускать второй параллельно
+findLatestActiveJobByCompanyAndMarketplace(string $companyId, MarketplaceType $marketplace): ?AdLoadJob
+
+// Активный job, чей диапазон включает дату — маппинг raw-документа → job
+findActiveJobCoveringDate(string $companyId, MarketplaceType $marketplace, \DateTimeImmutable $date): ?AdLoadJob
+
+// Атомарный UPDATE loaded_days = loaded_days + :delta (parallel-safe, минуя UoW).
+// @return int число обновлённых строк (0 если jobId/companyId не совпал)
+incrementLoadedDays(string $jobId, string $companyId, int $delta = 1): int
+
+// Идемпотентные terminal-переходы (raw DBAL UPDATE с guard status IN pending/running)
+markCompleted(string $jobId, string $companyId): int
+markFailed(string $jobId, string $companyId, string $reason): int
+```
+
+### `AdChunkProgressRepository` (`src/MarketplaceAds/Repository/AdChunkProgressRepository.php`)
+```php
+// Идемпотентная фиксация успеха чанка. true — фиксация прошла;
+// false — чанк уже был помечен (Messenger retry) → caller должен пропустить
+// инкремент счётчиков, иначе получим double-counting.
+markChunkCompleted(
+    string $jobId,
+    string $companyId,
+    \DateTimeImmutable $dateFrom,
+    \DateTimeImmutable $dateTo,
+): bool
+
+// Кол-во зафиксированных чанков job'а — для сравнения с chunksTotal при финализации.
+// IDOR-guard: проверяет принадлежность jobId компании через SELECT к marketplace_ad_load_jobs
+// и кидает \DomainException при несоответствии.
+countCompletedChunks(string $jobId, string $companyId): int
+```
+
+### `AdRawDocumentRepository` (`src/MarketplaceAds/Repository/AdRawDocumentRepository.php`)
+```php
+// Загрузка с IDOR-проверкой
+findByIdAndCompany(string $id, string $companyId): ?AdRawDocument
+
+// Идемпотентный переход DRAFT → FAILED через raw DBAL (минуя UoW).
+// @return int 1 — успех, 0 — уже FAILED / не наш
+markFailedWithReason(string $documentId, string $companyId, string $reason): int
+
+// COUNT документов компании за период (опц. фильтр по статусу).
+// Используется в финализации job'а: (total == processed + failed) → markCompleted.
+countByCompanyMarketplaceAndDateRange(
+    string $companyId,
+    string $marketplace,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    ?AdRawDocumentStatus $statusFilter = null,
+): int
+
+// Документы компании за период (DESC по report_date).
+// @return list<AdRawDocument>
+findByCompanyMarketplaceAndDateRange(
+    string $companyId,
+    string $marketplace,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+): array
 ```
 
 ---
@@ -438,9 +550,24 @@ enum AdRawDocumentStatus: string
 {
     case DRAFT     = 'draft';
     case PROCESSED = 'processed';
+    case FAILED    = 'failed';
 
-    public function getLabel(): string; // Черновик / Обработан
-    public function isDraft(): bool;    // true для DRAFT
+    public function getLabel(): string;   // Черновик / Обработан / Ошибка
+    public function isDraft(): bool;      // true для DRAFT
+    public function isTerminal(): bool;   // true для PROCESSED, FAILED
+}
+```
+
+### `src/MarketplaceAds/Enum/AdLoadJobStatus.php`
+```php
+enum AdLoadJobStatus: string
+{
+    case PENDING   = 'pending';
+    case RUNNING   = 'running';
+    case COMPLETED = 'completed';
+    case FAILED    = 'failed';
+
+    public function isTerminal(): bool; // true для COMPLETED, FAILED
 }
 ```
 
@@ -614,3 +741,4 @@ paths:
 | 1.8 | 2026-04-15 | MarketplaceAds: `OzonAdClient` реализован для работы с Ozon Performance API (`https://api-performance.ozon.ru`). Credentials забираются через `MarketplaceFacade::getConnectionCredentials(..., PERFORMANCE)`; OAuth2 access-token кэшируется в Symfony Cache с TTL = `expires_in - 300`. Пайплайн `fetchAdStatistics()`: листинг SKU-кампаний → async `/api/client/statistics` батчами по 100 кампаний → polling состояния (5 сек × 36 попыток = 3 мин) → скачивание CSV → парсинг через `fgetcsv` над `php://memory` (RFC 4180, автодетект `,` или `;`) → JSON `{"rows":[{campaign_id, campaign_name, sku, spend, views, clicks}]}`. `withAuthRetry()` один раз ретраит запрос при 401 (через внутренний `OzonAuthExpiredException`), 403 сигнализируется как permanent failure без ретрая. |
 | 1.9 | 2026-04-15 | MarketplaceAds: команды CLI переименованы в единый паттерн `app:marketplace-ads:*` — `marketplace-ads:load` → `app:marketplace-ads:load`, `marketplace-ads:reprocess` → `app:marketplace-ads:reprocess`. Приводит именование к общему для проекта префиксу `app:` (как у `app:marketplace:wb-daily-sync` и пр.). |
 | 1.10 | 2026-04-15 | Marketplace: UI модалки «Новое подключение» (`templates/marketplace/index.html.twig`) поддерживает два типа подключения — «Основное (Seller API)» и «Реклама (Performance API)». Тип `performance` доступен только при выборе Ozon, иначе опция скрыта и автоматически откатывается на `seller`. Form `action` переключается между `marketplace_connection_create` и `marketplace_connection_performance_create` без перезагрузки страницы; неактивный блок полей `disabled`, чтобы лишние поля не попадали в POST. В списке активных подключений для Performance подключения: суффикс «(Реклама)» к названию маркетплейса, скрыты кнопки «Синхронизировать», «За период», «Реализация», «Переобработать», строка синхронизации — статическая «—» (поллер статуса не запускается). |
+| 1.11 | 2026-04-19 | MarketplaceAds: серия задач по Ozon Ads pipeline. Новые Entity: `AdLoadJob` (пакетная загрузка за период, атомарный счётчик `loadedDays` через raw SQL), `AdChunkProgress` (идемпотентная фиксация успеха чанка через `UniqueConstraint` `(job_id, date_from, date_to)`). Новый Message `LoadOzonAdStatisticsRangeMessage` + handler-оркестратор: PENDING → RUNNING, разбиение диапазона на чанки ≤ 62 дня (лимит Ozon Performance API), dispatch `FetchOzonAdStatisticsMessage` на каждый чанк. `FetchOzonAdStatisticsHandler`: upsert AdRawDocument + идемпотентный `markChunkCompleted` + inc `loadedDays` только при успешной фиксации чанка. Enum `AdRawDocumentStatus` расширен кейсом `FAILED` (+`isTerminal()`); финализация job'а перешла на per-document статус и считает через `countByCompanyMarketplaceAndDateRange`. Удалены мёртвые counter-поля `processedDays` / `failedDays` из `AdLoadJob` (миграция `Version20260419080739`). Новые методы репозиториев: `AdLoadJobRepository::markCompleted` / `markFailed` / `findRecentByCompanyAndMarketplace`; `AdChunkProgressRepository::markChunkCompleted` / `countCompletedChunks`; `AdRawDocumentRepository::markFailedWithReason` / `countByCompanyMarketplaceAndDateRange` / `findByCompanyMarketplaceAndDateRange`. |

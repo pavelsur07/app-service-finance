@@ -21,8 +21,6 @@ final class AdLoadJobBuilder
     private AdLoadJobStatus $status = AdLoadJobStatus::PENDING;
     private ?string $failureReason = null;
     private int $loadedDays = 0;
-    private int $processedDays = 0;
-    private int $failedDays = 0;
     private int $chunksTotal = 0;
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -105,22 +103,6 @@ final class AdLoadJobBuilder
         return $clone;
     }
 
-    public function withProcessed(int $days): self
-    {
-        $clone = clone $this;
-        $clone->processedDays = $days;
-
-        return $clone;
-    }
-
-    public function withFailed(int $days): self
-    {
-        $clone = clone $this;
-        $clone->failedDays = $days;
-
-        return $clone;
-    }
-
     public function withChunksTotal(int $total): self
     {
         $clone = clone $this;
@@ -153,12 +135,6 @@ final class AdLoadJobBuilder
         // Для произвольного состояния в тестах используем Reflection.
         if ($this->loadedDays !== 0) {
             $this->setProperty($job, 'loadedDays', $this->loadedDays);
-        }
-        if ($this->processedDays !== 0) {
-            $this->setProperty($job, 'processedDays', $this->processedDays);
-        }
-        if ($this->failedDays !== 0) {
-            $this->setProperty($job, 'failedDays', $this->failedDays);
         }
         if ($this->chunksTotal !== 0) {
             $this->setProperty($job, 'chunksTotal', $this->chunksTotal);
