@@ -9,11 +9,38 @@ use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-class AdRawDocumentRepository extends ServiceEntityRepository
+class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDocumentRepositoryInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, AdRawDocument::class);
+    }
+
+    public function countByCompanyMarketplaceAndDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?AdRawDocumentStatus $statusFilter = null,
+    ): int {
+        $sql = 'SELECT COUNT(*) FROM marketplace_ad_raw_documents
+                WHERE company_id = :company_id
+                  AND marketplace = :marketplace
+                  AND report_date BETWEEN :from AND :to';
+
+        $params = [
+            'company_id' => $companyId,
+            'marketplace' => $marketplace,
+            'from' => $from->format('Y-m-d'),
+            'to' => $to->format('Y-m-d'),
+        ];
+
+        if (null !== $statusFilter) {
+            $sql .= ' AND status = :status';
+            $params['status'] = $statusFilter->value;
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->fetchOne($sql, $params);
     }
 
     /**
