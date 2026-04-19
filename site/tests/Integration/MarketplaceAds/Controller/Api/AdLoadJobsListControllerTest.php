@@ -17,7 +17,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
     private const OWNER_ID = '22222222-2222-2222-2222-d00000000001';
     private const OTHER_OWNER_ID = '22222222-2222-2222-2222-d00000000002';
 
-    public function testReturnsOnlyOwnCompanyJobsSortedDesc(): void
+    public function testReturnsJobsOrderedByCreatedAtDesc(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -47,20 +47,21 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         $em->persist($otherCompany);
         $em->flush();
 
+        $now = new \DateTimeImmutable('2026-04-19 12:00:00');
+
         $olderJob = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex(1)
             ->withDateRange(new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-10'))
+            ->withCreatedAt($now->modify('-2 seconds'))
             ->asCompleted()
             ->build();
-
-        // Небольшая задержка для корректного ORDER BY createdAt DESC
-        usleep(10000);
 
         $newerJob = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex(2)
             ->withDateRange(new \DateTimeImmutable('2026-02-01'), new \DateTimeImmutable('2026-02-10'))
+            ->withCreatedAt($now)
             ->asRunning()
             ->build();
 
@@ -68,6 +69,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
             ->withCompanyId(self::OTHER_COMPANY_ID)
             ->withIndex(3)
             ->withDateRange(new \DateTimeImmutable('2026-03-01'), new \DateTimeImmutable('2026-03-10'))
+            ->withCreatedAt($now->modify('-1 second'))
             ->build();
 
         $em->persist($olderJob);
@@ -92,7 +94,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertSame($newerJob->getId(), $data['items'][0]['id']);
         self::assertSame($olderJob->getId(), $data['items'][1]['id']);
 
-        // Проверяем форму JSON
+        // Shape of the JSON item
         self::assertSame('running', $data['items'][0]['status']);
         self::assertSame('2026-02-01', $data['items'][0]['dateFrom']);
         self::assertSame('2026-02-10', $data['items'][0]['dateTo']);
@@ -121,16 +123,18 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         $em->persist($company);
         $em->flush();
 
+        $base = new \DateTimeImmutable('2026-04-19 12:00:00');
+
         for ($i = 1; $i <= 25; ++$i) {
             $job = AdLoadJobBuilder::aJob()
                 ->withCompanyId(self::COMPANY_ID)
                 ->withIndex($i)
                 ->withMarketplace(MarketplaceType::OZON)
+                ->withCreatedAt($base->modify(sprintf('-%d seconds', 25 - $i)))
                 ->build();
             $em->persist($job);
-            $em->flush();
-            usleep(5000);
         }
+        $em->flush();
 
         $client->loginUser($owner);
         $session = $client->getContainer()->get('session');
@@ -143,5 +147,70 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
 
         $data = json_decode($client->getResponse()->getContent(), true);
         self::assertCount(20, $data['items']);
+    }
+
+    public function testReturnsOnlyOzonJobs(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('ads-jobs-ozon-only@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(self::COMPANY_ID)
+            ->withOwner($owner)
+            ->build();
+
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        $now = new \DateTimeImmutable('2026-04-19 12:00:00');
+
+        $ozon1 = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withCreatedAt($now->modify('-2 seconds'))
+            ->build();
+
+        $ozon2 = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withCreatedAt($now->modify('-1 second'))
+            ->build();
+
+        $wb = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withCreatedAt($now)
+            ->build();
+
+        $em->persist($ozon1);
+        $em->persist($ozon2);
+        $em->persist($wb);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $session = $client->getContainer()->get('session');
+        $session->set('active_company_id', self::COMPANY_ID);
+        $session->save();
+
+        $client->request('GET', '/api/marketplace-ads/load-jobs');
+
+        self::assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        self::assertCount(2, $data['items']);
+
+        $returnedIds = array_column($data['items'], 'id');
+        self::assertContains($ozon1->getId(), $returnedIds);
+        self::assertContains($ozon2->getId(), $returnedIds);
+        self::assertNotContains($wb->getId(), $returnedIds);
     }
 }

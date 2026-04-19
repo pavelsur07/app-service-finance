@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller\Api;
 
+use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -27,7 +28,11 @@ final class AdLoadJobsListController extends AbstractController
         $company = $this->activeCompanyService->getActiveCompany();
         $companyId = (string) $company->getId();
 
-        $jobs = $this->adLoadJobRepository->findRecentByCompany($companyId, self::LIMIT);
+        $jobs = $this->adLoadJobRepository->findRecentByCompanyAndMarketplace(
+            $companyId,
+            MarketplaceType::OZON,
+            self::LIMIT,
+        );
 
         $items = array_map(
             static fn ($job): array => [

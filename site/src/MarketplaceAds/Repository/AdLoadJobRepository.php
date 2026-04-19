@@ -43,11 +43,16 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         return parent::find($id, $lockMode, $lockVersion);
     }
 
-    public function findRecentByCompany(string $companyId, int $limit = 20): array
-    {
+    public function findRecentByCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+        int $limit = 20,
+    ): array {
         return $this->createQueryBuilder('j')
             ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
             ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
             ->orderBy('j.createdAt', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
