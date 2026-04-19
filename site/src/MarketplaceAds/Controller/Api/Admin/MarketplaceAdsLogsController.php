@@ -156,7 +156,7 @@ final class MarketplaceAdsLogsController extends AbstractController
                 fseek($handle, $position);
                 $chunk = (string) fread($handle, $readSize);
                 $buffer = $chunk . $buffer;
-                $newlines = substr_count($buffer, "\n");
+                $newlines += substr_count($chunk, "\n");
             }
         } finally {
             fclose($handle);
