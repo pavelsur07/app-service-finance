@@ -60,6 +60,25 @@
                     <div class="col-12">
                         <div class="card">
                             <div class="card-header">
+                                <h3 class="card-title">6. Список отчётов Ozon</h3>
+                                <div class="card-subtitle text-muted">
+                                    Инвентаризация всех заказанных отчётов — видно висящие
+                                    UUID'ы в NOT_STARTED/IN_PROGRESS, которых нет в нашей БД.
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <button type="button" class="btn btn-primary" id="btn-fetch-reports-list">
+                                    Получить список отчётов
+                                </button>
+                                <div class="mt-2" id="reports-list-summary"></div>
+                            </div>
+                            <pre id="result-reports-list" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
                                 <h3 class="card-title">3. Запросить статистику</h3>
                             </div>
                             <div class="card-body">
@@ -247,6 +266,51 @@
                         } else {
                             lastCampaigns = [];
                             summary.textContent = '';
+                        }
+                    });
+                });
+            });
+
+            // ----- 6. Reports list -----
+            var QUEUE_WARNING_THRESHOLD = 3;
+            var QUEUE_PENDING_STATES = ['NOT_STARTED', 'IN_PROGRESS'];
+
+            document.getElementById('btn-fetch-reports-list').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var url = '/api/marketplace-ads/admin/ozon/debug/statistics/list'
+                        + '?companyId=' + encodeURIComponent(companyId());
+                    return doFetch(url).then(function (res) {
+                        renderResult('result-reports-list', res.data, res.ok);
+                        var summary = document.getElementById('reports-list-summary');
+                        summary.innerHTML = '';
+                        if (!res.ok || !res.data || !res.data.states_breakdown) {
+                            return;
+                        }
+                        var states = res.data.states_breakdown || {};
+                        var total = res.data.total || 0;
+                        var totalBadge = document.createElement('span');
+                        totalBadge.className = 'badge bg-secondary me-2';
+                        totalBadge.textContent = 'Всего: ' + total;
+                        summary.appendChild(totalBadge);
+                        Object.keys(states).forEach(function (state) {
+                            var count = states[state];
+                            var badge = document.createElement('span');
+                            var isPending = QUEUE_PENDING_STATES.indexOf(state) !== -1;
+                            var isWarning = isPending && count >= QUEUE_WARNING_THRESHOLD;
+                            badge.className = 'badge me-2 '
+                                + (isWarning ? 'bg-danger' : (isPending ? 'bg-warning' : 'bg-success'));
+                            badge.textContent = state + ': ' + count;
+                            summary.appendChild(badge);
+                        });
+                        var anyWarning = QUEUE_PENDING_STATES.some(function (s) {
+                            return (states[s] || 0) >= QUEUE_WARNING_THRESHOLD;
+                        });
+                        if (anyWarning) {
+                            var note = document.createElement('div');
+                            note.className = 'text-danger mt-2';
+                            note.textContent = 'Очередь Ozon выглядит забитой ('
+                                + QUEUE_WARNING_THRESHOLD + '+ отчётов в NOT_STARTED/IN_PROGRESS).';
+                            summary.appendChild(note);
                         }
                     });
                 });

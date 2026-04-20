@@ -31,6 +31,7 @@ final class OzonDebugFetcher
     private const STATISTICS_PATH = '/api/client/statistics';
     private const STATISTICS_STATE_PATH = '/api/client/statistics/%s';
     private const STATISTICS_REPORT_PATH = '/api/client/statistics/report';
+    private const STATISTICS_LIST_PATH = '/api/client/statistics/list';
 
     private const REQUEST_TIMEOUT = 30;
     private const DOWNLOAD_TIMEOUT = 120;
@@ -164,6 +165,97 @@ final class OzonDebugFetcher
             'total' => count($list),
             'states_breakdown' => $statesBreakdown,
             'list' => $list,
+        ];
+    }
+
+    /**
+     * Инвентаризация всех заказанных отчётов Ozon Performance на аккаунте.
+     * Даёт видимость «висящих» UUID'ов (NOT_STARTED/IN_PROGRESS), которые
+     * не видны в нашей БД, но продолжают занимать слоты очереди Ozon.
+     *
+     * @return array{
+     *   status_code: int,
+     *   items: list<array<string, mixed>>,
+     *   total: int,
+     *   states_breakdown: array<string, int>,
+     *   raw_body: array<string, mixed>,
+     * }
+     */
+    public function listReports(string $companyId, int $page = 1, int $pageSize = 50): array
+    {
+        if ($page < 1) {
+            throw new \InvalidArgumentException('page: должно быть >= 1');
+        }
+        if ($pageSize < 1 || $pageSize > 1000) {
+            throw new \InvalidArgumentException('pageSize: допустимо от 1 до 1000');
+        }
+
+        $token = $this->fetchAccessToken($companyId);
+        $accessToken = $token['access_token'];
+        if ('' === $accessToken) {
+            throw new \RuntimeException('Ozon Performance: access_token пустой в ответе, debug-list-reports прерван');
+        }
+
+        $this->marketplaceAdsLogger->info('Ozon debug: GET /statistics/list', [
+            'companyId' => $companyId,
+            'page' => $page,
+            'pageSize' => $pageSize,
+        ]);
+
+        try {
+            $response = $this->httpClient->request('GET', self::BASE_URL.self::STATISTICS_LIST_PATH, [
+                'headers' => [
+                    'Authorization' => 'Bearer '.$accessToken,
+                    'Content-Type' => 'application/json',
+                ],
+                'query' => [
+                    'page' => $page,
+                    'pageSize' => $pageSize,
+                ],
+                'timeout' => self::REQUEST_TIMEOUT,
+            ]);
+
+            $statusCode = $response->getStatusCode();
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException('Ozon Performance: сеть недоступна (GET /statistics/list): '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/list): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
+        }
+
+        $data = $this->decodeJsonSafe($body);
+
+        $items = [];
+        foreach (['items', 'list', 'reports'] as $key) {
+            if (isset($data[$key]) && is_array($data[$key])) {
+                $items = array_values($data[$key]);
+                break;
+            }
+        }
+
+        $statesBreakdown = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $state = isset($item['state']) && is_scalar($item['state']) ? (string) $item['state'] : '';
+            $key = '' === $state ? '(empty)' : $state;
+            $statesBreakdown[$key] = ($statesBreakdown[$key] ?? 0) + 1;
+        }
+
+        return [
+            'status_code' => $statusCode,
+            'items' => $items,
+            'total' => count($items),
+            'states_breakdown' => $statesBreakdown,
+            'raw_body' => $data,
         ];
     }
 

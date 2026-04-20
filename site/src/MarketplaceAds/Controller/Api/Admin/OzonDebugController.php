@@ -117,6 +117,47 @@ final class OzonDebugController extends AbstractController
     }
 
     #[Route(
+        '/api/marketplace-ads/admin/ozon/debug/statistics/list',
+        name: 'marketplace_ads_admin_ozon_debug_statistics_list',
+        methods: ['GET'],
+    )]
+    public function statisticsList(Request $request): JsonResponse
+    {
+        $companyId = $this->requireCompanyId($request->query->get('companyId'));
+        if ($companyId instanceof JsonResponse) {
+            return $companyId;
+        }
+
+        $page = (int) $request->query->get('page', '1');
+        $pageSize = (int) $request->query->get('pageSize', '50');
+
+        $this->logger->info('Ozon debug call: statistics/list', [
+            'companyId' => $companyId,
+            'page' => $page,
+            'pageSize' => $pageSize,
+        ]);
+
+        try {
+            $result = $this->debugFetcher->listReports($companyId, $page, $pageSize);
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (OzonPermanentApiException $e) {
+            return $this->error($e->getMessage(), 400);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage(), 502, $e);
+        }
+
+        return $this->json([
+            'companyId' => $companyId,
+            'status_code' => $result['status_code'],
+            'total' => $result['total'],
+            'states_breakdown' => $result['states_breakdown'],
+            'items' => $result['items'],
+            'raw_body' => $result['raw_body'],
+        ]);
+    }
+
+    #[Route(
         '/api/marketplace-ads/admin/ozon/debug/statistics/request',
         name: 'marketplace_ads_admin_ozon_debug_statistics_request',
         methods: ['POST'],
