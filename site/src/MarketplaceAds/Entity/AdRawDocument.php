@@ -49,6 +49,15 @@ class AdRawDocument
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $processingError = null;
 
+    #[ORM\Column(type: 'string', length: 512, nullable: true)]
+    private ?string $storagePath = null;
+
+    #[ORM\Column(type: 'string', length: 64, nullable: true)]
+    private ?string $fileHash = null;
+
+    #[ORM\Column(type: 'bigint', nullable: true)]
+    private ?int $fileSizeBytes = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
 
@@ -114,6 +123,14 @@ class AdRawDocument
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function setFileStorage(string $path, string $hash, int $size): void
+    {
+        $this->storagePath = $path;
+        $this->fileHash = $hash;
+        $this->fileSizeBytes = $size;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function getId(): string
     {
         return $this->id;
@@ -162,5 +179,20 @@ class AdRawDocument
     public function getUpdatedAt(): \DateTimeImmutable
     {
         return $this->updatedAt;
+    }
+
+    public function getStoragePath(): ?string
+    {
+        return $this->storagePath;
+    }
+
+    public function getFileHash(): ?string
+    {
+        return $this->fileHash;
+    }
+
+    public function getFileSizeBytes(): ?int
+    {
+        return $this->fileSizeBytes;
     }
 }

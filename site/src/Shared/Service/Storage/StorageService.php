@@ -51,6 +51,41 @@ final class StorageService
         ];
     }
 
+    /**
+     * @return array{storagePath: string, fileHash: string, sizeBytes: int, mimeType: ?string}
+     */
+    public function storeBytes(string $bytes, string $relativePath): array
+    {
+        $relativePath = ltrim($relativePath, '/');
+        $targetDir = dirname($relativePath);
+
+        if ('.' !== $targetDir && '' !== $targetDir) {
+            $this->ensureDir($targetDir);
+        }
+
+        $absolutePath = $this->storageRoot.'/'.$relativePath;
+
+        if (false === file_put_contents($absolutePath, $bytes, \LOCK_EX)) {
+            throw new \RuntimeException(sprintf('Failed to write storage file "%s".', $absolutePath));
+        }
+
+        $fileHash = hash('sha256', $bytes);
+        $sizeBytes = strlen($bytes);
+
+        $finfo = finfo_open(\FILEINFO_MIME_TYPE);
+        $mimeType = false !== $finfo ? (finfo_buffer($finfo, $bytes) ?: null) : null;
+        if (false !== $finfo) {
+            finfo_close($finfo);
+        }
+
+        return [
+            'storagePath' => $relativePath,
+            'fileHash' => $fileHash,
+            'sizeBytes' => $sizeBytes,
+            'mimeType' => $mimeType,
+        ];
+    }
+
     public function getAbsolutePath(string $relativePath): string
     {
         return $this->storageRoot.'/'.ltrim($relativePath, '/');

@@ -162,6 +162,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
         # ⬇️ FIX: увеличен start_period — даём время на cache:warmup при первом старте
         healthcheck:
@@ -193,6 +194,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
 
     site-messenger-worker:
@@ -211,6 +213,7 @@ services:
                 condition: service_healthy
         volumes:
             - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
             - site_var_log:/app/var/log
         # ⬇️ FIX: Даём воркеру завершить текущее сообщение при остановке
         stop_grace_period: 60s
@@ -299,6 +302,7 @@ services:
 
 volumes:
     site_storage:
+    site_company_storage:
     site_var_log:
     traefik-certs:
     postgres_data:
