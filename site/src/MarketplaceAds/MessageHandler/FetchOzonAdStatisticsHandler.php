@@ -228,42 +228,55 @@ final class FetchOzonAdStatisticsHandler
 
         // Bronze-слой: сохраняем сырой ответ Ozon (ZIP или CSV) на диск ДО flush,
         // чтобы storage_path попал в один UPDATE/INSERT c документом. Принцип
-        // «1 bronze = 1 chunk»: все AdRawDocument'ы этого чанка получают
-        // одинаковый storage_path (первый физический download батча кампаний).
-        // Если каунт кампаний > 10 и чанк пошёл в несколько батчей — остальные
-        // downloads не сохраняются, это приемлемо (в проде большинство компаний
-        // укладывается в один батч; ослабление аудита для краевого кейса).
+        // «1 bronze = 1 chunk»: все AdRawDocument'ы чанка ссылаются на один
+        // физический файл. Если campaigns > 10, чанк режется на несколько
+        // батчей и Ozon возвращает несколько разных отчётов — тогда
+        // сохранять только первый было бы нечестно (file_hash на документах
+        // не соответствовал бы полным данным). В этом случае bronze
+        // принудительно НЕ пишется: storage_path/file_hash/file_size_bytes
+        // остаются null, в канал marketplace_ads летит warning с batchCount.
+        // Правильное решение (per-batch файлы со связью N:M c документами)
+        // — отдельная задача.
         $downloads = $this->ozonAdClient->getLastChunkDownloads();
         if ([] !== $downloads && [] !== $documents) {
-            $firstDownload = $downloads[0];
-            $extension = $firstDownload->wasZip ? 'zip' : 'csv';
-            $relativePath = sprintf(
-                'companies/%s/marketplace-ads/ozon/bronze/%s/%s.%s',
-                $message->companyId,
-                $dateFrom->format('Y-m-d'),
-                $firstDownload->reportUuid,
-                $extension,
-            );
+            if (count($downloads) > 1) {
+                $this->marketplaceAdsLogger->warning('Multi-batch chunk: bronze file not saved (known limitation)', [
+                    'jobId' => $message->jobId,
+                    'companyId' => $message->companyId,
+                    'dateFrom' => $dateFrom->format('Y-m-d'),
+                    'dateTo' => $dateTo->format('Y-m-d'),
+                    'batchCount' => count($downloads),
+                ]);
+            } else {
+                $firstDownload = $downloads[0];
+                $extension = $firstDownload->wasZip ? 'zip' : 'csv';
+                $relativePath = sprintf(
+                    'companies/%s/marketplace-ads/ozon/bronze/%s/%s.%s',
+                    $message->companyId,
+                    $dateFrom->format('Y-m-d'),
+                    $firstDownload->reportUuid,
+                    $extension,
+                );
 
-            $stored = $this->storageService->storeBytes($firstDownload->rawBytes, $relativePath);
-            $size = (int) $stored['sizeBytes'];
+                $stored = $this->storageService->storeBytes($firstDownload->rawBytes, $relativePath);
+                $size = (int) $stored['sizeBytes'];
 
-            foreach ($documents as $doc) {
-                $doc->setFileStorage($stored['storagePath'], $stored['fileHash'], $size);
+                foreach ($documents as $doc) {
+                    $doc->setFileStorage($stored['storagePath'], $stored['fileHash'], $size);
+                }
+
+                $this->marketplaceAdsLogger->info('Ozon bronze file stored', [
+                    'jobId' => $message->jobId,
+                    'companyId' => $message->companyId,
+                    'dateFrom' => $message->dateFrom,
+                    'dateTo' => $message->dateTo,
+                    'reportUuid' => $firstDownload->reportUuid,
+                    'storagePath' => $stored['storagePath'],
+                    'sizeBytes' => $size,
+                    'wasZip' => $firstDownload->wasZip,
+                    'documentsLinked' => count($documents),
+                ]);
             }
-
-            $this->marketplaceAdsLogger->info('Ozon bronze file stored', [
-                'jobId' => $message->jobId,
-                'companyId' => $message->companyId,
-                'dateFrom' => $message->dateFrom,
-                'dateTo' => $message->dateTo,
-                'reportUuid' => $firstDownload->reportUuid,
-                'storagePath' => $stored['storagePath'],
-                'sizeBytes' => $size,
-                'wasZip' => $firstDownload->wasZip,
-                'documentsLinked' => count($documents),
-                'downloadsInChunk' => count($downloads),
-            ]);
         }
 
         $this->entityManager->flush();

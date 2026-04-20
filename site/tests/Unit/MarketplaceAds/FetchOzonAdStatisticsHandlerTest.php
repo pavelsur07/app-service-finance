@@ -1082,6 +1082,125 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         );
     }
 
+    /**
+     * Bronze-сценарий 4: multi-batch чанк (campaigns > 10 → несколько Ozon-отчётов).
+     *
+     * При батчинге Ozon возвращает несколько независимых ZIP-файлов, и сохранять
+     * только первый было бы нечестно: file_hash на всех AdRawDocument'ах чанка
+     * не соответствовал бы полным данным. В таком случае storeBytes НЕ вызывается
+     * вовсе, документы остаются со storage_path=null, а в marketplace_ads-канал
+     * пишется warning с batchCount.
+     */
+    public function testMultiBatchChunkDoesNotSaveBronzeButLogsWarning(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        // Два download'а — эмулируют >10 кампаний, разнесённых по двум батчам
+        // внутри одного вызова fetchAdStatisticsRange().
+        $download1 = new OzonReportDownload(
+            rawBytes: "PK\x03\x04batch-1",
+            csvContent: 'csv-batch-1',
+            wasZip: true,
+            sizeBytes: 10,
+            sha256: str_repeat('a', 64),
+            reportUuid: 'uuid-batch-1',
+            filesInZip: 1,
+        );
+        $download2 = new OzonReportDownload(
+            rawBytes: "PK\x03\x04batch-2",
+            csvContent: 'csv-batch-2',
+            wasZip: true,
+            sizeBytes: 10,
+            sha256: str_repeat('b', 64),
+            reportUuid: 'uuid-batch-2',
+            filesInZip: 1,
+        );
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 100]]],
+            '2026-03-02' => ['rows' => [['spend' => 200]]],
+        ]);
+        $ozonClient->method('getLastChunkDownloads')->willReturn([$download1, $download2]);
+
+        $savedDocs = [];
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $rawRepo->method('save')->willReturnCallback(static function (AdRawDocument $doc) use (&$savedDocs): void {
+            $savedDocs[] = $doc;
+        });
+
+        // Критический инвариант: при multi-batch бронза НЕ пишется на диск.
+        $storageService = $this->createMock(StorageService::class);
+        $storageService->expects(self::never())->method('storeBytes');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $marketplaceAdsLogger = new class extends NullLogger {
+            /** @var array<string, mixed>|null */
+            public ?array $warningContext = null;
+
+            public function warning(string|\Stringable $message, array $context = []): void
+            {
+                if (str_contains((string) $message, 'Multi-batch chunk')) {
+                    $this->warningContext = $context;
+                }
+                parent::warning($message, $context);
+            }
+        };
+
+        $handler = new FetchOzonAdStatisticsHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $this->createMock(AdLoadJobFinalizer::class),
+            $em,
+            $messageBus,
+            $storageService,
+            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            $marketplaceAdsLogger,
+        );
+
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertNotNull($marketplaceAdsLogger->warningContext, 'warning "Multi-batch chunk" должен быть залогирован');
+        self::assertSame(self::JOB_ID, $marketplaceAdsLogger->warningContext['jobId']);
+        self::assertSame(self::COMPANY_ID, $marketplaceAdsLogger->warningContext['companyId']);
+        self::assertSame(self::DATE_FROM, $marketplaceAdsLogger->warningContext['dateFrom']);
+        self::assertSame(self::DATE_TO, $marketplaceAdsLogger->warningContext['dateTo']);
+        self::assertSame(2, $marketplaceAdsLogger->warningContext['batchCount']);
+
+        self::assertNotEmpty($savedDocs, 'документы должны создаваться даже без bronze');
+        foreach ($savedDocs as $doc) {
+            self::assertNull($doc->getStoragePath(), 'storage_path обязан оставаться null при multi-batch');
+            self::assertNull($doc->getFileHash(), 'file_hash обязан оставаться null при multi-batch');
+            self::assertNull($doc->getFileSizeBytes(), 'file_size_bytes обязан оставаться null при multi-batch');
+        }
+    }
+
     private function createHandler(
         OzonAdClient $ozonClient,
         AdRawDocumentRepository $rawRepo,
