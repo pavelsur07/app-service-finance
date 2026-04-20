@@ -23,7 +23,7 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  *             и связанный route.
  */
 #[Route('/_debug/marketplace')]
-#[IsGranted('ROLE_USER')]
+#[IsGranted('ROLE_SUPER_ADMIN')]
 final class OrphanDocumentIdDebugController extends AbstractController
 {
     private const SAMPLE_LIMIT = 50;
