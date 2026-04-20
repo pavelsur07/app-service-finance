@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
+use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonReportDownload;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -711,7 +712,242 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // Bronze: ZIP detection + extraction
+    // -----------------------------------------------------------------
+    public function testDownloadReportDetectsZipAndExtractsCsv(): void
+    {
+        $csvInsideZip = $this->loadFixture('ozon_range_iso.csv');
+        $zipBytes = $this->buildZipBytes(['report.csv' => $csvInsideZip]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-Z1'),
+            campaignListBody: $this->campaignListBody(3),
+            statisticsBody: '{"UUID":"uuid-zip-1"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-zip-1'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-05'),
+        );
+
+        // Парсинг распакованного CSV обязан дать те же 5 дат × 3 кампании, что и для plain-CSV.
+        self::assertCount(5, $result);
+        self::assertSame(['2026-03-01', '2026-03-02', '2026-03-03', '2026-03-04', '2026-03-05'], array_keys($result));
+        self::assertCount(3, $result['2026-03-01']['campaigns']);
+
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        self::assertTrue($downloads[0]->wasZip);
+        self::assertSame(1, $downloads[0]->filesInZip);
+        self::assertSame($zipBytes, $downloads[0]->rawBytes);
+        self::assertSame('uuid-zip-1', $downloads[0]->reportUuid);
+
+        $record = $this->findLogRecord('Ozon report downloaded');
+        self::assertTrue($record['context']['was_zip']);
+        self::assertSame(1, $record['context']['files_in_zip']);
+        self::assertSame(strlen($zipBytes), $record['context']['size_bytes']);
+        self::assertSame(strlen($csvInsideZip), $record['context']['csv_size_bytes']);
+    }
+
+    public function testDownloadReportHandlesMultipleCsvInZip(): void
+    {
+        // Первая «половина» CSV — заголовок + 3 строки первых трёх дат,
+        // вторая «половина» — заголовок + 3 строки последних двух дат.
+        // После конкатенации через "\n" парсер находит оба заголовка, но
+        // fgetcsv работает построчно и итерирует все data-строки одинаково.
+        $part1 = "date;campaign_id;campaign_name;sku;spend;views;clicks\n"
+            ."2026-03-01;111;Campaign A;SKU-1;10.50;100;5\n"
+            ."2026-03-02;111;Campaign A;SKU-1;11.50;110;6\n";
+        $part2 = "date;campaign_id;campaign_name;sku;spend;views;clicks\n"
+            ."2026-03-03;111;Campaign A;SKU-1;12.50;120;7\n";
+
+        $zipBytes = $this->buildZipBytes([
+            'report-part-1.csv' => $part1,
+            'manifest.json' => '{"ignored":true}',
+            'report-part-2.csv' => $part2,
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-Z2'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-zip-multi"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-zip-multi'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-03'),
+        );
+
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        self::assertTrue($downloads[0]->wasZip);
+        // filesInZip считает ВСЕ файлы в архиве включая manifest.json; CSV-only
+        // отфильтровывается уже при склейке csvContent.
+        self::assertSame(3, $downloads[0]->filesInZip);
+        self::assertStringContainsString('2026-03-01;111', $downloads[0]->csvContent);
+        self::assertStringContainsString('2026-03-03;111', $downloads[0]->csvContent);
+        // manifest.json не должен попасть в csvContent.
+        self::assertStringNotContainsString('"ignored"', $downloads[0]->csvContent);
+    }
+
+    public function testDownloadReportThrowsOnCorruptedZip(): void
+    {
+        // Обрезанный ZIP: magic bytes PK\x03\x04 присутствуют (→ wasZip=true),
+        // но остальное — мусор, ZipArchive::open() вернёт код ошибки.
+        $corrupted = "PK\x03\x04".str_repeat("\x00", 16).'garbage';
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-Z3'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-zip-bad"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-zip-bad'),
+            downloadCsv: $corrupted,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+            );
+            self::fail('Expected RuntimeException for corrupted ZIP');
+        } catch (\RuntimeException $e) {
+            $msg = $e->getMessage();
+            self::assertStringContainsString('uuid-zip-bad', $msg);
+            self::assertStringContainsString('ZIP', $msg);
+        }
+    }
+
+    public function testDownloadReportPassesPlainCsvUnchanged(): void
+    {
+        $csv = $this->loadFixture('ozon_range_iso.csv');
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-Z4'),
+            campaignListBody: $this->campaignListBody(3),
+            statisticsBody: '{"UUID":"uuid-plain"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-plain'),
+            downloadCsv: $csv,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-05'),
+        );
+
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        self::assertFalse($downloads[0]->wasZip);
+        self::assertSame(0, $downloads[0]->filesInZip);
+        // Для plain-CSV rawBytes и csvContent содержательно совпадают.
+        self::assertSame($csv, $downloads[0]->rawBytes);
+        self::assertSame($csv, $downloads[0]->csvContent);
+        self::assertSame('uuid-plain', $downloads[0]->reportUuid);
+
+        $record = $this->findLogRecord('Ozon report downloaded');
+        self::assertFalse($record['context']['was_zip']);
+        self::assertNull($record['context']['files_in_zip']);
+    }
+
+    public function testRawBytesPreservedInResult(): void
+    {
+        // Инвариант: для wasZip=true rawBytes — исходный ZIP (непригодный
+        // для fgetcsv), csvContent — распакованный CSV. Bronze-хранилище
+        // обязано получить ИМЕННО rawBytes, иначе replay-парсинг сломается.
+        $csv = "date;campaign_id;campaign_name;sku;spend;views;clicks\n"
+            ."2026-03-01;111;Campaign A;SKU-1;1.00;10;1\n";
+        $zipBytes = $this->buildZipBytes(['report.csv' => $csv]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-Z5'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-raw-zip"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-raw-zip'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+        );
+
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        /** @var OzonReportDownload $download */
+        $download = $downloads[0];
+
+        self::assertTrue($download->wasZip);
+        // rawBytes — PK-magic, НЕ начинается с CSV-заголовка.
+        self::assertSame("PK\x03\x04", substr($download->rawBytes, 0, 4));
+        self::assertStringStartsNotWith('date;', $download->rawBytes);
+
+        // csvContent — уже распакованный CSV, начинается с заголовка.
+        self::assertStringStartsWith('date;campaign_id', $download->csvContent);
+        self::assertNotSame($download->rawBytes, $download->csvContent);
+
+        // sha256 и sizeBytes считаются по rawBytes (а не csvContent) —
+        // bronze-хранилище и UI-диагностика работают с исходным файлом.
+        self::assertSame(hash('sha256', $zipBytes), $download->sha256);
+        self::assertSame(strlen($zipBytes), $download->sizeBytes);
+    }
+
+    // -----------------------------------------------------------------
     // helpers
+    // -----------------------------------------------------------------
+
+    /**
+     * Собирает валидный ZIP-архив в памяти, записывая через ZipArchive во
+     * временный файл и считывая bytes. Даёт гарантированно валидную
+     * последовательность заголовков и central directory (file_put_contents
+     * + ручное формирование ZIP-заголовков хрупко и часто проваливает
+     * ZipArchive::open() по тонкостям CRC/сжатия).
+     *
+     * @param array<string, string> $files name => content
+     */
+    private function buildZipBytes(array $files): string
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'ozon-test-zip-');
+        self::assertNotFalse($tmp, 'Failed to create temp file');
+
+        try {
+            $zip = new \ZipArchive();
+            $opened = $zip->open($tmp, \ZipArchive::OVERWRITE);
+            self::assertTrue(true === $opened, 'ZipArchive::open() must succeed');
+
+            foreach ($files as $name => $content) {
+                $zip->addFromString($name, $content);
+            }
+            $zip->close();
+
+            $bytes = file_get_contents($tmp);
+            self::assertNotFalse($bytes, 'Failed to read back zip');
+
+            return $bytes;
+        } finally {
+            @unlink($tmp);
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // legacy helpers (preserved)
     // -----------------------------------------------------------------
 
     /**

@@ -15,6 +15,7 @@ use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
+use App\Shared\Service\Storage\StorageService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -68,6 +69,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly AdLoadJobFinalizer $adLoadJobFinalizer,
         private readonly EntityManagerInterface $entityManager,
         private readonly MessageBusInterface $messageBus,
+        private readonly StorageService $storageService,
         private readonly AppLogger $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
@@ -222,6 +224,46 @@ final class FetchOzonAdStatisticsHandler
                 $existing->updatePayload($json);
                 $documents[] = $existing;
             }
+        }
+
+        // Bronze-слой: сохраняем сырой ответ Ozon (ZIP или CSV) на диск ДО flush,
+        // чтобы storage_path попал в один UPDATE/INSERT c документом. Принцип
+        // «1 bronze = 1 chunk»: все AdRawDocument'ы этого чанка получают
+        // одинаковый storage_path (первый физический download батча кампаний).
+        // Если каунт кампаний > 10 и чанк пошёл в несколько батчей — остальные
+        // downloads не сохраняются, это приемлемо (в проде большинство компаний
+        // укладывается в один батч; ослабление аудита для краевого кейса).
+        $downloads = $this->ozonAdClient->getLastChunkDownloads();
+        if ([] !== $downloads && [] !== $documents) {
+            $firstDownload = $downloads[0];
+            $extension = $firstDownload->wasZip ? 'zip' : 'csv';
+            $relativePath = sprintf(
+                'companies/%s/marketplace-ads/ozon/bronze/%s/%s.%s',
+                $message->companyId,
+                $dateFrom->format('Y-m-d'),
+                $firstDownload->reportUuid,
+                $extension,
+            );
+
+            $stored = $this->storageService->storeBytes($firstDownload->rawBytes, $relativePath);
+            $size = (int) $stored['sizeBytes'];
+
+            foreach ($documents as $doc) {
+                $doc->setFileStorage($stored['storagePath'], $stored['fileHash'], $size);
+            }
+
+            $this->marketplaceAdsLogger->info('Ozon bronze file stored', [
+                'jobId' => $message->jobId,
+                'companyId' => $message->companyId,
+                'dateFrom' => $message->dateFrom,
+                'dateTo' => $message->dateTo,
+                'reportUuid' => $firstDownload->reportUuid,
+                'storagePath' => $stored['storagePath'],
+                'sizeBytes' => $size,
+                'wasZip' => $firstDownload->wasZip,
+                'documentsLinked' => count($documents),
+                'downloadsInChunk' => count($downloads),
+            ]);
         }
 
         $this->entityManager->flush();
