@@ -225,15 +225,23 @@
                                 + '. States: ' + JSON.stringify(res.data.states_breakdown || {});
                             checkboxes.innerHTML = '';
                             lastCampaigns.forEach(function (c) {
-                                var id = c.id || '';
-                                var title = c.title || c.name || '';
-                                var state = c.state || '';
+                                var id = String(c.id || '');
+                                var title = String(c.title || c.name || '');
+                                var state = String(c.state || '');
                                 var label = document.createElement('label');
                                 label.className = 'form-check form-check-inline';
-                                label.innerHTML = '<input class="form-check-input campaign-check" type="checkbox" value="'
-                                    + String(id).replace(/"/g, '&quot;') + '"> '
-                                    + '<span>' + String(id) + ' — ' + String(title) + ' <small class="text-muted">('
-                                    + String(state) + ')</small></span>';
+                                var input = document.createElement('input');
+                                input.className = 'form-check-input campaign-check';
+                                input.type = 'checkbox';
+                                input.value = id;
+                                var span = document.createElement('span');
+                                span.appendChild(document.createTextNode(' ' + id + ' — ' + title + ' '));
+                                var small = document.createElement('small');
+                                small.className = 'text-muted';
+                                small.textContent = '(' + state + ')';
+                                span.appendChild(small);
+                                label.appendChild(input);
+                                label.appendChild(span);
                                 checkboxes.appendChild(label);
                             });
                         } else {
