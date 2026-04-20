@@ -73,13 +73,28 @@ final class StorageService
         }
 
         $absolutePath = $this->storageRoot.'/'.$relativePath;
+        $sizeBytes = strlen($bytes);
 
-        if (false === file_put_contents($absolutePath, $bytes, \LOCK_EX)) {
+        // file_put_contents может вернуть int < strlen($bytes) при disk-full / quota-exceeded /
+        // прерванной записи — в этом случае на диске окажется truncated-файл, но метод тихо
+        // вернёт success. Для бронзы это недопустимо: caller сохранит hash + size от полного
+        // буфера, а downstream получит битый артефакт. Поэтому сверяем записанный объём.
+        $written = file_put_contents($absolutePath, $bytes, \LOCK_EX);
+        if (false === $written) {
             throw new \RuntimeException(sprintf('Failed to write storage file "%s".', $absolutePath));
+        }
+        if ($written !== $sizeBytes) {
+            // Удаляем частично записанный файл, чтобы downstream не подхватил битый payload.
+            @unlink($absolutePath);
+            throw new \RuntimeException(sprintf(
+                'Short write to storage file "%s": wrote %d of %d bytes.',
+                $absolutePath,
+                $written,
+                $sizeBytes,
+            ));
         }
 
         $fileHash = hash('sha256', $bytes);
-        $sizeBytes = strlen($bytes);
 
         $finfo = finfo_open(\FILEINFO_MIME_TYPE);
         $mimeType = false !== $finfo ? (finfo_buffer($finfo, $bytes) ?: null) : null;
