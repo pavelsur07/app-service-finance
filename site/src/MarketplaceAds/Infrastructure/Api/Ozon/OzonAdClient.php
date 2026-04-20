@@ -1060,10 +1060,32 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function convertCsvToRows(string $csv, array $namesById): array
     {
+        $preamble = $this->stripPreamble($csv);
+        $preambleCampaignId = $preamble['campaign_id'];
+
         $rows = [];
-        foreach ($this->iterateCsvAssocRows($csv) as $row) {
-            $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+        $dataRowsSeen = 0;
+        $headerSample = '';
+        $firstDataSample = '';
+
+        foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
+            if (0 === $dataRowsSeen) {
+                $headerSample = implode(';', array_keys($row));
+                $firstDataSample = implode(';', array_values($row));
+            }
+            ++$dataRowsSeen;
+
             $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+            // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
+            // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
+            $campaignId = '' !== $preambleCampaignId
+                ? $preambleCampaignId
+                : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+
+            if ($this->isFooterOrEmptyRow($row, $sku)) {
+                continue;
+            }
+
             if ('' === $campaignId || '' === $sku) {
                 continue;
             }
@@ -1072,11 +1094,13 @@ class OzonAdClient implements AdPlatformClientInterface
                 'campaign_id' => $campaignId,
                 'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
                 'sku' => $sku,
-                'spend' => (float) str_replace(',', '.', (string) ($row['spend'] ?? $row['cost'] ?? '0')),
-                'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
-                'clicks' => (int) ($row['clicks'] ?? 0),
+                'spend' => (float) str_replace(',', '.', $this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
+                'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
+                'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
             ];
         }
+
+        $this->logEmptyCsvParseResultIfNeeded($dataRowsSeen, $rows, $headerSample, $firstDataSample);
 
         return $rows;
     }
@@ -1101,18 +1125,39 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function convertCsvToRowsByDate(string $csv, array $namesById): array
     {
+        $preamble = $this->stripPreamble($csv);
+        $preambleCampaignId = $preamble['campaign_id'];
+
         $result = [];
-        foreach ($this->iterateCsvAssocRows($csv) as $row) {
-            $campaignId = (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+        $dataRowsSeen = 0;
+        $headerSample = '';
+        $firstDataSample = '';
+
+        foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
+            if (0 === $dataRowsSeen) {
+                $headerSample = implode(';', array_keys($row));
+                $firstDataSample = implode(';', array_values($row));
+            }
+            ++$dataRowsSeen;
+
             $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+            // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
+            // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
+            $campaignId = '' !== $preambleCampaignId
+                ? $preambleCampaignId
+                : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+
+            if ($this->isFooterOrEmptyRow($row, $sku)) {
+                continue;
+            }
+
             if ('' === $campaignId || '' === $sku) {
-                // Пустые/частично заполненные строки пропускаем — как в convertCsvToRows.
                 continue;
             }
 
             $rawDate = $this->findDateField($row);
             if ('' === $rawDate) {
-                throw new \RuntimeException(sprintf('Ozon Performance: в строке отчёта отсутствует поле даты (ожидается одна из колонок: date, day, дата); campaign_id=%s, sku=%s', $campaignId, $sku));
+                throw new \RuntimeException(sprintf('Ozon Performance: в строке отчёта отсутствует поле даты (ожидается одна из колонок: date, day, дата, день); campaign_id=%s, sku=%s', $campaignId, $sku));
             }
             $date = $this->parseDateField($rawDate);
 
@@ -1128,11 +1173,13 @@ class OzonAdClient implements AdPlatformClientInterface
 
             $result[$date][$campaignId]['rows'][] = [
                 'sku' => $sku,
-                'spend' => $this->normalizeDecimal((string) ($row['spend'] ?? $row['cost'] ?? '0')),
-                'views' => (int) ($row['views'] ?? $row['impressions'] ?? 0),
-                'clicks' => (int) ($row['clicks'] ?? 0),
+                'spend' => $this->normalizeDecimal($this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
+                'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
+                'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
             ];
         }
+
+        $this->logEmptyCsvParseResultIfNeeded($dataRowsSeen, $result, $headerSample, $firstDataSample);
 
         return $result;
     }
@@ -1202,7 +1249,7 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function findDateField(array $row): string
     {
-        foreach (['date', 'day', 'дата'] as $key) {
+        foreach (['date', 'day', 'дата', 'день'] as $key) {
             if (isset($row[$key])) {
                 $value = trim($row[$key]);
                 if ('' !== $value) {
@@ -1212,6 +1259,128 @@ class OzonAdClient implements AdPlatformClientInterface
         }
 
         return '';
+    }
+
+    /**
+     * Детектит и отрезает preamble-строку Ozon CSV.
+     *
+     * Формат Ozon (апрель 2026):
+     *   ;Кампания по продвижению товаров № 14275771, период 17.04.2026-18.04.2026
+     *   День;sku;...
+     *
+     * Preamble опознаётся по двум признакам (любой достаточен):
+     *  - содержит "Кампания по продвижению" (устойчивый маркер Ozon);
+     *  - начинается с разделителя (';' или ','), что означает «пустая первая
+     *    ячейка + произвольный текст» — защита на случай, если Ozon поменяет
+     *    вступительный текст, но оставит тот же layout «пустая первая ячейка».
+     *
+     * Если preamble не распознан — возвращает исходный CSV без изменений и
+     * пустой campaign_id, чтобы legacy-формат (header сразу в первой строке)
+     * продолжал работать.
+     *
+     * campaign_id извлекается regex'ом `№\s*(\d+)` — ровно то место, где Ozon
+     * фиксирует идентификатор кампании в preamble-тексте.
+     *
+     * @return array{csv: string, campaign_id: string}
+     */
+    private function stripPreamble(string $csv): array
+    {
+        $csv = ltrim($csv, "\xEF\xBB\xBF"); // drop UTF-8 BOM
+        if ('' === $csv) {
+            return ['csv' => $csv, 'campaign_id' => ''];
+        }
+
+        $firstNewline = strpos($csv, "\n");
+        $firstLine = false === $firstNewline ? $csv : substr($csv, 0, $firstNewline);
+        $firstLineTrimmed = rtrim($firstLine, "\r");
+
+        $isPreamble = str_contains($firstLineTrimmed, 'Кампания по продвижению')
+            || str_starts_with($firstLineTrimmed, ';')
+            || str_starts_with($firstLineTrimmed, ',');
+
+        if (!$isPreamble) {
+            return ['csv' => $csv, 'campaign_id' => ''];
+        }
+
+        $campaignId = '';
+        if (1 === preg_match('/№\s*(\d+)/u', $firstLineTrimmed, $matches)) {
+            $campaignId = $matches[1];
+        }
+
+        $this->marketplaceAdsLogger->info('Ozon CSV preamble detected', [
+            'extractedCampaignId' => $campaignId,
+            'preambleLine' => mb_substr($firstLineTrimmed, 0, 200, 'UTF-8'),
+        ]);
+
+        $rest = false === $firstNewline ? '' : substr($csv, $firstNewline + 1);
+
+        return ['csv' => $rest, 'campaign_id' => $campaignId];
+    }
+
+    /**
+     * Возвращает значение первой непустой колонки из $keys; '' если ни одна
+     * не найдена (default — числовой 0 в callers, которые дальше приводят
+     * результат к (float)/(int)).
+     *
+     * @param array<string, string> $row
+     * @param list<string>          $keys
+     */
+    private function pickColumn(array $row, array $keys): string
+    {
+        foreach ($keys as $key) {
+            if (isset($row[$key]) && '' !== trim($row[$key])) {
+                return $row[$key];
+            }
+        }
+
+        return '0';
+    }
+
+    /**
+     * Отсекает footer-строки Ozon CSV («Всего;;...») и полностью пустые строки.
+     *
+     * Footer: первая колонка (date-cell) = 'всего' и/или sku пустой. Старый
+     * фильтр convertCsvToRows / convertCsvToRowsByDate отсеивал по пустому
+     * campaign_id + пустому sku; в новом формате campaign_id берётся из
+     * preamble и в data-строках его не бывает — без этой функции footer
+     * попал бы в aggregated-результат с нулями.
+     *
+     * @param array<string, string> $row
+     */
+    private function isFooterOrEmptyRow(array $row, string $sku): bool
+    {
+        if ('' === $sku) {
+            return true;
+        }
+
+        $dateCell = mb_strtolower(trim($this->findDateField($row)), 'UTF-8');
+        if ('всего' === $dateCell || 'total' === $dateCell) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Warning-лог, если ни одна data-строка не прошла фильтр: без него при
+     * очередном изменении формата Ozon мы бы снова смотрели на rowsCount=0
+     * и гадали про header'ы — теперь сразу видно, что реально пришло в CSV.
+     *
+     * @param array<mixed> $parsedRows
+     */
+    private function logEmptyCsvParseResultIfNeeded(
+        int $dataRowsSeen,
+        array $parsedRows,
+        string $headerSample,
+        string $firstDataSample,
+    ): void {
+        if ($dataRowsSeen > 0 && [] === $parsedRows) {
+            $this->marketplaceAdsLogger->warning('Ozon CSV: all data rows filtered out', [
+                'dataRowsSeen' => $dataRowsSeen,
+                'headerSample' => mb_substr($headerSample, 0, 200, 'UTF-8'),
+                'firstDataSample' => mb_substr($firstDataSample, 0, 200, 'UTF-8'),
+            ]);
+        }
     }
 
     /**

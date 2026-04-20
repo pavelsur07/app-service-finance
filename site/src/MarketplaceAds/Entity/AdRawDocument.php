@@ -101,6 +101,10 @@ class AdRawDocument
         }
 
         $this->status = AdRawDocumentStatus::DRAFT;
+        // Сброс в DRAFT означает «попробовать заново» — ошибка прошлой попытки
+        // к новой попытке не относится, её нужно убрать, чтобы UI не показывал
+        // stale-сообщение рядом со статусом DRAFT.
+        $this->processingError = null;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
