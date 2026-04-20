@@ -33,6 +33,12 @@
             <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_reconciliation') }}">
                 <span>Сверка</span>
             </a>
+            {% if is_granted('ROLE_SUPER_ADMIN') %}
+                {% set mp_ads_debug_active = current_route == 'marketplace_ads_admin_debug' %}
+                <a class="dropdown-item {{ mp_ads_debug_active ? 'active' : '' }}" href="{{ path('marketplace_ads_admin_debug') }}">
+                    <span>Ozon Debug</span>
+                </a>
+            {% endif %}
         </div>
     </div>
 </li>
