@@ -1813,6 +1813,106 @@ final class OzonAdClientTest extends TestCase
         self::assertSame(['111', '222'], $extractedIds);
     }
 
+    // -----------------------------------------------------------------
+    // ZIP, в двух частях которого совпадает (date, campaignId) — это
+    // ошибка данных Ozon (одна кампания не может прийти двумя отдельными
+    // CSV за тот же день). Парсер НЕ должен ни падать, ни складывать
+    // spend дубликата — берёт первое появление и логирует warning.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeDuplicateDateCampaignAcrossZipParts(): void
+    {
+        // Обе части — preamble № 111, sku 111001 за 17.04.2026, разные spend.
+        // Ожидаем, что победит первая: spend=25.00 (не 99.00 и не сумма 124.00).
+        $csvPart1 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;100;10;25,00\n";
+        $csvPart2 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;200;20;99,00\n";
+
+        $zipBytes = $this->buildZipBytes([
+            'campaign-111-a.csv' => $csvPart1,
+            'campaign-111-b.csv' => $csvPart2,
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-DUP'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-dup"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-dup'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame(['2026-04-17'], array_keys($result));
+        self::assertCount(1, $result['2026-04-17']['campaigns']);
+        self::assertSame('111', $result['2026-04-17']['campaigns'][0]['campaign_id']);
+        self::assertCount(1, $result['2026-04-17']['campaigns'][0]['rows']);
+        // Первое появление (25,00), а не второе (99,00) и не сумма.
+        self::assertSame('25.00', $result['2026-04-17']['campaigns'][0]['rows'][0]['spend']);
+
+        $dupLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon CSV: duplicate (date, campaignId) across ZIP parts' === $r['message'],
+        ));
+        self::assertCount(1, $dupLogs, 'Warning о дубликате должен быть записан ровно один раз на пару.');
+        self::assertSame('2026-04-17', $dupLogs[0]['context']['date']);
+        self::assertSame('111', $dupLogs[0]['context']['campaign_id']);
+        self::assertSame(0, $dupLogs[0]['context']['first_part_index']);
+        self::assertSame(1, $dupLogs[0]['context']['duplicate_part_index']);
+    }
+
+    // -----------------------------------------------------------------
+    // ZIP с нулём .csv-файлов (только manifest.json) — штатный сценарий
+    // для диапазонов без показов. Парсер возвращает пустой result,
+    // warning 'Ozon ZIP contains no CSV files' пишется в лог.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeZipWithNoCsvFilesLogsWarningAndReturnsEmpty(): void
+    {
+        $zipBytes = $this->buildZipBytes([
+            'manifest.json' => '{"files":[]}',
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-EMPTY'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-empty-zip"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-empty-zip'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        // Не должно бросать — ZIP без CSV — штатный «пустой день».
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame([], $result, 'ZIP без CSV → пустой набор дат.');
+
+        $warning = $this->findLogRecord('Ozon ZIP contains no CSV files');
+        self::assertSame('warning', $warning['level']);
+        self::assertSame('uuid-empty-zip', $warning['context']['report_uuid']);
+        self::assertSame(1, $warning['context']['files_in_zip'], 'Счётчик должен включать не-CSV файлы (manifest.json).');
+
+        // Загрузка bronze-слоя не падает и сохраняет ZIP целиком.
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        self::assertTrue($downloads[0]->wasZip);
+        self::assertSame([], $downloads[0]->csvParts);
+        self::assertSame('', $downloads[0]->csvContent);
+        self::assertSame($zipBytes, $downloads[0]->rawBytes);
+    }
+
     /**
      * Создаёт OzonAdPendingReport с произвольным requestedAt через reflection.
      * Нужно для тестов resume-ветки: Entity в конструкторе жёстко ставит

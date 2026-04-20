@@ -929,21 +929,27 @@ class OzonAdClient implements AdPlatformClientInterface
         $wasZip = strlen($rawBytes) >= 4 && "PK\x03\x04" === substr($rawBytes, 0, 4);
 
         if ($wasZip) {
-            $extracted = $this->extractCsvFromZip($rawBytes, $reportUuid);
-            $csvContent = $extracted['csvContent'];
-            $csvParts = $extracted['csvParts'];
-            $filesInZip = $extracted['filesInZip'];
+            $filesInZip = 0;
+            $csvParts = $this->extractCsvFromZip($rawBytes, $reportUuid, $filesInZip);
+            $csvContent = $this->mergeCsvPartsAsLegacyContent($csvParts);
         } else {
-            $csvContent = $rawBytes;
             // Plain-CSV: одна «часть», идентичная rawBytes. Контракт csvParts
             // держит парсер (он всегда iterate по list), чтобы downloadReport
             // не подменял shape между ZIP и plain-ответом.
             $csvParts = [$rawBytes];
+            $csvContent = $rawBytes;
             $filesInZip = 0;
         }
 
         $sizeBytes = strlen($rawBytes);
         $sha256 = hash('sha256', $rawBytes);
+
+        $this->marketplaceAdsLogger->info('Ozon report extracted', [
+            'report_uuid' => $reportUuid,
+            'was_zip' => $wasZip,
+            'parts_count' => count($csvParts),
+            'total_bytes' => $sizeBytes,
+        ]);
 
         $this->marketplaceAdsLogger->info('Ozon report downloaded', [
             'report_uuid' => $reportUuid,
@@ -966,27 +972,31 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * Распаковывает ZIP через временный файл: ZipArchive::open() работает только
-     * с путями в ФС, стрим-чтение из памяти не поддерживается. Возвращает:
-     *  - csvParts: список CSV-файлов verbatim (без модификаций). Каждая часть —
-     *    отдельный CSV из ZIP, потенциально с собственным preamble'ом (новый
-     *    Ozon-формат: «;Кампания по продвижению № N…»). Парсер обязан
-     *    обрабатывать каждый элемент отдельно, иначе в multi-campaign ZIP'е
-     *    header-строки частей 2+ попадут в data-поток, а campaign_id всех
-     *    строк будет приписан единственному preamble первой части.
-     *  - csvContent: legacy-concat с удалением первой строки у частей 2+.
-     *    Нужен только для обратной совместимости bronze-инспекции и тестов,
-     *    парсером НЕ используется.
-     *  - filesInZip: общее число файлов в архиве (включая не-CSV).
+     * Распаковывает ZIP через временный файл (ZipArchive::open() работает только
+     * с путями в ФС) и возвращает CSV-файлы verbatim по одному на элемент —
+     * в порядке обхода архива. Каждая часть потенциально имеет собственный
+     * preamble '«;Кампания по продвижению № N…»' (новый Ozon-формат); парсер
+     * convertCsvToRows* обязан обрабатывать элементы независимо, иначе в
+     * multi-campaign ZIP'е header-строки частей 2+ попадут в data-поток, а
+     * campaign_id всех строк будет приписан единственному preamble'у первой
+     * части. Файлы без .csv-расширения (манифесты и т.п.) игнорируются.
      *
-     * Файлы без .csv-расширения игнорируются (манифесты и т.п.) — не попадают
-     * ни в csvParts, ни в csvContent.
+     * Общее число файлов в архиве (включая не-CSV) возвращается через
+     * output-параметр $filesInZip — нужно для Ozon report downloaded-лога и
+     * bronze-диагностики (UI показывает files_in_zip как есть).
      *
-     * @return array{csvContent: string, csvParts: list<string>, filesInZip: int}
+     * Пустой архив либо архив без .csv-файлов не считается фатальной ошибкой:
+     * возвращаем [] и логируем warning, чтобы парсер прошёл дальше с пустым
+     * результатом (Ozon изредка отдаёт «пустой» ZIP для диапазонов без
+     * показов — это штатный сценарий, а не падение выгрузки).
      *
-     * @throws \RuntimeException если архив повреждён либо не содержит ни одного CSV
+     * @param int $filesInZip output: общее число записей в ZIP (включая не-CSV)
+     *
+     * @return list<string> CSV-файлы verbatim, по одному на элемент
+     *
+     * @throws \RuntimeException если архив повреждён (magic bytes есть, но ZipArchive::open не смог распарсить)
      */
-    private function extractCsvFromZip(string $zipBytes, string $reportUuid): array
+    private function extractCsvFromZip(string $zipBytes, string $reportUuid, int &$filesInZip = 0): array
     {
         $tmpPath = tempnam(sys_get_temp_dir(), 'ozon-bronze-');
         if (false === $tmpPath) {
@@ -1012,7 +1022,6 @@ class OzonAdClient implements AdPlatformClientInterface
             try {
                 $filesInZip = $zip->numFiles;
                 $csvParts = [];
-                $mergedParts = [];
                 for ($i = 0; $i < $filesInZip; ++$i) {
                     $name = $zip->getNameIndex($i);
                     if (false === $name) {
@@ -1025,45 +1034,55 @@ class OzonAdClient implements AdPlatformClientInterface
                     if (false === $content) {
                         continue;
                     }
-                    // csvParts — verbatim: парсер convertCsvToRows* обязан сам
-                    // обрабатывать preamble каждой части (в новом Ozon-формате
-                    // у каждого CSV своя строка «;Кампания по продвижению № N…»
-                    // с campaign_id собственной кампании). Склеивание в одну
-                    // строку теряло бы per-campaign attribution.
                     $csvParts[] = $content;
-
-                    // csvContent — legacy-concat для bronze-инспекции:
-                    // у всех частей кроме первой отрезаем ПЕРВУЮ строку
-                    // (preamble или header — в любом случае повторяющийся
-                    // служебный текст, который в склейке не нужен).
-                    if ([] !== $mergedParts) {
-                        $newlinePos = strpos($content, "\n");
-                        if (false !== $newlinePos) {
-                            $content = substr($content, $newlinePos + 1);
-                        }
-                    }
-                    $mergedParts[] = $content;
                 }
             } finally {
                 $zip->close();
             }
 
             if ([] === $csvParts) {
-                throw new \RuntimeException(sprintf(
-                    'Ozon Performance: ZIP-отчёт %s не содержит CSV-файлов (всего записей в архиве: %d)',
-                    $reportUuid,
-                    $filesInZip,
-                ));
+                // Ozon изредка отдаёт ZIP без .csv-файлов (только manifest.json
+                // либо пустой архив) — для дня без показов это штатный сценарий.
+                // Не бросаем, а логируем warning и возвращаем пустой список:
+                // парсер получит empty csvParts и тоже вернёт empty result.
+                $this->marketplaceAdsLogger->warning('Ozon ZIP contains no CSV files', [
+                    'report_uuid' => $reportUuid,
+                    'files_in_zip' => $filesInZip,
+                ]);
             }
 
-            return [
-                'csvContent' => implode("\n", $mergedParts),
-                'csvParts' => $csvParts,
-                'filesInZip' => $filesInZip,
-            ];
+            return $csvParts;
         } finally {
             @unlink($tmpPath);
         }
+    }
+
+    /**
+     * Склеивает csvParts в один CSV для поля OzonReportDownload::csvContent —
+     * это legacy-view для bronze-инспекции и старых тестов, парсер НЕ использует.
+     * У всех частей кроме первой отрезается первая строка (preamble или
+     * повторный header — в склейке не нужен).
+     *
+     * @param list<string> $csvParts
+     */
+    private function mergeCsvPartsAsLegacyContent(array $csvParts): string
+    {
+        if ([] === $csvParts) {
+            return '';
+        }
+
+        $merged = [];
+        foreach ($csvParts as $content) {
+            if ([] !== $merged) {
+                $newlinePos = strpos($content, "\n");
+                if (false !== $newlinePos) {
+                    $content = substr($content, $newlinePos + 1);
+                }
+            }
+            $merged[] = $content;
+        }
+
+        return implode("\n", $merged);
     }
 
     /**
@@ -1091,6 +1110,14 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function convertCsvToRows(array $csvParts, array $namesById): array
     {
+        $partsCount = count($csvParts);
+        if ($partsCount > 1) {
+            $this->marketplaceAdsLogger->info('Processing multi-part CSV', [
+                'parts_count' => $partsCount,
+                'mode' => 'flat',
+            ]);
+        }
+
         $rows = [];
         $totalDataRowsSeen = 0;
         $headerSample = '';
@@ -1169,12 +1196,29 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function convertCsvToRowsByDate(array $csvParts, array $namesById): array
     {
+        $partsCount = count($csvParts);
+        if ($partsCount > 1) {
+            $this->marketplaceAdsLogger->info('Processing multi-part CSV', [
+                'parts_count' => $partsCount,
+                'mode' => 'by_date',
+            ]);
+        }
+
         $result = [];
         $totalDataRowsSeen = 0;
         $headerSample = '';
         $firstDataSample = '';
+        // (date|campaignId) → partIndex первой части, где пара встретилась.
+        // Используется для детектирования дубликатов между CSV-частями: если
+        // одна и та же пара появляется в более поздней части, её строки
+        // пропускаются (берём данные первой части) и пишем warning.
+        $dateCampaignOriginPart = [];
+        // Дедуп для warning'а: пара ключ (date|campaignId) → true, чтобы для
+        // десятков строк одного дублированного (date, campaignId) записать
+        // warning один раз, а не на каждую строку.
+        $warnedDuplicateKeys = [];
 
-        foreach ($csvParts as $csv) {
+        foreach ($csvParts as $partIndex => $csv) {
             $preamble = $this->stripPreamble($csv);
             $preambleCampaignId = $preamble['campaign_id'];
 
@@ -1210,6 +1254,24 @@ class OzonAdClient implements AdPlatformClientInterface
                 }
                 $date = $this->parseDateField($rawDate);
 
+                $dupKey = $date.'|'.$campaignId;
+                if (isset($dateCampaignOriginPart[$dupKey]) && $dateCampaignOriginPart[$dupKey] !== $partIndex) {
+                    // Та же (date, campaignId) встречается уже во второй CSV-части —
+                    // это ошибка данных Ozon (дубликат кампании в ZIP). Берём
+                    // первое появление, остальные строки игнорируем, warning
+                    // пишем один раз на пару, чтобы не засорять лог.
+                    if (!isset($warnedDuplicateKeys[$dupKey])) {
+                        $this->marketplaceAdsLogger->warning('Ozon CSV: duplicate (date, campaignId) across ZIP parts', [
+                            'date' => $date,
+                            'campaign_id' => $campaignId,
+                            'first_part_index' => $dateCampaignOriginPart[$dupKey],
+                            'duplicate_part_index' => $partIndex,
+                        ]);
+                        $warnedDuplicateKeys[$dupKey] = true;
+                    }
+                    continue;
+                }
+
                 $campaignName = (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? '');
 
                 if (!isset($result[$date][$campaignId])) {
@@ -1218,6 +1280,7 @@ class OzonAdClient implements AdPlatformClientInterface
                         'campaign_name' => $campaignName,
                         'rows' => [],
                     ];
+                    $dateCampaignOriginPart[$dupKey] = $partIndex;
                 }
 
                 $result[$date][$campaignId]['rows'][] = [
