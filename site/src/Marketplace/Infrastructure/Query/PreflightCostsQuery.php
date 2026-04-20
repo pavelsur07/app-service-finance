@@ -42,7 +42,7 @@ final class PreflightCostsQuery
                     WHERE m.id IS NOT NULL AND m.include_in_pl = false
                 )                                                               AS excluded_from_pl,
                 COALESCE(
-                    SUM(CASE WHEN c.operation_type = 'storno' THEN -c.amount ELSE c.amount END)
+                    SUM(CASE WHEN c.operation_type = 'storno' THEN -ABS(c.amount) ELSE ABS(c.amount) END)
                         FILTER (WHERE m.include_in_pl = true AND m.pl_category_id IS NOT NULL),
                     0
                 )                                                               AS net_amount_for_pl

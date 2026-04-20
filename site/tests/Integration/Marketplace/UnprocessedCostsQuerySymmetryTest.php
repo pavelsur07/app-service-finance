@@ -189,6 +189,29 @@ final class UnprocessedCostsQuerySymmetryTest extends IntegrationTestCase
     }
 
     /**
+     * Защита от регрессии: если кто-то решит убрать ABS внутри CASE как "лишний",
+     * тест остановит. Инвариант amount ≥ 0 enforced только в коде (процессорах
+     * + миграции Version20260413120000), но не в БД — и WB Phase 2B ещё не
+     * полностью выкачена. Формула B использует ABS(SUM(c.amount)) на уровне
+     * группы, поэтому симметричная форма для A — ABS(c.amount) внутри signed-суммы.
+     */
+    public function testSignedAmountSymmetryWhenInvariantBroken(): void
+    {
+        $category = $this->createMappedCategory('broken_invariant_cat', 'Broken invariant cat');
+        // Нарушенный инвариант: storno с отрицательным amount.
+        $this->createCost($category, '500.00', MarketplaceCostOperationType::CHARGE, '2026-01-10');
+        $this->createCost($category, '-200.00', MarketplaceCostOperationType::STORNO, '2026-01-12');
+        $this->em->flush();
+
+        // Formula A: +ABS(500) + (-ABS(-200)) = 500 − 200 = 300.
+        // Formula B: charge_group total=ABS(500)=500 (+500); storno_group total=ABS(-200)=200 (−200) ⇒ 300.
+        self::assertEqualsWithDelta(300.0, (float) $this->getControlSum(), 0.01);
+        self::assertEqualsWithDelta(300.0, $this->handlerPlDocumentSum(), 0.01);
+        self::assertEqualsWithDelta(300.0, (float) $this->getPreflightNetAmount(), 0.01);
+        $this->assertSymmetry();
+    }
+
+    /**
      * Воспроизводит production-инцидент: company b57d7682-...
      * январь 2026, 1 000 000 начислений + 15 596.06 сторно.
      *
