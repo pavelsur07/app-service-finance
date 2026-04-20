@@ -7,7 +7,9 @@ namespace App\MarketplaceAds\Infrastructure\Api\Ozon;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
+use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
@@ -26,7 +28,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  *   2) GET  /api/client/campaign — все SKU-кампании (без фильтра по state, чтобы
  *      не терять backfill остановленных/архивных кампаний);
  *   3) POST /api/client/statistics батчами (до 10 campaignIds) → UUID отчёта;
- *   4) GET  /api/client/statistics/{uuid} — polling до READY (макс. 36 попыток × 5с = 3 мин);
+ *   4) GET  /api/client/statistics/{uuid} — polling до READY (макс. 120 попыток × 5с = 10 мин,
+ *      с ранним exit'ом через 5 мин, если state удерживается на NOT_STARTED);
  *   5) GET  /api/client/statistics/report — скачать CSV (либо сразу из state.report.link);
  *   6) преобразовать строки CSV в формат {"rows": [{campaign_id, campaign_name, sku, spend, views, clicks}]}.
  *
@@ -49,8 +52,29 @@ class OzonAdClient implements AdPlatformClientInterface
     // (ранее было 100; лимит ужесточён на стороне Ozon, подтверждено ответом
     // «Превышен лимит по количеству кампаний (максимум 10)»).
     private const STATISTICS_BATCH_SIZE = 10;
-    private const POLL_MAX_ATTEMPTS = 36;
+    // POLL_MAX_ATTEMPTS × POLL_INTERVAL_SECONDS = 600 сек (10 мин) общий
+    // таймаут на формирование отчёта Ozon. Увеличено с 3 до 10 минут после
+    // деградации Ozon Performance API: длинные IN_PROGRESS-фазы — норма для
+    // больших диапазонов, и 3-минутного окна хватало только на свежие узкие
+    // чанки. Ранний выход по NOT_STARTED (см. ниже) защищает от зависания
+    // в очереди, так что общий таймаут можно держать большим без риска
+    // блокировать слот на 10 минут зря.
+    private const POLL_MAX_ATTEMPTS = 120;
     private const POLL_INTERVAL_SECONDS = 5;
+    // Early-fail, если state держится NOT_STARTED дольше этого окна — значит
+    // очередь Ozon Performance перегружена, и отчёт скорее всего никогда не
+    // начнёт формироваться в разумное время. Отпускаем слот handler'а и
+    // отдаём управление пользователю, чтобы он повторил загрузку позже.
+    // Ограничено отдельной константой (а не production-по-времени-ожидания),
+    // чтобы успеть отпустить слот до того, как истечёт общий 10-минутный
+    // бюджет — иначе разница между «очередь» и «ошибка формирования»
+    // теряется в логах и метриках.
+    private const POLL_NOT_STARTED_MAX_SECONDS = 300;
+    // Максимальный возраст in-flight записи (с момента requestedAt), при
+    // котором resume имеет смысл. Старше этого порога отчёт считается
+    // мёртвым — лучше начать новый POST /statistics, чем продолжать polling
+    // UUID, который уже вышел за любой разумный SLA Ozon'а.
+    private const RESUME_MAX_AGE_SECONDS = 900;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
 
     // Для «свежих» диапазонов (dateFrom в пределах этого окна от сегодня) отсекаем
@@ -259,35 +283,68 @@ class OzonAdClient implements AdPlatformClientInterface
             /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
             $byDate = [];
 
+            // Resume-fetch: in-flight записи текущего job'а выбираем один раз
+            // до цикла, чтобы не спамить БД N запросами на N батчей. null → для
+            // legacy-вызовов без jobId (например, через fetchAdStatistics()),
+            // resume-логика просто не применится — ветка matchResumableReport()
+            // безопасно вернёт null.
+            $inFlightReports = (null !== $jobId)
+                ? $this->pendingReportRepo->findInFlightByJob($companyId, $jobId)
+                : [];
+
             foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
                 [$campaignIds, $namesById] = $this->splitBatch($batch);
 
-                $uuid = $this->withAuthRetry(
+                $resumable = $this->matchResumableReport(
+                    $inFlightReports,
+                    $dateFrom,
+                    $dateTo,
+                    $campaignIds,
                     $companyId,
-                    $clientId,
-                    $clientSecret,
-                    fn (string $token): string => $this->requestStatistics(
-                        $token,
-                        $companyId,
-                        $campaignIds,
-                        $dateFrom,
-                        $dateTo,
-                        'DATE',
-                        $jobId,
-                    ),
                 );
 
-                $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт (range)', [
-                    'companyId' => $companyId,
-                    'reportUuid' => $uuid,
-                    'campaignCount' => count($campaignIds),
-                ]);
+                if (null !== $resumable) {
+                    $uuid = $resumable->getOzonUuid();
+                    // requestedAt хранится с секундной точностью; для таймаута
+                    // NOT_STARTED (300s) погрешность в 1 секунду незначима.
+                    $pollStartedAt = (float) $resumable->getRequestedAt()->getTimestamp();
+
+                    $this->marketplaceAdsLogger->info('Resuming existing Ozon UUID instead of creating new', [
+                        'companyId' => $companyId,
+                        'reportUuid' => $uuid,
+                        'jobId' => $jobId,
+                        'ageSeconds' => (int) round(microtime(true) - $pollStartedAt),
+                        'campaignCount' => count($campaignIds),
+                    ]);
+                } else {
+                    $uuid = $this->withAuthRetry(
+                        $companyId,
+                        $clientId,
+                        $clientSecret,
+                        fn (string $token): string => $this->requestStatistics(
+                            $token,
+                            $companyId,
+                            $campaignIds,
+                            $dateFrom,
+                            $dateTo,
+                            'DATE',
+                            $jobId,
+                        ),
+                    );
+                    $pollStartedAt = null;
+
+                    $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт (range)', [
+                        'companyId' => $companyId,
+                        'reportUuid' => $uuid,
+                        'campaignCount' => count($campaignIds),
+                    ]);
+                }
 
                 $reportLink = $this->withAuthRetry(
                     $companyId,
                     $clientId,
                     $clientSecret,
-                    fn (string $token): string => $this->pollReport($token, $companyId, $uuid),
+                    fn (string $token): string => $this->pollReport($token, $companyId, $uuid, $pollStartedAt),
                 );
                 // pollReport не возвращает attempts, чтобы не ломать публичную
                 // сигнатуру — счётчик читаем через $this->lastPollAttempts и
@@ -650,11 +707,94 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Ищет in-flight запись, пригодную для resume текущего батча: совпадают
+     * dateFrom / dateTo / campaignIds (как множество). Возвращает первое
+     * найденное совпадение — in-flight записи ограничены одним jobId, а
+     * внутри job'а пересечения по (dateRange, campaignIds) не допускаются
+     * дизайном (в цикле мы перебираем непересекающиеся батчи array_chunk).
+     *
+     * Stale-записи (старше RESUME_MAX_AGE_SECONDS) финализируются как
+     * ABANDONED с reason='Resume threshold exceeded' и пропускаются — лучше
+     * начать новый POST /statistics, чем polling'ить UUID, который Ozon
+     * уже забыл. После abandon'а продолжаем сканирование: если в том же
+     * job'е есть stale + fresh пара (например, после гонки Messenger-воркеров),
+     * хотим финализировать stale и всё-таки подхватить fresh, а не создавать
+     * третий UUID.
+     *
+     * @param list<OzonAdPendingReport> $inFlightReports
+     * @param list<string>              $campaignIds
+     */
+    private function matchResumableReport(
+        array $inFlightReports,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        array $campaignIds,
+        string $companyId,
+    ): ?OzonAdPendingReport {
+        // campaignIds сравниваем как set (отсортированные list'ы), а не
+        // как ordered-list: порядок campaignIds на входе в requestStatistics
+        // зависит от сортировки в listSkuCampaigns и может меняться между
+        // запусками, хотя логически батч тот же.
+        $needle = $campaignIds;
+        sort($needle);
+
+        $now = microtime(true);
+        $dateFromYmd = $dateFrom->format('Y-m-d');
+        $dateToYmd = $dateTo->format('Y-m-d');
+
+        foreach ($inFlightReports as $report) {
+            if ($report->getDateFrom()->format('Y-m-d') !== $dateFromYmd) {
+                continue;
+            }
+            if ($report->getDateTo()->format('Y-m-d') !== $dateToYmd) {
+                continue;
+            }
+
+            $existing = $report->getCampaignIds();
+            sort($existing);
+            if ($existing !== $needle) {
+                continue;
+            }
+
+            $ageSeconds = $now - (float) $report->getRequestedAt()->getTimestamp();
+            if ($ageSeconds > self::RESUME_MAX_AGE_SECONDS) {
+                $this->marketplaceAdsLogger->warning('Stale Ozon UUID found, abandoning before new request', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $report->getOzonUuid(),
+                    'ageSeconds' => (int) round($ageSeconds),
+                    'thresholdSeconds' => self::RESUME_MAX_AGE_SECONDS,
+                ]);
+                $this->pendingReportRepo->markFinalized(
+                    $companyId,
+                    $report->getOzonUuid(),
+                    OzonAdPendingReportState::ABANDONED,
+                    'Resume threshold exceeded',
+                );
+
+                continue;
+            }
+
+            return $report;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param ?float $pollStartedAt Unix-timestamp старта polling'а для NOT_STARTED-таймаута.
+     *                              null → используется microtime(true) (fresh UUID). Для resume-
+     *                              ветки передаётся Unix-timestamp исходного requestedAt, чтобы
+     *                              NOT_STARTED-окно не обнулялось при Messenger-retry.
+     *
      * @return string ссылка на готовый отчёт (CSV)
      */
-    private function pollReport(string $token, string $companyId, string $uuid): string
-    {
-        $startedAt = microtime(true);
+    private function pollReport(
+        string $token,
+        string $companyId,
+        string $uuid,
+        ?float $pollStartedAt = null,
+    ): string {
+        $startedAt = $pollStartedAt ?? microtime(true);
 
         for ($attempt = 1; $attempt <= self::POLL_MAX_ATTEMPTS; ++$attempt) {
             $this->lastPollAttempts = $attempt;
@@ -667,13 +807,16 @@ class OzonAdClient implements AdPlatformClientInterface
 
             $state = $this->stringifyApiField($data['state'] ?? null);
             $now = new \DateTimeImmutable();
-            $waitedSeconds = round(microtime(true) - $startedAt, 1);
+            $waitedSecondsFloat = microtime(true) - $startedAt;
+            $waitedSeconds = round($waitedSecondsFloat, 1);
+            $isNotStartedPhase = 'NOT_STARTED' === $state;
 
             $this->marketplaceAdsLogger->info('Ozon poll iteration', [
                 'reportUuid' => $uuid,
                 'attempt' => $attempt,
                 'state' => $state,
                 'waitedSeconds' => $waitedSeconds,
+                'isNotStartedPhase' => $isNotStartedPhase,
             ]);
 
             // firstNonPendingAt фиксируется, как только отчёт сошёл с «NOT_STARTED»:
@@ -689,6 +832,25 @@ class OzonAdClient implements AdPlatformClientInterface
                 $attempt,
                 $firstNonPendingAt,
             );
+
+            // Early-fail по NOT_STARTED: проверяется ПЕРЕД OK/ERROR-обработкой,
+            // чтобы не пропустить переход state в терминальный после долгой
+            // очереди — правая ветка важнее (если Ozon вдруг вернул OK на этой
+            // же итерации, отпускать слот через exception было бы неправильно).
+            // ПОСЛЕ updateState: хотим зафиксировать последний полученный state
+            // в БД перед exception'ом, иначе диагностика «почему сделали
+            // abandon» теряется.
+            if ($isNotStartedPhase && $waitedSecondsFloat > self::POLL_NOT_STARTED_MAX_SECONDS) {
+                $waitedSecondsInt = (int) round($waitedSecondsFloat);
+                $this->pendingReportRepo->markFinalized(
+                    $companyId,
+                    $uuid,
+                    OzonAdPendingReportState::ABANDONED,
+                    sprintf('NOT_STARTED timeout: %d seconds', $waitedSecondsInt),
+                );
+
+                throw new OzonStatisticsQueueFullException($uuid, $waitedSecondsInt);
+            }
 
             if ('OK' === $state || 'READY' === $state) {
                 $link = $this->stringifyApiField($data['link'] ?? $data['report']['link'] ?? null);
