@@ -768,6 +768,18 @@ class OzonAdClient implements AdPlatformClientInterface
                     if (false === $content) {
                         continue;
                     }
+                    // Для всех CSV-частей кроме первой отрезаем строку заголовка:
+                    // Ozon в мульти-файловом ZIP дублирует header в каждой части,
+                    // и без отрезания iterateCsvAssocRows() распарсит "header2" как
+                    // данные — для range-загрузок parseDateField('date') упадёт,
+                    // для single-day загрузок появится фантомная строка
+                    // campaign_id="campaign_id" с нулями в spend/views/clicks.
+                    if ([] !== $csvParts) {
+                        $newlinePos = strpos($content, "\n");
+                        if (false !== $newlinePos) {
+                            $content = substr($content, $newlinePos + 1);
+                        }
+                    }
                     $csvParts[] = $content;
                 }
             } finally {

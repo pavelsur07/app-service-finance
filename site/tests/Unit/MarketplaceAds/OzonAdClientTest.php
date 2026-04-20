@@ -756,10 +756,11 @@ final class OzonAdClientTest extends TestCase
 
     public function testDownloadReportHandlesMultipleCsvInZip(): void
     {
-        // Первая «половина» CSV — заголовок + 3 строки первых трёх дат,
-        // вторая «половина» — заголовок + 3 строки последних двух дат.
-        // После конкатенации через "\n" парсер находит оба заголовка, но
-        // fgetcsv работает построчно и итерирует все data-строки одинаково.
+        // Первая часть CSV — заголовок + 2 строки первых двух дат,
+        // вторая часть — заголовок + 1 строка третьей даты.
+        // Ozon в мульти-файловом ZIP дублирует header в каждой CSV-части:
+        // без удаления повторных заголовков parseDateField() упадёт на
+        // "date" (строка header2, попавшая в поток data-строк).
         $part1 = "date;campaign_id;campaign_name;sku;spend;views;clicks\n"
             ."2026-03-01;111;Campaign A;SKU-1;10.50;100;5\n"
             ."2026-03-02;111;Campaign A;SKU-1;11.50;110;6\n";
@@ -782,11 +783,21 @@ final class OzonAdClientTest extends TestCase
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
 
-        $client->fetchAdStatisticsRange(
+        $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
             new \DateTimeImmutable('2026-03-03'),
         );
+
+        // Полный прогон парсера: данные обеих частей должны объединиться в
+        // три даты × одна кампания. Без фикса «drop repeated headers»
+        // fetchAdStatisticsRange выкинул бы RuntimeException на parseDateField('date').
+        self::assertSame(['2026-03-01', '2026-03-02', '2026-03-03'], array_keys($result));
+        foreach ($result as $date => $payload) {
+            self::assertCount(1, $payload['campaigns'], "дата $date должна содержать 1 кампанию");
+            self::assertSame('111', $payload['campaigns'][0]['campaign_id']);
+            self::assertCount(1, $payload['campaigns'][0]['rows'], "дата $date должна содержать 1 строку SKU");
+        }
 
         $downloads = $client->getLastChunkDownloads();
         self::assertCount(1, $downloads);
@@ -798,6 +809,13 @@ final class OzonAdClientTest extends TestCase
         self::assertStringContainsString('2026-03-03;111', $downloads[0]->csvContent);
         // manifest.json не должен попасть в csvContent.
         self::assertStringNotContainsString('"ignored"', $downloads[0]->csvContent);
+        // Заголовок "date;campaign_id;..." должен присутствовать в csvContent
+        // ровно один раз — у первой CSV-части. Повторы отрезаются при склейке.
+        self::assertSame(
+            1,
+            substr_count($downloads[0]->csvContent, 'date;campaign_id;campaign_name;sku;spend;views;clicks'),
+            'заголовок должен встречаться в csvContent ровно один раз после объединения частей',
+        );
     }
 
     public function testDownloadReportThrowsOnCorruptedZip(): void
