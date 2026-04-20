@@ -33,4 +33,17 @@ final class CompanyFacade
     {
         return $this->repository->getAllActiveCompanyIds();
     }
+
+    /**
+     * Возвращает компании по списку ID как простые DTO-массивы,
+     * чтобы вызывающий модуль не тянул Entity.
+     *
+     * @param list<string> $companyIds
+     *
+     * @return list<array{id: string, name: string}>
+     */
+    public function getCompaniesByIds(array $companyIds): array
+    {
+        return $this->repository->findByIds($companyIds);
+    }
 }

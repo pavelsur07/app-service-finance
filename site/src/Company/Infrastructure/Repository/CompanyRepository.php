@@ -49,4 +49,32 @@ class CompanyRepository extends ServiceEntityRepository
 
         return $this->connection->fetchFirstColumn($sql);
     }
+
+    /**
+     * @param list<string> $companyIds
+     *
+     * @return list<array{id: string, name: string}>
+     */
+    public function findByIds(array $companyIds): array
+    {
+        if ([] === $companyIds) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('c')
+            ->select('c.id AS id', 'c.name AS name')
+            ->where('c.id IN (:ids)')
+            ->setParameter('ids', array_values($companyIds))
+            ->orderBy('c.name', 'ASC')
+            ->getQuery()
+            ->getArrayResult();
+
+        return array_map(
+            static fn (array $r): array => [
+                'id' => (string) $r['id'],
+                'name' => (string) $r['name'],
+            ],
+            $rows,
+        );
+    }
 }

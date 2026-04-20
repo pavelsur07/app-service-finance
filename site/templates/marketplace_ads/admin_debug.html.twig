@@ -1,0 +1,346 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Ozon Debug — MarketplaceAds{% endblock %}
+
+{% block body %}
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <h2 class="page-title">Ozon Performance Debug</h2>
+            <div class="text-muted">
+                Прямые вызовы Ozon Performance API в обход async-пайплайна.
+                Ничего не сохраняется в БД — все результаты только в ответе.
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            {% if companies|length == 0 %}
+                <div class="alert alert-warning">
+                    Нет компаний с активным Ozon Performance подключением.
+                </div>
+            {% else %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <label class="form-label">Компания (только с Ozon Performance подключением)</label>
+                        <select id="debug-company-id" class="form-select">
+                            {% for company in companies %}
+                                <option value="{{ company.id }}">{{ company.name }} ({{ company.id }})</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">1. Токен</h3>
+                            </div>
+                            <div class="card-body">
+                                <button type="button" class="btn btn-primary" id="btn-fetch-token">Получить токен</button>
+                            </div>
+                            <pre id="result-token" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">2. Список кампаний</h3>
+                            </div>
+                            <div class="card-body">
+                                <button type="button" class="btn btn-primary" id="btn-fetch-campaigns">Получить кампании</button>
+                                <div class="mt-2 text-muted" id="campaigns-summary"></div>
+                            </div>
+                            <pre id="result-campaigns" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">3. Запросить статистику</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-2 mb-2">
+                                    <div class="col-md-3">
+                                        <label class="form-label">Дата с</label>
+                                        <input type="date" id="stats-from" class="form-control"
+                                               value="{{ 'now'|date_modify('-3 days')|date('Y-m-d') }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Дата по</label>
+                                        <input type="date" id="stats-to" class="form-control"
+                                               value="{{ 'now'|date_modify('-3 days')|date('Y-m-d') }}">
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">groupBy</label>
+                                        <select id="stats-group-by" class="form-select">
+                                            <option value="DATE">DATE</option>
+                                            <option value="NO_GROUP_BY">NO_GROUP_BY</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="mb-2">
+                                    <label class="form-label">Кампании (до 10)</label>
+                                    <div id="campaigns-checkboxes" class="mb-2 text-muted">
+                                        Сначала получите список кампаний (блок 2) — появятся чекбоксы.
+                                    </div>
+                                    <label class="form-label">Или введите ID вручную (через запятую)</label>
+                                    <input type="text" id="stats-manual-ids" class="form-control"
+                                           placeholder="12345,67890">
+                                </div>
+                                <button type="button" class="btn btn-primary" id="btn-request-stats">
+                                    Запросить
+                                </button>
+                                <div class="mt-2 text-muted">
+                                    Последний UUID: <code id="last-uuid">—</code>
+                                </div>
+                            </div>
+                            <pre id="result-stats" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">4. Проверить статус</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <label class="form-label">UUID</label>
+                                    <input type="text" id="status-uuid" class="form-control"
+                                           placeholder="uuid отчёта">
+                                </div>
+                                <button type="button" class="btn btn-primary" id="btn-check-status">Проверить</button>
+                            </div>
+                            <pre id="result-status" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title">5. Скачать отчёт</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="mb-2">
+                                    <label class="form-label">UUID</label>
+                                    <input type="text" id="download-uuid" class="form-control"
+                                           placeholder="uuid отчёта">
+                                </div>
+                                <button type="button" class="btn btn-primary" id="btn-download-preview">Превью</button>
+                                <a id="btn-download-raw" class="btn btn-outline-secondary" target="_blank" rel="noopener">
+                                    Сырой файл
+                                </a>
+                            </div>
+                            <pre id="result-download" class="debug-pre">—</pre>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <style>
+        .debug-pre {
+            max-height: 400px;
+            overflow: auto;
+            background: #1e1e1e;
+            color: #dcdcdc;
+            padding: 12px;
+            margin: 0;
+            font-size: 12px;
+            border-top: 1px solid #333;
+        }
+    </style>
+
+    <script>
+        (function () {
+            var companySel = document.getElementById('debug-company-id');
+            if (!companySel) { return; }
+
+            var pretty = function (value) {
+                try {
+                    return JSON.stringify(value, null, 2);
+                } catch (e) {
+                    return String(value);
+                }
+            };
+
+            var renderResult = function (elId, payload, okFlag) {
+                var el = document.getElementById(elId);
+                el.textContent = pretty(payload);
+                el.style.borderLeft = okFlag ? '4px solid #1a7f37' : '4px solid #d1242f';
+            };
+
+            var companyId = function () { return companySel.value; };
+
+            var withBusy = function (btn, cb) {
+                var original = btn.innerHTML;
+                btn.disabled = true;
+                btn.innerHTML = 'Выполняется...';
+                Promise.resolve(cb()).finally(function () {
+                    btn.disabled = false;
+                    btn.innerHTML = original;
+                });
+            };
+
+            var doFetch = function (url, init) {
+                init = init || {};
+                init.credentials = 'same-origin';
+                init.headers = Object.assign({'X-Requested-With': 'XMLHttpRequest'}, init.headers || {});
+                return fetch(url, init).then(function (r) {
+                    return r.json().then(function (data) {
+                        return {ok: r.ok, status: r.status, data: data};
+                    }).catch(function () {
+                        return {ok: r.ok, status: r.status, data: {error: 'Invalid JSON response'}};
+                    });
+                });
+            };
+
+            // ----- 1. Token -----
+            document.getElementById('btn-fetch-token').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var url = '/api/marketplace-ads/admin/ozon/debug/token?companyId=' + encodeURIComponent(companyId());
+                    return doFetch(url).then(function (res) {
+                        renderResult('result-token', res.data, res.ok);
+                    });
+                });
+            });
+
+            // ----- 2. Campaigns -----
+            var lastCampaigns = [];
+            document.getElementById('btn-fetch-campaigns').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var url = '/api/marketplace-ads/admin/ozon/debug/campaigns?companyId=' + encodeURIComponent(companyId());
+                    return doFetch(url).then(function (res) {
+                        renderResult('result-campaigns', res.data, res.ok);
+                        var summary = document.getElementById('campaigns-summary');
+                        var checkboxes = document.getElementById('campaigns-checkboxes');
+                        if (res.ok && res.data && Array.isArray(res.data.list)) {
+                            lastCampaigns = res.data.list;
+                            summary.textContent = 'Всего: ' + (res.data.total || 0)
+                                + '. States: ' + JSON.stringify(res.data.states_breakdown || {});
+                            checkboxes.innerHTML = '';
+                            lastCampaigns.forEach(function (c) {
+                                var id = String(c.id || '');
+                                var title = String(c.title || c.name || '');
+                                var state = String(c.state || '');
+                                var label = document.createElement('label');
+                                label.className = 'form-check form-check-inline';
+                                var input = document.createElement('input');
+                                input.className = 'form-check-input campaign-check';
+                                input.type = 'checkbox';
+                                input.value = id;
+                                var span = document.createElement('span');
+                                span.appendChild(document.createTextNode(' ' + id + ' — ' + title + ' '));
+                                var small = document.createElement('small');
+                                small.className = 'text-muted';
+                                small.textContent = '(' + state + ')';
+                                span.appendChild(small);
+                                label.appendChild(input);
+                                label.appendChild(span);
+                                checkboxes.appendChild(label);
+                            });
+                        } else {
+                            lastCampaigns = [];
+                            summary.textContent = '';
+                        }
+                    });
+                });
+            });
+
+            // ----- 3. Request statistics -----
+            var lastUuid = '';
+            var setLastUuid = function (uuid) {
+                lastUuid = uuid || '';
+                document.getElementById('last-uuid').textContent = lastUuid || '—';
+                if (lastUuid) {
+                    var su = document.getElementById('status-uuid');
+                    var du = document.getElementById('download-uuid');
+                    if (!su.value) su.value = lastUuid;
+                    if (!du.value) du.value = lastUuid;
+                }
+            };
+
+            document.getElementById('btn-request-stats').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var checked = Array.from(document.querySelectorAll('.campaign-check:checked')).map(function (el) { return el.value; });
+                    var manualRaw = document.getElementById('stats-manual-ids').value || '';
+                    var manual = manualRaw.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+                    var ids = checked.length ? checked : manual;
+                    if (!ids.length) {
+                        renderResult('result-stats', {error: 'Не выбрано ни одной кампании'}, false);
+                        return Promise.resolve();
+                    }
+                    var body = {
+                        companyId: companyId(),
+                        campaigns: ids.slice(0, 10),
+                        from: document.getElementById('stats-from').value,
+                        to: document.getElementById('stats-to').value,
+                        groupBy: document.getElementById('stats-group-by').value,
+                    };
+                    return doFetch('/api/marketplace-ads/admin/ozon/debug/statistics/request', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(body),
+                    }).then(function (res) {
+                        renderResult('result-stats', res.data, res.ok);
+                        if (res.ok && res.data && res.data.uuid) {
+                            setLastUuid(res.data.uuid);
+                        }
+                    });
+                });
+            });
+
+            // ----- 4. Check status -----
+            document.getElementById('btn-check-status').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var uuid = document.getElementById('status-uuid').value.trim();
+                    if (!uuid) {
+                        renderResult('result-status', {error: 'uuid: обязательный параметр'}, false);
+                        return Promise.resolve();
+                    }
+                    var url = '/api/marketplace-ads/admin/ozon/debug/statistics/status'
+                        + '?companyId=' + encodeURIComponent(companyId())
+                        + '&uuid=' + encodeURIComponent(uuid);
+                    return doFetch(url).then(function (res) {
+                        renderResult('result-status', res.data, res.ok);
+                    });
+                });
+            });
+
+            // ----- 5. Download -----
+            var rawLink = document.getElementById('btn-download-raw');
+            var updateRawLink = function () {
+                var uuid = document.getElementById('download-uuid').value.trim();
+                if (!uuid) { rawLink.removeAttribute('href'); return; }
+                rawLink.href = '/api/marketplace-ads/admin/ozon/debug/statistics/download'
+                    + '?companyId=' + encodeURIComponent(companyId())
+                    + '&uuid=' + encodeURIComponent(uuid)
+                    + '&raw=1';
+            };
+            document.getElementById('download-uuid').addEventListener('input', updateRawLink);
+            companySel.addEventListener('change', updateRawLink);
+            updateRawLink();
+
+            document.getElementById('btn-download-preview').addEventListener('click', function (e) {
+                withBusy(e.currentTarget, function () {
+                    var uuid = document.getElementById('download-uuid').value.trim();
+                    if (!uuid) {
+                        renderResult('result-download', {error: 'uuid: обязательный параметр'}, false);
+                        return Promise.resolve();
+                    }
+                    var url = '/api/marketplace-ads/admin/ozon/debug/statistics/download'
+                        + '?companyId=' + encodeURIComponent(companyId())
+                        + '&uuid=' + encodeURIComponent(uuid);
+                    return doFetch(url).then(function (res) {
+                        renderResult('result-download', res.data, res.ok);
+                    });
+                });
+            });
+        })();
+    </script>
+{% endblock %}
