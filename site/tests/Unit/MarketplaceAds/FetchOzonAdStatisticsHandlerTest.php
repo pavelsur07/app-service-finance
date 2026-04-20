@@ -907,6 +907,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $download = new OzonReportDownload(
             rawBytes: "PK\x03\x04raw-zip-bytes",
             csvContent: "date,campaign_id,sku,spend\n2026-03-01,1,SKU,100",
+            csvParts: ["date,campaign_id,sku,spend\n2026-03-01,1,SKU,100"],
             wasZip: true,
             sizeBytes: 16,
             sha256: str_repeat('a', 64),
@@ -1006,6 +1007,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $download = new OzonReportDownload(
             rawBytes: 'csv-raw-bytes',
             csvContent: 'csv-raw-bytes',
+            csvParts: ['csv-raw-bytes'],
             wasZip: false,
             sizeBytes: 13,
             sha256: str_repeat('c', 64),
@@ -1101,6 +1103,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $download = new OzonReportDownload(
             rawBytes: "PK\x03\x04abc",
             csvContent: 'unpacked',
+            csvParts: ['unpacked'],
             wasZip: true,
             sizeBytes: 7,
             sha256: str_repeat('e', 64),
@@ -1196,6 +1199,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $download1 = new OzonReportDownload(
             rawBytes: "PK\x03\x04batch-1",
             csvContent: 'csv-batch-1',
+            csvParts: ['csv-batch-1'],
             wasZip: true,
             sizeBytes: 10,
             sha256: str_repeat('a', 64),
@@ -1205,6 +1209,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $download2 = new OzonReportDownload(
             rawBytes: "PK\x03\x04batch-2",
             csvContent: 'csv-batch-2',
+            csvParts: ['csv-batch-2'],
             wasZip: true,
             sizeBytes: 10,
             sha256: str_repeat('b', 64),

@@ -1728,6 +1728,91 @@ final class OzonAdClientTest extends TestCase
         }
     }
 
+    // -----------------------------------------------------------------
+    // Multi-file ZIP, где каждый CSV имеет СВОЙ preamble (новый Ozon-формат,
+    // апрель 2026): один batch /statistics на несколько кампаний → Ozon
+    // возвращает ZIP, по одному CSV на кампанию, у каждого своя строка
+    // «;Кампания по продвижению № N, период …».
+    //
+    // Регрессия: до фикса extractCsvFromZip стрипал из частей 2+ только
+    // одну строку (предположение: это header-дубликат). В preamble-формате
+    // этой одной строкой оказывался preamble, а header второй части
+    // попадал в data-поток, и parseDateField('День') бросал RuntimeException
+    // на range-загрузках. Плюс campaign_id всех строк из частей 2+
+    // приписывался единственному распознанному preamble'у (первой части) —
+    // silent data corruption для multi-campaign ZIP.
+    //
+    // После фикса: парсер обходит csvParts по одному, каждому со своим
+    // stripPreamble → строки каждой кампании получают СВОЙ campaign_id.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeMultiCampaignZipWithPreamblePerPart(): void
+    {
+        $csvPart1 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;100;10;25,00\n";
+        $csvPart2 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 222, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;222001;Товар B;200;20;50,00\n";
+
+        $zipBytes = $this->buildZipBytes([
+            'campaign-111.csv' => $csvPart1,
+            'campaign-222.csv' => $csvPart2,
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-MULTIPRE'),
+            campaignListBody: $this->campaignListBody(2), // 111, 222
+            statisticsBody: '{"UUID":"uuid-multi-preamble"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-multi-preamble'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame(['2026-04-17'], array_keys($result));
+        self::assertCount(2, $result['2026-04-17']['campaigns'], 'В ZIP 2 кампании — обе должны попасть в результат.');
+
+        $byId = [];
+        foreach ($result['2026-04-17']['campaigns'] as $campaign) {
+            $byId[$campaign['campaign_id']] = $campaign;
+        }
+
+        self::assertArrayHasKey('111', $byId);
+        self::assertArrayHasKey('222', $byId);
+
+        // Критично: sku из CSV-части 2 имеет campaign_id='222' (из СВОЕГО preamble),
+        // а не '111' (который мы бы получили при single-pass парсинге merged CSV).
+        self::assertCount(1, $byId['111']['rows']);
+        self::assertSame('111001', $byId['111']['rows'][0]['sku']);
+        self::assertSame('Campaign A', $byId['111']['campaign_name']);
+        self::assertSame('25.00', $byId['111']['rows'][0]['spend']);
+
+        self::assertCount(1, $byId['222']['rows']);
+        self::assertSame('222001', $byId['222']['rows'][0]['sku']);
+        self::assertSame('Campaign B', $byId['222']['campaign_name']);
+        self::assertSame('50.00', $byId['222']['rows'][0]['spend']);
+
+        // Preamble-лог должен встретиться по одному разу на КАЖДЫЙ CSV,
+        // а не один раз на весь merged-контент.
+        $preambleLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon CSV preamble detected' === $r['message'],
+        ));
+        self::assertCount(2, $preambleLogs, 'Per-part parsing: preamble должен быть задетектирован у каждого CSV.');
+        $extractedIds = array_map(
+            static fn (array $r): string => (string) ($r['context']['extractedCampaignId'] ?? ''),
+            $preambleLogs,
+        );
+        sort($extractedIds);
+        self::assertSame(['111', '222'], $extractedIds);
+    }
+
     /**
      * Создаёт OzonAdPendingReport с произвольным requestedAt через reflection.
      * Нужно для тестов resume-ветки: Entity в конструкторе жёстко ставит

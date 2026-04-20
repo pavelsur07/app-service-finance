@@ -202,7 +202,7 @@ class OzonAdClient implements AdPlatformClientInterface
             // чтобы 401-ретрай не зафиксировал неуспешную выгрузку.
             $this->lastChunkDownloads[] = $download;
 
-            foreach ($this->convertCsvToRows($download->csvContent, $namesById) as $row) {
+            foreach ($this->convertCsvToRows($download->csvParts, $namesById) as $row) {
                 $rows[] = $row;
             }
         }
@@ -361,7 +361,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 // чтобы 401-ретрай не зафиксировал неуспешную выгрузку.
                 $this->lastChunkDownloads[] = $download;
 
-                foreach ($this->convertCsvToRowsByDate($download->csvContent, $namesById) as $date => $campaignsForDate) {
+                foreach ($this->convertCsvToRowsByDate($download->csvParts, $namesById) as $date => $campaignsForDate) {
                     // Батчи не пересекаются по campaign_id (array_chunk), поэтому коллизий
                     // внутри одной даты не будет — просто складываем кампании подряд.
                     foreach ($campaignsForDate as $campaignId => $campaign) {
@@ -931,9 +931,14 @@ class OzonAdClient implements AdPlatformClientInterface
         if ($wasZip) {
             $extracted = $this->extractCsvFromZip($rawBytes, $reportUuid);
             $csvContent = $extracted['csvContent'];
+            $csvParts = $extracted['csvParts'];
             $filesInZip = $extracted['filesInZip'];
         } else {
             $csvContent = $rawBytes;
+            // Plain-CSV: одна «часть», идентичная rawBytes. Контракт csvParts
+            // держит парсер (он всегда iterate по list), чтобы downloadReport
+            // не подменял shape между ZIP и plain-ответом.
+            $csvParts = [$rawBytes];
             $filesInZip = 0;
         }
 
@@ -951,6 +956,7 @@ class OzonAdClient implements AdPlatformClientInterface
         return new OzonReportDownload(
             rawBytes: $rawBytes,
             csvContent: $csvContent,
+            csvParts: $csvParts,
             wasZip: $wasZip,
             sizeBytes: $sizeBytes,
             sha256: $sha256,
@@ -961,11 +967,22 @@ class OzonAdClient implements AdPlatformClientInterface
 
     /**
      * Распаковывает ZIP через временный файл: ZipArchive::open() работает только
-     * с путями в ФС, стрим-чтение из памяти не поддерживается. Собирает все
-     * .csv-файлы из архива, конкатенируя их через "\n"; файлы без .csv-расширения
-     * игнорирует (мусорные записи / manifest-файлы).
+     * с путями в ФС, стрим-чтение из памяти не поддерживается. Возвращает:
+     *  - csvParts: список CSV-файлов verbatim (без модификаций). Каждая часть —
+     *    отдельный CSV из ZIP, потенциально с собственным preamble'ом (новый
+     *    Ozon-формат: «;Кампания по продвижению № N…»). Парсер обязан
+     *    обрабатывать каждый элемент отдельно, иначе в multi-campaign ZIP'е
+     *    header-строки частей 2+ попадут в data-поток, а campaign_id всех
+     *    строк будет приписан единственному preamble первой части.
+     *  - csvContent: legacy-concat с удалением первой строки у частей 2+.
+     *    Нужен только для обратной совместимости bronze-инспекции и тестов,
+     *    парсером НЕ используется.
+     *  - filesInZip: общее число файлов в архиве (включая не-CSV).
      *
-     * @return array{csvContent: string, filesInZip: int}
+     * Файлы без .csv-расширения игнорируются (манифесты и т.п.) — не попадают
+     * ни в csvParts, ни в csvContent.
+     *
+     * @return array{csvContent: string, csvParts: list<string>, filesInZip: int}
      *
      * @throws \RuntimeException если архив повреждён либо не содержит ни одного CSV
      */
@@ -995,6 +1012,7 @@ class OzonAdClient implements AdPlatformClientInterface
             try {
                 $filesInZip = $zip->numFiles;
                 $csvParts = [];
+                $mergedParts = [];
                 for ($i = 0; $i < $filesInZip; ++$i) {
                     $name = $zip->getNameIndex($i);
                     if (false === $name) {
@@ -1007,19 +1025,24 @@ class OzonAdClient implements AdPlatformClientInterface
                     if (false === $content) {
                         continue;
                     }
-                    // Для всех CSV-частей кроме первой отрезаем строку заголовка:
-                    // Ozon в мульти-файловом ZIP дублирует header в каждой части,
-                    // и без отрезания iterateCsvAssocRows() распарсит "header2" как
-                    // данные — для range-загрузок parseDateField('date') упадёт,
-                    // для single-day загрузок появится фантомная строка
-                    // campaign_id="campaign_id" с нулями в spend/views/clicks.
-                    if ([] !== $csvParts) {
+                    // csvParts — verbatim: парсер convertCsvToRows* обязан сам
+                    // обрабатывать preamble каждой части (в новом Ozon-формате
+                    // у каждого CSV своя строка «;Кампания по продвижению № N…»
+                    // с campaign_id собственной кампании). Склеивание в одну
+                    // строку теряло бы per-campaign attribution.
+                    $csvParts[] = $content;
+
+                    // csvContent — legacy-concat для bronze-инспекции:
+                    // у всех частей кроме первой отрезаем ПЕРВУЮ строку
+                    // (preamble или header — в любом случае повторяющийся
+                    // служебный текст, который в склейке не нужен).
+                    if ([] !== $mergedParts) {
                         $newlinePos = strpos($content, "\n");
                         if (false !== $newlinePos) {
                             $content = substr($content, $newlinePos + 1);
                         }
                     }
-                    $csvParts[] = $content;
+                    $mergedParts[] = $content;
                 }
             } finally {
                 $zip->close();
@@ -1034,7 +1057,8 @@ class OzonAdClient implements AdPlatformClientInterface
             }
 
             return [
-                'csvContent' => implode("\n", $csvParts),
+                'csvContent' => implode("\n", $mergedParts),
+                'csvParts' => $csvParts,
                 'filesInZip' => $filesInZip,
             ];
         } finally {
@@ -1054,53 +1078,68 @@ class OzonAdClient implements AdPlatformClientInterface
      * Преобразует CSV отчёта Ozon Performance (NO_GROUP_BY) в плоский список строк
      * формата {campaign_id, campaign_name, sku, spend, views, clicks}.
      *
+     * Принимает list<string> — по одному CSV на файл из ZIP (или один элемент
+     * для plain-CSV). Каждая часть обрабатывается независимо со своим preamble'ом:
+     * в новом Ozon-формате у каждой CSV в мульти-файловом ZIP — собственная
+     * строка «;Кампания по продвижению № N…», и campaign_id в data-строках
+     * берётся именно из неё. Единый pass'ом по concat'у терял бы attribution.
+     *
+     * @param list<string>          $csvParts  CSV verbatim по каждому файлу из ZIP
      * @param array<string, string> $namesById кэш campaign_name по campaign_id
      *
      * @return list<array{campaign_id: string, campaign_name: string, sku: string, spend: float, views: int, clicks: int}>
      */
-    private function convertCsvToRows(string $csv, array $namesById): array
+    private function convertCsvToRows(array $csvParts, array $namesById): array
     {
-        $preamble = $this->stripPreamble($csv);
-        $preambleCampaignId = $preamble['campaign_id'];
-
         $rows = [];
-        $dataRowsSeen = 0;
+        $totalDataRowsSeen = 0;
         $headerSample = '';
         $firstDataSample = '';
 
-        foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
-            if (0 === $dataRowsSeen) {
-                $headerSample = implode(';', array_keys($row));
-                $firstDataSample = implode(';', array_values($row));
+        foreach ($csvParts as $csv) {
+            $preamble = $this->stripPreamble($csv);
+            $preambleCampaignId = $preamble['campaign_id'];
+
+            foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
+                if (0 === $totalDataRowsSeen) {
+                    $headerSample = implode(';', array_keys($row));
+                    $firstDataSample = implode(';', array_values($row));
+                }
+                ++$totalDataRowsSeen;
+
+                $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+                // findDateField вычисляется один раз и переиспользуется в
+                // isFooterOrEmptyRow (обнаружение «Всего;;…») — раньше footer-
+                // проверка вызывала findDateField внутри себя, давая двойной
+                // проход по row-ключам на каждую строку.
+                $rawDate = $this->findDateField($row);
+
+                if ($this->isFooterOrEmptyRow($sku, $rawDate)) {
+                    continue;
+                }
+
+                // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
+                // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
+                $campaignId = '' !== $preambleCampaignId
+                    ? $preambleCampaignId
+                    : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+
+                if ('' === $campaignId || '' === $sku) {
+                    continue;
+                }
+
+                $rows[] = [
+                    'campaign_id' => $campaignId,
+                    'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
+                    'sku' => $sku,
+                    'spend' => (float) str_replace(',', '.', $this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
+                    'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
+                    'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
+                ];
             }
-            ++$dataRowsSeen;
-
-            $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
-            // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
-            // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
-            $campaignId = '' !== $preambleCampaignId
-                ? $preambleCampaignId
-                : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
-
-            if ($this->isFooterOrEmptyRow($row, $sku)) {
-                continue;
-            }
-
-            if ('' === $campaignId || '' === $sku) {
-                continue;
-            }
-
-            $rows[] = [
-                'campaign_id' => $campaignId,
-                'campaign_name' => (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? ''),
-                'sku' => $sku,
-                'spend' => (float) str_replace(',', '.', $this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
-                'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
-                'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
-            ];
         }
 
-        $this->logEmptyCsvParseResultIfNeeded($dataRowsSeen, $rows, $headerSample, $firstDataSample);
+        $this->logEmptyCsvParseResultIfNeeded($totalDataRowsSeen, $rows, $headerSample, $firstDataSample);
 
         return $rows;
     }
@@ -1113,6 +1152,11 @@ class OzonAdClient implements AdPlatformClientInterface
      * Возвращает промежуточную map (не финальный shape с `array_values`), чтобы caller
      * мог мёрджить результаты нескольких батчей без лишних O(N) проходов.
      *
+     * Принимает list<string> — по одному CSV на файл из ZIP (или один элемент
+     * для plain-CSV). Каждая часть обрабатывается независимо со своим preamble'ом,
+     * см. комментарий к {@see self::convertCsvToRows()}.
+     *
+     * @param list<string>          $csvParts  CSV verbatim по каждому файлу из ZIP
      * @param array<string, string> $namesById кэш campaign_name по campaign_id
      *
      * @return array<string, array<string, array{
@@ -1123,63 +1167,69 @@ class OzonAdClient implements AdPlatformClientInterface
      *
      * @throws \RuntimeException если в строке отсутствует или невалидна колонка date
      */
-    private function convertCsvToRowsByDate(string $csv, array $namesById): array
+    private function convertCsvToRowsByDate(array $csvParts, array $namesById): array
     {
-        $preamble = $this->stripPreamble($csv);
-        $preambleCampaignId = $preamble['campaign_id'];
-
         $result = [];
-        $dataRowsSeen = 0;
+        $totalDataRowsSeen = 0;
         $headerSample = '';
         $firstDataSample = '';
 
-        foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
-            if (0 === $dataRowsSeen) {
-                $headerSample = implode(';', array_keys($row));
-                $firstDataSample = implode(';', array_values($row));
-            }
-            ++$dataRowsSeen;
+        foreach ($csvParts as $csv) {
+            $preamble = $this->stripPreamble($csv);
+            $preambleCampaignId = $preamble['campaign_id'];
 
-            $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
-            // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
-            // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
-            $campaignId = '' !== $preambleCampaignId
-                ? $preambleCampaignId
-                : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
+            foreach ($this->iterateCsvAssocRows($preamble['csv']) as $row) {
+                if (0 === $totalDataRowsSeen) {
+                    $headerSample = implode(';', array_keys($row));
+                    $firstDataSample = implode(';', array_values($row));
+                }
+                ++$totalDataRowsSeen;
 
-            if ($this->isFooterOrEmptyRow($row, $sku)) {
-                continue;
-            }
+                $sku = (string) ($row['sku'] ?? $row['ozon_sku'] ?? '');
+                // findDateField вычисляется один раз и переиспользуется в
+                // isFooterOrEmptyRow + ниже для parseDateField (до рефакторинга
+                // было 2 прохода по row-ключам на каждую строку).
+                $rawDate = $this->findDateField($row);
 
-            if ('' === $campaignId || '' === $sku) {
-                continue;
-            }
+                if ($this->isFooterOrEmptyRow($sku, $rawDate)) {
+                    continue;
+                }
 
-            $rawDate = $this->findDateField($row);
-            if ('' === $rawDate) {
-                throw new \RuntimeException(sprintf('Ozon Performance: в строке отчёта отсутствует поле даты (ожидается одна из колонок: date, day, дата, день); campaign_id=%s, sku=%s', $campaignId, $sku));
-            }
-            $date = $this->parseDateField($rawDate);
+                // campaign_id приходит из preamble "№ X" в новом формате Ozon CSV
+                // (колонки campaign_id в файле нет). Для старого/fallback-формата — из колонки.
+                $campaignId = '' !== $preambleCampaignId
+                    ? $preambleCampaignId
+                    : (string) ($row['campaign_id'] ?? $row['id'] ?? '');
 
-            $campaignName = (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? '');
+                if ('' === $campaignId || '' === $sku) {
+                    continue;
+                }
 
-            if (!isset($result[$date][$campaignId])) {
-                $result[$date][$campaignId] = [
-                    'campaign_id' => $campaignId,
-                    'campaign_name' => $campaignName,
-                    'rows' => [],
+                if ('' === $rawDate) {
+                    throw new \RuntimeException(sprintf('Ozon Performance: в строке отчёта отсутствует поле даты (ожидается одна из колонок: date, day, дата, день); campaign_id=%s, sku=%s', $campaignId, $sku));
+                }
+                $date = $this->parseDateField($rawDate);
+
+                $campaignName = (string) ($row['campaign_name'] ?? $namesById[$campaignId] ?? '');
+
+                if (!isset($result[$date][$campaignId])) {
+                    $result[$date][$campaignId] = [
+                        'campaign_id' => $campaignId,
+                        'campaign_name' => $campaignName,
+                        'rows' => [],
+                    ];
+                }
+
+                $result[$date][$campaignId]['rows'][] = [
+                    'sku' => $sku,
+                    'spend' => $this->normalizeDecimal($this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
+                    'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
+                    'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
                 ];
             }
-
-            $result[$date][$campaignId]['rows'][] = [
-                'sku' => $sku,
-                'spend' => $this->normalizeDecimal($this->pickColumn($row, ['spend', 'cost', 'расход, ₽, с ндс', 'расход'])),
-                'views' => (int) $this->pickColumn($row, ['views', 'impressions', 'показы']),
-                'clicks' => (int) $this->pickColumn($row, ['clicks', 'клики']),
-            ];
         }
 
-        $this->logEmptyCsvParseResultIfNeeded($dataRowsSeen, $result, $headerSample, $firstDataSample);
+        $this->logEmptyCsvParseResultIfNeeded($totalDataRowsSeen, $result, $headerSample, $firstDataSample);
 
         return $result;
     }
@@ -1345,20 +1395,19 @@ class OzonAdClient implements AdPlatformClientInterface
      * preamble и в data-строках его не бывает — без этой функции footer
      * попал бы в aggregated-результат с нулями.
      *
-     * @param array<string, string> $row
+     * $rawDate принимаем как параметр (а не вычисляем findDateField'ом изнутри),
+     * потому что caller всё равно использует его ниже (для parseDateField) —
+     * лишний проход по row-ключам на каждую строку не нужен.
      */
-    private function isFooterOrEmptyRow(array $row, string $sku): bool
+    private function isFooterOrEmptyRow(string $sku, string $rawDate): bool
     {
         if ('' === $sku) {
             return true;
         }
 
-        $dateCell = mb_strtolower(trim($this->findDateField($row)), 'UTF-8');
-        if ('всего' === $dateCell || 'total' === $dateCell) {
-            return true;
-        }
+        $dateCell = mb_strtolower(trim($rawDate), 'UTF-8');
 
-        return false;
+        return 'всего' === $dateCell || 'total' === $dateCell;
     }
 
     /**
