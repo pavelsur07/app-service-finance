@@ -124,4 +124,27 @@ final class AdRawDocumentTest extends TestCase
             'already FAILED'    => [AdRawDocumentStatus::FAILED],
         ];
     }
+
+    public function testGettersReturnNullByDefault(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->build();
+
+        self::assertNull($doc->getStoragePath());
+        self::assertNull($doc->getFileHash());
+        self::assertNull($doc->getFileSizeBytes());
+    }
+
+    public function testSetFileStorageSetsAllThreeFieldsAtomically(): void
+    {
+        $doc = AdRawDocumentBuilder::aRawDocument()->build();
+        $path = 'companies/11111111-1111-1111-1111-111111111111/marketplace-ads/ozon/bronze/2026/04/20/x.zip';
+        $hash = str_repeat('a', 64);
+        $size = 12345;
+
+        $doc->setFileStorage($path, $hash, $size);
+
+        self::assertSame($path, $doc->getStoragePath());
+        self::assertSame($hash, $doc->getFileHash());
+        self::assertSame($size, $doc->getFileSizeBytes());
+    }
 }
