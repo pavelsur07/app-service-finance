@@ -77,6 +77,16 @@ final class StorageServiceTest extends TestCase
         self::assertStringStartsWith('text/', $result['mimeType']);
     }
 
+    public function testStoreBytesRejectsPathTraversal(): void
+    {
+        $service = new StorageService($this->storageRoot);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('Path traversal');
+
+        $service->storeBytes('x', 'companies/../../etc/passwd');
+    }
+
     public function testStoreBytesThrowsWhenWriteFails(): void
     {
         // storageRoot указывает на путь, где создать целевой подкаталог нельзя,

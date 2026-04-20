@@ -57,6 +57,15 @@ final class StorageService
     public function storeBytes(string $bytes, string $relativePath): array
     {
         $relativePath = ltrim($relativePath, '/');
+
+        // Защита от Path Traversal: любой сегмент '..' позволил бы выйти за storageRoot.
+        // Split по '/' вместо str_contains, чтобы имена файлов вроде "..zip" не срабатывали как false-positive.
+        foreach (explode('/', $relativePath) as $segment) {
+            if ('..' === $segment) {
+                throw new \InvalidArgumentException(sprintf('Path traversal segment detected in "%s".', $relativePath));
+            }
+        }
+
         $targetDir = dirname($relativePath);
 
         if ('.' !== $targetDir && '' !== $targetDir) {

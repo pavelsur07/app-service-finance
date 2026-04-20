@@ -55,8 +55,10 @@ class AdRawDocument
     #[ORM\Column(type: 'string', length: 64, nullable: true)]
     private ?string $fileHash = null;
 
+    // Doctrine hydrates BIGINT as string by default (см. MoneyFundMovement::$amountMinor) —
+    // на типизированном ?int возникал бы TypeError при загрузке.
     #[ORM\Column(type: 'bigint', nullable: true)]
-    private ?int $fileSizeBytes = null;
+    private ?string $fileSizeBytes = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private \DateTimeImmutable $updatedAt;
@@ -125,9 +127,11 @@ class AdRawDocument
 
     public function setFileStorage(string $path, string $hash, int $size): void
     {
+        Assert::greaterThanEq($size, 0, 'Размер файла не может быть отрицательным.');
+
         $this->storagePath = $path;
         $this->fileHash = $hash;
-        $this->fileSizeBytes = $size;
+        $this->fileSizeBytes = (string) $size;
         $this->updatedAt = new \DateTimeImmutable();
     }
 
@@ -193,6 +197,6 @@ class AdRawDocument
 
     public function getFileSizeBytes(): ?int
     {
-        return $this->fileSizeBytes;
+        return null !== $this->fileSizeBytes ? (int) $this->fileSizeBytes : null;
     }
 }
