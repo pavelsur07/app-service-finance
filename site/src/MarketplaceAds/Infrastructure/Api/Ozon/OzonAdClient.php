@@ -51,10 +51,11 @@ class OzonAdClient implements AdPlatformClientInterface
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
 
-    // Для «свежих» диапазонов (dateTo в пределах этого окна от сегодня) отсекаем
+    // Для «свежих» диапазонов (dateFrom в пределах этого окна от сегодня) отсекаем
     // явно неактивные кампании на клиенте, чтобы не спрашивать у Ozon статистику
-    // по архивам. Для backfill-а более старых периодов фильтр не применяется —
-    // архивная сегодня кампания могла откручиваться тогда.
+    // по архивам. Для backfill-а более старых периодов (или длинных чанков,
+    // которые начинаются до cutoff) фильтр не применяется — архивная сегодня
+    // кампания могла откручиваться тогда.
     private const RECENT_DAYS_THRESHOLD = 14;
     private const ACTIVE_CAMPAIGN_STATES = [
         'CAMPAIGN_STATE_RUNNING',
@@ -210,14 +211,19 @@ class OzonAdClient implements AdPlatformClientInterface
                 $clientSecret,
                 fn (string $token): array => $this->listSkuCampaigns($token),
             );
-            $campaignsCount = count($campaigns);
 
             $this->marketplaceAdsLogger->info('Ozon Performance: получен список SKU-кампаний (range)', [
                 'companyId' => $companyId,
-                'count' => $campaignsCount,
+                'count' => count($campaigns),
             ]);
 
             $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom, $dateTo);
+            // $campaignsCount отражает число кампаний, которые реально пойдут в
+            // /statistics (после клиентского фильтра по state) — итоговый
+            // summary-лог должен показывать фактическую работу, а не размер
+            // списка из Ozon. Детализация «до/после» уже есть в
+            // `Campaigns filtered by state`.
+            $campaignsCount = count($campaigns);
 
             /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
             $byDate = [];
@@ -486,11 +492,14 @@ class OzonAdClient implements AdPlatformClientInterface
     /**
      * Клиентский фильтр кампаний по state для «свежих» диапазонов.
      *
-     * Для $dateTo старше RECENT_DAYS_THRESHOLD дней (backfill) — возвращает
-     * все кампании без изменений: архивная сегодня кампания могла крутиться
-     * в запрошенный период. Для недавних диапазонов оставляет только
-     * ACTIVE_CAMPAIGN_STATES (+ пустой state, на всякий случай) и логирует
-     * разбивку отсечённых состояний в канал marketplace_ads.
+     * backfillMode определяется по $dateFrom: если начало диапазона старше
+     * RECENT_DAYS_THRESHOLD дней, весь чанк считаем backfill-ом и возвращаем
+     * кампании без изменений — иначе при длинных чанках (до 62 дней),
+     * заканчивающихся сегодня, мы бы дропнули рекламу, которая была активна
+     * в начале диапазона, а сегодня уже в ARCHIVED. Для недавних диапазонов
+     * (оба конца в пределах 14 дней) оставляем только ACTIVE_CAMPAIGN_STATES
+     * (+ пустой state) и логируем разбивку отсечённых состояний в канал
+     * marketplace_ads.
      *
      * @param list<array{id: string, title: string, state: string}> $campaigns
      *
@@ -503,7 +512,9 @@ class OzonAdClient implements AdPlatformClientInterface
     ): array {
         $today = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
         $cutoffDate = $today->modify('-'.self::RECENT_DAYS_THRESHOLD.' days');
-        $backfillMode = $dateTo < $cutoffDate;
+        // Решаем по $dateFrom: если хотя бы один день чанка старше cutoff —
+        // нельзя дропать ARCHIVED/INACTIVE, они могли откручиваться тогда.
+        $backfillMode = $dateFrom < $cutoffDate;
 
         if ($backfillMode) {
             $this->marketplaceAdsLogger->info('Campaigns filtered by state', [

@@ -602,6 +602,46 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // j.1) Campaign filter: mixed range (starts >14 days ago, ends today) →
+    //      treated as backfill, ARCHIVED/INACTIVE kept. Guards against dropping
+    //      campaigns that were active in the older part of a long chunk.
+    // -----------------------------------------------------------------
+    public function testFilterCampaignsLongChunkEndingTodayIsBackfillMode(): void
+    {
+        $campaignList = $this->campaignListBodyWithStates([
+            ['id' => '111', 'title' => 'Running',  'state' => 'CAMPAIGN_STATE_RUNNING'],
+            ['id' => '222', 'title' => 'Archived', 'state' => 'CAMPAIGN_STATE_ARCHIVED'],
+            ['id' => '333', 'title' => 'Inactive', 'state' => 'CAMPAIGN_STATE_INACTIVE'],
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-LC'),
+            campaignListBody: $campaignList,
+            statisticsBody: '{"UUID":"uuid-lc"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-lc'),
+            downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        // dateFrom 30 days ago (< cutoff), dateTo today (>> cutoff).
+        // Must behave as backfill: all 3 campaigns kept despite dateTo being recent.
+        $dateFrom = (new \DateTimeImmutable('today'))->modify('-30 days');
+        $dateTo = new \DateTimeImmutable('today');
+
+        $client->fetchAdStatisticsRange(self::COMPANY_ID, $dateFrom, $dateTo);
+
+        $record = $this->findLogRecord('Campaigns filtered by state');
+        self::assertTrue(
+            $record['context']['backfillMode'],
+            'Chunk starting 30 days ago must be backfill even if it ends today',
+        );
+        self::assertSame(3, $record['context']['totalCampaigns']);
+        self::assertSame(3, $record['context']['filteredCampaigns']);
+        self::assertSame([], $record['context']['skippedStates']);
+    }
+
+    // -----------------------------------------------------------------
     // j) Campaign filter: recent range, empty state → campaign preserved.
     // -----------------------------------------------------------------
     public function testFilterCampaignsRecentRangeKeepsEmptyState(): void
