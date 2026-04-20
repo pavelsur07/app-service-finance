@@ -7,8 +7,10 @@ namespace App\Tests\Unit\MarketplaceAds;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonReportDownload;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
@@ -26,6 +28,8 @@ final class OzonAdClientTest extends TestCase
 
     private MarketplaceFacade&MockObject $facade;
 
+    private OzonAdPendingReportRepository&MockObject $pendingReportRepo;
+
     /** @var AbstractLogger&object{records: array<int, array{level: string, message: string, context: array<string, mixed>}>} */
     private LoggerInterface $logger;
 
@@ -35,6 +39,17 @@ final class OzonAdClientTest extends TestCase
         $this->facade->method('getConnectionCredentials')
             ->with(self::COMPANY_ID, MarketplaceType::OZON, MarketplaceConnectionType::PERFORMANCE)
             ->willReturn(['api_key' => self::CLIENT_SECRET, 'client_id' => self::CLIENT_ID]);
+
+        // Stub-репозиторий: персистенс pending-отчётов проверяется отдельными integration-тестами.
+        // Для unit-тестов OzonAdClient достаточно no-op mock'а, чтобы методы create/updateState/
+        // markFinalized не падали при реальном flush().
+        $this->pendingReportRepo = $this->createMock(OzonAdPendingReportRepository::class);
+        $this->pendingReportRepo->method('create')->willReturnCallback(
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+        );
+        $this->pendingReportRepo->method('updateState')->willReturn(1);
+        $this->pendingReportRepo->method('markFinalized')->willReturn(1);
 
         $this->logger = new class extends AbstractLogger {
             /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
@@ -76,7 +91,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $csv,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -122,7 +137,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_dmy.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $resultDmy = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -138,7 +153,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-b2'),
             downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
         );
-        $clientIso = new OzonAdClient($httpIso, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $clientIso = new OzonAdClient($httpIso, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
         $resultIso = $clientIso->fetchAdStatisticsRange(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
@@ -161,7 +176,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_invalid_date.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/не удалось распарсить дату/u');
@@ -184,6 +199,7 @@ final class OzonAdClientTest extends TestCase
             new ArrayAdapter(),
             $this->logger,
             $this->logger,
+            $this->pendingReportRepo,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -207,6 +223,7 @@ final class OzonAdClientTest extends TestCase
             new ArrayAdapter(),
             $this->logger,
             $this->logger,
+            $this->pendingReportRepo,
         );
 
         $this->expectException(\InvalidArgumentException::class);
@@ -249,7 +266,7 @@ final class OzonAdClientTest extends TestCase
         ]);
 
         $http = new MockHttpClient($responses);
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -291,7 +308,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_cyrillic_header.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -320,7 +337,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -358,6 +375,7 @@ final class OzonAdClientTest extends TestCase
             new ArrayAdapter(),
             $this->logger,
             $this->logger,
+            $this->pendingReportRepo,
         );
 
         try {
@@ -401,7 +419,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => 'нет прав'], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -437,7 +455,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -473,7 +491,7 @@ final class OzonAdClientTest extends TestCase
             stateBody: json_encode(['state' => 'ERROR', 'error' => $errorPayload], JSON_THROW_ON_ERROR),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -504,7 +522,7 @@ final class OzonAdClientTest extends TestCase
             new MockResponse('{"error":"invalid campaign id"}', ['http_code' => 400]),
         ]);
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -541,7 +559,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         // Far-past range — guaranteed older than 14 days regardless of run date.
         $dateFrom = (new \DateTimeImmutable('today'))->modify('-60 days');
@@ -581,7 +599,7 @@ final class OzonAdClientTest extends TestCase
         ]);
 
         $http = new MockHttpClient($responses);
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         // Recent range — dateTo is within 14-day window from today.
         $dateFrom = (new \DateTimeImmutable('today'))->modify('-5 days');
@@ -623,7 +641,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         // dateFrom 30 days ago (< cutoff), dateTo today (>> cutoff).
         // Must behave as backfill: all 3 campaigns kept despite dateTo being recent.
@@ -660,7 +678,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $dateFrom = (new \DateTimeImmutable('today'))->modify('-3 days');
         $dateTo = (new \DateTimeImmutable('today'))->modify('-1 day');
@@ -687,7 +705,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $this->loadFixture('ozon_single_day_legacy.csv'),
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $json = $client->fetchAdStatistics(self::COMPANY_ID, new \DateTimeImmutable('2026-03-01'));
 
@@ -727,7 +745,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $zipBytes,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -781,7 +799,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $zipBytes,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -832,7 +850,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $corrupted,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         try {
             $client->fetchAdStatisticsRange(
@@ -860,7 +878,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $csv,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -899,7 +917,7 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $zipBytes,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -925,6 +943,281 @@ final class OzonAdClientTest extends TestCase
         // bronze-хранилище и UI-диагностика работают с исходным файлом.
         self::assertSame(hash('sha256', $zipBytes), $download->sha256);
         self::assertSame(strlen($zipBytes), $download->sizeBytes);
+    }
+
+    // -----------------------------------------------------------------
+    // UUID persistence — create() обязан быть вызван ДО любого pollReport'а
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangePersistsUuidBeforePolling(): void
+    {
+        $csv = $this->loadFixture('ozon_range_iso.csv');
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-P1'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-persist-1"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-persist-1'),
+            downloadCsv: $csv,
+        );
+
+        // $events фиксирует порядок вызовов create() / updateState() / markFinalized():
+        // create() обязан произойти СТРОГО до первого updateState(). Без этого
+        // invariant'а поллинг мог бы начать писать по несуществующему ozon_uuid.
+        /** @var list<string> $events */
+        $events = [];
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->expects(self::once())
+            ->method('create')
+            ->with(
+                self::equalTo(self::COMPANY_ID),
+                self::equalTo('uuid-persist-1'),
+                self::callback(static fn (\DateTimeImmutable $df): bool => '2026-03-01' === $df->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $dt): bool => '2026-03-05' === $dt->format('Y-m-d')),
+                self::equalTo(['111']),
+                self::equalTo('aaaaaaaa-aaaa-aaaa-aaaa-000000000001'),
+            )
+            ->willReturnCallback(
+                static function (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId) use (&$events): OzonAdPendingReport {
+                    $events[] = 'create';
+
+                    return new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId);
+                },
+            );
+        $repo->method('updateState')->willReturnCallback(static function () use (&$events): int {
+            $events[] = 'updateState';
+
+            return 1;
+        });
+        // На успешном pollReport() ожидаем markFinalized(OK).
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(self::COMPANY_ID, 'uuid-persist-1', 'OK', null)
+            ->willReturnCallback(static function () use (&$events): int {
+                $events[] = 'markFinalized';
+
+                return 1;
+            });
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-05'),
+            'aaaaaaaa-aaaa-aaaa-aaaa-000000000001',
+        );
+
+        // Ordering invariant: первая запись в $events — create; все updateState
+        // идут ПОСЛЕ create; markFinalized — самым последним.
+        self::assertNotEmpty($events);
+        self::assertSame('create', $events[0], 'create() обязан быть вызван до первого updateState()');
+        $firstUpdateIdx = array_search('updateState', $events, true);
+        self::assertIsInt($firstUpdateIdx, 'updateState() должен быть вызван хотя бы раз');
+        self::assertGreaterThan(0, $firstUpdateIdx, 'updateState() не может опережать create()');
+        self::assertSame('markFinalized', end($events), 'markFinalized() обязан быть последним вызовом');
+    }
+
+    // -----------------------------------------------------------------
+    // pollReport: КАЖДАЯ итерация вызывает updateState + пишет "Ozon poll iteration"
+    // -----------------------------------------------------------------
+    public function testPollReportLogsAndPersistsStateEveryIteration(): void
+    {
+        // Полная hippy-path цепочка, state=OK на первой итерации — одна updateState(..., 'OK', ...).
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-L1'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-log-1"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-log-1'),
+            downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;10;1;1\n",
+        );
+
+        $updateStateCalls = [];
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->method('create')->willReturnCallback(
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+        );
+        $repo->expects(self::atLeastOnce())
+            ->method('updateState')
+            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$updateStateCalls): int {
+                $updateStateCalls[] = [
+                    'companyId' => $companyId,
+                    'uuid' => $uuid,
+                    'state' => $state,
+                    'attempt' => $attempt,
+                    'firstNonPendingAt' => $firstNonPendingAt,
+                ];
+
+                return 1;
+            });
+        $repo->expects(self::once())->method('markFinalized')->with(self::COMPANY_ID, 'uuid-log-1', 'OK', null);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'aaaaaaaa-aaaa-aaaa-aaaa-000000000002',
+        );
+
+        self::assertCount(1, $updateStateCalls, 'OK на первой итерации → ровно один updateState()');
+        self::assertSame(self::COMPANY_ID, $updateStateCalls[0]['companyId']);
+        self::assertSame('uuid-log-1', $updateStateCalls[0]['uuid']);
+        self::assertSame('OK', $updateStateCalls[0]['state']);
+        self::assertSame(1, $updateStateCalls[0]['attempt']);
+        // state='OK' ≠ 'NOT_STARTED' → firstNonPendingAt должен быть передан (not null).
+        self::assertNotNull($updateStateCalls[0]['firstNonPendingAt']);
+
+        // Проверяем, что "Ozon poll iteration" лог выписан с контекстом.
+        $record = $this->findLogRecord('Ozon poll iteration');
+        self::assertSame('uuid-log-1', $record['context']['reportUuid']);
+        self::assertSame(1, $record['context']['attempt']);
+        self::assertSame('OK', $record['context']['state']);
+    }
+
+    // -----------------------------------------------------------------
+    // pollReport: NOT_STARTED → IN_PROGRESS → OK.
+    // Проверяет:
+    //  • updateState() вызван для каждой из трёх итераций с корректным state/attempt;
+    //  • firstNonPendingAt == null на iter1 (NOT_STARTED), не-null на iter2/iter3;
+    //  • ровно одна finalization (OK) в самом конце.
+    //
+    // pollReport() делает sleep(POLL_INTERVAL_SECONDS=5) между итерациями,
+    // поэтому тест занимает ~10 секунд реального времени. Это сознательный
+    // trade-off: альтернатива — refactor под инжектируемый sleeper, что
+    // ломает сигнатуру и плодит моки.
+    // -----------------------------------------------------------------
+    public function testPollReportCapturesFirstNonPendingAtOnceAcrossIterations(): void
+    {
+        $statePending = json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR);
+        $stateInProgress = json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR);
+        $stateReady = $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-multi');
+
+        $http = new MockHttpClient([
+            new MockResponse($this->tokenBody('TKN-MULTI')),
+            new MockResponse($this->campaignListBody(1)),
+            new MockResponse('{"UUID":"uuid-multi"}'),
+            // Три последовательных GET /statistics/{uuid}: NOT_STARTED → IN_PROGRESS → OK.
+            new MockResponse($statePending),
+            new MockResponse($stateInProgress),
+            new MockResponse($stateReady),
+            // download — однострочный CSV, чтобы не влиять на парсинг.
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        /** @var list<array{companyId: string, uuid: string, state: string, attempt: int, firstNonPendingAt: ?\DateTimeImmutable}> $calls */
+        $calls = [];
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->method('create')->willReturnCallback(
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+        );
+        $repo->expects(self::exactly(3))
+            ->method('updateState')
+            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$calls): int {
+                $calls[] = [
+                    'companyId' => $companyId,
+                    'uuid' => $uuid,
+                    'state' => $state,
+                    'attempt' => $attempt,
+                    'firstNonPendingAt' => $firstNonPendingAt,
+                ];
+
+                return 1;
+            });
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(self::COMPANY_ID, 'uuid-multi', 'OK', null)
+            ->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'aaaaaaaa-aaaa-aaaa-aaaa-000000000004',
+        );
+
+        self::assertCount(3, $calls);
+
+        self::assertSame(self::COMPANY_ID, $calls[0]['companyId']);
+        self::assertSame('uuid-multi', $calls[0]['uuid']);
+        self::assertSame('NOT_STARTED', $calls[0]['state']);
+        self::assertSame(1, $calls[0]['attempt']);
+        self::assertNull($calls[0]['firstNonPendingAt'], 'NOT_STARTED iteration must not capture firstNonPendingAt');
+
+        self::assertSame('IN_PROGRESS', $calls[1]['state']);
+        self::assertSame(2, $calls[1]['attempt']);
+        self::assertNotNull($calls[1]['firstNonPendingAt'], 'IN_PROGRESS iteration must capture firstNonPendingAt');
+
+        self::assertSame('OK', $calls[2]['state']);
+        self::assertSame(3, $calls[2]['attempt']);
+        // OK-итерация тоже передаёт firstNonPendingAt — COALESCE в Repository
+        // обеспечивает, что SQL-level значение не перезапишется (integration-тест
+        // testUpdateStateAdvancesAttemptAndTimestamps проверяет именно этот
+        // COALESCE-инвариант; здесь мы только фиксируем, что клиент передаёт
+        // не-null, чтобы COALESCE имел шанс сработать).
+        self::assertNotNull($calls[2]['firstNonPendingAt']);
+
+        // Каждая итерация пишет "Ozon poll iteration" в info-канал.
+        $iterationLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon poll iteration' === $r['message'],
+        ));
+        self::assertCount(3, $iterationLogs);
+        self::assertSame('NOT_STARTED', $iterationLogs[0]['context']['state']);
+        self::assertSame('IN_PROGRESS', $iterationLogs[1]['context']['state']);
+        self::assertSame('OK', $iterationLogs[2]['context']['state']);
+    }
+
+    // -----------------------------------------------------------------
+    // pollReport: state=ERROR на первой итерации → markFinalized('ERROR', message)
+    // и UUID УЖЕ был сохранён create()'ом
+    // -----------------------------------------------------------------
+    public function testPollReportFinalizesRecordOnFirstIterationError(): void
+    {
+        $http = $this->buildHttpClientForError(
+            tokenBody: $this->tokenBody('TKN-E1'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-first-err"}',
+            stateBody: json_encode(['state' => 'ERROR', 'error' => 'квота'], JSON_THROW_ON_ERROR),
+        );
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->expects(self::once())
+            ->method('create')
+            ->with(self::COMPANY_ID, 'uuid-first-err', self::anything(), self::anything(), self::anything(), self::anything())
+            ->willReturnCallback(
+                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                    => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            );
+        $repo->expects(self::once())
+            ->method('updateState')
+            ->with(self::COMPANY_ID, 'uuid-first-err', 'ERROR', self::anything(), 1, self::anything())
+            ->willReturn(1);
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(
+                self::COMPANY_ID,
+                'uuid-first-err',
+                'ERROR',
+                self::callback(static fn (?string $msg): bool => null !== $msg && str_contains($msg, 'ERROR') && str_contains($msg, 'квота')),
+            )
+            ->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $this->expectException(\RuntimeException::class);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'aaaaaaaa-aaaa-aaaa-aaaa-000000000003',
+        );
     }
 
     // -----------------------------------------------------------------

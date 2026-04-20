@@ -7,7 +7,9 @@ namespace App\MarketplaceAds\Infrastructure\Api\Ozon;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
@@ -89,6 +91,7 @@ class OzonAdClient implements AdPlatformClientInterface
         private readonly LoggerInterface $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
+        private readonly OzonAdPendingReportRepository $pendingReportRepo,
     ) {
     }
 
@@ -141,7 +144,15 @@ class OzonAdClient implements AdPlatformClientInterface
                 $companyId,
                 $clientId,
                 $clientSecret,
-                fn (string $token): string => $this->requestStatistics($token, $campaignIds, $date, $date, 'NO_GROUP_BY'),
+                fn (string $token): string => $this->requestStatistics(
+                    $token,
+                    $companyId,
+                    $campaignIds,
+                    $date,
+                    $date,
+                    'NO_GROUP_BY',
+                    null,
+                ),
             );
 
             $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт', [
@@ -154,7 +165,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 $companyId,
                 $clientId,
                 $clientSecret,
-                fn (string $token): string => $this->pollReport($token, $uuid),
+                fn (string $token): string => $this->pollReport($token, $companyId, $uuid),
             );
 
             $download = $this->withAuthRetry(
@@ -200,6 +211,7 @@ class OzonAdClient implements AdPlatformClientInterface
         string $companyId,
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
+        ?string $jobId = null,
     ): array {
         $this->lastChunkDownloads = [];
 
@@ -254,7 +266,15 @@ class OzonAdClient implements AdPlatformClientInterface
                     $companyId,
                     $clientId,
                     $clientSecret,
-                    fn (string $token): string => $this->requestStatistics($token, $campaignIds, $dateFrom, $dateTo, 'DATE'),
+                    fn (string $token): string => $this->requestStatistics(
+                        $token,
+                        $companyId,
+                        $campaignIds,
+                        $dateFrom,
+                        $dateTo,
+                        'DATE',
+                        $jobId,
+                    ),
                 );
 
                 $this->marketplaceAdsLogger->info('Ozon Performance: запрошен отчёт (range)', [
@@ -267,7 +287,7 @@ class OzonAdClient implements AdPlatformClientInterface
                     $companyId,
                     $clientId,
                     $clientSecret,
-                    fn (string $token): string => $this->pollReport($token, $uuid),
+                    fn (string $token): string => $this->pollReport($token, $companyId, $uuid),
                 );
                 // pollReport не возвращает attempts, чтобы не ломать публичную
                 // сигнатуру — счётчик читаем через $this->lastPollAttempts и
@@ -575,10 +595,12 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private function requestStatistics(
         string $token,
+        string $companyId,
         array $campaignIds,
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
         string $groupBy,
+        ?string $jobId,
     ): string {
         // Caller передаёт DateTimeImmutable в своей TZ (в проде date.timezone=Europe/Moscow).
         // Ozon ждёт google.protobuf.Timestamp (RFC3339 в UTC), поэтому сначала фиксируем
@@ -612,13 +634,25 @@ class OzonAdClient implements AdPlatformClientInterface
             throw new \RuntimeException('Ozon Performance: ответ /statistics не содержит UUID');
         }
 
+        // Persist UUID сразу (persist + flush внутри create()), до любого polling'а —
+        // если следующий шаг упадёт exception'ом / таймаутом / рестартом воркера,
+        // запись останется в БД как видимая точка диагностики и база для resume-логики.
+        $this->pendingReportRepo->create(
+            companyId: $companyId,
+            ozonUuid: $uuid,
+            dateFrom: $dateFrom,
+            dateTo: $dateTo,
+            campaignIds: $campaignIds,
+            jobId: $jobId,
+        );
+
         return $uuid;
     }
 
     /**
      * @return string ссылка на готовый отчёт (CSV)
      */
-    private function pollReport(string $token, string $uuid): string
+    private function pollReport(string $token, string $companyId, string $uuid): string
     {
         $startedAt = microtime(true);
 
@@ -632,6 +666,30 @@ class OzonAdClient implements AdPlatformClientInterface
             $data = $this->decodeJson($response->getContent(false), 'statistics state');
 
             $state = $this->stringifyApiField($data['state'] ?? null);
+            $now = new \DateTimeImmutable();
+            $waitedSeconds = round(microtime(true) - $startedAt, 1);
+
+            $this->marketplaceAdsLogger->info('Ozon poll iteration', [
+                'reportUuid' => $uuid,
+                'attempt' => $attempt,
+                'state' => $state,
+                'waitedSeconds' => $waitedSeconds,
+            ]);
+
+            // firstNonPendingAt фиксируется, как только отчёт сошёл с «NOT_STARTED»:
+            // IN_PROGRESS, OK/READY, ERROR/CANCELLED/NOT_FOUND и любой неизвестный
+            // не-пустой state — все означают, что Ozon начал работать с отчётом.
+            // COALESCE в updateState() защищает от перезаписи уже установленного timestamp.
+            $firstNonPendingAt = ('' !== $state && 'NOT_STARTED' !== $state) ? $now : null;
+            $this->pendingReportRepo->updateState(
+                $companyId,
+                $uuid,
+                $state,
+                $now,
+                $attempt,
+                $firstNonPendingAt,
+            );
+
             if ('OK' === $state || 'READY' === $state) {
                 $link = $this->stringifyApiField($data['link'] ?? $data['report']['link'] ?? null);
                 if ('' === $link) {
@@ -640,28 +698,47 @@ class OzonAdClient implements AdPlatformClientInterface
                     $link = self::STATISTICS_REPORT_PATH.'?UUID='.rawurlencode($uuid);
                 }
 
+                $this->pendingReportRepo->markFinalized($companyId, $uuid, OzonAdPendingReportState::OK);
+
                 $this->marketplaceAdsLogger->info('Ozon Performance: отчёт готов', [
                     'reportUuid' => $uuid,
                     'attempts' => $attempt,
-                    'waitedSeconds' => round(microtime(true) - $startedAt, 1),
+                    'waitedSeconds' => $waitedSeconds,
                 ]);
 
                 return $link;
             }
 
             if ('ERROR' === $state || 'CANCELLED' === $state || 'NOT_FOUND' === $state) {
-                throw new \RuntimeException(sprintf(
+                $errorMessage = sprintf(
                     'Ozon Performance: отчёт %s завершился со статусом %s: %s',
                     $uuid,
                     $state,
                     $this->stringifyApiField($data['error'] ?? null),
-                ));
+                );
+
+                $this->pendingReportRepo->markFinalized(
+                    $companyId,
+                    $uuid,
+                    OzonAdPendingReportState::ERROR,
+                    $errorMessage,
+                );
+
+                throw new \RuntimeException($errorMessage);
             }
 
             sleep(self::POLL_INTERVAL_SECONDS);
         }
 
-        throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s не готов за %d секунд', $uuid, self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS));
+        $timeoutSeconds = self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS;
+        $this->pendingReportRepo->markFinalized(
+            $companyId,
+            $uuid,
+            OzonAdPendingReportState::ABANDONED,
+            sprintf('Polling timeout after %d seconds', $timeoutSeconds),
+        );
+
+        throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s не готов за %d секунд', $uuid, $timeoutSeconds));
     }
 
     /**

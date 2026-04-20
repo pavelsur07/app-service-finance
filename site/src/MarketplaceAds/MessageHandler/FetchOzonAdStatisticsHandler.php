@@ -137,6 +137,7 @@ final class FetchOzonAdStatisticsHandler
                 $message->companyId,
                 $dateFrom,
                 $dateTo,
+                $message->jobId,
             );
         } catch (\InvalidArgumentException $e) {
             // Диапазон > 62 дней или from > to — баг вызывающего кода,
