@@ -145,10 +145,11 @@
                             <th>Статус</th>
                             <th>Загружен</th>
                             <th>Ошибка обработки</th>
+                            <th class="w-1">Действия</th>
                         </tr>
                         </thead>
                         <tbody>
-                        <tr><td colspan="4" class="text-center text-muted">Загрузка…</td></tr>
+                        <tr><td colspan="5" class="text-center text-muted">Загрузка…</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -291,11 +292,19 @@
                     });
             };
 
+            // Шаблон URL reprocess-эндпоинта: заменяем plaсeholder '__ID__' на реальный UUID
+            // в JS. Symfony-path с requirements=[0-9a-fA-F-]{36} отвергнет __ID__ при генерации,
+            // поэтому собираем URL из базового префикса и хвоста вручную.
+            var rawDocsListUrl = '{{ path('marketplace_ads_raw_documents_list') }}';
+            var buildReprocessUrl = function (documentId) {
+                return rawDocsListUrl + '/' + encodeURIComponent(documentId) + '/reprocess';
+            };
+
             var loadRawDocuments = function (dateFrom, dateTo) {
                 var tbody = document.querySelector('#ad-raw-documents-table tbody');
-                tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Загрузка…</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Загрузка…</td></tr>';
 
-                var url = '{{ path('marketplace_ads_raw_documents_list') }}';
+                var url = rawDocsListUrl;
                 if (dateFrom && dateTo) {
                     url += '?dateFrom=' + encodeURIComponent(dateFrom) + '&dateTo=' + encodeURIComponent(dateTo);
                 }
@@ -307,13 +316,13 @@
                     .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
                     .then(function (res) {
                         if (!res.ok) {
-                            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">'
+                            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">'
                                 + escapeHtml((res.data && res.data.message) || 'Ошибка загрузки') + '</td></tr>';
                             return;
                         }
                         var items = (res.data && res.data.items) || [];
                         if (items.length === 0) {
-                            tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">Нет данных</td></tr>';
+                            tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">Нет данных</td></tr>';
                             return;
                         }
                         tbody.innerHTML = items.map(function (doc) {
@@ -322,13 +331,52 @@
                                 + '<td>' + docStatusBadge(doc.status) + '</td>'
                                 + '<td><small>' + escapeHtml(doc.loadedAt) + '</small></td>'
                                 + '<td><small class="text-danger">' + escapeHtml(doc.processingError || '') + '</small></td>'
+                                + '<td><button type="button" class="btn btn-sm btn-outline-primary" data-reprocess-doc="' + escapeHtml(doc.id) + '">'
+                                + 'Переобработать</button></td>'
                                 + '</tr>';
                         }).join('');
                     })
                     .catch(function () {
-                        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Ошибка загрузки</td></tr>';
+                        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Ошибка загрузки</td></tr>';
                     });
             };
+
+            // Делегирование: клик по любой «Переобработать»-кнопке внутри таблицы.
+            // Одно-разовый listener на tbody переживает перерисовки innerHTML.
+            document.querySelector('#ad-raw-documents-table tbody').addEventListener('click', function (e) {
+                var btn = e.target.closest('[data-reprocess-doc]');
+                if (!btn) return;
+                var documentId = btn.getAttribute('data-reprocess-doc');
+                if (!documentId) return;
+
+                btn.disabled = true;
+                var original = btn.innerHTML;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск…';
+
+                fetch(buildReprocessUrl(documentId), {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                })
+                    .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
+                    .then(function (res) {
+                        if (!res.ok) {
+                            window.alert((res.data && res.data.message) || 'Не удалось поставить документ на переобработку.');
+                            btn.disabled = false;
+                            btn.innerHTML = original;
+                            return;
+                        }
+                        // Перезагружаем список, чтобы увидеть статус DRAFT и чистое поле «Ошибка».
+                        var fromEl = document.getElementById('raw-date-from');
+                        var toEl   = document.getElementById('raw-date-to');
+                        loadRawDocuments(fromEl.value, toEl.value);
+                    })
+                    .catch(function () {
+                        window.alert('Сетевая ошибка при постановке документа на переобработку.');
+                        btn.disabled = false;
+                        btn.innerHTML = original;
+                    });
+            });
 
             document.addEventListener('DOMContentLoaded', function () {
                 loadJobs();

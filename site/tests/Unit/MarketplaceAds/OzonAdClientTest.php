@@ -1581,6 +1581,338 @@ final class OzonAdClientTest extends TestCase
         $client->fetchAdStatistics(self::COMPANY_ID, new \DateTimeImmutable('2026-03-01'));
     }
 
+    // -----------------------------------------------------------------
+    // Ozon CSV preamble (апрель 2026): первая строка ";Кампания по продвижению
+    // товаров № X, период ..." + кириллические колонки + footer "Всего;;..."
+    // Проверяем весь pipeline: preamble отрезан, campaign_id из "№", footer
+    // отсечён, локализованные имена колонок подхвачены.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeParsesOzonPreambleFormat(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-PRE'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-pre"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-pre'),
+            downloadCsv: $this->loadFixture('ozon_range_with_preamble.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-18'),
+        );
+
+        self::assertSame(['2026-04-17', '2026-04-18'], array_keys($result), 'Footer "Всего" должен быть отсечён, остаются 2 даты');
+
+        // Campaign_id взят из preamble "№ 14275771", а не из колонки (её нет в этом формате).
+        self::assertCount(1, $result['2026-04-17']['campaigns']);
+        $campaign = $result['2026-04-17']['campaigns'][0];
+        self::assertSame('14275771', $campaign['campaign_id']);
+        self::assertCount(1, $campaign['rows']);
+
+        $row = $campaign['rows'][0];
+        self::assertSame('286085455', $row['sku']);
+        self::assertSame('1152.19', $row['spend'], 'Расход нормализуется из "1152,19" в "1152.19"');
+        self::assertSame(4399, $row['views']);
+        self::assertSame(218, $row['clicks']);
+
+        // Preamble detection лог info должен быть записан.
+        $preambleLog = $this->findLogRecord('Ozon CSV preamble detected');
+        self::assertSame('info', $preambleLog['level']);
+        self::assertSame('14275771', $preambleLog['context']['extractedCampaignId']);
+    }
+
+    // -----------------------------------------------------------------
+    // Backward-compat: CSV без preamble (старый/тестовый формат, заголовок
+    // сразу в первой строке) — ничего не меняется, campaign_id из колонки,
+    // preamble-лог не пишется.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeNoPreamblePreservesLegacyBehaviour(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-NOP'),
+            campaignListBody: $this->campaignListBody(3),
+            statisticsBody: '{"UUID":"uuid-nop"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-nop'),
+            downloadCsv: $this->loadFixture('ozon_range_iso.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-05'),
+        );
+
+        self::assertCount(5, $result);
+        // campaign_id из колонки CSV, не из preamble.
+        $campaign = $this->findCampaign($result['2026-03-01']['campaigns'], '111');
+        self::assertSame('111', $campaign['campaign_id']);
+
+        // Preamble не должен быть задетектирован.
+        foreach ($this->logger->records as $record) {
+            self::assertNotSame('Ozon CSV preamble detected', $record['message'], 'CSV без preamble не должен писать preamble-лог');
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Preamble без маркера "Кампания по продвижению", но начинается с ";"
+    // — распознаётся по layout-признаку (пустая первая ячейка). campaign_id
+    // всё равно извлекается regex'ом "№ N".
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeDetectsPreambleByLeadingDelimiter(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-LEAD'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-lead"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-lead'),
+            downloadCsv: $this->loadFixture('ozon_range_preamble_no_marker.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame(['2026-04-17'], array_keys($result));
+        // Preamble начинается с ";" и распознаётся по layout-признаку, хотя
+        // маркера "Кампания по продвижению" нет — campaign_id извлечён regex'ом "№".
+        $campaign = $result['2026-04-17']['campaigns'][0];
+        self::assertSame('99999', $campaign['campaign_id']);
+        self::assertSame('286085455', $campaign['rows'][0]['sku']);
+        self::assertSame('50.00', $campaign['rows'][0]['spend']);
+        self::assertSame(100, $campaign['rows'][0]['views']);
+        self::assertSame(10, $campaign['rows'][0]['clicks']);
+
+        // Preamble-лог должен быть записан (детект сработал по лидирующему ';').
+        $preambleLog = $this->findLogRecord('Ozon CSV preamble detected');
+        self::assertSame('99999', $preambleLog['context']['extractedCampaignId']);
+    }
+
+    // -----------------------------------------------------------------
+    // Footer "Всего;;..." без preamble: legacy-CSV с нормальным заголовком,
+    // но вдруг появилась финальная строка-агрегат — должна быть отсечена
+    // isFooterOrEmptyRow(), а не попасть в rows.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeFiltersFooterRowEvenWithoutPreamble(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-FOOT'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-foot"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-foot'),
+            downloadCsv: $this->loadFixture('ozon_range_footer_no_preamble.csv'),
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-02'),
+        );
+
+        // Только 2 даты (2026-03-01 и 2026-03-02) — footer "Всего;;..."
+        // попадает под isFooterOrEmptyRow (sku пустой), не создаёт bucket "всего".
+        self::assertSame(['2026-03-01', '2026-03-02'], array_keys($result));
+        foreach ($result as $date => $bucket) {
+            self::assertCount(1, $bucket['campaigns'], "Bucket $date: footer не должен добавлять лишних кампаний");
+        }
+    }
+
+    // -----------------------------------------------------------------
+    // Multi-file ZIP, где каждый CSV имеет СВОЙ preamble (новый Ozon-формат,
+    // апрель 2026): один batch /statistics на несколько кампаний → Ozon
+    // возвращает ZIP, по одному CSV на кампанию, у каждого своя строка
+    // «;Кампания по продвижению № N, период …».
+    //
+    // Регрессия: до фикса extractCsvFromZip стрипал из частей 2+ только
+    // одну строку (предположение: это header-дубликат). В preamble-формате
+    // этой одной строкой оказывался preamble, а header второй части
+    // попадал в data-поток, и parseDateField('День') бросал RuntimeException
+    // на range-загрузках. Плюс campaign_id всех строк из частей 2+
+    // приписывался единственному распознанному preamble'у (первой части) —
+    // silent data corruption для multi-campaign ZIP.
+    //
+    // После фикса: парсер обходит csvParts по одному, каждому со своим
+    // stripPreamble → строки каждой кампании получают СВОЙ campaign_id.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeMultiCampaignZipWithPreamblePerPart(): void
+    {
+        $csvPart1 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;100;10;25,00\n";
+        $csvPart2 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 222, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;222001;Товар B;200;20;50,00\n";
+
+        $zipBytes = $this->buildZipBytes([
+            'campaign-111.csv' => $csvPart1,
+            'campaign-222.csv' => $csvPart2,
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-MULTIPRE'),
+            campaignListBody: $this->campaignListBody(2), // 111, 222
+            statisticsBody: '{"UUID":"uuid-multi-preamble"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-multi-preamble'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame(['2026-04-17'], array_keys($result));
+        self::assertCount(2, $result['2026-04-17']['campaigns'], 'В ZIP 2 кампании — обе должны попасть в результат.');
+
+        $byId = [];
+        foreach ($result['2026-04-17']['campaigns'] as $campaign) {
+            $byId[$campaign['campaign_id']] = $campaign;
+        }
+
+        self::assertArrayHasKey('111', $byId);
+        self::assertArrayHasKey('222', $byId);
+
+        // Критично: sku из CSV-части 2 имеет campaign_id='222' (из СВОЕГО preamble),
+        // а не '111' (который мы бы получили при single-pass парсинге merged CSV).
+        self::assertCount(1, $byId['111']['rows']);
+        self::assertSame('111001', $byId['111']['rows'][0]['sku']);
+        self::assertSame('Campaign A', $byId['111']['campaign_name']);
+        self::assertSame('25.00', $byId['111']['rows'][0]['spend']);
+
+        self::assertCount(1, $byId['222']['rows']);
+        self::assertSame('222001', $byId['222']['rows'][0]['sku']);
+        self::assertSame('Campaign B', $byId['222']['campaign_name']);
+        self::assertSame('50.00', $byId['222']['rows'][0]['spend']);
+
+        // Preamble-лог должен встретиться по одному разу на КАЖДЫЙ CSV,
+        // а не один раз на весь merged-контент.
+        $preambleLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon CSV preamble detected' === $r['message'],
+        ));
+        self::assertCount(2, $preambleLogs, 'Per-part parsing: preamble должен быть задетектирован у каждого CSV.');
+        $extractedIds = array_map(
+            static fn (array $r): string => (string) ($r['context']['extractedCampaignId'] ?? ''),
+            $preambleLogs,
+        );
+        sort($extractedIds);
+        self::assertSame(['111', '222'], $extractedIds);
+    }
+
+    // -----------------------------------------------------------------
+    // ZIP, в двух частях которого совпадает (date, campaignId) — это
+    // ошибка данных Ozon (одна кампания не может прийти двумя отдельными
+    // CSV за тот же день). Парсер НЕ должен ни падать, ни складывать
+    // spend дубликата — берёт первое появление и логирует warning.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeDuplicateDateCampaignAcrossZipParts(): void
+    {
+        // Обе части — preamble № 111, sku 111001 за 17.04.2026, разные spend.
+        // Ожидаем, что победит первая: spend=25.00 (не 99.00 и не сумма 124.00).
+        $csvPart1 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;100;10;25,00\n";
+        $csvPart2 = "\xEF\xBB\xBF;Кампания по продвижению товаров № 111, период 17.04.2026-17.04.2026\n"
+            ."День;sku;Название товара;Показы;Клики;Расход, ₽, с НДС\n"
+            ."17.04.2026;111001;Товар A;200;20;99,00\n";
+
+        $zipBytes = $this->buildZipBytes([
+            'campaign-111-a.csv' => $csvPart1,
+            'campaign-111-b.csv' => $csvPart2,
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-DUP'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-dup"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-dup'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame(['2026-04-17'], array_keys($result));
+        self::assertCount(1, $result['2026-04-17']['campaigns']);
+        self::assertSame('111', $result['2026-04-17']['campaigns'][0]['campaign_id']);
+        self::assertCount(1, $result['2026-04-17']['campaigns'][0]['rows']);
+        // Первое появление (25,00), а не второе (99,00) и не сумма.
+        self::assertSame('25.00', $result['2026-04-17']['campaigns'][0]['rows'][0]['spend']);
+
+        $dupLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon CSV: duplicate (date, campaignId) across ZIP parts' === $r['message'],
+        ));
+        self::assertCount(1, $dupLogs, 'Warning о дубликате должен быть записан ровно один раз на пару.');
+        self::assertSame('2026-04-17', $dupLogs[0]['context']['date']);
+        self::assertSame('111', $dupLogs[0]['context']['campaign_id']);
+        self::assertSame(0, $dupLogs[0]['context']['first_part_index']);
+        self::assertSame(1, $dupLogs[0]['context']['duplicate_part_index']);
+    }
+
+    // -----------------------------------------------------------------
+    // ZIP с нулём .csv-файлов (только manifest.json) — штатный сценарий
+    // для диапазонов без показов. Парсер возвращает пустой result,
+    // warning 'Ozon ZIP contains no CSV files' пишется в лог.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeZipWithNoCsvFilesLogsWarningAndReturnsEmpty(): void
+    {
+        $zipBytes = $this->buildZipBytes([
+            'manifest.json' => '{"files":[]}',
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-EMPTY'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-empty-zip"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-empty-zip'),
+            downloadCsv: $zipBytes,
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        // Не должно бросать — ZIP без CSV — штатный «пустой день».
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-17'),
+            new \DateTimeImmutable('2026-04-17'),
+        );
+
+        self::assertSame([], $result, 'ZIP без CSV → пустой набор дат.');
+
+        $warning = $this->findLogRecord('Ozon ZIP contains no CSV files');
+        self::assertSame('warning', $warning['level']);
+        self::assertSame('uuid-empty-zip', $warning['context']['report_uuid']);
+        self::assertSame(1, $warning['context']['files_in_zip'], 'Счётчик должен включать не-CSV файлы (manifest.json).');
+
+        // Загрузка bronze-слоя не падает и сохраняет ZIP целиком.
+        $downloads = $client->getLastChunkDownloads();
+        self::assertCount(1, $downloads);
+        self::assertTrue($downloads[0]->wasZip);
+        self::assertSame([], $downloads[0]->csvParts);
+        self::assertSame('', $downloads[0]->csvContent);
+        self::assertSame($zipBytes, $downloads[0]->rawBytes);
+    }
+
     /**
      * Создаёт OzonAdPendingReport с произвольным requestedAt через reflection.
      * Нужно для тестов resume-ветки: Entity в конструкторе жёстко ставит
