@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Query;
 
+use App\Marketplace\Enum\AmountSource;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -37,21 +39,26 @@ final class UnprocessedSalesQuery
         string $periodFrom,
         string $periodTo,
     ): array {
-        $sql = <<<'SQL'
+        $marketplaceEnum = MarketplaceType::from($marketplace);
+        $saleGrossExpr = AmountSource::SALE_GROSS->getSqlExpression($marketplaceEnum);
+
+        $amountCase = <<<SQL
+            CASE m.amount_source
+                WHEN 'sale_gross'      THEN $saleGrossExpr
+                WHEN 'sale_revenue'    THEN s.total_revenue
+                WHEN 'sale_cost_price' THEN COALESCE(s.cost_price, 0) * s.quantity
+                ELSE 0
+            END
+        SQL;
+
+        $sql = <<<SQL
             SELECT
                 m.pl_category_id,
                 m.project_direction_id,
                 m.is_negative,
                 m.description_template,
                 m.sort_order,
-                SUM(
-                    CASE m.amount_source
-                        WHEN 'sale_gross'      THEN s.price_per_unit * s.quantity
-                        WHEN 'sale_revenue'    THEN s.total_revenue
-                        WHEN 'sale_cost_price' THEN COALESCE(s.cost_price, 0) * s.quantity
-                        ELSE 0
-                    END
-                ) AS total_amount
+                SUM($amountCase) AS total_amount
             FROM marketplace_sales s
             INNER JOIN marketplace_sale_mappings m
                 ON m.company_id = s.company_id
@@ -69,14 +76,7 @@ final class UnprocessedSalesQuery
                 m.is_negative,
                 m.description_template,
                 m.sort_order
-            HAVING SUM(
-                CASE m.amount_source
-                    WHEN 'sale_gross'      THEN s.price_per_unit * s.quantity
-                    WHEN 'sale_revenue'    THEN s.total_revenue
-                    WHEN 'sale_cost_price' THEN COALESCE(s.cost_price, 0) * s.quantity
-                    ELSE 0
-                END
-            ) != 0
+            HAVING SUM($amountCase) != 0
             ORDER BY m.sort_order ASC
         SQL;
 
