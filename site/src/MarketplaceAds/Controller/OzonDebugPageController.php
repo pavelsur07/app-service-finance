@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller;
 
+use App\Company\Facade\CompanyFacade;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
-use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
@@ -17,7 +17,7 @@ final class OzonDebugPageController extends AbstractController
 {
     public function __construct(
         private readonly ActiveOzonPerformanceConnectionsQuery $connectionsQuery,
-        private readonly Connection $connection,
+        private readonly CompanyFacade $companyFacade,
     ) {
     }
 
@@ -25,20 +25,9 @@ final class OzonDebugPageController extends AbstractController
     {
         $companyIds = $this->connectionsQuery->getCompanyIds();
 
-        $companies = [];
-        if ([] !== $companyIds) {
-            $rows = $this->connection->fetchAllAssociative(
-                'SELECT id::text AS id, name FROM company WHERE id IN (:ids) ORDER BY name ASC',
-                ['ids' => $companyIds],
-                ['ids' => Connection::PARAM_STR_ARRAY],
-            );
-            foreach ($rows as $row) {
-                $companies[] = [
-                    'id' => (string) $row['id'],
-                    'name' => (string) $row['name'],
-                ];
-            }
-        }
+        $companies = [] === $companyIds
+            ? []
+            : $this->companyFacade->getCompaniesByIds($companyIds);
 
         return $this->render('marketplace_ads/admin_debug.html.twig', [
             'companies' => $companies,

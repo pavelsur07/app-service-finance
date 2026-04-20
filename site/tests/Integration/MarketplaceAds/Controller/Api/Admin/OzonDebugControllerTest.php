@@ -53,8 +53,10 @@ final class OzonDebugControllerTest extends WebTestCaseBase
         self::assertSame(self::COMPANY_ID, $data['companyId']);
         self::assertStringStartsWith('ACCESS-TOKEN-123456', $data['access_token_prefix']);
         self::assertLessThanOrEqual(23, strlen($data['access_token_prefix']));
+        self::assertStringNotContainsString('78901234567890', $data['access_token_prefix']);
         self::assertSame(1800, $data['expires_in']);
         self::assertSame(200, $data['ozon_raw_response_status']);
+        self::assertSame('***REDACTED***', $data['ozon_raw_body']['access_token']);
     }
 
     public function testTokenRequires403WithoutSuperAdmin(): void

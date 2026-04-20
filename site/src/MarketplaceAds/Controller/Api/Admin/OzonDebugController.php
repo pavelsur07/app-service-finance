@@ -61,7 +61,18 @@ final class OzonDebugController extends AbstractController
         }
 
         $token = $result['access_token'];
-        $tokenPrefix = '' === $token ? '' : mb_substr($token, 0, 20).'...';
+        if ('' === $token) {
+            $tokenPrefix = '';
+        } elseif (mb_strlen($token) > 20) {
+            $tokenPrefix = mb_substr($token, 0, 20).'...';
+        } else {
+            $tokenPrefix = $token;
+        }
+
+        $rawBody = $result['ozon_raw_body'];
+        if (array_key_exists('access_token', $rawBody)) {
+            $rawBody['access_token'] = '***REDACTED***';
+        }
 
         return $this->json([
             'companyId' => $companyId,
@@ -69,7 +80,7 @@ final class OzonDebugController extends AbstractController
             'expires_in' => $result['expires_in'],
             'issued_at' => $result['issued_at'],
             'ozon_raw_response_status' => $result['ozon_raw_response_status'],
-            'ozon_raw_body' => $result['ozon_raw_body'],
+            'ozon_raw_body' => $rawBody,
         ]);
     }
 
