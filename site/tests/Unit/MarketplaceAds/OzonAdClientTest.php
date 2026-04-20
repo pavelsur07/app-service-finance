@@ -520,6 +520,160 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // h) Campaign filter: old range (dateTo > 14 days ago) — keep all campaigns
+    //    including ARCHIVED / INACTIVE (backfill). Log marked backfillMode=true.
+    // -----------------------------------------------------------------
+    public function testFilterCampaignsBackfillModeKeepsAllCampaigns(): void
+    {
+        $campaignList = $this->campaignListBodyWithStates([
+            ['id' => '111', 'title' => 'Running',  'state' => 'CAMPAIGN_STATE_RUNNING'],
+            ['id' => '222', 'title' => 'Archived', 'state' => 'CAMPAIGN_STATE_ARCHIVED'],
+            ['id' => '333', 'title' => 'Inactive', 'state' => 'CAMPAIGN_STATE_INACTIVE'],
+            ['id' => '444', 'title' => 'NoState',  'state' => ''],
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-BF'),
+            campaignListBody: $campaignList,
+            statisticsBody: '{"UUID":"uuid-bf"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-bf'),
+            downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        // Far-past range — guaranteed older than 14 days regardless of run date.
+        $dateFrom = (new \DateTimeImmutable('today'))->modify('-60 days');
+        $dateTo = (new \DateTimeImmutable('today'))->modify('-30 days');
+
+        $client->fetchAdStatisticsRange(self::COMPANY_ID, $dateFrom, $dateTo);
+
+        $record = $this->findLogRecord('Campaigns filtered by state');
+        self::assertSame('info', $record['level']);
+        self::assertSame(4, $record['context']['totalCampaigns']);
+        self::assertSame(4, $record['context']['filteredCampaigns']);
+        self::assertSame([], $record['context']['skippedStates']);
+        self::assertTrue($record['context']['backfillMode']);
+    }
+
+    // -----------------------------------------------------------------
+    // i) Campaign filter: recent range (dateTo within 14 days) — drop
+    //    ARCHIVED / INACTIVE, keep RUNNING / PLANNED / STOPPED.
+    // -----------------------------------------------------------------
+    public function testFilterCampaignsRecentRangeKeepsOnlyActiveStates(): void
+    {
+        $campaignList = $this->campaignListBodyWithStates([
+            ['id' => '111', 'title' => 'Running',  'state' => 'CAMPAIGN_STATE_RUNNING'],
+            ['id' => '222', 'title' => 'Planned',  'state' => 'CAMPAIGN_STATE_PLANNED'],
+            ['id' => '333', 'title' => 'Stopped',  'state' => 'CAMPAIGN_STATE_STOPPED'],
+            ['id' => '444', 'title' => 'Archived', 'state' => 'CAMPAIGN_STATE_ARCHIVED'],
+            ['id' => '555', 'title' => 'Inactive', 'state' => 'CAMPAIGN_STATE_INACTIVE'],
+        ]);
+
+        $requests = [];
+        $responses = $this->scriptedResponsesWithRecording($requests, [
+            new MockResponse($this->tokenBody('TKN-R')),
+            new MockResponse($campaignList),
+            new MockResponse('{"UUID":"uuid-r"}'),
+            new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-r')),
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n"),
+        ]);
+
+        $http = new MockHttpClient($responses);
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        // Recent range — dateTo is within 14-day window from today.
+        $dateFrom = (new \DateTimeImmutable('today'))->modify('-5 days');
+        $dateTo = (new \DateTimeImmutable('today'))->modify('-1 day');
+
+        $client->fetchAdStatisticsRange(self::COMPANY_ID, $dateFrom, $dateTo);
+
+        $record = $this->findLogRecord('Campaigns filtered by state');
+        self::assertSame(5, $record['context']['totalCampaigns']);
+        self::assertSame(3, $record['context']['filteredCampaigns']);
+        self::assertFalse($record['context']['backfillMode']);
+        self::assertSame(
+            ['CAMPAIGN_STATE_ARCHIVED' => 1, 'CAMPAIGN_STATE_INACTIVE' => 1],
+            $record['context']['skippedStates'],
+        );
+
+        // Exactly 5 HTTP requests (one stats batch of 3 filtered campaigns).
+        self::assertCount(5, $requests, 'Expected 5 HTTP requests: token, /campaign, /statistics, /state, /download');
+    }
+
+    // -----------------------------------------------------------------
+    // j.1) Campaign filter: mixed range (starts >14 days ago, ends today) →
+    //      treated as backfill, ARCHIVED/INACTIVE kept. Guards against dropping
+    //      campaigns that were active in the older part of a long chunk.
+    // -----------------------------------------------------------------
+    public function testFilterCampaignsLongChunkEndingTodayIsBackfillMode(): void
+    {
+        $campaignList = $this->campaignListBodyWithStates([
+            ['id' => '111', 'title' => 'Running',  'state' => 'CAMPAIGN_STATE_RUNNING'],
+            ['id' => '222', 'title' => 'Archived', 'state' => 'CAMPAIGN_STATE_ARCHIVED'],
+            ['id' => '333', 'title' => 'Inactive', 'state' => 'CAMPAIGN_STATE_INACTIVE'],
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-LC'),
+            campaignListBody: $campaignList,
+            statisticsBody: '{"UUID":"uuid-lc"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-lc'),
+            downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        // dateFrom 30 days ago (< cutoff), dateTo today (>> cutoff).
+        // Must behave as backfill: all 3 campaigns kept despite dateTo being recent.
+        $dateFrom = (new \DateTimeImmutable('today'))->modify('-30 days');
+        $dateTo = new \DateTimeImmutable('today');
+
+        $client->fetchAdStatisticsRange(self::COMPANY_ID, $dateFrom, $dateTo);
+
+        $record = $this->findLogRecord('Campaigns filtered by state');
+        self::assertTrue(
+            $record['context']['backfillMode'],
+            'Chunk starting 30 days ago must be backfill even if it ends today',
+        );
+        self::assertSame(3, $record['context']['totalCampaigns']);
+        self::assertSame(3, $record['context']['filteredCampaigns']);
+        self::assertSame([], $record['context']['skippedStates']);
+    }
+
+    // -----------------------------------------------------------------
+    // j) Campaign filter: recent range, empty state → campaign preserved.
+    // -----------------------------------------------------------------
+    public function testFilterCampaignsRecentRangeKeepsEmptyState(): void
+    {
+        $campaignList = $this->campaignListBodyWithStates([
+            ['id' => '111', 'title' => 'NoState',  'state' => ''],
+            ['id' => '222', 'title' => 'Archived', 'state' => 'CAMPAIGN_STATE_ARCHIVED'],
+        ]);
+
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-E'),
+            campaignListBody: $campaignList,
+            statisticsBody: '{"UUID":"uuid-e"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-e'),
+            downloadCsv: "date;campaign_id;campaign_name;sku;spend;views;clicks\n",
+        );
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger);
+
+        $dateFrom = (new \DateTimeImmutable('today'))->modify('-3 days');
+        $dateTo = (new \DateTimeImmutable('today'))->modify('-1 day');
+
+        $client->fetchAdStatisticsRange(self::COMPANY_ID, $dateFrom, $dateTo);
+
+        $record = $this->findLogRecord('Campaigns filtered by state');
+        self::assertFalse($record['context']['backfillMode']);
+        self::assertSame(2, $record['context']['totalCampaigns']);
+        self::assertSame(1, $record['context']['filteredCampaigns']);
+        self::assertSame(['CAMPAIGN_STATE_ARCHIVED' => 1], $record['context']['skippedStates']);
+    }
+
+    // -----------------------------------------------------------------
     // g) Backward-compat: fetchAdStatistics($companyId, $date) still works
     // -----------------------------------------------------------------
     public function testFetchAdStatisticsLegacyContractRemainsStable(): void
@@ -605,6 +759,27 @@ final class OzonAdClientTest extends TestCase
                 'id' => $id,
                 'title' => 'Campaign '.chr(64 + $i),
                 'advObjectType' => 'SKU',
+            ];
+        }
+
+        return json_encode(['list' => $list], JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * /campaign list with explicit state per campaign (covers the client-side
+     * filter by state).
+     *
+     * @param list<array{id: string, title: string, state: string}> $campaigns
+     */
+    private function campaignListBodyWithStates(array $campaigns): string
+    {
+        $list = [];
+        foreach ($campaigns as $c) {
+            $list[] = [
+                'id' => $c['id'],
+                'title' => $c['title'],
+                'advObjectType' => 'SKU',
+                'state' => $c['state'],
             ];
         }
 

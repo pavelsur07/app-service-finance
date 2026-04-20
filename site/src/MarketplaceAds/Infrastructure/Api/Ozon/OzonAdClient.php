@@ -51,6 +51,18 @@ class OzonAdClient implements AdPlatformClientInterface
     private const POLL_INTERVAL_SECONDS = 5;
     private const CACHE_KEY_TOKEN_PREFIX = 'ozon_perf_token_';
 
+    // Для «свежих» диапазонов (dateFrom в пределах этого окна от сегодня) отсекаем
+    // явно неактивные кампании на клиенте, чтобы не спрашивать у Ozon статистику
+    // по архивам. Для backfill-а более старых периодов (или длинных чанков,
+    // которые начинаются до cutoff) фильтр не применяется — архивная сегодня
+    // кампания могла откручиваться тогда.
+    private const RECENT_DAYS_THRESHOLD = 14;
+    private const ACTIVE_CAMPAIGN_STATES = [
+        'CAMPAIGN_STATE_RUNNING',
+        'CAMPAIGN_STATE_PLANNED',
+        'CAMPAIGN_STATE_STOPPED',
+    ];
+
     /**
      * Счётчик итераций последнего pollReport() — используется инструментированием
      * fetchAdStatisticsRange(), чтобы не ломать публичную сигнатуру pollReport
@@ -100,6 +112,8 @@ class OzonAdClient implements AdPlatformClientInterface
             'companyId' => $companyId,
             'count' => count($campaigns),
         ]);
+
+        $campaigns = $this->filterCampaignsForDateRange($campaigns, $date);
 
         if ([] === $campaigns) {
             return '{"rows": []}';
@@ -197,12 +211,19 @@ class OzonAdClient implements AdPlatformClientInterface
                 $clientSecret,
                 fn (string $token): array => $this->listSkuCampaigns($token),
             );
-            $campaignsCount = count($campaigns);
 
             $this->marketplaceAdsLogger->info('Ozon Performance: получен список SKU-кампаний (range)', [
                 'companyId' => $companyId,
-                'count' => $campaignsCount,
+                'count' => count($campaigns),
             ]);
+
+            $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom);
+            // $campaignsCount отражает число кампаний, которые реально пойдут в
+            // /statistics (после клиентского фильтра по state) — итоговый
+            // summary-лог должен показывать фактическую работу, а не размер
+            // списка из Ozon. Детализация «до/после» уже есть в
+            // `Campaigns filtered by state`.
+            $campaignsCount = count($campaigns);
 
             /** @var array<string, array<string, array{campaign_id: string, campaign_name: string, rows: list<array{sku: string, spend: string, views: int, clicks: int}>}>> $byDate */
             $byDate = [];
@@ -328,7 +349,7 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * @param list<array{id: string, title: string}> $batch
+     * @param list<array{id: string, title: string, state: string}> $batch
      *
      * @return array{0: list<string>, 1: array<string, string>}
      */
@@ -425,13 +446,13 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * Возвращает все SKU-кампании компании — включая остановленные, архивные
-     * и неактивные. Фильтр по state = RUNNING специально снят: для backfill-а
-     * за прошедшую дату нужны и кампании, которые сегодня уже остановлены,
-     * но вчера откручивались. Кампании без активности на $date просто вернут
-     * пустые строки из /statistics и отфильтруются дальше.
+     * Возвращает все SKU-кампании компании вместе с их state. Фильтр по state
+     * на уровне query-параметра GET /api/client/campaign не передаётся —
+     * Ozon API может тихо проигнорировать неподдерживаемый параметр. Отсев
+     * архивных/неактивных кампаний выполняется на клиенте через
+     * {@see self::filterCampaignsForDateRange()} только для «свежих» диапазонов.
      *
-     * @return list<array{id: string, title: string}>
+     * @return list<array{id: string, title: string, state: string}>
      */
     private function listSkuCampaigns(string $token): array
     {
@@ -461,10 +482,69 @@ class OzonAdClient implements AdPlatformClientInterface
             $result[] = [
                 'id' => $id,
                 'title' => (string) ($campaign['title'] ?? $campaign['name'] ?? ''),
+                'state' => (string) ($campaign['state'] ?? ''),
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Клиентский фильтр кампаний по state для «свежих» диапазонов.
+     *
+     * backfillMode определяется по $dateFrom: если начало диапазона старше
+     * RECENT_DAYS_THRESHOLD дней, весь чанк считаем backfill-ом и возвращаем
+     * кампании без изменений — иначе при длинных чанках (до 62 дней),
+     * заканчивающихся сегодня, мы бы дропнули рекламу, которая была активна
+     * в начале диапазона, а сегодня уже в ARCHIVED. Для недавних диапазонов
+     * (оба конца в пределах 14 дней) оставляем только ACTIVE_CAMPAIGN_STATES
+     * (+ пустой state) и логируем разбивку отсечённых состояний в канал
+     * marketplace_ads.
+     *
+     * @param list<array{id: string, title: string, state: string}> $campaigns
+     *
+     * @return list<array{id: string, title: string, state: string}>
+     */
+    private function filterCampaignsForDateRange(
+        array $campaigns,
+        \DateTimeImmutable $dateFrom,
+    ): array {
+        $today = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
+        $cutoffDate = $today->modify('-'.self::RECENT_DAYS_THRESHOLD.' days');
+        // Решаем по $dateFrom: если хотя бы один день чанка старше cutoff —
+        // нельзя дропать ARCHIVED/INACTIVE, они могли откручиваться тогда.
+        $backfillMode = $dateFrom < $cutoffDate;
+
+        if ($backfillMode) {
+            $this->marketplaceAdsLogger->info('Campaigns filtered by state', [
+                'totalCampaigns' => count($campaigns),
+                'filteredCampaigns' => count($campaigns),
+                'skippedStates' => [],
+                'backfillMode' => true,
+            ]);
+
+            return $campaigns;
+        }
+
+        $filtered = [];
+        $skippedStates = [];
+        foreach ($campaigns as $campaign) {
+            $state = $campaign['state'];
+            if ('' === $state || in_array($state, self::ACTIVE_CAMPAIGN_STATES, true)) {
+                $filtered[] = $campaign;
+                continue;
+            }
+            $skippedStates[$state] = ($skippedStates[$state] ?? 0) + 1;
+        }
+
+        $this->marketplaceAdsLogger->info('Campaigns filtered by state', [
+            'totalCampaigns' => count($campaigns),
+            'filteredCampaigns' => count($filtered),
+            'skippedStates' => $skippedStates,
+            'backfillMode' => false,
+        ]);
+
+        return $filtered;
     }
 
     /**
