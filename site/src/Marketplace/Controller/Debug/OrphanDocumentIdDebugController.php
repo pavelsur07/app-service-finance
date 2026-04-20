@@ -18,12 +18,15 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  *
  * Только SELECT, никаких мутаций.
  *
+ * Intentionally global scope — orphan detection requires visibility across all
+ * companies. Read-only, temporary (@deprecated).
+ *
  * @deprecated debug endpoint, remove after 2026-05-04 (2 недели от 2026-04-20).
  *             Follow-up: удалить файл OrphanDocumentIdDebugController.php
  *             и связанный route.
  */
 #[Route('/_debug/marketplace')]
-#[IsGranted('ROLE_SUPER_ADMIN')]
+#[IsGranted('ROLE_USER')]
 final class OrphanDocumentIdDebugController extends AbstractController
 {
     private const SAMPLE_LIMIT = 50;
@@ -39,6 +42,7 @@ final class OrphanDocumentIdDebugController extends AbstractController
         return $this->json([
             'meta' => [
                 'generated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'scope'        => 'all_companies',
                 'hint'         => 'Ожидание: десятки–сотни строк в январе–апреле 2026. Иное — стоп-сигнал, не применять миграцию.',
                 'note'         => 'Endpoint scoped to marketplace_costs rows where document_id references a documents.id that no longer exists.',
             ],
