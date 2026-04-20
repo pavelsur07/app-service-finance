@@ -18,6 +18,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\UnprocessedCostsQuery;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
+use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 
@@ -43,6 +44,7 @@ final class CloseMonthStageAction
         private readonly MarketplaceConnectionRepository    $connectionRepository,
         private readonly FinanceFacade                      $financeFacade,
         private readonly UnprocessedCostsQuery              $unprocessedCostsQuery,
+        private readonly EntityManagerInterface             $entityManager,
         private readonly LoggerInterface                    $logger,
         private readonly iterable                           $dataSources,
     ) {
@@ -53,6 +55,21 @@ final class CloseMonthStageAction
      * @throws \DomainException если preflight не пройден
      */
     public function __invoke(CloseMonthStageCommand $command): array
+    {
+        // Оборачиваем весь pipeline в одну Doctrine-транзакцию:
+        // save PLDocument (ORM), PLRegister-пересчёт (тот же EM),
+        // MarkProcessedQuery::markCosts (DBAL Connection того же EM).
+        // При любом throw — автоматический rollback, ничего не коммитится,
+        // ретраи Messenger стартуют с чистого состояния БД.
+        return $this->entityManager->wrapInTransaction(function () use ($command): array {
+            return $this->doInvoke($command);
+        });
+    }
+
+    /**
+     * @return array{monthCloseId: string, plDocumentIds: string[], preflightResult: PreflightResult}
+     */
+    private function doInvoke(CloseMonthStageCommand $command): array
     {
         $stage       = CloseStage::from($command->stage);
         $marketplace = MarketplaceType::from($command->marketplace);
@@ -207,9 +224,11 @@ final class CloseMonthStageAction
                 $delta = abs((float) $controlSumBefore - (float) $plDocumentSum);
 
                 if ($delta > 0.01) {
-                    // Критическая ошибка — откатываем через удаление документа
-                    $this->financeFacade->deletePLDocument($command->companyId, $documentId);
-
+                    // Контрольная сумма не сошлась — бросаем исключение, внешний
+                    // wrapInTransaction откатит создание PLDocument и UPDATE
+                    // marketplace_costs.document_id (ручной deletePLDocument
+                    // больше не нужен — раньше он оставлял висящий document_id,
+                    // т.к. DELETE коммитился отдельно от UPDATE).
                     throw new \RuntimeException(sprintf(
                         '[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.',
                         $controlSumBefore,
