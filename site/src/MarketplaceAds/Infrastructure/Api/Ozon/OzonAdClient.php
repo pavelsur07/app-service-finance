@@ -113,7 +113,7 @@ class OzonAdClient implements AdPlatformClientInterface
             'count' => count($campaigns),
         ]);
 
-        $campaigns = $this->filterCampaignsForDateRange($campaigns, $date, $date);
+        $campaigns = $this->filterCampaignsForDateRange($campaigns, $date);
 
         if ([] === $campaigns) {
             return '{"rows": []}';
@@ -217,7 +217,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 'count' => count($campaigns),
             ]);
 
-            $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom, $dateTo);
+            $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom);
             // $campaignsCount отражает число кампаний, которые реально пойдут в
             // /statistics (после клиентского фильтра по state) — итоговый
             // summary-лог должен показывать фактическую работу, а не размер
@@ -508,7 +508,6 @@ class OzonAdClient implements AdPlatformClientInterface
     private function filterCampaignsForDateRange(
         array $campaigns,
         \DateTimeImmutable $dateFrom,
-        \DateTimeImmutable $dateTo,
     ): array {
         $today = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
         $cutoffDate = $today->modify('-'.self::RECENT_DAYS_THRESHOLD.' days');
