@@ -49,7 +49,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
         // Сразу читаем из БД без em->flush() — create() обязан flush'ить сам.
         $this->em->clear();
-        $found = $this->repository->findByOzonUuid('uuid-create-1');
+        $found = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-create-1');
 
         self::assertInstanceOf(OzonAdPendingReport::class, $found);
         self::assertSame(self::COMPANY_ID, $found->getCompanyId());
@@ -93,11 +93,11 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         );
 
         $firstNow = new \DateTimeImmutable('2026-04-01 10:00:00');
-        $rows = $this->repository->updateState('uuid-upd-1', 'NOT_STARTED', $firstNow, 1);
+        $rows = $this->repository->updateState(self::COMPANY_ID, 'uuid-upd-1', 'NOT_STARTED', $firstNow, 1);
         self::assertSame(1, $rows);
 
         $this->em->clear();
-        $afterFirst = $this->repository->findByOzonUuid('uuid-upd-1');
+        $afterFirst = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-upd-1');
         self::assertNotNull($afterFirst);
         self::assertSame('NOT_STARTED', $afterFirst->getState());
         self::assertSame(1, $afterFirst->getPollAttempts());
@@ -107,10 +107,10 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
         // Second iteration — state moves off NOT_STARTED, firstNonPendingAt должен зафиксироваться.
         $secondNow = new \DateTimeImmutable('2026-04-01 10:00:05');
-        $this->repository->updateState('uuid-upd-1', 'IN_PROGRESS', $secondNow, 2, $secondNow);
+        $this->repository->updateState(self::COMPANY_ID, 'uuid-upd-1', 'IN_PROGRESS', $secondNow, 2, $secondNow);
 
         $this->em->clear();
-        $afterSecond = $this->repository->findByOzonUuid('uuid-upd-1');
+        $afterSecond = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-upd-1');
         self::assertNotNull($afterSecond);
         self::assertSame('IN_PROGRESS', $afterSecond->getState());
         self::assertSame(2, $afterSecond->getPollAttempts());
@@ -119,10 +119,10 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
         // Third iteration — firstNonPendingAt уже установлен → COALESCE обязан оставить исходный.
         $thirdNow = new \DateTimeImmutable('2026-04-01 10:00:10');
-        $this->repository->updateState('uuid-upd-1', 'IN_PROGRESS', $thirdNow, 3, $thirdNow);
+        $this->repository->updateState(self::COMPANY_ID, 'uuid-upd-1', 'IN_PROGRESS', $thirdNow, 3, $thirdNow);
 
         $this->em->clear();
-        $afterThird = $this->repository->findByOzonUuid('uuid-upd-1');
+        $afterThird = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-upd-1');
         self::assertNotNull($afterThird);
         self::assertSame(3, $afterThird->getPollAttempts());
         self::assertNotNull($afterThird->getFirstNonPendingAt());
@@ -139,6 +139,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         $this->em->flush();
 
         $rows = $this->repository->updateState(
+            self::COMPANY_ID,
             'no-such-uuid',
             'IN_PROGRESS',
             new \DateTimeImmutable('2026-04-01 10:00:00'),
@@ -162,11 +163,11 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
             jobId: null,
         );
 
-        $rows = $this->repository->markFinalized('uuid-fin-ok', OzonAdPendingReportState::OK);
+        $rows = $this->repository->markFinalized(self::COMPANY_ID, 'uuid-fin-ok', OzonAdPendingReportState::OK);
         self::assertSame(1, $rows);
 
         $this->em->clear();
-        $finalized = $this->repository->findByOzonUuid('uuid-fin-ok');
+        $finalized = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-fin-ok');
         self::assertNotNull($finalized);
         self::assertSame(OzonAdPendingReportState::OK, $finalized->getState());
         self::assertNotNull($finalized->getFinalizedAt());
@@ -188,13 +189,14 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         );
 
         $this->repository->markFinalized(
+            self::COMPANY_ID,
             'uuid-fin-err',
             OzonAdPendingReportState::ERROR,
             'Ozon API вернул ERROR: нет прав',
         );
 
         $this->em->clear();
-        $finalized = $this->repository->findByOzonUuid('uuid-fin-err');
+        $finalized = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-fin-err');
         self::assertNotNull($finalized);
         self::assertSame(OzonAdPendingReportState::ERROR, $finalized->getState());
         self::assertSame('Ozon API вернул ERROR: нет прав', $finalized->getErrorMessage());
@@ -214,14 +216,14 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
             jobId: null,
         );
 
-        $first = $this->repository->markFinalized('uuid-fin-idem', OzonAdPendingReportState::ERROR, 'boom');
-        $second = $this->repository->markFinalized('uuid-fin-idem', OzonAdPendingReportState::OK, 'should not overwrite');
+        $first = $this->repository->markFinalized(self::COMPANY_ID, 'uuid-fin-idem', OzonAdPendingReportState::ERROR, 'boom');
+        $second = $this->repository->markFinalized(self::COMPANY_ID, 'uuid-fin-idem', OzonAdPendingReportState::OK, 'should not overwrite');
 
         self::assertSame(1, $first, 'Первая финализация обязана обновить строку');
         self::assertSame(0, $second, 'Вторая финализация не должна затронуть ни одну строку');
 
         $this->em->clear();
-        $finalized = $this->repository->findByOzonUuid('uuid-fin-idem');
+        $finalized = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-fin-idem');
         self::assertNotNull($finalized);
         self::assertSame(OzonAdPendingReportState::ERROR, $finalized->getState());
         self::assertSame('boom', $finalized->getErrorMessage());
@@ -232,7 +234,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         $this->expectException(\InvalidArgumentException::class);
         $this->expectExceptionMessageMatches('/только терминальные state/');
 
-        $this->repository->markFinalized('any-uuid', OzonAdPendingReportState::IN_PROGRESS);
+        $this->repository->markFinalized(self::COMPANY_ID, 'any-uuid', OzonAdPendingReportState::IN_PROGRESS);
     }
 
     public function testFindInFlightByJobReturnsOnlyInFlightRecords(): void
@@ -258,6 +260,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
             jobId: $job->getId(),
         );
         $this->repository->updateState(
+            self::COMPANY_ID,
             'uuid-if-2',
             'IN_PROGRESS',
             new \DateTimeImmutable('2026-04-01 10:00:00'),
@@ -274,7 +277,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
             campaignIds: ['333'],
             jobId: $job->getId(),
         );
-        $this->repository->markFinalized('uuid-done', OzonAdPendingReportState::OK);
+        $this->repository->markFinalized(self::COMPANY_ID, 'uuid-done', OzonAdPendingReportState::OK);
 
         // На другом job'е — тоже in-flight, но из другого job'а → не должна попасть.
         $this->repository->create(
@@ -287,12 +290,64 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         );
 
         $this->em->clear();
-        $inFlight = $this->repository->findInFlightByJob($job->getId());
+        $inFlight = $this->repository->findInFlightByJob(self::COMPANY_ID, $job->getId());
 
         self::assertCount(2, $inFlight);
         $uuids = array_map(static fn (OzonAdPendingReport $r): string => $r->getOzonUuid(), $inFlight);
         sort($uuids);
         self::assertSame(['uuid-if-1', 'uuid-if-2'], $uuids);
+    }
+
+    public function testUpdateStateIgnoresRowOfForeignCompany(): void
+    {
+        // Запись создана под self::COMPANY_ID — любая попытка обновить её под
+        // другой company должна вернуть 0 строк и оставить state нетронутым.
+        // Это guard от IDOR: ozon_uuid уникален, но WHERE-clause дополнительно
+        // проверяет принадлежность к company.
+        $this->seedCompany();
+        $this->em->flush();
+
+        $this->repository->create(
+            companyId: self::COMPANY_ID,
+            ozonUuid: 'uuid-foreign',
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-03'),
+            campaignIds: ['111'],
+            jobId: null,
+        );
+
+        $foreignCompanyId = '99999999-9999-9999-9999-999999999999';
+
+        $updated = $this->repository->updateState(
+            $foreignCompanyId,
+            'uuid-foreign',
+            'IN_PROGRESS',
+            new \DateTimeImmutable('2026-04-01 10:00:00'),
+            1,
+            new \DateTimeImmutable('2026-04-01 10:00:00'),
+        );
+        self::assertSame(0, $updated, 'updateState не должен трогать строку чужой company');
+
+        $finalized = $this->repository->markFinalized(
+            $foreignCompanyId,
+            'uuid-foreign',
+            OzonAdPendingReportState::ERROR,
+            'foreign write',
+        );
+        self::assertSame(0, $finalized, 'markFinalized не должен трогать строку чужой company');
+
+        $this->em->clear();
+
+        // С корректной company — запись остаётся в REQUESTED, не финализирована.
+        $owned = $this->repository->findByOzonUuid(self::COMPANY_ID, 'uuid-foreign');
+        self::assertNotNull($owned);
+        self::assertSame(OzonAdPendingReportState::REQUESTED, $owned->getState());
+        self::assertNull($owned->getFinalizedAt());
+        self::assertNull($owned->getErrorMessage());
+
+        // С чужой company — findByOzonUuid обязан вернуть null.
+        $foreign = $this->repository->findByOzonUuid($foreignCompanyId, 'uuid-foreign');
+        self::assertNull($foreign, 'findByOzonUuid не должен возвращать строку чужой company');
     }
 
     public function testUniqueConstraintOnOzonUuid(): void

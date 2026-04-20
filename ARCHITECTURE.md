@@ -56,6 +56,7 @@
 | `AdDocumentLine` | MarketplaceAds | `string $companyId` ✅ |
 | `AdLoadJob` | MarketplaceAds | `string $companyId` ✅ |
 | `AdChunkProgress` | MarketplaceAds | через `jobId` (IDOR через AdLoadJob) |
+| `OzonAdPendingReport` | MarketplaceAds | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -128,6 +129,32 @@
 | `completedAt` | `DateTimeImmutable` | Время фиксации успеха |
 
 **Уникальность:** `UniqueConstraint` по `(job_id, date_from, date_to)` — делает фиксацию чанка идемпотентной на уровне БД. При Messenger-retry `FetchOzonAdStatisticsHandler` тот же чанк упрётся в uq-нарушение и не приведёт к двойному инкременту `loadedDays`.
+
+### `OzonAdPendingReport` — поля
+
+Таблица `marketplace_ad_pending_reports`. Фиксирует каждый запрошенный у Ozon
+Performance отчёт: UUID сохраняется ДО polling'а, что делает любой сбой
+pipeline'а (timeout, рестарт worker'а, exception) видимым для диагностики и
+даёт точку отталкивания для будущей resume-логики (задача 3).
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` (UUID v7) | PK |
+| `companyId` | `string` (UUID) | Неизменяем, без setter |
+| `ozonUuid` | `string` | UUID отчёта в Ozon Performance (`POST /api/client/statistics.UUID`). Уникален |
+| `jobId` | `?string` (UUID) | Ссылка на `AdLoadJob`, если отчёт запрошен range-пайплайном; `null` для legacy `fetchAdStatistics()` |
+| `dateFrom` / `dateTo` | `DateTimeImmutable` | Диапазон отчёта |
+| `campaignIds` | `list<string>` | campaign IDs, отправленные в `POST /statistics` (jsonb) |
+| `state` | `string` | Canonical state из {@see OzonAdPendingReportState} |
+| `pollAttempts` | `int` | Счётчик итераций polling'а (обновляется raw DBAL) |
+| `lastCheckedAt` | `?DateTimeImmutable` | Время последней итерации |
+| `firstNonPendingAt` | `?DateTimeImmutable` | Первая итерация, на которой state сошёл с `NOT_STARTED`; фиксируется один раз (COALESCE-guard в Repository) |
+| `finalizedAt` | `?DateTimeImmutable` | Выставляется один раз при `markFinalized`; guard против повторной терминализации |
+| `errorMessage` | `?string` | Диагностика для state=ERROR / ABANDONED |
+| `requestedAt` | `DateTimeImmutable` | Время создания записи |
+| `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
+
+**Уникальность:** `UniqueConstraint` по `ozon_uuid`. Индексы: `company_id`, `job_id`, `state`.
 
 ---
 
@@ -377,6 +404,57 @@ findByCompanyMarketplaceAndDateRange(
 ): array
 ```
 
+### `OzonAdPendingReportRepository` (`src/MarketplaceAds/Repository/OzonAdPendingReportRepository.php`)
+```php
+// Сохраняет запись о запрошенном отчёте (state = REQUESTED) + flush.
+// flush() намеренно внутри — caller (OzonAdClient::requestStatistics()) не должен
+// откладывать UoW: последующие шаги polling могут упасть, и без немедленного
+// сохранения UUID потеряется.
+// ВНИМАНИЕ: flush сбрасывает весь UoW — не держите грязные сущности в момент вызова.
+create(
+    string $companyId,
+    string $ozonUuid,
+    \DateTimeImmutable $dateFrom,
+    \DateTimeImmutable $dateTo,
+    array $campaignIds,
+    ?string $jobId,
+): OzonAdPendingReport
+
+// Инкрементально обновляет state/lastCheckedAt/pollAttempts (raw DBAL, минуя UoW).
+// firstNonPendingAt фиксируется через COALESCE — повторная передача не перезаписывает.
+// companyId в WHERE — defense-in-depth против IDOR (ozon_uuid сам по себе уникален,
+// но проверка company обязательна на каждой операции записи).
+// @return int число обновлённых строк (0 — ozonUuid не найден в company)
+updateState(
+    string $companyId,
+    string $ozonUuid,
+    string $state,
+    \DateTimeImmutable $lastCheckedAt,
+    int $pollAttempts,
+    ?\DateTimeImmutable $firstNonPendingAt = null,
+): int
+
+// Идемпотентный terminal-переход (state ∈ {OK, ERROR, ABANDONED}).
+// Guard `finalized_at IS NULL` не даёт перезаписать уже финализированную запись
+// (параллельный worker, пришедший позже к другому state, не стирает исходный).
+// @return int число обновлённых строк (0 — uuid не найден / уже финализирован)
+markFinalized(
+    string $companyId,
+    string $ozonUuid,
+    string $state,
+    ?string $errorMessage = null,
+): int
+
+// Загрузка с IDOR-проверкой
+findByOzonUuid(string $companyId, string $ozonUuid): ?OzonAdPendingReport
+
+// Все in-flight (REQUESTED / NOT_STARTED / IN_PROGRESS) записи конкретного job'а.
+// Для resume-логики (задача 3): Messenger-retry handler получает список UUID,
+// по которым нужно продолжать polling вместо нового POST /statistics.
+// @return list<OzonAdPendingReport>
+findInFlightByJob(string $companyId, string $jobId): array
+```
+
 ---
 
 ## Enum — актуальные значения
@@ -568,6 +646,32 @@ enum AdLoadJobStatus: string
     case FAILED    = 'failed';
 
     public function isTerminal(): bool; // true для COMPLETED, FAILED
+}
+```
+
+### `src/MarketplaceAds/Enum/OzonAdPendingReportState.php`
+```php
+// Canonical state для записей marketplace_ad_pending_reports.
+// Реализовано как final class с константами, а не PHP enum: исходные raw-значения
+// Ozon API (NOT_STARTED / IN_PROGRESS / OK / READY / ERROR / CANCELLED / NOT_FOUND)
+// приходят в state как есть, и clean-mapping «raw → canonical» выполняется в
+// OzonAdClient::pollReport(). Canonical набор:
+final class OzonAdPendingReportState
+{
+    public const REQUESTED   = 'REQUESTED';
+    public const NOT_STARTED = 'NOT_STARTED';
+    public const IN_PROGRESS = 'IN_PROGRESS';
+    public const OK          = 'OK';
+    public const ERROR       = 'ERROR';
+    public const ABANDONED   = 'ABANDONED';
+
+    // Состояния, в которых запись ещё не финализирована (finalized_at IS NULL).
+    public const IN_FLIGHT_STATES = ['REQUESTED', 'NOT_STARTED', 'IN_PROGRESS'];
+
+    // Терминальные: markFinalized() принимает только эти.
+    public const TERMINAL_STATES = ['OK', 'ERROR', 'ABANDONED'];
+
+    public static function isTerminal(string $state): bool;
 }
 ```
 

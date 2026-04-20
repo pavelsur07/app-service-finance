@@ -48,6 +48,8 @@ final class OzonAdClientTest extends TestCase
             static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
                 => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
         );
+        $this->pendingReportRepo->method('updateState')->willReturn(1);
+        $this->pendingReportRepo->method('markFinalized')->willReturn(1);
 
         $this->logger = new class extends AbstractLogger {
             /** @var array<int, array{level: string, message: string, context: array<string, mixed>}> */
@@ -957,6 +959,12 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $csv,
         );
 
+        // $events фиксирует порядок вызовов create() / updateState() / markFinalized():
+        // create() обязан произойти СТРОГО до первого updateState(). Без этого
+        // invariant'а поллинг мог бы начать писать по несуществующему ozon_uuid.
+        /** @var list<string> $events */
+        $events = [];
+
         $repo = $this->createMock(OzonAdPendingReportRepository::class);
         $repo->expects(self::once())
             ->method('create')
@@ -969,13 +977,26 @@ final class OzonAdClientTest extends TestCase
                 self::equalTo('aaaaaaaa-aaaa-aaaa-aaaa-000000000001'),
             )
             ->willReturnCallback(
-                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
-                    => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+                static function (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId) use (&$events): OzonAdPendingReport {
+                    $events[] = 'create';
+
+                    return new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId);
+                },
             );
+        $repo->method('updateState')->willReturnCallback(static function () use (&$events): int {
+            $events[] = 'updateState';
+
+            return 1;
+        });
         // На успешном pollReport() ожидаем markFinalized(OK).
         $repo->expects(self::once())
             ->method('markFinalized')
-            ->with('uuid-persist-1', 'OK', null);
+            ->with(self::COMPANY_ID, 'uuid-persist-1', 'OK', null)
+            ->willReturnCallback(static function () use (&$events): int {
+                $events[] = 'markFinalized';
+
+                return 1;
+            });
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
 
@@ -985,6 +1006,15 @@ final class OzonAdClientTest extends TestCase
             new \DateTimeImmutable('2026-03-05'),
             'aaaaaaaa-aaaa-aaaa-aaaa-000000000001',
         );
+
+        // Ordering invariant: первая запись в $events — create; все updateState
+        // идут ПОСЛЕ create; markFinalized — самым последним.
+        self::assertNotEmpty($events);
+        self::assertSame('create', $events[0], 'create() обязан быть вызван до первого updateState()');
+        $firstUpdateIdx = array_search('updateState', $events, true);
+        self::assertIsInt($firstUpdateIdx, 'updateState() должен быть вызван хотя бы раз');
+        self::assertGreaterThan(0, $firstUpdateIdx, 'updateState() не может опережать create()');
+        self::assertSame('markFinalized', end($events), 'markFinalized() обязан быть последним вызовом');
     }
 
     // -----------------------------------------------------------------
@@ -1009,8 +1039,9 @@ final class OzonAdClientTest extends TestCase
         );
         $repo->expects(self::atLeastOnce())
             ->method('updateState')
-            ->willReturnCallback(function (string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$updateStateCalls): int {
+            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$updateStateCalls): int {
                 $updateStateCalls[] = [
+                    'companyId' => $companyId,
                     'uuid' => $uuid,
                     'state' => $state,
                     'attempt' => $attempt,
@@ -1019,7 +1050,7 @@ final class OzonAdClientTest extends TestCase
 
                 return 1;
             });
-        $repo->expects(self::once())->method('markFinalized')->with('uuid-log-1', 'OK', null);
+        $repo->expects(self::once())->method('markFinalized')->with(self::COMPANY_ID, 'uuid-log-1', 'OK', null);
 
         $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
 
@@ -1031,6 +1062,7 @@ final class OzonAdClientTest extends TestCase
         );
 
         self::assertCount(1, $updateStateCalls, 'OK на первой итерации → ровно один updateState()');
+        self::assertSame(self::COMPANY_ID, $updateStateCalls[0]['companyId']);
         self::assertSame('uuid-log-1', $updateStateCalls[0]['uuid']);
         self::assertSame('OK', $updateStateCalls[0]['state']);
         self::assertSame(1, $updateStateCalls[0]['attempt']);
@@ -1042,6 +1074,103 @@ final class OzonAdClientTest extends TestCase
         self::assertSame('uuid-log-1', $record['context']['reportUuid']);
         self::assertSame(1, $record['context']['attempt']);
         self::assertSame('OK', $record['context']['state']);
+    }
+
+    // -----------------------------------------------------------------
+    // pollReport: NOT_STARTED → IN_PROGRESS → OK.
+    // Проверяет:
+    //  • updateState() вызван для каждой из трёх итераций с корректным state/attempt;
+    //  • firstNonPendingAt == null на iter1 (NOT_STARTED), не-null на iter2/iter3;
+    //  • ровно одна finalization (OK) в самом конце.
+    //
+    // pollReport() делает sleep(POLL_INTERVAL_SECONDS=5) между итерациями,
+    // поэтому тест занимает ~10 секунд реального времени. Это сознательный
+    // trade-off: альтернатива — refactor под инжектируемый sleeper, что
+    // ломает сигнатуру и плодит моки.
+    // -----------------------------------------------------------------
+    public function testPollReportCapturesFirstNonPendingAtOnceAcrossIterations(): void
+    {
+        $statePending = json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR);
+        $stateInProgress = json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR);
+        $stateReady = $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-multi');
+
+        $http = new MockHttpClient([
+            new MockResponse($this->tokenBody('TKN-MULTI')),
+            new MockResponse($this->campaignListBody(1)),
+            new MockResponse('{"UUID":"uuid-multi"}'),
+            // Три последовательных GET /statistics/{uuid}: NOT_STARTED → IN_PROGRESS → OK.
+            new MockResponse($statePending),
+            new MockResponse($stateInProgress),
+            new MockResponse($stateReady),
+            // download — однострочный CSV, чтобы не влиять на парсинг.
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        /** @var list<array{companyId: string, uuid: string, state: string, attempt: int, firstNonPendingAt: ?\DateTimeImmutable}> $calls */
+        $calls = [];
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->method('create')->willReturnCallback(
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+        );
+        $repo->expects(self::exactly(3))
+            ->method('updateState')
+            ->willReturnCallback(function (string $companyId, string $uuid, string $state, \DateTimeImmutable $now, int $attempt, ?\DateTimeImmutable $firstNonPendingAt = null) use (&$calls): int {
+                $calls[] = [
+                    'companyId' => $companyId,
+                    'uuid' => $uuid,
+                    'state' => $state,
+                    'attempt' => $attempt,
+                    'firstNonPendingAt' => $firstNonPendingAt,
+                ];
+
+                return 1;
+            });
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(self::COMPANY_ID, 'uuid-multi', 'OK', null)
+            ->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'aaaaaaaa-aaaa-aaaa-aaaa-000000000004',
+        );
+
+        self::assertCount(3, $calls);
+
+        self::assertSame(self::COMPANY_ID, $calls[0]['companyId']);
+        self::assertSame('uuid-multi', $calls[0]['uuid']);
+        self::assertSame('NOT_STARTED', $calls[0]['state']);
+        self::assertSame(1, $calls[0]['attempt']);
+        self::assertNull($calls[0]['firstNonPendingAt'], 'NOT_STARTED iteration must not capture firstNonPendingAt');
+
+        self::assertSame('IN_PROGRESS', $calls[1]['state']);
+        self::assertSame(2, $calls[1]['attempt']);
+        self::assertNotNull($calls[1]['firstNonPendingAt'], 'IN_PROGRESS iteration must capture firstNonPendingAt');
+
+        self::assertSame('OK', $calls[2]['state']);
+        self::assertSame(3, $calls[2]['attempt']);
+        // OK-итерация тоже передаёт firstNonPendingAt — COALESCE в Repository
+        // обеспечивает, что SQL-level значение не перезапишется (integration-тест
+        // testUpdateStateAdvancesAttemptAndTimestamps проверяет именно этот
+        // COALESCE-инвариант; здесь мы только фиксируем, что клиент передаёт
+        // не-null, чтобы COALESCE имел шанс сработать).
+        self::assertNotNull($calls[2]['firstNonPendingAt']);
+
+        // Каждая итерация пишет "Ozon poll iteration" в info-канал.
+        $iterationLogs = array_values(array_filter(
+            $this->logger->records,
+            static fn (array $r): bool => 'Ozon poll iteration' === $r['message'],
+        ));
+        self::assertCount(3, $iterationLogs);
+        self::assertSame('NOT_STARTED', $iterationLogs[0]['context']['state']);
+        self::assertSame('IN_PROGRESS', $iterationLogs[1]['context']['state']);
+        self::assertSame('OK', $iterationLogs[2]['context']['state']);
     }
 
     // -----------------------------------------------------------------
@@ -1067,11 +1196,12 @@ final class OzonAdClientTest extends TestCase
             );
         $repo->expects(self::once())
             ->method('updateState')
-            ->with('uuid-first-err', 'ERROR', self::anything(), 1, self::anything())
+            ->with(self::COMPANY_ID, 'uuid-first-err', 'ERROR', self::anything(), 1, self::anything())
             ->willReturn(1);
         $repo->expects(self::once())
             ->method('markFinalized')
             ->with(
+                self::COMPANY_ID,
                 'uuid-first-err',
                 'ERROR',
                 self::callback(static fn (?string $msg): bool => null !== $msg && str_contains($msg, 'ERROR') && str_contains($msg, 'квота')),

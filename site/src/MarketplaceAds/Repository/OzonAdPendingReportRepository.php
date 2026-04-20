@@ -37,6 +37,13 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
      * в середине pipeline'а: последующие шаги (pollReport, downloadReport)
      * могут упасть, и без немедленного flush UUID не попадёт в БД.
      *
+     * ВНИМАНИЕ: flush() здесь сбрасывает ВЕСЬ Doctrine UoW, а не только эту
+     * entity. Вызывающий код не должен держать в UoW другие "грязные"
+     * сущности на момент вызова create() — иначе они попадут в БД
+     * непредвиденно. В контексте Messenger-handler'а это безопасно:
+     * FetchOzonAdStatisticsHandler пишет через отдельные Repository с raw
+     * DBAL и не накапливает UoW.
+     *
      * @param list<string> $campaignIds
      */
     public function create(
@@ -73,9 +80,14 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
      * Реализовано через raw DBAL: polling вызывается в цикле, persist/flush
      * здесь означал бы загрузку entity в UoW на каждой итерации.
      *
-     * @return int число обновлённых строк (0 — ozonUuid не найден)
+     * companyId в WHERE-clause — defense-in-depth против IDOR: даже если
+     * ozon_uuid уникален сам по себе, принадлежность к company проверяем
+     * на каждой операции записи.
+     *
+     * @return int число обновлённых строк (0 — ozonUuid не найден в этой company)
      */
     public function updateState(
+        string $companyId,
         string $ozonUuid,
         string $state,
         \DateTimeImmutable $lastCheckedAt,
@@ -93,12 +105,14 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
                         poll_attempts = :poll_attempts,
                         updated_at = NOW()
                     WHERE ozon_uuid = :ozon_uuid
+                      AND company_id = :company_id
                     SQL,
                 [
                     'state' => $state,
                     'last_checked_at' => $lastCheckedAt->format('Y-m-d H:i:s'),
                     'poll_attempts' => $pollAttempts,
                     'ozon_uuid' => $ozonUuid,
+                    'company_id' => $companyId,
                 ],
             );
         }
@@ -112,6 +126,7 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
                     first_non_pending_at = COALESCE(first_non_pending_at, :first_non_pending_at),
                     updated_at = NOW()
                 WHERE ozon_uuid = :ozon_uuid
+                  AND company_id = :company_id
                 SQL,
             [
                 'state' => $state,
@@ -119,6 +134,7 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
                 'poll_attempts' => $pollAttempts,
                 'first_non_pending_at' => $firstNonPendingAt->format('Y-m-d H:i:s'),
                 'ozon_uuid' => $ozonUuid,
+                'company_id' => $companyId,
             ],
         );
     }
@@ -131,10 +147,16 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
      * финализированную запись — параллельный воркер, который видел тот же
      * UUID и пришёл к OK позже, не стирает исходный ERROR/ABANDONED.
      *
-     * @return int число обновлённых строк (0 — uuid не найден или уже финализирован)
+     * companyId в WHERE-clause — defense-in-depth против IDOR (см. updateState).
+     *
+     * @return int число обновлённых строк (0 — uuid не найден в company, уже финализирован)
      */
-    public function markFinalized(string $ozonUuid, string $state, ?string $errorMessage = null): int
-    {
+    public function markFinalized(
+        string $companyId,
+        string $ozonUuid,
+        string $state,
+        ?string $errorMessage = null,
+    ): int {
         if (!OzonAdPendingReportState::isTerminal($state)) {
             throw new \InvalidArgumentException(sprintf(
                 'markFinalized принимает только терминальные state (OK/ERROR/ABANDONED), получено: %s',
@@ -150,19 +172,21 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
                     finalized_at = NOW(),
                     updated_at = NOW()
                 WHERE ozon_uuid = :ozon_uuid
+                  AND company_id = :company_id
                   AND finalized_at IS NULL
                 SQL,
             [
                 'state' => $state,
                 'error_message' => $errorMessage,
                 'ozon_uuid' => $ozonUuid,
+                'company_id' => $companyId,
             ],
         );
     }
 
-    public function findByOzonUuid(string $ozonUuid): ?OzonAdPendingReport
+    public function findByOzonUuid(string $companyId, string $ozonUuid): ?OzonAdPendingReport
     {
-        return $this->findOneBy(['ozonUuid' => $ozonUuid]);
+        return $this->findOneBy(['companyId' => $companyId, 'ozonUuid' => $ozonUuid]);
     }
 
     /**
@@ -173,13 +197,15 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
      *
      * @return list<OzonAdPendingReport>
      */
-    public function findInFlightByJob(string $jobId): array
+    public function findInFlightByJob(string $companyId, string $jobId): array
     {
         /** @var list<OzonAdPendingReport> $result */
         $result = $this->createQueryBuilder('r')
-            ->where('r.jobId = :jobId')
+            ->where('r.companyId = :companyId')
+            ->andWhere('r.jobId = :jobId')
             ->andWhere('r.state IN (:inFlightStates)')
             ->andWhere('r.finalizedAt IS NULL')
+            ->setParameter('companyId', $companyId)
             ->setParameter('jobId', $jobId)
             ->setParameter('inFlightStates', OzonAdPendingReportState::IN_FLIGHT_STATES)
             ->orderBy('r.requestedAt', 'ASC')
