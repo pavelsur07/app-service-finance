@@ -1468,6 +1468,89 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // Resume: findInFlightByJob вернул [stale, fresh] для одного батча
+    // (возможно после гонки Messenger-воркеров). matchResumableReport
+    // должен финализировать stale как ABANDONED и всё-таки подхватить
+    // fresh вместо создания третьего UUID.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeResumesFreshAfterAbandoningStaleSibling(): void
+    {
+        $stale = $this->makePendingReport(
+            ozonUuid: 'uuid-stale-sibling',
+            jobId: 'eeeeeeee-eeee-eeee-eeee-000000000001',
+            campaignIds: ['111'],
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-01'),
+            requestedAt: (new \DateTimeImmutable())->modify('-901 seconds'),
+        );
+        $fresh = $this->makePendingReport(
+            ozonUuid: 'uuid-fresh-sibling',
+            jobId: 'eeeeeeee-eeee-eeee-eeee-000000000001',
+            campaignIds: ['111'],
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-01'),
+            requestedAt: (new \DateTimeImmutable())->modify('-60 seconds'),
+        );
+
+        /** @var list<array{method: string, url: string, auth: ?string}> $requests */
+        $requests = [];
+
+        $responses = $this->scriptedResponsesWithRecording($requests, [
+            new MockResponse($this->tokenBody('TKN-SIB')),
+            new MockResponse($this->campaignListBody(1)),
+            // НЕТ POST /statistics: свежий sibling подхвачен после abandon stale'а.
+            new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-fresh-sibling')),
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        $http = new MockHttpClient($responses);
+
+        $finalizedCalls = [];
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        // findInFlightByJob возвращает oldest-first: [stale, fresh].
+        $repo->method('findInFlightByJob')->willReturn([$stale, $fresh]);
+        // Третий UUID создаваться не должен.
+        $repo->expects(self::never())->method('create');
+        $repo->method('updateState')->willReturn(1);
+        $repo->method('markFinalized')->willReturnCallback(static function (string $companyId, string $uuid, string $state, ?string $error = null) use (&$finalizedCalls): int {
+            $finalizedCalls[] = ['uuid' => $uuid, 'state' => $state, 'error' => $error];
+
+            return 1;
+        });
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'eeeeeeee-eeee-eeee-eeee-000000000001',
+        );
+
+        // Stale финализирован ABANDONED, fresh довёден до OK.
+        self::assertCount(2, $finalizedCalls);
+        self::assertSame('uuid-stale-sibling', $finalizedCalls[0]['uuid']);
+        self::assertSame('ABANDONED', $finalizedCalls[0]['state']);
+        self::assertSame('Resume threshold exceeded', $finalizedCalls[0]['error']);
+        self::assertSame('uuid-fresh-sibling', $finalizedCalls[1]['uuid']);
+        self::assertSame('OK', $finalizedCalls[1]['state']);
+
+        // Никакого POST /statistics — fresh UUID подхвачен после abandon'а stale.
+        $statsPost = array_filter(
+            $requests,
+            static fn (array $r): bool => 'POST' === $r['method'] && str_ends_with($r['url'], '/api/client/statistics'),
+        );
+        self::assertCount(0, $statsPost, 'Fresh sibling должен быть resumed без нового POST /statistics');
+
+        // Подтверждение, что именно fresh UUID прошёл в GET /state.
+        $stateReq = array_values(array_filter(
+            $requests,
+            static fn (array $r): bool => str_contains($r['url'], '/api/client/statistics/uuid-fresh-sibling'),
+        ));
+        self::assertCount(1, $stateReq);
+    }
+
+    // -----------------------------------------------------------------
     // Resume: jobId=null (legacy-вызов fetchAdStatistics) → resume полностью
     // пропущен, findInFlightByJob не вызывается, обычный POST-флоу.
     // -----------------------------------------------------------------

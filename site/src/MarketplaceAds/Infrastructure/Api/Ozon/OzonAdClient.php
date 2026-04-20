@@ -716,7 +716,10 @@ class OzonAdClient implements AdPlatformClientInterface
      * Stale-записи (старше RESUME_MAX_AGE_SECONDS) финализируются как
      * ABANDONED с reason='Resume threshold exceeded' и пропускаются — лучше
      * начать новый POST /statistics, чем polling'ить UUID, который Ozon
-     * уже забыл.
+     * уже забыл. После abandon'а продолжаем сканирование: если в том же
+     * job'е есть stale + fresh пара (например, после гонки Messenger-воркеров),
+     * хотим финализировать stale и всё-таки подхватить fresh, а не создавать
+     * третий UUID.
      *
      * @param list<OzonAdPendingReport> $inFlightReports
      * @param list<string>              $campaignIds
@@ -768,7 +771,7 @@ class OzonAdClient implements AdPlatformClientInterface
                     'Resume threshold exceeded',
                 );
 
-                return null;
+                continue;
             }
 
             return $report;
