@@ -214,23 +214,4 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
 
         return $result;
     }
-
-    /**
-     * Unix-timestamp момента, когда POST /statistics был отправлен Ozon'у.
-     *
-     * Используется в resume-ветке {@see \App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient}:
-     * если handler перезапущен Messenger'ом и продолжает polling существующего
-     * UUID, NOT_STARTED-таймаут должен отсчитываться от исходного requestedAt,
-     * а не от момента resume — иначе зависший в очереди отчёт получит новое
-     * 5-минутное окно на каждом retry, и queue-full exception никогда не
-     * сработает.
-     *
-     * requestedAt проставляется в конструкторе Entity и не nullable в схеме,
-     * но тип возврата допускает null на случай будущих расширений — caller
-     * должен быть готов использовать fallback (now).
-     */
-    public function getPollStartTime(OzonAdPendingReport $report): ?float
-    {
-        return (float) $report->getRequestedAt()->getTimestamp();
-    }
 }

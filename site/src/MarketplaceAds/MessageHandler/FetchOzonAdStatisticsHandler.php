@@ -173,10 +173,19 @@ final class FetchOzonAdStatisticsHandler
             // бессмысленен — деградация обычно длится часы. Отдаём
             // Unrecoverable, чтобы пользователь вручную повторил загрузку
             // позже, когда Ozon оживёт.
+            //
+            // Пользовательский текст собираем прямо здесь из полей exception'а,
+            // а не конкатенацией с $e->getMessage() — иначе получится двойное
+            // «перегружена, повторите» (exception несёт технический английский
+            // message для логов / Sentry).
             $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
-                'Очередь отчётов Ozon Performance перегружена, повторите загрузку позже: '.$e->getMessage(),
+                sprintf(
+                    'Очередь отчётов Ozon Performance перегружена, повторите загрузку позже. Отчёт %s не начал обработку за %d секунд.',
+                    $e->getReportUuid(),
+                    $e->getWaitedSeconds(),
+                ),
             );
             $this->marketplaceAdsLogger->warning('Ozon statistics queue full', [
                 'jobId' => $message->jobId,

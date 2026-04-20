@@ -305,6 +305,8 @@ class OzonAdClient implements AdPlatformClientInterface
 
                 if (null !== $resumable) {
                     $uuid = $resumable->getOzonUuid();
+                    // requestedAt хранится с секундной точностью; для таймаута
+                    // NOT_STARTED (300s) погрешность в 1 секунду незначима.
                     $pollStartedAt = (float) $resumable->getRequestedAt()->getTimestamp();
 
                     $this->marketplaceAdsLogger->info('Resuming existing Ozon UUID instead of creating new', [

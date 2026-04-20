@@ -1284,6 +1284,11 @@ final class OzonAdClientTest extends TestCase
         } catch (\App\MarketplaceAds\Exception\OzonStatisticsQueueFullException $e) {
             self::assertSame('uuid-qf', $e->getReportUuid());
             self::assertGreaterThanOrEqual(300, $e->getWaitedSeconds());
+            // Технический английский message — для логов / Sentry; пользовательский
+            // русский текст формируется отдельно в handler'е.
+            self::assertStringContainsString('Ozon Performance NOT_STARTED timeout', $e->getMessage());
+            self::assertStringContainsString('uuid-qf', $e->getMessage());
+            self::assertStringContainsString('did not start processing', $e->getMessage());
         }
 
         // Лог итерации содержит isNotStartedPhase=true для наблюдаемости.

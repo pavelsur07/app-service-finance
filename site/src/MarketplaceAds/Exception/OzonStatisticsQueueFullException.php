@@ -24,8 +24,11 @@ final class OzonStatisticsQueueFullException extends \RuntimeException
         private readonly string $reportUuid,
         private readonly int $waitedSeconds,
     ) {
+        // Технический message (лог / Sentry). Пользовательский русский текст
+        // формирует handler через sprintf($uuid, $waitedSeconds) — чтобы не
+        // получать двойное «перегружена, повторите» при string-concat.
         parent::__construct(sprintf(
-            'Очередь отчётов Ozon Performance перегружена: отчёт %s не начал обработку за %d секунд. Повторите позже.',
+            'Ozon Performance NOT_STARTED timeout: report %s did not start processing within %d seconds',
             $reportUuid,
             $waitedSeconds,
         ));
