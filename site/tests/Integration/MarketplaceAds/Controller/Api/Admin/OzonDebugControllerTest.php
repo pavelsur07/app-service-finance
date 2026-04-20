@@ -24,6 +24,7 @@ final class OzonDebugControllerTest extends WebTestCaseBase
 
     private const URL_TOKEN = '/api/marketplace-ads/admin/ozon/debug/token';
     private const URL_CAMPAIGNS = '/api/marketplace-ads/admin/ozon/debug/campaigns';
+    private const URL_STATS_LIST = '/api/marketplace-ads/admin/ozon/debug/statistics/list';
     private const URL_STATS_REQUEST = '/api/marketplace-ads/admin/ozon/debug/statistics/request';
     private const URL_STATS_STATUS = '/api/marketplace-ads/admin/ozon/debug/statistics/status';
     private const URL_STATS_DOWNLOAD = '/api/marketplace-ads/admin/ozon/debug/statistics/download';
@@ -112,6 +113,86 @@ final class OzonDebugControllerTest extends WebTestCaseBase
         $this->loginAs($client, $owner);
 
         $client->request('GET', self::URL_CAMPAIGNS.'?companyId='.self::COMPANY_ID);
+
+        self::assertResponseStatusCodeSame(403);
+    }
+
+    public function testStatisticsListHappyPath(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->setHttpClient($client, [
+            new MockResponse(json_encode([
+                'access_token' => 'TKN-list',
+                'expires_in' => 1800,
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode([
+                'items' => [
+                    ['UUID' => 'uuid-1', 'state' => 'OK'],
+                    ['UUID' => 'uuid-2', 'state' => 'NOT_STARTED'],
+                    ['UUID' => 'uuid-3', 'state' => 'IN_PROGRESS'],
+                    ['UUID' => 'uuid-4', 'state' => 'IN_PROGRESS'],
+                ],
+                'total' => 127,
+            ], \JSON_THROW_ON_ERROR)),
+        ]);
+
+        $admin = $this->seedAdminAndCompany();
+        $this->loginAs($client, $admin);
+
+        $client->request('GET', self::URL_STATS_LIST.'?companyId='.self::COMPANY_ID);
+
+        self::assertResponseIsSuccessful();
+        $data = $this->decode($client);
+        self::assertSame(self::COMPANY_ID, $data['companyId']);
+        self::assertSame(200, $data['status_code']);
+        // total из Ozon (полная очередь), не count($items) первой страницы
+        self::assertSame(127, $data['total']);
+        self::assertSame(4, $data['page_items_count']);
+        self::assertSame(
+            ['OK' => 1, 'NOT_STARTED' => 1, 'IN_PROGRESS' => 2],
+            $data['states_breakdown'],
+        );
+        self::assertCount(4, $data['items']);
+        self::assertSame('uuid-1', $data['items'][0]['UUID']);
+    }
+
+    public function testStatisticsListFallsBackToItemsCountWhenNoTotalInResponse(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->setHttpClient($client, [
+            new MockResponse(json_encode([
+                'access_token' => 'TKN-list-2',
+                'expires_in' => 1800,
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode([
+                'items' => [
+                    ['UUID' => 'uuid-a', 'state' => 'OK'],
+                    ['UUID' => 'uuid-b', 'state' => 'OK'],
+                ],
+            ], \JSON_THROW_ON_ERROR)),
+        ]);
+
+        $admin = $this->seedAdminAndCompany();
+        $this->loginAs($client, $admin);
+
+        $client->request('GET', self::URL_STATS_LIST.'?companyId='.self::COMPANY_ID);
+
+        self::assertResponseIsSuccessful();
+        $data = $this->decode($client);
+        self::assertSame(2, $data['total']);
+        self::assertSame(2, $data['page_items_count']);
+    }
+
+    public function testStatisticsListRequires403WithoutSuperAdmin(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $owner = $this->seedCompanyOwnerOnly();
+        $this->loginAs($client, $owner);
+
+        $client->request('GET', self::URL_STATS_LIST.'?companyId='.self::COMPANY_ID);
 
         self::assertResponseStatusCodeSame(403);
     }
