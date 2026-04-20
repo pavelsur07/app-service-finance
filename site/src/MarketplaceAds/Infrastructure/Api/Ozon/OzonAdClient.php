@@ -70,6 +70,18 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private int $lastPollAttempts = 0;
 
+    /**
+     * Сырые выгрузки отчётов, собранные в последнем вызове
+     * fetchAdStatisticsRange() / fetchAdStatistics(). Используются handler'ом
+     * для сохранения bronze-слоя: один chunk может содержать несколько
+     * физических запросов к Ozon (батчи по 10 кампаний), и каждому
+     * соответствует отдельный отчёт-файл. Сбрасывается на старте каждой
+     * публичной операции fetch — НЕ читать между вызовами.
+     *
+     * @var list<OzonReportDownload>
+     */
+    private array $lastChunkDownloads = [];
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -92,6 +104,8 @@ class OzonAdClient implements AdPlatformClientInterface
 
     public function fetchAdStatistics(string $companyId, \DateTimeImmutable $date): string
     {
+        $this->lastChunkDownloads = [];
+
         $credentials = $this->resolveCredentials($companyId);
         $clientId = $credentials['client_id'];
         $clientSecret = $credentials['client_secret'];
@@ -143,14 +157,17 @@ class OzonAdClient implements AdPlatformClientInterface
                 fn (string $token): string => $this->pollReport($token, $uuid),
             );
 
-            $csv = $this->withAuthRetry(
+            $download = $this->withAuthRetry(
                 $companyId,
                 $clientId,
                 $clientSecret,
-                fn (string $token): string => $this->downloadReport($token, $reportLink),
+                fn (string $token): OzonReportDownload => $this->downloadReport($token, $reportLink, $uuid),
             );
+            // Сохраняем успешный download для bronze-слоя — только ПОСЛЕ withAuthRetry,
+            // чтобы 401-ретрай не зафиксировал неуспешную выгрузку.
+            $this->lastChunkDownloads[] = $download;
 
-            foreach ($this->convertCsvToRows($csv, $namesById) as $row) {
+            foreach ($this->convertCsvToRows($download->csvContent, $namesById) as $row) {
                 $rows[] = $row;
             }
         }
@@ -184,6 +201,8 @@ class OzonAdClient implements AdPlatformClientInterface
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
     ): array {
+        $this->lastChunkDownloads = [];
+
         $startedAt = microtime(true);
         // chunkDays считаем ещё до assertValidRange, чтобы лог ошибки содержал
         // фактический входной диапазон (даже если он > 62 дней).
@@ -255,14 +274,17 @@ class OzonAdClient implements AdPlatformClientInterface
                 // суммируем по всем батчам.
                 $totalPollAttempts += $this->lastPollAttempts;
 
-                $csv = $this->withAuthRetry(
+                $download = $this->withAuthRetry(
                     $companyId,
                     $clientId,
                     $clientSecret,
-                    fn (string $token): string => $this->downloadReport($token, $reportLink),
+                    fn (string $token): OzonReportDownload => $this->downloadReport($token, $reportLink, $uuid),
                 );
+                // Сохраняем успешный download для bronze-слоя — только ПОСЛЕ withAuthRetry,
+                // чтобы 401-ретрай не зафиксировал неуспешную выгрузку.
+                $this->lastChunkDownloads[] = $download;
 
-                foreach ($this->convertCsvToRowsByDate($csv, $namesById) as $date => $campaignsForDate) {
+                foreach ($this->convertCsvToRowsByDate($download->csvContent, $namesById) as $date => $campaignsForDate) {
                     // Батчи не пересекаются по campaign_id (array_chunk), поэтому коллизий
                     // внутри одной даты не будет — просто складываем кампании подряд.
                     foreach ($campaignsForDate as $campaignId => $campaign) {
@@ -642,7 +664,19 @@ class OzonAdClient implements AdPlatformClientInterface
         throw new \RuntimeException(sprintf('Ozon Performance: отчёт %s не готов за %d секунд', $uuid, self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS));
     }
 
-    private function downloadReport(string $token, string $reportLink): string
+    /**
+     * Скачивает отчёт и распаковывает ZIP-архив, если Ozon вернул сжатый ответ.
+     *
+     * Ozon Performance чаще возвращает ZIP для длинных диапазонов/мульти-файловых
+     * отчётов. Без распаковки fgetcsv() получал бы magic-bytes «PK\x03\x04», не
+     * находил заголовок CSV и тихо возвращал нулевой набор строк — root cause
+     * бага «rows_count=0 при наличии рекламы».
+     *
+     * $rawBytes в возвращаемом OzonReportDownload — всегда оригинальный ответ
+     * (ZIP или plain CSV), $csvContent — уже распакованный и конкатенированный
+     * CSV. Для plain-ответа оба поля совпадают по содержимому.
+     */
+    private function downloadReport(string $token, string $reportLink, string $reportUuid): OzonReportDownload
     {
         // link может прийти и абсолютным (https://...), и относительным (/api/...).
         $url = str_starts_with($reportLink, 'http://') || str_starts_with($reportLink, 'https://')
@@ -650,8 +684,131 @@ class OzonAdClient implements AdPlatformClientInterface
             : self::BASE_URL.$reportLink;
 
         $response = $this->authorizedRequest('GET', $url, $token, [], absoluteUrl: true);
+        $rawBytes = $response->getContent(false);
 
-        return $response->getContent(false);
+        // Magic bytes локального ZIP-заголовка (PKZIP): 50 4B 03 04.
+        $wasZip = strlen($rawBytes) >= 4 && "PK\x03\x04" === substr($rawBytes, 0, 4);
+
+        if ($wasZip) {
+            $extracted = $this->extractCsvFromZip($rawBytes, $reportUuid);
+            $csvContent = $extracted['csvContent'];
+            $filesInZip = $extracted['filesInZip'];
+        } else {
+            $csvContent = $rawBytes;
+            $filesInZip = 0;
+        }
+
+        $sizeBytes = strlen($rawBytes);
+        $sha256 = hash('sha256', $rawBytes);
+
+        $this->marketplaceAdsLogger->info('Ozon report downloaded', [
+            'report_uuid' => $reportUuid,
+            'was_zip' => $wasZip,
+            'size_bytes' => $sizeBytes,
+            'csv_size_bytes' => strlen($csvContent),
+            'files_in_zip' => $wasZip ? $filesInZip : null,
+        ]);
+
+        return new OzonReportDownload(
+            rawBytes: $rawBytes,
+            csvContent: $csvContent,
+            wasZip: $wasZip,
+            sizeBytes: $sizeBytes,
+            sha256: $sha256,
+            reportUuid: $reportUuid,
+            filesInZip: $filesInZip,
+        );
+    }
+
+    /**
+     * Распаковывает ZIP через временный файл: ZipArchive::open() работает только
+     * с путями в ФС, стрим-чтение из памяти не поддерживается. Собирает все
+     * .csv-файлы из архива, конкатенируя их через "\n"; файлы без .csv-расширения
+     * игнорирует (мусорные записи / manifest-файлы).
+     *
+     * @return array{csvContent: string, filesInZip: int}
+     *
+     * @throws \RuntimeException если архив повреждён либо не содержит ни одного CSV
+     */
+    private function extractCsvFromZip(string $zipBytes, string $reportUuid): array
+    {
+        $tmpPath = tempnam(sys_get_temp_dir(), 'ozon-bronze-');
+        if (false === $tmpPath) {
+            throw new \RuntimeException('Ozon Performance: не удалось создать временный файл для распаковки ZIP');
+        }
+
+        try {
+            if (false === file_put_contents($tmpPath, $zipBytes)) {
+                throw new \RuntimeException('Ozon Performance: не удалось записать ZIP во временный файл');
+            }
+
+            $zip = new \ZipArchive();
+            $openResult = $zip->open($tmpPath);
+            if (true !== $openResult) {
+                throw new \RuntimeException(sprintf(
+                    'Ozon Performance: не удалось открыть ZIP-отчёт (uuid=%s, size=%d bytes, ZipArchive error code=%d)',
+                    $reportUuid,
+                    strlen($zipBytes),
+                    is_int($openResult) ? $openResult : -1,
+                ));
+            }
+
+            try {
+                $filesInZip = $zip->numFiles;
+                $csvParts = [];
+                for ($i = 0; $i < $filesInZip; ++$i) {
+                    $name = $zip->getNameIndex($i);
+                    if (false === $name) {
+                        continue;
+                    }
+                    if (!str_ends_with(strtolower($name), '.csv')) {
+                        continue;
+                    }
+                    $content = $zip->getFromIndex($i);
+                    if (false === $content) {
+                        continue;
+                    }
+                    // Для всех CSV-частей кроме первой отрезаем строку заголовка:
+                    // Ozon в мульти-файловом ZIP дублирует header в каждой части,
+                    // и без отрезания iterateCsvAssocRows() распарсит "header2" как
+                    // данные — для range-загрузок parseDateField('date') упадёт,
+                    // для single-day загрузок появится фантомная строка
+                    // campaign_id="campaign_id" с нулями в spend/views/clicks.
+                    if ([] !== $csvParts) {
+                        $newlinePos = strpos($content, "\n");
+                        if (false !== $newlinePos) {
+                            $content = substr($content, $newlinePos + 1);
+                        }
+                    }
+                    $csvParts[] = $content;
+                }
+            } finally {
+                $zip->close();
+            }
+
+            if ([] === $csvParts) {
+                throw new \RuntimeException(sprintf(
+                    'Ozon Performance: ZIP-отчёт %s не содержит CSV-файлов (всего записей в архиве: %d)',
+                    $reportUuid,
+                    $filesInZip,
+                ));
+            }
+
+            return [
+                'csvContent' => implode("\n", $csvParts),
+                'filesInZip' => $filesInZip,
+            ];
+        } finally {
+            @unlink($tmpPath);
+        }
+    }
+
+    /**
+     * @return list<OzonReportDownload>
+     */
+    public function getLastChunkDownloads(): array
+    {
+        return $this->lastChunkDownloads;
     }
 
     /**

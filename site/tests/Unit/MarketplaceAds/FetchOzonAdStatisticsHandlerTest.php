@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\MarketplaceAds;
 
 use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
+use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
+use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonReportDownload;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler;
@@ -14,6 +16,7 @@ use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
+use App\Shared\Service\Storage\StorageService;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use DG\BypassFinals;
 use Doctrine\ORM\EntityManagerInterface;
@@ -25,9 +28,10 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 // Bootstrap pins BypassFinals to an allowlist; finalizer is final readonly — extend
-// the allowlist so PHPUnit can double it.
+// the allowlist so PHPUnit can double it. StorageService тоже final — нужен для bronze-тестов.
 BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
+    '*/src/Shared/Service/Storage/StorageService.php',
 ]);
 
 /**
@@ -185,6 +189,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $this->createMock(AdLoadJobFinalizer::class),
             $em,
             $messageBus,
+            $this->createMock(StorageService::class),
             $logger,
             $marketplaceAdsLogger,
         );
@@ -792,6 +797,410 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
+    /**
+     * Bronze-сценарий 1: happy-path.
+     *
+     * OzonAdClient вернул один download, handler обязан вызвать StorageService::storeBytes
+     * с путём `companies/{cid}/marketplace-ads/ozon/bronze/{dateFrom}/{uuid}.{zip|csv}`
+     * и прописать результат в setFileStorage() каждого AdRawDocument чанка.
+     */
+    public function testHappyPathSavesBronzeFileAndSetsStoragePathOnDocument(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        $download = new OzonReportDownload(
+            rawBytes: "PK\x03\x04raw-zip-bytes",
+            csvContent: "date,campaign_id,sku,spend\n2026-03-01,1,SKU,100",
+            wasZip: true,
+            sizeBytes: 16,
+            sha256: str_repeat('a', 64),
+            reportUuid: 'report-uuid-001',
+            filesInZip: 1,
+        );
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 100]]],
+        ]);
+        $ozonClient->method('getLastChunkDownloads')->willReturn([$download]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $savedDoc = null;
+        $rawRepo->expects(self::once())
+            ->method('save')
+            ->willReturnCallback(static function (AdRawDocument $doc) use (&$savedDoc): void {
+                $savedDoc = $doc;
+            });
+
+        $storageService = $this->createMock(StorageService::class);
+        $storageService->expects(self::once())
+            ->method('storeBytes')
+            ->with(
+                "PK\x03\x04raw-zip-bytes",
+                sprintf(
+                    'companies/%s/marketplace-ads/ozon/bronze/%s/report-uuid-001.zip',
+                    self::COMPANY_ID,
+                    self::DATE_FROM,
+                ),
+            )
+            ->willReturn([
+                'storagePath' => 'companies/'.self::COMPANY_ID.'/marketplace-ads/ozon/bronze/'.self::DATE_FROM.'/report-uuid-001.zip',
+                'fileHash' => str_repeat('b', 64),
+                'sizeBytes' => 16,
+                'mimeType' => 'application/zip',
+            ]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $handler = $this->createHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $em,
+            $messageBus,
+            null,
+            $storageService,
+        );
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertNotNull($savedDoc);
+        self::assertSame(
+            'companies/'.self::COMPANY_ID.'/marketplace-ads/ozon/bronze/'.self::DATE_FROM.'/report-uuid-001.zip',
+            $savedDoc->getStoragePath(),
+        );
+        self::assertSame(str_repeat('b', 64), $savedDoc->getFileHash());
+        self::assertSame(16, $savedDoc->getFileSizeBytes());
+    }
+
+    /**
+     * Bronze-сценарий 2: несколько документов одного чанка ссылаются на ОДИН bronze-файл.
+     *
+     * Принцип «1 bronze = 1 chunk»: storeBytes должен быть вызван ровно один раз,
+     * а setFileStorage каждого из трёх AdRawDocument получает одинаковые
+     * storage_path/file_hash/size (первый download батча).
+     */
+    public function testMultipleDocumentsInChunkShareSameBronzeFile(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        $download = new OzonReportDownload(
+            rawBytes: 'csv-raw-bytes',
+            csvContent: 'csv-raw-bytes',
+            wasZip: false,
+            sizeBytes: 13,
+            sha256: str_repeat('c', 64),
+            reportUuid: 'shared-uuid',
+            filesInZip: 0,
+        );
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 100]]],
+            '2026-03-02' => ['rows' => [['spend' => 200]]],
+            '2026-03-03' => ['rows' => [['spend' => 300]]],
+        ]);
+        $ozonClient->method('getLastChunkDownloads')->willReturn([$download]);
+
+        $savedDocs = [];
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $rawRepo->expects(self::exactly(3))
+            ->method('save')
+            ->willReturnCallback(static function (AdRawDocument $doc) use (&$savedDocs): void {
+                $savedDocs[] = $doc;
+            });
+
+        $storageService = $this->createMock(StorageService::class);
+        // Критически важно: storeBytes вызывается РОВНО ОДИН раз для всего чанка,
+        // даже при трёх документах — иначе мы бы дублировали bronze-файлы.
+        $storageService->expects(self::once())
+            ->method('storeBytes')
+            ->willReturn([
+                'storagePath' => 'companies/'.self::COMPANY_ID.'/marketplace-ads/ozon/bronze/'.self::DATE_FROM.'/shared-uuid.csv',
+                'fileHash' => str_repeat('d', 64),
+                'sizeBytes' => 13,
+                'mimeType' => 'text/csv',
+            ]);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $handler = $this->createHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $em,
+            $messageBus,
+            null,
+            $storageService,
+        );
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertCount(3, $savedDocs);
+        $expectedPath = 'companies/'.self::COMPANY_ID.'/marketplace-ads/ozon/bronze/'.self::DATE_FROM.'/shared-uuid.csv';
+        foreach ($savedDocs as $doc) {
+            self::assertSame($expectedPath, $doc->getStoragePath(), 'все документы чанка должны ссылаться на один bronze-файл');
+            self::assertSame(str_repeat('d', 64), $doc->getFileHash());
+            self::assertSame(13, $doc->getFileSizeBytes());
+        }
+    }
+
+    /**
+     * Bronze-сценарий 3: формат пути.
+     *
+     * Проверяет, что handler строит путь вида
+     * `companies/{companyId}/marketplace-ads/ozon/bronze/{yyyy-mm-dd}/{uuid}.{zip|csv}`
+     * и что {yyyy-mm-dd} — это именно dateFrom чанка (не dateTo и не текущая дата).
+     */
+    public function testBronzePathContainsCompanyIdAndDate(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        $download = new OzonReportDownload(
+            rawBytes: "PK\x03\x04abc",
+            csvContent: 'unpacked',
+            wasZip: true,
+            sizeBytes: 7,
+            sha256: str_repeat('e', 64),
+            reportUuid: '0197f1e2-3456-7890-abcd-ef0123456789',
+            filesInZip: 1,
+        );
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            self::DATE_FROM => ['rows' => []],
+        ]);
+        $ozonClient->method('getLastChunkDownloads')->willReturn([$download]);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $rawRepo->method('save');
+
+        $capturedPath = null;
+        $storageService = $this->createMock(StorageService::class);
+        $storageService->expects(self::once())
+            ->method('storeBytes')
+            ->willReturnCallback(static function (string $bytes, string $path) use (&$capturedPath): array {
+                $capturedPath = $path;
+
+                return [
+                    'storagePath' => $path,
+                    'fileHash' => str_repeat('f', 64),
+                    'sizeBytes' => strlen($bytes),
+                    'mimeType' => 'application/zip',
+                ];
+            });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $handler = $this->createHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $em,
+            $messageBus,
+            null,
+            $storageService,
+        );
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertSame(
+            sprintf(
+                'companies/%s/marketplace-ads/ozon/bronze/%s/%s.zip',
+                self::COMPANY_ID,
+                self::DATE_FROM,
+                '0197f1e2-3456-7890-abcd-ef0123456789',
+            ),
+            $capturedPath,
+        );
+    }
+
+    /**
+     * Bronze-сценарий 4: multi-batch чанк (campaigns > 10 → несколько Ozon-отчётов).
+     *
+     * При батчинге Ozon возвращает несколько независимых ZIP-файлов, и сохранять
+     * только первый было бы нечестно: file_hash на всех AdRawDocument'ах чанка
+     * не соответствовал бы полным данным. В таком случае storeBytes НЕ вызывается
+     * вовсе, документы остаются со storage_path=null, а в marketplace_ads-канал
+     * пишется warning с batchCount.
+     */
+    public function testMultiBatchChunkDoesNotSaveBronzeButLogsWarning(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->method('incrementLoadedDays')->willReturn(1);
+
+        // Два download'а — эмулируют >10 кампаний, разнесённых по двум батчам
+        // внутри одного вызова fetchAdStatisticsRange().
+        $download1 = new OzonReportDownload(
+            rawBytes: "PK\x03\x04batch-1",
+            csvContent: 'csv-batch-1',
+            wasZip: true,
+            sizeBytes: 10,
+            sha256: str_repeat('a', 64),
+            reportUuid: 'uuid-batch-1',
+            filesInZip: 1,
+        );
+        $download2 = new OzonReportDownload(
+            rawBytes: "PK\x03\x04batch-2",
+            csvContent: 'csv-batch-2',
+            wasZip: true,
+            sizeBytes: 10,
+            sha256: str_repeat('b', 64),
+            reportUuid: 'uuid-batch-2',
+            filesInZip: 1,
+        );
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('fetchAdStatisticsRange')->willReturn([
+            '2026-03-01' => ['rows' => [['spend' => 100]]],
+            '2026-03-02' => ['rows' => [['spend' => 200]]],
+        ]);
+        $ozonClient->method('getLastChunkDownloads')->willReturn([$download1, $download2]);
+
+        $savedDocs = [];
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $rawRepo->method('save')->willReturnCallback(static function (AdRawDocument $doc) use (&$savedDocs): void {
+            $savedDocs[] = $doc;
+        });
+
+        // Критический инвариант: при multi-batch бронза НЕ пишется на диск.
+        $storageService = $this->createMock(StorageService::class);
+        $storageService->expects(self::never())->method('storeBytes');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $marketplaceAdsLogger = new class extends NullLogger {
+            /** @var array<string, mixed>|null */
+            public ?array $warningContext = null;
+
+            public function warning(string|\Stringable $message, array $context = []): void
+            {
+                if (str_contains((string) $message, 'Multi-batch chunk')) {
+                    $this->warningContext = $context;
+                }
+                parent::warning($message, $context);
+            }
+        };
+
+        $handler = new FetchOzonAdStatisticsHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $this->createMock(AdLoadJobFinalizer::class),
+            $em,
+            $messageBus,
+            $storageService,
+            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            $marketplaceAdsLogger,
+        );
+
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertNotNull($marketplaceAdsLogger->warningContext, 'warning "Multi-batch chunk" должен быть залогирован');
+        self::assertSame(self::JOB_ID, $marketplaceAdsLogger->warningContext['jobId']);
+        self::assertSame(self::COMPANY_ID, $marketplaceAdsLogger->warningContext['companyId']);
+        self::assertSame(self::DATE_FROM, $marketplaceAdsLogger->warningContext['dateFrom']);
+        self::assertSame(self::DATE_TO, $marketplaceAdsLogger->warningContext['dateTo']);
+        self::assertSame(2, $marketplaceAdsLogger->warningContext['batchCount']);
+
+        self::assertNotEmpty($savedDocs, 'документы должны создаваться даже без bronze');
+        foreach ($savedDocs as $doc) {
+            self::assertNull($doc->getStoragePath(), 'storage_path обязан оставаться null при multi-batch');
+            self::assertNull($doc->getFileHash(), 'file_hash обязан оставаться null при multi-batch');
+            self::assertNull($doc->getFileSizeBytes(), 'file_size_bytes обязан оставаться null при multi-batch');
+        }
+    }
+
     private function createHandler(
         OzonAdClient $ozonClient,
         AdRawDocumentRepository $rawRepo,
@@ -800,6 +1209,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         EntityManagerInterface $em,
         MessageBusInterface $messageBus,
         ?AdLoadJobFinalizer $finalizer = null,
+        ?StorageService $storageService = null,
     ): FetchOzonAdStatisticsHandler {
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
@@ -809,6 +1219,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
             $em,
             $messageBus,
+            $storageService ?? $this->createMock(StorageService::class),
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             new NullLogger(),
         );
