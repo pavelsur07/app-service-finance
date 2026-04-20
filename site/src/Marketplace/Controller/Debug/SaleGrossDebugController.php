@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Controller\Debug;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\Shared\Service\ActiveCompanyService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -25,26 +26,34 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_USER')]
 final class SaleGrossDebugController extends AbstractController
 {
-    private const UUID_REGEX = '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i';
     private const DATE_REGEX = '/^\d{4}-\d{2}-\d{2}$/';
     private const TOP_DELTA_LIMIT = 50;
 
     public function __construct(
         private readonly Connection $connection,
+        private readonly ActiveCompanyService $activeCompanyService,
     ) {
     }
 
     #[Route('/sale-gross', name: 'marketplace_debug_sale_gross', methods: ['GET'])]
     public function __invoke(Request $request): JsonResponse
     {
-        $companyId = (string) $request->query->get('company_id', '');
+        // IDOR-protection: company всегда берётся из сессии активной компании
+        // пользователя; query-параметр company_id оставлен для читаемости URL
+        // в спецификации, но игнорируется / валидируется на совпадение.
+        $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
+
+        $requestedCompanyId = (string) $request->query->get('company_id', '');
+        if ($requestedCompanyId !== '' && $requestedCompanyId !== $companyId) {
+            return $this->json([
+                'error' => 'company_id в query не совпадает с активной компанией пользователя',
+            ], 403);
+        }
+
         $marketplace = (string) $request->query->get('marketplace', '');
         $from = (string) $request->query->get('from', '');
         $to = (string) $request->query->get('to', '');
 
-        if (!preg_match(self::UUID_REGEX, $companyId)) {
-            return $this->json(['error' => 'company_id must be a UUID'], 400);
-        }
         if (MarketplaceType::tryFrom($marketplace) === null) {
             return $this->json([
                 'error' => 'marketplace must be one of: '
