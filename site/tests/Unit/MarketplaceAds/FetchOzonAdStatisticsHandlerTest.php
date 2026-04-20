@@ -6,6 +6,7 @@ namespace App\Tests\Unit\MarketplaceAds;
 
 use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonReportDownload;
@@ -246,6 +247,93 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             self::DATE_FROM,
             self::DATE_TO,
         ));
+    }
+
+    /**
+     * Сценарий 3.5: OzonStatisticsQueueFullException — очередь отчётов Ozon перегружена.
+     *
+     * NOT_STARTED > 5 минут → client выбросил typed exception. Handler должен:
+     *   - вызвать markFailed с понятным пользовательским сообщением;
+     *   - залогировать warning с reportUuid и waitedSeconds;
+     *   - обернуть в UnrecoverableMessageHandlingException (не retry немедленно —
+     *     повтор имеет смысл только на следующий день, когда очередь Ozon рассосётся).
+     * markChunkCompleted НЕ вызывается.
+     */
+    public function testQueueFullExceptionMarksFailedAndThrowsUnrecoverable(): void
+    {
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::once())
+            ->method('markFailed')
+            ->with(
+                AdLoadJobBuilder::DEFAULT_ID,
+                self::COMPANY_ID,
+                self::stringContains('Очередь отчётов Ozon Performance перегружена'),
+            )
+            ->willReturn(1);
+        $jobRepo->expects(self::never())->method('incrementLoadedDays');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $queueFull = new OzonStatisticsQueueFullException('test-uuid-queue-full', 305);
+        $ozonClient->method('fetchAdStatisticsRange')->willThrowException($queueFull);
+
+        $rawRepo = $this->createMock(AdRawDocumentRepository::class);
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->expects(self::never())->method('markChunkCompleted');
+
+        $marketplaceAdsLogger = new class extends NullLogger {
+            /** @var array<string, mixed>|null */
+            public ?array $warningContext = null;
+
+            public function warning(string|\Stringable $message, array $context = []): void
+            {
+                if (str_contains((string) $message, 'Ozon statistics queue full')) {
+                    $this->warningContext = $context;
+                }
+                parent::warning($message, $context);
+            }
+        };
+
+        $handler = new FetchOzonAdStatisticsHandler(
+            $ozonClient,
+            $rawRepo,
+            $jobRepo,
+            $chunkProgressRepo,
+            $this->createMock(AdLoadJobFinalizer::class),
+            $em,
+            $messageBus,
+            $this->createMock(StorageService::class),
+            new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
+            $marketplaceAdsLogger,
+        );
+
+        try {
+            $handler(new FetchOzonAdStatisticsMessage(
+                AdLoadJobBuilder::DEFAULT_ID,
+                self::COMPANY_ID,
+                self::DATE_FROM,
+                self::DATE_TO,
+            ));
+            self::fail('expected UnrecoverableMessageHandlingException');
+        } catch (UnrecoverableMessageHandlingException $e) {
+            self::assertSame(
+                $queueFull,
+                $e->getPrevious(),
+                'UnrecoverableMessageHandlingException должен содержать оригинальный OzonStatisticsQueueFullException как previous',
+            );
+        }
+
+        self::assertNotNull($marketplaceAdsLogger->warningContext, 'warning "Ozon statistics queue full" должен быть залогирован');
+        self::assertSame('test-uuid-queue-full', $marketplaceAdsLogger->warningContext['reportUuid']);
+        self::assertSame(305, $marketplaceAdsLogger->warningContext['waitedSeconds']);
     }
 
     /**

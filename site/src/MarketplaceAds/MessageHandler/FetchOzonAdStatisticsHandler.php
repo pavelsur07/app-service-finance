@@ -7,6 +7,7 @@ namespace App\MarketplaceAds\MessageHandler;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
@@ -163,6 +164,29 @@ final class FetchOzonAdStatisticsHandler
 
             throw new UnrecoverableMessageHandlingException(
                 'FetchOzonAdStatisticsMessage: Ozon permanent failure — '.$e->getMessage(),
+                0,
+                $e,
+            );
+        } catch (OzonStatisticsQueueFullException $e) {
+            // Ozon Performance API перегружен: отчёт завис в NOT_STARTED
+            // дольше порога. Messenger-retry по расписанию (секунды/минуты)
+            // бессмысленен — деградация обычно длится часы. Отдаём
+            // Unrecoverable, чтобы пользователь вручную повторил загрузку
+            // позже, когда Ozon оживёт.
+            $this->adLoadJobRepository->markFailed(
+                $message->jobId,
+                $message->companyId,
+                'Очередь отчётов Ozon Performance перегружена, повторите загрузку позже: '.$e->getMessage(),
+            );
+            $this->marketplaceAdsLogger->warning('Ozon statistics queue full', [
+                'jobId' => $message->jobId,
+                'companyId' => $message->companyId,
+                'reportUuid' => $e->getReportUuid(),
+                'waitedSeconds' => $e->getWaitedSeconds(),
+            ]);
+
+            throw new UnrecoverableMessageHandlingException(
+                $e->getMessage(),
                 0,
                 $e,
             );

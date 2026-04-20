@@ -680,6 +680,32 @@ final class OzonAdPendingReportState
 
 ---
 
+## Exceptions — MarketplaceAds
+
+### `src/MarketplaceAds/Infrastructure/Api/Ozon/OzonPermanentApiException.php`
+Permanent-ошибка Ozon API (403, missing credentials, отсутствие scope «Продвижение»).
+Бросается из `OzonAdClient`, ловится в `FetchOzonAdStatisticsHandler` →
+`markFailed` + `UnrecoverableMessageHandlingException`. Messenger не ретраит.
+
+### `src/MarketplaceAds/Exception/OzonStatisticsQueueFullException.php`
+```php
+final class OzonStatisticsQueueFullException extends \RuntimeException
+{
+    public function __construct(string $reportUuid, int $waitedSeconds);
+    public function getReportUuid(): string;
+    public function getWaitedSeconds(): int;
+}
+```
+> Ozon Performance API перегружен: отчёт застрял в `NOT_STARTED` дольше 5 минут
+> (`OzonAdClient::POLL_NOT_STARTED_MAX_SECONDS`). Отдельный тип от
+> `OzonPermanentApiException`, потому что причина временная — стоит повторить
+> загрузку вручную позже (как правило, на следующий день). `FetchOzonAdStatisticsHandler`
+> ловит, маркирует job failed с понятным пользовательским сообщением и оборачивает
+> в `UnrecoverableMessageHandlingException`, чтобы Messenger не ретраил в пределах
+> минут — ретрай имеет смысл только после нормализации очереди Ozon.
+
+---
+
 ## Shared-сервисы (доступны во всех модулях)
 
 ```php

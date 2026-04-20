@@ -350,6 +350,32 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         self::assertNull($foreign, 'findByOzonUuid не должен возвращать строку чужой company');
     }
 
+    public function testGetPollStartTimeReturnsRequestedAtTimestamp(): void
+    {
+        $this->seedCompany();
+        $this->em->flush();
+
+        $before = microtime(true);
+        $entity = $this->repository->create(
+            companyId: self::COMPANY_ID,
+            ozonUuid: 'uuid-poll-start',
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-03'),
+            campaignIds: ['111'],
+            jobId: null,
+        );
+        $after = microtime(true);
+
+        $ts = $this->repository->getPollStartTime($entity);
+
+        self::assertNotNull($ts);
+        // Допуск в 1 секунду — Entity использует new DateTimeImmutable() без микросекунд,
+        // Unix-timestamp может оказаться чуть раньше $before при округлении.
+        self::assertGreaterThanOrEqual((float) ((int) $before) - 1, $ts);
+        self::assertLessThanOrEqual($after + 1, $ts);
+        self::assertSame((float) $entity->getRequestedAt()->getTimestamp(), $ts);
+    }
+
     public function testUniqueConstraintOnOzonUuid(): void
     {
         $this->seedCompany();

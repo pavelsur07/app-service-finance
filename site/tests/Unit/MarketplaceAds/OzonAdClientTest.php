@@ -1221,6 +1221,304 @@ final class OzonAdClientTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // Early-fail: NOT_STARTED-таймаут через resume c искусственно старым
+    // requestedAt. Resume-путь пропускает POST /statistics и стартует
+    // pollReport с pollStartedAt=исходный requestedAt. Если waitedSeconds
+    // > POLL_NOT_STARTED_MAX_SECONDS (300), должен бросаться
+    // OzonStatisticsQueueFullException + markFinalized(ABANDONED).
+    //
+    // Тест не использует реальные sleep(5) × 60 — неприемлемо по времени.
+    // Вместо этого эксплуатируется resume-ветка: pollStartedAt приходит
+    // из findInFlightByJob(), early-fail срабатывает на первой же итерации.
+    // -----------------------------------------------------------------
+    public function testPollReportEarlyFailsOnProlongedNotStartedPhase(): void
+    {
+        // requestedAt зафиксирован 301 секунду назад — превышает 5-минутное окно.
+        $stale = $this->makePendingReport(
+            ozonUuid: 'uuid-qf',
+            jobId: 'bbbbbbbb-bbbb-bbbb-bbbb-000000000001',
+            campaignIds: ['111'],
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-01'),
+            requestedAt: (new \DateTimeImmutable())->modify('-301 seconds'),
+        );
+
+        $http = new MockHttpClient([
+            new MockResponse($this->tokenBody('TKN-QF')),
+            new MockResponse($this->campaignListBody(1)),
+            // НЕТ POST /statistics: resume-путь пропускает шаг.
+            new MockResponse(json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR)),
+        ]);
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->expects(self::once())
+            ->method('findInFlightByJob')
+            ->with(self::COMPANY_ID, 'bbbbbbbb-bbbb-bbbb-bbbb-000000000001')
+            ->willReturn([$stale]);
+        // Resume-путь НЕ вызывает create(): мы продолжаем работу по существующему UUID.
+        $repo->expects(self::never())->method('create');
+        $repo->expects(self::once())
+            ->method('updateState')
+            ->with(self::COMPANY_ID, 'uuid-qf', 'NOT_STARTED', self::anything(), 1, self::isNull())
+            ->willReturn(1);
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(
+                self::COMPANY_ID,
+                'uuid-qf',
+                'ABANDONED',
+                self::callback(static fn (?string $msg): bool => null !== $msg && str_contains($msg, 'NOT_STARTED timeout')),
+            )
+            ->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        try {
+            $client->fetchAdStatisticsRange(
+                self::COMPANY_ID,
+                new \DateTimeImmutable('2026-03-01'),
+                new \DateTimeImmutable('2026-03-01'),
+                'bbbbbbbb-bbbb-bbbb-bbbb-000000000001',
+            );
+            self::fail('Expected OzonStatisticsQueueFullException');
+        } catch (\App\MarketplaceAds\Exception\OzonStatisticsQueueFullException $e) {
+            self::assertSame('uuid-qf', $e->getReportUuid());
+            self::assertGreaterThanOrEqual(300, $e->getWaitedSeconds());
+        }
+
+        // Лог итерации содержит isNotStartedPhase=true для наблюдаемости.
+        $iterationRecord = $this->findLogRecord('Ozon poll iteration');
+        self::assertTrue($iterationRecord['context']['isNotStartedPhase']);
+        self::assertSame('NOT_STARTED', $iterationRecord['context']['state']);
+    }
+
+    // -----------------------------------------------------------------
+    // Счётчик NOT_STARTED не ломает обычный путь: отчёт идёт NOT_STARTED →
+    // IN_PROGRESS → OK в пределах 5-минутного окна, early-fail не срабатывает.
+    // Реальный sleep(5) × 2 = ~10 секунд — сознательный trade-off.
+    // -----------------------------------------------------------------
+    public function testPollReportNotStartedFollowedByProgressCompletesSuccessfully(): void
+    {
+        $http = new MockHttpClient([
+            new MockResponse($this->tokenBody('TKN-OK-NS')),
+            new MockResponse($this->campaignListBody(1)),
+            new MockResponse('{"UUID":"uuid-ok-ns"}'),
+            // NOT_STARTED → IN_PROGRESS → OK: каждая итерация требует sleep(5)
+            // между запросами (кроме последней), итого ~10 сек реального времени.
+            new MockResponse(json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR)),
+            new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-ok-ns')),
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+
+        $result = $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+        );
+
+        // Early-fail не сработал → получили полноценный результат.
+        self::assertCount(1, $result);
+        self::assertArrayHasKey('2026-03-01', $result);
+    }
+
+    // -----------------------------------------------------------------
+    // Resume: findInFlightByJob возвращает свежий UUID, requestStatistics НЕ
+    // вызывается, pollReport стартует с существующим uuid и OK-ответом.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeResumesFreshInFlightUuid(): void
+    {
+        $fresh = $this->makePendingReport(
+            ozonUuid: 'uuid-resume-fresh',
+            jobId: 'cccccccc-cccc-cccc-cccc-000000000001',
+            campaignIds: ['111'],
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-01'),
+            requestedAt: (new \DateTimeImmutable())->modify('-60 seconds'),
+        );
+
+        /** @var list<array{method: string, url: string, auth: ?string}> $requests */
+        $requests = [];
+
+        $responses = $this->scriptedResponsesWithRecording($requests, [
+            new MockResponse($this->tokenBody('TKN-R1')),
+            new MockResponse($this->campaignListBody(1)),
+            // НЕТ POST /statistics — ожидаем сразу GET state.
+            new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-resume-fresh')),
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        $http = new MockHttpClient($responses);
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->method('findInFlightByJob')->willReturn([$fresh]);
+        $repo->expects(self::never())->method('create');
+        $repo->method('updateState')->willReturn(1);
+        $repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(self::COMPANY_ID, 'uuid-resume-fresh', 'OK', null)
+            ->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'cccccccc-cccc-cccc-cccc-000000000001',
+        );
+
+        // Ровно 4 запроса: token, /campaign, /state, /download. НЕТ POST /statistics.
+        self::assertCount(4, $requests, 'Resume path must skip POST /statistics');
+        self::assertStringContainsString('/api/client/token', $requests[0]['url']);
+        self::assertStringContainsString('/api/client/campaign', $requests[1]['url']);
+        self::assertStringContainsString('/api/client/statistics/uuid-resume-fresh', $requests[2]['url']);
+        self::assertStringContainsString('/api/client/statistics/report', $requests[3]['url']);
+
+        // Log: "Resuming existing Ozon UUID instead of creating new" с deterministic полями.
+        $resumeLog = $this->findLogRecord('Resuming existing Ozon UUID instead of creating new');
+        self::assertSame('info', $resumeLog['level']);
+        self::assertSame('uuid-resume-fresh', $resumeLog['context']['reportUuid']);
+        self::assertSame('cccccccc-cccc-cccc-cccc-000000000001', $resumeLog['context']['jobId']);
+        self::assertGreaterThanOrEqual(59, $resumeLog['context']['ageSeconds']);
+    }
+
+    // -----------------------------------------------------------------
+    // Resume: stale UUID (старше 15 минут) — старая запись финализируется
+    // ABANDONED с reason='Resume threshold exceeded', создаётся новый POST.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsRangeAbandonsStaleUuidAndCreatesNew(): void
+    {
+        $stale = $this->makePendingReport(
+            ozonUuid: 'uuid-resume-stale',
+            jobId: 'dddddddd-dddd-dddd-dddd-000000000001',
+            campaignIds: ['111'],
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-01'),
+            requestedAt: (new \DateTimeImmutable())->modify('-901 seconds'),
+        );
+
+        /** @var list<array{method: string, url: string, auth: ?string}> $requests */
+        $requests = [];
+
+        $responses = $this->scriptedResponsesWithRecording($requests, [
+            new MockResponse($this->tokenBody('TKN-R2')),
+            new MockResponse($this->campaignListBody(1)),
+            // Новый POST /statistics ДОЛЖЕН пройти — stale UUID отброшен.
+            new MockResponse('{"UUID":"uuid-resume-new"}'),
+            new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-resume-new')),
+            new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
+        ]);
+
+        $http = new MockHttpClient($responses);
+
+        $finalizedCalls = [];
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $repo->method('findInFlightByJob')->willReturn([$stale]);
+        // create() ВЫЗЫВАЕТСЯ для нового UUID.
+        $repo->expects(self::once())
+            ->method('create')
+            ->with(self::COMPANY_ID, 'uuid-resume-new', self::anything(), self::anything(), self::anything(), 'dddddddd-dddd-dddd-dddd-000000000001')
+            ->willReturnCallback(
+                static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                    => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+            );
+        $repo->method('updateState')->willReturn(1);
+        $repo->method('markFinalized')->willReturnCallback(static function (string $companyId, string $uuid, string $state, ?string $error = null) use (&$finalizedCalls): int {
+            $finalizedCalls[] = ['uuid' => $uuid, 'state' => $state, 'error' => $error];
+
+            return 1;
+        });
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        $client->fetchAdStatisticsRange(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-01'),
+            'dddddddd-dddd-dddd-dddd-000000000001',
+        );
+
+        // Stale uuid финализирован как ABANDONED, новый — как OK.
+        self::assertCount(2, $finalizedCalls);
+        self::assertSame('uuid-resume-stale', $finalizedCalls[0]['uuid']);
+        self::assertSame('ABANDONED', $finalizedCalls[0]['state']);
+        self::assertSame('Resume threshold exceeded', $finalizedCalls[0]['error']);
+        self::assertSame('uuid-resume-new', $finalizedCalls[1]['uuid']);
+        self::assertSame('OK', $finalizedCalls[1]['state']);
+
+        // Новый POST /statistics должен произойти.
+        $statsPost = array_filter(
+            $requests,
+            static fn (array $r): bool => 'POST' === $r['method'] && str_ends_with($r['url'], '/api/client/statistics'),
+        );
+        self::assertCount(1, $statsPost, 'Stale resume обязан привести к новому POST /statistics');
+
+        // Warning о stale UUID залогирован.
+        $warningRecord = $this->findLogRecord('Stale Ozon UUID found, abandoning before new request');
+        self::assertSame('warning', $warningRecord['level']);
+        self::assertSame('uuid-resume-stale', $warningRecord['context']['reportUuid']);
+    }
+
+    // -----------------------------------------------------------------
+    // Resume: jobId=null (legacy-вызов fetchAdStatistics) → resume полностью
+    // пропущен, findInFlightByJob не вызывается, обычный POST-флоу.
+    // -----------------------------------------------------------------
+    public function testFetchAdStatisticsLegacyNullJobIdSkipsResume(): void
+    {
+        $http = $this->buildHttpClientForRange(
+            tokenBody: $this->tokenBody('TKN-NULL'),
+            campaignListBody: $this->campaignListBody(1),
+            statisticsBody: '{"UUID":"uuid-null-job"}',
+            stateBody: $this->stateReadyBody('/api/client/statistics/report?UUID=uuid-null-job'),
+            downloadCsv: $this->loadFixture('ozon_single_day_legacy.csv'),
+        );
+
+        $repo = $this->createMock(OzonAdPendingReportRepository::class);
+        // findInFlightByJob НЕ должен быть вызван — resume применяется только
+        // при наличии jobId (якорь для сравнения батчей).
+        $repo->expects(self::never())->method('findInFlightByJob');
+        $repo->method('create')->willReturnCallback(
+            static fn (string $companyId, string $ozonUuid, \DateTimeImmutable $from, \DateTimeImmutable $to, array $campaignIds, ?string $jobId): OzonAdPendingReport
+                => new OzonAdPendingReport($companyId, $ozonUuid, $from, $to, $campaignIds, $jobId),
+        );
+        $repo->method('updateState')->willReturn(1);
+        $repo->method('markFinalized')->willReturn(1);
+
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+
+        // fetchAdStatistics — legacy-контракт без jobId.
+        $client->fetchAdStatistics(self::COMPANY_ID, new \DateTimeImmutable('2026-03-01'));
+    }
+
+    /**
+     * Создаёт OzonAdPendingReport с произвольным requestedAt через reflection.
+     * Нужно для тестов resume-ветки: Entity в конструкторе жёстко ставит
+     * requestedAt=now(), а тест требует искусственного "ещё живого" или
+     * "уже мёртвого" возраста записи.
+     *
+     * @param list<string> $campaignIds
+     */
+    private function makePendingReport(
+        string $ozonUuid,
+        ?string $jobId,
+        array $campaignIds,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        \DateTimeImmutable $requestedAt,
+    ): OzonAdPendingReport {
+        $report = new OzonAdPendingReport(self::COMPANY_ID, $ozonUuid, $dateFrom, $dateTo, $campaignIds, $jobId);
+
+        $ref = new \ReflectionProperty(OzonAdPendingReport::class, 'requestedAt');
+        $ref->setAccessible(true);
+        $ref->setValue($report, $requestedAt);
+
+        return $report;
+    }
+
+    // -----------------------------------------------------------------
     // helpers
     // -----------------------------------------------------------------
 
