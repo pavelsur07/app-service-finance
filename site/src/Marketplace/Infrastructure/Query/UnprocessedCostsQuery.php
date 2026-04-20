@@ -163,7 +163,7 @@ final class UnprocessedCostsQuery
     ): string {
         $result = $this->connection->fetchOne(
             <<<'SQL'
-            SELECT COALESCE(SUM(c.amount), 0)
+            SELECT COALESCE(SUM(CASE WHEN c.operation_type = 'storno' THEN -c.amount ELSE c.amount END), 0)
             FROM marketplace_costs c
             INNER JOIN marketplace_cost_pl_mappings m
                 ON m.cost_category_id = c.category_id
