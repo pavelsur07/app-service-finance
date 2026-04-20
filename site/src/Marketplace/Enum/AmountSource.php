@@ -9,6 +9,8 @@ namespace App\Marketplace\Enum;
  *
  * Продажи (из marketplace_sales):
  *   SALE_GROSS      → price_per_unit × quantity  (цена продавца × кол-во)
+ *                     ⚠ Для Ozon разворачивается в total_revenue: у Ozon
+ *                       price_per_unit хранит accrual за posting целиком.
  *   SALE_REVENUE    → total_revenue              (accruals_for_sale из финансовых транзакций)
  *   SALE_COST_PRICE → cost_price × quantity      (себестоимость)
  *
@@ -70,10 +72,19 @@ enum AmountSource: string
         };
     }
 
-    public function getSqlExpression(): string
+    /**
+     * Для Ozon SALE_GROSS возвращает s.total_revenue, т.к. price_per_unit
+     * у Ozon хранит accrual за posting целиком (не цену за штуку), а quantity —
+     * число item'ов в posting'е. Формула price_per_unit × quantity умножала бы
+     * accrual на количество товаров в заказе и завышала выручку на
+     * multi-item posting'ах (см. OzonSalesRawProcessor::processBatch:216-229).
+     */
+    public function getSqlExpression(?MarketplaceType $marketplace = null): string
     {
         return match ($this) {
-            self::SALE_GROSS        => 's.price_per_unit * s.quantity',
+            self::SALE_GROSS        => $marketplace === MarketplaceType::OZON
+                ? 's.total_revenue'
+                : 's.price_per_unit * s.quantity',
             self::SALE_REVENUE      => 's.total_revenue',
             self::SALE_COST_PRICE   => 's.cost_price * s.quantity',
             self::SALE_REALIZATION  => 'r.total_amount',        // marketplace_ozon_realizations: price_per_instance × quantity
