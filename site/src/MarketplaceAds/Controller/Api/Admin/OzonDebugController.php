@@ -141,8 +141,9 @@ final class OzonDebugController extends AbstractController
 
         $fromStr = isset($payload['from']) ? (string) $payload['from'] : '';
         $toStr = isset($payload['to']) ? (string) $payload['to'] : '';
-        $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $fromStr);
-        $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $toStr);
+        $utc = new \DateTimeZone('UTC');
+        $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $fromStr, $utc);
+        $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $toStr, $utc);
         if (false === $dateFrom || $dateFrom->format('Y-m-d') !== $fromStr) {
             return $this->error('from: ожидается YYYY-MM-DD', 400);
         }
@@ -292,7 +293,7 @@ final class OzonDebugController extends AbstractController
         if ('' === $value) {
             return $this->error('companyId: обязательный параметр', 400);
         }
-        if (1 !== preg_match('/^[0-9a-fA-F-]{32,36}$/', $value)) {
+        if (1 !== preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value)) {
             return $this->error('companyId: ожидается UUID', 400);
         }
 

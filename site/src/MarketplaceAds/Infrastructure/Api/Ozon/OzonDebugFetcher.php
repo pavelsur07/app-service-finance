@@ -72,9 +72,18 @@ final class OzonDebugFetcher
             ]);
 
             $statusCode = $response->getStatusCode();
-            $rawBody = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new \RuntimeException('Ozon Performance: сеть недоступна при получении токена: '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $rawBody = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, token): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($rawBody);
@@ -122,9 +131,18 @@ final class OzonDebugFetcher
             ]);
 
             $statusCode = $response->getStatusCode();
-            $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new \RuntimeException('Ozon Performance: сеть недоступна (GET /campaign): '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /campaign): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -212,9 +230,18 @@ final class OzonDebugFetcher
             ]);
 
             $statusCode = $response->getStatusCode();
-            $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new \RuntimeException('Ozon Performance: сеть недоступна (POST /statistics): '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, POST /statistics): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -272,9 +299,18 @@ final class OzonDebugFetcher
             );
 
             $statusCode = $response->getStatusCode();
-            $body = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new \RuntimeException('Ozon Performance: сеть недоступна (GET /statistics/{uuid}): '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, GET /statistics/{uuid}): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
         }
 
         $data = $this->decodeJsonSafe($body);
@@ -342,9 +378,18 @@ final class OzonDebugFetcher
             ]);
 
             $statusCode = $response->getStatusCode();
-            $rawBytes = $response->getContent(false);
         } catch (TransportExceptionInterface $e) {
             throw new \RuntimeException('Ozon Performance: сеть недоступна (download): '.$e->getMessage(), 0, $e);
+        }
+
+        try {
+            $rawBytes = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: обрыв соединения при чтении тела (HTTP %d, download): %s',
+                $statusCode,
+                $e->getMessage(),
+            ), 0, $e);
         }
 
         if ($statusCode < 200 || $statusCode >= 300) {
