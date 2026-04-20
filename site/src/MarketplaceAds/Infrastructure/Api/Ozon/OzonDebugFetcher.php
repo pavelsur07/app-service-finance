@@ -177,6 +177,7 @@ final class OzonDebugFetcher
      *   status_code: int,
      *   items: list<array<string, mixed>>,
      *   total: int,
+     *   page_items_count: int,
      *   states_breakdown: array<string, int>,
      *   raw_body: array<string, mixed>,
      * }
@@ -250,10 +251,13 @@ final class OzonDebugFetcher
             $statesBreakdown[$key] = ($statesBreakdown[$key] ?? 0) + 1;
         }
 
+        $apiTotal = isset($data['total']) && is_numeric($data['total']) ? (int) $data['total'] : null;
+
         return [
             'status_code' => $statusCode,
             'items' => $items,
-            'total' => count($items),
+            'total' => $apiTotal ?? count($items),
+            'page_items_count' => count($items),
             'states_breakdown' => $statesBreakdown,
             'raw_body' => $data,
         ];

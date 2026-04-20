@@ -151,6 +151,7 @@ final class OzonDebugController extends AbstractController
             'companyId' => $companyId,
             'status_code' => $result['status_code'],
             'total' => $result['total'],
+            'page_items_count' => $result['page_items_count'],
             'states_breakdown' => $result['states_breakdown'],
             'items' => $result['items'],
             'raw_body' => $result['raw_body'],

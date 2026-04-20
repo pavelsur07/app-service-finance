@@ -277,8 +277,12 @@
 
             document.getElementById('btn-fetch-reports-list').addEventListener('click', function (e) {
                 withBusy(e.currentTarget, function () {
+                    // pageSize=1000 — верхний предел Ozon, чтобы за один запрос увидеть
+                    // максимум очереди без UI-пагинации (UI-пагинация здесь избыточна
+                    // для ad-hoc debug).
                     var url = '/api/marketplace-ads/admin/ozon/debug/statistics/list'
-                        + '?companyId=' + encodeURIComponent(companyId());
+                        + '?companyId=' + encodeURIComponent(companyId())
+                        + '&pageSize=1000';
                     return doFetch(url).then(function (res) {
                         renderResult('result-reports-list', res.data, res.ok);
                         var summary = document.getElementById('reports-list-summary');
@@ -288,9 +292,12 @@
                         }
                         var states = res.data.states_breakdown || {};
                         var total = res.data.total || 0;
+                        var pageCount = res.data.page_items_count || 0;
                         var totalBadge = document.createElement('span');
                         totalBadge.className = 'badge bg-secondary me-2';
-                        totalBadge.textContent = 'Всего: ' + total;
+                        totalBadge.textContent = (total > pageCount)
+                            ? ('Всего в Ozon: ' + total + ' (на этой странице: ' + pageCount + ')')
+                            : ('Всего: ' + total);
                         summary.appendChild(totalBadge);
                         Object.keys(states).forEach(function (state) {
                             var count = states[state];

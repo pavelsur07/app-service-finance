@@ -133,7 +133,7 @@ final class OzonDebugControllerTest extends WebTestCaseBase
                     ['UUID' => 'uuid-3', 'state' => 'IN_PROGRESS'],
                     ['UUID' => 'uuid-4', 'state' => 'IN_PROGRESS'],
                 ],
-                'total' => 4,
+                'total' => 127,
             ], \JSON_THROW_ON_ERROR)),
         ]);
 
@@ -146,13 +146,43 @@ final class OzonDebugControllerTest extends WebTestCaseBase
         $data = $this->decode($client);
         self::assertSame(self::COMPANY_ID, $data['companyId']);
         self::assertSame(200, $data['status_code']);
-        self::assertSame(4, $data['total']);
+        // total из Ozon (полная очередь), не count($items) первой страницы
+        self::assertSame(127, $data['total']);
+        self::assertSame(4, $data['page_items_count']);
         self::assertSame(
             ['OK' => 1, 'NOT_STARTED' => 1, 'IN_PROGRESS' => 2],
             $data['states_breakdown'],
         );
         self::assertCount(4, $data['items']);
         self::assertSame('uuid-1', $data['items'][0]['UUID']);
+    }
+
+    public function testStatisticsListFallsBackToItemsCountWhenNoTotalInResponse(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $this->setHttpClient($client, [
+            new MockResponse(json_encode([
+                'access_token' => 'TKN-list-2',
+                'expires_in' => 1800,
+            ], \JSON_THROW_ON_ERROR)),
+            new MockResponse(json_encode([
+                'items' => [
+                    ['UUID' => 'uuid-a', 'state' => 'OK'],
+                    ['UUID' => 'uuid-b', 'state' => 'OK'],
+                ],
+            ], \JSON_THROW_ON_ERROR)),
+        ]);
+
+        $admin = $this->seedAdminAndCompany();
+        $this->loginAs($client, $admin);
+
+        $client->request('GET', self::URL_STATS_LIST.'?companyId='.self::COMPANY_ID);
+
+        self::assertResponseIsSuccessful();
+        $data = $this->decode($client);
+        self::assertSame(2, $data['total']);
+        self::assertSame(2, $data['page_items_count']);
     }
 
     public function testStatisticsListRequires403WithoutSuperAdmin(): void
