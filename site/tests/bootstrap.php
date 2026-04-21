@@ -10,6 +10,7 @@ DG\BypassFinals::allowPaths([
     '*/src/Marketplace/Infrastructure/Query/UnprocessedCostsQuery.php',
     '*/src/MarketplaceAnalytics/Domain/Service/CostMappingResolver.php',
     '*/src/MarketplaceAnalytics/Domain/Service/DefaultCostMappingSeedPolicy.php',
+    '*/src/MarketplaceAnalytics/Infrastructure/Query/UnitExtendedQuery.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {
