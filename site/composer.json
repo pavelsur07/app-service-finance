@@ -13,6 +13,7 @@
         "doctrine/doctrine-bundle": "^2.18.2",
         "doctrine/doctrine-migrations-bundle": "^3.7",
         "doctrine/orm": "^3.6.1",
+        "nelmio/api-doc-bundle": "^5.10",
         "openspout/openspout": "4.28.5",
         "pagerfanta/doctrine-dbal-adapter": "^4.8",
         "pagerfanta/doctrine-orm-adapter": "^4.7.2",

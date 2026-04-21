@@ -789,6 +789,30 @@ Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 м
 
 ---
 
+## API Documentation
+
+**URL:** `https://app.vashfindir.ru/api/doc` (требует авторизации `ROLE_USER`)
+**Spec JSON:** `https://app.vashfindir.ru/api/doc.json`
+
+**Инструмент:** `nelmio/api-doc-bundle` (OpenAPI 3.x)
+
+### Coverage
+
+| Статус | Эндпоинтов | Примечание |
+|---|---|---|
+| Документировано | 2 | Health (live, ready) |
+| Ожидает документации | ~50 | См. план по модулям |
+| Исключено (debug/admin) | ~22 | Не публикуются в OpenAPI |
+
+### Правила документирования
+
+- Атрибуты `#[OA\*]` ставятся над методом контроллера, логика метода не меняется
+- Debug- и admin-эндпоинты в OpenAPI не публикуются (см. `path_patterns` в `config/packages/nelmio_api_doc.yaml`)
+- Формат ошибок: целевой — `Problem` (RFC 7807), существующие legacy-форматы документируются как есть
+- Request/Response DTO описываются `#[OA\Schema]` рядом с классом DTO
+
+---
+
 ## Маршруты — конвенция
 
 ```

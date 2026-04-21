@@ -1,0 +1,64 @@
+nelmio_api_doc:
+    documentation:
+        info:
+            title: 'VashFinDir API'
+            description: |
+                Внутренний API приложения VashFinDir.
+
+                **Аутентификация:** session cookie `PHPSESSID`, устанавливается после логина через `/login`.
+
+                **Контекст компании:** определяется сервером через `ActiveCompanyService` на основе сессии.
+                Параметр `companyId` в запросах НЕ передаётся — он определяется автоматически.
+            version: '1.0.0'
+        servers:
+            - url: 'https://app.vashfindir.ru'
+              description: 'Production'
+            - url: 'http://localhost'
+              description: 'Local development'
+        components:
+            securitySchemes:
+                SessionCookie:
+                    type: apiKey
+                    in: cookie
+                    name: PHPSESSID
+                    description: 'Session cookie, устанавливается после логина через /login'
+            schemas:
+                Problem:
+                    type: object
+                    description: |
+                        RFC 7807 Problem Details.
+                        Целевой формат ошибок для нового API.
+                        Существующие эндпоинты могут возвращать legacy-форматы — см. описание конкретного ответа.
+                    required: [title, status]
+                    properties:
+                        type:
+                            type: string
+                            format: uri
+                            example: 'about:blank'
+                            description: 'URI идентификатор типа ошибки'
+                        title:
+                            type: string
+                            example: 'Validation Failed'
+                            description: 'Краткое человекочитаемое описание ошибки'
+                        status:
+                            type: integer
+                            example: 422
+                            description: 'HTTP status code'
+                        detail:
+                            type: string
+                            example: 'Поле title обязательно'
+                            description: 'Детальное описание конкретного случая'
+                        instance:
+                            type: string
+                            example: '/api/marketplaceanalytics'
+                            description: 'URI запроса, в котором произошла ошибка'
+        security:
+            - SessionCookie: []
+        tags:
+            - name: Health
+              description: 'Проверки жизнеспособности сервиса (liveness/readiness)'
+    areas:
+        default:
+            path_patterns:
+                - ^/api(?!/doc$|/doc\.json$)
+            disable_default_routes: true
