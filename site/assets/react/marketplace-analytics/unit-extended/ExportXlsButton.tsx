@@ -8,6 +8,7 @@ interface ExportXlsButtonProps {
 }
 
 const EXPORT_URL = '/api/marketplace-analytics/unit-extended/export';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 function buildExportUrl(marketplace: string, periodFrom: string, periodTo: string): string {
     const params = new URLSearchParams({ periodFrom, periodTo });
@@ -53,6 +54,11 @@ const ExportXlsButton: React.FC<ExportXlsButtonProps> = ({
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
+            }
+
+            const contentType = response.headers.get('Content-Type') ?? '';
+            if (response.redirected || !contentType.startsWith(XLSX_MIME)) {
+                throw new Error('Unexpected response (likely auth redirect)');
             }
 
             const blob = await response.blob();
