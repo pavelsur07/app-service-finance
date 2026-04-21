@@ -8,6 +8,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Api\Response\SnapshotResponse;
 use App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface;
 use App\Shared\Service\ActiveCompanyService;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -40,7 +41,7 @@ final class SnapshotShowController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Снэпшот найден',
-        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotResponse')
+        content: new Model(type: SnapshotResponse::class)
     )]
     #[OA\Response(response: 401, description: 'Не авторизован')]
     #[OA\Response(

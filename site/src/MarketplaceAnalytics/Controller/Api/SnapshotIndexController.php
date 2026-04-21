@@ -6,9 +6,11 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Api\Request\ListSnapshotsRequest;
+use App\MarketplaceAnalytics\Api\Response\SnapshotListResponse;
 use App\MarketplaceAnalytics\Api\Response\SnapshotResponse;
 use App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface;
 use App\Shared\Service\ActiveCompanyService;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -77,7 +79,7 @@ final class SnapshotIndexController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Постраничный список снэпшотов',
-        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotListResponse')
+        content: new Model(type: SnapshotListResponse::class)
     )]
     #[OA\Response(
         response: 400,
