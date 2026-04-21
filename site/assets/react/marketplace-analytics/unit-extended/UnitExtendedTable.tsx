@@ -121,7 +121,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     const [sortField, setSortField] = useState<SortField>('revenue');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
-    const { tableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft } = useFixedHeader();
+    const { tableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
 
     const sorted = useMemo(() => {
         const copy = [...items];
@@ -150,6 +150,10 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         });
     };
 
+    // Renders header row for both the real thead and the portal clone.
+    // When `widths` are provided (clone mode), each th gets a fixed pixel width.
+    // The frozen first column uses a counter-transform to stay visible despite the
+    // table's translateX(-scrollLeft) shift.
     const renderHeaderCells = (widths?: number[]) => {
         const getWidthStyle = (i: number): React.CSSProperties => {
             const w = widths?.[i];
@@ -166,7 +170,14 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                             cursor: 'pointer',
                             ...getWidthStyle(i),
                             ...(widths !== undefined && h.field === 'title'
-                                ? { position: 'sticky' as const, left: 0, zIndex: 1, background: 'var(--tblr-bg-surface)' }
+                                ? {
+                                    position: 'relative' as const,
+                                    zIndex: 10,
+                                    background: 'var(--tblr-bg-surface)',
+                                    // Counter-act the table's translateX(-scrollLeft) so the
+                                    // frozen column stays anchored at the left edge of the clone.
+                                    transform: `translateX(${scrollLeft}px)`,
+                                  }
                                 : {}),
                         }}
                         onClick={() => handleSort(h.field)}
@@ -206,25 +217,24 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     }
 
     const colCount = HEADERS.length + 1;
-    const wrapperRect = tableWrapperRef.current?.getBoundingClientRect();
 
     return (
         <>
             <style>{TABLE_STYLES}</style>
 
-            {showFixed && createPortal(
+            {showFixed && wrapperRect && createPortal(
                 <div style={{
                     position: 'fixed',
                     top: 0,
-                    left: wrapperRect?.left ?? 0,
-                    width: wrapperRect?.width ?? 'auto',
+                    left: wrapperRect.left,
+                    width: wrapperRect.width,
                     zIndex: 1050,
                     overflow: 'hidden',
                     background: 'var(--tblr-bg-surface)',
                     borderBottom: '2px solid var(--tblr-border-color)',
                     boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
                 }}>
-                    <table style={{
+                    <table className="table table-vcenter card-table" style={{
                         borderCollapse: 'separate',
                         borderSpacing: 0,
                         width: 'max-content',
