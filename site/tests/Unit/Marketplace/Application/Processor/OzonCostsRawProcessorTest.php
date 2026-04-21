@@ -497,6 +497,7 @@ final class OzonCostsRawProcessorTest extends TestCase
         $entry = $this->findEntry($entries, 'ozon_correction_point');
         self::assertNotNull($entry);
         self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(45.00, (float) $entry['amount'], 0.001);
         self::assertSame(MarketplaceCostOperationType::STORNO, $entry['operation_type']);
     }
 
