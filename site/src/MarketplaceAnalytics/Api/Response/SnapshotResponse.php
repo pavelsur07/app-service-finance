@@ -47,7 +47,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'total_cost_price', type: 'string', nullable: true, description: 'Суммарная себестоимость за день (десятичное)', example: '6000.00'),
         new OA\Property(property: 'cost_breakdown', type: 'object', description: 'Разбивка затрат по категориям', additionalProperties: true),
         new OA\Property(property: 'advertising_details', type: 'object', description: 'Детализация рекламных расходов', additionalProperties: true),
-        new OA\Property(property: 'data_quality', type: 'object', description: 'Индикаторы качества данных снэпшота', additionalProperties: true),
+        new OA\Property(property: 'data_quality', type: 'array', description: 'Список флагов качества данных снэпшота (значения enum DataQualityFlag)', items: new OA\Items(type: 'string')),
         new OA\Property(property: 'calculated_at', type: 'string', format: 'date-time', example: '2026-04-21T03:15:00+00:00'),
     ]
 )]
