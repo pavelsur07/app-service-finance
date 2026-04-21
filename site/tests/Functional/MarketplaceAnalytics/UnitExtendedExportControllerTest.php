@@ -71,6 +71,36 @@ final class UnitExtendedExportControllerTest extends WebTestCaseBase
         self::assertContains($status, [302, 401, 403], sprintf('Unexpected status for anonymous request: %d', $status));
     }
 
+    public function testReturns400WhenPeriodFormatIsInvalid(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        $owner = UserBuilder::aUser()
+            ->withEmail('owner-export-bad-date@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId('33333333-3333-3333-3333-333333333333')
+            ->withOwner($owner)
+            ->withName('Export Company Bad Date')
+            ->build();
+
+        $em = $this->em();
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        $this->loginAsOwner($client, $owner, (string) $company->getId());
+
+        $client->request('GET', self::EXPORT_URL, [
+            'marketplace' => 'ozon',
+            'periodFrom' => '2026/04/01',
+            'periodTo' => '2026-04-30',
+        ]);
+
+        self::assertResponseStatusCodeSame(400);
+    }
+
     public function testReturns400WhenPeriodFromMissing(): void
     {
         $client = static::createClient();

@@ -63,6 +63,10 @@ final class UnitExtendedExportController extends AbstractController
             return new JsonResponse(['error' => 'periodFrom and periodTo are required'], 400);
         }
 
+        if (!$this->isValidIsoDate($periodFrom) || !$this->isValidIsoDate($periodTo)) {
+            return new JsonResponse(['error' => 'periodFrom and periodTo must be in YYYY-MM-DD format'], 400);
+        }
+
         if ($periodFrom > $periodTo) {
             return new JsonResponse(['error' => 'periodFrom must be <= periodTo'], 400);
         }
@@ -100,5 +104,12 @@ final class UnitExtendedExportController extends AbstractController
         $response->headers->set('X-Accel-Buffering', 'no');
 
         return $response;
+    }
+
+    private function isValidIsoDate(string $value): bool
+    {
+        $date = \DateTimeImmutable::createFromFormat('Y-m-d', $value);
+
+        return $date instanceof \DateTimeImmutable && $date->format('Y-m-d') === $value;
     }
 }
