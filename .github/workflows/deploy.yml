@@ -268,6 +268,15 @@ jobs:
                     --health-interval=10s
                     --health-timeout=5s
                     --health-retries=5
+            redis:
+                image: redis:7-alpine
+                ports:
+                    - "6379:6379"
+                options: >-
+                    --health-cmd="redis-cli ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=10
 
         steps:
             - name: 📦 Checkout repository
@@ -299,11 +308,12 @@ jobs:
               env:
                   APP_ENV: dev
                   APP_DEBUG: 0
-                  APP_SECRET: ci-secret-not-used
                   DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=15&charset=utf8"
                   REDIS_DSN: "redis://127.0.0.1:6379"
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
-              run: php bin/console nelmio:apidoc:dump --format=json > var/openapi.json
+              run: |
+                  mkdir -p var
+                  php bin/console nelmio:apidoc:dump --format=json > var/openapi.json
 
             - name: 🔍 Check TypeScript schema is up to date
               working-directory: site
