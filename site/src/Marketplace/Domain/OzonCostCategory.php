@@ -160,6 +160,13 @@ final readonly class OzonCostCategory
                 serviceNames: ['MarketplaceServiceItemDropoffPPZ'],
             ),
             new self(
+                code: 'ozon_delivery_to_handover_place',
+                name: 'Доставка до места передачи Ozon',
+                widgetGroup: 'Услуги доставки и FBO',
+                xlsxGroup: 'Услуги доставки',
+                serviceNames: ['MarketplaceServiceItemDeliveryToHandoverPlaceOzon'],
+            ),
+            new self(
                 code: 'ozon_delivery',
                 name: 'Доставка Ozon',
                 widgetGroup: 'Услуги доставки и FBO',
@@ -227,7 +234,10 @@ final readonly class OzonCostCategory
                 name: 'Бронирование места (неполный состав) Ozon',
                 widgetGroup: 'Услуги доставки и FBO',
                 xlsxGroup: 'Услуги FBO',
-                serviceNames: ['OperationMarketplaceServiceSupplyInboundCargoShortage'],
+                serviceNames: [
+                    'OperationMarketplaceServiceSupplyInboundCargoShortage',
+                    'OperationMarketplaceServiceSupplyInboundSupplyShortage',
+                ],
             ),
             new self(
                 code: 'ozon_return_from_stock',
@@ -387,7 +397,10 @@ final readonly class OzonCostCategory
                 name: 'Приобретение отзывов Ozon',
                 widgetGroup: 'Продвижение и реклама',
                 xlsxGroup: 'Продвижение и реклама',
-                serviceNames: ['MarketplaceSaleReviewsItem'],
+                serviceNames: [
+                    'MarketplaceSaleReviewsItem',
+                    'OperationMarketplaceAcceleratedProductReviews',
+                ],
                 operationTypes: [
                     'OperationPointsForReviews',
                     'Баллы за отзывы',
@@ -513,6 +526,20 @@ final readonly class OzonCostCategory
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
                 operationTypes: ['Корректировки стоимости услуг'],
+            ),
+            new self(
+                code: 'ozon_correction_point',
+                name: 'Корректировка по операции Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['MarketplaceCorrectionPointOperation'],
+            ),
+            new self(
+                code: 'ozon_seller_correction',
+                name: 'Корректировка продавца Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['MarketplaceSellerCorrectionOperation'],
             ),
             new self(
                 code: 'ozon_other_service',
