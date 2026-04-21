@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Api\Response;
 
+use App\MarketplaceAnalytics\Api\Response\Schema\AdvertisingDetails;
+use App\MarketplaceAnalytics\Api\Response\Schema\CostBreakdown;
 use App\MarketplaceAnalytics\Entity\ListingDailySnapshot;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 
 #[OA\Schema(
@@ -70,8 +73,8 @@ use OpenApi\Attributes as OA;
             example: ['cost_price_missing', 'api_advertising_missing'],
             description: 'Флаги проблем с качеством данных (значения enum DataQualityFlag)',
         ),
-        new OA\Property(property: 'cost_breakdown', ref: '#/components/schemas/CostBreakdown'),
-        new OA\Property(property: 'advertising_details', ref: '#/components/schemas/AdvertisingDetails'),
+        new OA\Property(property: 'cost_breakdown', ref: new Model(type: CostBreakdown::class)),
+        new OA\Property(property: 'advertising_details', ref: new Model(type: AdvertisingDetails::class)),
     ]
 )]
 final readonly class SnapshotResponse

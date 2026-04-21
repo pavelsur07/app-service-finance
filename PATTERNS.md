@@ -995,6 +995,37 @@ final readonly class SnapshotResponse { /* не трогаем */ }
 
 Если поля в PHP и в JSON совпадают один в один (редкий случай) — можно использовать `#[Model(type: Dto::class)]`.
 
+### Вложенные ссылки между схемами
+
+Строковые ref (`ref: '#/components/schemas/X'`) ВНУТРИ `OA\Schema` НЕ работают — Nelmio не резолвит такой класс и не регистрирует его в `components.schemas`. JSON-фрагмент выглядит корректным, но цепочка вложенных схем обрывается: в спеке появится ссылка на `#/components/schemas/X`, но самого описания `X` в `components.schemas` не будет.
+
+**Правило:** для любой ссылки на другой PHP-класс-схему используй `ref: new Model(type: X::class)`. swagger-php сам отрендерит корректный `#/components/schemas/X` в итоговом JSON, а Nelmio при этом каскадно зарегистрирует всю цепочку вложенных классов.
+
+```php
+use Nelmio\ApiDocBundle\Attribute\Model;
+use OpenApi\Attributes as OA;
+
+#[OA\Schema(
+    schema: 'SnapshotResponse',
+    properties: [
+        // ❌ НЕ работает — Nelmio не увидит CostBreakdown
+        new OA\Property(property: 'cost_breakdown', ref: '#/components/schemas/CostBreakdown'),
+
+        // ✅ работает — Nelmio резолвит класс и регистрирует схему
+        new OA\Property(property: 'cost_breakdown', ref: new Model(type: CostBreakdown::class)),
+
+        // ✅ для массивов — Model внутри OA\Items
+        new OA\Property(
+            property: 'data',
+            type: 'array',
+            items: new OA\Items(ref: new Model(type: SnapshotResponse::class)),
+        ),
+    ]
+)]
+```
+
+**Исключение:** ссылка на схему, описанную inline в `config/packages/nelmio_api_doc.yaml` (например, `Problem`), — там PHP-класса нет, используется строковый ref. Это работает, потому что схема регистрируется из YAML напрямую.
+
 ### Документирование Request-DTO
 
 Для DTO, которые биндятся через `#[MapRequestPayload]`, описываем схему атрибутом над классом. Валидация (`#[Assert\*]`) Nelmio подхватывает автоматически в части required/min/max/pattern.
