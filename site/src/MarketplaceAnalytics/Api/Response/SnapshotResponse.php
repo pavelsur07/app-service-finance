@@ -21,6 +21,8 @@ use OpenApi\Attributes as OA;
         'revenue',
         'refunds',
         'avg_sale_price',
+        'cost_price',
+        'total_cost_price',
         'orders_quantity',
         'sales_quantity',
         'delivered_quantity',
