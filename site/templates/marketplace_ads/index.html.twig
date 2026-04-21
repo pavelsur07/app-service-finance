@@ -3,6 +3,8 @@
 {% block title %}Реклама — Маркетплейсы{% endblock %}
 
 {% block body %}
+    {% include 'marketplace_ads/_tabs.html.twig' with { activeTab: 'load' } %}
+
     <div class="page-header d-print-none">
         <div class="container-xl">
             <div class="row g-2 align-items-center">

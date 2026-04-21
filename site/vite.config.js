@@ -18,6 +18,7 @@ export default defineConfig({
                 marketplace_analytics_page: "./assets/react/marketplace-analytics-page.tsx",
                 reconciliation_page: "./assets/react/reconciliation-page.tsx",
                 unit_extended_page: "./assets/react/unit-extended-page.tsx",
+                ad_efficiency_page: "./assets/react/ad-efficiency-page.tsx",
             },
         }
     },
