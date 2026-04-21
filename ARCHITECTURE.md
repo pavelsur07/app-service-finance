@@ -457,6 +457,41 @@ findInFlightByJob(string $companyId, string $jobId): array
 
 ---
 
+## Query — MarketplaceAds
+
+> Read-model агрегаты на DBAL (минуя ORM hydration). Используются напрямую из
+> Controllers и не через Facade — это внутренний read-слой модуля.
+
+### `AdEfficiencyQuery` (`src/MarketplaceAds/Infrastructure/Query/AdEfficiencyQuery.php`)
+```php
+// Страница отчёта «Эффективность рекламы»: SKU × выручка × рекламные затраты × ДРР %.
+// Читает marketplace_sales + marketplace_ad_document_lines/marketplace_ad_documents +
+// marketplace_listings. Валидация входа (page/pageSize/sortBy/sortDir) внутри метода.
+// $sortBy whitelist: 'sku' | 'title' | 'revenue' | 'adSpend' | 'drrPercent' (fallback 'revenue').
+// $sortDir: 'asc' | 'desc' (fallback 'desc').
+// Денежные значения наружу — decimal-строки (bcmath-compatible).
+getPage(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    ?string $marketplace,
+    int $page,
+    int $pageSize,
+    string $sortBy = 'revenue',
+    string $sortDir = 'desc',
+): AdEfficiencyPageDTO
+```
+
+**DTO:**
+- `AdEfficiencyItemDTO` (`src/MarketplaceAds/Application/DTO/AdEfficiencyItemDTO.php`) —
+  строка таблицы: `listingId`, `sku`, `?title`, `marketplace`, `revenue`, `adSpend`, `?drrPercent`.
+  `drrPercent = null`, когда `revenue = 0`.
+- `AdEfficiencyPageDTO` (`src/MarketplaceAds/Application/DTO/AdEfficiencyPageDTO.php`) —
+  `items: list<AdEfficiencyItemDTO>`, `total`, `page`, `pageSize`, `totalRevenue`, `totalAdSpend`,
+  `?totalDrrPercent`. Totals считаются по ВСЕМУ набору листингов, не только по странице.
+
+---
+
 ## Enum — актуальные значения
 
 > Используй **только** эти значения. Не придумывай новые без обновления файла.
