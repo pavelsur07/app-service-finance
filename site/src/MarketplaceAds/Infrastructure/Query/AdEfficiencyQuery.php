@@ -68,35 +68,40 @@ final class AdEfficiencyQuery
 
         $mpSalesFilter = null !== $marketplace ? 'AND s.marketplace = :marketplace' : '';
         $mpAdsFilter = null !== $marketplace ? 'AND ad.marketplace = :marketplace' : '';
-        $mpSalesFilterNoAlias = null !== $marketplace ? 'AND marketplace = :marketplace' : '';
 
+        // base_listings = листинги, у которых были продажи ИЛИ рекламные расходы в периоде,
+        // И которые реально существуют в marketplace_listings текущей компании.
+        // Inner-join на marketplace_listings отсекает «висячие» listing_id в ad_document_lines
+        // (у которых нет FK к marketplace_listings) — чтобы total/totals совпадали с items.
         $baseListingsCte = <<<SQL
             base_listings AS (
-                SELECT s.listing_id
-                FROM marketplace_sales s
-                WHERE s.company_id = :companyId
-                  AND s.sale_date BETWEEN :periodFrom AND :periodTo
-                  {$mpSalesFilter}
-                GROUP BY s.listing_id
-                UNION
-                SELECT adl.listing_id
-                FROM marketplace_ad_document_lines adl
-                JOIN marketplace_ad_documents ad ON ad.id = adl.ad_document_id
-                WHERE ad.company_id = :companyId
-                  AND ad.report_date BETWEEN :periodFrom AND :periodTo
-                  {$mpAdsFilter}
-                GROUP BY adl.listing_id
+                SELECT t.listing_id
+                FROM (
+                    SELECT s.listing_id
+                    FROM marketplace_sales s
+                    WHERE s.company_id = :companyId
+                      AND s.sale_date BETWEEN :periodFrom AND :periodTo
+                      {$mpSalesFilter}
+                    UNION
+                    SELECT adl.listing_id
+                    FROM marketplace_ad_document_lines adl
+                    JOIN marketplace_ad_documents ad ON ad.id = adl.ad_document_id
+                    WHERE ad.company_id = :companyId
+                      AND ad.report_date BETWEEN :periodFrom AND :periodTo
+                      {$mpAdsFilter}
+                ) t
+                JOIN marketplace_listings ml ON ml.id = t.listing_id AND ml.company_id = :companyId
             )
             SQL;
 
         $salesCte = <<<SQL
             sales_agg AS (
-                SELECT listing_id, SUM(total_revenue) AS revenue
-                FROM marketplace_sales
-                WHERE company_id = :companyId
-                  AND sale_date BETWEEN :periodFrom AND :periodTo
-                  {$mpSalesFilterNoAlias}
-                GROUP BY listing_id
+                SELECT s.listing_id, SUM(s.total_revenue) AS revenue
+                FROM marketplace_sales s
+                WHERE s.company_id = :companyId
+                  AND s.sale_date BETWEEN :periodFrom AND :periodTo
+                  {$mpSalesFilter}
+                GROUP BY s.listing_id
             )
             SQL;
 
@@ -112,10 +117,24 @@ final class AdEfficiencyQuery
             )
             SQL;
 
-        $total = (int) $this->connection->fetchOne(
-            "WITH {$baseListingsCte} SELECT COUNT(*) FROM base_listings",
-            $params,
-        );
+        // Count + totals — одним запросом по тому же visible-набору, что и items.
+        // Гарантирует, что total не больше числа реально отдаваемых строк,
+        // а totals.drrPercent согласован с суммой по items.
+        $aggSql = <<<SQL
+            WITH {$baseListingsCte}, {$salesCte}, {$adsCte}
+            SELECT
+                COUNT(*) AS total,
+                COALESCE(SUM(COALESCE(sa.revenue, 0)), 0) AS total_revenue,
+                COALESCE(SUM(COALESCE(aa.ad_spend, 0)), 0) AS total_ad_spend
+            FROM base_listings bl
+            LEFT JOIN sales_agg sa ON sa.listing_id = bl.listing_id
+            LEFT JOIN ads_agg aa ON aa.listing_id = bl.listing_id
+            SQL;
+
+        $aggRow = $this->connection->fetchAssociative($aggSql, $params);
+        $total = (int) $aggRow['total'];
+        $totalRevenue = (string) $aggRow['total_revenue'];
+        $totalAdSpend = (string) $aggRow['total_ad_spend'];
 
         $offset = ($page - 1) * $pageSize;
         $orderColumn = self::SORT_COLUMNS[$sortBy];
@@ -165,31 +184,6 @@ final class AdEfficiencyQuery
                 drrPercent: null !== $row['drr_percent'] ? (string) $row['drr_percent'] : null,
             );
         }
-
-        $totalRevenueRaw = $this->connection->fetchOne(
-            <<<SQL
-            SELECT COALESCE(SUM(total_revenue), 0)
-            FROM marketplace_sales
-            WHERE company_id = :companyId
-              AND sale_date BETWEEN :periodFrom AND :periodTo
-              {$mpSalesFilterNoAlias}
-            SQL,
-            $params,
-        );
-        $totalRevenue = false === $totalRevenueRaw ? '0' : (string) $totalRevenueRaw;
-
-        $totalAdSpendRaw = $this->connection->fetchOne(
-            <<<SQL
-            SELECT COALESCE(SUM(adl.cost), 0)
-            FROM marketplace_ad_document_lines adl
-            JOIN marketplace_ad_documents ad ON ad.id = adl.ad_document_id
-            WHERE ad.company_id = :companyId
-              AND ad.report_date BETWEEN :periodFrom AND :periodTo
-              {$mpAdsFilter}
-            SQL,
-            $params,
-        );
-        $totalAdSpend = false === $totalAdSpendRaw ? '0' : (string) $totalAdSpendRaw;
 
         $totalDrrPercent = null;
         if (1 === bccomp($totalRevenue, '0', 4)) {

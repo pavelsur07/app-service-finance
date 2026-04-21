@@ -284,6 +284,44 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
         self::assertSame(self::LISTING_B_ID, $dtoB->items[0]->listingId);
     }
 
+    public function testOrphanedAdLineListingIdIsExcludedFromCountAndTotals(): void
+    {
+        // marketplace_ad_document_lines.listing_id не имеет FK на marketplace_listings:
+        // возможна ситуация, когда ad-строка ссылается на несуществующий листинг.
+        // Такие «висячие» id не должны попадать ни в total, ни в totalAdSpend,
+        // иначе API будет отдавать числа, несовместимые с отрисованной таблицей.
+        $orphanListingId = '99999999-9999-9999-9999-000000000001';
+        $this->persistAdDocumentWithLine(
+            companyId:   self::COMPANY_A_ID,
+            marketplace: MarketplaceType::OZON,
+            reportDate:  '2026-04-20',
+            campaignId:  'CAMP-ORPHAN',
+            parentSku:   'SKU-ORPHAN',
+            totalCost:   '42.00',
+            listingId:   $orphanListingId,
+            lineCost:    '42.00',
+        );
+        $this->em->flush();
+        $this->em->clear();
+
+        $dto = $this->query->getPage(
+            self::COMPANY_A_ID,
+            new \DateTimeImmutable(self::PERIOD_FROM),
+            new \DateTimeImmutable(self::PERIOD_TO),
+            null,
+            page: 1,
+            pageSize: 25,
+        );
+
+        self::assertSame(3, $dto->total, 'Висячий listing_id не должен увеличивать total');
+        $ids = array_map(static fn ($i) => $i->listingId, $dto->items);
+        self::assertNotContains($orphanListingId, $ids);
+
+        // totalAdSpend = 100 + 50 = 150 (висячие 42.00 не учтены)
+        self::assertEqualsWithDelta(150.0, (float) $dto->totalAdSpend, 0.01);
+        self::assertEqualsWithDelta(1500.0, (float) $dto->totalRevenue, 0.01);
+    }
+
     public function testTotalsAreComputedOverFullSetNotJustThePage(): void
     {
         $dto = $this->query->getPage(
