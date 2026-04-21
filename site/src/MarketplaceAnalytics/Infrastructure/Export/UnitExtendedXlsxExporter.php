@@ -52,30 +52,37 @@ final readonly class UnitExtendedXlsxExporter
 
     public function export(UnitExtendedExportRequest $request, string $outputPath): void
     {
+        // Export should always contain full dataset; override the query's default UI limit.
         $result = $this->unitExtendedQuery->execute(
             $request->companyId,
             $request->marketplace,
             $request->periodFrom,
             $request->periodTo,
+            \PHP_INT_MAX,
         );
+
+        $dataStyles = $this->buildDataStyles();
+        $totalsStyles = $this->buildTotalsStyles();
 
         $writer = new Writer();
         $writer->openToFile($outputPath);
 
-        $sheet = $writer->getCurrentSheet();
-        $sheet->setName('Unit-экономика');
+        try {
+            $sheet = $writer->getCurrentSheet();
+            $sheet->setName('Unit-экономика');
 
-        $writer->addRow($this->buildMetaRow($request));
-        $writer->addRow(new Row([]));
-        $writer->addRow($this->buildHeaderRow());
+            $writer->addRow($this->buildMetaRow($request));
+            $writer->addRow(new Row([]));
+            $writer->addRow($this->buildHeaderRow());
 
-        foreach ($result['items'] as $item) {
-            $writer->addRow($this->buildDataRow($item));
+            foreach ($result['items'] as $item) {
+                $writer->addRow($this->buildDataRow($item, $dataStyles));
+            }
+
+            $writer->addRow($this->buildTotalsRow($result['totals'], $totalsStyles));
+        } finally {
+            $writer->close();
         }
-
-        $writer->addRow($this->buildTotalsRow($result['totals']));
-
-        $writer->close();
     }
 
     private function buildMetaRow(UnitExtendedExportRequest $request): Row
@@ -115,13 +122,14 @@ final readonly class UnitExtendedXlsxExporter
 
     /**
      * @param array<string, mixed> $item
+     * @param array<string, Style> $styles keyed by column type
      */
-    private function buildDataRow(array $item): Row
+    private function buildDataRow(array $item, array $styles): Row
     {
         $cells = [];
         foreach (self::COLUMNS as $column) {
             $value = $item[$column['field']] ?? null;
-            $cells[] = $this->buildValueCell($value, $column['type']);
+            $cells[] = $this->buildTypedCell($value, $column['type'], $styles[$column['type']]);
         }
 
         return new Row($cells);
@@ -129,75 +137,69 @@ final readonly class UnitExtendedXlsxExporter
 
     /**
      * @param array<string, mixed> $totals
+     * @param array<string, Style> $styles keyed by column type, plus 'blank' for filler cells
      */
-    private function buildTotalsRow(array $totals): Row
+    private function buildTotalsRow(array $totals, array $styles): Row
     {
-        $boldStyle = (new Style())->setFontBold();
-        $moneyTotalStyle = (new Style())->setFontBold()->setFormat(self::FORMAT_MONEY);
-        $integerTotalStyle = (new Style())->setFontBold()->setFormat(self::FORMAT_INTEGER);
-        $percentTotalStyle = (new Style())->setFontBold()->setFormat(self::FORMAT_PERCENT);
-
         $cells = [];
         foreach (self::COLUMNS as $index => $column) {
             if (0 === $index) {
-                $cells[] = Cell::fromValue('ИТОГО', $boldStyle);
+                $cells[] = Cell::fromValue('ИТОГО', $styles['blank']);
 
                 continue;
             }
 
+            // Totals are computed per-listing and not aggregated for these fields.
             if (in_array($column['field'], ['title', 'marketplace', 'costPriceUnit'], true)) {
-                $cells[] = Cell::fromValue('', $boldStyle);
+                $cells[] = Cell::fromValue('', $styles['blank']);
 
                 continue;
             }
 
             $value = $totals[$column['field']] ?? null;
-
-            $style = match ($column['type']) {
-                'money' => $moneyTotalStyle,
-                'integer' => $integerTotalStyle,
-                'percent' => $percentTotalStyle,
-                default => $boldStyle,
-            };
-
-            if (null === $value) {
-                $cells[] = Cell::fromValue(null, $style);
-
-                continue;
-            }
-
-            $cells[] = $this->buildTypedCell($value, $column['type'], $style);
+            $cells[] = $this->buildTypedCell($value, $column['type'], $styles[$column['type']]);
         }
 
         return new Row($cells);
     }
 
-    private function buildValueCell(mixed $value, string $type): Cell
-    {
-        if (null === $value) {
-            return Cell::fromValue(null, $this->styleFor($type));
-        }
-
-        return $this->buildTypedCell($value, $type, $this->styleFor($type));
-    }
-
     private function buildTypedCell(mixed $value, string $type, Style $style): Cell
     {
+        if (null === $value) {
+            return Cell::fromValue(null, $style);
+        }
+
         return match ($type) {
-            'money' => Cell::fromValue((float) $value, $style),
+            'money', 'percent' => Cell::fromValue((float) $value, $style),
             'integer' => Cell::fromValue((int) $value, $style),
-            'percent' => Cell::fromValue((float) $value, $style),
             default => Cell::fromValue((string) $value, $style),
         };
     }
 
-    private function styleFor(string $type): Style
+    /**
+     * @return array<string, Style>
+     */
+    private function buildDataStyles(): array
     {
-        return match ($type) {
+        return [
+            'string' => new Style(),
             'money' => (new Style())->setFormat(self::FORMAT_MONEY),
             'integer' => (new Style())->setFormat(self::FORMAT_INTEGER),
             'percent' => (new Style())->setFormat(self::FORMAT_PERCENT),
-            default => new Style(),
-        };
+        ];
+    }
+
+    /**
+     * @return array<string, Style>
+     */
+    private function buildTotalsStyles(): array
+    {
+        return [
+            'blank' => (new Style())->setFontBold(),
+            'string' => (new Style())->setFontBold(),
+            'money' => (new Style())->setFontBold()->setFormat(self::FORMAT_MONEY),
+            'integer' => (new Style())->setFontBold()->setFormat(self::FORMAT_INTEGER),
+            'percent' => (new Style())->setFontBold()->setFormat(self::FORMAT_PERCENT),
+        ];
     }
 }
