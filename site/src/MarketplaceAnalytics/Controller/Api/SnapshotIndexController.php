@@ -112,6 +112,10 @@ final class SnapshotIndexController extends AbstractController
         )
     )]
     #[OA\Response(response: 401, description: 'Не авторизован')]
+    #[OA\Response(
+        response: 404,
+        description: 'У пользователя нет активной компании (ActiveCompanyService::getActiveCompany() бросает NotFoundHttpException)'
+    )]
     #[Route(
         '/api/marketplace-analytics/snapshots',
         name: 'marketplace_analytics_api_snapshot_index',

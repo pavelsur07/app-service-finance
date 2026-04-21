@@ -45,6 +45,10 @@ final class MarketplaceAnalyticsController extends AbstractController
     #[OA\Response(response: 401, description: 'Не авторизован')]
     #[OA\Response(response: 403, description: 'Недостаточно прав (требуется ROLE_COMPANY_OWNER)')]
     #[OA\Response(
+        response: 404,
+        description: 'У пользователя нет активной компании (ActiveCompanyService::getActiveCompany() бросает NotFoundHttpException)'
+    )]
+    #[OA\Response(
         response: 422,
         description: 'Ошибка валидации входных данных (legacy-формат, не RFC 7807)'
     )]

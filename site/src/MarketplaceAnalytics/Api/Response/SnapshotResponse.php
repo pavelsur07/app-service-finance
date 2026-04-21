@@ -24,6 +24,8 @@ use OpenApi\Attributes as OA;
         'orders_quantity',
         'delivered_quantity',
         'avg_sale_price',
+        'cost_price',
+        'total_cost_price',
         'cost_breakdown',
         'advertising_details',
         'data_quality',

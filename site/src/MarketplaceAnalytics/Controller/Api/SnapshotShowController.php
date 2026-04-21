@@ -45,7 +45,7 @@ final class SnapshotShowController extends AbstractController
     #[OA\Response(response: 401, description: 'Не авторизован')]
     #[OA\Response(
         response: 404,
-        description: 'Снэпшот не найден или не принадлежит активной компании (legacy-формат ошибки, не RFC 7807)',
+        description: 'Снэпшот не найден или не принадлежит активной компании (legacy-формат ошибки, не RFC 7807). Также возможен 404 без legacy-тела, если у пользователя нет активной компании (NotFoundHttpException из ActiveCompanyService).',
         content: new OA\JsonContent(
             type: 'object',
             properties: [
