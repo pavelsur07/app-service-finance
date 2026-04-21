@@ -77,28 +77,7 @@ final class SnapshotIndexController extends AbstractController
     #[OA\Response(
         response: 200,
         description: 'Постраничный список снэпшотов',
-        content: new OA\JsonContent(
-            type: 'object',
-            required: ['data', 'meta'],
-            properties: [
-                new OA\Property(
-                    property: 'data',
-                    type: 'array',
-                    items: new OA\Items(ref: '#/components/schemas/SnapshotResponse')
-                ),
-                new OA\Property(
-                    property: 'meta',
-                    type: 'object',
-                    required: ['total', 'page', 'per_page', 'pages'],
-                    properties: [
-                        new OA\Property(property: 'total', type: 'integer', example: 123),
-                        new OA\Property(property: 'page', type: 'integer', example: 1),
-                        new OA\Property(property: 'per_page', type: 'integer', example: 20),
-                        new OA\Property(property: 'pages', type: 'integer', example: 7),
-                    ]
-                ),
-            ]
-        )
+        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotListResponse')
     )]
     #[OA\Response(
         response: 400,
