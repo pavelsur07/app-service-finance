@@ -385,6 +385,178 @@ final class OzonCostsRawProcessorTest extends TestCase
         }
     }
 
+    // -------------------------------------------------------------------------
+    // Новые service_names 2026-04-21
+    // -------------------------------------------------------------------------
+
+    /**
+     * MarketplaceServiceItemDeliveryToHandoverPlaceOzon → ozon_delivery_to_handover_place, CHARGE.
+     */
+    public function testDeliveryToHandoverPlaceProducesChargeEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2100',
+            'operation_type'      => 'MarketplaceServiceItemDeliveryToHandoverPlaceOzon',
+            'operation_type_name' => 'Доставка до места передачи',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [['sku' => '501', 'name' => 'Товар']],
+            'services'            => [
+                ['name' => 'MarketplaceServiceItemDeliveryToHandoverPlaceOzon', 'price' => -88.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_delivery_to_handover_place');
+        self::assertNotNull($entry, 'DeliveryToHandoverPlace должен создать запись');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(88.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+    }
+
+    /**
+     * OperationMarketplaceAcceleratedProductReviews → ozon_reviews, CHARGE.
+     */
+    public function testAcceleratedProductReviewsProducesChargeEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2101',
+            'operation_type'      => 'OperationMarketplaceAcceleratedProductReviews',
+            'operation_type_name' => 'Ускоренные отзывы',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [],
+            'services'            => [
+                ['name' => 'OperationMarketplaceAcceleratedProductReviews', 'price' => -250.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_reviews');
+        self::assertNotNull($entry, 'AcceleratedProductReviews должен создать запись в ozon_reviews');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(250.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+    }
+
+    /**
+     * MarketplaceCorrectionPointOperation → ozon_correction_point, CHARGE.
+     */
+    public function testCorrectionPointOperationProducesChargeEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2102',
+            'operation_type'      => 'MarketplaceCorrectionPointOperation',
+            'operation_type_name' => 'Корректировка по операции',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [],
+            'services'            => [
+                ['name' => 'MarketplaceCorrectionPointOperation', 'price' => -45.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_correction_point');
+        self::assertNotNull($entry, 'CorrectionPointOperation должен создать запись в ozon_correction_point');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(45.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+    }
+
+    /**
+     * MarketplaceCorrectionPointOperation с положительной ценой → STORNO (возврат корректировки).
+     */
+    public function testCorrectionPointOperationPositivePriceProducesStornoEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2103',
+            'operation_type'      => 'MarketplaceCorrectionPointOperation',
+            'operation_type_name' => 'Корректировка по операции',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [],
+            'services'            => [
+                ['name' => 'MarketplaceCorrectionPointOperation', 'price' => 45.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_correction_point');
+        self::assertNotNull($entry);
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(45.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entry['operation_type']);
+    }
+
+    /**
+     * MarketplaceSellerCorrectionOperation → ozon_seller_correction, CHARGE.
+     */
+    public function testSellerCorrectionOperationProducesChargeEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2104',
+            'operation_type'      => 'MarketplaceSellerCorrectionOperation',
+            'operation_type_name' => 'Корректировка продавца',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [],
+            'services'            => [
+                ['name' => 'MarketplaceSellerCorrectionOperation', 'price' => -120.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_seller_correction');
+        self::assertNotNull($entry, 'SellerCorrectionOperation должен создать запись в ozon_seller_correction');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(120.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+    }
+
+    /**
+     * OperationMarketplaceServiceSupplyInboundSupplyShortage → ozon_supply_shortage, CHARGE.
+     */
+    public function testSupplyInboundSupplyShortageProducesChargeEntry(): void
+    {
+        $entries = $this->extractEntries([
+            'operation_id'        => '2105',
+            'operation_type'      => 'OperationMarketplaceServiceSupplyInboundSupplyShortage',
+            'operation_type_name' => 'Недостача при поставке',
+            'operation_date'      => '2026-01-15 10:00:00',
+            'sale_commission'     => 0,
+            'delivery_charge'     => 0,
+            'return_delivery_charge' => 0,
+            'amount'              => 0,
+            'type'                => 'services',
+            'items'               => [],
+            'services'            => [
+                ['name' => 'OperationMarketplaceServiceSupplyInboundSupplyShortage', 'price' => -330.00],
+            ],
+        ]);
+
+        $entry = $this->findEntry($entries, 'ozon_supply_shortage');
+        self::assertNotNull($entry, 'SupplyInboundSupplyShortage должен создать запись в ozon_supply_shortage');
+        self::assertGreaterThan(0, (float) $entry['amount']);
+        self::assertEqualsWithDelta(330.00, (float) $entry['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entry['operation_type']);
+    }
+
     /**
      * OperationAgentStornoDeliveredToCustomer (сторно продажи) — НЕ должна создавать
      * _main cost entry, т.к. выручка учитывается в OzonSalesRawProcessor.

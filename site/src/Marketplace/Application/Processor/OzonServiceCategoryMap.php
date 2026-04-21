@@ -23,7 +23,7 @@ final class OzonServiceCategoryMap
      * Версия словаря — обновлять при любом изменении маппинга.
      * Используется в /marketplace/costs/debug/map-version для проверки деплоя.
      */
-    public const VERSION = '2026-04-16.3';
+    public const VERSION = '2026-04-21.1';
 
     /**
      * Service names из API Ozon, которые являются нулевыми маркерами (price = 0).
