@@ -96,6 +96,36 @@ site-test-db-rebuild: site-test-wait-db
 	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
 
 
+# ===== API TYPES / OPENAPI =====
+#
+# Оба контейнера (site-php-cli и site-frontend) видят каталог ./site/ как /app,
+# поэтому промежуточный файл var/openapi.json читается обоими без проблем.
+# site-php-cli экспортирует спеку через CLI-команду Nelmio (без HTTP/auth),
+# site-frontend перегоняет JSON → TypeScript через openapi-typescript.
+
+.PHONY: api-doc-export api-doc-lint api-types api-types-check
+
+# Экспорт OpenAPI-спеки в JSON-файл (через PHP CLI — не требует HTTP и auth)
+api-doc-export:
+	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	@echo "✓ OpenAPI spec exported to site/var/openapi.json"
+
+# Lint спеки через Spectral (опционально, нужен сконфигурированный контейнер с node)
+api-doc-lint: api-doc-export
+	docker compose exec -T site-frontend sh -c "npx -y @stoplight/spectral-cli lint var/openapi.json"
+
+# Основная команда разработчика: сгенерировать TS-типы из экспортированной спеки
+api-types:
+	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	docker compose exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o assets/api/schema.d.ts"
+	@echo "✓ TS types regenerated at site/assets/api/schema.d.ts"
+	@echo "Don't forget to commit the updated schema.d.ts"
+
+# Проверка что закоммиченные типы соответствуют спеке (используется в CI)
+api-types-check:
+	docker compose exec -T site-php-cli sh -c "php bin/console nelmio:apidoc:dump --format=json > var/openapi.json"
+	docker compose exec -T site-frontend sh -c "npx openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
+
 build: build-site
 
 build-site:

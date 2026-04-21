@@ -1,12 +1,21 @@
 import { defineConfig } from "vite";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import symfonyPlugin from "vite-plugin-symfony";
 import react from '@vitejs/plugin-react';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
 export default defineConfig({
     plugins: [
         react(),
         symfonyPlugin(),
     ],
+    resolve: {
+        alias: {
+            '@': resolve(__dirname, 'assets'),
+        },
+    },
     // Настройки для продакшен-сборки (внутри Docker)
     build: {
         outDir: "public/build", // Явно говорим, куда класть результат
