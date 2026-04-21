@@ -78,16 +78,25 @@ function readInitialState(): State {
 }
 
 function syncUrl(state: State): void {
-    const params = new URLSearchParams();
-    if (state.marketplace) params.set('marketplace', state.marketplace);
+    const params = new URLSearchParams(window.location.search);
+
+    if (state.marketplace) {
+        params.set('marketplace', state.marketplace);
+    } else {
+        params.delete('marketplace');
+    }
+
     params.set('periodFrom', state.periodFrom);
     params.set('periodTo', state.periodTo);
     params.set('page', String(state.page));
     params.set('pageSize', String(state.pageSize));
     params.set('sortBy', state.sortBy);
     params.set('sortDir', state.sortDir);
+
     const search = params.toString();
-    window.history.replaceState(null, '', window.location.pathname + (search ? `?${search}` : ''));
+    const newUrl =
+        window.location.pathname + (search ? `?${search}` : '') + window.location.hash;
+    window.history.replaceState(null, '', newUrl);
 }
 
 const AdEfficiencyPage: React.FC<AdEfficiencyPageProps> = ({ marketplaces }) => {

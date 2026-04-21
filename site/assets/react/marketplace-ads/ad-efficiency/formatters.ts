@@ -1,3 +1,8 @@
+const numberFormatter = new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
 /**
  * Форматирование денежной суммы из decimal-строки в "1 234,56".
  * Пустая / некорректная строка → "0,00".
@@ -7,10 +12,7 @@ export function formatRub(value: string): string {
     if (!Number.isFinite(num)) {
         return '0,00';
     }
-    return new Intl.NumberFormat('ru-RU', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-    }).format(num);
+    return numberFormatter.format(num);
 }
 
 /**
@@ -25,10 +27,5 @@ export function formatDrr(value: string | null): string {
     if (!Number.isFinite(num) || num === 0) {
         return '—';
     }
-    return (
-        new Intl.NumberFormat('ru-RU', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-        }).format(num) + '%'
-    );
+    return numberFormatter.format(num) + '%';
 }
