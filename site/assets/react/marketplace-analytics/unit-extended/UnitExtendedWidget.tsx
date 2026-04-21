@@ -7,6 +7,7 @@ import { getMonthRange } from '../utils/utils';
 import type { MarketplaceOption } from '../types/analytics.types';
 import UnitExtendedFilters from './UnitExtendedFilters';
 import UnitExtendedTable from './UnitExtendedTable';
+import ExportXlsButton from './ExportXlsButton';
 
 interface UnitExtendedWidgetProps {
     marketplaces: MarketplaceOption[];
@@ -113,13 +114,19 @@ const UnitExtendedWidget: React.FC<UnitExtendedWidgetProps> = ({ marketplaces })
             <div className="card">
                 <div className="card-header">
                     <h3 className="card-title">Юнит-экономика по листингам</h3>
-                    {items.length > 0 && (
-                        <div className="card-options">
-                            <span className="text-muted">
+                    <div className="card-options">
+                        <ExportXlsButton
+                            marketplace={filters.marketplace}
+                            periodFrom={filters.dateFrom}
+                            periodTo={filters.dateTo}
+                            disabled={!filters.dateFrom || !filters.dateTo}
+                        />
+                        {items.length > 0 && (
+                            <span className="text-muted ms-3">
                                 Товаров: {items.length.toLocaleString('ru-RU')}
                             </span>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
 
                 <UnitExtendedTable
