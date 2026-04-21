@@ -249,3 +249,75 @@ jobs:
                   REDIS_DSN: "redis://127.0.0.1:6379"
                   MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
               run: php bin/console doctrine:migrations:migrate --no-interaction
+
+    # 5. ПРОВЕРКА СИНХРОНИЗАЦИИ API-ТИПОВ
+    api-types-check:
+        name: 🔍 Check API types sync
+        runs-on: ubuntu-latest
+        services:
+            postgres:
+                image: postgres:15-alpine
+                env:
+                    POSTGRES_DB: app
+                    POSTGRES_USER: app
+                    POSTGRES_PASSWORD: app
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd="pg_isready -U app -d app"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐘 Setup PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: 8.3
+                  tools: composer
+
+            - name: 📦 Install PHP dependencies
+              working-directory: site
+              run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: 📦 Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '20'
+                  cache: 'yarn'
+                  cache-dependency-path: site/yarn.lock
+
+            - name: 📦 Install Node dependencies
+              working-directory: site
+              run: yarn install --frozen-lockfile
+
+            - name: 🧬 Generate OpenAPI spec
+              working-directory: site
+              env:
+                  APP_ENV: dev
+                  APP_DEBUG: 0
+                  APP_SECRET: ci-secret-not-used
+                  DATABASE_URL: "pgsql://app:app@127.0.0.1:5432/app?serverVersion=15&charset=utf8"
+                  REDIS_DSN: "redis://127.0.0.1:6379"
+                  MESSENGER_TRANSPORT_DSN: "redis://127.0.0.1:6379/messages"
+              run: php bin/console nelmio:apidoc:dump --format=json > var/openapi.json
+
+            - name: 🔍 Check TypeScript schema is up to date
+              working-directory: site
+              run: |
+                  npx openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts
+                  if ! diff -q /tmp/schema.check.d.ts assets/api/schema.d.ts > /dev/null; then
+                      echo "::error::site/assets/api/schema.d.ts is out of sync with OpenAPI spec"
+                      echo ""
+                      echo "The committed TypeScript schema does not match what would be generated from the current backend code."
+                      echo ""
+                      echo "To fix: run 'make api-types' locally and commit the updated site/assets/api/schema.d.ts"
+                      echo ""
+                      echo "Diff:"
+                      diff /tmp/schema.check.d.ts assets/api/schema.d.ts || true
+                      exit 1
+                  fi
+                  echo "✅ schema.d.ts is in sync with OpenAPI spec"

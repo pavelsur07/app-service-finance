@@ -1126,4 +1126,6 @@ const { data, error } = await api.GET('/api/marketplace-analytics/snapshots', {
 
 **Продакшн-деплой** не запускает генерацию типов. Бандл собирается из закоммиченного `schema.d.ts`. CI проверяет, что закоммиченный файл соответствует текущей спеке (планируется в отдельном PR).
 
+**CI-гейт:** при PR job `api-types-check` проверяет, что `site/assets/api/schema.d.ts` соответствует актуальной OpenAPI-спеке. Если забыл запустить `make api-types` перед коммитом — PR не пройдёт. Фикс: запустить `make api-types` локально, закоммитить обновлённый `schema.d.ts`.
+
 **Демо-компонент:** `site/assets/react/marketplace-analytics/SnapshotListDemo.tsx` — референс использования типизированного клиента, не монтируется на страницы.
