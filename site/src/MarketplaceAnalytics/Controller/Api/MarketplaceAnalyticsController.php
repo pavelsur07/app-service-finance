@@ -7,6 +7,7 @@ namespace App\MarketplaceAnalytics\Controller\Api;
 use App\MarketplaceAnalytics\Api\Request\CreateMarketplaceAnalyticsRequest;
 use App\MarketplaceAnalytics\Application\CreateMarketplaceAnalyticsAction;
 use App\Shared\Service\ActiveCompanyService;
+use Nelmio\ApiDocBundle\Attribute\Model;
 use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -30,7 +31,7 @@ final class MarketplaceAnalyticsController extends AbstractController
     )]
     #[OA\RequestBody(
         required: true,
-        content: new OA\JsonContent(ref: '#/components/schemas/CreateMarketplaceAnalyticsRequest')
+        content: new Model(type: CreateMarketplaceAnalyticsRequest::class)
     )]
     #[OA\Response(
         response: 201,
