@@ -4,9 +4,8 @@
     "scripts": {
         "dev": "vite",
         "build": "vite build",
-        "api:types": "openapi-typescript http://site-nginx/api/doc.json -o assets/api/schema.d.ts",
-        "api:types:check": "openapi-typescript http://site-nginx/api/doc.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts",
-        "api:types:from-file": "openapi-typescript ../var/openapi.json -o assets/api/schema.d.ts"
+        "api:types": "openapi-typescript var/openapi.json -o assets/api/schema.d.ts",
+        "api:types:check": "openapi-typescript var/openapi.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts"
     },
     "devDependencies": {
         "@types/react": "^18.3.1",

@@ -51,3 +51,11 @@ const { data } = await api.GET('/api/marketplace-analytics/snapshots', { params:
 data?.data[0].listing_name;  // ok
 data?.data[0].nonexistent;   // TS error: Property 'nonexistent' does not exist
 ```
+
+## Безопасность
+
+- **Auth:** session cookie `PHPSESSID` (form_login на `/login`)
+- **CSRF:** `SameSite=Lax` на cookie (см. `config/packages/framework.yaml`) — защита от cross-site запросов на уровне браузера
+- **API в том же origin**, что и UI — кросс-доменные вызовы не поддерживаются
+
+Если разрабатывается интеграция с внешним доменом или мобильным клиентом — `client.ts` не подходит, нужен отдельный клиент с API-token или JWT auth. Это требует реформы firewall на бэке (отдельная задача, не в этой серии PR).
