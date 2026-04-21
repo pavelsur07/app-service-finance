@@ -3,18 +3,23 @@
     "private": true,
     "scripts": {
         "dev": "vite",
-        "build": "vite build"
+        "build": "vite build",
+        "api:types": "openapi-typescript http://site-nginx/api/doc.json -o assets/api/schema.d.ts",
+        "api:types:check": "openapi-typescript http://site-nginx/api/doc.json -o /tmp/schema.check.d.ts && diff /tmp/schema.check.d.ts assets/api/schema.d.ts",
+        "api:types:from-file": "openapi-typescript ../var/openapi.json -o assets/api/schema.d.ts"
     },
     "devDependencies": {
         "@types/react": "^18.3.1",
         "@types/react-dom": "^18.3.1",
         "@vitejs/plugin-react": "^5.1.4",
+        "openapi-typescript": "^7.9.1",
         "typescript": "^5.9.3",
         "vite": "^6.0",
         "vite-plugin-symfony": "^8.2"
     },
     "dependencies": {
         "@tabler/icons-webfont": "^3.37.1",
+        "openapi-fetch": "^0.14.1",
         "react": "^18.3.1",
         "react-dom": "^18.3.1"
     }

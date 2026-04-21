@@ -822,6 +822,20 @@ Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 м
 - Request/Response DTO описываются `#[OA\Schema]` рядом с классом DTO
 - Паттерн документирования — см. `PATTERNS.md` раздел 19
 
+### Типы для фронтенда
+
+**Генератор:** `openapi-typescript` (devDep в `site/package.json`)
+**Клиент:** `openapi-fetch` (runtime-dep)
+**Путь:** `site/assets/api/`
+
+- `schema.d.ts` — автогенерируется, лежит в git
+- `client.ts` — типизированный клиент `openapi-fetch`
+- `README.md` — инструкции для разработчиков
+
+**Как регенерировать:** `make api-types` (экспортирует спеку через `bin/console nelmio:apidoc:dump` и запускает `openapi-typescript`)
+
+**Демо-компонент:** `site/assets/react/marketplace-analytics/SnapshotListDemo.tsx` — референс использования типизированного клиента.
+
 ---
 
 ## Маршруты — конвенция
