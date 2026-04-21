@@ -6,6 +6,7 @@ import { formatMoney } from '../utils/utils';
 import { useFixedHeader } from './useFixedHeader';
 
 type SortField =
+    | 'sku'
     | 'title'
     | 'revenue'
     | 'quantity'
@@ -42,15 +43,26 @@ const TABLE_STYLES = `
 .ue-ext-table td.ue-ext-frozen,
 .ue-ext-table th.ue-ext-frozen {
     position: sticky;
-    left: 0;
     background: var(--tblr-bg-surface);
+}
+.ue-ext-table td.ue-ext-frozen-sku,
+.ue-ext-table th.ue-ext-frozen-sku {
+    left: 0;
+    min-width: 140px;
+    max-width: 140px;
+    width: 140px;
+}
+.ue-ext-table td.ue-ext-frozen-title,
+.ue-ext-table th.ue-ext-frozen-title {
+    left: 140px;
     min-width: 240px;
     max-width: 240px;
+    width: 240px;
 }
 .ue-ext-table td.ue-ext-frozen { z-index: 1; }
 .ue-ext-table thead th.ue-ext-frozen { z-index: 3; }
 .ue-ext-table tfoot td.ue-ext-frozen { z-index: 1; }
-.ue-ext-table .ue-ext-frozen::after {
+.ue-ext-table .ue-ext-frozen-title::after {
     content: '';
     position: absolute;
     top: 0;
@@ -76,6 +88,7 @@ interface ExpandedState {
 }
 
 const HEADERS: { field: SortField; label: string; align?: string }[] = [
+    { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
     { field: 'quantity', label: 'Кол-во', align: 'text-end' },
@@ -94,6 +107,9 @@ const HEADERS: { field: SortField; label: string; align?: string }[] = [
 function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField): number {
     if (field === 'title') {
         return a.title.localeCompare(b.title, 'ru');
+    }
+    if (field === 'sku') {
+        return a.sku.localeCompare(b.sku, 'ru');
     }
     const valA = (a[field] as number | null) ?? -Infinity;
     const valB = (b[field] as number | null) ?? -Infinity;
@@ -160,34 +176,43 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
             return w !== undefined ? { width: w, minWidth: w, maxWidth: w } : {};
         };
 
+        const frozenClass = (field: SortField): string => {
+            if (field === 'sku') return 'ue-ext-frozen ue-ext-frozen-sku';
+            if (field === 'title') return 'ue-ext-frozen ue-ext-frozen-title';
+            return '';
+        };
+
         return (
             <tr>
-                {HEADERS.map((h, i) => (
-                    <th
-                        key={h.field}
-                        className={`${h.align ?? ''} ${h.field === 'title' ? 'ue-ext-frozen' : ''}`}
-                        style={{
-                            cursor: 'pointer',
-                            ...getWidthStyle(i),
-                            ...(widths !== undefined && h.field === 'title'
-                                ? {
-                                    position: 'relative' as const,
-                                    zIndex: 10,
-                                    background: 'var(--tblr-bg-surface)',
-                                    // Counter-act the table's translateX(-scrollLeft) so the
-                                    // frozen column stays anchored at the left edge of the clone.
-                                    transform: `translateX(${scrollLeft}px)`,
-                                  }
-                                : {}),
-                        }}
-                        onClick={() => handleSort(h.field)}
-                    >
-                        {h.label}
-                        {sortField === h.field && (
-                            <i className={`ti ti-chevron-${sortDir === 'asc' ? 'up' : 'down'} ms-1`} />
-                        )}
-                    </th>
-                ))}
+                {HEADERS.map((h, i) => {
+                    const isFrozen = h.field === 'sku' || h.field === 'title';
+                    return (
+                        <th
+                            key={h.field}
+                            className={`${h.align ?? ''} ${frozenClass(h.field)}`}
+                            style={{
+                                cursor: 'pointer',
+                                ...getWidthStyle(i),
+                                ...(widths !== undefined && isFrozen
+                                    ? {
+                                        position: 'relative' as const,
+                                        zIndex: 10,
+                                        background: 'var(--tblr-bg-surface)',
+                                        // Counter-act the table's translateX(-scrollLeft) so the
+                                        // frozen columns stay anchored at the left edge of the clone.
+                                        transform: `translateX(${scrollLeft}px)`,
+                                      }
+                                    : {}),
+                            }}
+                            onClick={() => handleSort(h.field)}
+                        >
+                            {h.label}
+                            {sortField === h.field && (
+                                <i className={`ti ti-chevron-${sortDir === 'asc' ? 'up' : 'down'} ms-1`} />
+                            )}
+                        </th>
+                    );
+                })}
                 <th className="text-end" style={getWidthStyle(HEADERS.length)}>
                     Все затраты
                 </th>
@@ -263,9 +288,11 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                             return (
                                 <React.Fragment key={row.listingId}>
                                     <tr>
-                                        <td className="ue-ext-frozen">
+                                        <td className="ue-ext-frozen ue-ext-frozen-sku">
+                                            <div className="text-muted small text-truncate">{row.sku || '—'}</div>
+                                        </td>
+                                        <td className="ue-ext-frozen ue-ext-frozen-title">
                                             <div className="text-truncate">{row.title || '—'}</div>
-                                            <div className="text-muted small text-truncate">{row.sku}</div>
                                         </td>
                                         <td className="text-end">{formatMoney(row.revenue)}</td>
                                         <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
@@ -335,7 +362,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                     {totals && (
                         <tfoot>
                             <tr className="fw-bold">
-                                <td className="ue-ext-frozen">Итого</td>
+                                <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
+                                <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
                                 <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
