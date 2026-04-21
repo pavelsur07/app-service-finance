@@ -800,9 +800,19 @@ Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 м
 
 | Статус | Эндпоинтов | Примечание |
 |---|---|---|
-| Документировано | 2 | Health (live, ready) |
-| Ожидает документации | ~50 | См. план по модулям |
+| Документировано | 5 | Health (live, ready) + MarketplaceAnalytics (create, snapshots list, snapshot show) |
+| Ожидает документации | ~47 | См. план по модулям |
 | Исключено (debug/admin) | ~22 | Не публикуются в OpenAPI |
+
+### Задокументированные эндпоинты
+
+| Модуль | Эндпоинт | PR |
+|---|---|---|
+| Analytics | GET /api/health/live | PR-1 |
+| Analytics | GET /api/health/ready | PR-1 |
+| MarketplaceAnalytics | POST /api/marketplaceanalytics | PR-2 |
+| MarketplaceAnalytics | GET /api/marketplace-analytics/snapshots | PR-2 |
+| MarketplaceAnalytics | GET /api/marketplace-analytics/snapshots/{id} | PR-2 |
 
 ### Правила документирования
 
@@ -810,6 +820,7 @@ Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 м
 - Debug- и admin-эндпоинты в OpenAPI не публикуются (см. `path_patterns` в `config/packages/nelmio_api_doc.yaml`)
 - Формат ошибок: целевой — `Problem` (RFC 7807), существующие legacy-форматы документируются как есть
 - Request/Response DTO описываются `#[OA\Schema]` рядом с классом DTO
+- Паттерн документирования — см. `PATTERNS.md` раздел 19
 
 ---
 

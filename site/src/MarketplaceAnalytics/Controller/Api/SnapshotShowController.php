@@ -8,6 +8,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAnalytics\Api\Response\SnapshotResponse;
 use App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface;
 use App\Shared\Service\ActiveCompanyService;
+use OpenApi\Attributes as OA;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -15,6 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[IsGranted('ROLE_USER')]
+#[OA\Tag(name: 'Marketplace Analytics')]
 final class SnapshotShowController extends AbstractController
 {
     public function __construct(
@@ -23,6 +25,35 @@ final class SnapshotShowController extends AbstractController
         private readonly MarketplaceFacade $marketplaceFacade,
     ) {}
 
+    #[OA\Get(
+        summary: 'Снэпшот по ID',
+        description: 'Возвращает конкретный снэпшот аналитики. Проверяет принадлежность активной компании (multi-tenancy).',
+        tags: ['Marketplace Analytics']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        required: true,
+        description: 'UUID снэпшота',
+        schema: new OA\Schema(type: 'string', format: 'uuid')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Снэпшот найден',
+        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotResponse')
+    )]
+    #[OA\Response(response: 401, description: 'Не авторизован')]
+    #[OA\Response(
+        response: 404,
+        description: 'Снэпшот не найден или не принадлежит активной компании (legacy-формат ошибки, не RFC 7807). Также возможен 404 без legacy-тела, если у пользователя нет активной компании (NotFoundHttpException из ActiveCompanyService).',
+        content: new OA\JsonContent(
+            type: 'object',
+            properties: [
+                new OA\Property(property: 'type', type: 'string', example: 'NOT_FOUND'),
+                new OA\Property(property: 'message', type: 'string', example: 'Снимок не найден'),
+            ]
+        )
+    )]
     #[Route(
         '/api/marketplace-analytics/snapshots/{id}',
         name: 'marketplace_analytics_api_snapshot_show',

@@ -57,6 +57,8 @@ nelmio_api_doc:
         tags:
             - name: Health
               description: 'Проверки жизнеспособности сервиса (liveness/readiness)'
+            - name: Marketplace Analytics
+              description: 'Аналитика по маркетплейсам: снэпшоты, cost mappings, unit economics'
     areas:
         default:
             path_patterns:
