@@ -1,11 +1,10 @@
 # --- ЭТАП 1: Сборка фронтенда (Node) ---
 FROM node:20-alpine AS frontend_builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-# Используем install, если ci падает из-за несовпадения версий
-RUN npm ci
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN yarn build
 
 # --- ЭТАП 2: Финальный Nginx ---
 FROM nginx:1.27-alpine3.21

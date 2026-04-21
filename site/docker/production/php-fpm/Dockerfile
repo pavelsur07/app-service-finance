@@ -1,10 +1,10 @@
 # --- ЭТАП 1: Сборка фронтенда (Vite) ---
 FROM node:20-alpine AS frontend_builder
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json yarn.lock ./
+RUN yarn install --frozen-lockfile
 COPY . .
-RUN npm run build
+RUN yarn build
 
 # --- ЭТАП 2: Сборка PHP (Composer) ---
 FROM php:8.3-cli-alpine AS builder

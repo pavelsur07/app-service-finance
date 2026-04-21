@@ -834,6 +834,8 @@ Rate limiting: `reports_api` — 60 req/мин · `registration` — 5 req/10 м
 
 **Как регенерировать:** `make api-types` (экспортирует спеку через `bin/console nelmio:apidoc:dump` и запускает `openapi-typescript`)
 
+**CI:** job `api-types-check` в `.github/workflows/deploy.yml` проверяет синхронизацию `schema.d.ts` на каждом PR.
+
 **Демо-компонент:** `site/assets/react/marketplace-analytics/SnapshotListDemo.tsx` — референс использования типизированного клиента.
 
 ---

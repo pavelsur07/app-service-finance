@@ -27,4 +27,6 @@
 /node_modules/
 /public/build/
 ###< pentatrion/vite-bundle ###
+
+/package-lock.json
 symfony_context.txt
