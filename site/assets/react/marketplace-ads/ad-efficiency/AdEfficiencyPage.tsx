@@ -121,6 +121,13 @@ const AdEfficiencyPage: React.FC<AdEfficiencyPageProps> = ({ marketplaces }) => 
         [total, state.pageSize],
     );
 
+    useEffect(() => {
+        if (isLoading || total === 0) return;
+        if (state.page > totalPages) {
+            setState((prev) => ({ ...prev, page: totalPages }));
+        }
+    }, [isLoading, total, totalPages, state.page]);
+
     const displayStart = total === 0 ? 0 : (state.page - 1) * state.pageSize + 1;
     const displayEnd = Math.min(state.page * state.pageSize, total);
 
