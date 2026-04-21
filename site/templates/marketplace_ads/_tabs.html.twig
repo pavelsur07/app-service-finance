@@ -1,0 +1,22 @@
+<div class="page-header d-print-none mt-0 pt-0">
+    <div class="container-xl">
+        <div class="row">
+            <div class="col">
+                <ul class="nav nav-tabs">
+                    <li class="nav-item">
+                        <a class="nav-link {{ activeTab == 'efficiency' ? 'active' : '' }}"
+                           href="{{ path('marketplace_ads_efficiency_index') }}">
+                            <span>Эффективность рекламы</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {{ activeTab == 'load' ? 'active' : '' }}"
+                           href="{{ path('marketplace_ads_index') }}">
+                            <span>Загрузка</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>

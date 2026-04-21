@@ -1,0 +1,31 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Эффективность рекламы{% endblock %}
+
+{% block body %}
+    {% include 'marketplace_ads/_tabs.html.twig' with { activeTab: 'efficiency' } %}
+
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">Эффективность рекламы</h2>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-body">
+        <div class="container-xl">
+            <div
+                id="react-ad-efficiency"
+                data-marketplaces="{{ marketplaces|json_encode|e('html_attr') }}"
+            ></div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    {{ vite_entry_script_tags('ad_efficiency_page') }}
+{% endblock %}
