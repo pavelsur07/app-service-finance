@@ -26,6 +26,7 @@
 - [16. Тесты: Unit и Integration](#16-тесты-unit-и-integration)
 - [17. Entity Builder](#17-entity-builder)
 - [18. Decision Matrix](#18-decision-matrix)
+- [19. API Documentation (OpenAPI / Nelmio)](#19-api-documentation-openapi--nelmio)
 
 ---
 
@@ -952,3 +953,110 @@ $product = ProductBuilder::aProduct()->withCompanyId($company->getId())->build()
 | Побочный эффект (email, пуш) | — | ✅ |
 | Нужен retry при падении | — | ✅ |
 | Цепочка тяжёлых шагов | — | ✅ каждый шаг = Message |
+
+---
+
+## 19. API Documentation (OpenAPI / Nelmio)
+
+### Инструмент
+
+`nelmio/api-doc-bundle` + `zircote/swagger-php`. UI на `/api/doc`, спека на `/api/doc.json`.
+
+### Область действия
+
+- Документируем контроллеры под `src/{Module}/Controller/Api/`
+- НЕ документируем: `/api/public/` (публичные отчёты — отдельный security scheme), debug/admin-эндпоинты
+- НЕ документируем внутренние Facade-методы — они не HTTP
+
+### Правило: не менять логику
+
+Атрибуты `#[OA\*]` вешаются над классом контроллера и над методом `__invoke` / action-методом. Код внутри метода не меняется. DTO не переименовываются и не реструктурируются.
+
+### Документирование Response-DTO
+
+**Важно:** если Response-DTO имеет ручной `toArray()` со snake_case или другими переименованиями полей — `#[Model(type: ...)]` даст неправильную схему. Используем `#[OA\Schema]` вручную над классом.
+
+```php
+use OpenApi\Attributes as OA;
+
+#[OA\Schema(
+    schema: 'SnapshotResponse',
+    description: 'Снэпшот аналитики',
+    required: ['id', 'company_id'],
+    properties: [
+        new OA\Property(property: 'id', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'company_id', type: 'string', format: 'uuid'),
+        new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
+        // перечисляем все поля в том виде, как они реально возвращаются
+    ]
+)]
+final readonly class SnapshotResponse { /* не трогаем */ }
+```
+
+Если поля в PHP и в JSON совпадают один в один (редкий случай) — можно использовать `#[Model(type: Dto::class)]`.
+
+### Документирование Request-DTO
+
+Для DTO, которые биндятся через `#[MapRequestPayload]`, описываем схему атрибутом над классом. Валидация (`#[Assert\*]`) Nelmio подхватывает автоматически в части required/min/max/pattern.
+
+```php
+#[OA\Schema(
+    schema: 'CreateMarketplaceAnalyticsRequest',
+    required: ['title'],
+    properties: [
+        new OA\Property(property: 'title', type: 'string', minLength: 1),
+    ]
+)]
+final class CreateMarketplaceAnalyticsRequest { /* не трогаем */ }
+```
+
+### Документирование контроллера
+
+```php
+use OpenApi\Attributes as OA;
+
+#[OA\Tag(name: 'Marketplace Analytics')]
+final class SnapshotShowController extends AbstractController
+{
+    #[OA\Get(
+        summary: 'Снэпшот по ID',
+        description: 'Проверяет принадлежность активной компании.',
+        tags: ['Marketplace Analytics']
+    )]
+    #[OA\Parameter(
+        name: 'id',
+        in: 'path',
+        required: true,
+        schema: new OA\Schema(type: 'string', format: 'uuid')
+    )]
+    #[OA\Response(
+        response: 200,
+        description: 'Найдено',
+        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotResponse')
+    )]
+    #[OA\Response(response: 404, description: 'Не найдено')]
+    #[Route('/api/marketplace-analytics/snapshots/{id}', methods: ['GET'])]
+    public function __invoke(string $id): JsonResponse
+    {
+        // логика не меняется
+    }
+}
+```
+
+### Чеклист при добавлении нового API-эндпоинта
+
+1. У контроллера есть `#[OA\Tag]` (на классе) и `#[OA\Get|Post|...]` (на методе) с `summary` на русском
+2. Если принимает body — есть `#[OA\RequestBody]` со ссылкой на схему
+3. Если есть path/query параметры — каждый описан `#[OA\Parameter]` (кроме `companyId` — он из сессии, не документируется)
+4. Перечислены ВСЕ возможные HTTP-коды ответа, включая 401, 404, 422
+5. Response-DTO имеет `#[OA\Schema]` с перечислением полей в том виде, как они уходят в JSON (учитывая snake_case из `toArray()`)
+6. Новый тег зарегистрирован в `config/packages/nelmio_api_doc.yaml` в секции `tags`
+7. Счётчик coverage в `ARCHITECTURE.md` обновлён
+
+### Анти-паттерны
+
+- ❌ Использовать `#[Model(type: SomeDto::class)]`, если у DTO есть `toArray()` с переименованиями
+- ❌ Документировать `companyId` как query-параметр
+- ❌ Документировать debug/admin-эндпоинты в публичной area
+- ❌ Менять логику контроллера «заодно с документацией»
+- ❌ Выдумывать HTTP-коды, которых контроллер не возвращает
