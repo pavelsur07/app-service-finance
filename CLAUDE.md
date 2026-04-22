@@ -139,6 +139,10 @@ Doctrine генерирует proxy-класс наследованием от E
 ### Message (Messenger)
 - `readonly class` только с scalar ID — не Entity
 - Новый Message → добавить routing в `config/packages/messenger.yaml`
+- **Выбор транспорта обязателен** — ровно один из трёх:
+  - `async_sync` — внешние HTTP-запросы (marketplace/банк API, отправка email)
+  - `async_pipeline` — локальная обработка данных, DB-heavy (процессинг raw-документов, импорты, auto-rules, close-month, analytics recalc)
+  - `async_ads` — Ozon Performance polling (изолирован, т.к. handler может висеть до 10 минут)
 - Handler: нет `Request`/`Session`/`Security` — CLI-контекст
 - Паттерн полностью → `PATTERNS.md` раздел 10
 
@@ -197,7 +201,11 @@ NewModule:
     alias: NewModule
 
 # 3. config/packages/messenger.yaml (если есть async Messages)
-App\NewModule\Message\SomeMessage: async
+#    Выбрать ровно ОДИН транспорт под характер задачи:
+#    - async_sync      — внешние HTTP (marketplace/банк API, email)
+#    - async_pipeline  — локальная обработка (DB/CPU, импорты, analytics)
+#    - async_ads       — Ozon Performance polling (изолирован)
+App\NewModule\Message\SomeMessage: async_pipeline
 
 # 4. config/packages/twig.yaml (если есть шаблоны)
 paths:

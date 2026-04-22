@@ -419,9 +419,21 @@ final readonly class SyncWbReportMessage
 }
 ```
 
-После создания → добавить в `config/packages/messenger.yaml`:
+После создания → добавить в `config/packages/messenger.yaml` с выбором транспорта:
+
+| Транспорт | Когда использовать | Примеры сообщений |
+|---|---|---|
+| `async_sync` | Внешние HTTP-запросы, отправка email | `SyncWbReportMessage`, `SyncOzonReportMessage`, `BankImportMessage`, `SendEmailMessage` |
+| `async_pipeline` | Локальная обработка, DB/CPU-heavy | `ProcessDayReportMessage`, `ProcessRawDocumentStepMessage`, `ApplyAutoRulesForTransaction`, `RecalcSnapshotsMessage` |
+| `async_ads` | Ozon Performance polling (handler может висеть до 10 минут) | `FetchOzonAdStatisticsMessage`, `LoadOzonAdStatisticsRangeMessage` |
+
+Правило выбора:
+- Handler делает внешний HTTP-запрос к marketplace/банку/email → `async_sync`
+- Handler читает/пишет в БД, парсит локальные файлы, считает агрегаты → `async_pipeline`
+- Handler — часть Ozon Ads pipeline (выделенная очередь из-за долгого polling) → `async_ads`
+
 ```yaml
-App\Marketplace\Message\SyncWbReportMessage: async
+App\Marketplace\Message\SyncWbReportMessage: async_sync
 ```
 
 ### Handler
