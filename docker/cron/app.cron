@@ -13,6 +13,12 @@
 # Ежедневная загрузка рекламы Ozon за вчера для всех компаний с активным Performance-подключением.
 30 4 * * * php bin/console app:marketplace-ads:ozon-daily-sync --no-interaction >> /var/log/cron/app.log 2>&1
 
+# Poll Ozon Performance reports (async-poll redesign, step 5)
+# Picks up pending reports in REQUESTED state, transitions state via
+# GET /statistics/list (one call per company), dispatches download
+# on state=OK. See ARCHITECTURE.md.
+*/2 * * * * php bin/console app:marketplace-ads:ozon-poll-reports --quiet >> /var/log/cron/app.log 2>&1
+
 # 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
 0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod >> /var/log/cron/app.log 2>&1
 

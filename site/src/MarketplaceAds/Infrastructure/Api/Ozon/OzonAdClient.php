@@ -410,6 +410,128 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Async-poll flow: только POST /statistics. Без polling'а и без download'а.
+     *
+     * Выполняет всё, что раньше делал {@see fetchAdStatisticsRange()} до первого
+     * {@see pollReport()}: резолв credentials, получение access-token, listSkuCampaigns,
+     * фильтр recent-vs-backfill, разбивка на батчи по STATISTICS_BATCH_SIZE (≤10),
+     * requestStatistics (POST /statistics) per batch — с персистом
+     * {@see OzonAdPendingReport} в state=REQUESTED и jobId текущего задания.
+     *
+     * Resume: если {@see matchResumableReport()} находит in-flight запись (<900с),
+     * POST пропускается, existing UUID переиспользуется — защита от дубликатов
+     * при Messenger-retry.
+     *
+     * nextPollAt умышленно оставляется NULL — poll-cron обрабатывает NULL как
+     * «polled on next tick». При интервале cron 2 минуты и типичном времени
+     * формирования отчёта Ozon <60с медианное время REQUEST → OK detection
+     * составляет ~60-180с.
+     *
+     * Downstream: poll-cron переводит state REQUESTED → OK / ERROR;
+     * {@see DownloadOzonAdReportHandler} завершает ингест и диспатчит
+     * ProcessAdRawDocumentMessage.
+     *
+     * @return list<string> UUID'ы, созданные или переиспользованные для текущего чанка
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \InvalidArgumentException диапазон > 62 дней / from > to
+     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     */
+    public function requestStatisticsOnly(
+        string $companyId,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        ?string $jobId,
+    ): array {
+        $this->assertValidRange($dateFrom, $dateTo);
+
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $this->marketplaceAdsLogger->info('Ozon Performance: request-only начало', [
+            'companyId' => $companyId,
+            'dateFrom' => $dateFrom->format('Y-m-d'),
+            'dateTo' => $dateTo->format('Y-m-d'),
+            'jobId' => $jobId,
+        ]);
+
+        $campaigns = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): array => $this->listSkuCampaigns($token),
+        );
+
+        $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom);
+
+        // Resume-fetch: in-flight записи текущего job'а выбираем один раз
+        // до цикла, чтобы не спамить БД N запросами на N батчей.
+        $inFlightReports = (null !== $jobId)
+            ? $this->pendingReportRepo->findInFlightByJob($companyId, $jobId)
+            : [];
+
+        /** @var list<string> $uuids */
+        $uuids = [];
+
+        foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
+            [$campaignIds] = $this->splitBatch($batch);
+
+            $resumable = $this->matchResumableReport(
+                $inFlightReports,
+                $dateFrom,
+                $dateTo,
+                $campaignIds,
+                $companyId,
+            );
+
+            if (null !== $resumable) {
+                $uuid = $resumable->getOzonUuid();
+                $this->marketplaceAdsLogger->info('Ozon request-only: resumed existing UUID', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $uuid,
+                    'jobId' => $jobId,
+                    'campaignCount' => count($campaignIds),
+                ]);
+            } else {
+                $uuid = $this->withAuthRetry(
+                    $companyId,
+                    $clientId,
+                    $clientSecret,
+                    fn (string $token): string => $this->requestStatistics(
+                        $token,
+                        $companyId,
+                        $campaignIds,
+                        $dateFrom,
+                        $dateTo,
+                        'DATE',
+                        $jobId,
+                    ),
+                );
+                $this->marketplaceAdsLogger->info('Ozon request-only: запрошен новый отчёт', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $uuid,
+                    'jobId' => $jobId,
+                    'campaignCount' => count($campaignIds),
+                ]);
+            }
+
+            $uuids[] = $uuid;
+        }
+
+        $this->marketplaceAdsLogger->info('Ozon Performance: request-only завершено', [
+            'companyId' => $companyId,
+            'dateFrom' => $dateFrom->format('Y-m-d'),
+            'dateTo' => $dateTo->format('Y-m-d'),
+            'jobId' => $jobId,
+            'campaignsCount' => count($campaigns),
+            'uuidsCount' => count($uuids),
+        ]);
+
+        return $uuids;
+    }
+
+    /**
      * Один HTTP-снимок отчётов компании в Ozon Performance /statistics/list.
      *
      * В отличие от {@see pollReport()} не спит и не ретраится по состоянию —

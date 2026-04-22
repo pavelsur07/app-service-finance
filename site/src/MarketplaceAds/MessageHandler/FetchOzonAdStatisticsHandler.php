@@ -4,73 +4,71 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\MessageHandler;
 
-use App\Marketplace\Enum\MarketplaceType;
-use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
-use App\MarketplaceAds\Entity\AdRawDocument;
-use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
+use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
-use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
-use App\MarketplaceAds\Repository\AdRawDocumentRepository;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Shared\Service\AppLogger;
-use App\Shared\Service\Storage\StorageService;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Async-обработчик {@see FetchOzonAdStatisticsMessage}.
+ * Async-обработчик {@see FetchOzonAdStatisticsMessage} — request-only.
+ *
+ * Step 5 redesign: воркер больше НЕ polling'ит Ozon синхронно и НЕ скачивает
+ * отчёт. Его роль — только выставить POST /statistics и выйти (<30s на чанк
+ * вместо прежних ~10 мин). Завершение ингеста берёт на себя связка
+ * poll-cron → {@see DownloadOzonAdReportHandler}.
  *
  * Логика одного чанка:
  *  1) найти AdLoadJob (IDOR по company_id); если job удалён или в терминальном
  *     статусе — no-op;
- *  2) вызвать {@see OzonAdClient::fetchAdStatisticsRange};
- *  3) для каждого дня результата — upsert AdRawDocument (новый → save,
- *     существующий → updatePayload() — тот сам сбрасывает status в DRAFT);
- *  4) единый flush на весь чанк;
- *  5) атомарный incrementLoadedDays($jobId, chunkDays - skippedDays) — raw SQL,
- *     минуя UoW (parallel-safe с другими воркерами того же job'а). Считаем
- *     по покрытию чанка, а не по числу документов: Ozon может вернуть меньше
- *     дней, чем запросили (дни без кампаний), и такие «пустые» дни всё равно
- *     должны учитываться как обработанные, иначе прогресс зависнет ниже 100%;
- *  6) dispatch ProcessAdRawDocumentMessage за каждый документ — уже ПОСЛЕ
- *     flush, чтобы следующий handler увидел документ в БД.
+ *  2) валидировать формат / календарь dateFrom / dateTo;
+ *  3) вызвать {@see OzonAdClient::requestStatisticsOnly()} — он внутри
+ *     разрешит credentials, получит token, сделает listSkuCampaigns,
+ *     отфильтрует кампании, разобьёт на батчи ≤10 и на каждый батч
+ *     выполнит POST /statistics с persist'ом OzonAdPendingReport
+ *     (state=REQUESTED, jobId=этот job). Resume-логика внутри OzonAdClient
+ *     защищает от дубликатов POST'ов при Messenger-retry (окно 900s);
+ *  4) markChunkCompleted — идемпотентная фиксация чанка через
+ *     AdChunkProgressRepository, SAME AS BEFORE. Семантика смещена:
+ *     «chunk processed» → «chunk requested». При retry вернёт false
+ *     и инкременты счётчиков пропустятся, чтобы не удвоить progress;
+ *  5) RETURN. Никакого download, upsert AdRawDocument, dispatch
+ *     ProcessAdRawDocumentMessage — всё это теперь делает
+ *     DownloadOzonAdReportHandler после того, как poll-cron увидел
+ *     state=OK у pending-отчёта.
  *
  * Политика ошибок:
- *  - \InvalidArgumentException (range > 62 дней / from > to): permanent bug
- *    вызывающей стороны → markFailed(job) + UnrecoverableMessageHandlingException.
- *  - OzonPermanentApiException (403, missing credentials): permanent →
- *    markFailed(job) + UnrecoverableMessageHandlingException.
- *  - Прочие \Throwable (5xx, сеть, JSON-ошибки): transient → rethrow
- *    (Messenger ретраит по стратегии async). Когда retry'и исчерпаются,
- *    message уйдёт в failed-транспорт — его разбирает оператор.
+ *  - \InvalidArgumentException (diapazon > 62 дней / from > to) — permanent
+ *    bug вызывающей стороны → markFailed + UnrecoverableMessageHandlingException.
+ *  - OzonPermanentApiException (403, missing credentials) — permanent denial →
+ *    abandon всех in-flight pending-отчётов этого job'а (чтобы poll-cron не
+ *    продолжал их опрашивать после markFailed), markFailed + Unrecoverable.
+ *  - OzonAuthExpiredException (401) — внутри OzonAdClient::withAuthRetry один
+ *    раз ретраится с fresh-токеном, наружу не выходит.
+ *  - Прочие \Throwable (5xx, сеть, JSON-ошибки) — transient → rethrow,
+ *    Messenger ретраит. Resume-логика внутри OzonAdClient найдёт уже
+ *    созданный pending-отчёт (<900s) и пропустит re-POST.
  *
- * Порядок операций строгий: save() → flush() → incrementLoadedDays() →
- * dispatch(ProcessAdRawDocumentMessage) → tryFinalize. Иначе
- * ProcessAdRawDocumentHandler может стартовать до появления документа в БД.
- *
- * tryFinalize после dispatch — необходимый триггер для случая, когда Ozon
- * вернул 0 документов за период: per-document handler'ы никогда не
- * запустятся, и без прямого вызова finalizer здесь job застрянет в RUNNING.
+ * OzonStatisticsQueueFullException (NOT_STARTED timeout) старого sync-flow'а
+ * здесь больше не ловится — он выбрасывался из внутреннего polling-цикла,
+ * которого в async-режиме нет. Сам exception-класс не удалён (оставлен для
+ * совместимости с cleanup-PR), но из этого handler'а catch убран.
  */
 #[AsMessageHandler]
 final class FetchOzonAdStatisticsHandler
 {
     public function __construct(
         private readonly OzonAdClient $ozonAdClient,
-        private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
-        private readonly AdLoadJobFinalizer $adLoadJobFinalizer,
-        private readonly EntityManagerInterface $entityManager,
-        private readonly MessageBusInterface $messageBus,
-        private readonly StorageService $storageService,
+        private readonly OzonAdPendingReportRepository $pendingReportRepo,
         private readonly AppLogger $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
@@ -134,7 +132,7 @@ final class FetchOzonAdStatisticsHandler
         $chunkDays = (int) $dateFrom->diff($dateTo)->days + 1;
 
         try {
-            $result = $this->ozonAdClient->fetchAdStatisticsRange(
+            $uuids = $this->ozonAdClient->requestStatisticsOnly(
                 $message->companyId,
                 $dateFrom,
                 $dateTo,
@@ -155,7 +153,13 @@ final class FetchOzonAdStatisticsHandler
                 $e,
             );
         } catch (OzonPermanentApiException $e) {
-            // 403 / missing credentials — permanent denial, ретраить бессмысленно.
+            // 403 / missing credentials — permanent denial. Abandon все
+            // in-flight pending-отчёты этого job'а: job уходит в FAILED,
+            // и poll-cron'у больше нечего делать с их UUID'ами. Без abandon'а
+            // они остались бы висеть в REQUESTED до next_poll_at и
+            // генерили бы лишние HTTP-запросы.
+            $this->abandonInFlightForJob($message->companyId, $message->jobId, $e);
+
             $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
@@ -167,41 +171,11 @@ final class FetchOzonAdStatisticsHandler
                 0,
                 $e,
             );
-        } catch (OzonStatisticsQueueFullException $e) {
-            // Ozon Performance API перегружен: отчёт завис в NOT_STARTED
-            // дольше порога. Messenger-retry по расписанию (секунды/минуты)
-            // бессмысленен — деградация обычно длится часы. Отдаём
-            // Unrecoverable, чтобы пользователь вручную повторил загрузку
-            // позже, когда Ozon оживёт.
-            //
-            // Пользовательский текст собираем прямо здесь из полей exception'а,
-            // а не конкатенацией с $e->getMessage() — иначе получится двойное
-            // «перегружена, повторите» (exception несёт технический английский
-            // message для логов / Sentry).
-            $this->adLoadJobRepository->markFailed(
-                $message->jobId,
-                $message->companyId,
-                sprintf(
-                    'Очередь отчётов Ozon Performance перегружена, повторите загрузку позже. Отчёт %s не начал обработку за %d секунд.',
-                    $e->getReportUuid(),
-                    $e->getWaitedSeconds(),
-                ),
-            );
-            $this->marketplaceAdsLogger->warning('Ozon statistics queue full', [
-                'jobId' => $message->jobId,
-                'companyId' => $message->companyId,
-                'reportUuid' => $e->getReportUuid(),
-                'waitedSeconds' => $e->getWaitedSeconds(),
-            ]);
-
-            throw new UnrecoverableMessageHandlingException(
-                $e->getMessage(),
-                0,
-                $e,
-            );
         } catch (\Throwable $e) {
             // Сетевые сбои / 5xx / JSON-ошибки — transient, Messenger сделает retry.
-            $this->logger->error('Transient failure loading Ozon ad statistics chunk', $e, [
+            // Resume-логика внутри OzonAdClient на повторе найдёт уже
+            // созданный pending-отчёт (<900s) и пропустит дублирующий POST.
+            $this->logger->error('Transient failure requesting Ozon ad statistics chunk', $e, [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
                 'dateFrom' => $message->dateFrom,
@@ -212,113 +186,10 @@ final class FetchOzonAdStatisticsHandler
             throw $e;
         }
 
-        /** @var list<AdRawDocument> $documents */
-        $documents = [];
-        $skippedDays = 0;
-
-        foreach ($result as $dateString => $payload) {
-            $reportDate = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $dateString);
-            if (false === $reportDate) {
-                // OzonAdClient формирует ключи как Y-m-d; некорректный ключ — это баг клиента,
-                // но не повод ронять весь чанк. Логируем и пропускаем один день.
-                ++$skippedDays;
-                $this->logger->error('Invalid date key in Ozon result, day skipped', null, [
-                    'jobId' => $message->jobId,
-                    'companyId' => $message->companyId,
-                    'dateKey' => $dateString,
-                ]);
-                continue;
-            }
-
-            $json = json_encode($payload, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
-            if (false === $json) {
-                ++$skippedDays;
-                $this->logger->error('json_encode failed for Ozon day payload, day skipped', null, [
-                    'jobId' => $message->jobId,
-                    'companyId' => $message->companyId,
-                    'date' => $reportDate->format('Y-m-d'),
-                    'jsonError' => json_last_error_msg(),
-                ]);
-                continue;
-            }
-
-            $existing = $this->adRawDocumentRepository->findByMarketplaceAndDate(
-                $message->companyId,
-                MarketplaceType::OZON->value,
-                $reportDate,
-            );
-
-            if (null === $existing) {
-                $doc = new AdRawDocument($message->companyId, MarketplaceType::OZON, $reportDate, $json);
-                $this->adRawDocumentRepository->save($doc);
-                $documents[] = $doc;
-            } else {
-                // updatePayload() сам сбрасывает status в DRAFT и обновляет updatedAt —
-                // дополнительный resetToDraft() не нужен и привёл бы к двойному setter'у.
-                $existing->updatePayload($json);
-                $documents[] = $existing;
-            }
-        }
-
-        // Bronze-слой: сохраняем сырой ответ Ozon (ZIP или CSV) на диск ДО flush,
-        // чтобы storage_path попал в один UPDATE/INSERT c документом. Принцип
-        // «1 bronze = 1 chunk»: все AdRawDocument'ы чанка ссылаются на один
-        // физический файл. Если campaigns > 10, чанк режется на несколько
-        // батчей и Ozon возвращает несколько разных отчётов — тогда
-        // сохранять только первый было бы нечестно (file_hash на документах
-        // не соответствовал бы полным данным). В этом случае bronze
-        // принудительно НЕ пишется: storage_path/file_hash/file_size_bytes
-        // остаются null, в канал marketplace_ads летит warning с batchCount.
-        // Правильное решение (per-batch файлы со связью N:M c документами)
-        // — отдельная задача.
-        $downloads = $this->ozonAdClient->getLastChunkDownloads();
-        if ([] !== $downloads && [] !== $documents) {
-            if (count($downloads) > 1) {
-                $this->marketplaceAdsLogger->warning('Multi-batch chunk: bronze file not saved (known limitation)', [
-                    'jobId' => $message->jobId,
-                    'companyId' => $message->companyId,
-                    'dateFrom' => $dateFrom->format('Y-m-d'),
-                    'dateTo' => $dateTo->format('Y-m-d'),
-                    'batchCount' => count($downloads),
-                ]);
-            } else {
-                $firstDownload = $downloads[0];
-                $extension = $firstDownload->wasZip ? 'zip' : 'csv';
-                $relativePath = sprintf(
-                    'companies/%s/marketplace-ads/ozon/bronze/%s/%s.%s',
-                    $message->companyId,
-                    $dateFrom->format('Y-m-d'),
-                    $firstDownload->reportUuid,
-                    $extension,
-                );
-
-                $stored = $this->storageService->storeBytes($firstDownload->rawBytes, $relativePath);
-                $size = (int) $stored['sizeBytes'];
-
-                foreach ($documents as $doc) {
-                    $doc->setFileStorage($stored['storagePath'], $stored['fileHash'], $size);
-                }
-
-                $this->marketplaceAdsLogger->info('Ozon bronze file stored', [
-                    'jobId' => $message->jobId,
-                    'companyId' => $message->companyId,
-                    'dateFrom' => $message->dateFrom,
-                    'dateTo' => $message->dateTo,
-                    'reportUuid' => $firstDownload->reportUuid,
-                    'storagePath' => $stored['storagePath'],
-                    'sizeBytes' => $size,
-                    'wasZip' => $firstDownload->wasZip,
-                    'documentsLinked' => count($documents),
-                ]);
-            }
-        }
-
-        $this->entityManager->flush();
-
-        // Идемпотентная фиксация чанка — ПЕРЕД инкрементом счётчиков дней.
-        // При Messenger retry markChunkCompleted вернёт false (запись уже есть),
-        // и мы пропустим инкременты, не удвоив loaded/failed days.
-        // permanent/transient ошибки до сюда не доходят (rethrow / Unrecoverable выше).
+        // Идемпотентная фиксация чанка — в async-flow означает «запрос отправлен»,
+        // а не «данные обработаны». При Messenger-retry markChunkCompleted
+        // вернёт false (запись уже есть), и мы пропустим инкременты, не удвоив
+        // loaded days счётчик.
         $marked = $this->adChunkProgressRepository->markChunkCompleted(
             $message->jobId,
             $message->companyId,
@@ -334,56 +205,59 @@ final class FetchOzonAdStatisticsHandler
                 'date_to' => $message->dateTo,
             ]);
         } else {
-            // loaded_days считаем по покрытию чанка (chunkDays - skippedDays), а не
-            // по count($documents): Ozon легитимно возвращает меньше дней, чем
-            // запросили, если за какие-то дни вообще нет кампаний. Если брать
-            // count($documents), такие «пустые» дни навсегда останутся
-            // непосчитанными в прогрессе, и loaded не дорастёт до total.
-            $loadedDelta = $chunkDays - $skippedDays;
-            if ($loadedDelta > 0) {
-                $this->adLoadJobRepository->incrementLoadedDays(
-                    $message->jobId,
-                    $message->companyId,
-                    $loadedDelta,
-                );
-            }
-
-            if ($skippedDays > 0) {
-                // Per-document FAILED-статус AdRawDocument — источник правды по
-                // неуспехам; здесь оставляем предупреждение для наблюдаемости чанка.
-                $this->marketplaceAdsLogger->warning('Ozon ad chunk had skipped days', [
-                    'jobId' => $message->jobId,
-                    'companyId' => $message->companyId,
-                    'dateFrom' => $message->dateFrom,
-                    'dateTo' => $message->dateTo,
-                    'skippedDays' => $skippedDays,
-                ]);
-            }
-        }
-
-        foreach ($documents as $doc) {
-            $this->messageBus->dispatch(new ProcessAdRawDocumentMessage(
+            // loaded_days считаем по покрытию чанка: в async-flow запрос покрыл
+            // все дни диапазона, даже если за какие-то дни в итоге не окажется
+            // кампаний — финальный ответ приедет через DownloadOzonAdReportHandler.
+            $this->adLoadJobRepository->incrementLoadedDays(
+                $message->jobId,
                 $message->companyId,
-                $doc->getId(),
-            ));
+                $chunkDays,
+            );
         }
 
-        // Пытаемся финализировать job — покрывает кейс, когда Ozon вернул 0
-        // документов за период: ProcessAdRawDocumentHandler в этом случае
-        // никогда не запустится, и без явной попытки здесь job навечно завис
-        // бы в RUNNING при markChunkCompleted для последнего чанка.
-        $this->adLoadJobFinalizer->tryFinalize($message->jobId, $message->companyId);
-
-        $this->marketplaceAdsLogger->info('Ozon ad statistics chunk processed', [
+        $this->marketplaceAdsLogger->info('Ozon ad statistics chunk requested', [
             'jobId' => $message->jobId,
             'companyId' => $message->companyId,
             'dateFrom' => $message->dateFrom,
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
-            'documentsUpserted' => count($documents),
-            'daysLoaded' => $marked ? $chunkDays - $skippedDays : 0,
-            'daysSkipped' => $skippedDays,
+            'uuidsRequested' => count($uuids),
             'duplicate' => !$marked,
+        ]);
+    }
+
+    /**
+     * Финализирует все in-flight pending-отчёты job'а как ABANDONED.
+     *
+     * Вызывается из catch OzonPermanentApiException: раз job уходит в FAILED,
+     * poll-cron'у не имеет смысла продолжать GET /statistics/list по этим
+     * UUID. markFinalized идемпотентен (guard finalized_at IS NULL), так
+     * что race с poll-cron'ом безопасен.
+     */
+    private function abandonInFlightForJob(
+        string $companyId,
+        string $jobId,
+        OzonPermanentApiException $cause,
+    ): void {
+        $inFlight = $this->pendingReportRepo->findInFlightByJob($companyId, $jobId);
+        if ([] === $inFlight) {
+            return;
+        }
+
+        $reason = 'Job failed permanently: '.$cause->getMessage();
+        foreach ($inFlight as $pending) {
+            $this->pendingReportRepo->markFinalized(
+                $pending->getCompanyId(),
+                $pending->getOzonUuid(),
+                OzonAdPendingReportState::ABANDONED,
+                $reason,
+            );
+        }
+
+        $this->marketplaceAdsLogger->info('Abandoned in-flight pending reports after permanent failure', [
+            'jobId' => $jobId,
+            'companyId' => $companyId,
+            'abandonedCount' => count($inFlight),
         ]);
     }
 }

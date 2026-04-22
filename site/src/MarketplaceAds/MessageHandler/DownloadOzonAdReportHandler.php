@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\MessageHandler;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
@@ -62,6 +63,7 @@ final class DownloadOzonAdReportHandler
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $bus,
         private readonly StorageService $storageService,
+        private readonly AdLoadJobFinalizer $finalizer,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
     ) {
@@ -250,6 +252,24 @@ final class DownloadOzonAdReportHandler
                 $pending->getCompanyId(),
                 $doc->getId(),
             ));
+        }
+
+        // Zero-docs edge case: если Ozon вернул пустой отчёт, ни одного
+        // ProcessAdRawDocumentMessage не будет, и per-document trigger'а
+        // финализации job'а не произойдёт. В старом sync-flow этот случай
+        // покрывал FetchOzonAdStatisticsHandler прямым вызовом tryFinalize;
+        // в async-flow мы узнаём факт пустого отчёта только здесь, поэтому
+        // финализируем job напрямую. tryFinalize идемпотентен (считает
+        // processed vs total), так что лишнего вызова не произойдёт.
+        if ([] === $documents && null !== $pending->getJobId()) {
+            $this->logger->info('DownloadOzonAdReportMessage: zero docs in report — finalizing job directly', [
+                'pendingReportId' => $pending->getId(),
+                'jobId' => $pending->getJobId(),
+            ]);
+            $this->finalizer->tryFinalize(
+                $pending->getJobId(),
+                $pending->getCompanyId(),
+            );
         }
 
         $this->logger->info('DownloadOzonAdReportMessage: отчёт обработан', [
