@@ -63,6 +63,46 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         ));
     }
 
+    public function testOversizedBatchThrowsUnrecoverable(): void
+    {
+        // Defense-in-depth: Ozon принимает не более 10 campaignIds. Orchestrator
+        // бьёт через array_chunk(..., 10), но если кто-то задиспатчит сообщение
+        // руками с 11+ id, Ozon ответит 4xx — такие ошибки транспортируются
+        // через обычный \RuntimeException и иначе ретраились бы forever. Guard
+        // в handler'е ловит это один раз и отправляет сообщение в dead-letter.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('requestOneBatch');
+
+        $oversized = [];
+        for ($i = 1; $i <= 11; ++$i) {
+            $oversized[] = 'c'.$i;
+        }
+
+        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, new NullLogger());
+
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('campaignIds size 11 out of [1..10]');
+
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: $oversized,
+            batchIndex: 0,
+            batchTotal: 1,
+        ));
+    }
+
     public function testTransientRuntimeExceptionPropagatesWithoutMarkingFailed(): void
     {
         // Ozon 429 «Превышен лимит активных запросов» и прочие transient

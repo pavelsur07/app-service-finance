@@ -35,6 +35,16 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 #[AsMessageHandler]
 final class RequestOzonAdBatchHandler
 {
+    /**
+     * Ozon Performance API: «Превышен лимит по количеству кампаний (максимум 10)».
+     * Orchestrator бьёт batches через array_chunk(..., 10), так что в норме
+     * каждое сообщение приходит с 1..10 id. Но если кто-то диспатчит сообщение
+     * руками / из CLI в обход orchestrator'а с >10 id — Ozon вернёт 4xx,
+     * который handler бы ретраил бесконечно (4xx у нас transient). Явный
+     * guard с Unrecoverable ловит это один раз и bounce'ит в dead-letter.
+     */
+    private const STATISTICS_BATCH_SIZE = 10;
+
     public function __construct(
         private readonly AdLoadJobRepository $jobRepository,
         private readonly OzonAdClient $ozonAdClient,
@@ -60,6 +70,17 @@ final class RequestOzonAdBatchHandler
             ]);
 
             return;
+        }
+
+        // Размер батча должен быть 1..STATISTICS_BATCH_SIZE. Orchestrator это
+        // гарантирует; попадание сюда означает permanent bug у вызывающего.
+        $batchSize = count($message->campaignIds);
+        if ($batchSize < 1 || $batchSize > self::STATISTICS_BATCH_SIZE) {
+            throw new UnrecoverableMessageHandlingException(sprintf(
+                'RequestOzonAdBatchMessage: campaignIds size %d out of [1..%d]',
+                $batchSize,
+                self::STATISTICS_BATCH_SIZE,
+            ));
         }
 
         $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $message->dateFrom);
