@@ -63,6 +63,51 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         ));
     }
 
+    public function testTransientRuntimeExceptionPropagatesWithoutMarkingFailed(): void
+    {
+        // Ozon 429 «Превышен лимит активных запросов» и прочие transient
+        // (5xx, сеть, JSON) проходят наружу как \RuntimeException —
+        // Messenger ретраит по расписанию async_ads, markFailed не
+        // вызывается, Unrecoverable тоже.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::once())
+            ->method('requestOneBatch')
+            ->willThrowException(new \RuntimeException('Ozon Performance: HTTP 429 Превышен лимит активных запросов'));
+
+        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, new NullLogger());
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('HTTP 429');
+
+        try {
+            $handler(new RequestOzonAdBatchMessage(
+                companyId: self::COMPANY_ID,
+                jobId: self::JOB_ID,
+                dateFrom: self::DATE_FROM,
+                dateTo: self::DATE_TO,
+                campaignIds: ['c1'],
+                batchIndex: 0,
+                batchTotal: 1,
+            ));
+        } catch (\RuntimeException $e) {
+            self::assertNotInstanceOf(
+                UnrecoverableMessageHandlingException::class,
+                $e,
+                'transient-ошибки не должны заворачиваться в Unrecoverable',
+            );
+            throw $e;
+        }
+    }
+
     public function testPermanentApiExceptionMarksFailedAndThrowsUnrecoverable(): void
     {
         // 403 / scope revoked → весь job обречён. Handler вызывает markFailed
