@@ -18,6 +18,11 @@ namespace App\MarketplaceAds\Message;
  * Scalar-only payload per Messenger/CLAUDE.md rules. batchIndex + batchTotal
  * are optional for logic but помогают скоррелировать логи с исходным чанком
  * при дебаге.
+ *
+ * rateLimitAttempts counts how many times this batch has been rescheduled
+ * after an Ozon HTTP 429 (see {@see \App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler}).
+ * Defaults to 0 on first dispatch; the handler increments it on each
+ * reschedule and gives up once the cap is exceeded.
  */
 final readonly class RequestOzonAdBatchMessage
 {
@@ -32,6 +37,7 @@ final readonly class RequestOzonAdBatchMessage
         public array $campaignIds,
         public int $batchIndex,
         public int $batchTotal,
+        public int $rateLimitAttempts = 0,
     ) {
     }
 }

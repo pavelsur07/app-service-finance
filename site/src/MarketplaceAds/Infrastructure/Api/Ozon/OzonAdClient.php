@@ -9,6 +9,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
+use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
@@ -2064,7 +2065,13 @@ class OzonAdClient implements AdPlatformClientInterface
                 // диагностический статус не был подменён TransportException'ом.
                 $bodyPreview = '<body unavailable>';
             }
-            throw new \RuntimeException(sprintf('Ozon Performance: %s %s вернул HTTP %d, body: %s', $method, $urlOrPath, $statusCode, $bodyPreview));
+            $errorMessage = sprintf('Ozon Performance: %s %s вернул HTTP %d, body: %s', $method, $urlOrPath, $statusCode, $bodyPreview);
+
+            if (429 === $statusCode) {
+                throw new OzonRateLimitException($errorMessage);
+            }
+
+            throw new \RuntimeException($errorMessage);
         }
 
         return $response;
