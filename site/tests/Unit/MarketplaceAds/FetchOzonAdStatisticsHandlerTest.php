@@ -188,12 +188,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
-    public function testEmptyUuidsOnDuplicateChunkStillCallsFinalizer(): void
+    public function testZeroBatchesOnDuplicateChunkStillCallsFinalizer(): void
     {
-        // Инвариант: zero-uuids ветка вызывает tryFinalize независимо от
+        // Инвариант: zero-batches ветка вызывает tryFinalize независимо от
         // результата markChunkCompleted. tryFinalize идемпотентен (SQL-level
         // guard на статус RUNNING), и повторный вызов при Messenger-retry —
-        // безопасный no-op. Этот тест фиксирует контракт «zero-uuids всегда
+        // безопасный no-op. Этот тест фиксирует контракт «zero-batches всегда
         // пытается финализировать» и ловит регрессию, если кто-то решит
         // привязать вызов к `$marked === true`.
         $job = AdLoadJobBuilder::aJob()->asRunning()->build();
@@ -205,7 +205,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')->willReturn([]);
+        $ozonClient->method('prepareStatisticsBatches')->willReturn([]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -219,7 +219,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('tryFinalize')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Zero batches → никаких dispatch'ей.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
