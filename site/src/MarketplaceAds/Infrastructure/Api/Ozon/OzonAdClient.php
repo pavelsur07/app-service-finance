@@ -474,6 +474,141 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Скачивает готовый отчёт Ozon Performance по UUID и конвертирует CSV в
+     * структуру, сгруппированную по дате (совместимо с shape'ом
+     * {@see fetchAdStatisticsRange()} — date => ['campaigns' => [...]]).
+     *
+     * Используется в async-poll flow (step 4 redesign): poll-cron наблюдает
+     * state=OK на pending-отчёте и хэндит off на DownloadOzonAdReportHandler,
+     * который вызывает этот метод, чтобы завершить ингест без повторного
+     * POST /statistics и без внутреннего polling-цикла.
+     *
+     * НЕ опрашивает state и НЕ спит: вызывающий код уже знает, что state
+     * терминальный OK. Делает один GET /statistics/{uuid} ради свежей
+     * download-ссылки (Ozon link может содержать signed-expiration), затем
+     * GET download + парсинг CSV. 401 на любом шаге — один refresh-токен
+     * retry (withAuthRetry).
+     *
+     * namesById умышленно остаётся пустым: в новом Ozon-формате
+     * campaign_name приходит отдельной колонкой CSV (см. convertCsvToRowsByDate),
+     * а вызывать listSkuCampaigns() стоит одного лишнего HTTP-запроса и
+     * не улучшает качество — если кампания переименована/удалена с момента
+     * запроса, любой fallback всё равно неточен. Parser graceful degrade'ит
+     * до пустого campaign_name.
+     *
+     * НЕ трогает $this->lastChunkDownloads — bronze в async-flow'е пишет
+     * handler сам из возвращаемого `downloads` массива.
+     *
+     * @param list<string> $campaignIds Используются только для логирования контекста.
+     *
+     * @return array{
+     *     downloads: list<OzonReportDownload>,
+     *     resultByDate: array<string, array{campaigns: list<array{
+     *         campaign_id: string,
+     *         campaign_name: string,
+     *         rows: list<array{sku: string, spend: string, views: int, clicks: int}>,
+     *     }>}>,
+     * }
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     */
+    public function downloadAndConvertReport(
+        string $companyId,
+        string $reportUuid,
+        array $campaignIds = [],
+    ): array {
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $startedAt = microtime(true);
+
+        $this->marketplaceAdsLogger->info('Ozon async-download: начало', [
+            'companyId' => $companyId,
+            'reportUuid' => $reportUuid,
+            'campaignCount' => count($campaignIds),
+        ]);
+
+        $link = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): string => $this->fetchReadyReportLink($token, $reportUuid),
+        );
+
+        $download = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): OzonReportDownload => $this->downloadReport($token, $link, $reportUuid),
+        );
+
+        $byDate = $this->convertCsvToRowsByDate($download->csvParts, []);
+
+        // ksort для детерминированного порядка дней в логах и downstream-коде.
+        ksort($byDate);
+
+        $resultByDate = [];
+        foreach ($byDate as $date => $campaignsMap) {
+            $resultByDate[$date] = ['campaigns' => array_values($campaignsMap)];
+        }
+
+        $rowsCount = 0;
+        foreach ($byDate as $campaignsMap) {
+            foreach ($campaignsMap as $campaign) {
+                $rowsCount += count($campaign['rows']);
+            }
+        }
+
+        $this->marketplaceAdsLogger->info('Ozon async-download: завершено', [
+            'companyId' => $companyId,
+            'reportUuid' => $reportUuid,
+            'daysFound' => count($resultByDate),
+            'rowsCount' => $rowsCount,
+            'durationMs' => (int) round((microtime(true) - $startedAt) * 1000),
+        ]);
+
+        return [
+            'downloads' => [$download],
+            'resultByDate' => $resultByDate,
+        ];
+    }
+
+    /**
+     * Возвращает download-link готового отчёта. Если Ozon сообщает
+     * non-ready state, бросает \RuntimeException — caller (poll-cron)
+     * уже видел OK и рассинхрон state'ов = диагностика.
+     */
+    private function fetchReadyReportLink(string $token, string $uuid): string
+    {
+        $response = $this->authorizedRequest(
+            'GET',
+            sprintf(self::STATISTICS_STATE_PATH, rawurlencode($uuid)),
+            $token,
+        );
+        $data = $this->decodeJson($response->getContent(false), 'statistics state (async download)');
+
+        $state = strtoupper($this->stringifyApiField($data['state'] ?? null));
+        if ('OK' !== $state && 'READY' !== $state) {
+            throw new \RuntimeException(sprintf(
+                'Ozon Performance: downloadAndConvertReport вызван для отчёта %s в не-готовом state=%s',
+                $uuid,
+                $state,
+            ));
+        }
+
+        $link = $this->stringifyApiField($data['link'] ?? $data['report']['link'] ?? null);
+        if ('' === $link) {
+            // Старые версии API не отдают link отдельно — отчёт скачивается
+            // по фиксированному /report?UUID=…
+            $link = self::STATISTICS_REPORT_PATH.'?UUID='.rawurlencode($uuid);
+        }
+
+        return $link;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function fetchStatisticsListPage(string $token, int $page, int $pageSize): array

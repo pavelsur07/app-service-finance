@@ -9,9 +9,11 @@ use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
+use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Один опрос Ozon Performance /statistics/list на компанию и перевод всех её
@@ -55,6 +57,7 @@ final class OzonAdReportPoller
     public function __construct(
         private readonly OzonAdClient $client,
         private readonly OzonAdPendingReportRepository $repo,
+        private readonly MessageBusInterface $bus,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
     ) {
@@ -171,7 +174,8 @@ final class OzonAdReportPoller
 
         if ($this->isTerminalOk($normalizedUpper)) {
             // OK/READY → фиксируем state=OK, гасим next_poll_at (дальше не
-            // опрашиваем). markFinalized делает step 4 после скачивания CSV.
+            // опрашиваем). markFinalized делает DownloadOzonAdReportHandler
+            // после скачивания CSV.
             $this->repo->updateStateWithSchedule(
                 $companyId,
                 $uuid,
@@ -181,6 +185,14 @@ final class OzonAdReportPoller
                 $nextAttempts,
                 $now,
             );
+
+            // Handoff в async_pipeline: handler сам забирает CSV, upsert'ит
+            // AdRawDocument, финализирует pending-отчёт. Dispatch безопасно
+            // повторный — handler идемпотентен через finalized_at check.
+            $this->bus->dispatch(new DownloadOzonAdReportMessage(
+                companyId: $companyId,
+                pendingReportId: $row->getId(),
+            ));
 
             return [1, 0];
         }
