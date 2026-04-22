@@ -242,7 +242,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')->willReturn(['uuid-1']);
+        $ozonClient->method('prepareStatisticsBatches')->willReturn([['c1']]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -251,10 +251,17 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        // Non-empty uuids path: finalizer не должен вызываться — за финализацию
+        // Non-empty batches path: finalizer не должен вызываться — за финализацию
         // отвечает DownloadOzonAdReportHandler через per-document trigger.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
+
+        // На дубликате мы всё равно диспатчим батчи — matchResumableReport
+        // внутри RequestOzonAdBatchHandler абсорбирует повторный POST.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
 
         $marketplaceAdsLogger = new class extends NullLogger {
             public bool $infoLogged = false;
@@ -274,6 +281,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer,
+            $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             $marketplaceAdsLogger,
         );
