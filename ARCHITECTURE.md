@@ -626,6 +626,25 @@ OzonAdReportPoller (state=OK)
                  └─ ProcessAdRawDocumentHandler (fan-out per day)
 ```
 
+### `AdRawDocument.raw_payload` — две поддерживаемые формы
+
+`OzonAdRawDataParser` принимает обе формы и возвращает одинаковый список `AdRawEntry`:
+
+- **flat** (legacy — `LoadAdDataCommand`, `ReprocessAdDataCommand`,
+  pre-step-4 writers, raw-документы, уже сохранённые в БД до шага 4):
+  ```json
+  {"rows":[{"campaign_id":"…","campaign_name":"…","sku":"…","spend":"…","views":0,"clicks":0}]}
+  ```
+- **nested** (current — `DownloadOzonAdReportHandler` после шага 4 async-poll редизайна):
+  ```json
+  {"campaigns":[{"campaign_id":"…","campaign_name":"…","rows":[{"sku":"…","spend":"…","views":0,"clicks":0}]}]}
+  ```
+
+Парсер диспатчится по наличию ключа `campaigns`; для nested-формы поля
+`campaign_id` / `campaign_name` пробрасываются из родительского объекта
+в каждую row перед общей агрегацией — downstream-код (`ProcessAdRawDocumentAction`)
+не знает, какая форма была на входе.
+
 ---
 
 ## Query — MarketplaceAds
@@ -1128,4 +1147,5 @@ paths:
 | 1.8 | 2026-04-15 | MarketplaceAds: `OzonAdClient` реализован для работы с Ozon Performance API (`https://api-performance.ozon.ru`). Credentials забираются через `MarketplaceFacade::getConnectionCredentials(..., PERFORMANCE)`; OAuth2 access-token кэшируется в Symfony Cache с TTL = `expires_in - 300`. Пайплайн `fetchAdStatistics()`: листинг SKU-кампаний → async `/api/client/statistics` батчами по 100 кампаний → polling состояния (5 сек × 36 попыток = 3 мин) → скачивание CSV → парсинг через `fgetcsv` над `php://memory` (RFC 4180, автодетект `,` или `;`) → JSON `{"rows":[{campaign_id, campaign_name, sku, spend, views, clicks}]}`. `withAuthRetry()` один раз ретраит запрос при 401 (через внутренний `OzonAuthExpiredException`), 403 сигнализируется как permanent failure без ретрая. |
 | 1.9 | 2026-04-15 | MarketplaceAds: команды CLI переименованы в единый паттерн `app:marketplace-ads:*` — `marketplace-ads:load` → `app:marketplace-ads:load`, `marketplace-ads:reprocess` → `app:marketplace-ads:reprocess`. Приводит именование к общему для проекта префиксу `app:` (как у `app:marketplace:wb-daily-sync` и пр.). |
 | 1.10 | 2026-04-15 | Marketplace: UI модалки «Новое подключение» (`templates/marketplace/index.html.twig`) поддерживает два типа подключения — «Основное (Seller API)» и «Реклама (Performance API)». Тип `performance` доступен только при выборе Ozon, иначе опция скрыта и автоматически откатывается на `seller`. Form `action` переключается между `marketplace_connection_create` и `marketplace_connection_performance_create` без перезагрузки страницы; неактивный блок полей `disabled`, чтобы лишние поля не попадали в POST. В списке активных подключений для Performance подключения: суффикс «(Реклама)» к названию маркетплейса, скрыты кнопки «Синхронизировать», «За период», «Реализация», «Переобработать», строка синхронизации — статическая «—» (поллер статуса не запускается). |
+| 1.12 | 2026-04-22 | MarketplaceAds: `OzonAdRawDataParser` теперь принимает обе формы `raw_payload` — legacy flat `{"rows":[…]}` и nested `{"campaigns":[{campaign_id, campaign_name, rows:[…]}]}`, записываемый `DownloadOzonAdReportHandler` (шаг 4 async-poll редизайна). Парсер диспатчится по наличию ключа `campaigns`, пробрасывает `campaign_id` / `campaign_name` из родительского объекта в каждую row и делегирует агрегацию общему пути. Фикс silent no-op: до этого nested-payload уходил в `[]` → `ProcessAdRawDocumentAction` создавал 0 `AdDocument` и помечал `AdRawDocument` как `PROCESSED`, UI «Эффективность рекламы» показывал 0 затрат. Unit-тесты гарантируют идентичность entries для обеих форм. |
 | 1.11 | 2026-04-19 | MarketplaceAds: серия задач по Ozon Ads pipeline. Новые Entity: `AdLoadJob` (пакетная загрузка за период, атомарный счётчик `loadedDays` через raw SQL), `AdChunkProgress` (идемпотентная фиксация успеха чанка через `UniqueConstraint` `(job_id, date_from, date_to)`). Новый Message `LoadOzonAdStatisticsRangeMessage` + handler-оркестратор: PENDING → RUNNING, разбиение диапазона на чанки ≤ 62 дня (лимит Ozon Performance API), dispatch `FetchOzonAdStatisticsMessage` на каждый чанк. `FetchOzonAdStatisticsHandler`: upsert AdRawDocument + идемпотентный `markChunkCompleted` + inc `loadedDays` только при успешной фиксации чанка. Enum `AdRawDocumentStatus` расширен кейсом `FAILED` (+`isTerminal()`); финализация job'а перешла на per-document статус и считает через `countByCompanyMarketplaceAndDateRange`. Удалены мёртвые counter-поля `processedDays` / `failedDays` из `AdLoadJob` (миграция `Version20260419080739`). Новые методы репозиториев: `AdLoadJobRepository::markCompleted` / `markFailed` / `findRecentByCompanyAndMarketplace`; `AdChunkProgressRepository::markChunkCompleted` / `countCompletedChunks`; `AdRawDocumentRepository::markFailedWithReason` / `countByCompanyMarketplaceAndDateRange` / `findByCompanyMarketplaceAndDateRange`. |

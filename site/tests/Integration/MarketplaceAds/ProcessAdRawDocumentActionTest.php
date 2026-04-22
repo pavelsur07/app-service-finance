@@ -187,6 +187,42 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
         ($this->action())(self::COMPANY_ID, '99999999-9999-9999-9999-999999999999');
     }
 
+    public function testProcessesNestedCampaignsPayload(): void
+    {
+        $company = $this->seedCompany();
+        $this->seedListing($company, 'SKU-PARENT-1', 'L', '55555555-5555-5555-5555-000000000101');
+        $this->seedListing($company, 'SKU-PARENT-1', 'XL', '55555555-5555-5555-5555-000000000102');
+        $this->em->flush();
+
+        $rawDocumentId = $this->seedOzonRawDocumentWithNestedPayload([
+            [
+                'campaign_id' => 'CAMP-N',
+                'campaign_name' => 'Nested',
+                'rows' => [
+                    ['sku' => 'SKU-PARENT-1', 'spend' => '100.00', 'views' => 1000, 'clicks' => 40],
+                ],
+            ],
+        ]);
+
+        ($this->action())(self::COMPANY_ID, $rawDocumentId);
+
+        $this->em->clear();
+
+        $adDocuments = $this->em->getRepository(AdDocument::class)->findBy(['adRawDocumentId' => $rawDocumentId]);
+        self::assertCount(1, $adDocuments);
+
+        $adDocument = $adDocuments[0];
+        self::assertSame('CAMP-N', $adDocument->getCampaignId());
+        self::assertSame('Nested', $adDocument->getCampaignName());
+        self::assertSame('SKU-PARENT-1', $adDocument->getParentSku());
+        self::assertSame('100.00', $adDocument->getTotalCost());
+        self::assertSame(1000, $adDocument->getTotalImpressions());
+        self::assertSame(40, $adDocument->getTotalClicks());
+
+        $lines = $this->em->getRepository(AdDocumentLine::class)->findBy(['adDocument' => $adDocument->getId()]);
+        self::assertCount(2, $lines);
+    }
+
     private function action(): ProcessAdRawDocumentAction
     {
         return self::getContainer()->get(ProcessAdRawDocumentAction::class);
@@ -233,6 +269,26 @@ final class ProcessAdRawDocumentActionTest extends IntegrationTestCase
             companyId:   self::COMPANY_ID,
             marketplace: MarketplaceType::OZON,
             reportDate:  new \DateTimeImmutable('2026-04-10'),
+            rawPayload:  $payload,
+        );
+
+        $this->em->persist($rawDocument);
+        $this->em->flush();
+
+        return $rawDocument->getId();
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $campaigns
+     */
+    private function seedOzonRawDocumentWithNestedPayload(array $campaigns): string
+    {
+        $payload = json_encode(['campaigns' => $campaigns], JSON_THROW_ON_ERROR);
+
+        $rawDocument = new AdRawDocument(
+            companyId:   self::COMPANY_ID,
+            marketplace: MarketplaceType::OZON,
+            reportDate:  new \DateTimeImmutable('2026-04-11'),
             rawPayload:  $payload,
         );
 

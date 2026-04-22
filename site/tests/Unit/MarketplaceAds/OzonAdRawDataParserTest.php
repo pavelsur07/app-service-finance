@@ -229,4 +229,159 @@ final class OzonAdRawDataParserTest extends TestCase
 
         self::assertSame([], $logger->records);
     }
+
+    public function testParsesNestedCampaignsFormat(): void
+    {
+        $json = json_encode([
+            'campaigns' => [
+                [
+                    'campaign_id' => '24449058',
+                    'campaign_name' => '07.04 Ловушка для мух желтая',
+                    'rows' => [
+                        ['sku' => '3765141162', 'spend' => '17.87', 'views' => 219, 'clicks' => 1],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json);
+
+        self::assertCount(1, $result);
+        self::assertInstanceOf(AdRawEntry::class, $result[0]);
+        self::assertSame('24449058', $result[0]->campaignId);
+        self::assertSame('07.04 Ловушка для мух желтая', $result[0]->campaignName);
+        self::assertSame('3765141162', $result[0]->parentSku);
+        self::assertSame('17.87', $result[0]->cost);
+        self::assertSame(219, $result[0]->impressions);
+        self::assertSame(1, $result[0]->clicks);
+    }
+
+    /**
+     * Регрессионный guard: одни и те же данные в обоих форматах должны
+     * давать идентичные AdRawEntry — это инвариант, на который опирается
+     * ProcessAdRawDocumentAction при обработке legacy + новых raw-документов.
+     */
+    public function testFlatAndNestedProduceIdenticalEntries(): void
+    {
+        $flatJson = json_encode([
+            'rows' => [
+                ['campaign_id' => '111', 'campaign_name' => 'C1', 'sku' => 'A',
+                 'spend' => 12.34, 'views' => 100, 'clicks' => 3],
+                ['campaign_id' => '111', 'campaign_name' => 'C1', 'sku' => 'B',
+                 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $nestedJson = json_encode([
+            'campaigns' => [
+                [
+                    'campaign_id' => '111',
+                    'campaign_name' => 'C1',
+                    'rows' => [
+                        ['sku' => 'A', 'spend' => 12.34, 'views' => 100, 'clicks' => 3],
+                        ['sku' => 'B', 'spend' => 5.00, 'views' => 50, 'clicks' => 1],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        self::assertEquals($this->parser->parse($flatJson), $this->parser->parse($nestedJson));
+    }
+
+    public function testNestedMultipleCampaignsMultipleRows(): void
+    {
+        $json = json_encode([
+            'campaigns' => [
+                [
+                    'campaign_id' => '111',
+                    'campaign_name' => 'Alpha',
+                    'rows' => [
+                        ['sku' => 'A', 'spend' => 1.00, 'views' => 10, 'clicks' => 1],
+                        ['sku' => 'B', 'spend' => 2.00, 'views' => 20, 'clicks' => 2],
+                    ],
+                ],
+                [
+                    'campaign_id' => '222',
+                    'campaign_name' => 'Beta',
+                    'rows' => [
+                        ['sku' => 'A', 'spend' => 3.00, 'views' => 30, 'clicks' => 3],
+                        ['sku' => 'C', 'spend' => 4.00, 'views' => 40, 'clicks' => 4],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json);
+
+        self::assertCount(4, $result);
+
+        $byKey = [];
+        foreach ($result as $entry) {
+            $byKey[$entry->campaignId.'|'.$entry->parentSku] = $entry;
+        }
+
+        self::assertArrayHasKey('111|A', $byKey);
+        self::assertSame('Alpha', $byKey['111|A']->campaignName);
+        self::assertSame('1.00', $byKey['111|A']->cost);
+
+        self::assertArrayHasKey('111|B', $byKey);
+        self::assertSame('222', $byKey['222|A']->campaignId);
+        self::assertSame('Beta', $byKey['222|A']->campaignName);
+        self::assertSame('3.00', $byKey['222|A']->cost);
+
+        self::assertArrayHasKey('222|C', $byKey);
+    }
+
+    public function testNestedEmptyCampaignsReturnsEmpty(): void
+    {
+        self::assertSame([], $this->parser->parse('{"campaigns": []}'));
+    }
+
+    public function testNestedCampaignWithoutRowsIsSkipped(): void
+    {
+        $json = json_encode([
+            'campaigns' => [
+                ['campaign_id' => '111', 'campaign_name' => 'NoRows'],
+                [
+                    'campaign_id' => '222',
+                    'campaign_name' => 'WithRows',
+                    'rows' => [
+                        ['sku' => 'X', 'spend' => 9.99, 'views' => 10, 'clicks' => 1],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json);
+
+        self::assertCount(1, $result);
+        self::assertSame('222', $result[0]->campaignId);
+        self::assertSame('X', $result[0]->parentSku);
+    }
+
+    /**
+     * Defensive для будущих вариаций payload: если nested row уже несёт
+     * свой campaign_id — НЕ перезатираем его родительским.
+     */
+    public function testNestedRowOwnCampaignIdNotOverwritten(): void
+    {
+        $json = json_encode([
+            'campaigns' => [
+                [
+                    'campaign_id' => 'PARENT',
+                    'campaign_name' => 'ParentName',
+                    'rows' => [
+                        ['campaign_id' => 'ROW', 'campaign_name' => 'RowName',
+                         'sku' => 'X', 'spend' => 1.00, 'views' => 1, 'clicks' => 0],
+                    ],
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $result = $this->parser->parse($json);
+
+        self::assertCount(1, $result);
+        self::assertSame('ROW', $result[0]->campaignId);
+        self::assertSame('RowName', $result[0]->campaignName);
+    }
 }
