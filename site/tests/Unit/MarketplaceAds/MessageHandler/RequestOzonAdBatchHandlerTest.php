@@ -62,6 +62,30 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         ));
     }
 
+    public function testMissingJobIsNoop(): void
+    {
+        // Гонка dispatch-vs-cleanup: orchestrator успел диспатчнуть батч
+        // прямо перед тем, как job был вычищен (ручной cleanup, миграция).
+        // findByIdAndCompany возвращает null → handler молча ack'ает.
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn(null);
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('requestOneBatch');
+
+        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, new NullLogger());
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: ['c1'],
+            batchIndex: 0,
+            batchTotal: 1,
+        ));
+    }
+
     public function testTerminalJobIsNoop(): void
     {
         // Если job уже в терминальном статусе (успел зафейлиться другим
