@@ -527,6 +527,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('prepareStatisticsBatches');
         $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -534,7 +535,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('invalid date format');
