@@ -371,7 +371,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')
+        $ozonClient->method('prepareStatisticsBatches')
             ->willThrowException(new \RuntimeException('Ozon 502 Bad Gateway'));
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -384,7 +384,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Transient на prep-этапе → ни одного dispatch'а батчей.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Ozon 502 Bad Gateway');
