@@ -10,6 +10,7 @@ use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
+use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
@@ -20,7 +21,9 @@ use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Sentry\State\HubInterface;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 // AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
 BypassFinals::allowPaths([
@@ -54,7 +57,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
     private const DATE_FROM = '2026-03-01';
     private const DATE_TO = '2026-03-03';
 
-    public function testHappyPathCallsRequestStatisticsOnlyAndMarkChunkCompleted(): void
+    public function testHappyPathDispatchesOneBatchMessagePerBatchAndMarkChunkCompleted(): void
     {
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
@@ -72,14 +75,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::once())
-            ->method('requestStatisticsOnly')
+            ->method('prepareStatisticsBatches')
             ->with(
                 self::COMPANY_ID,
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-03' === $d->format('Y-m-d')),
-                self::JOB_ID,
             )
-            ->willReturn(['uuid-1', 'uuid-2']);
+            ->willReturn([['c1', 'c2'], ['c3']]);
+        $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -95,20 +98,39 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        // Regression guard: finalize attempt belongs ONLY to the zero-uuids
-        // branch. Non-empty chunks never call tryFinalize directly — the per-doc
-        // path through DownloadOzonAdReportHandler + ProcessAdRawDocumentHandler
-        // owns that responsibility.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        $dispatched = [];
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(2))
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $m) use (&$dispatched): Envelope {
+                $dispatched[] = $m;
+
+                return new Envelope($m);
+            });
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             self::JOB_ID,
             self::COMPANY_ID,
             self::DATE_FROM,
             self::DATE_TO,
         ));
+
+        self::assertCount(2, $dispatched);
+        foreach ($dispatched as $i => $m) {
+            self::assertInstanceOf(RequestOzonAdBatchMessage::class, $m);
+            self::assertSame(self::JOB_ID, $m->jobId);
+            self::assertSame(self::COMPANY_ID, $m->companyId);
+            self::assertSame(self::DATE_FROM, $m->dateFrom);
+            self::assertSame(self::DATE_TO, $m->dateTo);
+            self::assertSame($i, $m->batchIndex);
+            self::assertSame(2, $m->batchTotal);
+        }
+        self::assertSame(['c1', 'c2'], $dispatched[0]->campaignIds);
+        self::assertSame(['c3'], $dispatched[1]->campaignIds);
     }
 
     public function testEmptyUuidsStillCallsMarkChunkCompletedAndFinalizer(): void
@@ -531,13 +553,21 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         AdChunkProgressRepositoryInterface $chunkProgressRepo,
         OzonAdPendingReportRepository $pendingRepo,
         ?AdLoadJobFinalizer $finalizer = null,
+        ?MessageBusInterface $messageBus = null,
     ): FetchOzonAdStatisticsHandler {
+        if (null === $messageBus) {
+            $messageBus = $this->createMock(MessageBusInterface::class);
+            $messageBus->method('dispatch')
+                ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+        }
+
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $jobRepo,
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
+            $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             new NullLogger(),
         );
