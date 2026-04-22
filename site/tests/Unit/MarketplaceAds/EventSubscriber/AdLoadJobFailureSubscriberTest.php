@@ -43,7 +43,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
             '2026-03-01',
             '2026-03-03',
         ));
-        $event = new WorkerMessageFailedEvent($envelope, 'async', new \RuntimeException('transient'));
+        $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException('transient'));
         $event->setForRetry();
 
         self::assertTrue($event->willRetry(), 'sanity: событие помечено для ретрая');
@@ -63,7 +63,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
             self::COMPANY_ID,
             'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
         ));
-        $event = new WorkerMessageFailedEvent($envelope, 'async', new \RuntimeException('boom'));
+        $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException('boom'));
 
         self::assertFalse($event->willRetry());
 
@@ -102,7 +102,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
         ));
         $event = new WorkerMessageFailedEvent(
             $envelope,
-            'async',
+            'async_ads',
             new \RuntimeException('Ozon 502 Bad Gateway'),
         );
 
@@ -146,7 +146,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
                 }),
             );
 
-        $event = new WorkerMessageFailedEvent($envelope, 'async', $wrapper);
+        $event = new WorkerMessageFailedEvent($envelope, 'async_ads', $wrapper);
 
         (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
     }
@@ -178,7 +178,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
             '2026-03-01',
             '2026-03-03',
         ));
-        $event = new WorkerMessageFailedEvent($envelope, 'async', new \RuntimeException($longMessage));
+        $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException($longMessage));
 
         (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
     }
@@ -207,7 +207,7 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
             '2026-03-01',
             '2026-03-03',
         ));
-        $event = new WorkerMessageFailedEvent($envelope, 'async', new \RuntimeException($longMessage));
+        $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException($longMessage));
 
         (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
     }

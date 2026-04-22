@@ -127,7 +127,7 @@ jobs:
                     echo "✅ land healthy"
 
                     echo "🐳 [4/5] Обновляем воркеры и CLI"
-                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker scheduler
+                    docker compose -f docker-compose.prod.yml up -d --no-deps site-php-cli site-messenger-worker-sync site-messenger-worker-pipeline site-messenger-worker-ads scheduler
 
                     echo "🐳 [5/5] Поднимаем остальные сервисы (если есть новые)"
                     docker compose -f docker-compose.prod.yml up -d --remove-orphans
