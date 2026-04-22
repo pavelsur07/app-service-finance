@@ -581,9 +581,6 @@ class OzonAdClient implements AdPlatformClientInterface
         $batches = [];
         foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
             [$campaignIds] = $this->splitBatch($batch);
-            if ([] === $campaignIds) {
-                continue;
-            }
             $batches[] = $campaignIds;
         }
 
