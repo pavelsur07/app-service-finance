@@ -24,7 +24,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *     если RUNNING — продолжаем (это retry Messenger'а после сбоя на этапе
  *     рассылки, idempotent dispatch покроет повторный заход);
  *  3) бьёт диапазон dateFrom..dateTo на чанки ≤ 62 дня (лимит Ozon API,
- *     см. {@see \App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient::fetchAdStatisticsRange});
+ *     см. {@see \App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient::requestStatisticsOnly});
  *  4) при первом проходе (chunksTotal == 0) устанавливает chunksTotal + flush;
  *     на retry — skip (chunksTotal уже выставлен);
  *  5) диспатчит N × FetchOzonAdStatisticsMessage по одному на чанк.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\MarketplaceAds\MessageHandler;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
@@ -28,8 +29,10 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 // StorageService — final class, нужен BypassFinals для createMock.
+// AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
 BypassFinals::allowPaths([
     '*/src/Shared/Service/Storage/StorageService.php',
+    '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
 ]);
 
 /**
@@ -63,6 +66,8 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
     private MessageBusInterface $bus;
     /** @var StorageService&MockObject */
     private StorageService $storage;
+    /** @var AdLoadJobFinalizer&MockObject */
+    private AdLoadJobFinalizer $finalizer;
 
     protected function setUp(): void
     {
@@ -72,6 +77,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $this->em = $this->createMock(EntityManagerInterface::class);
         $this->bus = $this->createMock(MessageBusInterface::class);
         $this->storage = $this->createMock(StorageService::class);
+        $this->finalizer = $this->createMock(AdLoadJobFinalizer::class);
     }
 
     public function testPendingReportNotFoundIsNoop(): void
@@ -297,9 +303,10 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         self::assertStringContainsString('"campaigns"', $existing->getRawPayload(), 'updatePayload должен переписать payload');
     }
 
-    public function testEmptyResultByDateSkipsBronzeAndDispatch(): void
+    public function testHandlerCallsFinalizerOnZeroDocs(): void
     {
-        $pending = $this->makePendingReport();
+        $jobId = Uuid::uuid7()->toString();
+        $pending = $this->makePendingReport(jobId: $jobId);
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
 
         $download = $this->makeDownload('raw-bytes-empty');
@@ -320,6 +327,78 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $this->bus->expects(self::never())->method('dispatch');
 
+        // Zero-docs edge case: handler должен сам вызвать finalizer->tryFinalize,
+        // иначе job с нулём документов навечно залип бы в RUNNING.
+        $this->finalizer->expects(self::once())
+            ->method('tryFinalize')
+            ->with($jobId, self::COMPANY_ID);
+
+        $this->makeHandler()(new DownloadOzonAdReportMessage(
+            companyId: self::COMPANY_ID,
+            pendingReportId: self::PENDING_ID,
+        ));
+    }
+
+    public function testHandlerSkipsFinalizerIfPendingHasNoJobId(): void
+    {
+        // Defensive: pending-отчёт может существовать без jobId (manual-triggered
+        // загрузка через OzonDebugFetcher, cleanup-cron'ом). Финализировать нечего,
+        // tryFinalize не должен вызываться даже при пустом отчёте.
+        $pending = $this->makePendingReport(jobId: null);
+        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
+
+        $this->client->method('downloadAndConvertReport')->willReturn([
+            'downloads' => [$this->makeDownload('raw-bytes-empty')],
+            'resultByDate' => [],
+        ]);
+
+        $this->em->expects(self::once())->method('flush');
+        $this->pendingRepo->expects(self::once())
+            ->method('markFinalized')
+            ->with(self::COMPANY_ID, self::OZON_UUID, OzonAdPendingReportState::OK, null)
+            ->willReturn(1);
+
+        $this->bus->expects(self::never())->method('dispatch');
+        $this->finalizer->expects(self::never())->method('tryFinalize');
+
+        $this->makeHandler()(new DownloadOzonAdReportMessage(
+            companyId: self::COMPANY_ID,
+            pendingReportId: self::PENDING_ID,
+        ));
+    }
+
+    public function testHappyPathDoesNotCallFinalizer(): void
+    {
+        // Non-empty report → per-document handler'ы (ProcessAdRawDocumentHandler)
+        // сами позовут finalizer после обработки каждого документа, duplicate
+        // call здесь нарушил бы single-source-of-truth для счётчиков.
+        $pending = $this->makePendingReport();
+        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
+
+        $this->client->method('downloadAndConvertReport')->willReturn([
+            'downloads' => [$this->makeDownload('raw-bytes-1')],
+            'resultByDate' => [
+                '2026-04-01' => ['campaigns' => [[
+                    'campaign_id' => 'c1',
+                    'campaign_name' => 'C',
+                    'rows' => [['sku' => 's', 'spend' => '1.00', 'views' => 1, 'clicks' => 1]],
+                ]]],
+            ],
+        ]);
+
+        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+        $this->storage->method('storeBytes')->willReturn([
+            'storagePath' => 'p',
+            'fileHash' => 'h',
+            'sizeBytes' => 11,
+            'mimeType' => 'text/csv',
+        ]);
+        $this->bus->method('dispatch')->willReturnCallback(
+            static fn (object $m): Envelope => new Envelope($m),
+        );
+
+        $this->finalizer->expects(self::never())->method('tryFinalize');
+
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
             pendingReportId: self::PENDING_ID,
@@ -335,19 +414,25 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             $this->em,
             $this->bus,
             $this->storage,
+            $this->finalizer,
             new NullLogger(),
         );
     }
 
-    private function makePendingReport(?\DateTimeImmutable $finalizedAt = null): OzonAdPendingReport
-    {
+    private function makePendingReport(
+        ?\DateTimeImmutable $finalizedAt = null,
+        ?string $jobId = 'auto',
+    ): OzonAdPendingReport {
+        if ('auto' === $jobId) {
+            $jobId = Uuid::uuid7()->toString();
+        }
         $pending = new OzonAdPendingReport(
             companyId: self::COMPANY_ID,
             ozonUuid: self::OZON_UUID,
             dateFrom: new \DateTimeImmutable('2026-04-01'),
             dateTo: new \DateTimeImmutable('2026-04-02'),
             campaignIds: ['c1', 'c2'],
-            jobId: Uuid::uuid7()->toString(),
+            jobId: $jobId,
         );
 
         $ref = new \ReflectionClass($pending);
