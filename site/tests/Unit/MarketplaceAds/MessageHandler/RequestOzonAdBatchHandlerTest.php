@@ -61,4 +61,33 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             batchTotal: 1,
         ));
     }
+
+    public function testTerminalJobIsNoop(): void
+    {
+        // Если job уже в терминальном статусе (успел зафейлиться другим
+        // батчем / был вручную отменён), handler должен молча ack'нуть
+        // сообщение — никакого POST в Ozon и никакого markFailed.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asFailed('уже упал раньше')
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('requestOneBatch');
+
+        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, new NullLogger());
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: ['c1'],
+            batchIndex: 0,
+            batchTotal: 1,
+        ));
+    }
 }
