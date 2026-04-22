@@ -686,6 +686,31 @@ Previously FetchOzonAdStatisticsHandler called requestStatisticsOnly,
 which looped N POSTs back-to-back and reliably hit 429 on the 2nd
 batch for companies with >10 active SKU campaigns.
 
+### Ozon rate limit — «max 1 active /statistics request per account»
+
+FIFO+single-worker (PR #1629) serializes our HTTP calls but does NOT
+satisfy Ozon's "1 active request" constraint — Ozon measures this on
+their backend (UUID-creation occupancy), which outlasts our HTTP
+round-trip by 30–60 seconds. A POST that returns 200 in 150ms on our
+side still occupies a slot on Ozon's side, so the next POST within
+that window is guaranteed to 429.
+
+`OzonAdClient::authorizedRequest` distinguishes HTTP 429 from other
+non-2xx responses and throws `OzonRateLimitException` (extends
+`\RuntimeException`). `RequestOzonAdBatchHandler` catches it and
+reschedules the same message via
+`MessageBusInterface::dispatch(new Envelope($msg), [new DelayStamp(60_000)])`.
+The current message is ACK'd (no Messenger retry consumed, no failure
+transport). The rescheduled message reappears in `async_ads` 60s later,
+by which time Ozon's backend slot has typically freed.
+
+`RequestOzonAdBatchMessage::$rateLimitAttempts` counts reschedules and
+caps them at 10 per batch (10 minutes total per-batch wait). Exceeding
+this marks the job failed via `AdLoadJobRepository::markFailed()` and
+raises `UnrecoverableMessageHandlingException` — functionally equivalent
+to the `OzonPermanentApiException` branch but with a different reason
+string.
+
 Параллельно cron */2 * * * *:
 app:marketplace-ads:ozon-poll-reports → OzonPollReportsCommand → OzonAdReportPoller
   ↓ (GET /statistics/list per active company; reconcile state per UUID)
