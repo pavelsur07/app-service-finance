@@ -19,7 +19,6 @@ use Ramsey\Uuid\Uuid;
 final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-000000000001';
-    private const OWNER_ID = '22222222-2222-2222-2222-000000000001';
 
     private OzonAdPendingReportRepository $repository;
     private AdLoadJobRepository $jobRepository;
@@ -34,7 +33,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testCreatePersistsRecordImmediatelyInRequestedState(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $entity = $this->repository->create(
@@ -65,6 +64,8 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testCreateLinksJobIdWhenProvided(): void
     {
+        $this->seedCompany(self::COMPANY_ID);
+        $this->em->flush();
         $job = $this->seedJob();
 
         $entity = $this->repository->create(
@@ -81,7 +82,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testUpdateStateAdvancesAttemptAndTimestamps(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -136,7 +137,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testUpdateStateReturnsZeroForUnknownUuid(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $rows = $this->repository->updateState(
@@ -152,7 +153,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testMarkFinalizedSetsTerminalStateAndTimestamp(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -177,7 +178,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testMarkFinalizedStoresErrorMessage(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -205,7 +206,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testMarkFinalizedIsIdempotent(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -240,6 +241,8 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testFindInFlightByJobReturnsOnlyInFlightRecords(): void
     {
+        $this->seedCompany(self::COMPANY_ID);
+        $this->em->flush();
         $job = $this->seedJob();
         $otherJob = $this->seedJob(index: 2);
 
@@ -305,7 +308,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         // другой company должна вернуть 0 строк и оставить state нетронутым.
         // Это guard от IDOR: ozon_uuid уникален, но WHERE-clause дополнительно
         // проверяет принадлежность к company.
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -353,7 +356,7 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     public function testUniqueConstraintOnOzonUuid(): void
     {
-        $this->seedCompany();
+        $this->seedCompany(self::COMPANY_ID);
         $this->em->flush();
 
         $this->repository->create(
@@ -469,9 +472,6 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 
     private function seedJob(int $index = 1): AdLoadJob
     {
-        $this->seedCompany();
-        $this->em->flush();
-
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->withIndex($index)
@@ -483,20 +483,23 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
         return $job;
     }
 
-    private function seedCompany(): Company
+    private function seedCompany(?string $companyId = null): Company
     {
-        $existing = $this->em->getRepository(Company::class)->find(self::COMPANY_ID);
-        if (null !== $existing) {
-            return $existing;
-        }
+        $companyId = $companyId ?? Uuid::uuid7()->toString();
+        $ownerId = Uuid::uuid7()->toString();
+
+        // Email must be unique per User due to UNIQ_IDENTIFIER_EMAIL. Use a
+        // fresh random suffix per call — guarantees no collision even if the
+        // test-to-test TRUNCATE chain leaks rows from a prior test.
+        $email = sprintf('owner+%s@example.test', substr($ownerId, 0, 12));
 
         $owner = UserBuilder::aUser()
-            ->withId(self::OWNER_ID)
-            ->withEmail('owner@example.test')
+            ->withId($ownerId)
+            ->withEmail($email)
             ->build();
 
         $company = CompanyBuilder::aCompany()
-            ->withId(self::COMPANY_ID)
+            ->withId($companyId)
             ->withOwner($owner)
             ->build();
 
