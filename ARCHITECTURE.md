@@ -532,7 +532,7 @@ Per-company state machine для shared-polling'а. `__invoke(companyId, now): P
    - raw state ∈ {ERROR, CANCELLED, NOT_FOUND} → `markFinalized(ERROR, rawState в message)`;
    - остальное (NOT_STARTED, IN_PROGRESS и пр.) → `updateStateWithSchedule(rawState, next backoff)`.
 
-Backoff: `15 / 30 / 60 / 120 / 300 / 600 сек` по `poll_attempts`, clamp на 600.
+Backoff: `30 / 60 / 120 / 300 / 600 сек` по `poll_attempts` (1-based), clamp на 600.
 MAX_AGE_BEFORE_ABANDON = 3600 сек.
 
 ### `OzonPollReportsCommand` (`app:marketplace-ads:ozon-poll-reports`)

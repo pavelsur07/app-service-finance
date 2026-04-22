@@ -29,12 +29,16 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 final class OzonAdReportPoller
 {
     /**
-     * Backoff в секундах по poll_attempts (0-based, clamp по верхней границе).
-     * После 6-й попытки держим 10 минут — компромисс между «не дёргать Ozon»
-     * и «не держать row в in-flight сутками».
+     * Backoff в секундах, индекс = poll_attempts (1-based, clamp по верхней границе).
+     *
+     * computeNextPollAt() вызывается с $attempts = $pollAttempts + 1, поэтому
+     * индекс 1 — schedule первого опроса после создания записи. Индекс 0
+     * умышленно отсутствует: момент создания строки — не ответственность
+     * этого сервиса (сегодня это FetchOzonAdStatisticsHandler, в step 4 —
+     * download-диспетчер). После 5-й попытки держим 10 минут — компромисс
+     * между «не дёргать Ozon» и «не держать row в in-flight сутками».
      */
     private const BACKOFF_SCHEDULE_SECONDS = [
-        0 => 15,
         1 => 30,
         2 => 60,
         3 => 120,
@@ -222,8 +226,12 @@ final class OzonAdReportPoller
 
     private function computeNextPollAt(\DateTimeImmutable $now, int $attempts): \DateTimeImmutable
     {
-        $last = array_key_last(self::BACKOFF_SCHEDULE_SECONDS);
-        $idx = min(max(0, $attempts), $last);
+        // max($firstIdx, …) — belt-and-suspenders clamp: если где-то $attempts=0
+        // просочится (programmer error), берём первый валидный индекс
+        // вместо undefined-index crash.
+        $firstIdx = array_key_first(self::BACKOFF_SCHEDULE_SECONDS);
+        $lastIdx = array_key_last(self::BACKOFF_SCHEDULE_SECONDS);
+        $idx = max($firstIdx, min($attempts, $lastIdx));
         $seconds = self::BACKOFF_SCHEDULE_SECONDS[$idx];
 
         return $now->modify(sprintf('+%d seconds', $seconds));

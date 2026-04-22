@@ -305,31 +305,41 @@ final class OzonAdReportPollerTest extends TestCase
     }
 
     /**
-     * BACKOFF_SCHEDULE_SECONDS[i] — задержка ПОСЛЕ i-го poll'а. В сервисе
-     * nextAttempts = pollAttempts + 1, поэтому тест задаёт pollAttemptsBefore
-     * и ожидает BACKOFF[pollAttemptsBefore + 1] (clamp на верхней границе = 5).
+     * BACKOFF_SCHEDULE_SECONDS[i] — задержка ПОСЛЕ i-го poll'а. Сервис
+     * вызывает computeNextPollAt($now, $pollAttempts + 1), поэтому тест
+     * передаёт $nextAttempts напрямую (уже после +1) и ожидает BACKOFF[min(nextAttempts, 5)].
+     * Индекса 0 в таблице нет (см. const-комментарий) — значения ≤0 должны
+     * clamp'иться к первому валидному индексу (1 → 30s).
      *
-     * @return iterable<string, array{int, int}> [pollAttemptsBefore, expectedSeconds]
+     * В сервисе $nextAttempts = pollAttempts_before + 1, поэтому для теста
+     * достаточно задать pollAttempts_before = $nextAttempts - 1 (значения
+     * <0 допустимы через прямой рефлекшн и тестируют defensive clamp).
+     *
+     * @return iterable<string, array{int, int}> [nextAttempts, expectedSeconds]
      */
     public static function backoffSchedule(): iterable
     {
-        yield 'before=0 → 30s (BACKOFF[1])' => [0, 30];
-        yield 'before=1 → 60s (BACKOFF[2])' => [1, 60];
-        yield 'before=2 → 120s (BACKOFF[3])' => [2, 120];
-        yield 'before=3 → 300s (BACKOFF[4])' => [3, 300];
-        yield 'before=4 → 600s (BACKOFF[5])' => [4, 600];
-        yield 'before=5 → 600s (clamp at 5)' => [5, 600];
-        yield 'before=10 → 600s (clamp at 5)' => [10, 600];
+        yield 'zero_attempts_clamps_up' => [0, 30];
+        yield 'first_poll' => [1, 30];
+        yield 'second_poll' => [2, 60];
+        yield 'third_poll' => [3, 120];
+        yield 'fourth_poll' => [4, 300];
+        yield 'fifth_poll' => [5, 600];
+        yield 'beyond_last_clamps' => [10, 600];
+        yield 'negative_clamps_up' => [-1, 30];
     }
 
     /**
      * @dataProvider backoffSchedule
      */
-    public function testBackoffScheduleIsCorrect(int $pollAttemptsBefore, int $expectedSeconds): void
+    public function testBackoffScheduleIsCorrect(int $nextAttempts, int $expectedSeconds): void
     {
         $now = new \DateTimeImmutable('2026-04-22 12:00:00');
 
-        $r = $this->makeReport('uuid-bo', pollAttempts: $pollAttemptsBefore, ageSeconds: 60);
+        // Сервис прибавляет 1 к pollAttempts перед вызовом computeNextPollAt,
+        // поэтому задаём pollAttempts_before = nextAttempts - 1. Для nextAttempts ≤ 0
+        // это даст отрицательный pollAttempts в entity — записывается через reflection.
+        $r = $this->makeReport('uuid-bo', pollAttempts: $nextAttempts - 1, ageSeconds: 60);
 
         $this->repo->method('findInFlightByCompany')->willReturn([$r]);
         $this->client->method('listReportsForCompany')->willReturn([]); // missing → reschedule
@@ -338,7 +348,7 @@ final class OzonAdReportPollerTest extends TestCase
 
         $this->repo->expects(self::once())
             ->method('updateSchedule')
-            ->with(self::COMPANY_ID, 'uuid-bo', $now, $expected, $pollAttemptsBefore + 1)
+            ->with(self::COMPANY_ID, 'uuid-bo', $now, $expected, $nextAttempts)
             ->willReturn(1);
 
         ($this->poller)(self::COMPANY_ID, $now);
