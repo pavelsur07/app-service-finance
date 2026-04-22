@@ -453,6 +453,15 @@ findByOzonUuid(string $companyId, string $ozonUuid): ?OzonAdPendingReport
 // по которым нужно продолжать polling вместо нового POST /statistics.
 // @return list<OzonAdPendingReport>
 findInFlightByJob(string $companyId, string $jobId): array
+
+// Все in-flight (не финализированные) записи для company, ORDER BY requested_at ASC.
+// "In-flight" = finalized_at IS NULL (единственный источник правды; фильтр по state
+// намеренно не добавлен, чтобы не дублировать логику терминализации).
+// Используется будущей poll-cron (шаг 3 redesign-плана) для bulk-запроса
+// GET /api/client/statistics/list по всем активным UUID одной компании.
+// companyId обязателен и валидируется Assert::uuid().
+// @return list<OzonAdPendingReport>
+findInFlightByCompany(string $companyId): array
 ```
 
 ---
