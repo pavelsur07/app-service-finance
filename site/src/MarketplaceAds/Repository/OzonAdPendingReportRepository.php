@@ -318,6 +318,23 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
     }
 
     /**
+     * IDOR-safe lookup по PK + companyId.
+     *
+     * Используется async-download handler'ом (step 4): Messenger-payload
+     * несёт pending report ID и companyId; handler resolve'ит entity по
+     * обоим полям, чтобы чужая company никаким способом (подмена id в
+     * очереди, повтор retry после смены владельца) не получила доступ к
+     * pending-отчёту.
+     */
+    public function findByIdAndCompany(string $id, string $companyId): ?OzonAdPendingReport
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->findOneBy(['id' => $id, 'companyId' => $companyId]);
+    }
+
+    /**
      * Все in-flight записи (REQUESTED / NOT_STARTED / IN_PROGRESS) для конкретного job'а.
      * Пригодится для задачи 3 (resume on Messenger retry): handler при повторном
      * запуске получит список UUID, по которым надо продолжать polling вместо

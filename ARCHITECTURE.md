@@ -449,6 +449,10 @@ markFinalized(
 // Загрузка с IDOR-проверкой
 findByOzonUuid(string $companyId, string $ozonUuid): ?OzonAdPendingReport
 
+// IDOR-safe lookup по PK + companyId. Используется async-download handler'ом
+// (step 4 redesign): Messenger-payload несёт pending report ID + companyId.
+findByIdAndCompany(string $id, string $companyId): ?OzonAdPendingReport
+
 // Все in-flight (REQUESTED / NOT_STARTED / IN_PROGRESS) записи конкретного job'а.
 // Для resume-логики (задача 3): Messenger-retry handler получает список UUID,
 // по которым нужно продолжать polling вместо нового POST /statistics.
@@ -528,7 +532,8 @@ Per-company state machine для shared-polling'а. `__invoke(companyId, now): P
    - `UUID` отсутствует в ответе + age ≥ 1h → `markFinalized(ABANDONED)`;
    - отсутствует + age < 1h → `updateSchedule` с backoff `next_poll_at`;
    - raw state ∈ {OK, READY} → `updateStateWithSchedule(OK, nextPollAt=null)`
-     (download + финализацию делает step 4, не этот сервис);
+     + dispatch `DownloadOzonAdReportMessage` в `async_pipeline` (download +
+     финализацию делает `DownloadOzonAdReportHandler`);
    - raw state ∈ {ERROR, CANCELLED, NOT_FOUND} → `markFinalized(ERROR, rawState в message)`;
    - остальное (NOT_STARTED, IN_PROGRESS и пр.) → `updateStateWithSchedule(rawState, next backoff)`.
 
@@ -551,6 +556,75 @@ app:marketplace-ads:ozon-poll-reports [--company-id=UUID] [--dry-run]
 
 **Не подключена к cron** в step 3/5. Step 5 добавит её в `docker/cron/app.cron`.
 До тех пор запуск только ручной: `docker exec site-php-cli php bin/console app:marketplace-ads:ozon-poll-reports`.
+
+### `OzonAdClient::downloadAndConvertReport` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`)
+```php
+// Скачивает готовый (state=OK/READY) Ozon-отчёт по UUID и конвертирует CSV
+// в структуру date => ['campaigns' => [...]] (совместимо с shape'ом
+// fetchAdStatisticsRange()). НЕ опрашивает state и НЕ спит: предполагается,
+// что caller (poll-cron → DownloadOzonAdReportHandler) уже знает, что отчёт
+// готов. Один GET /statistics/{uuid} за свежей ссылкой + GET report + парсинг.
+// 401 → один refresh-токен retry (withAuthRetry).
+// namesById намеренно пустой: campaign_name приходит отдельной колонкой CSV;
+// листинг кампаний стоит лишнего HTTP и не улучшает качество fallback'а.
+// @param list<string> $campaignIds — только для логирования контекста
+// @return array{downloads: list<OzonReportDownload>, resultByDate: array<string, array{campaigns: list<array{...}>}>}
+// @throws OzonPermanentApiException 403 / missing credentials
+// @throws \RuntimeException         не-готовый state / прочие non-2xx / network / JSON
+downloadAndConvertReport(
+    string $companyId,
+    string $reportUuid,
+    array $campaignIds = [],
+): array
+```
+
+### `DownloadOzonAdReportMessage` (`src/MarketplaceAds/Message/DownloadOzonAdReportMessage.php`)
+
+Scalar-only Messenger-сообщение: `(companyId, pendingReportId)`. Диспатчится
+`OzonAdReportPoller` при переходе pending-отчёта в state=OK/READY.
+Routing: `async_pipeline` (retry 3× 5s/10s/20s).
+
+### `DownloadOzonAdReportHandler` (`src/MarketplaceAds/MessageHandler/DownloadOzonAdReportHandler.php`)
+
+Async-обработчик `DownloadOzonAdReportMessage`. Завершает ингест готового
+отчёта:
+1. `pendingRepo->findByIdAndCompany(pendingReportId, companyId)` — IDOR-safe
+   load; если null или `finalizedAt !== null` → идемпотентный no-op ACK.
+2. `OzonAdClient::downloadAndConvertReport()` — скачивает CSV, конвертирует
+   в date-keyed результат.
+3. За каждый день результата — upsert `AdRawDocument` (новый → `save()`,
+   существующий → `updatePayload()`).
+4. Bronze: `StorageService::storeBytes()` один раз (один UUID = один физический
+   файл), `setFileStorage()` на каждом документе.
+5. `em->flush()` — персист + bronze metadata одним запросом.
+6. `pendingRepo->markFinalized(OK)` — guard `finalized_at IS NULL` делает
+   операцию идемпотентной.
+7. `dispatch(ProcessAdRawDocumentMessage)` за каждый документ — строго ПОСЛЕ
+   `flush()`, иначе per-document handler может не найти документ в БД.
+
+Политика ошибок:
+- `OzonPermanentApiException` (403, missing creds) → `markFinalized(ERROR)`
+  + `UnrecoverableMessageHandlingException` (не ретраит).
+- Прочие `\Throwable` (5xx, сеть) → rethrow, Messenger ретраит по
+  `async_pipeline`-schedule.
+- Not-found / already-finalized — не ошибки, ACK.
+
+Handler НЕ вызывает `AdLoadJobFinalizer::tryFinalize()` — это ответственность
+`ProcessAdRawDocumentHandler` (единственный источник правды по счётчикам job'а).
+
+Поток:
+```
+OzonAdReportPoller (state=OK)
+  └─ dispatch DownloadOzonAdReportMessage ─→ async_pipeline
+       └─ DownloadOzonAdReportHandler
+            ├─ OzonAdClient::downloadAndConvertReport
+            ├─ upsert AdRawDocument per day
+            ├─ StorageService::storeBytes (bronze)
+            ├─ em->flush
+            ├─ pendingRepo->markFinalized(OK)
+            └─ dispatch ProcessAdRawDocumentMessage ─→ async_pipeline
+                 └─ ProcessAdRawDocumentHandler (fan-out per day)
+```
 
 ---
 

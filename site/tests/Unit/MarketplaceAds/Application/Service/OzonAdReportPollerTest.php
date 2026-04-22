@@ -9,11 +9,14 @@ use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
+use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
+use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Unit-тесты {@see OzonAdReportPoller}: per-company state-machine shared-polling'а.
@@ -37,16 +40,20 @@ final class OzonAdReportPollerTest extends TestCase
     private OzonAdClient $client;
     /** @var OzonAdPendingReportRepository&MockObject */
     private OzonAdPendingReportRepository $repo;
+    /** @var MessageBusInterface&MockObject */
+    private MessageBusInterface $bus;
     private OzonAdReportPoller $poller;
 
     protected function setUp(): void
     {
         $this->client = $this->createMock(OzonAdClient::class);
         $this->repo = $this->createMock(OzonAdPendingReportRepository::class);
+        $this->bus = $this->createMock(MessageBusInterface::class);
 
         $this->poller = new OzonAdReportPoller(
             $this->client,
             $this->repo,
+            $this->bus,
             new NullLogger(),
         );
     }
@@ -61,6 +68,7 @@ final class OzonAdReportPollerTest extends TestCase
             ->willReturn([]);
 
         $this->client->expects(self::never())->method('listReportsForCompany');
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -91,6 +99,9 @@ final class OzonAdReportPollerTest extends TestCase
                 return 1;
             });
 
+        // 403 путь никогда не должен диспатчить download — row'ы финализированы ERROR.
+        $this->bus->expects(self::never())->method('dispatch');
+
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
         self::assertSame(2, $result->seen);
@@ -111,6 +122,7 @@ final class OzonAdReportPollerTest extends TestCase
         $this->repo->expects(self::never())->method('markFinalized');
         $this->repo->expects(self::never())->method('updateSchedule');
         $this->repo->expects(self::never())->method('updateStateWithSchedule');
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -143,6 +155,18 @@ final class OzonAdReportPollerTest extends TestCase
             )
             ->willReturn(1);
 
+        // OK путь обязан диспатчить DownloadOzonAdReportMessage c совпадающими
+        // companyId + pendingReportId (step 4 редизайна).
+        $this->bus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(function (object $message) use ($r1): Envelope {
+                self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
+                self::assertSame(self::COMPANY_ID, $message->companyId);
+                self::assertSame($r1->getId(), $message->pendingReportId);
+
+                return new Envelope($message);
+            });
+
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
         self::assertSame(1, $result->seen);
@@ -163,6 +187,15 @@ final class OzonAdReportPollerTest extends TestCase
         $this->repo->expects(self::once())
             ->method('updateStateWithSchedule')
             ->with(self::COMPANY_ID, 'uuid-ready', OzonAdPendingReportState::OK, $now, null, 1, $now);
+
+        $this->bus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(function (object $message) use ($r1): Envelope {
+                self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
+                self::assertSame($r1->getId(), $message->pendingReportId);
+
+                return new Envelope($message);
+            });
 
         ($this->poller)(self::COMPANY_ID, $now);
     }
@@ -187,6 +220,7 @@ final class OzonAdReportPollerTest extends TestCase
             ->willReturn(1);
         $this->repo->expects(self::never())->method('updateStateWithSchedule');
         $this->repo->expects(self::never())->method('updateSchedule');
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -215,6 +249,7 @@ final class OzonAdReportPollerTest extends TestCase
                 1,
             )
             ->willReturn(1);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -242,6 +277,7 @@ final class OzonAdReportPollerTest extends TestCase
                 self::stringContains('Missing from /statistics/list'),
             )
             ->willReturn(1);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -272,6 +308,7 @@ final class OzonAdReportPollerTest extends TestCase
                 null, // NOT_STARTED → не фиксируем firstNonPendingAt
             )
             ->willReturn(1);
+        $this->bus->expects(self::never())->method('dispatch');
 
         $result = ($this->poller)(self::COMPANY_ID, $now);
 
@@ -300,6 +337,7 @@ final class OzonAdReportPollerTest extends TestCase
                 $now, // state ≠ NOT_STARTED → фиксируем
             )
             ->willReturn(1);
+        $this->bus->expects(self::never())->method('dispatch');
 
         ($this->poller)(self::COMPANY_ID, $now);
     }
