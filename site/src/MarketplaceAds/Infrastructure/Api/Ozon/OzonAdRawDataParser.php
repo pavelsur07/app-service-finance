@@ -13,14 +13,12 @@ use Psr\Log\NullLogger;
 /**
  * Парсер rawPayload рекламной статистики Ozon.
  *
- * TODO: уточнить реальный формат ответа Performance API Ozon.
- * Ожидаемая структура:
- * {
- *   "rows": [
- *     {"campaign_id": "123", "campaign_name": "...", "sku": "456",
- *      "spend": 150.50, "views": 1000, "clicks": 50}
- *   ]
- * }
+ * Поддерживаются две формы payload (см. ARCHITECTURE §AdRawDocument):
+ *  - legacy flat: {"rows":[{campaign_id, campaign_name, sku, spend, views, clicks}]}
+ *    (LoadAdDataCommand / ReprocessAdDataCommand / pre-step-4 writers)
+ *  - nested:      {"campaigns":[{campaign_id, campaign_name, rows:[{sku, spend, views, clicks}]}]}
+ *    (DownloadOzonAdReportHandler, шаг 4 async-poll редизайна)
+ * Обе формы после парсинга дают идентичные AdRawEntry.
  */
 final class OzonAdRawDataParser implements AdRawDataParserInterface
 {
@@ -46,8 +44,72 @@ final class OzonAdRawDataParser implements AdRawDataParserInterface
     {
         $data = json_decode($rawPayload, true, flags: \JSON_THROW_ON_ERROR);
 
+        // Nested form пишется DownloadOzonAdReportHandler (async-poll, шаг 4);
+        // flat form остаётся для legacy-loader'ов и старых raw-документов в БД.
+        if (isset($data['campaigns']) && is_array($data['campaigns'])) {
+            return $this->parseFlat($this->flattenCampaigns($data['campaigns']));
+        }
+
         $rows = $data['rows'] ?? [];
         if (!is_array($rows) || [] === $rows) {
+            return [];
+        }
+
+        return $this->parseFlat($rows);
+    }
+
+    /**
+     * Разворачивает nested-payload в плоский список rows, пробрасывая
+     * campaign_id / campaign_name из родительского объекта внутрь каждой строки,
+     * так что parseFlat() видит те же ключи, что и в legacy-формате.
+     *
+     * @param list<mixed> $campaigns
+     * @return list<mixed>
+     */
+    private function flattenCampaigns(array $campaigns): array
+    {
+        $flattened = [];
+
+        foreach ($campaigns as $campaign) {
+            if (!is_array($campaign)) {
+                continue;
+            }
+
+            $campaignId = isset($campaign['campaign_id']) ? (string) $campaign['campaign_id'] : '';
+            $campaignName = isset($campaign['campaign_name']) ? (string) $campaign['campaign_name'] : '';
+            $rows = $campaign['rows'] ?? [];
+
+            if (!is_array($rows) || [] === $rows) {
+                continue;
+            }
+
+            foreach ($rows as $row) {
+                if (!is_array($row)) {
+                    // Сохраняем non-array элементы, чтобы parseFlat учёл их в
+                    // счётчике skipped_non_array (единообразная диагностика).
+                    $flattened[] = $row;
+                    continue;
+                }
+
+                // Не перезаписываем поля, если строка уже несёт свой
+                // campaign_id/campaign_name — defensive для будущих вариаций payload.
+                $row['campaign_id'] = $row['campaign_id'] ?? $campaignId;
+                $row['campaign_name'] = $row['campaign_name'] ?? $campaignName;
+
+                $flattened[] = $row;
+            }
+        }
+
+        return $flattened;
+    }
+
+    /**
+     * @param list<mixed> $rows
+     * @return list<AdRawEntry>
+     */
+    private function parseFlat(array $rows): array
+    {
+        if ([] === $rows) {
             return [];
         }
 
