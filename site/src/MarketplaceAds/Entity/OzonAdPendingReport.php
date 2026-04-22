@@ -84,6 +84,9 @@ class OzonAdPendingReport
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $finalizedAt = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $nextPollAt = null;
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $errorMessage = null;
 
@@ -198,6 +201,16 @@ class OzonAdPendingReport
     public function getFinalizedAt(): ?\DateTimeImmutable
     {
         return $this->finalizedAt;
+    }
+
+    public function getNextPollAt(): ?\DateTimeImmutable
+    {
+        return $this->nextPollAt;
+    }
+
+    public function setNextPollAt(?\DateTimeImmutable $nextPollAt): void
+    {
+        $this->nextPollAt = $nextPollAt;
     }
 
     public function getErrorMessage(): ?string

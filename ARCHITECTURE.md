@@ -150,11 +150,12 @@ pipeline'а (timeout, рестарт worker'а, exception) видимым для
 | `lastCheckedAt` | `?DateTimeImmutable` | Время последней итерации |
 | `firstNonPendingAt` | `?DateTimeImmutable` | Первая итерация, на которой state сошёл с `NOT_STARTED`; фиксируется один раз (COALESCE-guard в Repository) |
 | `finalizedAt` | `?DateTimeImmutable` | Выставляется один раз при `markFinalized`; guard против повторной терминализации |
+| `nextPollAt` | `?DateTimeImmutable` | Плановое время следующего polling'а. `NULL` = «опросить немедленно на ближайшем тике cron-а». Используется poll-cron'ом с partial-индексом `idx_ad_pending_report_next_poll` (`WHERE finalized_at IS NULL`). Введено в step 2/5 async-poll redesign |
 | `errorMessage` | `?string` | Диагностика для state=ERROR / ABANDONED |
 | `requestedAt` | `DateTimeImmutable` | Время создания записи |
 | `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
 
-**Уникальность:** `UniqueConstraint` по `ozon_uuid`. Индексы: `company_id`, `job_id`, `state`.
+**Уникальность:** `UniqueConstraint` по `ozon_uuid`. Индексы: `company_id`, `job_id`, `state`, partial `idx_ad_pending_report_next_poll` на `next_poll_at WHERE finalized_at IS NULL`.
 
 ---
 
