@@ -308,7 +308,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')
+        $ozonClient->method('prepareStatisticsBatches')
             ->willThrowException(new OzonPermanentApiException('403 — нет скоупа «Продвижение»'));
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -343,7 +343,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // prepareStatisticsBatches кинул exception до цикла dispatch —
+        // ни одного RequestOzonAdBatchMessage'а быть не должно.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
