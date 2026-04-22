@@ -8,6 +8,7 @@ use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Webmozart\Assert\Assert;
 
 /**
  * Репозиторий записей о запрошенных отчётах Ozon Performance.
@@ -213,5 +214,35 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
             ->getResult();
 
         return $result;
+    }
+
+    /**
+     * Все in-flight (не финализированные) записи для company, отсортированные
+     * по requestedAt ASC — свежие воркеры сначала обрабатывают самые старые.
+     *
+     * "In-flight" определяется строго по `finalized_at IS NULL` — это единственный
+     * источник правды. Фильтр по state умышленно не добавлен: это дублировало бы
+     * логику терминализации и могло бы разъехаться с реальным состоянием записи.
+     *
+     * Используется будущей poll-cron командой (шаг 3 из redesign-плана) для
+     * bulk-запроса `GET /api/client/statistics/list` по всем активным UUID
+     * одной компании за один проход.
+     *
+     * @return list<OzonAdPendingReport>
+     */
+    public function findInFlightByCompany(string $companyId): array
+    {
+        Assert::uuid($companyId);
+
+        /** @var list<OzonAdPendingReport> $rows */
+        $rows = $this->createQueryBuilder('r')
+            ->andWhere('r.companyId = :companyId')
+            ->andWhere('r.finalizedAt IS NULL')
+            ->setParameter('companyId', $companyId)
+            ->orderBy('r.requestedAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $rows;
     }
 }

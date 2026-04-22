@@ -14,6 +14,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Ramsey\Uuid\Uuid;
 
 final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
 {
@@ -374,6 +375,96 @@ final class OzonAdPendingReportRepositoryTest extends IntegrationTestCase
             campaignIds: ['222'],
             jobId: null,
         );
+    }
+
+    public function testFindInFlightByCompanyReturnsOnlyNonFinalizedRowsForTheCompany(): void
+    {
+        $companyA = Uuid::uuid7()->toString();
+        $companyB = Uuid::uuid7()->toString();
+
+        // A1 — company A, not finalized, requested 10:00
+        // A2 — company A, not finalized, requested 08:00 (older → expect first)
+        // A3 — company A, finalized (should NOT be returned)
+        // B1 — company B, not finalized (wrong company → should NOT be returned)
+        // B2 — company B, finalized
+        $a1 = $this->persistPendingReport($companyA, '2026-04-20 10:00:00', null);
+        $a2 = $this->persistPendingReport($companyA, '2026-04-20 08:00:00', null);
+        $this->persistPendingReport($companyA, '2026-04-20 09:00:00', '2026-04-20 09:05:00');
+        $this->persistPendingReport($companyB, '2026-04-20 07:00:00', null);
+        $this->persistPendingReport($companyB, '2026-04-20 07:30:00', '2026-04-20 07:35:00');
+        $this->em->flush();
+
+        $a1Id = $a1->getId();
+        $a2Id = $a2->getId();
+        $this->em->clear();
+
+        $result = $this->repository->findInFlightByCompany($companyA);
+
+        self::assertCount(2, $result);
+        // Ordered by requestedAt ASC — A2 (08:00) before A1 (10:00).
+        self::assertSame($a2Id, $result[0]->getId());
+        self::assertSame($a1Id, $result[1]->getId());
+    }
+
+    public function testFindInFlightByCompanyReturnsEmptyArrayWhenCompanyHasNoInFlightReports(): void
+    {
+        $companyA = Uuid::uuid7()->toString();
+        $this->persistPendingReport($companyA, '2026-04-20 10:00:00', '2026-04-20 10:05:00');
+        $this->em->flush();
+        $this->em->clear();
+
+        $result = $this->repository->findInFlightByCompany($companyA);
+
+        self::assertSame([], $result);
+    }
+
+    public function testFindInFlightByCompanyRejectsNonUuidCompanyId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->repository->findInFlightByCompany('not-a-uuid');
+    }
+
+    /**
+     * Создаёт OzonAdPendingReport с подменённым requestedAt (для контроля сортировки)
+     * и опциональным finalizedAt (для проверок фильтра "in-flight"). Оба поля
+     * неизменяемы через публичный API и устанавливаются в конструкторе / raw DBAL
+     * соответственно, поэтому в тестовой фикстуре используется reflection.
+     */
+    private function persistPendingReport(
+        string $companyId,
+        string $requestedAt,
+        ?string $finalizedAt,
+        ?string $jobId = null,
+    ): OzonAdPendingReport {
+        $report = new OzonAdPendingReport(
+            companyId: $companyId,
+            ozonUuid: Uuid::uuid7()->toString(),
+            dateFrom: new \DateTimeImmutable('2026-04-01'),
+            dateTo: new \DateTimeImmutable('2026-04-01'),
+            campaignIds: ['12345'],
+            jobId: $jobId,
+        );
+
+        $ref = new \ReflectionClass($report);
+
+        $requestedProp = $ref->getProperty('requestedAt');
+        $requestedProp->setAccessible(true);
+        $requestedProp->setValue($report, new \DateTimeImmutable($requestedAt));
+
+        if (null !== $finalizedAt) {
+            $finalizedProp = $ref->getProperty('finalizedAt');
+            $finalizedProp->setAccessible(true);
+            $finalizedProp->setValue($report, new \DateTimeImmutable($finalizedAt));
+
+            $stateProp = $ref->getProperty('state');
+            $stateProp->setAccessible(true);
+            $stateProp->setValue($report, OzonAdPendingReportState::OK);
+        }
+
+        $this->em->persist($report);
+
+        return $report;
     }
 
     private function seedJob(int $index = 1): AdLoadJob
