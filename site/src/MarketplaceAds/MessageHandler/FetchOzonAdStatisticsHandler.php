@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\MessageHandler;
 
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
@@ -39,7 +40,12 @@ use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
  *     AdChunkProgressRepository, SAME AS BEFORE. Семантика смещена:
  *     «chunk processed» → «chunk requested». При retry вернёт false
  *     и инкременты счётчиков пропустятся, чтобы не удвоить progress;
- *  5) RETURN. Никакого download, upsert AdRawDocument, dispatch
+ *  5) если requestStatisticsOnly вернул пустой список UUID (нет активных
+ *     SKU-кампаний / всё отфильтровано по recency), вызвать
+ *     {@see AdLoadJobFinalizer::tryFinalize()} напрямую — иначе job
+ *     навечно залипнет в RUNNING: нет pending → нет download → нет
+ *     zero-docs финализации в DownloadOzonAdReportHandler;
+ *  6) RETURN. Никакого download, upsert AdRawDocument, dispatch
  *     ProcessAdRawDocumentMessage — всё это теперь делает
  *     DownloadOzonAdReportHandler после того, как poll-cron увидел
  *     state=OK у pending-отчёта.
@@ -69,6 +75,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly OzonAdPendingReportRepository $pendingReportRepo,
+        private readonly AdLoadJobFinalizer $finalizer,
         private readonly AppLogger $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
@@ -212,6 +219,32 @@ final class FetchOzonAdStatisticsHandler
                 $message->jobId,
                 $message->companyId,
                 $chunkDays,
+            );
+        }
+
+        // Zero-uuids branch: requestStatisticsOnly вернул пустой список
+        // (нет активных SKU-кампаний или все отфильтровались recency-cutoff'ом).
+        // Значит ни одного OzonAdPendingReport не создано, poll-cron'у нечего
+        // опрашивать, и zero-docs финализация в DownloadOzonAdReportHandler
+        // никогда не сработает для этого чанка. Без прямого вызова tryFinalize
+        // здесь job навечно застрял бы в RUNNING — это восстанавливает гарантию
+        // из старого sync-обработчика (commit 7d00eb0) на новом уровне
+        // пайплайна. tryFinalize идемпотентен: если другие чанки ещё in-flight,
+        // он безопасно вернётся без изменений.
+        if ([] === $uuids) {
+            $this->finalizer->tryFinalize(
+                $message->jobId,
+                $message->companyId,
+            );
+
+            $this->marketplaceAdsLogger->info(
+                'Ozon ad statistics chunk had no active campaigns — tryFinalize called directly',
+                [
+                    'jobId' => $message->jobId,
+                    'companyId' => $message->companyId,
+                    'dateFrom' => $message->dateFrom,
+                    'dateTo' => $message->dateTo,
+                ],
             );
         }
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAds;
 
+use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
@@ -15,10 +16,16 @@ use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
+use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Sentry\State\HubInterface;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+
+// AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
+BypassFinals::allowPaths([
+    '*/src/MarketplaceAds/Application/Service/AdLoadJobFinalizer.php',
+]);
 
 /**
  * Unit-тесты {@see FetchOzonAdStatisticsHandler} для async-poll flow (step 5).
@@ -88,9 +95,107 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        // Regression guard: finalize attempt belongs ONLY to the zero-uuids
+        // branch. Non-empty chunks never call tryFinalize directly — the per-doc
+        // path through DownloadOzonAdReportHandler + ProcessAdRawDocumentHandler
+        // owns that responsibility.
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
         $handler(new FetchOzonAdStatisticsMessage(
             self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
+    public function testEmptyUuidsStillCallsMarkChunkCompletedAndFinalizer(): void
+    {
+        // Zero-uuids scenario: requestStatisticsOnly возвращает [] (нет активных
+        // SKU-кампаний или все отфильтрованы recency-cutoff'ом). В этом случае
+        // ни одного OzonAdPendingReport не создано → poll-cron'у нечего
+        // опрашивать → DownloadOzonAdReportHandler для этого чанка никогда
+        // не сработает. Без прямого tryFinalize здесь job навсегда застрял бы
+        // в RUNNING.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markFailed');
+        $jobRepo->expects(self::once())
+            ->method('incrementLoadedDays')
+            ->with(self::JOB_ID, self::COMPANY_ID, 3)
+            ->willReturn(1);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::once())
+            ->method('requestStatisticsOnly')
+            ->willReturn([]);
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->expects(self::once())
+            ->method('markChunkCompleted')
+            ->willReturn(true);
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+        $pendingRepo->expects(self::never())->method('markFinalized');
+
+        // KEY ASSERTION: the fix. tryFinalize MUST be called in the zero-uuids
+        // branch, otherwise jobs with no active campaigns would hang in RUNNING.
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::once())
+            ->method('tryFinalize')
+            ->with(self::JOB_ID, self::COMPANY_ID);
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+    }
+
+    public function testEmptyUuidsOnDuplicateChunkStillCallsFinalizer(): void
+    {
+        // Инвариант: zero-uuids ветка вызывает tryFinalize независимо от
+        // результата markChunkCompleted. tryFinalize идемпотентен (SQL-level
+        // guard на статус RUNNING), и повторный вызов при Messenger-retry —
+        // безопасный no-op. Этот тест фиксирует контракт «zero-uuids всегда
+        // пытается финализировать» и ловит регрессию, если кто-то решит
+        // привязать вызов к `$marked === true`.
+        $job = AdLoadJobBuilder::aJob()->asRunning()->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        // duplicate-chunk → incrementLoadedDays не вызывается (chunk уже учтён
+        // в первичном проходе).
+        $jobRepo->expects(self::never())->method('incrementLoadedDays');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('requestStatisticsOnly')->willReturn([]);
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->expects(self::once())
+            ->method('markChunkCompleted')
+            ->willReturn(false);
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::once())
+            ->method('tryFinalize')
+            ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID);
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        $handler(new FetchOzonAdStatisticsMessage(
+            AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
             self::DATE_FROM,
             self::DATE_TO,
@@ -116,6 +221,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
+        // Non-empty uuids path: finalizer не должен вызываться — за финализацию
+        // отвечает DownloadOzonAdReportHandler через per-document trigger.
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
         $marketplaceAdsLogger = new class extends NullLogger {
             public bool $infoLogged = false;
 
@@ -133,6 +243,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $jobRepo,
             $chunkProgressRepo,
             $pendingRepo,
+            $finalizer,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             $marketplaceAdsLogger,
         );
@@ -189,7 +300,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             )
             ->willReturn(1);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        // Permanent error path: markFailed сам переводит job в FAILED,
+        // дополнительный tryFinalize не нужен.
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
@@ -221,7 +337,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        // Transient error: Messenger повторит message, finalize пока не нужен.
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Ozon 502 Bad Gateway');
@@ -410,12 +530,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         AdLoadJobRepository $jobRepo,
         AdChunkProgressRepositoryInterface $chunkProgressRepo,
         OzonAdPendingReportRepository $pendingRepo,
+        ?AdLoadJobFinalizer $finalizer = null,
     ): FetchOzonAdStatisticsHandler {
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $jobRepo,
             $chunkProgressRepo,
             $pendingRepo,
+            $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             new NullLogger(),
         );
