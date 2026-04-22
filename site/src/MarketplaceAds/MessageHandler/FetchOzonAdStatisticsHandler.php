@@ -9,6 +9,7 @@ use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
+use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
@@ -17,55 +18,58 @@ use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Async-обработчик {@see FetchOzonAdStatisticsMessage} — request-only.
+ * Async-обработчик {@see FetchOzonAdStatisticsMessage} — orchestrator'ом one-
+ * POST-per-message pipeline'а.
  *
- * Step 5 redesign: воркер больше НЕ polling'ит Ozon синхронно и НЕ скачивает
- * отчёт. Его роль — только выставить POST /statistics и выйти (<30s на чанк
- * вместо прежних ~10 мин). Завершение ингеста берёт на себя связка
- * poll-cron → {@see DownloadOzonAdReportHandler}.
+ * Шаг 5 redesign'а сделал этот handler request-only (без polling'а и без
+ * download'а). Follow-up fix (текущий PR): сам POST /statistics вынесен
+ * в {@see RequestOzonAdBatchHandler} — Ozon Performance API разрешает
+ * ровно 1 активный запрос к /statistics на аккаунт, и дёргать N батчей
+ * back-to-back из одного handler'а ловило 429 начиная со 2-го батча.
  *
- * Логика одного чанка:
- *  1) найти AdLoadJob (IDOR по company_id); если job удалён или в терминальном
- *     статусе — no-op;
- *  2) валидировать формат / календарь dateFrom / dateTo;
- *  3) вызвать {@see OzonAdClient::requestStatisticsOnly()} — он внутри
- *     разрешит credentials, получит token, сделает listSkuCampaigns,
- *     отфильтрует кампании, разобьёт на батчи ≤10 и на каждый батч
- *     выполнит POST /statistics с persist'ом OzonAdPendingReport
- *     (state=REQUESTED, jobId=этот job). Resume-логика внутри OzonAdClient
- *     защищает от дубликатов POST'ов при Messenger-retry (окно 900s);
- *  4) markChunkCompleted — идемпотентная фиксация чанка через
- *     AdChunkProgressRepository, SAME AS BEFORE. Семантика смещена:
- *     «chunk processed» → «chunk requested». При retry вернёт false
- *     и инкременты счётчиков пропустятся, чтобы не удвоить progress;
- *  5) если requestStatisticsOnly вернул пустой список UUID (нет активных
- *     SKU-кампаний / всё отфильтровано по recency), вызвать
- *     {@see AdLoadJobFinalizer::tryFinalize()} напрямую — иначе job
- *     навечно залипнет в RUNNING: нет pending → нет download → нет
- *     zero-docs финализации в DownloadOzonAdReportHandler;
- *  6) RETURN. Никакого download, upsert AdRawDocument, dispatch
- *     ProcessAdRawDocumentMessage — всё это теперь делает
- *     DownloadOzonAdReportHandler после того, как poll-cron увидел
- *     state=OK у pending-отчёта.
+ * Этот handler теперь:
+ *  1) находит AdLoadJob (IDOR-guard по company_id); job отсутствует /
+ *     в терминальном статусе — no-op;
+ *  2) валидирует формат и календарь dateFrom / dateTo;
+ *  3) вызывает {@see OzonAdClient::prepareStatisticsBatches()} — она
+ *     резолвит credentials, получает токен, делает listSkuCampaigns,
+ *     фильтрует recency-cutoff'ом и возвращает список батчей по ≤10
+ *     campaign_id. Никаких POST /statistics здесь не происходит;
+ *  4) для каждого батча диспатчит {@see RequestOzonAdBatchMessage}
+ *     (транспорт async_ads, single worker + FIFO). Единственный worker
+ *     поочерёдно делает по одному POST, серilизуя Ozon'овский лимит без
+ *     sleep'ов и без intra-handler parallelism'а;
+ *  5) markChunkCompleted + incrementLoadedDays — семантика «chunk
+ *     dispatched» (как и в предыдущем шаге 5). При Messenger-retry
+ *     markChunkCompleted вернёт false и счётчики не удвоятся;
+ *  6) zero-batches ветка: если prepareStatisticsBatches вернул [] (нет
+ *     активных SKU-кампаний / всё отфильтровано по recency-cutoff'у), ни
+ *     одного OzonAdPendingReport не появится — значит poll-cron'у нечего
+ *     опрашивать, и zero-docs финализация в DownloadOzonAdReportHandler
+ *     не сработает. Вызываем {@see AdLoadJobFinalizer::tryFinalize()}
+ *     напрямую, иначе job навечно залип бы в RUNNING.
  *
  * Политика ошибок:
- *  - \InvalidArgumentException (diapazon > 62 дней / from > to) — permanent
- *    bug вызывающей стороны → markFailed + UnrecoverableMessageHandlingException.
+ *  - \InvalidArgumentException (диапазон > 62 дней / from > to) — permanent
+ *    баг вызывающей стороны → markFailed + Unrecoverable.
  *  - OzonPermanentApiException (403, missing credentials) — permanent denial →
- *    abandon всех in-flight pending-отчётов этого job'а (чтобы poll-cron не
- *    продолжал их опрашивать после markFailed), markFailed + Unrecoverable.
+ *    abandon всех in-flight pending-отчётов этого job'а (созданных ранее на
+ *    предыдущих чанках), markFailed + Unrecoverable. В новом дизайне
+ *    prepareStatisticsBatches сам по себе pending-отчётов не создаёт, но
+ *    in-flight из предыдущих чанков того же job'а ещё могут полевать в cron.
  *  - OzonAuthExpiredException (401) — внутри OzonAdClient::withAuthRetry один
  *    раз ретраится с fresh-токеном, наружу не выходит.
- *  - Прочие \Throwable (5xx, сеть, JSON-ошибки) — transient → rethrow,
- *    Messenger ретраит. Resume-логика внутри OzonAdClient найдёт уже
- *    созданный pending-отчёт (<900s) и пропустит re-POST.
+ *  - Прочие \Throwable (5xx, сеть, JSON-ошибки на prep-шаге; transient
+ *    ошибки dispatch'а на Redis) — transient → rethrow, Messenger ретраит.
+ *    При ретрае matchResumableReport внутри RequestOzonAdBatchHandler
+ *    предохранит от повторных POST'ов уже-выданных UUID.
  *
- * OzonStatisticsQueueFullException (NOT_STARTED timeout) старого sync-flow'а
- * здесь больше не ловится — он выбрасывался из внутреннего polling-цикла,
- * которого в async-режиме нет. Сам exception-класс не удалён (оставлен для
- * совместимости с cleanup-PR), но из этого handler'а catch убран.
+ * Сам POST /statistics больше не делается в этом handler'е; catch 429
+ * переехал в downstream RequestOzonAdBatchHandler, где его Messenger ретраит
+ * штатно по расписанию async_ads.
  */
 #[AsMessageHandler]
 final class FetchOzonAdStatisticsHandler
@@ -76,6 +80,7 @@ final class FetchOzonAdStatisticsHandler
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly OzonAdPendingReportRepository $pendingReportRepo,
         private readonly AdLoadJobFinalizer $finalizer,
+        private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
@@ -139,11 +144,10 @@ final class FetchOzonAdStatisticsHandler
         $chunkDays = (int) $dateFrom->diff($dateTo)->days + 1;
 
         try {
-            $uuids = $this->ozonAdClient->requestStatisticsOnly(
+            $batches = $this->ozonAdClient->prepareStatisticsBatches(
                 $message->companyId,
                 $dateFrom,
                 $dateTo,
-                $message->jobId,
             );
         } catch (\InvalidArgumentException $e) {
             // Диапазон > 62 дней или from > to — баг вызывающего кода,
@@ -161,10 +165,10 @@ final class FetchOzonAdStatisticsHandler
             );
         } catch (OzonPermanentApiException $e) {
             // 403 / missing credentials — permanent denial. Abandon все
-            // in-flight pending-отчёты этого job'а: job уходит в FAILED,
-            // и poll-cron'у больше нечего делать с их UUID'ами. Без abandon'а
-            // они остались бы висеть в REQUESTED до next_poll_at и
-            // генерили бы лишние HTTP-запросы.
+            // in-flight pending-отчёты этого job'а (из предыдущих чанков /
+            // retry'ев): job уходит в FAILED, и poll-cron'у больше нечего
+            // делать с их UUID'ами. Без abandon'а они остались бы висеть
+            // в REQUESTED до next_poll_at и генерили бы лишние HTTP-запросы.
             $this->abandonInFlightForJob($message->companyId, $message->jobId, $e);
 
             $this->adLoadJobRepository->markFailed(
@@ -179,10 +183,10 @@ final class FetchOzonAdStatisticsHandler
                 $e,
             );
         } catch (\Throwable $e) {
-            // Сетевые сбои / 5xx / JSON-ошибки — transient, Messenger сделает retry.
-            // Resume-логика внутри OzonAdClient на повторе найдёт уже
-            // созданный pending-отчёт (<900s) и пропустит дублирующий POST.
-            $this->logger->error('Transient failure requesting Ozon ad statistics chunk', $e, [
+            // Сетевые сбои / 5xx / JSON-ошибки на prep-стадии — transient,
+            // Messenger сделает retry. prepareStatisticsBatches идемпотентен
+            // (ничего не персистит), повтор безопасен.
+            $this->logger->error('Transient failure preparing Ozon ad statistics batches', $e, [
                 'jobId' => $message->jobId,
                 'companyId' => $message->companyId,
                 'dateFrom' => $message->dateFrom,
@@ -191,6 +195,23 @@ final class FetchOzonAdStatisticsHandler
             ]);
 
             throw $e;
+        }
+
+        // Диспатч по одному сообщению на батч — single async_ads worker
+        // обработает их последовательно, не нарушая Ozon'овский лимит
+        // «1 active /statistics request». matchResumableReport внутри
+        // RequestOzonAdBatchHandler даёт идемпотентность при Messenger-retry.
+        $batchTotal = count($batches);
+        foreach ($batches as $batchIndex => $campaignIds) {
+            $this->messageBus->dispatch(new RequestOzonAdBatchMessage(
+                companyId: $message->companyId,
+                jobId: $message->jobId,
+                dateFrom: $message->dateFrom,
+                dateTo: $message->dateTo,
+                campaignIds: $campaignIds,
+                batchIndex: $batchIndex,
+                batchTotal: $batchTotal,
+            ));
         }
 
         // Идемпотентная фиксация чанка — в async-flow означает «запрос отправлен»,
@@ -222,23 +243,24 @@ final class FetchOzonAdStatisticsHandler
             );
         }
 
-        // Zero-uuids branch: requestStatisticsOnly вернул пустой список
+        // Zero-batches branch: prepareStatisticsBatches вернул пустой список
         // (нет активных SKU-кампаний или все отфильтровались recency-cutoff'ом).
-        // Значит ни одного OzonAdPendingReport не создано, poll-cron'у нечего
-        // опрашивать, и zero-docs финализация в DownloadOzonAdReportHandler
-        // никогда не сработает для этого чанка. Без прямого вызова tryFinalize
-        // здесь job навечно застрял бы в RUNNING — это восстанавливает гарантию
-        // из старого sync-обработчика (commit 7d00eb0) на новом уровне
-        // пайплайна. tryFinalize идемпотентен: если другие чанки ещё in-flight,
-        // он безопасно вернётся без изменений.
-        if ([] === $uuids) {
+        // Значит ни один RequestOzonAdBatchMessage не будет диспатчен, ни
+        // одного OzonAdPendingReport не создано, poll-cron'у нечего опрашивать,
+        // и zero-docs финализация в DownloadOzonAdReportHandler никогда не
+        // сработает для этого чанка. Без прямого вызова tryFinalize здесь job
+        // навечно застрял бы в RUNNING — это восстанавливает гарантию из
+        // старого sync-обработчика (commit 7d00eb0) на новом уровне пайплайна.
+        // tryFinalize идемпотентен: если другие чанки ещё in-flight, он
+        // безопасно вернётся без изменений.
+        if ([] === $batches) {
             $this->finalizer->tryFinalize(
                 $message->jobId,
                 $message->companyId,
             );
 
             $this->marketplaceAdsLogger->info(
-                'Ozon ad statistics chunk had no active campaigns — tryFinalize called directly',
+                'Ozon ad statistics chunk had no active campaigns — finalizing directly',
                 [
                     'jobId' => $message->jobId,
                     'companyId' => $message->companyId,
@@ -248,13 +270,13 @@ final class FetchOzonAdStatisticsHandler
             );
         }
 
-        $this->marketplaceAdsLogger->info('Ozon ad statistics chunk requested', [
+        $this->marketplaceAdsLogger->info('Ozon ad statistics chunk dispatched', [
             'jobId' => $message->jobId,
             'companyId' => $message->companyId,
             'dateFrom' => $message->dateFrom,
             'dateTo' => $message->dateTo,
             'chunkDays' => $chunkDays,
-            'uuidsRequested' => count($uuids),
+            'batchesDispatched' => $batchTotal,
             'duplicate' => !$marked,
         ]);
     }

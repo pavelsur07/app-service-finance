@@ -10,6 +10,7 @@ use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
+use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
@@ -20,7 +21,9 @@ use DG\BypassFinals;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Sentry\State\HubInterface;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 // AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
 BypassFinals::allowPaths([
@@ -54,7 +57,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
     private const DATE_FROM = '2026-03-01';
     private const DATE_TO = '2026-03-03';
 
-    public function testHappyPathCallsRequestStatisticsOnlyAndMarkChunkCompleted(): void
+    public function testHappyPathDispatchesOneBatchMessagePerBatchAndMarkChunkCompleted(): void
     {
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
@@ -72,14 +75,14 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::once())
-            ->method('requestStatisticsOnly')
+            ->method('prepareStatisticsBatches')
             ->with(
                 self::COMPANY_ID,
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-01' === $d->format('Y-m-d')),
                 self::callback(static fn (\DateTimeImmutable $d): bool => '2026-03-03' === $d->format('Y-m-d')),
-                self::JOB_ID,
             )
-            ->willReturn(['uuid-1', 'uuid-2']);
+            ->willReturn([['c1', 'c2'], ['c3']]);
+        $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -95,30 +98,48 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        // Regression guard: finalize attempt belongs ONLY to the zero-uuids
-        // branch. Non-empty chunks never call tryFinalize directly — the per-doc
-        // path through DownloadOzonAdReportHandler + ProcessAdRawDocumentHandler
-        // owns that responsibility.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        $dispatched = [];
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(2))
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $m) use (&$dispatched): Envelope {
+                $dispatched[] = $m;
+
+                return new Envelope($m);
+            });
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             self::JOB_ID,
             self::COMPANY_ID,
             self::DATE_FROM,
             self::DATE_TO,
         ));
+
+        self::assertCount(2, $dispatched);
+        foreach ($dispatched as $i => $m) {
+            self::assertInstanceOf(RequestOzonAdBatchMessage::class, $m);
+            self::assertSame(self::JOB_ID, $m->jobId);
+            self::assertSame(self::COMPANY_ID, $m->companyId);
+            self::assertSame(self::DATE_FROM, $m->dateFrom);
+            self::assertSame(self::DATE_TO, $m->dateTo);
+            self::assertSame($i, $m->batchIndex);
+            self::assertSame(2, $m->batchTotal);
+        }
+        self::assertSame(['c1', 'c2'], $dispatched[0]->campaignIds);
+        self::assertSame(['c3'], $dispatched[1]->campaignIds);
     }
 
-    public function testEmptyUuidsStillCallsMarkChunkCompletedAndFinalizer(): void
+    public function testZeroBatchesStillCallsMarkChunkCompletedAndFinalizer(): void
     {
-        // Zero-uuids scenario: requestStatisticsOnly возвращает [] (нет активных
-        // SKU-кампаний или все отфильтрованы recency-cutoff'ом). В этом случае
-        // ни одного OzonAdPendingReport не создано → poll-cron'у нечего
-        // опрашивать → DownloadOzonAdReportHandler для этого чанка никогда
-        // не сработает. Без прямого tryFinalize здесь job навсегда застрял бы
-        // в RUNNING.
+        // Zero-batches scenario: prepareStatisticsBatches возвращает [] (нет
+        // активных SKU-кампаний или все отфильтрованы recency-cutoff'ом). Ни
+        // одного RequestOzonAdBatchMessage не диспатчим, ни одного pending-
+        // отчёта не создастся → poll-cron'у нечего опрашивать → без прямого
+        // tryFinalize job навсегда застрял бы в RUNNING.
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
@@ -135,7 +156,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::once())
-            ->method('requestStatisticsOnly')
+            ->method('prepareStatisticsBatches')
             ->willReturn([]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -146,14 +167,19 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        // KEY ASSERTION: the fix. tryFinalize MUST be called in the zero-uuids
+        // KEY ASSERTION: the fix. tryFinalize MUST be called in the zero-batches
         // branch, otherwise jobs with no active campaigns would hang in RUNNING.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::once())
             ->method('tryFinalize')
             ->with(self::JOB_ID, self::COMPANY_ID);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Regression guard: zero-batches ветка не диспатчит ни одного
+        // RequestOzonAdBatchMessage'а.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             self::JOB_ID,
             self::COMPANY_ID,
@@ -162,12 +188,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
     }
 
-    public function testEmptyUuidsOnDuplicateChunkStillCallsFinalizer(): void
+    public function testZeroBatchesOnDuplicateChunkStillCallsFinalizer(): void
     {
-        // Инвариант: zero-uuids ветка вызывает tryFinalize независимо от
+        // Инвариант: zero-batches ветка вызывает tryFinalize независимо от
         // результата markChunkCompleted. tryFinalize идемпотентен (SQL-level
         // guard на статус RUNNING), и повторный вызов при Messenger-retry —
-        // безопасный no-op. Этот тест фиксирует контракт «zero-uuids всегда
+        // безопасный no-op. Этот тест фиксирует контракт «zero-batches всегда
         // пытается финализировать» и ловит регрессию, если кто-то решит
         // привязать вызов к `$marked === true`.
         $job = AdLoadJobBuilder::aJob()->asRunning()->build();
@@ -179,7 +205,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')->willReturn([]);
+        $ozonClient->method('prepareStatisticsBatches')->willReturn([]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -193,7 +219,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->method('tryFinalize')
             ->with(AdLoadJobBuilder::DEFAULT_ID, self::COMPANY_ID);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Zero batches → никаких dispatch'ей.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
@@ -212,7 +242,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')->willReturn(['uuid-1']);
+        $ozonClient->method('prepareStatisticsBatches')->willReturn([['c1']]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
         $chunkProgressRepo->expects(self::once())
@@ -221,10 +251,17 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        // Non-empty uuids path: finalizer не должен вызываться — за финализацию
+        // Non-empty batches path: finalizer не должен вызываться — за финализацию
         // отвечает DownloadOzonAdReportHandler через per-document trigger.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
+
+        // На дубликате мы всё равно диспатчим батчи — matchResumableReport
+        // внутри RequestOzonAdBatchHandler абсорбирует повторный POST.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
 
         $marketplaceAdsLogger = new class extends NullLogger {
             public bool $infoLogged = false;
@@ -244,6 +281,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer,
+            $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             $marketplaceAdsLogger,
         );
@@ -270,7 +308,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')
+        $ozonClient->method('prepareStatisticsBatches')
             ->willThrowException(new OzonPermanentApiException('403 — нет скоупа «Продвижение»'));
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -305,7 +343,12 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // prepareStatisticsBatches кинул exception до цикла dispatch —
+        // ни одного RequestOzonAdBatchMessage'а быть не должно.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
@@ -328,7 +371,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')
+        $ozonClient->method('prepareStatisticsBatches')
             ->willThrowException(new \RuntimeException('Ozon 502 Bad Gateway'));
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -341,7 +384,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::never())->method('tryFinalize');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Transient на prep-этапе → ни одного dispatch'а батчей.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('Ozon 502 Bad Gateway');
@@ -373,6 +420,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('prepareStatisticsBatches');
         $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -382,7 +430,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         self::assertTrue($job->getStatus()->isTerminal(), 'sanity: FAILED is terminal');
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
@@ -399,6 +450,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('prepareStatisticsBatches');
         $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -406,7 +458,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             AdLoadJobBuilder::DEFAULT_ID,
             self::COMPANY_ID,
@@ -432,7 +487,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $jobRepo->expects(self::never())->method('incrementLoadedDays');
 
         $ozonClient = $this->createMock(OzonAdClient::class);
-        $ozonClient->method('requestStatisticsOnly')
+        $ozonClient->method('prepareStatisticsBatches')
             ->willThrowException(new \InvalidArgumentException('Диапазон превышает 62 дня'));
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -440,7 +495,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('invalid date range');
@@ -469,6 +527,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('prepareStatisticsBatches');
         $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -476,7 +535,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('invalid date format');
@@ -505,6 +567,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             ->willReturn(1);
 
         $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('prepareStatisticsBatches');
         $ozonClient->expects(self::never())->method('requestStatisticsOnly');
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -512,7 +575,10 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo);
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, null, $messageBus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('2026-02-31');
@@ -531,13 +597,21 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         AdChunkProgressRepositoryInterface $chunkProgressRepo,
         OzonAdPendingReportRepository $pendingRepo,
         ?AdLoadJobFinalizer $finalizer = null,
+        ?MessageBusInterface $messageBus = null,
     ): FetchOzonAdStatisticsHandler {
+        if (null === $messageBus) {
+            $messageBus = $this->createMock(MessageBusInterface::class);
+            $messageBus->method('dispatch')
+                ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+        }
+
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $jobRepo,
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),
+            $messageBus,
             new AppLogger(new NullLogger(), $this->createMock(HubInterface::class)),
             new NullLogger(),
         );

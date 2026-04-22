@@ -666,9 +666,25 @@ Cron OzonAdDailySyncCommand (04:30 daily) → DispatchOzonAdLoadAction
 LoadOzonAdStatisticsRangeMessage → LoadOzonAdStatisticsRangeHandler
   ↓ (split into ≤62-day chunks)
 FetchOzonAdStatisticsMessage (async_ads) → FetchOzonAdStatisticsHandler
-  ↓ request-only: OzonAdClient::requestStatisticsOnly → POST /statistics per batch,
-    persist OzonAdPendingReport(state=REQUESTED), markChunkCompleted, return
-[worker exits in <30s; no more 10-min sync poll blocking a single slot]
+  ↓ prepareStatisticsBatches (credentials, campaigns, chunk into ≤10)
+  ↓ dispatch one RequestOzonAdBatchMessage per batch
+  ↓ markChunkCompleted, incrementLoadedDays
+  ↓ [if no batches: AdLoadJobFinalizer::tryFinalize directly]
+RequestOzonAdBatchMessage (async_ads) → RequestOzonAdBatchHandler
+  ↓ OzonAdClient::requestOneBatch = matchResumableReport OR requestStatistics (POST /statistics)
+  ↓ OzonAdPendingReport persisted (state=REQUESTED, nextPollAt=NULL)
+[each worker exits in <1s; no intra-handler 429 storm; no 10-min sync block]
+
+### Why one POST per message
+
+Ozon Performance API: max 1 active /api/client/statistics per account.
+Any 2nd concurrent request returns HTTP 429 «Превышен лимит активных
+запросов (максимум 1)». With async_ads having a single worker and
+FIFO Redis transport, dispatching one RequestOzonAdBatchMessage per
+batch naturally serializes POSTs with zero intra-handler orchestration.
+Previously FetchOzonAdStatisticsHandler called requestStatisticsOnly,
+which looped N POSTs back-to-back and reliably hit 429 on the 2nd
+batch for companies with >10 active SKU campaigns.
 
 Параллельно cron */2 * * * *:
 app:marketplace-ads:ozon-poll-reports → OzonPollReportsCommand → OzonAdReportPoller
@@ -684,9 +700,9 @@ on state=OK:
 
 `OzonAdClient::pollReport()`, `matchResumableReport()`, `POLL_MAX_ATTEMPTS`,
 `POLL_INTERVAL_SECONDS`, `POLL_NOT_STARTED_MAX_SECONDS`, `RESUME_MAX_AGE_SECONDS`,
-`OzonStatisticsQueueFullException`, `OzonAdClient::fetchAdStatisticsRange()` остаются
-в коде как dead-but-preserved до отдельного cleanup-PR в ~2 недели после стабилизации
-step 5.
+`OzonStatisticsQueueFullException`, `OzonAdClient::fetchAdStatisticsRange()`,
+`OzonAdClient::requestStatisticsOnly()` остаются в коде как dead-but-preserved
+до отдельного cleanup-PR в ~2 недели после стабилизации step 5 / rate-limit fix.
 
 ### `AdRawDocument.raw_payload` — две поддерживаемые формы
 

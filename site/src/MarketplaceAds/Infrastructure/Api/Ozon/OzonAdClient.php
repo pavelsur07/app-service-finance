@@ -532,6 +532,149 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Prepare batch plans for a chunk without issuing any POST /statistics.
+     *
+     * Делает: resolveCredentials → getAccessToken → listSkuCampaigns
+     *      → filterCampaignsForDateRange → chunk на батчи ≤STATISTICS_BATCH_SIZE.
+     *
+     * Caller (FetchOzonAdStatisticsHandler) диспатчит одно
+     * {@see \App\MarketplaceAds\Message\RequestOzonAdBatchMessage} на каждый
+     * возвращённый батч; каждое message вызывает {@see self::requestOneBatch()},
+     * чтобы сделать собственный POST. Такой split принудительно сериализует
+     * Ozon'овский лимит «1 active /statistics request per account» через
+     * FIFO single-worker транспорта async_ads — без intra-handler parallelism
+     * и без sleep-based rate limiting.
+     *
+     * @return list<list<string>> список батчей campaign_id (в каждом 1..10 id)
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \InvalidArgumentException диапазон > 62 дней / from > to
+     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     */
+    public function prepareStatisticsBatches(
+        string $companyId,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): array {
+        $this->assertValidRange($dateFrom, $dateTo);
+
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $this->marketplaceAdsLogger->info('Ozon Performance: prepareStatisticsBatches начало', [
+            'companyId' => $companyId,
+            'dateFrom' => $dateFrom->format('Y-m-d'),
+            'dateTo' => $dateTo->format('Y-m-d'),
+        ]);
+
+        $campaigns = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): array => $this->listSkuCampaigns($token),
+        );
+
+        $campaigns = $this->filterCampaignsForDateRange($campaigns, $dateFrom);
+
+        /** @var list<list<string>> $batches */
+        $batches = [];
+        foreach (array_chunk($campaigns, self::STATISTICS_BATCH_SIZE) as $batch) {
+            [$campaignIds] = $this->splitBatch($batch);
+            $batches[] = $campaignIds;
+        }
+
+        $this->marketplaceAdsLogger->info('Ozon Performance: prepareStatisticsBatches готово', [
+            'companyId' => $companyId,
+            'dateFrom' => $dateFrom->format('Y-m-d'),
+            'dateTo' => $dateTo->format('Y-m-d'),
+            'campaignsCount' => count($campaigns),
+            'batchesCount' => count($batches),
+        ]);
+
+        return $batches;
+    }
+
+    /**
+     * POST /api/client/statistics для ровно одного батча кампаний.
+     *
+     * Используется {@see \App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler}
+     * — это единственный caller в новом async-pipeline'е. Resume-логика через
+     * {@see self::matchResumableReport()} пропускает re-POST при Messenger-retry
+     * (идемпотентность в окне 900с): если батч с тем же (dateFrom, dateTo,
+     * campaignIds as set) уже in-flight для этого job'а, возвращается его UUID.
+     *
+     * @param list<string> $campaignIds 1..STATISTICS_BATCH_SIZE записей
+     *
+     * @return string UUID отчёта (новый либо переиспользованный)
+     *
+     * @throws OzonPermanentApiException 403
+     * @throws \InvalidArgumentException пустой $campaignIds
+     * @throws \RuntimeException         прочие non-2xx (включая 429) / 5xx / network
+     */
+    public function requestOneBatch(
+        string $companyId,
+        string $jobId,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+        array $campaignIds,
+    ): string {
+        if ([] === $campaignIds) {
+            throw new \InvalidArgumentException('requestOneBatch: campaignIds must not be empty');
+        }
+
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $inFlightReports = $this->pendingReportRepo->findInFlightByJob($companyId, $jobId);
+
+        $resumable = $this->matchResumableReport(
+            $inFlightReports,
+            $dateFrom,
+            $dateTo,
+            $campaignIds,
+            $companyId,
+        );
+
+        if (null !== $resumable) {
+            $uuid = $resumable->getOzonUuid();
+            $this->marketplaceAdsLogger->info('Ozon requestOneBatch: resumed existing UUID', [
+                'companyId' => $companyId,
+                'reportUuid' => $uuid,
+                'jobId' => $jobId,
+                'campaignCount' => count($campaignIds),
+            ]);
+
+            return $uuid;
+        }
+
+        $uuid = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): string => $this->requestStatistics(
+                $token,
+                $companyId,
+                $campaignIds,
+                $dateFrom,
+                $dateTo,
+                'DATE',
+                $jobId,
+            ),
+        );
+
+        $this->marketplaceAdsLogger->info('Ozon requestOneBatch: запрошен новый отчёт', [
+            'companyId' => $companyId,
+            'reportUuid' => $uuid,
+            'jobId' => $jobId,
+            'campaignCount' => count($campaignIds),
+        ]);
+
+        return $uuid;
+    }
+
+    /**
      * Один HTTP-снимок отчётов компании в Ozon Performance /statistics/list.
      *
      * В отличие от {@see pollReport()} не спит и не ретраится по состоянию —
