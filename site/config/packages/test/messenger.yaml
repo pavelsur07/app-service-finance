@@ -1,4 +1,6 @@
 framework:
     messenger:
         transports:
-            async: 'in-memory://'
+            async_sync: 'in-memory://'
+            async_pipeline: 'in-memory://'
+            async_ads: 'in-memory://'

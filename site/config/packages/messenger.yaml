@@ -3,17 +3,28 @@ framework:
         failure_transport: failed
 
         transports:
-            # https://symfony.com/doc/current/messenger.html#transport-configuration
-            async:
-                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
-                #options:
-                #    use_notify: true
-                #    check_delayed_interval: 60000
+            async_sync:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_SYNC)%'
                 retry_strategy:
                     max_retries: 3
+                    delay: 10000
                     multiplier: 2
+
+            async_pipeline:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_PIPELINE)%'
+                retry_strategy:
+                    max_retries: 3
+                    delay: 5000
+                    multiplier: 2
+
+            async_ads:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_ADS)%'
+                retry_strategy:
+                    max_retries: 2
+                    delay: 30000
+                    multiplier: 2
+
             failed: 'doctrine://default?queue_name=failed'
-            # sync: 'sync://'
 
         default_bus: messenger.bus.default
 
@@ -24,32 +35,32 @@ framework:
                     - doctrine_close_connection
 
         routing:
-            'App\Message\ApplyAutoRulesForTransaction': async
-            'App\Message\EnqueueAutoRulesForRange': async
-            'App\Marketplace\Message\SyncWbReportMessage': async
-            'App\Marketplace\Message\SyncOzonReportMessage': async
-            'App\Marketplace\Message\InitialSyncMessage': async
-            'App\Marketplace\Message\TriggerInitialSyncMessage': async
-            'App\Marketplace\Message\SyncOzonRealizationMessage': async    # ← НОВОЕ
-            'App\Marketplace\Message\ImportInventoryCostPriceMessage': async    # ← НОВОЕ
-            'App\Marketplace\Message\CloseMonthStageMessage': async    # ← НОВОЕ
-            'App\Marketplace\Message\ProcessDayReportMessage': async
-            'App\Marketplace\Message\ProcessRawDocumentStepMessage': async
-            'App\Marketplace\Message\ReprocessCostsMessage': async
-            'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async
-            'App\Catalog\Message\ImportProductsMessage': async
-            #App\Message\ApplyAutoRulesForTransaction: async
-            #App\Message\EnqueueAutoRulesForRange: async
-            App\Message\SendRegistrationEmailMessage: async
-            App\Cash\Message\Import\BankImportMessage: async
-            App\Cash\Message\Import\CashFileImportMessage: async
-            Symfony\Component\Mailer\Messenger\SendEmailMessage: async
-            Symfony\Component\Notifier\Message\ChatMessage: async
-            Symfony\Component\Notifier\Message\SmsMessage: async
-            App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage: async
-            App\MarketplaceAds\Message\ProcessAdRawDocumentMessage: async
-            App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage: async
-            App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage: async
+            # --- async_sync: external marketplace/bank HTTP fetches ---
+            'App\Marketplace\Message\SyncWbReportMessage': async_sync
+            'App\Marketplace\Message\SyncOzonReportMessage': async_sync
+            'App\Marketplace\Message\SyncOzonRealizationMessage': async_sync
+            'App\Marketplace\Message\InitialSyncMessage': async_sync
+            'App\Marketplace\Message\TriggerInitialSyncMessage': async_sync
+            'App\Marketplace\Application\Command\FetchMarketplaceDataCommand': async_sync
+            'App\Cash\Message\Import\BankImportMessage': async_sync
+            'App\Cash\Message\Import\CashFileImportMessage': async_sync
+            'App\Message\SendRegistrationEmailMessage': async_sync
+            'Symfony\Component\Mailer\Messenger\SendEmailMessage': async_sync
+            'Symfony\Component\Notifier\Message\ChatMessage': async_sync
+            'Symfony\Component\Notifier\Message\SmsMessage': async_sync
 
-            # Route your messages to the transports
-            # 'App\Message\YourMessage': async
+            # --- async_pipeline: local CPU/DB processing of already-fetched data ---
+            'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline
+            'App\Marketplace\Message\ProcessRawDocumentStepMessage': async_pipeline
+            'App\Marketplace\Message\ReprocessCostsMessage': async_pipeline
+            'App\Marketplace\Message\CloseMonthStageMessage': async_pipeline
+            'App\Marketplace\Message\ImportInventoryCostPriceMessage': async_pipeline
+            'App\Catalog\Message\ImportProductsMessage': async_pipeline
+            'App\Message\ApplyAutoRulesForTransaction': async_pipeline
+            'App\Message\EnqueueAutoRulesForRange': async_pipeline
+            'App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage': async_pipeline
+            'App\MarketplaceAds\Message\ProcessAdRawDocumentMessage': async_pipeline
+
+            # --- async_ads: Ozon Performance polling (may block up to 10 min per message) ---
+            'App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage': async_ads
+            'App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage': async_ads
