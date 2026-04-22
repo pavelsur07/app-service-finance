@@ -65,3 +65,4 @@ framework:
             # --- async_ads: Ozon Performance polling (may block up to 10 min per message) ---
             'App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage': async_ads
             'App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage': async_ads
+            'App\MarketplaceAds\Message\RequestOzonAdBatchMessage': async_ads
