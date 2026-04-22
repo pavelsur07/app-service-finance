@@ -12,6 +12,7 @@ use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 
 /**
  * Unit-тесты {@see RequestOzonAdBatchHandler}: ровно один POST /statistics
@@ -57,6 +58,49 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             dateFrom: self::DATE_FROM,
             dateTo: self::DATE_TO,
             campaignIds: ['c1', 'c2'],
+            batchIndex: 0,
+            batchTotal: 1,
+        ));
+    }
+
+    public function testPermanentApiExceptionMarksFailedAndThrowsUnrecoverable(): void
+    {
+        // 403 / scope revoked → весь job обречён. Handler вызывает markFailed
+        // и оборачивает ошибку в Unrecoverable — Messenger не ретраит, а
+        // оставшиеся батчи того же job'а упадут с «job уже терминален»
+        // и станут no-op (см. testTerminalJobIsNoop).
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::once())
+            ->method('markFailed')
+            ->with(
+                self::JOB_ID,
+                self::COMPANY_ID,
+                self::stringContains('Ozon Performance'),
+            )
+            ->willReturn(1);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::once())
+            ->method('requestOneBatch')
+            ->willThrowException(new OzonPermanentApiException('403 — нет скоупа «Продвижение»'));
+
+        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, new NullLogger());
+
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('Ozon permanent failure');
+
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: ['c1'],
             batchIndex: 0,
             batchTotal: 1,
         ));
