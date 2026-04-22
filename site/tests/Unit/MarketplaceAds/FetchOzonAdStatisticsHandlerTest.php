@@ -133,14 +133,13 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         self::assertSame(['c3'], $dispatched[1]->campaignIds);
     }
 
-    public function testEmptyUuidsStillCallsMarkChunkCompletedAndFinalizer(): void
+    public function testZeroBatchesStillCallsMarkChunkCompletedAndFinalizer(): void
     {
-        // Zero-uuids scenario: requestStatisticsOnly возвращает [] (нет активных
-        // SKU-кампаний или все отфильтрованы recency-cutoff'ом). В этом случае
-        // ни одного OzonAdPendingReport не создано → poll-cron'у нечего
-        // опрашивать → DownloadOzonAdReportHandler для этого чанка никогда
-        // не сработает. Без прямого tryFinalize здесь job навсегда застрял бы
-        // в RUNNING.
+        // Zero-batches scenario: prepareStatisticsBatches возвращает [] (нет
+        // активных SKU-кампаний или все отфильтрованы recency-cutoff'ом). Ни
+        // одного RequestOzonAdBatchMessage не диспатчим, ни одного pending-
+        // отчёта не создастся → poll-cron'у нечего опрашивать → без прямого
+        // tryFinalize job навсегда застрял бы в RUNNING.
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
@@ -157,7 +156,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
 
         $ozonClient = $this->createMock(OzonAdClient::class);
         $ozonClient->expects(self::once())
-            ->method('requestStatisticsOnly')
+            ->method('prepareStatisticsBatches')
             ->willReturn([]);
 
         $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
@@ -168,14 +167,19 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
         $pendingRepo->expects(self::never())->method('markFinalized');
 
-        // KEY ASSERTION: the fix. tryFinalize MUST be called in the zero-uuids
+        // KEY ASSERTION: the fix. tryFinalize MUST be called in the zero-batches
         // branch, otherwise jobs with no active campaigns would hang in RUNNING.
         $finalizer = $this->createMock(AdLoadJobFinalizer::class);
         $finalizer->expects(self::once())
             ->method('tryFinalize')
             ->with(self::JOB_ID, self::COMPANY_ID);
 
-        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer);
+        // Regression guard: zero-batches ветка не диспатчит ни одного
+        // RequestOzonAdBatchMessage'а.
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
         $handler(new FetchOzonAdStatisticsMessage(
             self::JOB_ID,
             self::COMPANY_ID,
