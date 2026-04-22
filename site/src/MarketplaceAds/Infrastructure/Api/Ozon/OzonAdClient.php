@@ -45,6 +45,7 @@ class OzonAdClient implements AdPlatformClientInterface
     private const STATISTICS_PATH = '/api/client/statistics';
     private const STATISTICS_STATE_PATH = '/api/client/statistics/%s';
     private const STATISTICS_REPORT_PATH = '/api/client/statistics/report';
+    private const STATISTICS_LIST_PATH = '/api/client/statistics/list';
 
     private const REQUEST_TIMEOUT = 30;
     private const TOKEN_TTL_SAFETY_MARGIN = 300;
@@ -406,6 +407,97 @@ class OzonAdClient implements AdPlatformClientInterface
 
             throw $e;
         }
+    }
+
+    /**
+     * Один HTTP-снимок отчётов компании в Ozon Performance /statistics/list.
+     *
+     * В отличие от {@see pollReport()} не спит и не ретраится по состоянию —
+     * возвращает map «UUID => raw state» по текущему листингу Ozon.
+     *
+     * Пагинация: до MAX_LIST_PAGES * pageSize строк за проход. Кэп нужен,
+     * чтобы polling cron не зависал на аккаунте с аномально длинным списком;
+     * если такое случится, необработанные UUID будут подхвачены на следующем
+     * тике (in-flight-набор короткоживущий).
+     *
+     * Используется в CLI-команде app:marketplace-ads:ozon-poll-reports.
+     * НЕ вызывай из существующих handler'ов — step 5 redesign заменит их
+     * отдельным PR.
+     *
+     * @return array<string, string> UUID => raw state, пусто = листинг пуст
+     *
+     * @throws OzonPermanentApiException 403 (нет Performance scope / client_id блокирован)
+     * @throws \RuntimeException         остальные non-2xx / network / JSON-ошибки
+     */
+    public function listReportsForCompany(string $companyId): array
+    {
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        // 100 — проверенный pageSize из OzonDebugFetcher::listReports();
+        // 3 страницы × 100 = 300 строк/тик. Поднять, если прод-телеметрия
+        // покажет компании со стабильно большим in-flight объёмом.
+        $pageSize = 100;
+        $maxPages = 3;
+
+        $out = [];
+
+        for ($page = 1; $page <= $maxPages; ++$page) {
+            /** @var list<array<string, mixed>> $items */
+            $items = $this->withAuthRetry(
+                $companyId,
+                $clientId,
+                $clientSecret,
+                fn (string $token): array => $this->fetchStatisticsListPage($token, $page, $pageSize),
+            );
+
+            if ([] === $items) {
+                break;
+            }
+
+            foreach ($items as $item) {
+                $uuid = (string) ($item['UUID'] ?? $item['uuid'] ?? '');
+                $state = (string) ($item['state'] ?? '');
+                if ('' === $uuid || '' === $state) {
+                    continue;
+                }
+                $out[$uuid] = $state;
+            }
+
+            if (count($items) < $pageSize) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<array<string, mixed>>
+     */
+    private function fetchStatisticsListPage(string $token, int $page, int $pageSize): array
+    {
+        $response = $this->authorizedRequest(
+            'GET',
+            sprintf('%s?page=%d&pageSize=%d', self::STATISTICS_LIST_PATH, $page, $pageSize),
+            $token,
+        );
+
+        $data = $this->decodeJson($response->getContent(false), 'statistics list');
+
+        // Ozon возвращает листинг под одним из трёх ключей (наблюдено в
+        // OzonDebugFetcher::listReports()). Берём первый найденный.
+        foreach (['items', 'list', 'reports'] as $key) {
+            if (isset($data[$key]) && is_array($data[$key])) {
+                /** @var list<array<string, mixed>> $items */
+                $items = array_values(array_filter($data[$key], 'is_array'));
+
+                return $items;
+            }
+        }
+
+        return [];
     }
 
     /**

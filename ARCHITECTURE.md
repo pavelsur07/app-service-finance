@@ -463,7 +463,94 @@ findInFlightByJob(string $companyId, string $jobId): array
 // companyId обязателен и валидируется Assert::uuid().
 // @return list<OzonAdPendingReport>
 findInFlightByCompany(string $companyId): array
+
+// Distinct companyIds с хотя бы одной in-flight записью, готовой к опросу:
+// finalized_at IS NULL AND (next_poll_at IS NULL OR next_poll_at <= :now).
+// next_poll_at IS NULL = «опросить на ближайшем тике» (legacy + fresh REQUESTED).
+// Используется poll-cron'ом (OzonPollReportsCommand). Raw DBAL, без ORM-гидратации.
+// @return list<string>
+findCompanyIdsWithDueReports(\DateTimeImmutable $now): array
+
+// Scheduling-only update: last_checked_at, next_poll_at, poll_attempts, updated_at.
+// state / error_message / finalized_at не трогает. Guard `finalized_at IS NULL`
+// + companyId в WHERE. Используется poll-cron'ом, когда Ozon ещё не отдал
+// нового state, но тик надо зафиксировать и перепланировать.
+// @return int число обновлённых строк (0 — uuid не найден / уже финализирован)
+updateSchedule(
+    string $companyId,
+    string $ozonUuid,
+    \DateTimeImmutable $lastCheckedAt,
+    \DateTimeImmutable $nextPollAt,
+    int $pollAttempts,
+): int
+
+// Обновляет state + scheduling одним UPDATE'ом (атомарно, без гонки с markFinalized).
+// $nextPollAt=null — записывает NULL в БД (дальше по scheduling не опрашиваем).
+// Отдельный метод от updateState(), чтобы не ломать старых вызывающих.
+// @return int число обновлённых строк (0 — uuid не найден / уже финализирован)
+updateStateWithSchedule(
+    string $companyId,
+    string $ozonUuid,
+    string $state,
+    \DateTimeImmutable $lastCheckedAt,
+    ?\DateTimeImmutable $nextPollAt,
+    int $pollAttempts,
+    ?\DateTimeImmutable $firstNonPendingAt = null,
+): int
 ```
+
+### `OzonAdClient::listReportsForCompany` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`)
+```php
+// Один HTTP-снимок Ozon Performance GET /api/client/statistics/list.
+// Не спит, не ретраится по state — возвращает текущий map "UUID => raw state".
+// Пагинация до MAX_LIST_PAGES × pageSize (300 за тик), остаток — на следующий тик.
+// Используется только OzonAdReportPoller; существующий synchronous pipeline
+// (pollReport / fetchAdStatistics*) не трогается.
+// @return array<string, string> UUID => state (raw Ozon)
+// @throws OzonPermanentApiException 403 — нет Performance scope
+// @throws \RuntimeException         прочие non-2xx / транспорт / JSON
+listReportsForCompany(string $companyId): array
+```
+
+### `OzonAdReportPoller` (`src/MarketplaceAds/Application/Service/OzonAdReportPoller.php`)
+
+Per-company state machine для shared-polling'а. `__invoke(companyId, now): PollResult`.
+
+Вход: `companyId` + `DateTimeImmutable $now` (inject-или-снаружи, упрощает тесты).
+Выход: `PollResult { seen, updated, finalized, errors }` (readonly DTO).
+
+Контракт:
+1. `findInFlightByCompany($companyId)` — если пусто, zero-result, Ozon не дёргается.
+2. `OzonAdClient::listReportsForCompany($companyId)` — один HTTP-вызов:
+   - `OzonPermanentApiException` (403) → все in-flight строки `markFinalized(ERROR)`;
+   - любой другой `\Throwable` → строки не трогаем, `errors=1`, next tick повторит.
+3. Per-row reconcile:
+   - `UUID` отсутствует в ответе + age ≥ 1h → `markFinalized(ABANDONED)`;
+   - отсутствует + age < 1h → `updateSchedule` с backoff `next_poll_at`;
+   - raw state ∈ {OK, READY} → `updateStateWithSchedule(OK, nextPollAt=null)`
+     (download + финализацию делает step 4, не этот сервис);
+   - raw state ∈ {ERROR, CANCELLED, NOT_FOUND} → `markFinalized(ERROR, rawState в message)`;
+   - остальное (NOT_STARTED, IN_PROGRESS и пр.) → `updateStateWithSchedule(rawState, next backoff)`.
+
+Backoff: `15 / 30 / 60 / 120 / 300 / 600 сек` по `poll_attempts`, clamp на 600.
+MAX_AGE_BEFORE_ABANDON = 3600 сек.
+
+### `OzonPollReportsCommand` (`app:marketplace-ads:ozon-poll-reports`)
+
+```
+app:marketplace-ads:ozon-poll-reports [--company-id=UUID] [--dry-run]
+```
+
+Оркестратор shared-polling'а: `findCompanyIdsWithDueReports(now)` → для каждой
+компании вызов `OzonAdReportPoller`. Per-company isolation: исключение одной
+компании не валит остальных.
+
+- `--dry-run` — не делает HTTP и не пишет в БД, только печатает "DRY company=… in_flight=…".
+- `--company-id=UUID` — опрос одной компании (диагностика).
+- Exit code: `FAILURE` если хоть у одной компании `errors > 0`, иначе `SUCCESS`.
+
+**Не подключена к cron** в step 3/5. Step 5 добавит её в `docker/cron/app.cron`.
+До тех пор запуск только ручной: `docker exec site-php-cli php bin/console app:marketplace-ads:ozon-poll-reports`.
 
 ---
 

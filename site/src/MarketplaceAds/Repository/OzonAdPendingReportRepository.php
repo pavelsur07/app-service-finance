@@ -185,6 +185,133 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
         );
     }
 
+    /**
+     * Обновляет поля scheduling (last_checked_at, next_poll_at, poll_attempts)
+     * без изменения state / error_message / finalized_at. Используется
+     * poll-cron'ом, когда Ozon ещё не отдал нового состояния, но мы
+     * зафиксировали попытку и перепланировали следующий тик.
+     *
+     * Guard `finalized_at IS NULL` — идемпотентно: не обновит уже терминальную
+     * запись, даже если параллельный воркер успел её финализировать.
+     *
+     * companyId в WHERE — defense-in-depth против IDOR (см. updateState).
+     *
+     * @return int число обновлённых строк (0 — uuid не найден или уже финализирован)
+     */
+    public function updateSchedule(
+        string $companyId,
+        string $ozonUuid,
+        \DateTimeImmutable $lastCheckedAt,
+        \DateTimeImmutable $nextPollAt,
+        int $pollAttempts,
+    ): int {
+        Assert::uuid($companyId);
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_pending_reports
+                SET last_checked_at = :last_checked_at,
+                    next_poll_at    = :next_poll_at,
+                    poll_attempts   = :poll_attempts,
+                    updated_at      = NOW()
+                WHERE ozon_uuid = :ozon_uuid
+                  AND company_id = :company_id
+                  AND finalized_at IS NULL
+                SQL,
+            [
+                'last_checked_at' => $lastCheckedAt->format('Y-m-d H:i:s'),
+                'next_poll_at' => $nextPollAt->format('Y-m-d H:i:s'),
+                'poll_attempts' => $pollAttempts,
+                'ozon_uuid' => $ozonUuid,
+                'company_id' => $companyId,
+            ],
+        );
+    }
+
+    /**
+     * Обновляет state + scheduling одним UPDATE'ом. Нужно poll-cron'у, когда
+     * Ozon отдал новое non-terminal state и одновременно надо перепланировать
+     * следующий опрос — делать это в два запроса бессмысленно и создаёт гонку
+     * с параллельным markFinalized.
+     *
+     * Отдельный метод (а не extension updateState), чтобы не ломать существующих
+     * вызывающих updateState() из старого synchronous polling pipeline.
+     *
+     * $nextPollAt=null — запланируем "null" в БД (значит «не опрашивать через
+     * scheduling», актуально когда Ozon перешёл в OK и дальнейший polling не нужен).
+     *
+     * companyId в WHERE — IDOR defense-in-depth. Guard `finalized_at IS NULL`
+     * — идемпотентность против гонки с markFinalized().
+     *
+     * @return int число обновлённых строк (0 — uuid не найден или уже финализирован)
+     */
+    public function updateStateWithSchedule(
+        string $companyId,
+        string $ozonUuid,
+        string $state,
+        \DateTimeImmutable $lastCheckedAt,
+        ?\DateTimeImmutable $nextPollAt,
+        int $pollAttempts,
+        ?\DateTimeImmutable $firstNonPendingAt = null,
+    ): int {
+        Assert::uuid($companyId);
+
+        $sql = <<<'SQL'
+            UPDATE marketplace_ad_pending_reports
+            SET state = :state,
+                last_checked_at = :last_checked_at,
+                next_poll_at    = :next_poll_at,
+                poll_attempts   = :poll_attempts,
+                first_non_pending_at = COALESCE(first_non_pending_at, :first_non_pending_at),
+                updated_at      = NOW()
+            WHERE ozon_uuid = :ozon_uuid
+              AND company_id = :company_id
+              AND finalized_at IS NULL
+            SQL;
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            $sql,
+            [
+                'state' => $state,
+                'last_checked_at' => $lastCheckedAt->format('Y-m-d H:i:s'),
+                'next_poll_at' => $nextPollAt?->format('Y-m-d H:i:s'),
+                'poll_attempts' => $pollAttempts,
+                'first_non_pending_at' => $firstNonPendingAt?->format('Y-m-d H:i:s'),
+                'ozon_uuid' => $ozonUuid,
+                'company_id' => $companyId,
+            ],
+        );
+    }
+
+    /**
+     * Distinct companyIds, у которых есть хоть одна in-flight запись, готовая
+     * к опросу: finalized_at IS NULL AND (next_poll_at IS NULL OR next_poll_at <= :now).
+     *
+     * next_poll_at IS NULL покрывает два кейса: (1) legacy-строки до step 2,
+     * (2) свежесозданные REQUESTED ещё не расписанные командой. Оба кейса
+     * = «опросить на ближайшем тике».
+     *
+     * Raw DBAL: нужен только distinct company_id, гидратация entity избыточна.
+     * Partial index idx_ad_pending_report_next_poll (WHERE finalized_at IS NULL)
+     * обеспечивает быструю часть `next_poll_at <= :now`.
+     *
+     * @return list<string>
+     */
+    public function findCompanyIdsWithDueReports(\DateTimeImmutable $now): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->fetchFirstColumn(
+            <<<'SQL'
+                SELECT DISTINCT company_id
+                FROM marketplace_ad_pending_reports
+                WHERE finalized_at IS NULL
+                  AND (next_poll_at IS NULL OR next_poll_at <= :now)
+                SQL,
+            ['now' => $now->format('Y-m-d H:i:s')],
+        );
+
+        return array_map(static fn ($v): string => (string) $v, $rows);
+    }
+
     public function findByOzonUuid(string $companyId, string $ozonUuid): ?OzonAdPendingReport
     {
         return $this->findOneBy(['companyId' => $companyId, 'ozonUuid' => $ozonUuid]);
