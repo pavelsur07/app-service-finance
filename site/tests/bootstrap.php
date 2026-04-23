@@ -12,6 +12,7 @@ DG\BypassFinals::allowPaths([
     '*/src/MarketplaceAnalytics/Domain/Service/DefaultCostMappingSeedPolicy.php',
     '*/src/MarketplaceAnalytics/Infrastructure/Query/UnitExtendedQuery.php',
     '*/src/MarketplaceAds/Repository/AdScheduledBatchRepository.php',
+    '*/src/Shared/Service/Storage/StorageService.php',
 ]);
 
 if (method_exists(Dotenv::class, 'bootEnv')) {

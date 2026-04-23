@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\MessageHandler;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
+use App\MarketplaceAds\Application\Service\OzonReportExtensionDetector;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
@@ -130,8 +131,8 @@ final class DownloadOzonAdReportHandler
         }
 
         $body = $response['body'];
-        $contentType = $response['contentType'] ?? '';
-        $extension = $this->detectExtension((string) $contentType, $body);
+        $contentType = $response['contentType'] ?? null;
+        $extension = OzonReportExtensionDetector::detect($body, $contentType);
 
         $relativePath = sprintf(
             'marketplace-ads/%s/%s.%s',
@@ -228,29 +229,5 @@ final class DownloadOzonAdReportHandler
             'documentsUpserted' => count($documents),
             'processedAt' => $now->format('Y-m-d H:i:s'),
         ]);
-    }
-
-    /**
-     * Определяет расширение файла отчёта Ozon.
-     *
-     * Magic bytes — источник истины, т.к. определяются по самому контенту:
-     * Ozon / CDN / прокси могут отдать ZIP с Content-Type `text/csv`
-     * (наблюдалось в проде на перезапакованных ответах). Поэтому сначала
-     * проверяем PK\x03\x04, а Content-Type используем только как fallback.
-     */
-    private function detectExtension(string $contentType, string $body): string
-    {
-        // Magic bytes: локальный ZIP-header. Истина по контенту.
-        if (\strlen($body) >= 4 && "PK\x03\x04" === substr($body, 0, 4)) {
-            return 'zip';
-        }
-
-        // Content-Type: fallback при отсутствии magic bytes.
-        $ct = strtolower(trim(explode(';', $contentType)[0] ?? ''));
-        if (\in_array($ct, ['application/zip', 'application/x-zip-compressed'], true)) {
-            return 'zip';
-        }
-
-        return 'csv';
     }
 }
