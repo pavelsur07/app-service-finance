@@ -19,6 +19,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
  * Async-обработчик {@see FetchOzonAdStatisticsMessage} — orchestrator'ом one-
@@ -204,15 +205,27 @@ final class FetchOzonAdStatisticsHandler
         // внутри RequestOzonAdBatchHandler даёт идемпотентность при Messenger-retry.
         $batchTotal = count($batches);
         foreach ($batches as $batchIndex => $campaignIds) {
-            $this->messageBus->dispatch(new RequestOzonAdBatchMessage(
-                companyId: $message->companyId,
-                jobId: $message->jobId,
-                dateFrom: $message->dateFrom,
-                dateTo: $message->dateTo,
-                campaignIds: $campaignIds,
-                batchIndex: $batchIndex,
-                batchTotal: $batchTotal,
-            ));
+            // Ozon /statistics жёстко троттлит при back-to-back POST'ах на аккаунт
+            // (25 подряд → устойчивые 429, которые не пробить даже 10 ретраями).
+            // Разносим batch'и на 90 секунд — Ozon'у хватает обработать предыдущий
+            // запрос до того, как прилетит следующий. batchIndex=0 идёт без задержки.
+            $stamps = [];
+            if ($batchIndex > 0) {
+                $stamps[] = new DelayStamp($batchIndex * 90_000);
+            }
+
+            $this->messageBus->dispatch(
+                new RequestOzonAdBatchMessage(
+                    companyId: $message->companyId,
+                    jobId: $message->jobId,
+                    dateFrom: $message->dateFrom,
+                    dateTo: $message->dateTo,
+                    campaignIds: $campaignIds,
+                    batchIndex: $batchIndex,
+                    batchTotal: $batchTotal,
+                ),
+                $stamps,
+            );
         }
 
         // Идемпотентная фиксация чанка — в async-flow означает «запрос отправлен»,
