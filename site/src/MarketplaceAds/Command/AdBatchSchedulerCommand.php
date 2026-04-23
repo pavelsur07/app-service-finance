@@ -45,6 +45,17 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *
  * Не подключён в cron в рамках Task-11.5 — ждёт Poller (Task-11.6) и
  * Finalizer (Task-11.7), включится одним релизом.
+ *
+ * Trade-off — HTTP внутри транзакции:
+ * POST `/api/client/statistics` выполняется, пока открыт `FOR UPDATE`-lock
+ * на взятом PLANNED-батче. Это сознательно: так инвариант «IN_FLIGHT → есть
+ * ozon_uuid» гарантируется на уровне БД (Poller Task-11.6 смотрит
+ * исключительно на этот инвариант и не должен видеть IN_FLIGHT без uuid).
+ * Альтернатива two-phase (IN_FLIGHT без uuid → HTTP → uuid) потребовала бы
+ * промежуточного DISPATCHING-состояния и recovery-крона для stuck-батчей —
+ * сложность, не оправданная текущим масштабом (один worker, минутный cron,
+ * HTTP-таймаут 30с, типичная длительность 1–3с). При росте параллелизма
+ * или HTTP-таймаута стоит пересмотреть.
  */
 #[AsCommand(
     name: 'app:marketplace-ads:scheduler',
