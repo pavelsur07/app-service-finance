@@ -4,362 +4,293 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Controller\Api\Admin;
 
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonDebugFetcher;
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
-use Psr\Log\LoggerInterface;
+use App\MarketplaceAds\Enum\OzonAdPendingReportState;
+use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
-use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\HttpFoundation\ResponseHeaderBag;
-use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\Security\Http\Attribute\IsGranted;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
- * Admin debug endpoints для ручной отладки Ozon Performance API.
+ * ВРЕМЕННЫЙ контроллер для диагностики Ozon Performance API.
+ * УДАЛИТЬ после решения инцидента 23.04.2026 с застрявшими
+ * pending_reports в state=REQUESTED, хотя у Ozon отчёты уже готовы (OK).
  *
- * Все методы:
- *  - требуют ROLE_SUPER_ADMIN,
- *  - принимают companyId (query / body),
- *  - возвращают JsonResponse с сырыми ответами Ozon (без скрытия ошибок),
- *  - логируют факт вызова в канал marketplace_ads.
+ * Два endpoint'а:
+ *   GET /debug/ozon-ads/list-reports?companyId=<UUID>   — посмотреть, что Ozon
+ *       возвращает на /statistics/list + прямой опрос каждого UUID.
+ *   GET /debug/ozon-ads/force-download?companyId=<UUID> — выгрузить все
+ *       in-flight pending_reports company: для каждого спросить
+ *       /statistics/{uuid}; если state=OK — обновить БД + dispatch download.
  *
- * Это debug-инструмент: он намеренно обходит async-пайплайн, не создаёт
- * AdLoadJob/AdRawDocument и ничего не пишет в БД.
+ * БЕЗ авторизации намеренно — временный dev-tool, удаляется сразу после
+ * инцидента. URL знают только разработчики.
  */
-#[IsGranted('ROLE_SUPER_ADMIN')]
+#[Route('/debug/ozon-ads', name: 'debug_ozon_ads_')]
 final class OzonDebugController extends AbstractController
 {
     public function __construct(
-        private readonly OzonDebugFetcher $debugFetcher,
-        #[Autowire(service: 'monolog.logger.marketplace_ads')]
-        private readonly LoggerInterface $logger,
+        private readonly HttpClientInterface $httpClient,
+        private readonly Connection $connection,
     ) {
     }
 
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/token',
-        name: 'marketplace_ads_admin_ozon_debug_token',
-        methods: ['GET'],
-    )]
-    public function token(Request $request): JsonResponse
+    /**
+     * Показывает сырой ответ Ozon /statistics/list (до 5 страниц по 100) +
+     * проверяет наличие in-flight UUID company в списке + делает прямой
+     * опрос /statistics/{uuid} по каждому in-flight UUID.
+     */
+    #[Route('/list-reports', name: 'list_reports', methods: ['GET'])]
+    public function listReports(Request $request): JsonResponse
     {
-        $companyId = $this->requireCompanyId($request->query->get('companyId'));
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
+        $companyId = $request->query->get('companyId');
+        if (!$companyId) {
+            return new JsonResponse(['error' => 'companyId query param required'], 400);
         }
 
-        $this->logger->info('Ozon debug call: token', ['companyId' => $companyId]);
-
-        try {
-            $result = $this->debugFetcher->fetchAccessToken($companyId);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
+        // 1. Credentials
+        $row = $this->connection->fetchAssociative(
+            'SELECT client_id, api_key FROM marketplace_connections
+             WHERE company_id = :c AND marketplace = :m AND connection_type = :t',
+            ['c' => $companyId, 'm' => 'ozon', 't' => 'performance']
+        );
+        if (!$row) {
+            return new JsonResponse(['error' => "No creds for companyId=$companyId"], 404);
         }
 
-        $token = $result['access_token'];
-        if ('' === $token) {
-            $tokenPrefix = '';
-        } elseif (mb_strlen($token) > 20) {
-            $tokenPrefix = mb_substr($token, 0, 20).'...';
-        } else {
-            $tokenPrefix = $token;
-        }
-
-        $rawBody = $result['ozon_raw_body'];
-        if (array_key_exists('access_token', $rawBody)) {
-            $rawBody['access_token'] = '***REDACTED***';
-        }
-
-        return $this->json([
-            'companyId' => $companyId,
-            'access_token_prefix' => $tokenPrefix,
-            'expires_in' => $result['expires_in'],
-            'issued_at' => $result['issued_at'],
-            'ozon_raw_response_status' => $result['ozon_raw_response_status'],
-            'ozon_raw_body' => $rawBody,
+        // 2. Token
+        $tokenResp = $this->httpClient->request('POST', 'https://api-performance.ozon.ru/api/client/token', [
+            'json' => [
+                'client_id' => $row['client_id'],
+                'client_secret' => $row['api_key'],
+                'grant_type' => 'client_credentials',
+            ],
         ]);
-    }
-
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/campaigns',
-        name: 'marketplace_ads_admin_ozon_debug_campaigns',
-        methods: ['GET'],
-    )]
-    public function campaigns(Request $request): JsonResponse
-    {
-        $companyId = $this->requireCompanyId($request->query->get('companyId'));
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
+        $tokenCode = $tokenResp->getStatusCode();
+        $tokenData = json_decode($tokenResp->getContent(false), true);
+        $token = $tokenData['access_token'] ?? null;
+        if (!$token) {
+            return new JsonResponse([
+                'step' => 'token',
+                'http_code' => $tokenCode,
+                'body' => $tokenData,
+            ], 502);
         }
 
-        $this->logger->info('Ozon debug call: campaigns', ['companyId' => $companyId]);
+        // 3. Наши застрявшие UUID
+        $ourUuids = $this->connection->fetchFirstColumn(
+            'SELECT ozon_uuid FROM marketplace_ad_pending_reports
+             WHERE company_id = :c AND finalized_at IS NULL',
+            ['c' => $companyId]
+        );
 
-        try {
-            $result = $this->debugFetcher->listCampaigns($companyId);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
-        }
+        // 4. Собрать все страницы Ozon /statistics/list
+        $allItems = [];
+        $pages = [];
+        $pageSize = 100;
 
-        return $this->json([
-            'companyId' => $companyId,
-            'status_code' => $result['status_code'],
-            'total' => $result['total'],
-            'states_breakdown' => $result['states_breakdown'],
-            'list' => $result['list'],
-            'raw_body' => $result['raw_body'],
-        ]);
-    }
-
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/statistics/list',
-        name: 'marketplace_ads_admin_ozon_debug_statistics_list',
-        methods: ['GET'],
-    )]
-    public function statisticsList(Request $request): JsonResponse
-    {
-        $companyId = $this->requireCompanyId($request->query->get('companyId'));
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
-        }
-
-        $page = (int) $request->query->get('page', '1');
-        $pageSize = (int) $request->query->get('pageSize', '50');
-
-        $this->logger->info('Ozon debug call: statistics/list', [
-            'companyId' => $companyId,
-            'page' => $page,
-            'pageSize' => $pageSize,
-        ]);
-
-        try {
-            $result = $this->debugFetcher->listReports($companyId, $page, $pageSize);
-        } catch (\InvalidArgumentException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
-        }
-
-        return $this->json([
-            'companyId' => $companyId,
-            'status_code' => $result['status_code'],
-            'total' => $result['total'],
-            'page_items_count' => $result['page_items_count'],
-            'states_breakdown' => $result['states_breakdown'],
-            'items' => $result['items'],
-            'raw_body' => $result['raw_body'],
-        ]);
-    }
-
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/statistics/request',
-        name: 'marketplace_ads_admin_ozon_debug_statistics_request',
-        methods: ['POST'],
-    )]
-    public function statisticsRequest(Request $request): JsonResponse
-    {
-        $payload = json_decode($request->getContent(), true);
-        if (!is_array($payload)) {
-            return $this->error('Body: ожидается JSON-объект', 400);
-        }
-
-        $companyId = $this->requireCompanyId($payload['companyId'] ?? null);
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
-        }
-
-        $campaigns = $payload['campaigns'] ?? null;
-        if (!is_array($campaigns) || [] === $campaigns) {
-            return $this->error('campaigns: массив с ID обязателен', 400);
-        }
-        $campaignIds = [];
-        foreach ($campaigns as $c) {
-            if (is_scalar($c)) {
-                $id = trim((string) $c);
-                if ('' !== $id) {
-                    $campaignIds[] = $id;
-                }
+        for ($page = 1; $page <= 5; $page++) {
+            $listResp = $this->httpClient->request(
+                'GET',
+                "https://api-performance.ozon.ru/api/client/statistics/list?page=$page&pageSize=$pageSize",
+                [
+                    'headers' => ['Authorization' => "Bearer $token", 'Accept' => 'application/json'],
+                ]
+            );
+            $listCode = $listResp->getStatusCode();
+            $listBody = $listResp->getContent(false);
+            $data = json_decode($listBody, true);
+            $items = $data['items'] ?? $data['list'] ?? [];
+            $pages[] = [
+                'page' => $page,
+                'http_code' => $listCode,
+                'top_level_keys' => is_array($data) ? array_keys($data) : null,
+                'items_count' => count($items),
+                'total' => $data['total'] ?? null,
+            ];
+            foreach ($items as $item) {
+                $allItems[] = $item;
+            }
+            if (count($items) < $pageSize) {
+                break;
             }
         }
-        if ([] === $campaignIds) {
-            return $this->error('campaigns: не нашлось валидных ID', 400);
+
+        // 5. Проверка наших UUID в ответе
+        $ourUuidsStatus = [];
+        foreach ($ourUuids as $u) {
+            $found = false;
+            $foundData = null;
+            foreach ($allItems as $item) {
+                foreach ($item as $val) {
+                    if (is_string($val) && strcasecmp($val, $u) === 0) {
+                        $found = true;
+                        $foundData = $item;
+                        break 2;
+                    }
+                }
+            }
+            $ourUuidsStatus[] = [
+                'uuid' => $u,
+                'found_in_list' => $found,
+                'data' => $foundData,
+            ];
         }
 
-        $fromStr = isset($payload['from']) ? (string) $payload['from'] : '';
-        $toStr = isset($payload['to']) ? (string) $payload['to'] : '';
-        $utc = new \DateTimeZone('UTC');
-        $dateFrom = \DateTimeImmutable::createFromFormat('!Y-m-d', $fromStr, $utc);
-        $dateTo = \DateTimeImmutable::createFromFormat('!Y-m-d', $toStr, $utc);
-        if (false === $dateFrom || $dateFrom->format('Y-m-d') !== $fromStr) {
-            return $this->error('from: ожидается YYYY-MM-DD', 400);
-        }
-        if (false === $dateTo || $dateTo->format('Y-m-d') !== $toStr) {
-            return $this->error('to: ожидается YYYY-MM-DD', 400);
-        }
-
-        $groupBy = isset($payload['groupBy']) ? (string) $payload['groupBy'] : 'NO_GROUP_BY';
-
-        $this->logger->info('Ozon debug call: statistics/request', [
-            'companyId' => $companyId,
-            'campaigns' => $campaignIds,
-            'from' => $fromStr,
-            'to' => $toStr,
-            'groupBy' => $groupBy,
-        ]);
-
-        try {
-            $result = $this->debugFetcher->requestStatistics($companyId, $campaignIds, $dateFrom, $dateTo, $groupBy);
-        } catch (\InvalidArgumentException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
-        }
-
-        return $this->json([
-            'companyId' => $companyId,
-            'request_body' => $result['request_body'],
-            'uuid' => $result['uuid'],
-            'ozon_status_code' => $result['ozon_status_code'],
-            'ozon_raw_response' => $result['ozon_raw_response'],
-        ]);
-    }
-
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/statistics/status',
-        name: 'marketplace_ads_admin_ozon_debug_statistics_status',
-        methods: ['GET'],
-    )]
-    public function statisticsStatus(Request $request): JsonResponse
-    {
-        $companyId = $this->requireCompanyId($request->query->get('companyId'));
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
-        }
-
-        $uuid = trim((string) $request->query->get('uuid', ''));
-        if ('' === $uuid) {
-            return $this->error('uuid: обязательный параметр', 400);
-        }
-
-        $this->logger->info('Ozon debug call: statistics/status', [
-            'companyId' => $companyId,
-            'uuid' => $uuid,
-        ]);
-
-        try {
-            $result = $this->debugFetcher->checkStatus($companyId, $uuid);
-        } catch (\InvalidArgumentException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
-        }
-
-        return $this->json([
-            'companyId' => $companyId,
-            'uuid' => $result['uuid'],
-            'state' => $result['state'],
-            'status_code' => $result['status_code'],
-            'ozon_raw_response' => $result['ozon_raw_response'],
-        ]);
-    }
-
-    #[Route(
-        '/api/marketplace-ads/admin/ozon/debug/statistics/download',
-        name: 'marketplace_ads_admin_ozon_debug_statistics_download',
-        methods: ['GET'],
-    )]
-    public function statisticsDownload(Request $request): Response
-    {
-        $companyId = $this->requireCompanyId($request->query->get('companyId'));
-        if ($companyId instanceof JsonResponse) {
-            return $companyId;
-        }
-
-        $uuid = trim((string) $request->query->get('uuid', ''));
-        if ('' === $uuid) {
-            return $this->error('uuid: обязательный параметр', 400);
-        }
-
-        $raw = '1' === (string) $request->query->get('raw', '0');
-
-        $this->logger->info('Ozon debug call: statistics/download', [
-            'companyId' => $companyId,
-            'uuid' => $uuid,
-            'raw' => $raw,
-        ]);
-
-        try {
-            $result = $this->debugFetcher->downloadReport($companyId, $uuid);
-        } catch (\InvalidArgumentException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (OzonPermanentApiException $e) {
-            return $this->error($e->getMessage(), 400);
-        } catch (\Throwable $e) {
-            return $this->error($e->getMessage(), 502, $e);
-        }
-
-        if ($raw) {
-            $filename = sprintf('ozon-report-%s.%s', $uuid, $result['was_zip'] ? 'zip' : 'csv');
-            $response = new Response($result['raw_bytes']);
-            $response->headers->set(
-                'Content-Type',
-                $result['was_zip'] ? 'application/zip' : 'text/csv; charset=utf-8',
+        // 6. Прямой опрос /statistics/{uuid} по каждому нашему UUID
+        $directProbes = [];
+        foreach ($ourUuids as $uuid) {
+            $resp = $this->httpClient->request(
+                'GET',
+                "https://api-performance.ozon.ru/api/client/statistics/$uuid",
+                [
+                    'headers' => ['Authorization' => "Bearer $token", 'Accept' => 'application/json'],
+                ]
             );
-            $response->headers->set(
-                'Content-Disposition',
-                $response->headers->makeDisposition(
-                    ResponseHeaderBag::DISPOSITION_ATTACHMENT,
-                    $filename,
-                ),
-            );
-
-            return $response;
+            $directProbes[] = [
+                'uuid' => $uuid,
+                'http_code' => $resp->getStatusCode(),
+                'body' => json_decode($resp->getContent(false), true),
+            ];
         }
 
-        return $this->json([
+        return new JsonResponse([
             'companyId' => $companyId,
-            'uuid' => $uuid,
-            'was_zip' => $result['was_zip'],
-            'size_bytes' => $result['size_bytes'],
-            'content_preview' => $result['content_preview'],
-            'files_in_zip' => $result['files_in_zip'],
+            'client_id' => substr($row['client_id'], 0, 16) . '...',
+            'token_ok' => true,
+            'token_http_code' => $tokenCode,
+            'list_pages' => $pages,
+            'total_items_collected' => count($allItems),
+            'first_5_items' => array_slice($allItems, 0, 5),
+            'last_5_items' => array_slice($allItems, -5),
+            'our_uuids' => $ourUuidsStatus,
+            'direct_probes_by_uuid' => $directProbes,
         ]);
     }
 
-    private function requireCompanyId(mixed $raw): JsonResponse|string
-    {
-        if (!is_string($raw)) {
-            return $this->error('companyId: обязательный параметр', 400);
-        }
-        $value = trim($raw);
-        if ('' === $value) {
-            return $this->error('companyId: обязательный параметр', 400);
-        }
-        if (1 !== preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $value)) {
-            return $this->error('companyId: ожидается UUID', 400);
-        }
-
-        return $value;
-    }
-
-    private function error(string $message, int $status, ?\Throwable $e = null): JsonResponse
-    {
-        $payload = ['error' => $message];
-        if (null !== $e) {
-            $payload['exception_class'] = $e::class;
+    /**
+     * Для всех in-flight pending_reports company: напрямую спросить
+     * /statistics/{uuid}; если state=OK — обновить БД на OK и диспатчить
+     * DownloadOzonAdReportMessage.
+     *
+     * Временный фикс для «повисших REQUESTED при реально готовом отчёте»
+     * из-за того, что /statistics/list возвращает пустой ответ и обычный
+     * poller не видит эти UUID.
+     */
+    #[Route('/force-download', name: 'force_download', methods: ['GET'])]
+    public function forceDownload(
+        Request $request,
+        MessageBusInterface $bus,
+        OzonAdPendingReportRepository $repo,
+    ): JsonResponse {
+        $companyId = $request->query->get('companyId');
+        if (!$companyId) {
+            return new JsonResponse(['error' => 'companyId query param required'], 400);
         }
 
-        return $this->json($payload, $status);
+        // 1. Credentials
+        $row = $this->connection->fetchAssociative(
+            'SELECT client_id, api_key FROM marketplace_connections
+             WHERE company_id = :c AND marketplace = :m AND connection_type = :t',
+            ['c' => $companyId, 'm' => 'ozon', 't' => 'performance']
+        );
+        if (!$row) {
+            return new JsonResponse(['error' => "No creds for companyId=$companyId"], 404);
+        }
+
+        // 2. Token
+        $tokenResp = $this->httpClient->request('POST', 'https://api-performance.ozon.ru/api/client/token', [
+            'json' => [
+                'client_id' => $row['client_id'],
+                'client_secret' => $row['api_key'],
+                'grant_type' => 'client_credentials',
+            ],
+        ]);
+        $tokenData = json_decode($tokenResp->getContent(false), true);
+        $token = $tokenData['access_token'] ?? null;
+        if (!$token) {
+            return new JsonResponse(['error' => 'token failed', 'body' => $tokenData], 502);
+        }
+
+        // 3. Все in-flight pending_reports company
+        $pending = $repo->findInFlightByCompany($companyId);
+        if ([] === $pending) {
+            return new JsonResponse([
+                'companyId' => $companyId,
+                'message' => 'No in-flight pending reports for this company',
+                'pending_count' => 0,
+                'results' => [],
+            ]);
+        }
+
+        // 4. Опрос каждого UUID и обновление БД + dispatch при state=OK
+        $results = [];
+        foreach ($pending as $p) {
+            $uuid = $p->getOzonUuid();
+            $resp = $this->httpClient->request(
+                'GET',
+                "https://api-performance.ozon.ru/api/client/statistics/$uuid",
+                [
+                    'headers' => ['Authorization' => "Bearer $token", 'Accept' => 'application/json'],
+                ]
+            );
+            $httpCode = $resp->getStatusCode();
+            $data = json_decode($resp->getContent(false), true);
+            $ozonState = strtoupper((string) ($data['state'] ?? 'UNKNOWN'));
+
+            $action = 'skipped';
+            $updatedRows = 0;
+
+            if ($httpCode === 200 && in_array($ozonState, ['OK', 'READY'], true)) {
+                $now = new \DateTimeImmutable();
+                // markFinalized=NULL — OK ветка finalized_at не выставляет,
+                // это сделает DownloadOzonAdReportHandler после успешной загрузки.
+                $updatedRows = $repo->updateStateWithSchedule(
+                    $companyId,
+                    $uuid,
+                    OzonAdPendingReportState::OK,
+                    $now,
+                    null,
+                    $p->getPollAttempts(),
+                    $now,
+                );
+
+                if ($updatedRows > 0) {
+                    $bus->dispatch(new DownloadOzonAdReportMessage(
+                        companyId: $companyId,
+                        pendingReportId: $p->getId(),
+                    ));
+                    $action = 'marked_ok_and_dispatched_download';
+                } else {
+                    $action = 'update_returned_0_rows';
+                }
+            } elseif ($httpCode === 200 && in_array($ozonState, ['ERROR', 'CANCELLED', 'NOT_FOUND'], true)) {
+                $action = 'ozon_state_is_terminal_error_not_handled_here';
+            } elseif ($httpCode === 200) {
+                $action = "ozon_state=$ozonState (not OK, left as-is)";
+            } else {
+                $action = "ozon_http=$httpCode (left as-is)";
+            }
+
+            $results[] = [
+                'pendingReportId' => $p->getId(),
+                'uuid' => $uuid,
+                'db_state_was' => $p->getState()->value,
+                'ozon_http' => $httpCode,
+                'ozon_state' => $ozonState,
+                'updated_rows' => $updatedRows,
+                'action' => $action,
+            ];
+        }
+
+        return new JsonResponse([
+            'companyId' => $companyId,
+            'pending_count' => count($pending),
+            'results' => $results,
+        ]);
     }
 }
