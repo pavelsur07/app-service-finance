@@ -691,7 +691,12 @@ class OzonAdClient implements AdPlatformClientInterface
                         'campaigns' => $campaignIds,
                         'from' => $from,
                         'to' => $to,
-                        'groupBy' => 'NO_GROUP_BY',
+                        // groupBy=DATE — per-day строки в CSV, консистентно с
+                        // range-pipeline'ом (requestStatistics → fetchAdStatisticsRange
+                        // / requestOneBatch), который парсит отчёт как per-day данные.
+                        // NO_GROUP_BY дал бы одну строку на кампанию за весь диапазон
+                        // и сломал бы downstream-парсер при dateFrom != dateTo.
+                        'groupBy' => 'DATE',
                     ],
                 ]);
 
