@@ -389,4 +389,28 @@ class OzonAdPendingReportRepository extends ServiceEntityRepository
 
         return $rows;
     }
+
+    /**
+     * Счётчик in-flight pending reports конкретной company.
+     * Используется backpressure-гейтом в RequestOzonAdBatchHandler:
+     * если >= 3 (лимит Ozon «активных отчётов» на аккаунт) — не делаем POST,
+     * откладываем Message в очередь.
+     *
+     * Отличие от findInFlightByCompany(): возвращает только COUNT без hydration,
+     * вызывается на каждом сообщении, должен быть быстрым.
+     */
+    public function countInFlightByCompany(string $companyId): int
+    {
+        Assert::uuid($companyId);
+
+        return (int) $this->getEntityManager()->getConnection()->fetchOne(
+            <<<'SQL'
+                SELECT COUNT(*)
+                FROM marketplace_ad_pending_reports
+                WHERE company_id = :company_id
+                  AND finalized_at IS NULL
+                SQL,
+            ['company_id' => $companyId],
+        );
+    }
 }

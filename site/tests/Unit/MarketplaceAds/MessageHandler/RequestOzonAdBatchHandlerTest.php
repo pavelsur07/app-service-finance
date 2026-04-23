@@ -10,6 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -21,7 +22,7 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 /**
  * Unit-тесты {@see RequestOzonAdBatchHandler}: ровно один POST /statistics
  * на сообщение, с корректной обработкой terminal / missing / permanent /
- * transient / rate-limited сценариев.
+ * transient / rate-limited / backpressure сценариев.
  */
 final class RequestOzonAdBatchHandlerTest extends TestCase
 {
@@ -58,7 +59,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
         $handler(new RequestOzonAdBatchMessage(
             companyId: self::COMPANY_ID,
             jobId: self::JOB_ID,
@@ -97,7 +98,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             $oversized[] = 'c'.$i;
         }
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('campaignIds size 11 out of [1..10]');
@@ -136,7 +137,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('HTTP 500');
@@ -196,7 +197,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
@@ -227,7 +228,11 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+        // Если job отсутствует — backpressure-гейт не должен вызываться.
+        $pendingRepo->expects(self::never())->method('countInFlightByCompany');
+
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus, $pendingRepo);
         $handler(new RequestOzonAdBatchMessage(
             companyId: self::COMPANY_ID,
             jobId: self::JOB_ID,
@@ -259,7 +264,110 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: ['c1'],
+            batchIndex: 0,
+            batchTotal: 1,
+        ));
+    }
+
+    public function testBackpressureReschedulesWhenSlotsExhausted(): void
+    {
+        // Backpressure-гейт: если у company уже 3 in-flight pending_reports,
+        // handler НЕ делает POST, а дис­патчит сообщение обратно с DelayStamp
+        // 60с. rateLimitAttempts не инкрементируется (это pre-check, не 429),
+        // markFailed не вызывается.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $jobRepo->expects(self::never())->method('markFailed');
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::never())->method('requestOneBatch');
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+        $pendingRepo->expects(self::once())
+            ->method('countInFlightByCompany')
+            ->with(self::COMPANY_ID)
+            ->willReturn(3);
+
+        $capturedEnvelope = null;
+        $capturedStamps = null;
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $env, array $stamps) use (&$capturedEnvelope, &$capturedStamps): Envelope {
+                $capturedEnvelope = $env;
+                $capturedStamps = $stamps;
+
+                return $env instanceof Envelope ? $env : new Envelope($env);
+            });
+
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus, $pendingRepo);
+        $handler(new RequestOzonAdBatchMessage(
+            companyId: self::COMPANY_ID,
+            jobId: self::JOB_ID,
+            dateFrom: self::DATE_FROM,
+            dateTo: self::DATE_TO,
+            campaignIds: ['c1', 'c2'],
+            batchIndex: 0,
+            batchTotal: 1,
+            rateLimitAttempts: 2,
+        ));
+
+        self::assertInstanceOf(Envelope::class, $capturedEnvelope);
+        $rescheduled = $capturedEnvelope->getMessage();
+        self::assertInstanceOf(RequestOzonAdBatchMessage::class, $rescheduled);
+        self::assertSame(self::COMPANY_ID, $rescheduled->companyId);
+        self::assertSame(self::JOB_ID, $rescheduled->jobId);
+        self::assertSame(['c1', 'c2'], $rescheduled->campaignIds);
+        self::assertSame(
+            2,
+            $rescheduled->rateLimitAttempts,
+            'backpressure не должен инкрементировать rateLimitAttempts — это не 429',
+        );
+
+        self::assertIsArray($capturedStamps);
+        self::assertCount(1, $capturedStamps);
+        self::assertInstanceOf(DelayStamp::class, $capturedStamps[0]);
+        self::assertSame(60_000, $capturedStamps[0]->getDelay());
+    }
+
+    public function testBackpressureAllowsWhenSlotsAvailable(): void
+    {
+        // countInFlightByCompany < 3 → handler идёт в штатный POST-путь.
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+        $pendingRepo->expects(self::once())
+            ->method('countInFlightByCompany')
+            ->with(self::COMPANY_ID)
+            ->willReturn(2);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->expects(self::once())
+            ->method('requestOneBatch')
+            ->willReturn('uuid-1');
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus, $pendingRepo);
         $handler(new RequestOzonAdBatchMessage(
             companyId: self::COMPANY_ID,
             jobId: self::JOB_ID,
@@ -303,7 +411,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
                 return $env instanceof Envelope ? $env : new Envelope($env);
             });
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
         $handler(new RequestOzonAdBatchMessage(
             companyId: self::COMPANY_ID,
             jobId: self::JOB_ID,
@@ -353,7 +461,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
                 return $env instanceof Envelope ? $env : new Envelope($env);
             });
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
         $handler(new RequestOzonAdBatchMessage(
             companyId: self::COMPANY_ID,
             jobId: self::JOB_ID,
@@ -398,7 +506,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
         $bus = $this->createMock(MessageBusInterface::class);
         $bus->expects(self::never())->method('dispatch');
 
-        $handler = new RequestOzonAdBatchHandler($jobRepo, $ozonClient, $bus, new NullLogger());
+        $handler = $this->createHandler($jobRepo, $ozonClient, $bus);
 
         $this->expectException(UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon rate limit exhausted');
@@ -413,5 +521,28 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             batchTotal: 1,
             rateLimitAttempts: 10,
         ));
+    }
+
+    private function createHandler(
+        AdLoadJobRepository $jobRepo,
+        OzonAdClient $ozonClient,
+        MessageBusInterface $bus,
+        ?OzonAdPendingReportRepository $pendingRepo = null,
+    ): RequestOzonAdBatchHandler {
+        if (null === $pendingRepo) {
+            // Дефолт: 0 in-flight reports — backpressure не срабатывает,
+            // handler идёт в штатный путь. Тесты со specific backpressure
+            // semantics подают явный mock.
+            $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+            $pendingRepo->method('countInFlightByCompany')->willReturn(0);
+        }
+
+        return new RequestOzonAdBatchHandler(
+            $jobRepo,
+            $ozonClient,
+            $pendingRepo,
+            $bus,
+            new NullLogger(),
+        );
     }
 }
