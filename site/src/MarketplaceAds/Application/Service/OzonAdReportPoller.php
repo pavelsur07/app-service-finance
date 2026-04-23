@@ -58,7 +58,7 @@ final class OzonAdReportPoller
      * наблюдениям. Меньше — ложные abandon'ы (см. 1ч до v1.15). Больше —
      * пользователь долго ждёт понятной ошибки при реально сломанном Ozon.
      */
-    private const MAX_AGE_BEFORE_ABANDON_SECONDS = 10800;
+    private const MAX_AGE_BEFORE_ABANDON_SECONDS = 10_800;
 
     public function __construct(
         private readonly OzonAdClient $client,
