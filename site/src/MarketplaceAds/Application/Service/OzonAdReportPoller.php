@@ -49,10 +49,16 @@ final class OzonAdReportPoller
     ];
 
     /**
-     * Строки старше этого возраста без финализации — force-ABANDONED. Ограничивает
-     * lifetime «зомби-UUID», которые Ozon не отдаёт в листинге.
+     * Строки старше этого возраста без финализации — force-ABANDONED.
+     * Ограничивает lifetime «зомби-UUID», которые Ozon не отдаёт в листинге.
+     *
+     * 3 часа — компромисс по итогам инцидента 22–23 апреля 2026: Ozon
+     * Performance под нагрузкой держит отчёты в очереди генерации
+     * 30–90 минут, редко до 2 часов. 3 часа = 99-й перцентиль по
+     * наблюдениям. Меньше — ложные abandon'ы (см. 1ч до v1.15). Больше —
+     * пользователь долго ждёт понятной ошибки при реально сломанном Ozon.
      */
-    private const MAX_AGE_BEFORE_ABANDON_SECONDS = 3600;
+    private const MAX_AGE_BEFORE_ABANDON_SECONDS = 10_800;
 
     public function __construct(
         private readonly OzonAdClient $client,
