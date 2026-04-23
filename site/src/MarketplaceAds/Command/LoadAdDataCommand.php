@@ -9,7 +9,6 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
-use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
@@ -18,26 +17,27 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Cron-команда: загружает рекламные отчёты маркетплейсов за дату (по умолчанию — за вчера)
- * и ставит задачи на их обработку через Messenger.
+ * Cron-команда: загружает рекламные отчёты маркетплейсов за дату (по умолчанию — за вчера).
  *
  * Для каждой пары (company × marketplace):
  *   1) берём JSON через AdPlatformClientInterface;
  *   2) upsert-им AdRawDocument (уникальный ключ company + marketplace + report_date);
  *   3) копим подготовленный документ, а единый flush делаем в конце прохода по всем парам,
  *      чтобы на N компаниях × M площадках не получить N*M отдельных транзакций.
- *   4) только после успешного flush отправляем ProcessAdRawDocumentMessage в async-транспорт —
- *      иначе воркер заберёт сообщение до того, как документ появится в БД.
+ *
+ * ПАРСИНГ ВРЕМЕННО ОТКЛЮЧЁН (task-8, 23.04.2026): ProcessAdRawDocumentMessage
+ * больше не диспатчится. Документы остаются в DRAFT, файлы доступны оператору
+ * через UI «История загрузок» → кнопка «Открыть». Возобновим парсинг отдельной
+ * задачей.
  *
  * Ошибки API/отсутствия клиента/подключения логируются, но не прерывают цикл —
  * cron должен попробовать обработать всё, что может.
  */
 #[AsCommand(
     name: 'app:marketplace-ads:load',
-    description: 'Загружает рекламную статистику маркетплейсов за дату и ставит обработку в очередь.',
+    description: 'Загружает рекламную статистику маркетплейсов за дату.',
 )]
 final class LoadAdDataCommand extends Command
 {
@@ -59,7 +59,6 @@ final class LoadAdDataCommand extends Command
         private readonly AdRawDocumentRepository $rawDocumentRepository,
         private readonly iterable $platformClients,
         private readonly EntityManagerInterface $entityManager,
-        private readonly MessageBusInterface $bus,
         private readonly AppLogger $logger,
     ) {
         parent::__construct();
@@ -160,14 +159,11 @@ final class LoadAdDataCommand extends Command
             $this->entityManager->flush();
         }
 
-        $loaded = 0;
-        foreach ($preparedDocuments as $document) {
-            $this->bus->dispatch(new ProcessAdRawDocumentMessage(
-                companyId: $document->getCompanyId(),
-                adRawDocumentId: $document->getId(),
-            ));
-            ++$loaded;
-        }
+        // ПАРСИНГ ВРЕМЕННО ОТКЛЮЧЁН (task-8, 23.04.2026):
+        // ProcessAdRawDocumentMessage больше не диспатчится. raw-документы
+        // остаются в DRAFT, файлы доступны через UI кнопкой «Открыть».
+        // Возобновим парсинг отдельной задачей.
+        $loaded = count($preparedDocuments);
 
         $output->writeln(sprintf(
             '<info>Готово. Загружено: %d, пропущено: %d, ошибок: %d.</info>',

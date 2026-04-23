@@ -806,14 +806,64 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Скачивает raw-контент готового отчёта по UUID без парсинга CSV.
+     *
+     * Используется task-8 flow: {@see DownloadOzonAdReportHandler} сохраняет
+     * тело отчёта на диск как файл (csv/zip), парсинг временно отключён.
+     * Возвращает тело и Content-Type — последний нужен для определения
+     * расширения файла (приоритет magic bytes PK\x03\x04 > Content-Type).
+     *
+     * @return array{body: string, contentType: ?string}
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     */
+    public function fetchReportContent(string $companyId, string $reportUuid): array
+    {
+        Assert::uuid($companyId);
+        // reportUuid попадает в имя файла на диске (marketplace-ads/<company>/<uuid>.<ext>).
+        // UUID-валидация гарантирует отсутствие slashes/..-сегментов вне зависимости
+        // от того, откуда пришла строка (БД, внешний caller) — path traversal невозможен.
+        Assert::uuid($reportUuid);
+
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $link = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): string => $this->fetchReadyReportLink($token, $reportUuid),
+        );
+
+        $url = str_starts_with($link, 'http://') || str_starts_with($link, 'https://')
+            ? $link
+            : self::BASE_URL.$link;
+
+        $response = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): \Symfony\Contracts\HttpClient\ResponseInterface => $this->authorizedRequest('GET', $url, $token, [], absoluteUrl: true),
+        );
+
+        $headers = $response->getHeaders(false);
+        $contentType = null;
+        if (isset($headers['content-type'][0])) {
+            $contentType = (string) $headers['content-type'][0];
+        }
+
+        return [
+            'body' => $response->getContent(false),
+            'contentType' => $contentType,
+        ];
+    }
+
+    /**
      * Скачивает готовый отчёт Ozon Performance по UUID и конвертирует CSV в
      * структуру, сгруппированную по дате (совместимо с shape'ом
      * {@see fetchAdStatisticsRange()} — date => ['campaigns' => [...]]).
-     *
-     * Используется в async-poll flow (step 4 redesign): poll-cron наблюдает
-     * state=OK на pending-отчёте и хэндит off на DownloadOzonAdReportHandler,
-     * который вызывает этот метод, чтобы завершить ингест без повторного
-     * POST /statistics и без внутреннего polling-цикла.
      *
      * НЕ опрашивает state и НЕ спит: вызывающий код уже знает, что state
      * терминальный OK. Делает один GET /statistics/{uuid} ради свежей
@@ -844,6 +894,12 @@ class OzonAdClient implements AdPlatformClientInterface
      *
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
      * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     *
+     * @deprecated Since v1.18 (task-8): парсинг отключён, метод не вызывается.
+     *             {@see DownloadOzonAdReportHandler} использует
+     *             {@see self::fetchReportContent()} вместо этого. Будет
+     *             восстановлен или удалён в follow-up задаче, когда
+     *             парсер вернут в пайплайн.
      */
     public function downloadAndConvertReport(
         string $companyId,
