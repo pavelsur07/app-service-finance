@@ -13,6 +13,7 @@ use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\Envelope;
@@ -26,6 +27,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *  - OzonPermanentApiException (403) → все строки markFinalized(ERROR).
  *  - Generic Throwable → строки не трогаются, errors=1.
  *  - Ozon state=OK → updateStateWithSchedule(state=OK, nextPollAt=null). НЕ markFinalized.
+ *  - Ozon state=OK, updateStateWithSchedule=0 rows (гонка с параллельной финализацией)
+ *    → dispatch НЕ происходит, warning в лог (v1.16).
  *  - Ozon state=ERROR → markFinalized(ERROR) c raw state в errorMessage.
  *  - UUID отсутствует в ответе, age < 3h → updateSchedule с backoff.
  *  - UUID отсутствует, age ≥ 3h → markFinalized(ABANDONED).
@@ -186,7 +189,8 @@ final class OzonAdReportPollerTest extends TestCase
         $this->repo->expects(self::never())->method('markFinalized');
         $this->repo->expects(self::once())
             ->method('updateStateWithSchedule')
-            ->with(self::COMPANY_ID, 'uuid-ready', OzonAdPendingReportState::OK, $now, null, 1, $now);
+            ->with(self::COMPANY_ID, 'uuid-ready', OzonAdPendingReportState::OK, $now, null, 1, $now)
+            ->willReturn(1);
 
         $this->bus->expects(self::once())
             ->method('dispatch')
@@ -198,6 +202,82 @@ final class OzonAdReportPollerTest extends TestCase
             });
 
         ($this->poller)(self::COMPANY_ID, $now);
+    }
+
+    public function testOkStateDispatchesDownloadWhenUpdateAffectedRow(): void
+    {
+        // v1.16: explicit happy-path guard — updateStateWithSchedule=1 row
+        // означает, что state=OK зафиксирован в БД до dispatch'а, контракт
+        // «OK видна в БД до прихода message» соблюдён.
+        $now = new \DateTimeImmutable('2026-04-22 12:00:00');
+        $r1 = $this->makeReport('uuid-ok-dispatch', pollAttempts: 0, ageSeconds: 60);
+
+        $this->repo->method('findInFlightByCompany')->willReturn([$r1]);
+        $this->client->method('listReportsForCompany')
+            ->willReturn(['uuid-ok-dispatch' => 'OK']);
+
+        $this->repo->expects(self::once())
+            ->method('updateStateWithSchedule')
+            ->willReturn(1);
+
+        $this->bus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(function (object $message) use ($r1): Envelope {
+                self::assertInstanceOf(DownloadOzonAdReportMessage::class, $message);
+                self::assertSame(self::COMPANY_ID, $message->companyId);
+                self::assertSame($r1->getId(), $message->pendingReportId);
+
+                return new Envelope($message);
+            });
+
+        $result = ($this->poller)(self::COMPANY_ID, $now);
+
+        // reconcileOne returns [1, 0] → aggregated PollResult fields.
+        self::assertSame(1, $result->updated);
+        self::assertSame(0, $result->finalized);
+    }
+
+    public function testOkStateSkipsDownloadDispatchWhenUpdateReturnsZeroRows(): void
+    {
+        // v1.16: race protection — если updateStateWithSchedule вернул 0 строк
+        // (запись параллельно финализирована), dispatch DownloadOzonAdReportMessage
+        // НЕ делается. Warning с context (companyId, reportUuid, pendingReportId)
+        // пишется в лог для диагностики.
+        $now = new \DateTimeImmutable('2026-04-22 12:00:00');
+        $r1 = $this->makeReport('uuid-race', pollAttempts: 0, ageSeconds: 60);
+
+        $this->repo->method('findInFlightByCompany')->willReturn([$r1]);
+        $this->client->method('listReportsForCompany')
+            ->willReturn(['uuid-race' => 'OK']);
+
+        $this->repo->expects(self::once())
+            ->method('updateStateWithSchedule')
+            ->willReturn(0);
+
+        // КЛЮЧЕВОЕ УТВЕРЖДЕНИЕ: dispatch не вызывается при 0 rows.
+        $this->bus->expects(self::never())->method('dispatch');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('update returned 0 rows'),
+                self::callback(function (array $context) use ($r1): bool {
+                    self::assertSame(self::COMPANY_ID, $context['companyId'] ?? null);
+                    self::assertSame('uuid-race', $context['reportUuid'] ?? null);
+                    self::assertSame($r1->getId(), $context['pendingReportId'] ?? null);
+
+                    return true;
+                }),
+            );
+
+        $poller = new OzonAdReportPoller($this->client, $this->repo, $this->bus, $logger);
+        $result = ($poller)(self::COMPANY_ID, $now);
+
+        // reconcileOne returns [0, 0] — ни updated, ни finalized не инкрементируются.
+        self::assertSame(0, $result->updated);
+        self::assertSame(0, $result->finalized);
+        self::assertSame(1, $result->seen);
     }
 
     public function testErrorStateFinalizesWithRawStateInMessage(): void
