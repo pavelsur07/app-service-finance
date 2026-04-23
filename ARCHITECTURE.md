@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.16 / 2026-04-23
+> Версия: 1.17 / 2026-04-23
 
 ---
 
@@ -534,13 +534,27 @@ requestStatisticsOnly(
 ): array
 ```
 
-### `OzonAdClient::listReportsForCompany` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`)
+### `OzonAdClient::pollOneReport` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`)
 ```php
+// Один GET /api/client/statistics/{uuid} — надёжный per-UUID poll. Возвращает
+// uppercase state и сырой ответ (для диагностики / логирования). Ретраев нет —
+// транспорт/5xx/timeouts бросаются наружу, caller ловит их per-UUID без
+// прерывания итерации.
+// v1.17: основной механизм polling'а вместо сломанного /statistics/list
+// (инцидент 23.04.2026 — листинг возвращал total=0 при реальных OK отчётах).
+// @return array{state: string, raw: array<string, mixed>}
+// @throws OzonPermanentApiException 403 — нет Performance scope
+// @throws \RuntimeException         прочие non-2xx / транспорт / JSON
+pollOneReport(string $companyId, string $uuid): array
+```
+
+### `OzonAdClient::listReportsForCompany` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`) — @deprecated v1.17
+```php
+// @deprecated Since v1.17: /statistics/list ненадёжен (инцидент 23.04.2026).
+//             Используйте pollOneReport($companyId, $uuid).
+//             Оставлен для возможного диагностического использования.
 // Один HTTP-снимок Ozon Performance GET /api/client/statistics/list.
 // Не спит, не ретраится по state — возвращает текущий map "UUID => raw state".
-// Пагинация до MAX_LIST_PAGES × pageSize (300 за тик), остаток — на следующий тик.
-// Используется только OzonAdReportPoller; существующий synchronous pipeline
-// (pollReport / fetchAdStatistics*) не трогается.
 // @return array<string, string> UUID => state (raw Ozon)
 // @throws OzonPermanentApiException 403 — нет Performance scope
 // @throws \RuntimeException         прочие non-2xx / транспорт / JSON
@@ -549,27 +563,26 @@ listReportsForCompany(string $companyId): array
 
 ### `OzonAdReportPoller` (`src/MarketplaceAds/Application/Service/OzonAdReportPoller.php`)
 
-Per-company state machine для shared-polling'а. `__invoke(companyId, now): PollResult`.
+Per-company state machine для per-UUID polling'а (v1.17). `__invoke(companyId): PollResult`.
 
-Вход: `companyId` + `DateTimeImmutable $now` (inject-или-снаружи, упрощает тесты).
-Выход: `PollResult { seen, updated, finalized, errors }` (readonly DTO).
+Вход: `companyId` (UUID). Выход: `PollResult { seen, updated, finalized, errors }`
+(readonly DTO).
 
 Контракт:
 1. `findInFlightByCompany($companyId)` — если пусто, zero-result, Ozon не дёргается.
-2. `OzonAdClient::listReportsForCompany($companyId)` — один HTTP-вызов:
-   - `OzonPermanentApiException` (403) → все in-flight строки `markFinalized(ERROR)`;
-   - любой другой `\Throwable` → строки не трогаем, `errors=1`, next tick повторит.
-3. Per-row reconcile:
-   - `UUID` отсутствует в ответе + age ≥ 1h → `markFinalized(ABANDONED)`;
-   - отсутствует + age < 1h → `updateSchedule` с backoff `next_poll_at`;
-   - raw state ∈ {OK, READY} → `updateStateWithSchedule(OK, nextPollAt=null)`
-     + dispatch `DownloadOzonAdReportMessage` в `async_pipeline` (download +
-     финализацию делает `DownloadOzonAdReportHandler`);
-   - raw state ∈ {ERROR, CANCELLED, NOT_FOUND} → `markFinalized(ERROR, rawState в message)`;
-   - остальное (NOT_STARTED, IN_PROGRESS и пр.) → `updateStateWithSchedule(rawState, next backoff)`.
+2. Для каждого in-flight row: `OzonAdClient::pollOneReport($companyId, $uuid)`.
+   - любой `\Throwable` на одном UUID → `errors++`, остальные обрабатываются.
+3. Per-row reconcile по state:
+   - state ∈ {OK, READY} → `updateStateWithSchedule(OK, nextPollAt=null)`,
+     ТОЛЬКО ЕСЛИ updatedRows > 0 — dispatch `DownloadOzonAdReportMessage` в
+     `async_pipeline` (v1.16: защита от гонки с параллельной финализацией);
+   - state ∈ {ERROR, CANCELLED, NOT_FOUND} → `markFinalized(ERROR, state в message)`;
+   - non-terminal (NOT_STARTED / IN_PROGRESS / прочее) → `updateStateWithSchedule(mappedState, next backoff)`;
+     неизвестные значения маппятся в IN_PROGRESS (продолжаем polling);
+     затем overlay-check: если age ≥ MAX_AGE_BEFORE_ABANDON → `markFinalized(ABANDONED)`.
 
 Backoff: `30 / 60 / 120 / 300 / 600 сек` по `poll_attempts` (1-based), clamp на 600.
-MAX_AGE_BEFORE_ABANDON = 3600 сек.
+MAX_AGE_BEFORE_ABANDON_SECONDS = 10 800 (3 часа, v1.15).
 
 ### `OzonPollReportsCommand` (`app:marketplace-ads:ozon-poll-reports`)
 
@@ -577,7 +590,7 @@ MAX_AGE_BEFORE_ABANDON = 3600 сек.
 app:marketplace-ads:ozon-poll-reports [--company-id=UUID] [--dry-run]
 ```
 
-Оркестратор shared-polling'а: `findCompanyIdsWithDueReports(now)` → для каждой
+Оркестратор polling'а: `findCompanyIdsWithDueReports(now)` → для каждой
 компании вызов `OzonAdReportPoller`. Per-company isolation: исключение одной
 компании не валит остальных.
 
@@ -586,9 +599,9 @@ app:marketplace-ads:ozon-poll-reports [--company-id=UUID] [--dry-run]
 - Exit code: `FAILURE` если хоть у одной компании `errors > 0`, иначе `SUCCESS`.
 
 **Cron** (с step 5): `*/2 * * * *` в `docker/cron/app.cron`. Тикает каждые 2 минуты,
-за тик один `GET /statistics/list` на активную компанию. Интервал в ≈30-60× ниже
-дневного лимита Ozon (100k req/day на client_id), median time REQUEST → OK
-detection ~60-180s.
+за тик до N `GET /statistics/{uuid}` на активную компанию, где N = число in-flight
+(ограничено backpressure v1.13 сверху 3). Итого ≤ 3×companies HTTP-calls за тик.
+Median time REQUEST → OK detection ~60-180s.
 
 ### `OzonAdClient::downloadAndConvertReport` (`src/MarketplaceAds/Infrastructure/Api/Ozon/OzonAdClient.php`)
 ```php
@@ -730,8 +743,14 @@ to the `OzonPermanentApiException` branch but with a different reason
 string.
 
 Параллельно cron */2 * * * *:
-app:marketplace-ads:ozon-poll-reports → OzonPollReportsCommand → OzonAdReportPoller
-  ↓ (GET /statistics/list per active company; reconcile state per UUID)
+app:marketplace-ads:ozon-poll-reports → OzonPollReportsCommand → OzonAdReportPoller::__invoke($companyId)
+  ↓ findInFlightByCompany [БД]
+  ↓ for each pending_report:
+  ↓   GET /statistics/{uuid}  (v1.17 per-UUID polling)
+  ↓   if state=OK:    updateStateWithSchedule(OK) + dispatch DownloadOzonAdReportMessage
+  ↓   if state=ERROR: markFinalized(ERROR)
+  ↓   else:           updateStateWithSchedule(mappedState, nextPollAt)
+  ↓   if age>=3h:     markFinalized(ABANDONED)
 on state=OK:
   DownloadOzonAdReportMessage (async_pipeline) → DownloadOzonAdReportHandler
     ↓ OzonAdClient::downloadAndConvertReport → CSV → OzonAdRawDataParser (nested-format)
@@ -1273,4 +1292,5 @@ paths:
 | 1.14 | 2026-04-23 | MarketplaceAds: `MAX_RATE_LIMIT_ATTEMPTS` в `RequestOzonAdBatchHandler` снижен 10 → 3. После v1.13 backpressure 429 по лимиту активных отчётов невозможен; 3 попыток (3 минуты) достаточно для transient глобального throttle'а. Тесты обновлены: `rateLimitAttempts` boundary значение теперь 3, инкремент-тест использует 1 → 2. |
 | 1.15 | 2026-04-23 | MarketplaceAds: `OzonAdReportPoller::MAX_AGE_BEFORE_ABANDON_SECONDS` увеличен 3600 → 10 800 (1ч → 3ч). По итогам инцидента 22–23 апреля 2026: Ozon Performance под нагрузкой держит отчёты в очереди генерации до 2 часов; 1-часовой порог приводил к ложным ABANDONED. Unit-тест `testMissingFromListAndOldAbandons` обновлён (ageSeconds: 3700 → 10 900). |
 | 1.16 | 2026-04-23 | MarketplaceAds: `OzonAdReportPoller::reconcileOne` защищён от гонки в terminal-OK ветке. Проверка affected rows от `updateStateWithSchedule`: при 0 строк (уже финализирован параллельно) `DownloadOzonAdReportMessage` не диспатчится, пишется `warning` с `companyId` / `reportUuid` / `pendingReportId`. Гарантирует контракт «OK видна в БД до прихода message» для `DownloadOzonAdReportHandler`. Добавлены unit-тесты `testOkStateDispatchesDownloadWhenUpdateAffectedRow` и `testOkStateSkipsDownloadDispatchWhenUpdateReturnsZeroRows`. |
+| 1.17 | 2026-04-23 | MarketplaceAds: ПЕРЕДЕЛКА polling. `OzonAdReportPoller` теперь делает per-UUID polling через `GET /api/client/statistics/{uuid}` вместо сломанного `GET /api/client/statistics/list` (инцидент 23.04.2026: listing возвращал `total=0` при реально готовых отчётах — 4 pending_reports висели в REQUESTED 4+ часа, force-download по UUID подтвердил state=OK). Новый метод `OzonAdClient::pollOneReport(companyId, uuid): array{state, raw}`. Старый `listReportsForCompany` помечен `@deprecated` (не удалён — может пригодиться для диагностики). Защита от race в terminal-OK ветке (v1.16) сохранена: UPDATE → check rows → dispatch. Permanent-exception path сохранён: `OzonPermanentApiException` от `pollOneReport` финализирует row как ERROR без ожидания 3h до ABANDONED (ловится внутри `pollAndReconcile`, транзиентные ошибки продолжают пролетать в внешний catch). Force-abandon через `MAX_AGE_BEFORE_ABANDON_SECONDS = 10 800` (v1.15) сохранён. Сигнатура `OzonAdReportPoller::__invoke` упрощена: `(string $companyId): PollResult` (убран параметр `$now` — создаётся внутри). Количество HTTP calls: с 1/tick/company до N/tick/company, где N = in-flight reports (ограничено backpressure v1.13 сверху 3), итого ≤ 3×companies HTTP-calls за тик. Переписаны unit-тесты `OzonAdReportPollerTest` (7 новых кейсов: ok/dispatch, in-progress/reschedule, error/finalize, old-in-progress/force-abandoned, per-uuid-exception/isolation, ok+0rows/skip-dispatch, permanent-exception/finalize-error). Интеграционный `OzonPollReportsCommandTest` перепрофилирован на `pollOneReport`-контракт. |
 | 1.11 | 2026-04-19 | MarketplaceAds: серия задач по Ozon Ads pipeline. Новые Entity: `AdLoadJob` (пакетная загрузка за период, атомарный счётчик `loadedDays` через raw SQL), `AdChunkProgress` (идемпотентная фиксация успеха чанка через `UniqueConstraint` `(job_id, date_from, date_to)`). Новый Message `LoadOzonAdStatisticsRangeMessage` + handler-оркестратор: PENDING → RUNNING, разбиение диапазона на чанки ≤ 62 дня (лимит Ozon Performance API), dispatch `FetchOzonAdStatisticsMessage` на каждый чанк. `FetchOzonAdStatisticsHandler`: upsert AdRawDocument + идемпотентный `markChunkCompleted` + inc `loadedDays` только при успешной фиксации чанка. Enum `AdRawDocumentStatus` расширен кейсом `FAILED` (+`isTerminal()`); финализация job'а перешла на per-document статус и считает через `countByCompanyMarketplaceAndDateRange`. Удалены мёртвые counter-поля `processedDays` / `failedDays` из `AdLoadJob` (миграция `Version20260419080739`). Новые методы репозиториев: `AdLoadJobRepository::markCompleted` / `markFailed` / `findRecentByCompanyAndMarketplace`; `AdChunkProgressRepository::markChunkCompleted` / `countCompletedChunks`; `AdRawDocumentRepository::markFailedWithReason` / `countByCompanyMarketplaceAndDateRange` / `findByCompanyMarketplaceAndDateRange`. |

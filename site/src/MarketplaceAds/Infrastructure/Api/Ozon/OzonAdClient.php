@@ -19,6 +19,7 @@ use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Webmozart\Assert\Assert;
 
 /**
  * Клиент Ozon Performance API: загружает суточную рекламную статистику в формате,
@@ -676,7 +677,76 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Опросить статус одного report-UUID через GET /api/client/statistics/{uuid}.
+     *
+     * Используется {@see \App\MarketplaceAds\Application\Service\OzonAdReportPoller}
+     * для per-UUID polling (v1.17). В отличие от {@see listReportsForCompany}
+     * этот endpoint работает надёжно и возвращает реальный state конкретного
+     * отчёта — инцидент 23.04.2026 показал, что /statistics/list может
+     * отдавать total=0 при реально готовых отчётах.
+     *
+     * Response example:
+     *   {
+     *     "UUID": "b0f94b5b-...",
+     *     "state": "OK" | "NOT_STARTED" | "IN_PROGRESS" | "ERROR" | "CANCELLED" | ...,
+     *     "createdAt": "2026-04-23T06:42:26.586281Z",
+     *     "updatedAt": "2026-04-23T06:44:41.110669Z",
+     *     "link": "/api/client/statistics/report?UUID=...",
+     *     "kind": "STATS",
+     *     ...
+     *   }
+     *
+     * Ретраи не делаются на уровне метода — транспортные / 5xx-ошибки
+     * бросаются наружу, caller (`OzonAdReportPoller::__invoke`) ловит и
+     * изолирует per-UUID без прерывания итерации по остальным отчётам.
+     *
+     * @return array{state: string, raw: array<string, mixed>} нормализованный state (uppercase)
+     *                                                         + сырой ответ Ozon
+     *
+     * @throws OzonPermanentApiException 403 (нет Performance scope / client_id блокирован)
+     * @throws \RuntimeException         остальные non-2xx / network / JSON-ошибки
+     */
+    public function pollOneReport(string $companyId, string $uuid): array
+    {
+        Assert::uuid($companyId);
+        Assert::notEmpty($uuid, 'uuid не может быть пустым.');
+
+        $credentials = $this->resolveCredentials($companyId);
+
+        /** @var array<string, mixed> $data */
+        $data = $this->withAuthRetry(
+            $companyId,
+            $credentials['client_id'],
+            $credentials['client_secret'],
+            function (string $token) use ($uuid): array {
+                $response = $this->authorizedRequest(
+                    'GET',
+                    sprintf(self::STATISTICS_STATE_PATH, rawurlencode($uuid)),
+                    $token,
+                );
+
+                return $this->decodeJson($response->getContent(false), 'statistics state (per-UUID poll)');
+            },
+        );
+
+        $stateRaw = $this->stringifyApiField($data['state'] ?? 'UNKNOWN');
+        $stateNormalized = strtoupper('' === $stateRaw ? 'UNKNOWN' : $stateRaw);
+
+        return [
+            'state' => $stateNormalized,
+            'raw' => $data,
+        ];
+    }
+
+    /**
      * Один HTTP-снимок отчётов компании в Ozon Performance /statistics/list.
+     *
+     * @deprecated Since v1.17: Ozon Performance /statistics/list возвращает
+     *             пустой listing (total=0) для активных отчётов даже когда
+     *             они реально существуют в state=OK (инцидент 23.04.2026).
+     *             Используйте {@see pollOneReport} для per-UUID polling.
+     *             Метод оставлен для возможного диагностического использования
+     *             (листинг всего, что Ozon отдаёт по аккаунту).
      *
      * В отличие от {@see pollReport()} не спит и не ретраится по состоянию —
      * возвращает map «UUID => raw state» по текущему листингу Ozon.
@@ -685,10 +755,6 @@ class OzonAdClient implements AdPlatformClientInterface
      * чтобы polling cron не зависал на аккаунте с аномально длинным списком;
      * если такое случится, необработанные UUID будут подхвачены на следующем
      * тике (in-flight-набор короткоживущий).
-     *
-     * Используется в CLI-команде app:marketplace-ads:ozon-poll-reports.
-     * НЕ вызывай из существующих handler'ов — step 5 redesign заменит их
-     * отдельным PR.
      *
      * @return array<string, string> UUID => raw state, пусто = листинг пуст
      *
