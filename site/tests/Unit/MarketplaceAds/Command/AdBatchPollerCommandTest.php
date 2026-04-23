@@ -130,6 +130,49 @@ final class AdBatchPollerCommandTest extends TestCase
         self::assertStringContainsString('state=ERROR', (string) $batch->getLastError());
     }
 
+    public function testNotFoundStateMarksFailed(): void
+    {
+        $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
+
+        $this->batchRepo->method('findAllInFlight')->willReturn([$batch]);
+        $this->ozonClient->method('pollOneReport')
+            ->willReturn(['state' => 'NOT_FOUND', 'raw' => []]);
+
+        $this->ozonClient->expects(self::never())->method('fetchReportContent');
+        $this->em->expects(self::once())->method('flush');
+
+        $tester = new CommandTester($this->command);
+        self::assertSame(0, $tester->execute([]));
+
+        self::assertSame(AdScheduledBatchState::FAILED, $batch->getState());
+        self::assertStringContainsString('state=NOT_FOUND', (string) $batch->getLastError());
+    }
+
+    public function testPermanentApiExceptionDuringDownloadMarksFailed(): void
+    {
+        $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
+
+        $this->batchRepo->method('findAllInFlight')->willReturn([$batch]);
+        $this->ozonClient->method('pollOneReport')
+            ->willReturn(['state' => 'OK', 'raw' => []]);
+
+        // Download бросает permanent — должен быть поймано, batch → FAILED.
+        $this->ozonClient->expects(self::once())
+            ->method('fetchReportContent')
+            ->willThrowException(new OzonPermanentApiException('403 revoked mid-download'));
+
+        $this->storage->expects(self::never())->method('storeBytes');
+        $this->em->expects(self::once())->method('flush');
+
+        $tester = new CommandTester($this->command);
+        self::assertSame(0, $tester->execute([]));
+
+        self::assertSame(AdScheduledBatchState::FAILED, $batch->getState());
+        self::assertNotNull($batch->getFinishedAt());
+        self::assertStringStartsWith('Download permanent failure:', (string) $batch->getLastError());
+        self::assertNull($batch->getStoragePath(), 'storage не должен быть установлен при permanent');
+    }
+
     public function testCancelledStateMarksFailed(): void
     {
         $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');

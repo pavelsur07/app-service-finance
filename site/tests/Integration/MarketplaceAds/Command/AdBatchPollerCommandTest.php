@@ -163,6 +163,52 @@ final class AdBatchPollerCommandTest extends IntegrationTestCase
         self::assertStringEndsWith('.zip', (string) $reloaded->getStoragePath());
     }
 
+    public function testNotFoundStateMarksBatchFailed(): void
+    {
+        $job = $this->seedJob();
+        $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa7777-aaaa-aaaa-aaaa-aaaaaaaaaaa7');
+
+        $this->clientMock->method('pollOneReport')
+            ->willReturn(['state' => 'NOT_FOUND', 'raw' => []]);
+        $this->clientMock->expects(self::never())->method('fetchReportContent');
+        $this->storageMock->expects(self::never())->method('storeBytes');
+
+        $tester = $this->makeCommandTester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $this->em->clear();
+        $reloaded = $this->batchRepo->find($batch->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(AdScheduledBatchState::FAILED, $reloaded->getState());
+        self::assertStringContainsString('state=NOT_FOUND', (string) $reloaded->getLastError());
+        self::assertNotNull($reloaded->getFinishedAt());
+    }
+
+    public function testPermanentApiExceptionDuringDownloadMarksBatchFailed(): void
+    {
+        $job = $this->seedJob();
+        $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa8888-aaaa-aaaa-aaaa-aaaaaaaaaaa8');
+
+        $this->clientMock->method('pollOneReport')
+            ->willReturn(['state' => 'OK', 'raw' => []]);
+        $this->clientMock->method('fetchReportContent')
+            ->willThrowException(new \App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException(
+                'Ozon Performance: report download denied (403)',
+            ));
+        $this->storageMock->expects(self::never())->method('storeBytes');
+
+        $tester = $this->makeCommandTester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $this->em->clear();
+        $reloaded = $this->batchRepo->find($batch->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(AdScheduledBatchState::FAILED, $reloaded->getState(), 'Permanent download failure → FAILED, а не IN_FLIGHT');
+        self::assertStringStartsWith('Download permanent failure:', (string) $reloaded->getLastError());
+        self::assertNotNull($reloaded->getFinishedAt());
+        self::assertNull($reloaded->getStoragePath(), 'Файл не должен быть записан');
+    }
+
     public function testNotStartedBatchStaysInFlight(): void
     {
         $job = $this->seedJob();

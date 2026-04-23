@@ -162,12 +162,35 @@ final class AdBatchPollerCommand extends Command
         switch ($state) {
             case 'OK':
             case 'READY':
-                $this->downloadAndFinalize($batch);
+                try {
+                    $this->downloadAndFinalize($batch);
+                } catch (OzonPermanentApiException $e) {
+                    // 403 / revoked credentials во время скачивания — permanent.
+                    // Без этого catch'а исключение улетало бы в outer per-batch
+                    // \Throwable и писалось как transient: batch висел бы IN_FLIGHT
+                    // и следующий тик ретраил тот же 403 бесконечно.
+                    $batch->setState(AdScheduledBatchState::FAILED);
+                    $batch->setLastError('Download permanent failure: '.$e->getMessage());
+                    $batch->setFinishedAt(new \DateTimeImmutable());
+                    $this->em->flush();
+
+                    $this->logger->error('Poller: permanent failure during download', [
+                        'batchId' => $batch->getId(),
+                        'ozonUuid' => $uuid,
+                        'error' => $e->getMessage(),
+                    ]);
+
+                    return 'failed';
+                }
 
                 return 'ok';
 
             case 'ERROR':
             case 'CANCELLED':
+            case 'NOT_FOUND':
+                // NOT_FOUND = UUID пропал на стороне Ozon (expired / GC'ed /
+                // invalid). Без терминализации батч висел бы IN_FLIGHT вечно —
+                // тот же поведение, что и в старом `OzonAdReportPoller`.
                 $batch->setState(AdScheduledBatchState::FAILED);
                 $batch->setLastError(sprintf('Ozon reported state=%s', $state));
                 $batch->setFinishedAt(new \DateTimeImmutable());
