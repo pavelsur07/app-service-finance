@@ -437,7 +437,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
 
     public function testRateLimitIncrementsAttemptsOnReschedule(): void
     {
-        // rateLimitAttempts: 0 → 1 на первом 429, 3 → 4 на четвёртом и т.д.
+        // rateLimitAttempts: 0 → 1 на первом 429, 1 → 2 на втором и т.д.
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
             ->asRunning()
@@ -470,18 +470,18 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             campaignIds: ['c1'],
             batchIndex: 0,
             batchTotal: 1,
-            rateLimitAttempts: 3,
+            rateLimitAttempts: 1,
         ));
 
         self::assertInstanceOf(Envelope::class, $captured);
         $rescheduled = $captured->getMessage();
         self::assertInstanceOf(RequestOzonAdBatchMessage::class, $rescheduled);
-        self::assertSame(4, $rescheduled->rateLimitAttempts);
+        self::assertSame(2, $rescheduled->rateLimitAttempts);
     }
 
     public function testRateLimitMaxAttemptsMarksFailedAndUnrecoverable(): void
     {
-        // После MAX_RATE_LIMIT_ATTEMPTS (10) reschedules handler сдаётся:
+        // После MAX_RATE_LIMIT_ATTEMPTS (3) reschedules handler сдаётся:
         // markFailed на job, Unrecoverable наружу, новых сообщений в bus нет.
         $job = AdLoadJobBuilder::aJob()
             ->withCompanyId(self::COMPANY_ID)
@@ -519,7 +519,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
             campaignIds: ['c1'],
             batchIndex: 0,
             batchTotal: 1,
-            rateLimitAttempts: 10,
+            rateLimitAttempts: 3,
         ));
     }
 

@@ -65,12 +65,16 @@ final class RequestOzonAdBatchHandler
     private const RATE_LIMIT_BACKOFF_MS = 60_000;
 
     /**
-     * 10 * 60s = 10 min max delay per batch before we give up and mark
-     * the job failed. Беспредельный loop невозможен — Ozon либо отдаст
-     * 200 в пределах этого окна, либо проблема на их стороне затянулась
-     * и инженерам стоит посмотреть руками.
+     * 3 × 60с = 3 минуты максимум на rate-limit backoff одного batch'а.
+     * Если Ozon троттлит устойчиво — markFailed, инженер смотрит руками.
+     *
+     * Снижено с 10 до 3 после внедрения backpressure (v1.13): 429 по лимиту
+     * активных отчётов теперь физически невозможен — client-side gate блокирует
+     * POST до превышения порога MAX_IN_FLIGHT_PER_COMPANY=3. Остаются только
+     * редкие глобальные throttle'ы Ozon — 3 попыток (3 минуты) хватает
+     * отличить transient от устойчивой проблемы.
      */
-    private const MAX_RATE_LIMIT_ATTEMPTS = 10;
+    private const MAX_RATE_LIMIT_ATTEMPTS = 3;
 
     /**
      * Ozon Performance жёсткий лимит: не более 3 активных отчётов в очереди
