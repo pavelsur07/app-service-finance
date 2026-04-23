@@ -156,6 +156,53 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         self::assertSame($low->getId(), $picked->getId(), 'Ties — по batch_index ASC');
     }
 
+    public function testFindNextPlannedSkipsBatchesScheduledInFuture(): void
+    {
+        $job = $this->seedJob();
+
+        $future = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->withScheduledAt((new \DateTimeImmutable())->modify('+1 hour'))
+            ->build();
+
+        $this->repository->save($future);
+        $this->em->clear();
+
+        $picked = $this->repository->findNextPlanned();
+
+        self::assertNull($picked, 'Батч со scheduled_at в будущем не должен выбираться (retry/backoff).');
+    }
+
+    public function testFindNextPlannedPicksDueBatchEvenIfAnotherIsFurtherInFuture(): void
+    {
+        $job = $this->seedJob();
+
+        $due = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(5)
+            ->withScheduledAt((new \DateTimeImmutable())->modify('-1 minute'))
+            ->build();
+
+        $future = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->withScheduledAt((new \DateTimeImmutable())->modify('+1 hour'))
+            ->build();
+
+        $this->repository->save($future);
+        $this->repository->save($due);
+        $this->em->clear();
+
+        $picked = $this->repository->findNextPlanned();
+
+        self::assertNotNull($picked);
+        self::assertSame($due->getId(), $picked->getId(), 'Выбран должен быть готовый батч, future игнорируется несмотря на меньший batch_index.');
+    }
+
     public function testFindNextPlannedSkipsNonPlannedStates(): void
     {
         $job = $this->seedJob();

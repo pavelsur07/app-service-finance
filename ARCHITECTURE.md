@@ -185,7 +185,7 @@ pipeline'а (timeout, рестарт worker'а, exception) видимым для
 **Индексы:** partial `idx_asb_scheduler (scheduled_at) WHERE state='PLANNED'`, partial `idx_asb_poller (id) WHERE state='IN_FLIGHT'`, `idx_asb_job (job_id, state)`, UNIQUE `idx_asb_job_batch (job_id, batch_index)` — последний обеспечивает идемпотентность планирования.
 
 **Repository (`AdScheduledBatchRepository`):**
-- `findNextPlanned(): ?AdScheduledBatch` — native SQL `FOR UPDATE SKIP LOCKED`, порядок `scheduled_at ASC, batch_index ASC`
+- `findNextPlanned(): ?AdScheduledBatch` — native SQL `FOR UPDATE SKIP LOCKED`, порядок `scheduled_at ASC, batch_index ASC`, предикат `scheduled_at <= NOW()` (retry/backoff через `setScheduledAt()` в будущее не выбирается)
 - `findAllInFlight(): list<AdScheduledBatch>` — порядок `started_at ASC`
 - `findByJobId(string $jobId): list<AdScheduledBatch>`
 - `findDownloadableByJobId(string $jobId): list<AdScheduledBatch>` — `storage_path IS NOT NULL`

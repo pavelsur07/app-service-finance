@@ -44,6 +44,11 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
      *  - secondary по batch_index → внутри одного тика батчи одного job'а
      *    идут по возрастанию (снижает реордеринг в логах).
      *
+     * Предикат `scheduled_at <= NOW()` обязателен: retry/backoff-логика
+     * (Task-11.3+) двигает `scheduled_at` в будущее через `setScheduledAt()`,
+     * и без фильтра scheduler подхватит батч раньше запланированного момента,
+     * сведя на нет throttling.
+     *
      * Реализация через native SQL: Doctrine DQL не поддерживает `SKIP LOCKED`
      * (только `PESSIMISTIC_WRITE` → простой `FOR UPDATE`, который блокирует
      * воркер вместо того, чтобы пропустить строку).
@@ -56,6 +61,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
         $sql = sprintf(
             'SELECT %s FROM marketplace_ad_scheduled_batches b '
             . 'WHERE b.state = :state '
+            . '  AND b.scheduled_at <= NOW() '
             . 'ORDER BY b.scheduled_at ASC, b.batch_index ASC '
             . 'LIMIT 1 FOR UPDATE SKIP LOCKED',
             $rsm->generateSelectClause(['b' => 'b']),
