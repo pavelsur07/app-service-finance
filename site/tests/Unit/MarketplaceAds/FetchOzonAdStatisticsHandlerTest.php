@@ -24,6 +24,7 @@ use Sentry\State\HubInterface;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 // AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
 BypassFinals::allowPaths([
@@ -105,10 +106,11 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $messageBus = $this->createMock(MessageBusInterface::class);
         $messageBus->expects(self::exactly(2))
             ->method('dispatch')
-            ->willReturnCallback(static function (object $m) use (&$dispatched): Envelope {
-                $dispatched[] = $m;
+            ->willReturnCallback(static function (object $envelope) use (&$dispatched): Envelope {
+                self::assertInstanceOf(Envelope::class, $envelope);
+                $dispatched[] = $envelope;
 
-                return new Envelope($m);
+                return $envelope;
             });
 
         $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
@@ -120,7 +122,8 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         ));
 
         self::assertCount(2, $dispatched);
-        foreach ($dispatched as $i => $m) {
+        foreach ($dispatched as $i => $envelope) {
+            $m = $envelope->getMessage();
             self::assertInstanceOf(RequestOzonAdBatchMessage::class, $m);
             self::assertSame(self::JOB_ID, $m->jobId);
             self::assertSame(self::COMPANY_ID, $m->companyId);
@@ -129,8 +132,121 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
             self::assertSame($i, $m->batchIndex);
             self::assertSame(2, $m->batchTotal);
         }
-        self::assertSame(['c1', 'c2'], $dispatched[0]->campaignIds);
-        self::assertSame(['c3'], $dispatched[1]->campaignIds);
+        self::assertSame(['c1', 'c2'], $dispatched[0]->getMessage()->campaignIds);
+        self::assertSame(['c3'], $dispatched[1]->getMessage()->campaignIds);
+    }
+
+    public function testDispatchesBatchesWithJitteredDelay(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('prepareStatisticsBatches')
+            ->willReturn([
+                ['c1', 'c2', 'c3'],
+                ['c4', 'c5', 'c6'],
+                ['c7', 'c8', 'c9'],
+            ]);
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
+        $dispatched = [];
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $envelope) use (&$dispatched): Envelope {
+                self::assertInstanceOf(Envelope::class, $envelope);
+                $dispatched[] = $envelope;
+
+                return $envelope;
+            });
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertCount(3, $dispatched);
+
+        $stamps0 = $dispatched[0]->all(DelayStamp::class);
+        self::assertTrue(
+            [] === $stamps0 || 0 === $stamps0[0]->getDelay(),
+            'Batch 0 should dispatch without delay',
+        );
+
+        $stamps1 = $dispatched[1]->all(DelayStamp::class);
+        self::assertCount(1, $stamps1);
+        self::assertSame(90_000, $stamps1[0]->getDelay());
+
+        $stamps2 = $dispatched[2]->all(DelayStamp::class);
+        self::assertCount(1, $stamps2);
+        self::assertSame(180_000, $stamps2[0]->getDelay());
+    }
+
+    public function testSingleBatchDispatchesWithoutDelay(): void
+    {
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withDateRange(new \DateTimeImmutable(self::DATE_FROM), new \DateTimeImmutable(self::DATE_TO))
+            ->asRunning()
+            ->build();
+
+        $jobRepo = $this->createMock(AdLoadJobRepository::class);
+        $jobRepo->method('findByIdAndCompany')->willReturn($job);
+
+        $ozonClient = $this->createMock(OzonAdClient::class);
+        $ozonClient->method('prepareStatisticsBatches')
+            ->willReturn([['c1', 'c2']]);
+
+        $chunkProgressRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $chunkProgressRepo->method('markChunkCompleted')->willReturn(true);
+
+        $pendingRepo = $this->createMock(OzonAdPendingReportRepository::class);
+
+        $finalizer = $this->createMock(AdLoadJobFinalizer::class);
+        $finalizer->expects(self::never())->method('tryFinalize');
+
+        $dispatched = null;
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->willReturnCallback(static function (object $envelope) use (&$dispatched): Envelope {
+                self::assertInstanceOf(Envelope::class, $envelope);
+                $dispatched = $envelope;
+
+                return $envelope;
+            });
+
+        $handler = $this->createHandler($ozonClient, $jobRepo, $chunkProgressRepo, $pendingRepo, $finalizer, $messageBus);
+        $handler(new FetchOzonAdStatisticsMessage(
+            self::JOB_ID,
+            self::COMPANY_ID,
+            self::DATE_FROM,
+            self::DATE_TO,
+        ));
+
+        self::assertNotNull($dispatched);
+        $stamps = $dispatched->all(DelayStamp::class);
+        self::assertTrue(
+            [] === $stamps || 0 === $stamps[0]->getDelay(),
+            'Single batch should dispatch immediately (no DelayStamp)',
+        );
     }
 
     public function testZeroBatchesStillCallsMarkChunkCompletedAndFinalizer(): void
