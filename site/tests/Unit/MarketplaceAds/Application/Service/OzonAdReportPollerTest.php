@@ -27,8 +27,8 @@ use Symfony\Component\Messenger\MessageBusInterface;
  *  - Generic Throwable → строки не трогаются, errors=1.
  *  - Ozon state=OK → updateStateWithSchedule(state=OK, nextPollAt=null). НЕ markFinalized.
  *  - Ozon state=ERROR → markFinalized(ERROR) c raw state в errorMessage.
- *  - UUID отсутствует в ответе, age < 1h → updateSchedule с backoff.
- *  - UUID отсутствует, age ≥ 1h → markFinalized(ABANDONED).
+ *  - UUID отсутствует в ответе, age < 3h → updateSchedule с backoff.
+ *  - UUID отсутствует, age ≥ 3h → markFinalized(ABANDONED).
  *  - Ozon state=NOT_STARTED → updateStateWithSchedule(state=NOT_STARTED, nextPollAt).
  *  - Backoff schedule корректен для attempts 0..10.
  */
@@ -261,7 +261,8 @@ final class OzonAdReportPollerTest extends TestCase
     public function testMissingFromListAndOldAbandons(): void
     {
         $now = new \DateTimeImmutable('2026-04-22 12:00:00');
-        $r1 = $this->makeReport('uuid-zombie', pollAttempts: 5, ageSeconds: 3700);
+        // Чуть старше MAX_AGE_BEFORE_ABANDON_SECONDS (10 800с, v1.15).
+        $r1 = $this->makeReport('uuid-zombie', pollAttempts: 5, ageSeconds: 10900);
 
         $this->repo->method('findInFlightByCompany')->willReturn([$r1]);
         $this->client->method('listReportsForCompany')->willReturn([]);
