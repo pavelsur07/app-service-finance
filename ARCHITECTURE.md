@@ -688,21 +688,31 @@ batch for companies with >10 active SKU campaigns.
 
 ### Ozon rate limit — «max 1 active /statistics request per account»
 
-FIFO+single-worker (PR #1629) serializes our HTTP calls but does NOT
-satisfy Ozon's "1 active request" constraint — Ozon measures this on
-their backend (UUID-creation occupancy), which outlasts our HTTP
-round-trip by 30–60 seconds. A POST that returns 200 in 150ms on our
-side still occupies a slot on Ozon's side, so the next POST within
-that window is guaranteed to 429.
+Ozon measures rate limit by backend UUID-creation slot occupancy
+(30–60s per POST), not by concurrent HTTP connections. A single
+async_ads worker + FIFO Redis transport serializes our POSTs in
+SEQUENCE but not in TIME — worker processes N messages in ~Ns total,
+hitting 429 on batches 2..N.
 
-`OzonAdClient::authorizedRequest` distinguishes HTTP 429 from other
-non-2xx responses and throws `OzonRateLimitException` (extends
-`\RuntimeException`). `RequestOzonAdBatchHandler` catches it and
-reschedules the same message via
-`MessageBusInterface::dispatch(new Envelope($msg), [new DelayStamp(60_000)])`.
+`FetchOzonAdStatisticsHandler` spaces batches at dispatch:
+
+    batch #i → DelayStamp(i × 90_000 ms)
+
+So the worker picks up batch #0 immediately, sits idle, picks up
+batch #1 at t=90s, etc. Ozon's slot is free by the time each POST
+lands. For N batches, wall-time sync duration ≈ N × 90 seconds.
+
+The `OzonRateLimitException` → reschedule path in
+`RequestOzonAdBatchHandler` remains as a safety net: if external
+activity on the same Ozon account coincides with our slot, or if
+Ozon's slot occupancy exceeds 90s, a 429 is caught and the batch
+reschedules with `DelayStamp(60_000)`. `OzonAdClient::authorizedRequest`
+distinguishes HTTP 429 from other non-2xx responses and throws
+`OzonRateLimitException` (extends `\RuntimeException`).
+`RequestOzonAdBatchHandler` catches it and reschedules the same message
+via `MessageBusInterface::dispatch(new Envelope($msg), [new DelayStamp(60_000)])`.
 The current message is ACK'd (no Messenger retry consumed, no failure
-transport). The rescheduled message reappears in `async_ads` 60s later,
-by which time Ozon's backend slot has typically freed.
+transport).
 
 `RequestOzonAdBatchMessage::$rateLimitAttempts` counts reschedules and
 caps them at 10 per batch (10 minutes total per-batch wait). Exceeding
