@@ -77,6 +77,12 @@ final class RequestOzonAdBatchHandler
      * на один Performance-аккаунт. Превышение → 429 "Превышен лимит активных".
      * Этот guard делает проверку на СТОРОНЕ КЛИЕНТА, до POST, по БД —
      * предсказуемее, чем ловить 429 от Ozon.
+     *
+     * ВАЖНО: корректность этого guard'а зависит от того, что транспорт
+     * async_ads остаётся single-worker + FIFO. При >1 worker'е read-modify-write
+     * «COUNT → dispatch POST» становится гонкой: два worker'а могут одновременно
+     * увидеть count=2 и создать 4-й слот. Если будете поднимать параллелизм —
+     * замените на SELECT ... FOR UPDATE или Redis-lock per company_id.
      */
     private const MAX_IN_FLIGHT_PER_COMPANY = 3;
 
@@ -118,10 +124,12 @@ final class RequestOzonAdBatchHandler
         // Backpressure: Ozon лимит = 3 активных отчёта/аккаунт. Превышение →
         // 429 "Превышен лимит активных". Проверяем ДО POST'а через БД — если
         // у company уже 3+ in-flight, не тратим HTTP и slot Ozon'а, откладываем
-        // message на 60 секунд. rateLimitAttempts НЕ инкрементим — это не 429,
-        // это pre-check, повторяется пока слоты не освободятся (без ограничения
-        // попыток; заблокированный batch в конечном счёте попадёт в общий
-        // failure path через MAX_AGE_BEFORE_ABANDON_SECONDS).
+        // message на 60 секунд. rateLimitAttempts НЕ инкрементим — это pre-check,
+        // а не 429. Цикл продолжается пока слоты не освободятся; верхняя граница —
+        // не число попыток, а lifecycle AdLoadJob: когда job помечается FAILED
+        // через другие пути (permanent error / bad date range / таймаут операции),
+        // этот message тоже выйдет из цикла через первую же проверку
+        // `$job->getStatus()->isTerminal()` в начале __invoke.
         $inFlight = $this->pendingReportRepo->countInFlightByCompany($message->companyId);
         if ($inFlight >= self::MAX_IN_FLIGHT_PER_COMPANY) {
             $this->messageBus->dispatch(
