@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
@@ -45,10 +46,13 @@ final class AdLoadJobsListController extends AbstractController
             // Batch-агрегат для нового cron-driven pipeline (Task-11.3+).
             // Для jobs старого Messenger-pipeline'а countStatesForJob вернёт [] —
             // UI отрисует старый «Чанки: N» путь через hasBatches=false.
+            // Ключи — AdScheduledBatchState::value (см. countStatesForJob SQL).
             $stats = $this->adScheduledBatchRepository->countStatesForJob($job->getId(), $companyId);
-            $ok = $stats['OK'] ?? 0;
-            $failedLike = ($stats['FAILED'] ?? 0) + ($stats['ABANDONED'] ?? 0);
-            $pending = ($stats['PLANNED'] ?? 0) + ($stats['IN_FLIGHT'] ?? 0);
+            $ok = $stats[AdScheduledBatchState::OK->value] ?? 0;
+            $failedLike = ($stats[AdScheduledBatchState::FAILED->value] ?? 0)
+                + ($stats[AdScheduledBatchState::ABANDONED->value] ?? 0);
+            $pending = ($stats[AdScheduledBatchState::PLANNED->value] ?? 0)
+                + ($stats[AdScheduledBatchState::IN_FLIGHT->value] ?? 0);
             $totalBatches = $ok + $failedLike + $pending;
             $hasBatches = $totalBatches > 0;
 
