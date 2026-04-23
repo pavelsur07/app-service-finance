@@ -598,6 +598,36 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * Возвращает ВСЕ SKU-кампании компании без клиентских фильтров.
+     *
+     * Используется {@see \App\MarketplaceAds\Application\Service\AdBatchPlanner}
+     * (Task-11.3) как чистый адаптер над `GET /api/client/campaign`: фильтрация
+     * по state / recency — зона ответственности потребителя. В отличие от
+     * {@see self::prepareStatisticsBatches()}, здесь не делается разбиение на
+     * батчи и не дропаются ARCHIVED/INACTIVE — planner сохраняет полный список
+     * для последующей ручной отмены при force-abandon или диагностики.
+     *
+     * @return list<array{id: string, title: string, state: string}>
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     */
+    public function listAllSkuCampaigns(string $companyId): array
+    {
+        $credentials = $this->resolveCredentials($companyId);
+
+        /** @var list<array{id: string, title: string, state: string}> $campaigns */
+        $campaigns = $this->withAuthRetry(
+            $companyId,
+            $credentials['client_id'],
+            $credentials['client_secret'],
+            fn (string $token): array => $this->listSkuCampaigns($token),
+        );
+
+        return $campaigns;
+    }
+
+    /**
      * POST /api/client/statistics для ровно одного батча кампаний.
      *
      * Используется {@see \App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler}
