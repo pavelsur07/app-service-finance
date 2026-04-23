@@ -67,7 +67,7 @@ class AdScheduledBatch
     #[ORM\Column(type: 'string', length: 32, enumType: AdScheduledBatchState::class, options: ['default' => 'PLANNED'])]
     private AdScheduledBatchState $state;
 
-    #[ORM\Column(type: 'datetime_immutable')]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     private \DateTimeImmutable $scheduledAt;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
@@ -94,10 +94,10 @@ class AdScheduledBatch
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $lastError = null;
 
-    #[ORM\Column(type: 'datetime_immutable')]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: 'datetime_immutable')]
+    #[ORM\Column(type: 'datetime_immutable', options: ['default' => 'CURRENT_TIMESTAMP'])]
     private \DateTimeImmutable $updatedAt;
 
     /**
