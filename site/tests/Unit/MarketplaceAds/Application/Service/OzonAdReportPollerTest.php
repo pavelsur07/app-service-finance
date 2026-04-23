@@ -8,6 +8,7 @@ use App\MarketplaceAds\Application\Service\OzonAdReportPoller;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
+use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use PHPUnit\Framework\MockObject\MockObject;
@@ -251,6 +252,57 @@ final class OzonAdReportPollerTest extends TestCase
         self::assertSame(1, $result->errors);
 
         self::assertSame([$r1->getId(), $r3->getId()], $dispatched);
+    }
+
+    public function testInvokeWithPermanentExceptionOnOneReportFinalizesAsError(): void
+    {
+        // Permanent 403 / non-retryable 4xx на конкретном UUID → row
+        // финализируется ERROR немедленно, без ожидания 3h-ABANDONED.
+        // Transient ошибки по-прежнему пролетают в внешний catch → errors++.
+        $r = $this->makeReport('uuid-permanent', pollAttempts: 0, ageSeconds: 60);
+
+        $this->repo->method('findInFlightByCompany')->willReturn([$r]);
+        $this->client->expects(self::once())
+            ->method('pollOneReport')
+            ->with(self::COMPANY_ID, 'uuid-permanent')
+            ->willThrowException(new OzonPermanentApiException(
+                'Ozon Performance: GET /api/client/statistics/uuid-permanent вернул 403 (недостаточно прав у client_id)',
+            ));
+
+        $this->repo->expects(self::once())
+            ->method('markFinalized')
+            ->with(
+                self::COMPANY_ID,
+                'uuid-permanent',
+                OzonAdPendingReportState::ERROR,
+                self::stringContains('Ozon permanent error'),
+            )
+            ->willReturn(1);
+
+        $this->repo->expects(self::never())->method('updateStateWithSchedule');
+        $this->bus->expects(self::never())->method('dispatch');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with(
+                self::stringContains('permanent API exception'),
+                self::callback(function (array $context) use ($r): bool {
+                    self::assertSame(self::COMPANY_ID, $context['companyId'] ?? null);
+                    self::assertSame('uuid-permanent', $context['reportUuid'] ?? null);
+                    self::assertSame($r->getId(), $context['pendingReportId'] ?? null);
+
+                    return true;
+                }),
+            );
+
+        $poller = new OzonAdReportPoller($this->client, $this->repo, $this->bus, $logger);
+        $result = ($poller)(self::COMPANY_ID);
+
+        self::assertSame(1, $result->seen);
+        self::assertSame(0, $result->updated);
+        self::assertSame(1, $result->finalized);
+        self::assertSame(0, $result->errors, 'permanent 403 — обработанный исход, errors++ не делается');
     }
 
     public function testInvokeWithOkStateButUpdateReturns0RowsSkipsDispatch(): void

@@ -8,6 +8,7 @@ use App\MarketplaceAds\Application\DTO\PollResult;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
+use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
@@ -115,10 +116,36 @@ final class OzonAdReportPoller
     {
         $uuid = $row->getOzonUuid();
         $now = new \DateTimeImmutable();
-
-        $result = $this->client->pollOneReport($companyId, $uuid);
-        $stateUpper = $result['state'];
         $nextAttempts = $row->getPollAttempts() + 1;
+
+        try {
+            $result = $this->client->pollOneReport($companyId, $uuid);
+        } catch (OzonPermanentApiException $e) {
+            // Permanent ошибка по конкретному UUID (403 scope / client_id блокирован,
+            // и прочие не-ретраебельные 4xx). Фиксируем ERROR сразу, чтобы row не
+            // гнил в REQUESTED до 3h-ABANDONED. Восстанавливает v1.16 поведение
+            // (до v1.17 бросался единым bulk-catch в __invoke).
+            //
+            // Транзиентные ошибки (5xx, сеть, 429) продолжают пролетать в внешний
+            // catch (\Throwable) в __invoke — это retryable путь, row остаётся живой.
+            $this->repo->markFinalized(
+                $companyId,
+                $uuid,
+                OzonAdPendingReportState::ERROR,
+                sprintf('Ozon permanent error on pollOneReport: %s', $e->getMessage()),
+            );
+
+            $this->logger->warning('Ozon pending report finalized as ERROR due to permanent API exception', [
+                'companyId' => $companyId,
+                'reportUuid' => $uuid,
+                'pendingReportId' => $row->getId(),
+                'message' => $e->getMessage(),
+            ]);
+
+            return [0, 1];
+        }
+
+        $stateUpper = $result['state'];
 
         if ($this->isTerminalOk($stateUpper)) {
             // Порядок строгий: UPDATE сначала, dispatch — только если UPDATE прошёл.
@@ -168,7 +195,10 @@ final class OzonAdReportPoller
         // маппим консервативно в IN_PROGRESS — продолжаем polling.
         $mappedState = $this->mapNonTerminalState($stateUpper);
         $nextPollAt = $this->computeNextPollAt($now, $nextAttempts);
-        $firstNonPendingAt = OzonAdPendingReportState::NOT_STARTED === $mappedState ? null : $now;
+        $firstNonPendingAt = in_array($mappedState, [
+            OzonAdPendingReportState::REQUESTED,
+            OzonAdPendingReportState::NOT_STARTED,
+        ], true) ? null : $now;
 
         $this->repo->updateStateWithSchedule(
             $companyId,
@@ -200,11 +230,15 @@ final class OzonAdReportPoller
     /**
      * Маппинг non-terminal Ozon-состояний в наш enum. Неизвестные значения
      * трактуем как IN_PROGRESS — продолжаем polling без потери записи.
+     *
+     * REQUESTED/NOT_STARTED семантически «ещё не началось» — вызывающий код
+     * на их базе не фиксирует firstNonPendingAt.
      */
     private function mapNonTerminalState(string $stateUpper): string
     {
         return match ($stateUpper) {
             'NOT_STARTED' => OzonAdPendingReportState::NOT_STARTED,
+            'REQUESTED' => OzonAdPendingReportState::REQUESTED,
             'IN_PROGRESS' => OzonAdPendingReportState::IN_PROGRESS,
             default => OzonAdPendingReportState::IN_PROGRESS,
         };
