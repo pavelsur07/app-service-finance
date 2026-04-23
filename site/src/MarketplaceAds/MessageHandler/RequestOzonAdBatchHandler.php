@@ -9,6 +9,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
@@ -71,9 +72,30 @@ final class RequestOzonAdBatchHandler
      */
     private const MAX_RATE_LIMIT_ATTEMPTS = 10;
 
+    /**
+     * Ozon Performance жёсткий лимит: не более 3 активных отчётов в очереди
+     * на один Performance-аккаунт. Превышение → 429 "Превышен лимит активных".
+     * Этот guard делает проверку на СТОРОНЕ КЛИЕНТА, до POST, по БД —
+     * предсказуемее, чем ловить 429 от Ozon.
+     *
+     * ВАЖНО: корректность этого guard'а зависит от того, что транспорт
+     * async_ads остаётся single-worker + FIFO. При >1 worker'е read-modify-write
+     * «COUNT → dispatch POST» становится гонкой: два worker'а могут одновременно
+     * увидеть count=2 и создать 4-й слот. Если будете поднимать параллелизм —
+     * замените на SELECT ... FOR UPDATE или Redis-lock per company_id.
+     */
+    private const MAX_IN_FLIGHT_PER_COMPANY = 3;
+
+    /**
+     * Backpressure delay: если слотов нет — ждём минуту и возвращаемся.
+     * Тот же порядок, что и RATE_LIMIT_BACKOFF_MS — для консистентности.
+     */
+    private const BACKPRESSURE_BACKOFF_MS = 60_000;
+
     public function __construct(
         private readonly AdLoadJobRepository $jobRepository,
         private readonly OzonAdClient $ozonAdClient,
+        private readonly OzonAdPendingReportRepository $pendingReportRepo,
         private readonly MessageBusInterface $messageBus,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
@@ -94,6 +116,35 @@ final class RequestOzonAdBatchHandler
                 'status' => null === $job ? 'missing' : $job->getStatus()->value,
                 'batchIndex' => $message->batchIndex,
                 'batchTotal' => $message->batchTotal,
+            ]);
+
+            return;
+        }
+
+        // Backpressure: Ozon лимит = 3 активных отчёта/аккаунт. Превышение →
+        // 429 "Превышен лимит активных". Проверяем ДО POST'а через БД — если
+        // у company уже 3+ in-flight, не тратим HTTP и slot Ozon'а, откладываем
+        // message на 60 секунд. rateLimitAttempts НЕ инкрементим — это pre-check,
+        // а не 429. Цикл продолжается пока слоты не освободятся; верхняя граница —
+        // не число попыток, а lifecycle AdLoadJob: когда job помечается FAILED
+        // через другие пути (permanent error / bad date range / таймаут операции),
+        // этот message тоже выйдет из цикла через первую же проверку
+        // `$job->getStatus()->isTerminal()` в начале __invoke.
+        $inFlight = $this->pendingReportRepo->countInFlightByCompany($message->companyId);
+        if ($inFlight >= self::MAX_IN_FLIGHT_PER_COMPANY) {
+            $this->messageBus->dispatch(
+                new Envelope($message),
+                [new DelayStamp(self::BACKPRESSURE_BACKOFF_MS)],
+            );
+
+            $this->marketplaceAdsLogger->info('RequestOzonAdBatchMessage: backpressure — slots exhausted, rescheduled', [
+                'jobId' => $message->jobId,
+                'companyId' => $message->companyId,
+                'batchIndex' => $message->batchIndex,
+                'batchTotal' => $message->batchTotal,
+                'inFlight' => $inFlight,
+                'maxInFlight' => self::MAX_IN_FLIGHT_PER_COMPANY,
+                'delayMs' => self::BACKPRESSURE_BACKOFF_MS,
             ]);
 
             return;

@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.11 / 2026-04-19
+> Версия: 1.13 / 2026-04-23
 
 ---
 
@@ -467,6 +467,14 @@ findInFlightByJob(string $companyId, string $jobId): array
 // companyId обязателен и валидируется Assert::uuid().
 // @return list<OzonAdPendingReport>
 findInFlightByCompany(string $companyId): array
+
+// Счётчик in-flight pending reports (finalized_at IS NULL) конкретной company.
+// Используется backpressure-гейтом в RequestOzonAdBatchHandler: если >= 3
+// (Ozon жёсткий лимит «активных отчётов» на аккаунт) — POST не делается,
+// сообщение откладывается на 60с. Raw DBAL COUNT, без hydration — вызывается
+// на каждом сообщении и должен быть быстрым.
+// companyId обязателен и валидируется Assert::uuid().
+countInFlightByCompany(string $companyId): int
 
 // Distinct companyIds с хотя бы одной in-flight записью, готовой к опросу:
 // finalized_at IS NULL AND (next_poll_at IS NULL OR next_poll_at <= :now).
@@ -1261,4 +1269,5 @@ paths:
 | 1.9 | 2026-04-15 | MarketplaceAds: команды CLI переименованы в единый паттерн `app:marketplace-ads:*` — `marketplace-ads:load` → `app:marketplace-ads:load`, `marketplace-ads:reprocess` → `app:marketplace-ads:reprocess`. Приводит именование к общему для проекта префиксу `app:` (как у `app:marketplace:wb-daily-sync` и пр.). |
 | 1.10 | 2026-04-15 | Marketplace: UI модалки «Новое подключение» (`templates/marketplace/index.html.twig`) поддерживает два типа подключения — «Основное (Seller API)» и «Реклама (Performance API)». Тип `performance` доступен только при выборе Ozon, иначе опция скрыта и автоматически откатывается на `seller`. Form `action` переключается между `marketplace_connection_create` и `marketplace_connection_performance_create` без перезагрузки страницы; неактивный блок полей `disabled`, чтобы лишние поля не попадали в POST. В списке активных подключений для Performance подключения: суффикс «(Реклама)» к названию маркетплейса, скрыты кнопки «Синхронизировать», «За период», «Реализация», «Переобработать», строка синхронизации — статическая «—» (поллер статуса не запускается). |
 | 1.12 | 2026-04-22 | MarketplaceAds: `OzonAdRawDataParser` теперь принимает обе формы `raw_payload` — legacy flat `{"rows":[…]}` и nested `{"campaigns":[{campaign_id, campaign_name, rows:[…]}]}`, записываемый `DownloadOzonAdReportHandler` (шаг 4 async-poll редизайна). Парсер диспатчится по наличию ключа `campaigns`, пробрасывает `campaign_id` / `campaign_name` из родительского объекта в каждую row и делегирует агрегацию общему пути. Фикс silent no-op: до этого nested-payload уходил в `[]` → `ProcessAdRawDocumentAction` создавал 0 `AdDocument` и помечал `AdRawDocument` как `PROCESSED`, UI «Эффективность рекламы» показывал 0 затрат. Unit-тесты гарантируют идентичность entries для обеих форм. |
+| 1.13 | 2026-04-23 | MarketplaceAds: backpressure по in-flight pending_reports. Добавлен `OzonAdPendingReportRepository::countInFlightByCompany`. `RequestOzonAdBatchHandler` перед POST проверяет COUNT in-flight ≥ 3 (Ozon лимит «активных отчётов» на аккаунт) и откладывает сообщение на 60с без инкремента `rateLimitAttempts`. `BATCH_SPACING_MS = 90_000` из `FetchOzonAdStatisticsHandler` удалён — spacing больше не нужен при наличии backpressure. |
 | 1.11 | 2026-04-19 | MarketplaceAds: серия задач по Ozon Ads pipeline. Новые Entity: `AdLoadJob` (пакетная загрузка за период, атомарный счётчик `loadedDays` через raw SQL), `AdChunkProgress` (идемпотентная фиксация успеха чанка через `UniqueConstraint` `(job_id, date_from, date_to)`). Новый Message `LoadOzonAdStatisticsRangeMessage` + handler-оркестратор: PENDING → RUNNING, разбиение диапазона на чанки ≤ 62 дня (лимит Ozon Performance API), dispatch `FetchOzonAdStatisticsMessage` на каждый чанк. `FetchOzonAdStatisticsHandler`: upsert AdRawDocument + идемпотентный `markChunkCompleted` + inc `loadedDays` только при успешной фиксации чанка. Enum `AdRawDocumentStatus` расширен кейсом `FAILED` (+`isTerminal()`); финализация job'а перешла на per-document статус и считает через `countByCompanyMarketplaceAndDateRange`. Удалены мёртвые counter-поля `processedDays` / `failedDays` из `AdLoadJob` (миграция `Version20260419080739`). Новые методы репозиториев: `AdLoadJobRepository::markCompleted` / `markFailed` / `findRecentByCompanyAndMarketplace`; `AdChunkProgressRepository::markChunkCompleted` / `countCompletedChunks`; `AdRawDocumentRepository::markFailedWithReason` / `countByCompanyMarketplaceAndDateRange` / `findByCompanyMarketplaceAndDateRange`. |

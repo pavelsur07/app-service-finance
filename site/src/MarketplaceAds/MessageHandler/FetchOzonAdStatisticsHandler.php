@@ -17,10 +17,8 @@ use App\Shared\Service\AppLogger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Messenger\Stamp\DelayStamp;
 
 /**
  * Async-обработчик {@see FetchOzonAdStatisticsMessage} — orchestrator'ом one-
@@ -76,23 +74,6 @@ use Symfony\Component\Messenger\Stamp\DelayStamp;
 #[AsMessageHandler]
 final class FetchOzonAdStatisticsHandler
 {
-    /**
-     * Ozon Performance API: "max 1 active /statistics request per account".
-     * Ozon's backend slot occupancy is typically 30-60s. 90s gives us a
-     * safety margin.
-     *
-     * When dispatching N batches for a chunk, we space them:
-     * batch #0 → immediately, batch #i → DelayStamp(i × BATCH_SPACING_MS).
-     *
-     * This prevents the single async_ads worker from issuing N POSTs in
-     * ~Ns wall time (which Ozon rate-limits to 429 on all but the first).
-     *
-     * The 429-reschedule in RequestOzonAdBatchHandler remains as a safety
-     * net for edge cases (Ozon slower than 90s, or concurrent external
-     * activity on the same account).
-     */
-    private const BATCH_SPACING_MS = 90_000;
-
     public function __construct(
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdLoadJobRepository $adLoadJobRepository,
@@ -217,12 +198,13 @@ final class FetchOzonAdStatisticsHandler
         }
 
         // Диспатч по одному сообщению на батч — single async_ads worker
-        // обработает их последовательно, не нарушая Ozon'овский лимит
-        // «1 active /statistics request». matchResumableReport внутри
-        // RequestOzonAdBatchHandler даёт идемпотентность при Messenger-retry.
+        // обработает их последовательно. Ozon лимит «3 активных отчёта/аккаунт»
+        // обеспечивается backpressure-гейтом в RequestOzonAdBatchHandler
+        // (COUNT in-flight pending_reports до POST'а). matchResumableReport
+        // внутри RequestOzonAdBatchHandler даёт идемпотентность при Messenger-retry.
         $batchTotal = count($batches);
         foreach ($batches as $batchIndex => $campaignIds) {
-            $envelope = new Envelope(new RequestOzonAdBatchMessage(
+            $this->messageBus->dispatch(new RequestOzonAdBatchMessage(
                 companyId: $message->companyId,
                 jobId: $message->jobId,
                 dateFrom: $message->dateFrom,
@@ -231,26 +213,6 @@ final class FetchOzonAdStatisticsHandler
                 batchIndex: $batchIndex,
                 batchTotal: $batchTotal,
             ));
-
-            // Space batches in time to avoid Ozon "max 1 active request" 429s.
-            // Batch #0 dispatches immediately; subsequent batches delayed by
-            // BATCH_SPACING_MS per their index.
-            if ($batchIndex > 0) {
-                $envelope = $envelope->with(new DelayStamp($batchIndex * self::BATCH_SPACING_MS));
-            }
-
-            $this->messageBus->dispatch($envelope);
-        }
-
-        if ($batchTotal > 1) {
-            $totalDelaySec = (int) (($batchTotal - 1) * self::BATCH_SPACING_MS / 1000);
-            $this->marketplaceAdsLogger->info('Ozon ad batches dispatched with time spacing', [
-                'jobId' => $message->jobId,
-                'companyId' => $message->companyId,
-                'batchTotal' => $batchTotal,
-                'batchSpacingSeconds' => self::BATCH_SPACING_MS / 1000,
-                'estimatedWallTime' => $totalDelaySec.'s',
-            ]);
         }
 
         // Идемпотентная фиксация чанка — в async-flow означает «запрос отправлен»,
