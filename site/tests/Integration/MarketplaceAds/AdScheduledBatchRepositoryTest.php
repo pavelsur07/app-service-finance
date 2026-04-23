@@ -33,7 +33,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->jobRepository = self::getContainer()->get(AdLoadJobRepository::class);
     }
 
-    public function testSavePersistsAndFlushesImmediately(): void
+    public function testSavePersistsWithoutFlush(): void
     {
         $job = $this->seedJob();
 
@@ -45,8 +45,13 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($batch);
 
-        // save() обязан делать flush сразу — без дополнительного em->flush() записи уже в БД.
+        // save() делает только persist — до flush в БД ничего нет
+        // (консистентно с AdLoadJobRepository::save()).
         $conn = $this->em->getConnection();
+        $count = (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_ad_scheduled_batches');
+        self::assertSame(0, $count);
+
+        $this->em->flush();
         $count = (int) $conn->fetchOne('SELECT COUNT(*) FROM marketplace_ad_scheduled_batches');
         self::assertSame(1, $count);
     }
@@ -68,6 +73,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($batch);
         $id = $batch->getId();
+        $this->em->flush();
         $this->em->clear();
 
         $loaded = $this->repository->find($id);
@@ -119,6 +125,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         // newer batch_index=0 идёт перед older по вторичной сортировке, но primary — scheduled_at.
         $this->repository->save($newer);
         $this->repository->save($older);
+        $this->em->flush();
         $this->em->clear();
 
         $picked = $this->repository->findNextPlanned();
@@ -148,6 +155,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($high);
         $this->repository->save($low);
+        $this->em->flush();
         $this->em->clear();
 
         $picked = $this->repository->findNextPlanned();
@@ -168,6 +176,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
             ->build();
 
         $this->repository->save($future);
+        $this->em->flush();
         $this->em->clear();
 
         $picked = $this->repository->findNextPlanned();
@@ -195,6 +204,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($future);
         $this->repository->save($due);
+        $this->em->flush();
         $this->em->clear();
 
         $picked = $this->repository->findNextPlanned();
@@ -233,6 +243,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->repository->save($inFlight);
         $this->repository->save($ok);
         $this->repository->save($planned);
+        $this->em->flush();
         $this->em->clear();
 
         $picked = $this->repository->findNextPlanned();
@@ -261,6 +272,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($first);
         $this->repository->save($second);
+        $this->em->flush();
         $this->em->clear();
 
         // Открываем отдельное DBAL-соединение (имитация другого worker'а) и
@@ -316,6 +328,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->repository->save($planned);
         $this->repository->save($newer);
         $this->repository->save($older);
+        $this->em->flush();
         $this->em->clear();
 
         $result = $this->repository->findAllInFlight();
@@ -350,6 +363,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->repository->save($a1);
         $this->repository->save($a0);
         $this->repository->save($other);
+        $this->em->flush();
         $this->em->clear();
 
         $result = $this->repository->findByJobId($jobA->getId());
@@ -382,6 +396,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
                 ->build();
             $this->repository->save($batch);
         }
+        $this->em->flush();
         $this->em->clear();
 
         $counts = $this->repository->countStatesForJob($job->getId());
@@ -423,6 +438,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
 
         $this->repository->save($withFile);
         $this->repository->save($noFile);
+        $this->em->flush();
         $this->em->clear();
 
         $result = $this->repository->findDownloadableByJobId($job->getId());
@@ -466,6 +482,23 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
             campaignIds: ['c-1'],
             dateFrom: new \DateTimeImmutable('2026-03-10'),
             dateTo: new \DateTimeImmutable('2026-03-01'),
+            batchIndex: 0,
+            scheduledAt: new \DateTimeImmutable(),
+        );
+    }
+
+    public function testConstructorRejectsNonStringCampaignIds(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/campaignIds должны быть строками/');
+
+        new AdScheduledBatch(
+            id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+            jobId: AdScheduledBatchBuilder::DEFAULT_JOB_ID,
+            companyId: self::COMPANY_ID,
+            campaignIds: ['c-1', 42, 'c-3'], // @phpstan-ignore-line
+            dateFrom: new \DateTimeImmutable('2026-03-01'),
+            dateTo: new \DateTimeImmutable('2026-03-10'),
             batchIndex: 0,
             scheduledAt: new \DateTimeImmutable(),
         );

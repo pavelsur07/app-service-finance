@@ -190,7 +190,7 @@ pipeline'а (timeout, рестарт worker'а, exception) видимым для
 - `findByJobId(string $jobId): list<AdScheduledBatch>`
 - `findDownloadableByJobId(string $jobId): list<AdScheduledBatch>` — `storage_path IS NOT NULL`
 - `countStatesForJob(string $jobId): array<string,int>` — raw DBAL `GROUP BY state`
-- `save(AdScheduledBatch $batch): void` — persist + flush сразу (scheduler ждёт видимости в БД)
+- `save(AdScheduledBatch $batch): void` — persist без flush (консистентно с `AdLoadJobRepository::save()`), вызывающий сам flush'ит в конце транзакции
 
 Dead code на Task-11.2: Repository ещё никем не вызывается, будет использован в Task-11.3+ (planner / poster / poller / finalizer).
 

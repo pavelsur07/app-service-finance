@@ -155,18 +155,18 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
     }
 
     /**
-     * Persist + flush.
+     * Persist без flush — консистентно с {@see AdLoadJobRepository::save()}.
      *
-     * В отличие от AdLoadJobRepository::save(), здесь flush делается сразу:
-     * планировщик создаёт батчи единым bulk'ом и ожидает, что после вызова
-     * запись физически лежит в БД (cron-команды уже могут её подхватить
-     * на ближайшем тике).
+     * Flush делегируется вызывающему коду:
+     *  - planner-cron (Task-11.3+) создаёт 20–30 батчей на job и делает один
+     *    flush в конце цикла, а не N round-trips;
+     *  - scheduler/poster/poller/finalizer мутируют батч в рамках одной
+     *    транзакции с `findNextPlanned() FOR UPDATE SKIP LOCKED`, flush в
+     *    конце транзакции.
      */
     public function save(AdScheduledBatch $batch): void
     {
-        $em = $this->getEntityManager();
-        $em->persist($batch);
-        $em->flush();
+        $this->getEntityManager()->persist($batch);
     }
 
     /**

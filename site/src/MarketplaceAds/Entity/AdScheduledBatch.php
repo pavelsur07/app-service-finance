@@ -116,6 +116,7 @@ class AdScheduledBatch
         Assert::uuid($id);
         Assert::uuid($jobId);
         Assert::uuid($companyId);
+        Assert::allString($campaignIds, 'Все campaignIds должны быть строками.');
         Assert::greaterThanEq($batchIndex, 0, 'batchIndex не может быть отрицательным.');
 
         // Нормализация до 00:00 — консистентно с AdLoadJob / AdChunkProgress:
