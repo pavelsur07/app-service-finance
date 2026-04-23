@@ -8,7 +8,6 @@ use App\Company\Entity\Company;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
@@ -23,12 +22,12 @@ use Symfony\Component\Console\Tester\CommandTester;
  * End-to-end тесты {@see \App\MarketplaceAds\Command\OzonPollReportsCommand}:
  * boot kernel + реальный Postgres + mock'нутый {@see OzonAdClient}.
  *
- * Покрываются:
+ * Покрываются (v1.17 per-UUID polling):
  *  - чистый БД → SUCCESS, "No companies with due reports";
  *  - --dry-run не дёргает Ozon;
- *  - happy path: одна компания, одна OK, одна missing (young) → OK row
- *    в state=OK без finalize, missing row перепланирована;
- *  - per-company isolation: OzonAdClient бросает для компании A,
+ *  - happy path: одна компания, один OK + один IN_PROGRESS → OK row
+ *    в state=OK без finalize, IN_PROGRESS row в state=IN_PROGRESS с nextPollAt;
+ *  - per-company isolation: pollOneReport бросает для компании A,
  *    компания B всё равно обрабатывается, exit=FAILURE.
  */
 final class OzonPollReportsCommandTest extends IntegrationTestCase
@@ -50,7 +49,7 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
     public function testEmptyDbExitsSuccessWithMessage(): void
     {
         $tester = $this->makeCommandTester();
-        $this->clientMock->expects(self::never())->method('listReportsForCompany');
+        $this->clientMock->expects(self::never())->method('pollOneReport');
 
         $exit = $tester->execute([]);
 
@@ -64,7 +63,7 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
         $this->persistReport($companyId, nextPollAt: null, finalizedAt: null, ozonUuid: 'uuid-dry-1');
         $this->em->flush();
 
-        $this->clientMock->expects(self::never())->method('listReportsForCompany');
+        $this->clientMock->expects(self::never())->method('pollOneReport');
 
         $tester = $this->makeCommandTester();
         $exit = $tester->execute(['--dry-run' => true]);
@@ -80,7 +79,7 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
     {
         $companyId = $this->seedCompany()->getId();
 
-        // One already-delivered (OK), one young and not-yet-listed (missing).
+        // Один готов (OK), один всё ещё формируется (IN_PROGRESS).
         $this->persistReport(
             $companyId,
             nextPollAt: null,
@@ -92,15 +91,20 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
             $companyId,
             nextPollAt: null,
             finalizedAt: null,
-            ozonUuid: 'uuid-missing',
+            ozonUuid: 'uuid-inprogress',
             requestedAt: new \DateTimeImmutable('-1 minute'),
         );
         $this->em->flush();
 
         $this->clientMock
-            ->method('listReportsForCompany')
-            ->with($companyId)
-            ->willReturn(['uuid-ok' => 'OK']);
+            ->method('pollOneReport')
+            ->willReturnCallback(static function (string $cid, string $uuid): array {
+                return match ($uuid) {
+                    'uuid-ok' => ['state' => 'OK', 'raw' => ['UUID' => $uuid, 'state' => 'OK']],
+                    'uuid-inprogress' => ['state' => 'IN_PROGRESS', 'raw' => ['UUID' => $uuid, 'state' => 'IN_PROGRESS']],
+                    default => ['state' => 'UNKNOWN', 'raw' => []],
+                };
+            });
 
         $tester = $this->makeCommandTester();
         $exit = $tester->execute([]);
@@ -115,11 +119,12 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
         self::assertNull($okRow->getNextPollAt(), 'next_poll_at cleared after OK');
         self::assertSame(1, $okRow->getPollAttempts());
 
-        $missingRow = $this->repo->findByOzonUuid($companyId, 'uuid-missing');
-        self::assertNotNull($missingRow);
-        self::assertNotNull($missingRow->getNextPollAt(), 'missing-young row gets rescheduled');
-        self::assertSame(1, $missingRow->getPollAttempts());
-        self::assertNull($missingRow->getFinalizedAt());
+        $ipRow = $this->repo->findByOzonUuid($companyId, 'uuid-inprogress');
+        self::assertNotNull($ipRow);
+        self::assertSame(OzonAdPendingReportState::IN_PROGRESS, $ipRow->getState());
+        self::assertNotNull($ipRow->getNextPollAt(), 'IN_PROGRESS row rescheduled with backoff');
+        self::assertSame(1, $ipRow->getPollAttempts());
+        self::assertNull($ipRow->getFinalizedAt());
     }
 
     public function testPerCompanyIsolation(): void
@@ -130,30 +135,30 @@ final class OzonPollReportsCommandTest extends IntegrationTestCase
         $this->persistReport($companyB, nextPollAt: null, finalizedAt: null, ozonUuid: 'uuid-b-1');
         $this->em->flush();
 
-        // A: 403 → все in-flight финализируются как ERROR
-        // B: OK → перевод в state=OK, не finalize
+        // A: pollOneReport бросает → per-UUID exception изолирована (errors=1),
+        //     но row НЕ финализируется (ждём следующий tick).
+        // B: OK → state=OK без finalize (download отдельно).
         $this->clientMock
-            ->method('listReportsForCompany')
-            ->willReturnCallback(function (string $companyId) use ($companyA): array {
+            ->method('pollOneReport')
+            ->willReturnCallback(function (string $companyId, string $uuid) use ($companyA): array {
                 if ($companyId === $companyA) {
-                    throw new OzonPermanentApiException('403 forbidden for company A');
+                    throw new \RuntimeException('network blip for company A');
                 }
 
-                return ['uuid-b-1' => 'OK'];
+                return ['state' => 'OK', 'raw' => ['UUID' => $uuid, 'state' => 'OK']];
             });
 
         $tester = $this->makeCommandTester();
         $exit = $tester->execute([]);
 
-        // errors > 0 (company A finalized с errors=count) → FAILURE
+        // errors > 0 (company A returned errors=1) → FAILURE
         self::assertSame(Command::FAILURE, $exit);
 
         $this->em->clear();
 
         $rowA = $this->repo->findByOzonUuid($companyA, 'uuid-a-1');
         self::assertNotNull($rowA);
-        self::assertSame(OzonAdPendingReportState::ERROR, $rowA->getState());
-        self::assertNotNull($rowA->getFinalizedAt(), 'company A permanent 403 → finalized ERROR');
+        self::assertNull($rowA->getFinalizedAt(), 'company A per-UUID exception — row оставлен для следующего тика');
 
         $rowB = $this->repo->findByOzonUuid($companyB, 'uuid-b-1');
         self::assertNotNull($rowB);

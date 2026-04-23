@@ -16,10 +16,11 @@ use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * CLI-команда shared-polling для Ozon Performance /statistics/list.
+ * CLI-команда polling'а для Ozon Performance отчётов.
  *
  * Проходит по всем компаниям, у которых есть хоть одна due in-flight запись,
- * и делает ровно один GET /statistics/list на компанию (через {@see OzonAdReportPoller}).
+ * и делегирует per-UUID polling в {@see OzonAdReportPoller} (v1.17 перешёл
+ * на GET /statistics/{uuid} вместо сломанного GET /statistics/list).
  *
  * В step 3/5 async-poll redesign команда ещё не включена в cron — прод
  * запускает её вручную для валидации. Step 5 добавит её в docker/cron/app.cron.
@@ -33,7 +34,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 #[AsCommand(
     name: 'app:marketplace-ads:ozon-poll-reports',
-    description: 'Poll Ozon Performance /statistics/list for all in-flight reports across companies.',
+    description: 'Poll Ozon Performance per-UUID for all in-flight reports across companies.',
 )]
 final class OzonPollReportsCommand extends Command
 {
@@ -93,7 +94,7 @@ final class OzonPollReportsCommand extends Command
             }
 
             try {
-                $result = ($this->poller)($companyId, $now);
+                $result = ($this->poller)($companyId);
             } catch (\Throwable $e) {
                 // Per-company isolation: сбой одной компании не должен
                 // блокировать остальные.

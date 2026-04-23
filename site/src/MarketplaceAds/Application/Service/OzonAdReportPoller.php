@@ -8,25 +8,25 @@ use App\MarketplaceAds\Application\DTO\PollResult;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Webmozart\Assert\Assert;
 
 /**
- * Один опрос Ozon Performance /statistics/list на компанию и перевод всех её
- * in-flight записей в актуальное Ozon-state. Ядро будущей cron-задачи
- * «shared polling»: вместо одного воркера на UUID — один HTTP-запрос на
- * компанию и обновление N строк батчем.
+ * Per-company state machine для polling'а Ozon Performance отчётов.
+ *
+ * v1.17: переделано на per-UUID polling через GET /api/client/statistics/{uuid}
+ * вместо GET /api/client/statistics/list. Инцидент 23.04.2026 показал, что
+ * листинг отдаёт total=0 при реально готовых отчётах; per-UUID endpoint
+ * работает надёжно. Rate-limit под контролем: backpressure v1.13 ограничивает
+ * in-flight до 3 на company, поэтому максимум 3 HTTP-запроса на company за
+ * тик cron'а (≈90 сек), Ozon это держит спокойно.
  *
  * Не скачивает отчёт: строки в state=OK остаются finalized_at=NULL, финальный
- * download + markFinalized делает step 4 (DownloadOzonAdReportMessage handler).
- *
- * Чистый сервис: без Request / Session / транзакций. Вызывающий
- * {@see \App\MarketplaceAds\Command\OzonPollReportsCommand} решает, как
- * итерировать компании и когда flush'ить UoW.
+ * download + markFinalized делает DownloadOzonAdReportMessage handler.
  */
 final class OzonAdReportPoller
 {
@@ -36,9 +36,8 @@ final class OzonAdReportPoller
      * computeNextPollAt() вызывается с $attempts = $pollAttempts + 1, поэтому
      * индекс 1 — schedule первого опроса после создания записи. Индекс 0
      * умышленно отсутствует: момент создания строки — не ответственность
-     * этого сервиса (сегодня это FetchOzonAdStatisticsHandler, в step 4 —
-     * download-диспетчер). После 5-й попытки держим 10 минут — компромисс
-     * между «не дёргать Ozon» и «не держать row в in-flight сутками».
+     * этого сервиса. После 5-й попытки держим 10 минут — компромисс между
+     * «не дёргать Ozon» и «не держать row в in-flight сутками».
      */
     private const BACKOFF_SCHEDULE_SECONDS = [
         1 => 30,
@@ -50,13 +49,11 @@ final class OzonAdReportPoller
 
     /**
      * Строки старше этого возраста без финализации — force-ABANDONED.
-     * Ограничивает lifetime «зомби-UUID», которые Ozon не отдаёт в листинге.
+     * Ограничивает lifetime «зомби-UUID», которые Ozon больше не обновляет.
      *
      * 3 часа — компромисс по итогам инцидента 22–23 апреля 2026: Ozon
      * Performance под нагрузкой держит отчёты в очереди генерации
-     * 30–90 минут, редко до 2 часов. 3 часа = 99-й перцентиль по
-     * наблюдениям. Меньше — ложные abandon'ы (см. 1ч до v1.15). Больше —
-     * пользователь долго ждёт понятной ошибки при реально сломанном Ozon.
+     * 30–90 минут, редко до 2 часов. 3 часа = 99-й перцентиль по наблюдениям.
      */
     private const MAX_AGE_BEFORE_ABANDON_SECONDS = 10_800;
 
@@ -69,126 +66,65 @@ final class OzonAdReportPoller
     ) {
     }
 
-    public function __invoke(string $companyId, \DateTimeImmutable $now): PollResult
+    public function __invoke(string $companyId): PollResult
     {
+        Assert::uuid($companyId);
+
         $inFlight = $this->repo->findInFlightByCompany($companyId);
         if ([] === $inFlight) {
             return new PollResult(seen: 0, updated: 0, finalized: 0, errors: 0);
         }
 
-        // Один HTTP-запрос. Если он упал — строки не трогаем, next_poll_at
-        // не менялся, следующий тик cron'а их снова подхватит.
-        try {
-            $ozonMap = $this->client->listReportsForCompany($companyId);
-        } catch (OzonPermanentApiException $e) {
-            foreach ($inFlight as $row) {
-                $this->repo->markFinalized(
-                    $row->getCompanyId(),
-                    $row->getOzonUuid(),
-                    OzonAdPendingReportState::ERROR,
-                    'Ozon Performance API permanently denied: '.$e->getMessage(),
-                );
-            }
-
-            $this->logger->warning('Ozon Performance API permanently denied — all in-flight reports marked ERROR', [
-                'companyId' => $companyId,
-                'count' => count($inFlight),
-                'error' => $e->getMessage(),
-            ]);
-
-            return new PollResult(
-                seen: count($inFlight),
-                updated: 0,
-                finalized: count($inFlight),
-                errors: count($inFlight),
-            );
-        } catch (\Throwable $e) {
-            $this->logger->warning('Ozon poll listReportsForCompany failed — will retry next tick', [
-                'companyId' => $companyId,
-                'error' => $e->getMessage(),
-            ]);
-
-            return new PollResult(seen: count($inFlight), updated: 0, finalized: 0, errors: 1);
-        }
-
+        $seen = 0;
         $updated = 0;
         $finalized = 0;
+        $errors = 0;
 
         foreach ($inFlight as $row) {
-            [$u, $f] = $this->reconcileOne($row, $ozonMap, $now);
-            $updated += $u;
-            $finalized += $f;
+            ++$seen;
+            try {
+                [$u, $f] = $this->pollAndReconcile($companyId, $row);
+                $updated += $u;
+                $finalized += $f;
+            } catch (\Throwable $e) {
+                ++$errors;
+                $this->logger->error('Ozon poll report failed', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $row->getOzonUuid(),
+                    'pendingReportId' => $row->getId(),
+                    'exception' => $e::class,
+                    'message' => $e->getMessage(),
+                ]);
+            }
         }
 
         return new PollResult(
-            seen: count($inFlight),
+            seen: $seen,
             updated: $updated,
             finalized: $finalized,
-            errors: 0,
+            errors: $errors,
         );
     }
 
     /**
-     * @param array<string, string> $ozonMap UUID => raw state из Ozon
+     * Опросить один UUID через /statistics/{uuid} и обновить БД на основе state.
      *
      * @return array{0: int, 1: int} [updated, finalized]
      */
-    private function reconcileOne(
-        OzonAdPendingReport $row,
-        array $ozonMap,
-        \DateTimeImmutable $now,
-    ): array {
+    private function pollAndReconcile(string $companyId, OzonAdPendingReport $row): array
+    {
         $uuid = $row->getOzonUuid();
-        $companyId = $row->getCompanyId();
+        $now = new \DateTimeImmutable();
+
+        $result = $this->client->pollOneReport($companyId, $uuid);
+        $stateUpper = $result['state'];
         $nextAttempts = $row->getPollAttempts() + 1;
-        $ageSeconds = $now->getTimestamp() - $row->getRequestedAt()->getTimestamp();
 
-        // 1) Отсутствует в ответе — либо ещё не дошла до листинга, либо
-        //    истёк TTL на стороне Ozon.
-        if (!isset($ozonMap[$uuid])) {
-            if ($ageSeconds >= self::MAX_AGE_BEFORE_ABANDON_SECONDS) {
-                $this->repo->markFinalized(
-                    $companyId,
-                    $uuid,
-                    OzonAdPendingReportState::ABANDONED,
-                    sprintf('Missing from /statistics/list after %ds', $ageSeconds),
-                );
-
-                $this->logger->warning('Ozon pending report abandoned — not found in list', [
-                    'companyId' => $companyId,
-                    'reportUuid' => $uuid,
-                    'ageSeconds' => $ageSeconds,
-                ]);
-
-                return [0, 1];
-            }
-
-            $this->repo->updateSchedule(
-                $companyId,
-                $uuid,
-                $now,
-                $this->computeNextPollAt($now, $nextAttempts),
-                $nextAttempts,
-            );
-
-            return [1, 0];
-        }
-
-        // 2) Есть в листинге — решаем по rawState.
-        $rawState = $ozonMap[$uuid];
-        $normalizedUpper = strtoupper($rawState);
-
-        if ($this->isTerminalOk($normalizedUpper)) {
-            // OK/READY → фиксируем state=OK, гасим next_poll_at (дальше не
-            // опрашиваем). markFinalized делает DownloadOzonAdReportHandler
-            // после скачивания CSV.
-            //
-            // Порядок строгий: сначала коммит state=OK в БД, потом dispatch.
-            // Если UPDATE вернул 0 строк — запись уже финализирована параллельным
-            // worker'ом или внешне изменилась (guard finalized_at IS NULL в SQL).
-            // Download дублировать нельзя; возвращаем [0, 0] без dispatch'а.
-            // Контракт для DownloadOzonAdReportHandler: «OK видна в БД до прихода
-            // message» — соблюдается только при $updatedRows > 0.
+        if ($this->isTerminalOk($stateUpper)) {
+            // Порядок строгий: UPDATE сначала, dispatch — только если UPDATE прошёл.
+            // Защита от гонки: если запись уже финализирована параллельно (0 rows),
+            // download нельзя дублировать. Контракт v1.16: «OK видна в БД до
+            // прихода message» — соблюдается только при $updatedRows > 0.
             $updatedRows = $this->repo->updateStateWithSchedule(
                 $companyId,
                 $uuid,
@@ -209,9 +145,6 @@ final class OzonAdReportPoller
                 return [0, 0];
             }
 
-            // Handoff в async_pipeline: handler сам забирает CSV, upsert'ит
-            // AdRawDocument, финализирует pending-отчёт. Dispatch безопасно
-            // повторный — handler идемпотентен через finalized_at check.
             $this->bus->dispatch(new DownloadOzonAdReportMessage(
                 companyId: $companyId,
                 pendingReportId: $row->getId(),
@@ -220,33 +153,61 @@ final class OzonAdReportPoller
             return [1, 0];
         }
 
-        if ($this->isTerminalError($normalizedUpper)) {
-            // ERROR/CANCELLED/NOT_FOUND → нормализуем в ERROR, в errorMessage
-            // оставляем исходный rawState для диагностики.
+        if ($this->isTerminalError($stateUpper)) {
             $this->repo->markFinalized(
                 $companyId,
                 $uuid,
                 OzonAdPendingReportState::ERROR,
-                sprintf('Ozon returned terminal state: %s', $rawState),
+                sprintf('Ozon report state=%s', $stateUpper),
             );
 
             return [0, 1];
         }
 
-        // 3) Non-terminal (NOT_STARTED, IN_PROGRESS, ...): записываем state
-        //    «как есть», фиксируем firstNonPendingAt если это первый non-REQUESTED
-        //    тик, планируем следующий poll.
+        // Non-terminal: обновляем state + next_poll_at. Неизвестные значения
+        // маппим консервативно в IN_PROGRESS — продолжаем polling.
+        $mappedState = $this->mapNonTerminalState($stateUpper);
+        $nextPollAt = $this->computeNextPollAt($now, $nextAttempts);
+        $firstNonPendingAt = OzonAdPendingReportState::NOT_STARTED === $mappedState ? null : $now;
+
         $this->repo->updateStateWithSchedule(
             $companyId,
             $uuid,
-            $rawState,
+            $mappedState,
             $now,
-            $this->computeNextPollAt($now, $nextAttempts),
+            $nextPollAt,
             $nextAttempts,
-            OzonAdPendingReportState::NOT_STARTED === $normalizedUpper ? null : $now,
+            $firstNonPendingAt,
         );
 
+        // Force-abandon если UUID слишком старый. Делается после updateStateWithSchedule
+        // (полный polling-цикл не break'ается), затем overlay-финализация.
+        $ageSeconds = $now->getTimestamp() - $row->getRequestedAt()->getTimestamp();
+        if ($ageSeconds >= self::MAX_AGE_BEFORE_ABANDON_SECONDS) {
+            $this->repo->markFinalized(
+                $companyId,
+                $uuid,
+                OzonAdPendingReportState::ABANDONED,
+                sprintf('Force-abandoned after %d seconds (Ozon state=%s)', $ageSeconds, $stateUpper),
+            );
+
+            return [0, 1];
+        }
+
         return [1, 0];
+    }
+
+    /**
+     * Маппинг non-terminal Ozon-состояний в наш enum. Неизвестные значения
+     * трактуем как IN_PROGRESS — продолжаем polling без потери записи.
+     */
+    private function mapNonTerminalState(string $stateUpper): string
+    {
+        return match ($stateUpper) {
+            'NOT_STARTED' => OzonAdPendingReportState::NOT_STARTED,
+            'IN_PROGRESS' => OzonAdPendingReportState::IN_PROGRESS,
+            default => OzonAdPendingReportState::IN_PROGRESS,
+        };
     }
 
     private function isTerminalOk(string $stateUpper): bool
@@ -261,9 +222,8 @@ final class OzonAdReportPoller
 
     private function computeNextPollAt(\DateTimeImmutable $now, int $attempts): \DateTimeImmutable
     {
-        // max($firstIdx, …) — belt-and-suspenders clamp: если где-то $attempts=0
-        // просочится (programmer error), берём первый валидный индекс
-        // вместо undefined-index crash.
+        // Belt-and-suspenders clamp: если где-то $attempts=0 / негатив просочится
+        // (programmer error), берём первый валидный индекс вместо undefined-index crash.
         $firstIdx = array_key_first(self::BACKOFF_SCHEDULE_SECONDS);
         $lastIdx = array_key_last(self::BACKOFF_SCHEDULE_SECONDS);
         $idx = max($firstIdx, min($attempts, $lastIdx));
