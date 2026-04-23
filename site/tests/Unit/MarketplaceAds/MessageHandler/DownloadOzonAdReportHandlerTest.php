@@ -8,12 +8,11 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\Service\AdLoadJobFinalizer;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Entity\OzonAdPendingReport;
+use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Enum\OzonAdPendingReportState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
-use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonReportDownload;
 use App\MarketplaceAds\Message\DownloadOzonAdReportMessage;
-use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\MessageHandler\DownloadOzonAdReportHandler;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
@@ -24,9 +23,6 @@ use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Ramsey\Uuid\Uuid;
-use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 // StorageService — final class, нужен BypassFinals для createMock.
 // AdLoadJobFinalizer — final readonly, нужен BypassFinals для createMock.
@@ -36,7 +32,8 @@ BypassFinals::allowPaths([
 ]);
 
 /**
- * Unit-тесты {@see DownloadOzonAdReportHandler}: async-download pending-отчёта.
+ * Unit-тесты {@see DownloadOzonAdReportHandler}: task-8 flow — сохранение
+ * raw-отчёта на диск без парсинга.
  *
  * Покрываемые инварианты:
  *  1. findByIdAndCompany вернул null → warning + no-op ACK, никаких side-effects.
@@ -44,15 +41,17 @@ BypassFinals::allowPaths([
  *  3. OzonPermanentApiException → markFinalized(ERROR) + Unrecoverable.
  *  4. Generic \Throwable → markFinalized НЕ вызывается, exception propagate
  *     (Messenger ретраит).
- *  5. Happy-path 2 дня → 2 dispatch(ProcessAdRawDocumentMessage).
- *  6. Happy-path bronze — один download → setFileStorage на каждом документе.
- *  7. Порядок side-effects: flush → markFinalized(OK) → dispatch.
+ *  5. Happy-path: storeBytes вызван с правильным relativePath; AdRawDocument
+ *     создан per-day с storage_path/hash/size и rawPayload='{}'.
+ *  6. Detection расширения: zip по Content-Type, zip по magic bytes, csv по
+ *     Content-Type, csv по умолчанию.
+ *  7. ProcessAdRawDocumentMessage НЕ диспатчится (bus удалён из зависимостей).
  */
 final class DownloadOzonAdReportHandlerTest extends TestCase
 {
     private const COMPANY_ID = '11111111-1111-1111-1111-111111111111';
     private const PENDING_ID = '22222222-2222-2222-2222-222222222222';
-    private const OZON_UUID = 'ozon-report-uuid-xyz';
+    private const OZON_UUID = '33333333-3333-3333-3333-333333333333';
 
     /** @var OzonAdPendingReportRepository&MockObject */
     private OzonAdPendingReportRepository $pendingRepo;
@@ -62,8 +61,6 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
     private OzonAdClient $client;
     /** @var EntityManagerInterface&MockObject */
     private EntityManagerInterface $em;
-    /** @var MessageBusInterface&MockObject */
-    private MessageBusInterface $bus;
     /** @var StorageService&MockObject */
     private StorageService $storage;
     /** @var AdLoadJobFinalizer&MockObject */
@@ -75,7 +72,6 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $this->rawRepo = $this->createMock(AdRawDocumentRepository::class);
         $this->client = $this->createMock(OzonAdClient::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
-        $this->bus = $this->createMock(MessageBusInterface::class);
         $this->storage = $this->createMock(StorageService::class);
         $this->finalizer = $this->createMock(AdLoadJobFinalizer::class);
     }
@@ -87,10 +83,10 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             ->with(self::PENDING_ID, self::COMPANY_ID)
             ->willReturn(null);
 
-        $this->client->expects(self::never())->method('downloadAndConvertReport');
+        $this->client->expects(self::never())->method('fetchReportContent');
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->bus->expects(self::never())->method('dispatch');
+        $this->storage->expects(self::never())->method('storeBytes');
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
@@ -104,10 +100,10 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
 
-        $this->client->expects(self::never())->method('downloadAndConvertReport');
+        $this->client->expects(self::never())->method('fetchReportContent');
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->bus->expects(self::never())->method('dispatch');
+        $this->storage->expects(self::never())->method('storeBytes');
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
@@ -121,7 +117,7 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
 
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
 
-        $this->client->method('downloadAndConvertReport')
+        $this->client->method('fetchReportContent')
             ->willThrowException(new OzonPermanentApiException('403 forbidden'));
 
         $this->pendingRepo->expects(self::once())
@@ -135,9 +131,9 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             ->willReturn(1);
 
         $this->em->expects(self::never())->method('flush');
-        $this->bus->expects(self::never())->method('dispatch');
+        $this->storage->expects(self::never())->method('storeBytes');
 
-        $this->expectException(UnrecoverableMessageHandlingException::class);
+        $this->expectException(\Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException::class);
         $this->expectExceptionMessage('Ozon permanent failure');
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
@@ -151,12 +147,12 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $pending = $this->makePendingReport();
 
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
-        $this->client->method('downloadAndConvertReport')
+        $this->client->method('fetchReportContent')
             ->willThrowException(new \RuntimeException('network timeout'));
 
         $this->pendingRepo->expects(self::never())->method('markFinalized');
         $this->em->expects(self::never())->method('flush');
-        $this->bus->expects(self::never())->method('dispatch');
+        $this->storage->expects(self::never())->method('storeBytes');
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('network timeout');
@@ -167,32 +163,21 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         ));
     }
 
-    public function testHappyPathUpsertsDocumentsAndDispatchesProcessingAfterFlush(): void
+    public function testHappyPathStoresFileAndUpsertsDocumentsPerDayWithoutDispatch(): void
     {
         $pending = $this->makePendingReport();
-
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
 
-        $download = $this->makeDownload('raw-bytes-1');
-        $this->client->method('downloadAndConvertReport')
+        $csvBody = "date;sku;spend\n2026-04-01;S1;1.00\n2026-04-02;S1;2.00";
+        $this->client->method('fetchReportContent')
+            ->with(self::COMPANY_ID, self::OZON_UUID)
             ->willReturn([
-                'downloads' => [$download],
-                'resultByDate' => [
-                    '2026-04-01' => ['campaigns' => [[
-                        'campaign_id' => 'c1',
-                        'campaign_name' => 'Camp 1',
-                        'rows' => [['sku' => 's1', 'spend' => '10.00', 'views' => 5, 'clicks' => 1]],
-                    ]]],
-                    '2026-04-02' => ['campaigns' => [[
-                        'campaign_id' => 'c1',
-                        'campaign_name' => 'Camp 1',
-                        'rows' => [['sku' => 's1', 'spend' => '20.00', 'views' => 10, 'clicks' => 2]],
-                    ]]],
-                ],
+                'body' => $csvBody,
+                'contentType' => 'text/csv; charset=utf-8',
             ]);
 
-        // Оба дня новые — findByMarketplaceAndDate возвращает null.
         $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+
         /** @var list<AdRawDocument> $saved */
         $saved = [];
         $this->rawRepo->expects(self::exactly(2))
@@ -201,17 +186,18 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
                 $saved[] = $doc;
             });
 
+        $expectedPath = sprintf('marketplace-ads/%s/%s.csv', self::COMPANY_ID, self::OZON_UUID);
         $this->storage->expects(self::once())
             ->method('storeBytes')
+            ->with($csvBody, $expectedPath)
             ->willReturn([
-                'storagePath' => 'companies/xxx/marketplace-ads/ozon/bronze/2026-04-01/ozon-report-uuid-xyz.csv',
+                'storagePath' => $expectedPath,
                 'fileHash' => 'sha256:deadbeef',
-                'sizeBytes' => 11,
+                'sizeBytes' => \strlen($csvBody),
                 'mimeType' => 'text/csv',
             ]);
 
-        // Строгий порядок вызовов: flush → markFinalized → dispatch. Assertим через
-        // шаг-трекер, потому что PHPUnit InSequence не работает для разных моков.
+        // Строгий порядок: flush → markFinalized(OK).
         $trace = [];
         $this->em->expects(self::once())
             ->method('flush')
@@ -227,37 +213,126 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
                 return 1;
             });
 
-        $dispatched = [];
-        $this->bus->expects(self::exactly(2))
-            ->method('dispatch')
-            ->willReturnCallback(function (object $message) use (&$dispatched, &$trace): Envelope {
-                self::assertInstanceOf(ProcessAdRawDocumentMessage::class, $message);
-                self::assertSame(self::COMPANY_ID, $message->companyId);
-                $dispatched[] = $message;
-                $trace[] = 'dispatch';
-
-                return new Envelope($message);
-            });
-
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
             pendingReportId: self::PENDING_ID,
         ));
 
-        self::assertCount(2, $saved, '2 новых AdRawDocument должны быть сохранены');
+        self::assertCount(2, $saved, '2 AdRawDocument — по одному на день диапазона 2026-04-01..02');
         foreach ($saved as $doc) {
             self::assertSame(MarketplaceType::OZON, $doc->getMarketplace());
             self::assertSame(self::COMPANY_ID, $doc->getCompanyId());
-            self::assertSame('companies/xxx/marketplace-ads/ozon/bronze/2026-04-01/ozon-report-uuid-xyz.csv', $doc->getStoragePath());
+            self::assertSame('{}', $doc->getRawPayload(), 'raw_payload = "{}" — контент на диске, не в БД');
+            self::assertSame(AdRawDocumentStatus::DRAFT, $doc->getStatus());
+            self::assertSame($expectedPath, $doc->getStoragePath());
             self::assertSame('sha256:deadbeef', $doc->getFileHash());
-            self::assertSame(11, $doc->getFileSizeBytes());
+            self::assertSame(\strlen($csvBody), $doc->getFileSizeBytes());
         }
 
-        self::assertCount(2, $dispatched, 'dispatch должен быть вызван по разу на документ');
-        self::assertSame(['flush', 'markFinalized', 'dispatch', 'dispatch'], $trace, 'flush → markFinalized → dispatch — порядок критичен');
+        $dates = array_map(
+            static fn (AdRawDocument $d): string => $d->getReportDate()->format('Y-m-d'),
+            $saved,
+        );
+        self::assertSame(['2026-04-01', '2026-04-02'], $dates);
+
+        self::assertSame(['flush', 'markFinalized'], $trace);
     }
 
-    public function testHappyPathExistingDocumentUpdatesPayload(): void
+    public function testExtensionZipByContentType(): void
+    {
+        $pending = $this->makePendingReport();
+        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
+
+        $this->client->method('fetchReportContent')->willReturn([
+            'body' => 'arbitrary-bytes',
+            'contentType' => 'application/zip',
+        ]);
+        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+
+        $expectedPath = sprintf('marketplace-ads/%s/%s.zip', self::COMPANY_ID, self::OZON_UUID);
+        $this->storage->expects(self::once())
+            ->method('storeBytes')
+            ->with(self::anything(), $expectedPath)
+            ->willReturn([
+                'storagePath' => $expectedPath,
+                'fileHash' => 'h',
+                'sizeBytes' => 15,
+                'mimeType' => 'application/zip',
+            ]);
+
+        $this->pendingRepo->method('markFinalized')->willReturn(1);
+
+        $this->makeHandler()(new DownloadOzonAdReportMessage(
+            companyId: self::COMPANY_ID,
+            pendingReportId: self::PENDING_ID,
+        ));
+    }
+
+    public function testExtensionZipByMagicBytesWhenContentTypeAmbiguous(): void
+    {
+        $pending = $this->makePendingReport();
+        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
+
+        // PK\x03\x04 — локальный ZIP-header, должен переключить на zip даже при
+        // octet-stream Content-Type.
+        $zipBody = "PK\x03\x04rest-of-archive";
+        $this->client->method('fetchReportContent')->willReturn([
+            'body' => $zipBody,
+            'contentType' => 'application/octet-stream',
+        ]);
+        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+
+        $expectedPath = sprintf('marketplace-ads/%s/%s.zip', self::COMPANY_ID, self::OZON_UUID);
+        $this->storage->expects(self::once())
+            ->method('storeBytes')
+            ->with($zipBody, $expectedPath)
+            ->willReturn([
+                'storagePath' => $expectedPath,
+                'fileHash' => 'h',
+                'sizeBytes' => \strlen($zipBody),
+                'mimeType' => 'application/zip',
+            ]);
+
+        $this->pendingRepo->method('markFinalized')->willReturn(1);
+
+        $this->makeHandler()(new DownloadOzonAdReportMessage(
+            companyId: self::COMPANY_ID,
+            pendingReportId: self::PENDING_ID,
+        ));
+    }
+
+    public function testExtensionCsvByDefault(): void
+    {
+        $pending = $this->makePendingReport();
+        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
+
+        // Ни zip-content-type, ни PK-magic bytes → дефолт csv.
+        $this->client->method('fetchReportContent')->willReturn([
+            'body' => 'date;sku;spend',
+            'contentType' => null,
+        ]);
+        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
+
+        $expectedPath = sprintf('marketplace-ads/%s/%s.csv', self::COMPANY_ID, self::OZON_UUID);
+        $this->storage->expects(self::once())
+            ->method('storeBytes')
+            ->with(self::anything(), $expectedPath)
+            ->willReturn([
+                'storagePath' => $expectedPath,
+                'fileHash' => 'h',
+                'sizeBytes' => 14,
+                'mimeType' => 'text/plain',
+            ]);
+
+        $this->pendingRepo->method('markFinalized')->willReturn(1);
+
+        $this->makeHandler()(new DownloadOzonAdReportMessage(
+            companyId: self::COMPANY_ID,
+            pendingReportId: self::PENDING_ID,
+        ));
+    }
+
+    public function testExistingDocumentGetsUpdatedPayloadAndFileStorage(): void
     {
         $pending = $this->makePendingReport();
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
@@ -269,140 +344,37 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             '{"old":"payload"}',
         );
 
-        // Существующий документ — save не вызывается, updatePayload внутри entity.
-        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn($existing);
-        $this->rawRepo->expects(self::never())->method('save');
+        // findByMarketplaceAndDate — existing для первого дня, null для второго.
+        $this->rawRepo->method('findByMarketplaceAndDate')
+            ->willReturnCallback(function (string $companyId, string $mp, \DateTimeImmutable $date) use ($existing): ?AdRawDocument {
+                if ('2026-04-01' === $date->format('Y-m-d')) {
+                    return $existing;
+                }
 
-        $download = $this->makeDownload('raw-bytes-2');
-        $this->client->method('downloadAndConvertReport')
-            ->willReturn([
-                'downloads' => [$download],
-                'resultByDate' => [
-                    '2026-04-01' => ['campaigns' => [['campaign_id' => 'c1', 'campaign_name' => 'N', 'rows' => []]]],
-                ],
-            ]);
+                return null;
+            });
+        $this->rawRepo->expects(self::once())->method('save');
 
+        $this->client->method('fetchReportContent')->willReturn([
+            'body' => 'body',
+            'contentType' => 'text/csv',
+        ]);
         $this->storage->method('storeBytes')->willReturn([
-            'storagePath' => 'p',
+            'storagePath' => 'path',
             'fileHash' => 'h',
-            'sizeBytes' => 11,
+            'sizeBytes' => 4,
             'mimeType' => 'text/csv',
         ]);
-
-        $this->em->expects(self::once())->method('flush');
-        $this->pendingRepo->expects(self::once())->method('markFinalized');
-        $this->bus->expects(self::once())
-            ->method('dispatch')
-            ->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+        $this->pendingRepo->method('markFinalized')->willReturn(1);
 
         $this->makeHandler()(new DownloadOzonAdReportMessage(
             companyId: self::COMPANY_ID,
             pendingReportId: self::PENDING_ID,
         ));
 
-        self::assertStringContainsString('"campaigns"', $existing->getRawPayload(), 'updatePayload должен переписать payload');
-    }
-
-    public function testHandlerCallsFinalizerOnZeroDocs(): void
-    {
-        $jobId = Uuid::uuid7()->toString();
-        $pending = $this->makePendingReport(jobId: $jobId);
-        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
-
-        $download = $this->makeDownload('raw-bytes-empty');
-        $this->client->method('downloadAndConvertReport')->willReturn([
-            'downloads' => [$download],
-            'resultByDate' => [],
-        ]);
-
-        $this->rawRepo->expects(self::never())->method('save');
-        $this->storage->expects(self::never())->method('storeBytes');
-        $this->em->expects(self::once())->method('flush');
-
-        // markFinalized всё равно вызывается — пустой отчёт это валидный "обработан".
-        $this->pendingRepo->expects(self::once())
-            ->method('markFinalized')
-            ->with(self::COMPANY_ID, self::OZON_UUID, OzonAdPendingReportState::OK, null)
-            ->willReturn(1);
-
-        $this->bus->expects(self::never())->method('dispatch');
-
-        // Zero-docs edge case: handler должен сам вызвать finalizer->tryFinalize,
-        // иначе job с нулём документов навечно залип бы в RUNNING.
-        $this->finalizer->expects(self::once())
-            ->method('tryFinalize')
-            ->with($jobId, self::COMPANY_ID);
-
-        $this->makeHandler()(new DownloadOzonAdReportMessage(
-            companyId: self::COMPANY_ID,
-            pendingReportId: self::PENDING_ID,
-        ));
-    }
-
-    public function testHandlerSkipsFinalizerIfPendingHasNoJobId(): void
-    {
-        // Defensive: pending-отчёт может существовать без jobId (manual-triggered
-        // загрузка через OzonDebugFetcher, cleanup-cron'ом). Финализировать нечего,
-        // tryFinalize не должен вызываться даже при пустом отчёте.
-        $pending = $this->makePendingReport(jobId: null);
-        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
-
-        $this->client->method('downloadAndConvertReport')->willReturn([
-            'downloads' => [$this->makeDownload('raw-bytes-empty')],
-            'resultByDate' => [],
-        ]);
-
-        $this->em->expects(self::once())->method('flush');
-        $this->pendingRepo->expects(self::once())
-            ->method('markFinalized')
-            ->with(self::COMPANY_ID, self::OZON_UUID, OzonAdPendingReportState::OK, null)
-            ->willReturn(1);
-
-        $this->bus->expects(self::never())->method('dispatch');
-        $this->finalizer->expects(self::never())->method('tryFinalize');
-
-        $this->makeHandler()(new DownloadOzonAdReportMessage(
-            companyId: self::COMPANY_ID,
-            pendingReportId: self::PENDING_ID,
-        ));
-    }
-
-    public function testHappyPathDoesNotCallFinalizer(): void
-    {
-        // Non-empty report → per-document handler'ы (ProcessAdRawDocumentHandler)
-        // сами позовут finalizer после обработки каждого документа, duplicate
-        // call здесь нарушил бы single-source-of-truth для счётчиков.
-        $pending = $this->makePendingReport();
-        $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
-
-        $this->client->method('downloadAndConvertReport')->willReturn([
-            'downloads' => [$this->makeDownload('raw-bytes-1')],
-            'resultByDate' => [
-                '2026-04-01' => ['campaigns' => [[
-                    'campaign_id' => 'c1',
-                    'campaign_name' => 'C',
-                    'rows' => [['sku' => 's', 'spend' => '1.00', 'views' => 1, 'clicks' => 1]],
-                ]]],
-            ],
-        ]);
-
-        $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
-        $this->storage->method('storeBytes')->willReturn([
-            'storagePath' => 'p',
-            'fileHash' => 'h',
-            'sizeBytes' => 11,
-            'mimeType' => 'text/csv',
-        ]);
-        $this->bus->method('dispatch')->willReturnCallback(
-            static fn (object $m): Envelope => new Envelope($m),
-        );
-
-        $this->finalizer->expects(self::never())->method('tryFinalize');
-
-        $this->makeHandler()(new DownloadOzonAdReportMessage(
-            companyId: self::COMPANY_ID,
-            pendingReportId: self::PENDING_ID,
-        ));
+        self::assertSame('{}', $existing->getRawPayload(), 'existing updatePayload()->{}');
+        self::assertSame('path', $existing->getStoragePath());
+        self::assertSame(4, $existing->getFileSizeBytes());
     }
 
     private function makeHandler(): DownloadOzonAdReportHandler
@@ -412,7 +384,6 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
             $this->rawRepo,
             $this->client,
             $this->em,
-            $this->bus,
             $this->storage,
             $this->finalizer,
             new NullLogger(),
@@ -441,34 +412,16 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         $idProp->setAccessible(true);
         $idProp->setValue($pending, self::PENDING_ID);
 
+        $stateProp = $ref->getProperty('state');
+        $stateProp->setAccessible(true);
+        $stateProp->setValue($pending, OzonAdPendingReportState::OK);
+
         if (null !== $finalizedAt) {
             $finalizedProp = $ref->getProperty('finalizedAt');
             $finalizedProp->setAccessible(true);
             $finalizedProp->setValue($pending, $finalizedAt);
-
-            $stateProp = $ref->getProperty('state');
-            $stateProp->setAccessible(true);
-            $stateProp->setValue($pending, OzonAdPendingReportState::OK);
-        } else {
-            $stateProp = $ref->getProperty('state');
-            $stateProp->setAccessible(true);
-            $stateProp->setValue($pending, OzonAdPendingReportState::OK);
         }
 
         return $pending;
-    }
-
-    private function makeDownload(string $rawBytes): OzonReportDownload
-    {
-        return new OzonReportDownload(
-            rawBytes: $rawBytes,
-            csvContent: 'date;sku;spend;views;clicks',
-            csvParts: ['date;sku;spend;views;clicks'],
-            wasZip: false,
-            sizeBytes: strlen($rawBytes),
-            sha256: hash('sha256', $rawBytes),
-            reportUuid: self::OZON_UUID,
-            filesInZip: 0,
-        );
     }
 }

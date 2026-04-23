@@ -56,6 +56,7 @@ final class AdRawDocumentsListController extends AbstractController
                 'status' => $doc->getStatus()->value,
                 'loadedAt' => $doc->getLoadedAt()->format('d.m.Y H:i'),
                 'processingError' => $doc->getProcessingError(),
+                'hasFile' => null !== $doc->getStoragePath(),
             ],
             $documents,
         );

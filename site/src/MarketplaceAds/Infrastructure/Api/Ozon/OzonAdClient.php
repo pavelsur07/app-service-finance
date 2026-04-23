@@ -845,6 +845,58 @@ class OzonAdClient implements AdPlatformClientInterface
      * @throws OzonPermanentApiException 403 / отсутствующие credentials
      * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
      */
+    /**
+     * Скачивает raw-контент готового отчёта по UUID без парсинга CSV.
+     *
+     * Используется task-8 flow: {@see DownloadOzonAdReportHandler} сохраняет
+     * тело отчёта на диск как файл (csv/zip), парсинг временно отключён.
+     * Возвращает тело и Content-Type — последний нужен для определения
+     * расширения файла (application/zip → zip, text/csv → csv, fallback
+     * по magic bytes PK\x03\x04).
+     *
+     * @return array{body: string, contentType: ?string}
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     */
+    public function fetchReportContent(string $companyId, string $reportUuid): array
+    {
+        Assert::uuid($companyId);
+
+        $credentials = $this->resolveCredentials($companyId);
+        $clientId = $credentials['client_id'];
+        $clientSecret = $credentials['client_secret'];
+
+        $link = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): string => $this->fetchReadyReportLink($token, $reportUuid),
+        );
+
+        $url = str_starts_with($link, 'http://') || str_starts_with($link, 'https://')
+            ? $link
+            : self::BASE_URL.$link;
+
+        $response = $this->withAuthRetry(
+            $companyId,
+            $clientId,
+            $clientSecret,
+            fn (string $token): \Symfony\Contracts\HttpClient\ResponseInterface => $this->authorizedRequest('GET', $url, $token, [], absoluteUrl: true),
+        );
+
+        $headers = $response->getHeaders(false);
+        $contentType = null;
+        if (isset($headers['content-type'][0])) {
+            $contentType = (string) $headers['content-type'][0];
+        }
+
+        return [
+            'body' => $response->getContent(false),
+            'contentType' => $contentType,
+        ];
+    }
+
     public function downloadAndConvertReport(
         string $companyId,
         string $reportUuid,

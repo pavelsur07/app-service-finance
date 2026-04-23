@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -21,7 +23,9 @@ final class AdLoadJobsListController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly AdLoadJobRepository $adLoadJobRepository,
-    ) {}
+        private readonly AdRawDocumentRepository $adRawDocumentRepository,
+    ) {
+    }
 
     public function __invoke(): JsonResponse
     {
@@ -34,8 +38,34 @@ final class AdLoadJobsListController extends AbstractController
             self::LIMIT,
         );
 
-        $items = array_map(
-            static fn ($job): array => [
+        $items = [];
+        foreach ($jobs as $job) {
+            // Для каждого job'а подтягиваем raw-документы в его периоде и
+            // оставляем только те, у которых заполнен storage_path — т.е. есть
+            // файл для скачивания. UI рендерит по одной кнопке «Открыть» на
+            // каждую такую дату.
+            $documents = $this->adRawDocumentRepository->findByCompanyMarketplaceAndDateRange(
+                $companyId,
+                MarketplaceType::OZON->value,
+                $job->getDateFrom(),
+                $job->getDateTo(),
+            );
+
+            $files = [];
+            foreach ($documents as $doc) {
+                if (!$doc instanceof AdRawDocument) {
+                    continue;
+                }
+                if (null === $doc->getStoragePath()) {
+                    continue;
+                }
+                $files[] = [
+                    'id' => $doc->getId(),
+                    'reportDate' => $doc->getReportDate()->format('Y-m-d'),
+                ];
+            }
+
+            $items[] = [
                 'id' => $job->getId(),
                 'status' => $job->getStatus()->value,
                 'dateFrom' => $job->getDateFrom()->format('Y-m-d'),
@@ -44,9 +74,9 @@ final class AdLoadJobsListController extends AbstractController
                 'createdAt' => $job->getCreatedAt()->format('d.m.Y H:i'),
                 'finishedAt' => $job->getFinishedAt()?->format('d.m.Y H:i'),
                 'lastError' => $job->getFailureReason(),
-            ],
-            $jobs,
-        );
+                'files' => $files,
+            ];
+        }
 
         return $this->json(['items' => $items]);
     }

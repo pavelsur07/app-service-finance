@@ -271,13 +271,15 @@
                         }
                         tbody.innerHTML = items.map(function (job) {
                             var canMarkFailed = isCompanyOwner && (job.status === 'pending' || job.status === 'running');
-                            var actionsCell = canMarkFailed
-                                ? '<td><button type="button" class="btn btn-sm btn-outline-danger" '
+                            var markFailedBtn = canMarkFailed
+                                ? '<button type="button" class="btn btn-sm btn-outline-danger mb-1" '
                                     + 'data-bs-toggle="modal" '
                                     + 'data-bs-target="#modal-mark-ad-load-job-failed" '
                                     + 'data-job-id="' + escapeHtml(job.id) + '">'
-                                    + 'Пометить FAILED</button></td>'
-                                : '<td></td>';
+                                    + 'Пометить FAILED</button>'
+                                : '';
+                            var filesButtons = renderJobFiles(job.files || []);
+                            var actionsCell = '<td>' + filesButtons + markFailedBtn + '</td>';
                             return '<tr>'
                                 + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
                                 + '<td>' + jobStatusBadge(job.status) + '</td>'
@@ -300,6 +302,30 @@
             var rawDocsListUrl = '{{ path('marketplace_ads_raw_documents_list') }}';
             var buildReprocessUrl = function (documentId) {
                 return rawDocsListUrl + '/' + encodeURIComponent(documentId) + '/reprocess';
+            };
+
+            // Кнопка «Открыть» — скачать сырой csv/zip, сохранённый на диск
+            // (task-8). URL собираем вручную по той же причине, что и
+            // reprocess: UUID placeholder не пройдёт Symfony requirements.
+            var buildDownloadUrl = function (documentId) {
+                return '/marketplace-ads/raw-documents/' + encodeURIComponent(documentId) + '/download';
+            };
+
+            var formatDateRu = function (isoDate) {
+                var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ''));
+                return m ? (m[3] + '.' + m[2] + '.' + m[1]) : escapeHtml(isoDate);
+            };
+
+            var renderJobFiles = function (files) {
+                if (!Array.isArray(files) || files.length === 0) {
+                    return '';
+                }
+                return files.map(function (f) {
+                    return '<a href="' + escapeHtml(buildDownloadUrl(f.id)) + '" '
+                        + 'class="btn btn-sm btn-outline-primary me-1 mb-1">'
+                        + 'Открыть ' + formatDateRu(f.reportDate)
+                        + '</a>';
+                }).join('');
             };
 
             var loadRawDocuments = function (dateFrom, dateTo) {
@@ -328,12 +354,17 @@
                             return;
                         }
                         tbody.innerHTML = items.map(function (doc) {
+                            var openBtn = doc.hasFile
+                                ? '<a href="' + escapeHtml(buildDownloadUrl(doc.id)) + '" '
+                                    + 'class="btn btn-sm btn-outline-primary me-1">Открыть</a>'
+                                : '';
                             return '<tr>'
                                 + '<td>' + escapeHtml(doc.reportDate) + '</td>'
                                 + '<td>' + docStatusBadge(doc.status) + '</td>'
                                 + '<td><small>' + escapeHtml(doc.loadedAt) + '</small></td>'
                                 + '<td><small class="text-danger">' + escapeHtml(doc.processingError || '') + '</small></td>'
-                                + '<td><button type="button" class="btn btn-sm btn-outline-primary" data-reprocess-doc="' + escapeHtml(doc.id) + '">'
+                                + '<td>' + openBtn
+                                + '<button type="button" class="btn btn-sm btn-outline-secondary" data-reprocess-doc="' + escapeHtml(doc.id) + '">'
                                 + 'Переобработать</button></td>'
                                 + '</tr>';
                         }).join('');

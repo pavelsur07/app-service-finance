@@ -7,7 +7,6 @@ namespace App\Tests\Integration\MarketplaceAds\Controller\Api;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Entity\AdRawDocument;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
-use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdRawDocumentBuilder;
@@ -21,14 +20,14 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
     private const OWNER_ID = '22222222-2222-2222-2222-e10000000001';
     private const OTHER_OWNER_ID = '22222222-2222-2222-2222-e10000000002';
 
-    public function testReprocessResetsFailedDocumentAndDispatchesMessage(): void
+    public function testReprocessResetsFailedDocumentToDraft(): void
     {
         $client = static::createClient();
         $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
-        $transport = $client->getContainer()->get('messenger.transport.async');
+        $transport = $client->getContainer()->get('messenger.transport.async_pipeline');
         $transport->reset();
 
         $owner = UserBuilder::aUser()
@@ -77,13 +76,9 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         self::assertSame(AdRawDocumentStatus::DRAFT, $refreshed->getStatus());
         self::assertNull($refreshed->getProcessingError(), 'Ошибка прошлой попытки должна быть очищена.');
 
-        // Messenger: ровно один ProcessAdRawDocumentMessage с правильными id.
-        $envelopes = $transport->get();
-        self::assertCount(1, $envelopes);
-        $message = iterator_to_array($envelopes)[0]->getMessage();
-        self::assertInstanceOf(ProcessAdRawDocumentMessage::class, $message);
-        self::assertSame($docId, $message->adRawDocumentId);
-        self::assertSame(self::COMPANY_ID, $message->companyId);
+        // Парсинг временно отключён (task-8) — ProcessAdRawDocumentMessage
+        // не диспатчится, несмотря на сброс статуса.
+        self::assertCount(0, $transport->get());
     }
 
     public function testReprocessReturns404WhenDocumentBelongsToOtherCompany(): void
@@ -93,7 +88,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
-        $transport = $client->getContainer()->get('messenger.transport.async');
+        $transport = $client->getContainer()->get('messenger.transport.async_pipeline');
         $transport->reset();
 
         $owner = UserBuilder::aUser()
@@ -161,7 +156,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
-        $transport = $client->getContainer()->get('messenger.transport.async');
+        $transport = $client->getContainer()->get('messenger.transport.async_pipeline');
         $transport->reset();
 
         $owner = UserBuilder::aUser()
@@ -190,14 +185,14 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         self::assertCount(0, $transport->get());
     }
 
-    public function testReprocessAcceptsAlreadyDraftDocumentAndDispatchesMessage(): void
+    public function testReprocessAcceptsAlreadyDraftDocumentAsNoopSuccess(): void
     {
         $client = static::createClient();
         $this->resetDb();
         $em = $this->em();
 
         /** @var InMemoryTransport $transport */
-        $transport = $client->getContainer()->get('messenger.transport.async');
+        $transport = $client->getContainer()->get('messenger.transport.async_pipeline');
         $transport->reset();
 
         $owner = UserBuilder::aUser()
@@ -237,8 +232,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
 
         self::assertResponseIsSuccessful();
 
-        // Повторный reprocess на DRAFT-документе всё равно дожны диспатчнуть сообщение —
-        // это нормальный сценарий после краша воркера.
-        self::assertCount(1, $transport->get());
+        // Парсинг отключён (task-8) — dispatch не происходит.
+        self::assertCount(0, $transport->get());
     }
 }

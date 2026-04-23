@@ -7,7 +7,6 @@ namespace App\MarketplaceAds\Command;
 use App\Company\Facade\CompanyFacade;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Enum\AdRawDocumentStatus;
-use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -15,12 +14,14 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
-use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
  * Переобработка AdRawDocument: находит raw-документы по фильтрам
- * (--date, --marketplace, --company-id — все опциональные, любую комбинацию),
- * сбрасывает их статус в DRAFT и ставит ProcessAdRawDocumentMessage в очередь.
+ * (--date, --marketplace, --company-id — все опциональные, любую комбинацию)
+ * и сбрасывает их статус в DRAFT.
+ *
+ * ПАРСИНГ ВРЕМЕННО ОТКЛЮЧЁН (task-8, 23.04.2026): ProcessAdRawDocumentMessage
+ * больше не диспатчится. Документы остаются в DRAFT до возобновления парсера.
  *
  * Чтобы исключить случайный прогон «всего-по-всем-компаниям» при опечатке в CLI,
  * команда требует либо хотя бы один фильтр, либо явный --all.
@@ -32,9 +33,6 @@ use Symfony\Component\Messenger\MessageBusInterface;
  * (Doctrine toIterable) — документы читаются из курсора по одному и не
  * материализуются все сразу в память, поэтому clear() между батчами не
  * оставляет «хвост» detached-сущностей из предзагруженного массива.
- * Сообщения в очередь отправляются только после того, как все статусы
- * закоммичены в БД, иначе воркер мог бы забрать документ раньше, чем увидит
- * его DRAFT-статус.
  */
 #[AsCommand(
     name: 'app:marketplace-ads:reprocess',
@@ -60,7 +58,6 @@ final class ReprocessAdDataCommand extends Command
         private readonly AdRawDocumentRepository $rawDocumentRepository,
         private readonly CompanyFacade $companyFacade,
         private readonly EntityManagerInterface $entityManager,
-        private readonly MessageBusInterface $bus,
     ) {
         parent::__construct();
     }
@@ -169,10 +166,7 @@ final class ReprocessAdDataCommand extends Command
             reportDate: $reportDate,
         );
 
-        // Собираем пары (companyId, id) для dispatch — в момент clear() объекты
-        // Entity станут detached, поэтому запоминаем scalar-идентификаторы заранее.
-        /** @var list<array{companyId: string, id: string}> $toDispatch */
-        $toDispatch = [];
+        $resetCount = 0;
         $batchIndex = 0;
 
         foreach ($stream as $document) {
@@ -180,10 +174,7 @@ final class ReprocessAdDataCommand extends Command
                 $document->resetToDraft();
             }
 
-            $toDispatch[] = [
-                'companyId' => $document->getCompanyId(),
-                'id' => $document->getId(),
-            ];
+            ++$resetCount;
 
             if (0 === ++$batchIndex % self::BATCH_SIZE) {
                 $this->entityManager->flush();
@@ -197,25 +188,16 @@ final class ReprocessAdDataCommand extends Command
             return Command::SUCCESS;
         }
 
-        // Финальный flush для хвоста последней неполной пачки. clear()
-        // здесь делаем тоже — у команды дальше нет операций с identity map,
-        // а воркер в любом случае перечитает документ по id + companyId.
+        // Финальный flush для хвоста последней неполной пачки.
         $this->entityManager->flush();
         $this->entityManager->clear();
 
-        $dispatched = 0;
-        foreach ($toDispatch as $ids) {
-            $this->bus->dispatch(new ProcessAdRawDocumentMessage(
-                companyId: $ids['companyId'],
-                adRawDocumentId: $ids['id'],
-            ));
-
-            ++$dispatched;
-        }
-
+        // ПАРСИНГ ВРЕМЕННО ОТКЛЮЧЁН (task-8, 23.04.2026):
+        // ProcessAdRawDocumentMessage больше не диспатчится — документы
+        // просто сбрасываются в DRAFT.
         $output->writeln(sprintf(
-            '<info>Переобработка запущена: отправлено %d сообщений.</info>',
-            $dispatched,
+            '<info>Сброшено в DRAFT: %d документов.</info>',
+            $resetCount,
         ));
 
         return Command::SUCCESS;
