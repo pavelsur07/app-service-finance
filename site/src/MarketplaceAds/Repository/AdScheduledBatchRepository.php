@@ -102,16 +102,22 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
     /**
      * Все батчи конкретного job'а (любого state).
      *
+     * IDOR-guard: `companyId` в WHERE. Чужой `jobId`, случайно пробитый
+     * из UI/API, вернёт пустой массив вместо утечки.
+     *
      * @return list<AdScheduledBatch>
      */
-    public function findByJobId(string $jobId): array
+    public function findByJobId(string $jobId, string $companyId): array
     {
         Assert::uuid($jobId);
+        Assert::uuid($companyId);
 
         /** @var list<AdScheduledBatch> $result */
         $result = $this->createQueryBuilder('b')
             ->where('b.jobId = :jobId')
+            ->andWhere('b.companyId = :companyId')
             ->setParameter('jobId', $jobId)
+            ->setParameter('companyId', $companyId)
             ->orderBy('b.batchIndex', 'ASC')
             ->getQuery()
             ->getResult();
@@ -130,20 +136,28 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
      * Raw DBAL: finalizer работает частыми тиками, гидратация entity
      * избыточна (нужен только COUNT(*)).
      *
+     * IDOR-guard: `company_id` в WHERE — даже если jobId принадлежит чужой
+     * компании, получим пустую сводку.
+     *
      * @return array<string, int>
      */
-    public function countStatesForJob(string $jobId): array
+    public function countStatesForJob(string $jobId, string $companyId): array
     {
         Assert::uuid($jobId);
+        Assert::uuid($companyId);
 
         $rows = $this->getEntityManager()->getConnection()->fetchAllAssociative(
             <<<'SQL'
                 SELECT state, COUNT(*) AS cnt
                 FROM marketplace_ad_scheduled_batches
                 WHERE job_id = :job_id
+                  AND company_id = :company_id
                 GROUP BY state
                 SQL,
-            ['job_id' => $jobId],
+            [
+                'job_id' => $jobId,
+                'company_id' => $companyId,
+            ],
         );
 
         $result = [];
@@ -175,17 +189,23 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
      * Фильтр `storage_path IS NOT NULL` вынесен в SQL: показывать в списке
      * «нечего скачивать» записи без файла — баг UX.
      *
+     * IDOR-guard: `companyId` обязателен, метод вызывается из HTTP-контекста
+     * (Task-11.8 UI), подмена `jobId` не должна отдать чужие download-ссылки.
+     *
      * @return list<AdScheduledBatch>
      */
-    public function findDownloadableByJobId(string $jobId): array
+    public function findDownloadableByJobId(string $jobId, string $companyId): array
     {
         Assert::uuid($jobId);
+        Assert::uuid($companyId);
 
         /** @var list<AdScheduledBatch> $result */
         $result = $this->createQueryBuilder('b')
             ->where('b.jobId = :jobId')
+            ->andWhere('b.companyId = :companyId')
             ->andWhere('b.storagePath IS NOT NULL')
             ->setParameter('jobId', $jobId)
+            ->setParameter('companyId', $companyId)
             ->orderBy('b.batchIndex', 'ASC')
             ->getQuery()
             ->getResult();

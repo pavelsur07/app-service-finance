@@ -366,11 +366,32 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        $result = $this->repository->findByJobId($jobA->getId());
+        $result = $this->repository->findByJobId($jobA->getId(), self::COMPANY_ID);
 
         self::assertCount(2, $result);
         self::assertSame(0, $result[0]->getBatchIndex());
         self::assertSame(2, $result[1]->getBatchIndex());
+    }
+
+    public function testFindByJobIdReturnsEmptyForForeignCompanyIDOR(): void
+    {
+        $job = $this->seedJob();
+        $otherCompanyId = '11111111-1111-1111-1111-000000000002';
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->build();
+
+        $this->repository->save($batch);
+        $this->em->flush();
+        $this->em->clear();
+
+        // Своя компания — видит
+        self::assertCount(1, $this->repository->findByJobId($job->getId(), self::COMPANY_ID));
+        // Чужая — не видит, даже зная jobId
+        self::assertCount(0, $this->repository->findByJobId($job->getId(), $otherCompanyId));
     }
 
     public function testCountStatesForJobReturnsAggregatesByState(): void
@@ -399,7 +420,7 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        $counts = $this->repository->countStatesForJob($job->getId());
+        $counts = $this->repository->countStatesForJob($job->getId(), self::COMPANY_ID);
 
         self::assertSame(3, $counts['PLANNED'] ?? 0);
         self::assertSame(1, $counts['IN_FLIGHT'] ?? 0);
@@ -408,11 +429,33 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         self::assertArrayNotHasKey('ABANDONED', $counts, 'Пустые буксеты не должны появляться');
     }
 
+    public function testCountStatesForJobReturnsEmptyForForeignCompanyIDOR(): void
+    {
+        $job = $this->seedJob();
+        $otherCompanyId = '11111111-1111-1111-1111-000000000002';
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->build();
+
+        $this->repository->save($batch);
+        $this->em->flush();
+        $this->em->clear();
+
+        self::assertSame(
+            [],
+            $this->repository->countStatesForJob($job->getId(), $otherCompanyId),
+            'Чужой company_id не должен видеть агрегаты job\'а.',
+        );
+    }
+
     public function testCountStatesForJobReturnsEmptyArrayForUnknownJob(): void
     {
         $this->seedJob();
 
-        $counts = $this->repository->countStatesForJob('99999999-9999-9999-9999-999999999999');
+        $counts = $this->repository->countStatesForJob('99999999-9999-9999-9999-999999999999', self::COMPANY_ID);
 
         self::assertSame([], $counts);
     }
@@ -441,13 +484,36 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         $this->em->flush();
         $this->em->clear();
 
-        $result = $this->repository->findDownloadableByJobId($job->getId());
+        $result = $this->repository->findDownloadableByJobId($job->getId(), self::COMPANY_ID);
 
         self::assertCount(1, $result);
         self::assertSame($withFile->getId(), $result[0]->getId());
         self::assertSame('marketplace-ads/file-1.csv', $result[0]->getStoragePath());
         self::assertSame('hash1', $result[0]->getFileHash());
         self::assertSame(1024, $result[0]->getFileSize());
+    }
+
+    public function testFindDownloadableByJobIdReturnsEmptyForForeignCompanyIDOR(): void
+    {
+        $job = $this->seedJob();
+        $otherCompanyId = '11111111-1111-1111-1111-000000000002';
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage('marketplace-ads/file-1.csv', 'hash1', 1024)
+            ->build();
+
+        $this->repository->save($batch);
+        $this->em->flush();
+        $this->em->clear();
+
+        // Своя компания — видит ссылку
+        self::assertCount(1, $this->repository->findDownloadableByJobId($job->getId(), self::COMPANY_ID));
+        // Чужая — нет, даже при валидном jobId (UI Task-11.8 не должна подтянуть файлы через подмену id)
+        self::assertCount(0, $this->repository->findDownloadableByJobId($job->getId(), $otherCompanyId));
     }
 
     public function testUpdatedAtAdvancesOnSetters(): void
