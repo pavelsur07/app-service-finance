@@ -200,10 +200,10 @@ final class AdJobFinalizerCommandTest extends TestCase
                 return ['OK' => 1];
             });
 
-        // markCompleted должен быть вызван только для jobB.
+        // markCompleted должен быть вызван только для jobB (с companyId).
         $this->jobRepo->expects(self::once())
             ->method('markCompleted')
-            ->with($jobB->getId())
+            ->with($jobB->getId(), self::COMPANY_ID)
             ->willReturn(1);
 
         $tester = new CommandTester($this->command);
