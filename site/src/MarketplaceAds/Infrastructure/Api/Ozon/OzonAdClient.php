@@ -628,6 +628,93 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
+     * POST `/api/client/statistics` — единая чистая точка входа для cron-driven
+     * pipeline (Task-11.5 {@see \App\MarketplaceAds\Command\AdBatchSchedulerCommand}).
+     *
+     * В отличие от {@see self::requestOneBatch()}, НЕ пишет в
+     * `marketplace_ad_pending_reports` (старый pipeline-артефакт) и не делает
+     * resume-матчинг — это ответственность новой таблицы `ad_scheduled_batches`.
+     *
+     * Семантика ошибок:
+     *  - 403 / отсутствующие credentials → {@see OzonPermanentApiException}
+     *    (caller помечает batch FAILED);
+     *  - 429 → {@see \App\MarketplaceAds\Exception\OzonRateLimitException}
+     *    (caller перепланирует `scheduled_at` на +N минут);
+     *  - 5xx / network / JSON → `\RuntimeException` (caller откатывает
+     *    транзакцию, batch остаётся PLANNED, cron попробует на следующем тике).
+     *
+     * @param list<string> $campaignIds 1..10 записей (лимит Ozon на POST /statistics)
+     *
+     * @return string UUID созданного отчёта
+     *
+     * @throws OzonPermanentApiException
+     * @throws \App\MarketplaceAds\Exception\OzonRateLimitException
+     * @throws \InvalidArgumentException пустой $campaignIds или диапазон > 62 дней
+     * @throws \RuntimeException         прочие non-2xx / network / JSON-ошибки
+     */
+    public function postStatistics(
+        string $companyId,
+        array $campaignIds,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): string {
+        if ([] === $campaignIds) {
+            throw new \InvalidArgumentException('postStatistics: campaignIds must not be empty');
+        }
+
+        $this->assertValidRange($dateFrom, $dateTo);
+
+        $credentials = $this->resolveCredentials($companyId);
+
+        /** @var string $uuid */
+        $uuid = $this->withAuthRetry(
+            $companyId,
+            $credentials['client_id'],
+            $credentials['client_secret'],
+            function (string $token) use ($companyId, $campaignIds, $dateFrom, $dateTo): string {
+                // Caller передаёт DateTimeImmutable в своей TZ; Ozon ждёт RFC3339 в UTC.
+                // Сначала фиксируем границы суток в исходной TZ, затем конвертируем в UTC —
+                // иначе календарный день MSK был бы помечен как UTC и сдвинул окно на 3 часа.
+                $utc = new \DateTimeZone('UTC');
+                $from = $dateFrom->setTime(0, 0, 0)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+                $to = $dateTo->setTime(23, 59, 59)->setTimezone($utc)->format('Y-m-d\TH:i:s\Z');
+
+                $this->marketplaceAdsLogger->info('Ozon Performance POST /statistics (scheduler)', [
+                    'companyId' => $companyId,
+                    'campaignCount' => count($campaignIds),
+                    'from' => $from,
+                    'to' => $to,
+                ]);
+
+                $response = $this->authorizedRequest('POST', self::STATISTICS_PATH, $token, [
+                    'json' => [
+                        'campaigns' => $campaignIds,
+                        'from' => $from,
+                        'to' => $to,
+                        // groupBy=DATE — per-day строки в CSV, консистентно с
+                        // range-pipeline'ом (requestStatistics → fetchAdStatisticsRange
+                        // / requestOneBatch), который парсит отчёт как per-day данные.
+                        // NO_GROUP_BY дал бы одну строку на кампанию за весь диапазон
+                        // и сломал бы downstream-парсер при dateFrom != dateTo.
+                        'groupBy' => 'DATE',
+                    ],
+                ]);
+
+                $data = $this->decodeJson($response->getContent(false), 'statistics request (scheduler)');
+
+                $uuid = $this->stringifyApiField($data['UUID'] ?? $data['uuid'] ?? null);
+                if ('' === $uuid) {
+                    throw new \RuntimeException('Ozon Performance: ответ /statistics не содержит UUID');
+                }
+
+                return $uuid;
+            },
+        );
+
+        return $uuid;
+    }
+
+    /**
      * POST /api/client/statistics для ровно одного батча кампаний.
      *
      * Используется {@see \App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler}
