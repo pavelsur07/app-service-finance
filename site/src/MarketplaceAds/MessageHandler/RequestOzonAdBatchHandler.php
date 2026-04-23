@@ -74,7 +74,7 @@ final class RequestOzonAdBatchHandler
      * редкие глобальные throttle'ы Ozon — 3 попыток (3 минуты) хватает
      * отличить transient от устойчивой проблемы.
      */
-    private const MAX_RATE_LIMIT_ATTEMPTS = 3;
+    private const MAX_RATE_LIMIT_ATTEMPTS = 10;
 
     /**
      * Ozon Performance жёсткий лимит: не более 3 активных отчётов в очереди
