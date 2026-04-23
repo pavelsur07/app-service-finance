@@ -60,4 +60,25 @@ interface AdLoadJobRepositoryInterface
      * @return int число обновлённых строк (0 если job уже терминальный или чужой)
      */
     public function markFailed(string $jobId, string $companyId, string $reason): int;
+
+    /**
+     * Помечает задание как PARTIAL_SUCCESS — часть батчей прошла, часть нет.
+     * Используется финализатором cron-driven pipeline (Task-11.7).
+     *
+     * Идемпотентно (status IN pending/running), IDOR-safe, пишет $reason в
+     * `failure_reason` (поле переиспользуется — хранит объяснение терминального
+     * не-OK исхода).
+     *
+     * @return int число обновлённых строк (0 если job уже терминальный или чужой)
+     */
+    public function markPartialSuccess(string $jobId, string $companyId, string $reason): int;
+
+    /**
+     * Все job'ы в статусе RUNNING (глобально, без company-фильтра — cron
+     * работает cross-tenant). Используется финализатором Task-11.7 для
+     * сканирования кандидатов на закрытие.
+     *
+     * @return list<AdLoadJob>
+     */
+    public function findAllRunning(): array;
 }

@@ -182,6 +182,56 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         );
     }
 
+    /**
+     * Помечает задание как PARTIAL_SUCCESS через raw DBAL UPDATE (минуя UoW).
+     *
+     * Используется финализатором cron-driven pipeline (Task-11.7), когда
+     * batch'и job'а завершились смесью OK + FAILED/ABANDONED. Идемпотентно
+     * (status IN pending/running) + IDOR-safe (company_id в WHERE).
+     *
+     * @return int число обновлённых строк (0 если job уже терминальный или чужой)
+     */
+    public function markPartialSuccess(string $jobId, string $companyId, string $reason): int
+    {
+        if ('' === $reason) {
+            throw new \InvalidArgumentException('Причина частичного успеха не может быть пустой.');
+        }
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_load_jobs
+                SET status = 'partial_success',
+                    failure_reason = :reason,
+                    finished_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :jobId
+                  AND company_id = :companyId
+                  AND status IN ('pending', 'running')
+                SQL,
+            [
+                'reason' => $reason,
+                'jobId' => $jobId,
+                'companyId' => $companyId,
+            ],
+        );
+    }
+
+    /**
+     * @return list<AdLoadJob>
+     */
+    public function findAllRunning(): array
+    {
+        /** @var list<AdLoadJob> $result */
+        $result = $this->createQueryBuilder('j')
+            ->where('j.status = :status')
+            ->setParameter('status', AdLoadJobStatus::RUNNING)
+            ->orderBy('j.createdAt', 'ASC')
+            ->getQuery()
+            ->getResult();
+
+        return $result;
+    }
+
     private function atomicIncrement(string $column, string $jobId, string $companyId, int $delta): int
     {
         // Whitelist — защита от SQL-injection через имя колонки (параметризовать имя

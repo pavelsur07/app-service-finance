@@ -552,10 +552,15 @@
                 });
             }
 
-            // Поллер прогресса загрузки рекламы Ozon (15 сек)
+            // Поллер прогресса загрузки рекламы Ozon (15 сек).
+            // Терминальные статусы (polling stops): completed | failed | partial_success.
+            // Последний добавлен в Task-11.7: cron-финализатор (Task-11.7) проставляет
+            // его при смеси OK + FAILED/ABANDONED batch'ей. Без этой проверки jobs
+            // в partial_success поллились бы бесконечно.
+            var TERMINAL_AD_JOB_STATUSES = ['completed', 'failed', 'partial_success'];
             document.querySelectorAll('[data-ad-job-id]').forEach(function (widget) {
                 var status = widget.dataset.adJobStatus;
-                if (status === 'completed' || status === 'failed') return;
+                if (TERMINAL_AD_JOB_STATUSES.indexOf(status) !== -1) return;
 
                 var statusUrl = widget.dataset.statusUrl;
                 var bar       = widget.querySelector('.ozon-ad-progress-bar');
@@ -571,7 +576,7 @@
                                     + ', Документов: ' + data.totalDocs
                                     + ' (' + data.processedDocs + ' обработано, ' + data.failedDocs + ' ошибок)';
                             }
-                            if (data.status === 'completed' || data.status === 'failed') {
+                            if (TERMINAL_AD_JOB_STATUSES.indexOf(data.status) !== -1) {
                                 clearInterval(interval);
                                 window.location.reload();
                             }
