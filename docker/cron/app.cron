@@ -2,33 +2,33 @@
 # │       │      │     │     │
 
 # Каждые 5 минут: авто-правила ДДС
-#*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction >> /var/log/cron/app.log 2>&1
+#*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction
 
 # Ночная синхронизация отчётов WB по реализации.
-0 3 * * * php bin/console app:marketplace:wb-daily-sync --no-interaction >> /var/log/cron/app.log 2>&1
+0 3 * * * php bin/console app:marketplace:wb-daily-sync --no-interaction
 
 # Ночная синхронизация отчётов Ozon по реализации.
-0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction >> /var/log/cron/app.log 2>&1
+0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
 # Ежедневная загрузка рекламы Ozon за вчера для всех компаний с активным Performance-подключением.
-30 4 * * * php bin/console app:marketplace-ads:ozon-daily-sync --no-interaction >> /var/log/cron/app.log 2>&1
+30 4 * * * php bin/console app:marketplace-ads:ozon-daily-sync --no-interaction
 
 # Poll Ozon Performance reports (async-poll redesign, step 5)
 # Picks up pending reports in REQUESTED state, transitions state via
 # GET /statistics/list (one call per company), dispatches download
 # on state=OK. See ARCHITECTURE.md.
-*/2 * * * * php bin/console app:marketplace-ads:ozon-poll-reports --quiet >> /var/log/cron/app.log 2>&1
+*/2 * * * * php bin/console app:marketplace-ads:ozon-poll-reports --quiet
 
 # 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
-0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod >> /var/log/cron/app.log 2>&1
+0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod
 
 # Раз в час: пересчёт оперативных P&L-агрегатов
-#5 * * * * php /app/bin/console app:pl:rebuild --no-interaction >> /var/log/cron/app.log 2>&1
+#5 * * * * php /app/bin/console app:pl:rebuild --no-interaction
 
 # Ежедневно в 02:10: снапшоты остатков по счетам
-#10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction >> /var/log/cron/app.log 2>&1
+#10 2 * * * php /app/bin/console app:money-account:snapshot --no-interaction
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
-#0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod >> /var/log/cron/app.log 2>&1
+#0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
 
 

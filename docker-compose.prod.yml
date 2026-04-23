@@ -370,7 +370,6 @@ services:
             FEATURE_FUNDS_AND_WIDGET: ${FEATURE_FUNDS_AND_WIDGET:-1}
         volumes:
             - ./docker/cron/app.cron:/etc/crontabs/app.cron:ro
-            - ./var/log/cron:/var/log/cron:rw
         depends_on:
             site-postgres:
                 condition: service_healthy
