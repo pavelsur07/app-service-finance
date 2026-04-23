@@ -182,7 +182,14 @@ final class OzonAdReportPoller
             // OK/READY → фиксируем state=OK, гасим next_poll_at (дальше не
             // опрашиваем). markFinalized делает DownloadOzonAdReportHandler
             // после скачивания CSV.
-            $this->repo->updateStateWithSchedule(
+            //
+            // Порядок строгий: сначала коммит state=OK в БД, потом dispatch.
+            // Если UPDATE вернул 0 строк — запись уже финализирована параллельным
+            // worker'ом или внешне изменилась (guard finalized_at IS NULL в SQL).
+            // Download дублировать нельзя; возвращаем [0, 0] без dispatch'а.
+            // Контракт для DownloadOzonAdReportHandler: «OK видна в БД до прихода
+            // message» — соблюдается только при $updatedRows > 0.
+            $updatedRows = $this->repo->updateStateWithSchedule(
                 $companyId,
                 $uuid,
                 OzonAdPendingReportState::OK,
@@ -191,6 +198,16 @@ final class OzonAdReportPoller
                 $nextAttempts,
                 $now,
             );
+
+            if (0 === $updatedRows) {
+                $this->logger->warning('Ozon pending report OK — update returned 0 rows, skipping download dispatch', [
+                    'companyId' => $companyId,
+                    'reportUuid' => $uuid,
+                    'pendingReportId' => $row->getId(),
+                ]);
+
+                return [0, 0];
+            }
 
             // Handoff в async_pipeline: handler сам забирает CSV, upsert'ит
             // AdRawDocument, финализирует pending-отчёт. Dispatch безопасно
