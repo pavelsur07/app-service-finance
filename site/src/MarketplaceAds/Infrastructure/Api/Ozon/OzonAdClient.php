@@ -806,53 +806,12 @@ class OzonAdClient implements AdPlatformClientInterface
     }
 
     /**
-     * Скачивает готовый отчёт Ozon Performance по UUID и конвертирует CSV в
-     * структуру, сгруппированную по дате (совместимо с shape'ом
-     * {@see fetchAdStatisticsRange()} — date => ['campaigns' => [...]]).
-     *
-     * Используется в async-poll flow (step 4 redesign): poll-cron наблюдает
-     * state=OK на pending-отчёте и хэндит off на DownloadOzonAdReportHandler,
-     * который вызывает этот метод, чтобы завершить ингест без повторного
-     * POST /statistics и без внутреннего polling-цикла.
-     *
-     * НЕ опрашивает state и НЕ спит: вызывающий код уже знает, что state
-     * терминальный OK. Делает один GET /statistics/{uuid} ради свежей
-     * download-ссылки (Ozon link может содержать signed-expiration), затем
-     * GET download + парсинг CSV. 401 на любом шаге — один refresh-токен
-     * retry (withAuthRetry).
-     *
-     * namesById умышленно остаётся пустым: в новом Ozon-формате
-     * campaign_name приходит отдельной колонкой CSV (см. convertCsvToRowsByDate),
-     * а вызывать listSkuCampaigns() стоит одного лишнего HTTP-запроса и
-     * не улучшает качество — если кампания переименована/удалена с момента
-     * запроса, любой fallback всё равно неточен. Parser graceful degrade'ит
-     * до пустого campaign_name.
-     *
-     * НЕ трогает $this->lastChunkDownloads — bronze в async-flow'е пишет
-     * handler сам из возвращаемого `downloads` массива.
-     *
-     * @param list<string> $campaignIds Используются только для логирования контекста.
-     *
-     * @return array{
-     *     downloads: list<OzonReportDownload>,
-     *     resultByDate: array<string, array{campaigns: list<array{
-     *         campaign_id: string,
-     *         campaign_name: string,
-     *         rows: list<array{sku: string, spend: string, views: int, clicks: int}>,
-     *     }>}>,
-     * }
-     *
-     * @throws OzonPermanentApiException 403 / отсутствующие credentials
-     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
-     */
-    /**
      * Скачивает raw-контент готового отчёта по UUID без парсинга CSV.
      *
      * Используется task-8 flow: {@see DownloadOzonAdReportHandler} сохраняет
      * тело отчёта на диск как файл (csv/zip), парсинг временно отключён.
      * Возвращает тело и Content-Type — последний нужен для определения
-     * расширения файла (application/zip → zip, text/csv → csv, fallback
-     * по magic bytes PK\x03\x04).
+     * расширения файла (приоритет magic bytes PK\x03\x04 > Content-Type).
      *
      * @return array{body: string, contentType: ?string}
      *
@@ -862,6 +821,10 @@ class OzonAdClient implements AdPlatformClientInterface
     public function fetchReportContent(string $companyId, string $reportUuid): array
     {
         Assert::uuid($companyId);
+        // reportUuid попадает в имя файла на диске (marketplace-ads/<company>/<uuid>.<ext>).
+        // UUID-валидация гарантирует отсутствие slashes/..-сегментов вне зависимости
+        // от того, откуда пришла строка (БД, внешний caller) — path traversal невозможен.
+        Assert::uuid($reportUuid);
 
         $credentials = $this->resolveCredentials($companyId);
         $clientId = $credentials['client_id'];
@@ -897,6 +860,47 @@ class OzonAdClient implements AdPlatformClientInterface
         ];
     }
 
+    /**
+     * Скачивает готовый отчёт Ozon Performance по UUID и конвертирует CSV в
+     * структуру, сгруппированную по дате (совместимо с shape'ом
+     * {@see fetchAdStatisticsRange()} — date => ['campaigns' => [...]]).
+     *
+     * НЕ опрашивает state и НЕ спит: вызывающий код уже знает, что state
+     * терминальный OK. Делает один GET /statistics/{uuid} ради свежей
+     * download-ссылки (Ozon link может содержать signed-expiration), затем
+     * GET download + парсинг CSV. 401 на любом шаге — один refresh-токен
+     * retry (withAuthRetry).
+     *
+     * namesById умышленно остаётся пустым: в новом Ozon-формате
+     * campaign_name приходит отдельной колонкой CSV (см. convertCsvToRowsByDate),
+     * а вызывать listSkuCampaigns() стоит одного лишнего HTTP-запроса и
+     * не улучшает качество — если кампания переименована/удалена с момента
+     * запроса, любой fallback всё равно неточен. Parser graceful degrade'ит
+     * до пустого campaign_name.
+     *
+     * НЕ трогает $this->lastChunkDownloads — bronze в async-flow'е пишет
+     * handler сам из возвращаемого `downloads` массива.
+     *
+     * @param list<string> $campaignIds Используются только для логирования контекста.
+     *
+     * @return array{
+     *     downloads: list<OzonReportDownload>,
+     *     resultByDate: array<string, array{campaigns: list<array{
+     *         campaign_id: string,
+     *         campaign_name: string,
+     *         rows: list<array{sku: string, spend: string, views: int, clicks: int}>,
+     *     }>}>,
+     * }
+     *
+     * @throws OzonPermanentApiException 403 / отсутствующие credentials
+     * @throws \RuntimeException         отчёт не в ready-состоянии или прочие non-2xx / network / JSON-ошибки
+     *
+     * @deprecated Since v1.18 (task-8): парсинг отключён, метод не вызывается.
+     *             {@see DownloadOzonAdReportHandler} использует
+     *             {@see self::fetchReportContent()} вместо этого. Будет
+     *             восстановлен или удалён в follow-up задаче, когда
+     *             парсер вернут в пайплайн.
+     */
     public function downloadAndConvertReport(
         string $companyId,
         string $reportUuid,

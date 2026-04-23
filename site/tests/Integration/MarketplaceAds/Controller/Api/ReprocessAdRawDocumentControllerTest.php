@@ -66,7 +66,7 @@ final class ReprocessAdRawDocumentControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
 
         $data = json_decode($client->getResponse()->getContent(), true);
-        self::assertSame('reprocessing_dispatched', $data['status']);
+        self::assertSame('reset_to_draft', $data['status']);
         self::assertSame($docId, $data['documentId']);
 
         // БД: статус сброшен на DRAFT, processingError очищен.

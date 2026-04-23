@@ -233,23 +233,21 @@ final class DownloadOzonAdReportHandler
     /**
      * Определяет расширение файла отчёта Ozon.
      *
-     * Первый источник истины — Content-Type header. При неоднозначности
-     * (application/octet-stream, text/plain, пустой заголовок) — проверяем
-     * magic bytes первых 4 байт. PK\x03\x04 → zip, иначе csv.
+     * Magic bytes — источник истины, т.к. определяются по самому контенту:
+     * Ozon / CDN / прокси могут отдать ZIP с Content-Type `text/csv`
+     * (наблюдалось в проде на перезапакованных ответах). Поэтому сначала
+     * проверяем PK\x03\x04, а Content-Type используем только как fallback.
      */
     private function detectExtension(string $contentType, string $body): string
     {
-        $ct = strtolower(trim(explode(';', $contentType)[0] ?? ''));
-
-        if (\in_array($ct, ['application/zip', 'application/x-zip-compressed'], true)) {
+        // Magic bytes: локальный ZIP-header. Истина по контенту.
+        if (\strlen($body) >= 4 && "PK\x03\x04" === substr($body, 0, 4)) {
             return 'zip';
         }
 
-        if (\in_array($ct, ['text/csv', 'application/csv'], true)) {
-            return 'csv';
-        }
-
-        if (\strlen($body) >= 4 && "PK\x03\x04" === substr($body, 0, 4)) {
+        // Content-Type: fallback при отсутствии magic bytes.
+        $ct = strtolower(trim(explode(';', $contentType)[0] ?? ''));
+        if (\in_array($ct, ['application/zip', 'application/x-zip-compressed'], true)) {
             return 'zip';
         }
 

@@ -268,17 +268,18 @@ final class DownloadOzonAdReportHandlerTest extends TestCase
         ));
     }
 
-    public function testExtensionZipByMagicBytesWhenContentTypeAmbiguous(): void
+    public function testExtensionZipByMagicBytesBeatsConflictingContentType(): void
     {
         $pending = $this->makePendingReport();
         $this->pendingRepo->method('findByIdAndCompany')->willReturn($pending);
 
-        // PK\x03\x04 — локальный ZIP-header, должен переключить на zip даже при
-        // octet-stream Content-Type.
+        // PK\x03\x04 — локальный ZIP-header. Magic bytes должны побеждать
+        // Content-Type, даже если CDN/прокси пометил ответ как text/csv.
+        // Иначе юзер скачал бы ".csv" с бинарным ZIP-содержимым.
         $zipBody = "PK\x03\x04rest-of-archive";
         $this->client->method('fetchReportContent')->willReturn([
             'body' => $zipBody,
-            'contentType' => 'application/octet-stream',
+            'contentType' => 'text/csv',
         ]);
         $this->rawRepo->method('findByMarketplaceAndDate')->willReturn(null);
 

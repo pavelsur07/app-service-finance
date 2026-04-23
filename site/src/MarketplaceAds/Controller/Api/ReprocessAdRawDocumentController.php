@@ -38,8 +38,10 @@ final class ReprocessAdRawDocumentController extends AbstractController
             return $this->json(['message' => 'Документ не найден.'], 404);
         }
 
+        // Парсинг отключён (task-8): dispatch'а больше нет, API возвращает
+        // 'reset_to_draft' — ровно то, что было сделано в БД.
         return $this->json([
-            'status' => 'reprocessing_dispatched',
+            'status' => 'reset_to_draft',
             'documentId' => $id,
         ]);
     }
