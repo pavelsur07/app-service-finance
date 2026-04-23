@@ -15,6 +15,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Command\LockableTrait;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -28,13 +29,21 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  *  2) по state:
  *      - `OK` / `READY`  → {@see OzonAdClient::fetchReportContent()} → сохранить
  *        файл через {@see StorageService::storeBytes()} → batch в OK;
- *      - `ERROR` / `CANCELLED` → batch в FAILED с причиной;
- *      - `NOT_STARTED` / `IN_PROGRESS` → без изменений (следующий тик попробует);
+ *      - `ERROR` / `CANCELLED` / `NOT_FOUND` → batch в FAILED с причиной;
+ *      - `NOT_STARTED` / `IN_PROGRESS` → проверяется возраст:
+ *          - moложе {@see self::MAX_AGE_BEFORE_ABANDON_HOURS}ч — без изменений
+ *            (следующий тик попробует);
+ *          - старше — batch в ABANDONED (Ozon «забыл» отчёт или не смог его
+ *            сгенерировать, см. инцидент 22–23.04.2026 в ARCHITECTURE v1.15);
  *      - unknown / unexpected → лог warning, batch не трогаем.
  *
  * Ozon не лимитирует `GET /statistics/{uuid}`, только `POST /statistics` (см.
  * Scheduler Task-11.5), поэтому Poller обрабатывает весь queue за один тик,
  * а не по одному за инвокейшн.
+ *
+ * Overlap-protection: {@see LockableTrait}. Если предыдущий Poller ещё не
+ * завершился (cron-тик наложился на прошлый), новый инстанс выходит без
+ * работы — дубликация download'ов и гонка на одном UUID исключены.
  *
  * Per-batch try/catch: transient-ошибка на одном батче (сеть, 5xx) не
  * останавливает обработку остальных — батч остаётся IN_FLIGHT, следующий тик
@@ -54,6 +63,17 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 )]
 final class AdBatchPollerCommand extends Command
 {
+    use LockableTrait;
+
+    /**
+     * Максимальный возраст `startedAt` до перевода батча в ABANDONED.
+     *
+     * 3 часа — соответствие поведению старого {@see \App\MarketplaceAds\Application\Service\OzonAdReportPoller}
+     * (v1.15): Ozon Performance под нагрузкой держит отчёты в очереди генерации
+     * до 2 часов; 3-часовой порог даёт запас с буфером.
+     */
+    private const MAX_AGE_BEFORE_ABANDON_HOURS = 3;
+
     public function __construct(
         private readonly OzonAdClient $ozonClient,
         private readonly AdScheduledBatchRepository $batchRepo,
@@ -67,52 +87,62 @@ final class AdBatchPollerCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $batches = $this->batchRepo->findAllInFlight();
-
-        if ([] === $batches) {
-            $output->writeln('<info>No IN_FLIGHT batches.</info>');
+        if (!$this->lock()) {
+            $output->writeln('<comment>Another poller is running, skipping.</comment>');
 
             return self::SUCCESS;
         }
 
-        $output->writeln(sprintf('Processing %d IN_FLIGHT batches', count($batches)));
+        try {
+            $batches = $this->batchRepo->findAllInFlight();
 
-        $okCount = 0;
-        $failedCount = 0;
-        $stillInFlight = 0;
-        $transientErrors = 0;
+            if ([] === $batches) {
+                $output->writeln('<info>No IN_FLIGHT batches.</info>');
 
-        foreach ($batches as $batch) {
-            try {
-                $result = $this->processBatch($batch);
-                match ($result) {
-                    'ok' => ++$okCount,
-                    'failed' => ++$failedCount,
-                    default => ++$stillInFlight,
-                };
-            } catch (\Throwable $e) {
-                // Transient для конкретного батча — логируем, идём дальше.
-                // Batch остаётся IN_FLIGHT, следующий poll попробует снова.
-                ++$transientErrors;
-                $this->logger->warning('Poller: batch processing failed (transient)', [
-                    'batchId' => $batch->getId(),
-                    'ozonUuid' => $batch->getOzonUuid(),
-                    'companyId' => $batch->getCompanyId(),
-                    'error' => $e->getMessage(),
-                    'exception' => $e::class,
-                ]);
+                return self::SUCCESS;
             }
+
+            $output->writeln(sprintf('Processing %d IN_FLIGHT batches', count($batches)));
+
+            $okCount = 0;
+            $failedCount = 0;
+            $stillInFlight = 0;
+            $transientErrors = 0;
+
+            foreach ($batches as $batch) {
+                try {
+                    $result = $this->processBatch($batch);
+                    match ($result) {
+                        'ok' => ++$okCount,
+                        'failed' => ++$failedCount,
+                        default => ++$stillInFlight,
+                    };
+                } catch (\Throwable $e) {
+                    // Transient для конкретного батча — логируем, идём дальше.
+                    // Batch остаётся IN_FLIGHT, следующий poll попробует снова.
+                    ++$transientErrors;
+                    $this->logger->warning('Poller: batch processing failed (transient)', [
+                        'batchId' => $batch->getId(),
+                        'ozonUuid' => $batch->getOzonUuid(),
+                        'companyId' => $batch->getCompanyId(),
+                        'error' => $e->getMessage(),
+                        'exception' => $e::class,
+                    ]);
+                }
+            }
+
+            $output->writeln(sprintf(
+                '<info>Totals: ok=%d failed=%d in_flight=%d transient_errors=%d</info>',
+                $okCount,
+                $failedCount,
+                $stillInFlight,
+                $transientErrors,
+            ));
+
+            return self::SUCCESS;
+        } finally {
+            $this->release();
         }
-
-        $output->writeln(sprintf(
-            '<info>Totals: ok=%d failed=%d in_flight=%d transient_errors=%d</info>',
-            $okCount,
-            $failedCount,
-            $stillInFlight,
-            $transientErrors,
-        ));
-
-        return self::SUCCESS;
     }
 
     /**
@@ -206,6 +236,37 @@ final class AdBatchPollerCommand extends Command
 
             case 'NOT_STARTED':
             case 'IN_PROGRESS':
+                // Abandon-timeout: если Ozon держит отчёт в неготовом состоянии
+                // > MAX_AGE_BEFORE_ABANDON_HOURS часов от момента нашего POST
+                // (`startedAt` выставляется Scheduler'ом в Task-11.5), мы
+                // переводим батч в ABANDONED и не продолжаем polling.
+                // Соответствует поведению старого OzonAdReportPoller (v1.15,
+                // MAX_AGE_BEFORE_ABANDON_SECONDS=10 800).
+                $startedAt = $batch->getStartedAt();
+                if (null !== $startedAt) {
+                    $ageSeconds = (new \DateTimeImmutable())->getTimestamp() - $startedAt->getTimestamp();
+                    if ($ageSeconds > self::MAX_AGE_BEFORE_ABANDON_HOURS * 3600) {
+                        $ageHours = (int) ($ageSeconds / 3600);
+                        $batch->setState(AdScheduledBatchState::ABANDONED);
+                        $batch->setLastError(sprintf(
+                            'Abandoned: stuck in %s for %d hours',
+                            $state,
+                            $ageHours,
+                        ));
+                        $batch->setFinishedAt(new \DateTimeImmutable());
+                        $this->em->flush();
+
+                        $this->logger->warning('Poller: batch abandoned after timeout', [
+                            'batchId' => $batch->getId(),
+                            'ozonUuid' => $uuid,
+                            'state' => $state,
+                            'ageHours' => $ageHours,
+                        ]);
+
+                        return 'failed';
+                    }
+                }
+
                 // Ждём — следующий poll попробует снова.
                 $this->logger->debug('Poller: batch still in progress', [
                     'batchId' => $batch->getId(),

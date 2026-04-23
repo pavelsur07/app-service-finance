@@ -230,6 +230,55 @@ final class AdBatchPollerCommandTest extends IntegrationTestCase
         self::assertNull($reloaded->getLastError());
     }
 
+    public function testInProgressBatchAbandonedAfterTimeout(): void
+    {
+        $job = $this->seedJob();
+        $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa9999-aaaa-aaaa-aaaa-aaaaaaaaaaa9');
+
+        // startedAt = now - 4h: выходит за MAX_AGE_BEFORE_ABANDON_HOURS (3h).
+        $batch->setStartedAt(new \DateTimeImmutable('-4 hours'));
+        $this->em->flush();
+
+        $this->clientMock->method('pollOneReport')
+            ->willReturn(['state' => 'IN_PROGRESS', 'raw' => []]);
+        $this->clientMock->expects(self::never())->method('fetchReportContent');
+
+        $tester = $this->makeCommandTester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $this->em->clear();
+        $reloaded = $this->batchRepo->find($batch->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(AdScheduledBatchState::ABANDONED, $reloaded->getState());
+        self::assertNotNull($reloaded->getFinishedAt());
+        self::assertStringContainsString('Abandoned: stuck in IN_PROGRESS', (string) $reloaded->getLastError());
+        self::assertStringContainsString('4 hours', (string) $reloaded->getLastError());
+    }
+
+    public function testInProgressBatchStaysInFlightWithinTimeout(): void
+    {
+        $job = $this->seedJob();
+        $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaabbbb-aaaa-aaaa-aaaa-aaaaaaaaaaa9');
+
+        // startedAt = now - 1h: в пределах MAX_AGE_BEFORE_ABANDON_HOURS (3h).
+        $batch->setStartedAt(new \DateTimeImmutable('-1 hour'));
+        $this->em->flush();
+
+        $this->clientMock->method('pollOneReport')
+            ->willReturn(['state' => 'IN_PROGRESS', 'raw' => []]);
+        $this->clientMock->expects(self::never())->method('fetchReportContent');
+
+        $tester = $this->makeCommandTester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $this->em->clear();
+        $reloaded = $this->batchRepo->find($batch->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(AdScheduledBatchState::IN_FLIGHT, $reloaded->getState(), 'Моложе 3h — не abandon, остаётся IN_FLIGHT');
+        self::assertNull($reloaded->getFinishedAt());
+        self::assertNull($reloaded->getLastError());
+    }
+
     public function testTransientErrorOnOneBatchDoesNotBlockOthers(): void
     {
         $job = $this->seedJob();

@@ -211,6 +211,27 @@ final class AdBatchPollerCommandTest extends TestCase
         self::assertNull($batch->getLastError());
     }
 
+    public function testInProgressBatchAbandonedAfterThreeHours(): void
+    {
+        $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
+        // Override startedAt: 4 часа назад → за порогом 3h.
+        $batch->setStartedAt(new \DateTimeImmutable('-4 hours'));
+
+        $this->batchRepo->method('findAllInFlight')->willReturn([$batch]);
+        $this->ozonClient->method('pollOneReport')
+            ->willReturn(['state' => 'IN_PROGRESS', 'raw' => []]);
+
+        $this->ozonClient->expects(self::never())->method('fetchReportContent');
+        $this->em->expects(self::once())->method('flush');
+
+        $tester = new CommandTester($this->command);
+        self::assertSame(0, $tester->execute([]));
+
+        self::assertSame(AdScheduledBatchState::ABANDONED, $batch->getState());
+        self::assertNotNull($batch->getFinishedAt());
+        self::assertStringContainsString('Abandoned: stuck in IN_PROGRESS', (string) $batch->getLastError());
+    }
+
     public function testInProgressKeepsBatchInFlight(): void
     {
         $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
