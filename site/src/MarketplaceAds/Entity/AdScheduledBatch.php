@@ -34,6 +34,7 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_ad_scheduled_batches')]
 #[ORM\Index(columns: ['job_id', 'state'], name: 'idx_asb_job')]
 #[ORM\UniqueConstraint(name: 'idx_asb_job_batch', columns: ['job_id', 'batch_index'])]
+#[ORM\HasLifecycleCallbacks]
 class AdScheduledBatch
 {
     #[ORM\Id]
@@ -148,6 +149,43 @@ class AdScheduledBatch
         $this->scheduledAt = $scheduledAt->setTimezone($utc);
         $this->createdAt = $now;
         $this->updatedAt = $now;
+    }
+
+    /**
+     * Re-parse wall-clock как UTC после Doctrine hydration (Task-13a fix).
+     *
+     * Колонки `timestamp without time zone` хранят текст вида '2026-04-24 11:00:00'
+     * без TZ. Doctrine `datetime_immutable`-тип гидратирует через
+     * `DateTimeImmutable::createFromFormat('Y-m-d H:i:s', ...)` без явного TZ →
+     * PHP применяет default TZ процесса (у scheduler-контейнера Europe/Moscow).
+     * Результат: instant сдвинут на -3 часа относительно того, что Scheduler
+     * записывал как UTC (`now()-3h` в Unix-секундах). `setTimezone('UTC')` тут
+     * не помогает — он лишь меняет TZ-метку, instant остаётся сдвинутым.
+     *
+     * Приходится заново интерпретировать wall-clock: форматируем hydrated-
+     * значение в строку 'Y-m-d H:i:s.u' (в PHP TZ это равно UTC wall-clock'у,
+     * который и лежал в DB) и создаём новый DateTimeImmutable с явным UTC —
+     * instant становится правильным, независимо от `date.timezone` процесса.
+     *
+     * Prod-инцидент 23–24.04.2026: batch'и переходили в ABANDONED за 30 сек
+     * вместо 3-часового порога, потому что Poller видел hydrated-startedAt
+     * «на 3 часа в прошлом» и `age > MAX_AGE_BEFORE_ABANDON_HOURS=3`.
+     */
+    #[ORM\PostLoad]
+    public function normalizeTimezonesAfterLoad(): void
+    {
+        $utc = new \DateTimeZone('UTC');
+        $fmt = 'Y-m-d H:i:s.u';
+
+        $this->scheduledAt = new \DateTimeImmutable($this->scheduledAt->format($fmt), $utc);
+        $this->startedAt = null === $this->startedAt
+            ? null
+            : new \DateTimeImmutable($this->startedAt->format($fmt), $utc);
+        $this->finishedAt = null === $this->finishedAt
+            ? null
+            : new \DateTimeImmutable($this->finishedAt->format($fmt), $utc);
+        $this->createdAt = new \DateTimeImmutable($this->createdAt->format($fmt), $utc);
+        $this->updatedAt = new \DateTimeImmutable($this->updatedAt->format($fmt), $utc);
     }
 
     public function setState(AdScheduledBatchState $state): void
