@@ -19,6 +19,30 @@
 # on state=OK. See ARCHITECTURE.md.
 */2 * * * * php bin/console app:marketplace-ads:ozon-poll-reports --quiet
 
+# Cron-driven Ozon Performance pipeline (Task-11.9a, ARCHITECTURE v1.27).
+# Заменяет event-driven Messenger-цепочку (FetchOzonAdStatisticsHandler →
+# RequestOzonAdBatchHandler → DownloadOzonAdReportHandler). Старый
+# ozon-poll-reports выше оставлен: обслуживает остатки in-flight
+# OzonAdPendingReport'ов старого pipeline'а до Task-11.9b.
+#
+# Scheduler: берёт 1 PLANNED batch → POST /statistics → IN_FLIGHT.
+# Минутный интервал — естественный rate-limiter под лимит Ozon «1
+# активная выгрузка на аккаунт».
+* * * * * php bin/console app:marketplace-ads:scheduler --no-interaction --quiet
+
+# Poller: обрабатывает все IN_FLIGHT — poll GET /statistics/{uuid} +
+# download + переход в OK/FAILED/ABANDONED. Двойной запуск с offset'ом
+# 30 секунд даёт фактический ≤30-секундный lag между готовностью отчёта
+# в Ozon и сохранением файла на диск. LockableTrait (Task-11.6) защищает
+# от overlap: если предыдущий тик ещё не завершился, новый просто выйдет.
+* * * * * php bin/console app:marketplace-ads:poller --no-interaction --quiet
+* * * * * sleep 30 && php bin/console app:marketplace-ads:poller --no-interaction --quiet
+
+# Finalizer: финализирует RUNNING job'ы когда все их batch'и терминальные
+# (OK/FAILED/ABANDONED). Решение по статусу — по агрегату: all-OK →
+# COMPLETED, 0-OK → FAILED, mix → PARTIAL_SUCCESS.
+* * * * * php bin/console app:marketplace-ads:finalizer --no-interaction --quiet
+
 # 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
 0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod
 
