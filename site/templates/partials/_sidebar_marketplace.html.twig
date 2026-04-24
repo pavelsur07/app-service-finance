@@ -1,44 +1,7 @@
-{% set marketplace_path = app.request ? app.request.pathinfo : '' %}
-{% set marketplace_menu_active =
-    (current_route starts with 'marketplace_' and not (current_route starts with 'marketplace_analytics_') and not (current_route starts with 'marketplace_ads_'))
-    or current_route starts with 'marketplace_analytics_'
-    or current_route starts with 'marketplace_ads_'
-%}
-<li class="nav-item dropdown {{ marketplace_menu_active ? 'show' : '' }}">
-    <a class="nav-link dropdown-toggle {{ marketplace_menu_active ? 'show active' : '' }}" href="#" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{{ marketplace_menu_active ? 'true' : 'false' }}">
-        <span class="nav-link-icon"><i class="ti ti-building-store"></i></span>
-        <span class="nav-link-title">Маркетплейсы</span>
+{% set ads_active = current_route starts with 'marketplace_ads_efficiency' %}
+<li class="nav-item {{ ads_active ? 'active' : '' }}">
+    <a class="nav-link {{ ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}" title="Реклама">
+        <span class="nav-link-icon"><i class="ti ti-speakerphone"></i></span>
+        <span class="nav-link-title hide-when-collapsed">Реклама</span>
     </a>
-    {% set marketplace_menu_show = marketplace_menu_active ? 'show' : '' %}
-    <div class="dropdown-menu {{ marketplace_menu_show }}">
-        <div class="dropdown-menu-column">
-            {% set mp_charges_active =
-                current_route starts with 'marketplace_'
-                and not (current_route starts with 'marketplace_analytics_')
-                and not (current_route starts with 'marketplace_ads_')
-                and current_route != 'marketplace_reconciliation'
-            %}
-            <a class="dropdown-item {{ mp_charges_active ? 'active' : '' }}" href="{{ path('marketplace_index') }}">
-                <span>Начисления</span>
-            </a>
-            {% set mp_unit_active = current_route starts with 'marketplace_analytics_' %}
-            <a class="dropdown-item {{ mp_unit_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_unit_economics_index') }}">
-                <span>Unit-экономика</span>
-            </a>
-            {% set mp_ads_active = current_route starts with 'marketplace_ads_' %}
-            <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_index') }}">
-                <span>Реклама</span>
-            </a>
-            {% set mp_reconciliation_active = current_route == 'marketplace_reconciliation' %}
-            <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_reconciliation') }}">
-                <span>Сверка</span>
-            </a>
-            {% if is_granted('ROLE_SUPER_ADMIN') %}
-                {% set mp_ads_debug_active = current_route == 'marketplace_ads_admin_debug' %}
-                <a class="dropdown-item {{ mp_ads_debug_active ? 'active' : '' }}" href="{{ path('marketplace_ads_admin_debug') }}">
-                    <span>Ozon Debug</span>
-                </a>
-            {% endif %}
-        </div>
-    </div>
 </li>
