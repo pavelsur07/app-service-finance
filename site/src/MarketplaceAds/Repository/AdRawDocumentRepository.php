@@ -109,6 +109,56 @@ class AdRawDocumentRepository extends ServiceEntityRepository implements AdRawDo
     }
 
     /**
+     * Идемпотентный lookup по метке `batch_id=<uuid>\nfilename=<name>\n`
+     * в префиксе `raw_payload` (Task-12-test).
+     *
+     * Используется {@see \App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction}:
+     * повторный клик «Обработать» не должен создавать второй документ для той же
+     * (company, batch, filename) — искомая пара однозначно идентифицирует CSV
+     * внутри batch'а (filename = `<campaignId>_<from>-<to>.csv`).
+     *
+     * IDOR-guard: `companyId` в WHERE (фильтр до LIKE). Условие `raw_payload LIKE`
+     * работает по префиксу (≈100 символов), таблица небольшая (сотни документов
+     * на компанию) — запрос идёт по `idx_ad_raw_document_company` + фильтр LIKE.
+     *
+     * LIKE escape: `filename` содержит `_` (`<campaignId>_<from>-<to>.csv`),
+     * который в SQL LIKE — wildcard «любой символ». Экранируем `%`, `_`, `\`
+     * через {@see self::escapeLike()}: PostgreSQL LIKE по умолчанию считает `\`
+     * escape-символом (без явного `ESCAPE` в запросе), поэтому достаточно
+     * passed-через-параметр `\_` / `\%` / `\\`.
+     */
+    public function findByBatchAndFilename(
+        string $companyId,
+        string $batchId,
+        string $filename,
+    ): ?AdRawDocument {
+        $prefix = sprintf("batch_id=%s\nfilename=%s\n", $batchId, $filename);
+
+        /** @var AdRawDocument|null $result */
+        $result = $this->createQueryBuilder('r')
+            ->where('r.companyId = :companyId')
+            ->andWhere('r.rawPayload LIKE :prefix')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('prefix', $this->escapeLike($prefix).'%')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+
+        return $result;
+    }
+
+    /**
+     * Экранирование LIKE-метасимволов (`%`, `_`, `\`) в префиксе для
+     * {@see self::findByBatchAndFilename()}. PostgreSQL LIKE по умолчанию
+     * трактует `\` как escape — дополнительный ESCAPE-clause не нужен,
+     * достаточно удвоить backslash и префиксировать `%`/`_`.
+     */
+    private function escapeLike(string $value): string
+    {
+        return strtr($value, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']);
+    }
+
+    /**
      * @return AdRawDocument[]
      */
     public function findDrafts(string $companyId): array

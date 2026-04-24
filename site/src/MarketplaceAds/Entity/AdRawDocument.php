@@ -13,12 +13,13 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: AdRawDocumentRepository::class)]
 #[ORM\Table(name: 'marketplace_ad_raw_documents')]
-#[ORM\UniqueConstraint(
-    name: 'uq_ad_raw_document_company_marketplace_date',
-    columns: ['company_id', 'marketplace', 'report_date'],
-)]
 #[ORM\Index(columns: ['company_id'], name: 'idx_ad_raw_document_company')]
 #[ORM\Index(columns: ['company_id', 'marketplace'], name: 'idx_ad_raw_document_company_marketplace')]
+// UNIQUE (company_id, marketplace, report_date) снят в Version20260424120000:
+// новый cron-driven pipeline (Task-12-test) создаёт до 10 AdRawDocument
+// на один день (по одному на CSV-кампанию внутри batch'а). Идемпотентность
+// обеспечивается маркером `batch_id=<uuid>\nfilename=<name>\n---\n` в начале
+// raw_payload, см. ExtractBatchesToRawDocumentsAction.
 class AdRawDocument
 {
     #[ORM\Id]

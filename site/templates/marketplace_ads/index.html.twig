@@ -28,6 +28,19 @@
     <div class="page-body">
         <div class="container-xl">
 
+            {% for message in app.flashes('success') %}
+                <div class="alert alert-success alert-dismissible" role="alert">
+                    <div>{{ message }}</div>
+                    <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="alert alert-danger alert-dismissible" role="alert">
+                    <div>{{ message }}</div>
+                    <a class="btn-close" data-bs-dismiss="alert" aria-label="Close"></a>
+                </div>
+            {% endfor %}
+
             {# ---------- Блок «Реклама Ozon» ---------- #}
             <div class="card mb-3">
                 <div class="card-header">
@@ -309,7 +322,20 @@
                                     + 'Пометить FAILED</button>'
                                 : '';
                             var filesButtons = renderJobFiles(job.files || []);
-                            var actionsCell = '<td>' + filesButtons + markFailedBtn + '</td>';
+                            // Task-12-test: кнопка «Обработать». Показываем только
+                            // если API вернул extractToken (owner + completed/partial_success
+                            // с батчами нового pipeline'а).
+                            var extractBtn = job.extractToken
+                                ? '<form method="post" '
+                                    + 'action="/marketplace-ads/jobs/' + encodeURIComponent(job.id) + '/extract-batches" '
+                                    + 'class="d-inline me-1 mb-1">'
+                                    + '<input type="hidden" name="_token" value="' + escapeHtml(job.extractToken) + '">'
+                                    + '<button type="submit" class="btn btn-sm btn-primary" '
+                                    + 'onclick="return confirm(\'Запустить обработку всех batch файлов этого job?\')">'
+                                    + 'Обработать</button>'
+                                    + '</form>'
+                                : '';
+                            var actionsCell = '<td>' + filesButtons + extractBtn + markFailedBtn + '</td>';
                             return '<tr>'
                                 + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
                                 + '<td>' + jobStatusBadge(job.status) + '</td>'

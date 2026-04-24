@@ -14,6 +14,7 @@ use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Security\Csrf\CsrfTokenManagerInterface;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 #[Route('/api/marketplace-ads/load-jobs', name: 'marketplace_ads_load_jobs_list', methods: ['GET'])]
@@ -27,6 +28,7 @@ final class AdLoadJobsListController extends AbstractController
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
         private readonly AdScheduledBatchRepository $adScheduledBatchRepository,
+        private readonly CsrfTokenManagerInterface $csrfTokenManager,
     ) {
     }
 
@@ -40,6 +42,8 @@ final class AdLoadJobsListController extends AbstractController
             MarketplaceType::OZON,
             self::LIMIT,
         );
+
+        $canExtract = $this->isGranted('ROLE_COMPANY_OWNER');
 
         $items = [];
         foreach ($jobs as $job) {
@@ -64,9 +68,18 @@ final class AdLoadJobsListController extends AbstractController
                 ? $this->collectBatchFiles($job->getId(), $companyId)
                 : $this->collectRawDocumentFiles($companyId, $job->getDateFrom(), $job->getDateTo());
 
+            // Task-12-test: CSRF-токен для кнопки «Обработать». Показываем
+            // токен только если (1) user имеет ROLE_COMPANY_OWNER (требование
+            // контроллера-экстракта) и (2) job в терминальном состоянии с
+            // batch'ами нового pipeline'а. Без токена кнопка в UI не рисуется.
+            $statusValue = $job->getStatus()->value;
+            $extractToken = ($canExtract && $hasBatches && in_array($statusValue, ['completed', 'partial_success'], true))
+                ? $this->csrfTokenManager->getToken('extract-batches-'.$job->getId())->getValue()
+                : null;
+
             $items[] = [
                 'id' => $job->getId(),
-                'status' => $job->getStatus()->value,
+                'status' => $statusValue,
                 'dateFrom' => $job->getDateFrom()->format('Y-m-d'),
                 'dateTo' => $job->getDateTo()->format('Y-m-d'),
                 'chunksTotal' => $job->getChunksTotal(),
@@ -81,6 +94,7 @@ final class AdLoadJobsListController extends AbstractController
                     'hasBatches' => $hasBatches,
                 ],
                 'files' => $files,
+                'extractToken' => $extractToken,
             ];
         }
 

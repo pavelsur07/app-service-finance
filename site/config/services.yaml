@@ -234,8 +234,22 @@ services:
     App\MarketplaceAds\Domain\Service\ListingSalesProviderInterface:
         '@App\MarketplaceAds\Infrastructure\ListingSalesProviderMarketplace'
 
-    # Парсеры raw-данных рекламных отчётов
-    App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdRawDataParser:
+    # Парсеры raw-данных рекламных отчётов.
+    #
+    # OzonAdRawDataParser (JSON) остаётся зарегистрирован как обычный сервис,
+    # но БЕЗ тега `marketplace_ads.raw_data_parser`: он теперь инжектится
+    # только как fallback-зависимость в OzonPerformanceCsvParser и не попадает
+    # в итератор ProcessAdRawDocumentAction напрямую. Это сделано в Task-12-test,
+    # чтобы новый CSV+JSON-диспатчер OzonPerformanceCsvParser был единственной
+    # точкой входа для Ozon-платформы: он сам решает, парсить CSV нативно
+    # (новый cron-driven pipeline с маркером `batch_id=`) или делегировать JSON
+    # в legacy-парсер.
+    App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdRawDataParser: ~
+
+    App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPerformanceCsvParser:
+        arguments:
+            $jsonFallbackParser: '@App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdRawDataParser'
+            $logger: '@monolog.logger.marketplace_ads'
         tags: ['marketplace_ads.raw_data_parser']
 
     App\MarketplaceAds\Infrastructure\Api\Wildberries\WildberriesAdRawDataParser:
