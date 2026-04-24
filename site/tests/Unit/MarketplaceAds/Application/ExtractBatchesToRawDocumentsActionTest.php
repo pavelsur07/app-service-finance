@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace App\Tests\Unit\MarketplaceAds\Application;
 
 use App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction;
+use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Entity\AdScheduledBatch;
+use App\MarketplaceAds\Enum\AdScheduledBatchState;
+use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
 use App\Shared\Service\Storage\StorageService;
@@ -12,6 +16,7 @@ use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -171,6 +176,261 @@ final class ExtractBatchesToRawDocumentsActionTest extends TestCase
         $this->expectExceptionMessageMatches('/no storage_path/');
 
         $this->action->extractCsvsFromBatch($batch);
+    }
+
+    public function testProcessBatchHappyPathCreatesRawDocAndDispatchesMessage(): void
+    {
+        $relativePath = 'marketplace-ads/11111111-1111-1111-1111-111111111111/22655731_23.04.2026-23.04.2026.csv';
+        $csvBody = "sku;spend\nsku-1;1.00\n";
+        $this->writeFile($relativePath, $csvBody);
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withId('bbbbbbbb-bbbb-bbbb-bbbb-000000000001')
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage($relativePath, 'hash-1', strlen($csvBody))
+            ->build();
+
+        $rawDocRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawDocRepo->expects(self::once())
+            ->method('findByBatchAndFilename')
+            ->with($batch->getCompanyId(), $batch->getId(), '22655731_23.04.2026-23.04.2026.csv')
+            ->willReturn(null);
+        $rawDocRepo->expects(self::once())
+            ->method('save')
+            ->with(self::isInstanceOf(AdRawDocument::class));
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())
+            ->method('dispatch')
+            ->with(self::callback(function (object $msg): bool {
+                return $msg instanceof ProcessAdRawDocumentMessage
+                    && '11111111-1111-1111-1111-111111111111' === $msg->companyId;
+            }))
+            ->willReturnCallback(static fn (object $msg): Envelope => new Envelope($msg));
+
+        $action = new ExtractBatchesToRawDocumentsAction(
+            $this->createMock(AdScheduledBatchRepository::class),
+            $rawDocRepo,
+            new StorageService($this->tmpDir),
+            $em,
+            $messageBus,
+            new NullLogger(),
+        );
+
+        $result = $action->processBatch($batch);
+
+        self::assertSame(1, $result['processed']);
+        self::assertSame(0, $result['skipped']);
+    }
+
+    public function testProcessBatchIdempotencyExistingRawDocIsSkipped(): void
+    {
+        $relativePath = 'marketplace-ads/11111111-1111-1111-1111-111111111111/already-processed.csv';
+        $csvBody = "sku;spend\nsku-1;1.00\n";
+        $this->writeFile($relativePath, $csvBody);
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withId('bbbbbbbb-bbbb-bbbb-bbbb-000000000002')
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage($relativePath, 'hash-1', strlen($csvBody))
+            ->build();
+
+        $existingDoc = $this->createMock(AdRawDocument::class);
+
+        $rawDocRepo = $this->createMock(AdRawDocumentRepository::class);
+        // Существующий документ найден → второй AdRawDocument не создаётся.
+        $rawDocRepo->expects(self::once())
+            ->method('findByBatchAndFilename')
+            ->willReturn($existingDoc);
+        $rawDocRepo->expects(self::never())->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        // Flush не нужен: dispatchIds пуст (всё skipped), conditional-flush
+        // пропускает noop-round-trip в БД. Clear тоже не нужен — UoW чист,
+        // мы не вошли в persist-путь.
+        $em->expects(self::never())->method('flush');
+        $em->expects(self::never())->method('clear');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        // Dispatch не вызывается при skipped — reprocess уже происходит через
+        // отдельный pipeline, а Poller не должен плодить дубликаты сообщений.
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $action = new ExtractBatchesToRawDocumentsAction(
+            $this->createMock(AdScheduledBatchRepository::class),
+            $rawDocRepo,
+            new StorageService($this->tmpDir),
+            $em,
+            $messageBus,
+            new NullLogger(),
+        );
+
+        $result = $action->processBatch($batch);
+
+        self::assertSame(0, $result['processed']);
+        self::assertSame(1, $result['skipped']);
+    }
+
+    public function testProcessBatchZipWithMultipleCsvsProcessesAll(): void
+    {
+        $relativePath = 'marketplace-ads/11111111-1111-1111-1111-111111111111/multi.zip';
+        $zipAbsolute = $this->tmpDir.'/'.$relativePath;
+        $this->makeParentDir($zipAbsolute);
+
+        $zip = new \ZipArchive();
+        self::assertTrue(true === $zip->open($zipAbsolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
+        $zip->addFromString('22655731_23.04.2026-23.04.2026.csv', "csv-1-content");
+        $zip->addFromString('22655732_23.04.2026-23.04.2026.csv', "csv-2-content");
+        $zip->close();
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withId('bbbbbbbb-bbbb-bbbb-bbbb-000000000003')
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage($relativePath, 'hash-zip', (int) filesize($zipAbsolute))
+            ->build();
+
+        $rawDocRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawDocRepo->method('findByBatchAndFilename')->willReturn(null);
+        $rawDocRepo->expects(self::exactly(2))->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::exactly(2))
+            ->method('dispatch')
+            ->willReturnCallback(static fn (object $msg): Envelope => new Envelope($msg));
+
+        $action = new ExtractBatchesToRawDocumentsAction(
+            $this->createMock(AdScheduledBatchRepository::class),
+            $rawDocRepo,
+            new StorageService($this->tmpDir),
+            $em,
+            $messageBus,
+            new NullLogger(),
+        );
+
+        $result = $action->processBatch($batch);
+
+        self::assertSame(2, $result['processed']);
+        self::assertSame(0, $result['skipped']);
+    }
+
+    public function testProcessBatchDetachesPersistedDocsWhenMidLoopExceptionLeaksEntities(): void
+    {
+        // Регрессия на UoW-leak (review PR #1654): processBatchInternal
+        // персистит AdRawDocument в цикле по CSV. Если сбой случился на 2-м из
+        // 3-х CSV — первый persist() уже успешен. Без detach'а orphan остался
+        // бы в UoW и следующий em->flush() (следующий batch в tick'е Poller'а
+        // или аггрегированный flush в __invoke) отправил бы его в БД вне
+        // своего контекста.
+        //
+        // Почему detach, а не em->clear(): Doctrine ORM 3.x больше не
+        // поддерживает selective clear(entityName); глобальный em->clear()
+        // detach'нул бы и pre-fetched managed AdScheduledBatch'и Poller'а
+        // (из findAllInFlight), после чего их setState/setLastError/flush
+        // silently не дошли бы до БД — регрессия хуже самого leak'а.
+        //
+        // Контракт: em->detach() вызван ровно 1 раз (на первом, единственном
+        // успешно-persisted AdRawDocument); em->flush() — не вызывался
+        // (exception внутри цикла, до conditional flush'а в processBatch).
+        $relativePath = 'marketplace-ads/11111111-1111-1111-1111-111111111111/three-csvs.zip';
+        $zipAbsolute = $this->tmpDir.'/'.$relativePath;
+        $this->makeParentDir($zipAbsolute);
+
+        $zip = new \ZipArchive();
+        self::assertTrue(true === $zip->open($zipAbsolute, \ZipArchive::CREATE | \ZipArchive::OVERWRITE));
+        $zip->addFromString('11111111_23.04.2026-23.04.2026.csv', 'csv-1-ok');
+        $zip->addFromString('22222222_23.04.2026-23.04.2026.csv', 'csv-2-will-throw');
+        $zip->addFromString('33333333_23.04.2026-23.04.2026.csv', 'csv-3-never-reached');
+        $zip->close();
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withId('bbbbbbbb-bbbb-bbbb-bbbb-000000000099')
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage($relativePath, 'hash-3', (int) filesize($zipAbsolute))
+            ->build();
+
+        $rawDocRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawDocRepo->method('findByBatchAndFilename')->willReturn(null);
+
+        // save() на 1-м CSV — OK (entity в UoW), на 2-м — бросает. 3-й до
+        // вызова не доходит (исключение прерывает цикл).
+        $saveCall = 0;
+        $rawDocRepo->expects(self::exactly(2))
+            ->method('save')
+            ->willReturnCallback(static function () use (&$saveCall): void {
+                ++$saveCall;
+                if (2 === $saveCall) {
+                    throw new \RuntimeException('DB hiccup on 2nd CSV');
+                }
+            });
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+        // Clear не должен вызываться — он бы убил Poller'овские AdScheduledBatch.
+        $em->expects(self::never())->method('clear');
+        // Detach — строго по числу persisted-to-point-of-failure: 1.
+        $em->expects(self::once())
+            ->method('detach')
+            ->with(self::isInstanceOf(AdRawDocument::class));
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $action = new ExtractBatchesToRawDocumentsAction(
+            $this->createMock(AdScheduledBatchRepository::class),
+            $rawDocRepo,
+            new StorageService($this->tmpDir),
+            $em,
+            $messageBus,
+            new NullLogger(),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('DB hiccup on 2nd CSV');
+
+        $action->processBatch($batch);
+    }
+
+    public function testProcessBatchPropagatesExtractionError(): void
+    {
+        // storage_path отсутствует → extractCsvsFromBatch бросает \RuntimeException
+        // ДО первого persist'а. processBatch пробрасывает — ничего не detach'ит
+        // (persisted-list пуст), flush не зовётся.
+        $batch = AdScheduledBatchBuilder::aBatch()->build();
+
+        $rawDocRepo = $this->createMock(AdRawDocumentRepository::class);
+        $rawDocRepo->expects(self::never())->method('save');
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::never())->method('flush');
+        $em->expects(self::never())->method('clear');
+        $em->expects(self::never())->method('detach');
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::never())->method('dispatch');
+
+        $action = new ExtractBatchesToRawDocumentsAction(
+            $this->createMock(AdScheduledBatchRepository::class),
+            $rawDocRepo,
+            new StorageService($this->tmpDir),
+            $em,
+            $messageBus,
+            new NullLogger(),
+        );
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessageMatches('/no storage_path/');
+
+        $action->processBatch($batch);
     }
 
     public function testBuildRawPayloadPrefixesCsvWithBatchIdAndFilenameMarker(): void

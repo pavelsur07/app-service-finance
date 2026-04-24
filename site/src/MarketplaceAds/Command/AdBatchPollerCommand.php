@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Command;
 
+use App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction;
 use App\MarketplaceAds\Application\Service\OzonReportExtensionDetector;
 use App\MarketplaceAds\Entity\AdScheduledBatch;
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
@@ -79,6 +80,7 @@ final class AdBatchPollerCommand extends Command
         private readonly AdScheduledBatchRepository $batchRepo,
         private readonly StorageService $storageService,
         private readonly EntityManagerInterface $em,
+        private readonly ExtractBatchesToRawDocumentsAction $extractAction,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
     ) {
@@ -325,5 +327,26 @@ final class AdBatchPollerCommand extends Command
             'fileSize' => $stored['sizeBytes'],
             'extension' => $extension,
         ]);
+
+        // Task-13a: auto-extract zip → AdRawDocument + dispatch сразу после
+        // скачивания. Если падает — batch остаётся в OK, кнопка «Обработать»
+        // работает как safety net (см. ExtractBatchesController). Auto-extract
+        // НЕ блокирует успешное завершение batch'а: файл уже на диске, дальше
+        // это отдельный шаг, который можно повторить вручную.
+        try {
+            $extractResult = $this->extractAction->processBatch($batch);
+            $this->logger->info('Poller: batch auto-extracted', [
+                'batchId' => $batch->getId(),
+                'processed' => $extractResult['processed'],
+                'skipped' => $extractResult['skipped'],
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error('Poller: auto-extract failed, batch remains for manual extraction', [
+                'batchId' => $batch->getId(),
+                'companyId' => $batch->getCompanyId(),
+                'storagePath' => $batch->getStoragePath(),
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }
