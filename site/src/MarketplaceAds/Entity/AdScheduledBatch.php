@@ -129,7 +129,13 @@ class AdScheduledBatch
             throw new \DomainException('dateFrom не может быть позже dateTo.');
         }
 
-        $now = new \DateTimeImmutable();
+        // UTC-нормализация: Postgres NOW() возвращает UTC, а колонка
+        // `timestamp without time zone` хранит значение «как есть». Если писать
+        // DateTimeImmutable в локальном TZ (Europe/Moscow +3), scheduler-cron
+        // сравнивает его с UTC-NOW() и получает 3-часовой лаг (инцидент
+        // Task-11.9a first prod run). См. ARCHITECTURE.md v1.28.
+        $utc = new \DateTimeZone('UTC');
+        $now = new \DateTimeImmutable('now', $utc);
 
         $this->id = $id;
         $this->jobId = $jobId;
@@ -139,7 +145,7 @@ class AdScheduledBatch
         $this->dateTo = $dateTo;
         $this->batchIndex = $batchIndex;
         $this->state = AdScheduledBatchState::PLANNED;
-        $this->scheduledAt = $scheduledAt;
+        $this->scheduledAt = $scheduledAt->setTimezone($utc);
         $this->createdAt = $now;
         $this->updatedAt = $now;
     }
@@ -158,13 +164,17 @@ class AdScheduledBatch
 
     public function setStartedAt(?\DateTimeImmutable $startedAt): void
     {
-        $this->startedAt = $startedAt;
+        $this->startedAt = null === $startedAt
+            ? null
+            : $startedAt->setTimezone(new \DateTimeZone('UTC'));
         $this->markUpdatedAt();
     }
 
     public function setFinishedAt(?\DateTimeImmutable $finishedAt): void
     {
-        $this->finishedAt = $finishedAt;
+        $this->finishedAt = null === $finishedAt
+            ? null
+            : $finishedAt->setTimezone(new \DateTimeZone('UTC'));
         $this->markUpdatedAt();
     }
 
@@ -208,13 +218,13 @@ class AdScheduledBatch
 
     public function setScheduledAt(\DateTimeImmutable $scheduledAt): void
     {
-        $this->scheduledAt = $scheduledAt;
+        $this->scheduledAt = $scheduledAt->setTimezone(new \DateTimeZone('UTC'));
         $this->markUpdatedAt();
     }
 
     public function markUpdatedAt(): void
     {
-        $this->updatedAt = new \DateTimeImmutable();
+        $this->updatedAt = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
     }
 
     public function getId(): string

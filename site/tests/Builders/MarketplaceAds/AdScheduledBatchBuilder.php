@@ -30,9 +30,13 @@ final class AdScheduledBatchBuilder
 
     private function __construct()
     {
-        $this->dateFrom = new \DateTimeImmutable('2026-03-01');
-        $this->dateTo = new \DateTimeImmutable('2026-03-10');
-        $this->scheduledAt = new \DateTimeImmutable('2026-03-01 00:00:00');
+        // Таймстампы в тестах — явно UTC. Entity (Task-11.9a-fix) нормализует
+        // входящий DateTimeImmutable в UTC; фиксированный UTC в билдере исключает
+        // зависимость от PHP default TZ в сравнениях round-trip'ов через Doctrine.
+        $utc = new \DateTimeZone('UTC');
+        $this->dateFrom = new \DateTimeImmutable('2026-03-01', $utc);
+        $this->dateTo = new \DateTimeImmutable('2026-03-10', $utc);
+        $this->scheduledAt = new \DateTimeImmutable('2026-03-01 00:00:00', $utc);
     }
 
     public static function aBatch(): self
@@ -142,11 +146,12 @@ final class AdScheduledBatchBuilder
 
         if (null !== $this->state) {
             $batch->setState($this->state);
+            $utc = new \DateTimeZone('UTC');
             if (AdScheduledBatchState::IN_FLIGHT === $this->state || $this->state->isTerminal()) {
-                $batch->setStartedAt(new \DateTimeImmutable());
+                $batch->setStartedAt(new \DateTimeImmutable('now', $utc));
             }
             if ($this->state->isTerminal()) {
-                $batch->setFinishedAt(new \DateTimeImmutable());
+                $batch->setFinishedAt(new \DateTimeImmutable('now', $utc));
             }
         }
 
