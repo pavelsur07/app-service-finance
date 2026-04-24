@@ -273,6 +273,33 @@ final class AdBatchPollerCommandTest extends TestCase
         self::assertStringContainsString('Abandoned: stuck in IN_PROGRESS', (string) $batch->getLastError());
     }
 
+    /**
+     * Task-13a regression: в prod-инциденте 23–24.04.2026 батчи переходили в
+     * ABANDONED через 30 секунд после POST'а из-за TZ mismatch между MSK-
+     * hydrated startedAt и UTC-now(). Проверяем явно: startedAt ровно 30 сек
+     * назад (в UTC, как делает PostLoad после fix'а) → age < 3h → батч остаётся
+     * IN_FLIGHT.
+     */
+    public function testRecentStartedAtDoesNotTriggerAbandon(): void
+    {
+        $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
+        $batch->setStartedAt(new \DateTimeImmutable('-30 seconds', new \DateTimeZone('UTC')));
+
+        $this->batchRepo->method('findAllInFlight')->willReturn([$batch]);
+        $this->ozonClient->method('pollOneReport')
+            ->willReturn(['state' => 'NOT_STARTED', 'raw' => []]);
+
+        // Батч не абандонится → flush не вызывается.
+        $this->em->expects(self::never())->method('flush');
+
+        $tester = new CommandTester($this->command);
+        self::assertSame(0, $tester->execute([]));
+
+        self::assertSame(AdScheduledBatchState::IN_FLIGHT, $batch->getState());
+        self::assertNull($batch->getFinishedAt());
+        self::assertNull($batch->getLastError());
+    }
+
     public function testInProgressKeepsBatchInFlight(): void
     {
         $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');

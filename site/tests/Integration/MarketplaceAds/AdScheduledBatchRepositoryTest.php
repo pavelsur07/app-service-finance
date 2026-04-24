@@ -95,6 +95,96 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         self::assertNull($loaded->getStoragePath());
     }
 
+    /**
+     * Task-13a regression: Doctrine при hydration `timestamp without time zone`
+     * создаёт DateTimeImmutable в PHP default TZ (Europe/Moscow в scheduler-
+     * контейнере). Без PostLoad-нормализации Poller сравнивает UTC-now() с MSK-
+     * startedAt → артефактная +3h дельта → false-positive ABANDONED через 30 сек.
+     *
+     * После PostLoad callback все datetime-поля после find() — строго в UTC,
+     * независимо от PHP default TZ рантайма.
+     */
+    public function testPostLoadNormalizesAllDatetimeFieldsToUtc(): void
+    {
+        $prevTz = date_default_timezone_get();
+        date_default_timezone_set('Europe/Moscow');
+
+        try {
+            $job = $this->seedJob();
+            $utc = new \DateTimeZone('UTC');
+
+            $batch = AdScheduledBatchBuilder::aBatch()
+                ->withJobId($job->getId())
+                ->withCompanyId(self::COMPANY_ID)
+                ->withIndex(0)
+                ->withState(AdScheduledBatchState::IN_FLIGHT)
+                ->withScheduledAt(new \DateTimeImmutable('2026-04-24 10:00:00', $utc))
+                ->build();
+            $batch->setStartedAt(new \DateTimeImmutable('2026-04-24 11:00:00', $utc));
+            $batch->setFinishedAt(new \DateTimeImmutable('2026-04-24 12:00:00', $utc));
+
+            $this->repository->save($batch);
+            $id = $batch->getId();
+            $this->em->flush();
+            $this->em->clear();
+
+            $loaded = $this->repository->find($id);
+
+            self::assertNotNull($loaded);
+            self::assertSame('UTC', $loaded->getScheduledAt()->getTimezone()->getName());
+            self::assertSame('UTC', $loaded->getStartedAt()?->getTimezone()->getName());
+            self::assertSame('UTC', $loaded->getFinishedAt()?->getTimezone()->getName());
+            self::assertSame('UTC', $loaded->getCreatedAt()->getTimezone()->getName());
+            self::assertSame('UTC', $loaded->getUpdatedAt()->getTimezone()->getName());
+
+            // Инстант сохраняется: нормализация меняет только TZ метку, не момент времени.
+            self::assertSame('2026-04-24 11:00:00', $loaded->getStartedAt()?->format('Y-m-d H:i:s'));
+        } finally {
+            date_default_timezone_set($prevTz);
+        }
+    }
+
+    /**
+     * Task-13a regression: startedAt=now-30sec после hydration в PHP-TZ=Moscow
+     * не даёт артефактную +3h дельту — возраст остаётся < MAX_AGE (3h), батч не
+     * абандонится (в обратном случае до fix'а падал prod за 30 секунд).
+     */
+    public function testHydratedStartedAtKeepsRealAgeUnderAbandonThreshold(): void
+    {
+        $prevTz = date_default_timezone_get();
+        date_default_timezone_set('Europe/Moscow');
+
+        try {
+            $job = $this->seedJob();
+            $utc = new \DateTimeZone('UTC');
+            $nowUtc = new \DateTimeImmutable('now', $utc);
+
+            $batch = AdScheduledBatchBuilder::aBatch()
+                ->withJobId($job->getId())
+                ->withCompanyId(self::COMPANY_ID)
+                ->withIndex(0)
+                ->withState(AdScheduledBatchState::IN_FLIGHT)
+                ->build();
+            $batch->setStartedAt($nowUtc->modify('-30 seconds'));
+
+            $this->repository->save($batch);
+            $id = $batch->getId();
+            $this->em->flush();
+            $this->em->clear();
+
+            $loaded = $this->repository->find($id);
+            self::assertNotNull($loaded);
+
+            $age = (new \DateTimeImmutable('now', $utc))->getTimestamp() - ($loaded->getStartedAt()?->getTimestamp() ?? 0);
+            // Нижняя планка 300с ловит и полный 3-часовой сдвиг (prod-инцидент),
+            // и мелкие секундные/минутные сдвиги из-за частичной нормализации.
+            self::assertLessThan(300, $age, 'После PostLoad-нормализации 30-секундный возраст не должен сдвигаться заметно (ни на 3h, ни на минуты).');
+            self::assertGreaterThanOrEqual(0, $age, 'Возраст не может быть отрицательным.');
+        } finally {
+            date_default_timezone_set($prevTz);
+        }
+    }
+
     public function testFindNextPlannedReturnsNullWhenEmpty(): void
     {
         $this->seedJob();
