@@ -14,8 +14,12 @@ final class SalesListQuery
     ) {
     }
 
-    public function buildQueryBuilder(string $companyId, ?string $marketplace): QueryBuilder
-    {
+    public function buildQueryBuilder(
+        string $companyId,
+        ?string $marketplace,
+        ?\DateTimeImmutable $from = null,
+        ?\DateTimeImmutable $to = null,
+    ): QueryBuilder {
         $qb = $this->connection->createQueryBuilder()
             ->select(
                 's.id',
@@ -38,6 +42,16 @@ final class SalesListQuery
         if ($marketplace !== null) {
             $qb->andWhere('s.marketplace = :marketplace')
                 ->setParameter('marketplace', $marketplace);
+        }
+
+        if ($from !== null) {
+            $qb->andWhere('s.sale_date >= :saleDateFrom')
+                ->setParameter('saleDateFrom', $from->format('Y-m-d'));
+        }
+
+        if ($to !== null) {
+            $qb->andWhere('s.sale_date <= :saleDateTo')
+                ->setParameter('saleDateTo', $to->format('Y-m-d'));
         }
 
         return $qb;
