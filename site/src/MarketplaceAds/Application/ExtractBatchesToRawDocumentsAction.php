@@ -254,13 +254,8 @@ final readonly class ExtractBatchesToRawDocumentsAction
     private function resolveMarketplace(AdScheduledBatch $batch): MarketplaceType
     {
         $value = $batch->getMarketplace();
-        foreach (MarketplaceType::cases() as $case) {
-            if ($case->value === $value) {
-                return $case;
-            }
-        }
 
-        throw new \RuntimeException(sprintf(
+        return MarketplaceType::tryFrom($value) ?? throw new \RuntimeException(sprintf(
             'Unknown marketplace "%s" on batch %s',
             $value,
             $batch->getId(),
