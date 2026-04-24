@@ -321,7 +321,6 @@
                                     + 'data-job-id="' + escapeHtml(job.id) + '">'
                                     + 'Пометить FAILED</button>'
                                 : '';
-                            var filesButtons = renderJobFiles(job.files || []);
                             // Task-12-test: кнопка «Обработать». Показываем только
                             // если API вернул extractToken (owner + completed/partial_success
                             // с батчами нового pipeline'а).
@@ -335,7 +334,11 @@
                                     + 'Обработать</button>'
                                     + '</form>'
                                 : '';
-                            var actionsCell = '<td>' + filesButtons + extractBtn + markFailedBtn + '</td>';
+                            // Task-16: кнопки «Открыть batch N» убраны из UI. Endpoint
+                            // /marketplace-ads/batches/{id}/download остаётся доступен
+                            // для admin-debug через прямой URL.
+                            var hasActions = extractBtn || markFailedBtn;
+                            var actionsCell = '<td>' + (hasActions ? extractBtn + markFailedBtn : '<span class="text-muted">—</span>') + '</td>';
                             return '<tr>'
                                 + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
                                 + '<td>' + jobStatusBadge(job.status) + '</td>'
@@ -365,38 +368,6 @@
             // reprocess: UUID placeholder не пройдёт Symfony requirements.
             var buildDownloadUrl = function (documentId) {
                 return '/marketplace-ads/raw-documents/' + encodeURIComponent(documentId) + '/download';
-            };
-
-            // Download-URL для батча нового cron-driven pipeline (Task-11.8).
-            var buildBatchDownloadUrl = function (batchId) {
-                return '/marketplace-ads/batches/' + encodeURIComponent(batchId) + '/download';
-            };
-
-            var formatDateRu = function (isoDate) {
-                var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ''));
-                return m ? (m[3] + '.' + m[2] + '.' + m[1]) : escapeHtml(isoDate);
-            };
-
-            var renderJobFiles = function (files) {
-                if (!Array.isArray(files) || files.length === 0) {
-                    return '';
-                }
-                return files.map(function (f) {
-                    // Новый cron-driven pipeline: одна кнопка на batch.
-                    if (f.kind === 'batch') {
-                        var label = 'Открыть batch ' + f.batchIndex
-                            + ' (' + formatDateRu(f.dateFrom) + '—' + formatDateRu(f.dateTo) + ')';
-                        return '<a href="' + escapeHtml(buildBatchDownloadUrl(f.id)) + '" '
-                            + 'class="btn btn-sm btn-outline-primary me-1 mb-1">'
-                            + escapeHtml(label)
-                            + '</a>';
-                    }
-                    // Старый Messenger-pipeline: одна кнопка на день.
-                    return '<a href="' + escapeHtml(buildDownloadUrl(f.id)) + '" '
-                        + 'class="btn btn-sm btn-outline-primary me-1 mb-1">'
-                        + 'Открыть ' + formatDateRu(f.reportDate)
-                        + '</a>';
-                }).join('');
             };
 
             var loadRawDocuments = function (dateFrom, dateTo) {

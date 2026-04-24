@@ -62,6 +62,28 @@ interface AdRawDocumentRepositoryInterface
     ): array;
 
     /**
+     * Последние $limit документов компании за период для конкретного маркетплейса.
+     * Применение: UI-список «Сырые документы» (Task-16 — ограничение выборки top-N).
+     *
+     * Реализация обязана:
+     *  - ограничивать выборку `company_id = :companyId` (IDOR-guard на уровне SQL);
+     *  - сравнивать `report_date` включительно по обеим границам `[$from, $to]`;
+     *  - сортировать по `created_at DESC` (последний загруженный документ сверху);
+     *  - применять лимит ПОСЛЕ фильтрации по диапазону дат.
+     *
+     * @param string $marketplace значение {@see \App\Marketplace\Enum\MarketplaceType::value}
+     *
+     * @return list<AdRawDocument>
+     */
+    public function findRecentByCompanyMarketplaceAndDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        int $limit = 20,
+    ): array;
+
+    /**
      * Идемпотентный lookup AdRawDocument по метке `batch_id=<uuid>\nfilename=<name>\n`
      * в префиксе `raw_payload` (Task-12-test).
      *

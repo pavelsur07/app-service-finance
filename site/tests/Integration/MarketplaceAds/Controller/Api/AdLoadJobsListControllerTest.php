@@ -106,7 +106,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('lastError', $data['items'][0]);
     }
 
-    public function testLimitsTo20Items(): void
+    public function testLimitsTo10Items(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -127,12 +127,12 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
 
         $base = new \DateTimeImmutable('2026-04-19 12:00:00');
 
-        for ($i = 1; $i <= 25; ++$i) {
+        for ($i = 1; $i <= 15; ++$i) {
             $job = AdLoadJobBuilder::aJob()
                 ->withCompanyId(self::COMPANY_ID)
                 ->withIndex($i)
                 ->withMarketplace(MarketplaceType::OZON)
-                ->withCreatedAt($base->modify(sprintf('-%d seconds', 25 - $i)))
+                ->withCreatedAt($base->modify(sprintf('-%d seconds', 15 - $i)))
                 ->build();
             $em->persist($job);
         }
@@ -148,7 +148,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertResponseIsSuccessful();
 
         $data = json_decode($client->getResponse()->getContent(), true);
-        self::assertCount(20, $data['items']);
+        self::assertCount(10, $data['items']);
     }
 
     public function testReturnsOnlyOzonJobs(): void
@@ -216,7 +216,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertNotContains($wb->getId(), $returnedIds);
     }
 
-    public function testJobWithScheduledBatchesExposesBatchStatsAndBatchKindFiles(): void
+    public function testJobWithScheduledBatchesExposesBatchStatsWithoutBatchDownloadFiles(): void
     {
         $client = static::createClient();
         $this->resetDb();
@@ -291,14 +291,11 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertSame(0, $item['batchStats']['failed']);
         self::assertSame(1, $item['batchStats']['pending']);
 
-        // files = только батчи со storagePath (IN_FLIGHT без файла не попадёт).
-        self::assertCount(2, $item['files']);
-        foreach ($item['files'] as $file) {
-            self::assertSame('batch', $file['kind']);
-            self::assertArrayHasKey('batchIndex', $file);
-            self::assertArrayHasKey('dateFrom', $file);
-            self::assertArrayHasKey('dateTo', $file);
-        }
+        // Task-16: поле `files` и кнопки «Открыть batch N» убраны из UI.
+        // Endpoint /marketplace-ads/batches/{id}/download остаётся доступен
+        // для admin-debug через прямой URL, но API списка jobs его больше не
+        // перечисляет.
+        self::assertArrayNotHasKey('files', $item);
     }
 
     public function testJobWithoutScheduledBatchesFallsBackToRawDocumentFilesAndHasBatchesFalse(): void
@@ -343,8 +340,7 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         // Legacy job: нет AdScheduledBatch → hasBatches=false, батч-статы нулевые.
         self::assertFalse($item['batchStats']['hasBatches']);
         self::assertSame(0, $item['batchStats']['total']);
-        // files может быть пустым (без AdRawDocument'ов в БД), главное что ключ есть.
-        self::assertArrayHasKey('files', $item);
-        self::assertSame([], $item['files']);
+        // Task-16: поле `files` удалено из ответа (кнопки batch-download убраны из UI).
+        self::assertArrayNotHasKey('files', $item);
     }
 }

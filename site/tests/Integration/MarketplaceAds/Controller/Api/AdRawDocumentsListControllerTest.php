@@ -166,6 +166,52 @@ final class AdRawDocumentsListControllerTest extends WebTestCaseBase
         self::assertArrayHasKey('message', $data);
     }
 
+    public function testLimitsTo20Items(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('ads-raw-limit@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(self::COMPANY_ID)
+            ->withOwner($owner)
+            ->build();
+
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        // 30 документов внутри запрошенного периода [2026-03-01, 2026-03-31]
+        // → после лимита 20 в ответе ровно 20 items (фильтр по датам
+        // применяется ДО лимита, см. Task-16).
+        for ($i = 1; $i <= 30; ++$i) {
+            $doc = AdRawDocumentBuilder::aRawDocument()
+                ->withCompanyId(self::COMPANY_ID)
+                ->withIndex($i)
+                ->withMarketplace(MarketplaceType::OZON)
+                ->withReportDate(new \DateTimeImmutable(sprintf('2026-03-%02d', $i)))
+                ->build();
+            $em->persist($doc);
+        }
+        $em->flush();
+
+        $client->loginUser($owner);
+        $session = $client->getContainer()->get('session');
+        $session->set('active_company_id', self::COMPANY_ID);
+        $session->save();
+
+        $client->request('GET', '/api/marketplace-ads/raw-documents?dateFrom=2026-03-01&dateTo=2026-03-31');
+
+        self::assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        self::assertCount(20, $data['items']);
+    }
+
     public function testIdorDoesNotLeakOtherCompanyDocuments(): void
     {
         $client = static::createClient();
