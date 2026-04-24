@@ -7,9 +7,12 @@ namespace App\Tests\Integration\MarketplaceAds\Command;
 use App\Company\Entity\Company;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Entity\AdScheduledBatch;
+use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
+use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdRawDocumentRepository;
 use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
 use App\Shared\Service\Storage\StorageService;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -21,6 +24,7 @@ use PHPUnit\Framework\MockObject\MockObject;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
+use Symfony\Component\Messenger\Transport\InMemoryTransport;
 
 /**
  * End-to-end тесты {@see \App\MarketplaceAds\Command\AdBatchPollerCommand}:
@@ -279,6 +283,161 @@ final class AdBatchPollerCommandTest extends IntegrationTestCase
         self::assertNull($reloaded->getLastError());
     }
 
+    /**
+     * Task-13a: после успешного download'а Poller сразу вызывает
+     * {@see \App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction::processBatch()}
+     * — AdRawDocument должен быть создан и ProcessAdRawDocumentMessage
+     * отправлен в `async_pipeline` без ручного клика по кнопке «Обработать».
+     *
+     * Отличие от остальных интеграционных тестов: НЕ мокаем StorageService —
+     * нужен реальный storage, чтобы {@see StorageService::getAbsolutePath()}
+     * вернул путь к файлу, который прочитает extractCsvsFromBatch.
+     */
+    public function testOkStateAutoExtractsRawDocumentAndDispatchesMessage(): void
+    {
+        // Снимаем мок StorageService, устанавливаем реальный сервис с tmp-root'ом.
+        $tmpRoot = sys_get_temp_dir().'/poller-autoextract-'.bin2hex(random_bytes(6));
+        mkdir($tmpRoot, 0o775, true);
+
+        try {
+            $realStorage = new StorageService($tmpRoot);
+            self::getContainer()->set(StorageService::class, $realStorage);
+
+            $job = $this->seedJob();
+            $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa1111-aaaa-aaaa-aaaa-autoext00001');
+
+            $csvBody = "\xEF\xBB\xBF;Кампания по продвижению товаров № 22655731, период 23.04.2026-23.04.2026\n"
+                ."sku;spend\n"
+                ."sku-1;1.00\n";
+
+            $this->clientMock->method('pollOneReport')
+                ->willReturn(['state' => 'OK', 'raw' => []]);
+            $this->clientMock->method('fetchReportContent')
+                ->willReturn(['body' => $csvBody, 'contentType' => 'text/csv']);
+
+            $tester = $this->makeCommandTester();
+            self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+            $this->em->clear();
+
+            $reloaded = $this->batchRepo->find($batch->getId());
+            self::assertNotNull($reloaded);
+            self::assertSame(AdScheduledBatchState::OK, $reloaded->getState());
+            self::assertNotNull($reloaded->getStoragePath());
+
+            /** @var AdRawDocumentRepository $rawRepo */
+            $rawRepo = self::getContainer()->get(AdRawDocumentRepository::class);
+            $docs = $rawRepo->findBy(['companyId' => self::COMPANY_ID]);
+            self::assertCount(1, $docs, 'Poller после download\'а должен создать AdRawDocument без ручного клика');
+            self::assertSame(AdRawDocumentStatus::DRAFT, $docs[0]->getStatus());
+            self::assertStringStartsWith(
+                sprintf("batch_id=%s\nfilename=", $batch->getId()),
+                $docs[0]->getRawPayload(),
+            );
+
+            /** @var InMemoryTransport $transport */
+            $transport = self::getContainer()->get('messenger.transport.async_pipeline');
+            $envelopes = $transport->getSent();
+            self::assertCount(1, $envelopes);
+            $message = $envelopes[0]->getMessage();
+            self::assertInstanceOf(ProcessAdRawDocumentMessage::class, $message);
+            self::assertSame(self::COMPANY_ID, $message->companyId);
+            self::assertSame($docs[0]->getId(), $message->adRawDocumentId);
+        } finally {
+            $this->rmDirRecursive($tmpRoot);
+        }
+    }
+
+    /**
+     * Auto-extract идемпотентен: повторный вызов processBatch на уже
+     * обработанном batch'е → findByBatchAndFilename находит AdRawDocument,
+     * createOrFindRawDocument возвращает null → skipped++. Мы моделируем это
+     * косвенно: первый tick создаёт doc, затем мы вручную зовём processBatch
+     * ещё раз и проверяем, что второй doc не создаётся.
+     */
+    public function testAutoExtractIsIdempotentOnRepeatedProcessBatchCall(): void
+    {
+        $tmpRoot = sys_get_temp_dir().'/poller-idempotent-'.bin2hex(random_bytes(6));
+        mkdir($tmpRoot, 0o775, true);
+
+        try {
+            $realStorage = new StorageService($tmpRoot);
+            self::getContainer()->set(StorageService::class, $realStorage);
+
+            $job = $this->seedJob();
+            $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa2222-aaaa-aaaa-aaaa-autoext00002');
+
+            $csvBody = "\xEF\xBB\xBF;Кампания по продвижению товаров № 33333, период 23.04.2026-23.04.2026\n"
+                ."sku;spend\n"
+                ."sku-1;2.50\n";
+
+            $this->clientMock->method('pollOneReport')
+                ->willReturn(['state' => 'OK', 'raw' => []]);
+            $this->clientMock->method('fetchReportContent')
+                ->willReturn(['body' => $csvBody, 'contentType' => 'text/csv']);
+
+            $tester = $this->makeCommandTester();
+            self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+            /** @var AdRawDocumentRepository $rawRepo */
+            $rawRepo = self::getContainer()->get(AdRawDocumentRepository::class);
+            self::assertCount(1, $rawRepo->findBy(['companyId' => self::COMPANY_ID]));
+
+            // Повторный вызов processBatch на том же batch'е — идемпотентен.
+            /** @var \App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction $extractAction */
+            $extractAction = self::getContainer()->get(
+                \App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction::class,
+            );
+
+            $this->em->clear();
+            $reloaded = $this->batchRepo->find($batch->getId());
+            self::assertNotNull($reloaded);
+
+            $result = $extractAction->processBatch($reloaded);
+            self::assertSame(0, $result['processed']);
+            self::assertSame(1, $result['skipped'], 'Второй вызов: existing AdRawDocument → skipped');
+
+            self::assertCount(1, $rawRepo->findBy(['companyId' => self::COMPANY_ID]), 'Дубликата не появилось');
+        } finally {
+            $this->rmDirRecursive($tmpRoot);
+        }
+    }
+
+    public function testAutoExtractFailureDoesNotMarkBatchFailed(): void
+    {
+        // Используем дефолтный storage mock (из parent setUp) — он вернёт
+        // пустой absolutePath → extractCsvsFromBatch упадёт с "file missing
+        // on disk" → Poller поймает \Throwable и залогирует, batch остаётся OK.
+        $job = $this->seedJob();
+        $batch = $this->persistBatch($job, batchIndex: 0, ozonUuid: 'aaaa3333-aaaa-aaaa-aaaa-autoext00003');
+
+        $this->clientMock->method('pollOneReport')
+            ->willReturn(['state' => 'OK', 'raw' => []]);
+        $this->clientMock->method('fetchReportContent')
+            ->willReturn(['body' => 'a,b,c', 'contentType' => 'text/csv']);
+
+        $this->storageMock->method('storeBytes')
+            ->willReturnCallback(static fn (string $body, string $path): array => [
+                'storagePath' => $path,
+                'fileHash' => hash('sha256', $body),
+                'sizeBytes' => strlen($body),
+                'mimeType' => null,
+            ]);
+        // getAbsolutePath не настроен → возвращает null-like; extract упадёт.
+
+        $tester = $this->makeCommandTester();
+        self::assertSame(Command::SUCCESS, $tester->execute([]));
+
+        $this->em->clear();
+        $reloaded = $this->batchRepo->find($batch->getId());
+        self::assertNotNull($reloaded);
+        self::assertSame(AdScheduledBatchState::OK, $reloaded->getState(), 'Extract fail → batch всё равно OK, fallback через кнопку');
+
+        /** @var AdRawDocumentRepository $rawRepo */
+        $rawRepo = self::getContainer()->get(AdRawDocumentRepository::class);
+        self::assertCount(0, $rawRepo->findBy(['companyId' => self::COMPANY_ID]));
+    }
+
     public function testTransientErrorOnOneBatchDoesNotBlockOthers(): void
     {
         $job = $this->seedJob();
@@ -355,6 +514,29 @@ final class AdBatchPollerCommandTest extends IntegrationTestCase
         $this->em->flush();
 
         return $batch;
+    }
+
+    private function rmDirRecursive(string $dir): void
+    {
+        if (!is_dir($dir)) {
+            return;
+        }
+        $entries = scandir($dir);
+        if (false === $entries) {
+            return;
+        }
+        foreach ($entries as $entry) {
+            if ('.' === $entry || '..' === $entry) {
+                continue;
+            }
+            $path = $dir.'/'.$entry;
+            if (is_dir($path)) {
+                $this->rmDirRecursive($path);
+            } else {
+                @unlink($path);
+            }
+        }
+        @rmdir($dir);
     }
 
     private function seedCompany(string $companyId, string $ownerId, string $email): Company

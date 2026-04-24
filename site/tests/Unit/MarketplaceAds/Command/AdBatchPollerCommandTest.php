@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\MarketplaceAds\Command;
 
+use App\MarketplaceAds\Application\ExtractBatchesToRawDocumentsAction;
 use App\MarketplaceAds\Command\AdBatchPollerCommand;
 use App\MarketplaceAds\Entity\AdScheduledBatch;
 use App\MarketplaceAds\Enum\AdScheduledBatchState;
@@ -41,6 +42,8 @@ final class AdBatchPollerCommandTest extends TestCase
     private StorageService $storage;
     /** @var EntityManagerInterface&MockObject */
     private EntityManagerInterface $em;
+    /** @var ExtractBatchesToRawDocumentsAction&MockObject */
+    private ExtractBatchesToRawDocumentsAction $extractAction;
 
     private AdBatchPollerCommand $command;
 
@@ -50,12 +53,14 @@ final class AdBatchPollerCommandTest extends TestCase
         $this->batchRepo = $this->createMock(AdScheduledBatchRepository::class);
         $this->storage = $this->createMock(StorageService::class);
         $this->em = $this->createMock(EntityManagerInterface::class);
+        $this->extractAction = $this->createMock(ExtractBatchesToRawDocumentsAction::class);
 
         $this->command = new AdBatchPollerCommand(
             $this->ozonClient,
             $this->batchRepo,
             $this->storage,
             $this->em,
+            $this->extractAction,
             new NullLogger(),
         );
     }
@@ -100,6 +105,12 @@ final class AdBatchPollerCommandTest extends TestCase
 
         $this->em->expects(self::once())->method('flush');
 
+        // Task-13a: после успешного download'а вызывается auto-extract.
+        $this->extractAction->expects(self::once())
+            ->method('processBatch')
+            ->with($batch)
+            ->willReturn(['processed' => 1, 'skipped' => 0]);
+
         $tester = new CommandTester($this->command);
         self::assertSame(0, $tester->execute([]));
 
@@ -108,6 +119,36 @@ final class AdBatchPollerCommandTest extends TestCase
         self::assertSame(5, $batch->getFileSize());
         self::assertNotNull($batch->getFinishedAt());
         self::assertNull($batch->getLastError());
+    }
+
+    public function testOkStateAutoExtractFailureDoesNotMarkBatchFailed(): void
+    {
+        $batch = $this->buildInFlightBatch('11111111-1111-1111-1111-111111111111');
+
+        $this->batchRepo->method('findAllInFlight')->willReturn([$batch]);
+        $this->ozonClient->method('pollOneReport')
+            ->willReturn(['state' => 'OK', 'raw' => []]);
+        $this->ozonClient->method('fetchReportContent')
+            ->willReturn(['body' => 'a,b,c', 'contentType' => 'text/csv']);
+
+        $this->storage->method('storeBytes')->willReturn([
+            'storagePath' => sprintf('marketplace-ads/%s/%s.csv', $batch->getCompanyId(), (string) $batch->getOzonUuid()),
+            'fileHash' => 'abc123',
+            'sizeBytes' => 5,
+            'mimeType' => null,
+        ]);
+
+        // Auto-extract падает — это НЕ должно перевести batch в FAILED.
+        $this->extractAction->expects(self::once())
+            ->method('processBatch')
+            ->willThrowException(new \RuntimeException('zip is broken'));
+
+        $tester = new CommandTester($this->command);
+        self::assertSame(0, $tester->execute([]));
+
+        self::assertSame(AdScheduledBatchState::OK, $batch->getState(), 'Extract failure не ломает successful download');
+        self::assertNull($batch->getLastError(), 'lastError — только про download, не про extract');
+        self::assertStringContainsString('ok=1', $tester->getDisplay());
     }
 
     public function testErrorStateMarksFailed(): void

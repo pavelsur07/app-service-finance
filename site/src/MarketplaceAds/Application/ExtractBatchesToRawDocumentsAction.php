@@ -52,6 +52,9 @@ final readonly class ExtractBatchesToRawDocumentsAction
      * Распаковывает все OK-батчи job'а, создаёт AdRawDocument на каждый CSV
      * и диспатчит ProcessAdRawDocumentMessage для async-обработки.
      *
+     * Используется ручной кнопкой «Обработать» (safety-net: если auto-extract
+     * в Poller'е Task-13a упал, кнопка позволяет обработать job целиком).
+     *
      * @return array{processed: int, skipped: int, errors: int}
      *     processed — сколько новых AdRawDocument создано (и Messages диспатчнуто);
      *     skipped   — сколько уже существовавших (company, batch, filename) пар найдено;
@@ -61,30 +64,22 @@ final readonly class ExtractBatchesToRawDocumentsAction
     {
         $batches = $this->batchRepo->findDownloadableByJobId($jobId, $companyId);
 
-        $processed = 0;
         $skipped = 0;
         $errors = 0;
-        /** @var list<string> $dispatchIds */
-        $dispatchIds = [];
+        /** @var list<AdRawDocument> $allPersisted */
+        $allPersisted = [];
 
         foreach ($batches as $batch) {
             try {
-                $csvs = $this->extractCsvsFromBatch($batch);
-                foreach ($csvs as $filename => $csvContent) {
-                    $rawDocId = $this->createOrFindRawDocument(
-                        $companyId,
-                        $batch,
-                        (string) $filename,
-                        $csvContent,
-                    );
-                    if (null === $rawDocId) {
-                        ++$skipped;
-                        continue;
-                    }
-                    $dispatchIds[] = $rawDocId;
-                    ++$processed;
+                $result = $this->processBatchInternal($batch);
+                $skipped += $result['skipped'];
+                foreach ($result['persistedDocs'] as $doc) {
+                    $allPersisted[] = $doc;
                 }
             } catch (\Throwable $e) {
+                // processBatchInternal уже detach'нул свои частично-persisted
+                // документы — UoW чист относительно этого batch'а, можно идти
+                // дальше без утечки в последующий flush.
                 ++$errors;
                 $this->logger->error('Batch extraction failed', [
                     'jobId' => $jobId,
@@ -99,14 +94,28 @@ final readonly class ExtractBatchesToRawDocumentsAction
         // Flush до dispatch: handler начнёт работать, как только worker подхватит
         // message, и findByIdAndCompany должен увидеть свежий AdRawDocument в БД.
         // Без этого при in-memory транспорте/быстром worker'е handler увидит «not found».
-        $this->em->flush();
+        if ([] !== $allPersisted) {
+            try {
+                $this->em->flush();
+            } catch (\Throwable $e) {
+                // Flush упал — detach всех, чтобы не «перетекли» в последующие
+                // operations на том же EM (например, следующий HTTP-запрос в
+                // shared EM контексте долгой Messenger-consumer сессии).
+                foreach ($allPersisted as $doc) {
+                    $this->em->detach($doc);
+                }
+                throw $e;
+            }
+        }
 
-        foreach ($dispatchIds as $rawDocId) {
+        foreach ($allPersisted as $doc) {
             $this->messageBus->dispatch(new ProcessAdRawDocumentMessage(
                 $companyId,
-                $rawDocId,
+                $doc->getId(),
             ));
         }
+
+        $processed = count($allPersisted);
 
         $this->logger->info('ExtractBatchesToRawDocumentsAction: finished', [
             'jobId' => $jobId,
@@ -122,6 +131,129 @@ final readonly class ExtractBatchesToRawDocumentsAction
             'skipped' => $skipped,
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * Обрабатывает один batch (вызывается из Poller'а сразу после успешного
+     * скачивания, Task-13a).
+     *
+     * Отличия от {@see __invoke}:
+     *  - точечная обработка одного уже-OK батча, без прохода по job'у;
+     *  - исключения на extraction пробрасываются наружу — Poller ловит
+     *    `\Throwable` сам и логирует как «auto-extract failed, batch остаётся
+     *    для ручной переобработки». Batch не переводится в FAILED: файл на
+     *    диске есть, кнопка «Обработать» сработает как fallback;
+     *  - идемпотентность: если AdRawDocument для (company, batch, filename)
+     *    уже существует → skipped++.
+     *
+     * UoW-изоляция (review PR #1654): `processBatchInternal` персистит
+     * AdRawDocument'ы в цикле по CSV. Если в середине цикла бросается
+     * exception (битый zip, сбой `createOrFindRawDocument` на N-м CSV после
+     * первых K успешных persist'ов, сбой `em->flush()`), ранее-persisted
+     * entity остаются в UoW. Следующий batch в tick'е Poller'а вызвал бы
+     * `em->flush()` и эти «orphan»-документы ушли бы в БД вне своего
+     * контекста. Защита — **surgical `em->detach()`** только по нашим
+     * свежеперсистированным `AdRawDocument`-ссылкам:
+     *  - `em->clear()` не подходит: pre-fetched managed AdScheduledBatch'и
+     *    в Poller'е (из `findAllInFlight()`) были бы detach'нуты, последующие
+     *    state-transitions (setState/setLastError/setFinishedAt + flush)
+     *    silently не дошли бы до БД. Doctrine ORM 3.x больше не поддерживает
+     *    selective `clear(entityName)`, поэтому detach — единственный
+     *    безопасный вариант.
+     *  - detach per-entity: остальной UoW (AdScheduledBatch и др.) остаётся
+     *    нетронутым, Poller продолжает работать как раньше.
+     *
+     * @return array{processed: int, skipped: int}
+     */
+    public function processBatch(AdScheduledBatch $batch): array
+    {
+        $result = $this->processBatchInternal($batch);
+        /** @var list<AdRawDocument> $persisted */
+        $persisted = $result['persistedDocs'];
+
+        try {
+            // Flush только если реально есть что коммитить — избегаем
+            // noop-flush на batch'ах, где все CSV уже processed (skipped).
+            if ([] !== $persisted) {
+                $this->em->flush();
+            }
+        } catch (\Throwable $e) {
+            // Flush failed (DB-constraint / connection) — detach всех, чтобы
+            // orphan'ы не ушли в следующий flush.
+            foreach ($persisted as $doc) {
+                $this->em->detach($doc);
+            }
+            throw $e;
+        }
+
+        foreach ($persisted as $doc) {
+            $this->messageBus->dispatch(new ProcessAdRawDocumentMessage(
+                $batch->getCompanyId(),
+                $doc->getId(),
+            ));
+        }
+
+        $this->logger->info('ExtractBatchesToRawDocumentsAction::processBatch: finished', [
+            'companyId' => $batch->getCompanyId(),
+            'batchId' => $batch->getId(),
+            'processed' => count($persisted),
+            'skipped' => $result['skipped'],
+        ]);
+
+        return [
+            'processed' => count($persisted),
+            'skipped' => $result['skipped'],
+        ];
+    }
+
+    /**
+     * Общая логика: извлечь CSV → создать/найти AdRawDocument → собрать
+     * список свежеперсистированных entity-ссылок. Flush и dispatch делает
+     * вызывающий, чтобы __invoke мог объединить flush по нескольким batch'ам
+     * в одну транзакцию.
+     *
+     * UoW-leak guard: если бросается exception в цикле, detach'ит уже
+     * persisted AdRawDocument'ы (см. процедурное обоснование в
+     * {@see processBatch}). Rethrow оригинальное исключение — вызывающие
+     * ветки (__invoke / processBatch) логируют / пробрасывают дальше.
+     *
+     * @return array{skipped: int, persistedDocs: list<AdRawDocument>}
+     *
+     * @throws \Throwable всё, что бросила extractCsvsFromBatch / createOrFindRawDocument
+     */
+    private function processBatchInternal(AdScheduledBatch $batch): array
+    {
+        $companyId = $batch->getCompanyId();
+        $skipped = 0;
+        /** @var list<AdRawDocument> $persisted */
+        $persisted = [];
+
+        try {
+            $csvs = $this->extractCsvsFromBatch($batch);
+            foreach ($csvs as $filename => $csvContent) {
+                $doc = $this->createOrFindRawDocument(
+                    $companyId,
+                    $batch,
+                    (string) $filename,
+                    $csvContent,
+                );
+                if (null === $doc) {
+                    ++$skipped;
+                    continue;
+                }
+                $persisted[] = $doc;
+            }
+
+            return [
+                'skipped' => $skipped,
+                'persistedDocs' => $persisted,
+            ];
+        } catch (\Throwable $e) {
+            foreach ($persisted as $doc) {
+                $this->em->detach($doc);
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -215,6 +347,9 @@ final readonly class ExtractBatchesToRawDocumentsAction
      * Идемпотентно создаёт AdRawDocument или возвращает null если уже существует
      * документ с тем же (companyId, batchId, filename).
      *
+     * Возвращает **entity-ссылку** (а не id), чтобы caller мог передать её в
+     * `em->detach()` при UoW-leak guard'е (см. {@see processBatchInternal}).
+     *
      * `raw_payload` получает префикс `batch_id=<uuid>\nfilename=<name>\n---\n<csv>` —
      * маркер служит ключом идемпотентности ({@see AdRawDocumentRepository::findByBatchAndFilename}).
      * reportDate берётся из `batch.dateFrom` (batch нового pipeline'а — один день).
@@ -224,7 +359,7 @@ final readonly class ExtractBatchesToRawDocumentsAction
         AdScheduledBatch $batch,
         string $filename,
         string $csvContent,
-    ): ?string {
+    ): ?AdRawDocument {
         $existing = $this->rawDocRepo->findByBatchAndFilename(
             $companyId,
             $batch->getId(),
@@ -248,7 +383,7 @@ final readonly class ExtractBatchesToRawDocumentsAction
 
         $this->rawDocRepo->save($doc);
 
-        return $doc->getId();
+        return $doc;
     }
 
     private function resolveMarketplace(AdScheduledBatch $batch): MarketplaceType
