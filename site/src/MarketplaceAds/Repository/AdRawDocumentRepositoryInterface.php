@@ -60,4 +60,20 @@ interface AdRawDocumentRepositoryInterface
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): array;
+
+    /**
+     * Идемпотентный lookup AdRawDocument по метке `batch_id=<uuid>\nfilename=<name>\n`
+     * в префиксе `raw_payload` (Task-12-test).
+     *
+     * Реализация обязана:
+     *  - ограничивать выборку `company_id = :companyId` (IDOR-guard);
+     *  - корректно экранировать SQL LIKE метасимволы в `batchId`/`filename`
+     *    (filename содержит `_` по формату `<campaignId>_<from>-<to>.csv`);
+     *  - возвращать null при отсутствии совпадения, не выбрасывать exception.
+     */
+    public function findByBatchAndFilename(
+        string $companyId,
+        string $batchId,
+        string $filename,
+    ): ?AdRawDocument;
 }
