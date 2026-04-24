@@ -108,8 +108,6 @@ final class AdBatchSchedulerCommandTest extends IntegrationTestCase
         $this->clientMock->method('postStatistics')
             ->willThrowException(new OzonRateLimitException('Ozon Performance: HTTP 429, rate-limited'));
 
-        $before = new \DateTimeImmutable();
-
         $tester = $this->makeCommandTester();
         $exit = $tester->execute([]);
 
@@ -127,10 +125,19 @@ final class AdBatchSchedulerCommandTest extends IntegrationTestCase
         self::assertNotNull($reloaded->getLastError());
         self::assertStringContainsString('429', (string) $reloaded->getLastError());
 
-        // scheduled_at должен сдвинуться примерно на +5 минут от момента запуска.
-        $delta = $reloaded->getScheduledAt()->getTimestamp() - $before->getTimestamp();
-        self::assertGreaterThanOrEqual(4 * 60, $delta, 'scheduled_at сдвинулся на >= 4 мин');
-        self::assertLessThanOrEqual(6 * 60, $delta, 'scheduled_at сдвинулся на <= 6 мин');
+        // scheduled_at должен сдвинуться примерно на +5 минут относительно NOW().
+        // Сравнение выполняем на стороне Postgres (SELECT scheduled_at - NOW()),
+        // чтобы не зависеть от того, в какой TZ Doctrine десериализует
+        // TIMESTAMP WITHOUT TIME ZONE при `getScheduledAt()->getTimestamp()`
+        // (Task-11.9a-fix: entity пишет UTC-wall-clock, а Doctrine при чтении
+        // использует default PHP TZ — в тестах из docker это Europe/Moscow).
+        $deltaSeconds = (int) $this->em->getConnection()->fetchOne(
+            'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
+            . 'FROM marketplace_ad_scheduled_batches WHERE id = :id',
+            ['id' => $batch->getId()],
+        );
+        self::assertGreaterThanOrEqual(4 * 60, $deltaSeconds, 'scheduled_at сдвинулся на >= 4 мин');
+        self::assertLessThanOrEqual(6 * 60, $deltaSeconds, 'scheduled_at сдвинулся на <= 6 мин');
     }
 
     public function testPermanentFailureMarksBatchFailed(): void

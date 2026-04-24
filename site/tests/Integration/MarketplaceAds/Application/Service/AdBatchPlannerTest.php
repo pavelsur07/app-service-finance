@@ -174,6 +174,55 @@ final class AdBatchPlannerTest extends IntegrationTestCase
         self::assertSame(240, (int) $rows[2]['ts'] - $base);
     }
 
+    /**
+     * Регрессия Task-11.9a-fix: scheduled_at первого батча должен быть «due»
+     * при сравнении с Postgres NOW() (UTC) сразу после planBatchesForJob.
+     *
+     * До фикса PHP писал DateTimeImmutable в локальном TZ (Europe/Moscow +3),
+     * а `b.scheduled_at <= NOW()` в {@see AdScheduledBatchRepository::findNextPlanned()}
+     * сравнивает с UTC → 3-часовой лаг. Тест падал бы с отрицательным delta.
+     */
+    public function testFirstBatchIsDueImmediatelyVsPostgresNow(): void
+    {
+        $job = $this->seedJob();
+
+        $this->ozonClient->method('listAllSkuCampaigns')->willReturn(
+            $this->buildCampaigns(5), // 1 батч — batchIndex=0 без сдвига
+        );
+
+        $this->planner->planBatchesForJob(
+            $job->getId(),
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-04-01'),
+            new \DateTimeImmutable('2026-04-10'),
+        );
+
+        $conn = $this->em->getConnection();
+        $deltaSeconds = (int) $conn->fetchOne(
+            'SELECT EXTRACT(EPOCH FROM (scheduled_at - NOW()))::bigint '
+            . 'FROM marketplace_ad_scheduled_batches '
+            . 'WHERE job_id = :jobId AND batch_index = 0',
+            ['jobId' => $job->getId()],
+        );
+
+        // scheduled_at должен быть ≤ NOW() в пределах секунды. Допускаем
+        // небольшую положительную погрешность (например, clock skew), но
+        // 3-часовой дрейф (старый баг) завалит тест с запасом.
+        self::assertLessThanOrEqual(
+            1,
+            $deltaSeconds,
+            sprintf(
+                'scheduled_at первого батча должен быть <= NOW() в пределах 1с, получили delta=%ds (TZ-баг?)',
+                $deltaSeconds,
+            ),
+        );
+        self::assertGreaterThanOrEqual(
+            -5,
+            $deltaSeconds,
+            'scheduled_at не должен быть «давно в прошлом» — это тоже симптом TZ-расхождения',
+        );
+    }
+
     public function testEmptyCampaignsThrowsAndPersistsNothing(): void
     {
         $job = $this->seedJob();

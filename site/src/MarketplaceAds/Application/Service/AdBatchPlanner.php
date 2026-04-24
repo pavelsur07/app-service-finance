@@ -103,7 +103,9 @@ final readonly class AdBatchPlanner
         );
 
         $chunks = array_chunk($campaignIds, self::BATCH_SIZE);
-        $now = new \DateTimeImmutable();
+        // UTC: Postgres NOW() возвращает UTC, локальный PHP TZ дал бы лаг
+        // при сравнении scheduled_at < NOW() в scheduler-cron. См. ARCHITECTURE v1.28.
+        $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
         $created = 0;
 
         foreach ($chunks as $batchIndex => $chunk) {

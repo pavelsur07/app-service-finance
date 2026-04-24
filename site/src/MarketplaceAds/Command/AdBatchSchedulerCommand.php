@@ -118,7 +118,9 @@ final class AdBatchSchedulerCommand extends Command
                     $batch->getDateTo(),
                 );
 
-                $now = new \DateTimeImmutable();
+                // UTC — см. ARCHITECTURE.md v1.28 (Postgres NOW() в UTC,
+                // без нормализации появлялся 3h лаг scheduled_at).
+                $now = new \DateTimeImmutable('now', new \DateTimeZone('UTC'));
                 $batch->setState(AdScheduledBatchState::IN_FLIGHT);
                 $batch->setOzonUuid($uuid);
                 $batch->setStartedAt($now);
@@ -130,7 +132,7 @@ final class AdBatchSchedulerCommand extends Command
             } catch (OzonRateLimitException $e) {
                 // Ozon держит активную выгрузку — batch остаётся PLANNED,
                 // scheduled_at сдвигается, retry_count растёт.
-                $newScheduledAt = (new \DateTimeImmutable())->modify(
+                $newScheduledAt = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify(
                     sprintf('+%d minutes', self::RATE_LIMIT_RESCHEDULE_MINUTES),
                 );
                 $batch->setScheduledAt($newScheduledAt);
@@ -154,7 +156,7 @@ final class AdBatchSchedulerCommand extends Command
                 // по агрегату.
                 $batch->setState(AdScheduledBatchState::FAILED);
                 $batch->setLastError('Ozon permanent: '.$e->getMessage());
-                $batch->setFinishedAt(new \DateTimeImmutable());
+                $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
 
                 $this->logger->error('Scheduler: permanent Ozon failure, marking FAILED', [
                     'batchId' => $batch->getId(),

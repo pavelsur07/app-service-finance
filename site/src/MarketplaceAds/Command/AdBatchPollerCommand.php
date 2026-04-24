@@ -164,7 +164,7 @@ final class AdBatchPollerCommand extends Command
 
             $batch->setState(AdScheduledBatchState::FAILED);
             $batch->setLastError('Invariant violation: IN_FLIGHT without ozon_uuid');
-            $batch->setFinishedAt(new \DateTimeImmutable());
+            $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
             $this->em->flush();
 
             return 'failed';
@@ -175,7 +175,7 @@ final class AdBatchPollerCommand extends Command
         } catch (OzonPermanentApiException $e) {
             $batch->setState(AdScheduledBatchState::FAILED);
             $batch->setLastError('Poll permanent failure: '.$e->getMessage());
-            $batch->setFinishedAt(new \DateTimeImmutable());
+            $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
             $this->em->flush();
 
             $this->logger->error('Poller: permanent poll failure, marking FAILED', [
@@ -201,7 +201,7 @@ final class AdBatchPollerCommand extends Command
                     // и следующий тик ретраил тот же 403 бесконечно.
                     $batch->setState(AdScheduledBatchState::FAILED);
                     $batch->setLastError('Download permanent failure: '.$e->getMessage());
-                    $batch->setFinishedAt(new \DateTimeImmutable());
+                    $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
                     $this->em->flush();
 
                     $this->logger->error('Poller: permanent failure during download', [
@@ -223,7 +223,7 @@ final class AdBatchPollerCommand extends Command
                 // тот же поведение, что и в старом `OzonAdReportPoller`.
                 $batch->setState(AdScheduledBatchState::FAILED);
                 $batch->setLastError(sprintf('Ozon reported state=%s', $state));
-                $batch->setFinishedAt(new \DateTimeImmutable());
+                $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
                 $this->em->flush();
 
                 $this->logger->info('Poller: batch marked FAILED', [
@@ -244,7 +244,7 @@ final class AdBatchPollerCommand extends Command
                 // MAX_AGE_BEFORE_ABANDON_SECONDS=10 800).
                 $startedAt = $batch->getStartedAt();
                 if (null !== $startedAt) {
-                    $ageSeconds = (new \DateTimeImmutable())->getTimestamp() - $startedAt->getTimestamp();
+                    $ageSeconds = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->getTimestamp() - $startedAt->getTimestamp();
                     if ($ageSeconds > self::MAX_AGE_BEFORE_ABANDON_HOURS * 3600) {
                         $ageHours = (int) ($ageSeconds / 3600);
                         $batch->setState(AdScheduledBatchState::ABANDONED);
@@ -253,7 +253,7 @@ final class AdBatchPollerCommand extends Command
                             $state,
                             $ageHours,
                         ));
-                        $batch->setFinishedAt(new \DateTimeImmutable());
+                        $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
                         $this->em->flush();
 
                         $this->logger->warning('Poller: batch abandoned after timeout', [
@@ -313,7 +313,7 @@ final class AdBatchPollerCommand extends Command
         $batch->setStoragePath((string) $stored['storagePath']);
         $batch->setFileHash((string) $stored['fileHash']);
         $batch->setFileSize((int) $stored['sizeBytes']);
-        $batch->setFinishedAt(new \DateTimeImmutable());
+        $batch->setFinishedAt(new \DateTimeImmutable('now', new \DateTimeZone('UTC')));
 
         $this->em->flush();
 
