@@ -11,11 +11,15 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\SalesListQuery;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceListingBuilder;
+use App\Tests\Builders\Marketplace\MarketplaceSaleBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
-use Ramsey\Uuid\Uuid;
 
 final class SalesListQueryTest extends IntegrationTestCase
 {
+    private const COMPANY_ID = '11111111-1111-1111-1111-000000000077';
+    private const OWNER_ID = '22222222-2222-2222-2222-000000000077';
+
     private Company $company;
     private MarketplaceListing $wbListing;
     private MarketplaceListing $ozonListing;
@@ -26,32 +30,26 @@ final class SalesListQueryTest extends IntegrationTestCase
         parent::setUp();
 
         $owner = UserBuilder::aUser()
-            ->withId('22222222-2222-2222-2222-000000000077')
+            ->withId(self::OWNER_ID)
             ->withEmail('sales-list-query@example.test')
             ->build();
 
         $this->company = CompanyBuilder::aCompany()
-            ->withId('11111111-1111-1111-1111-000000000077')
+            ->withId(self::COMPANY_ID)
             ->withOwner($owner)
             ->build();
 
-        $this->wbListing = new MarketplaceListing(
-            Uuid::uuid4()->toString(),
-            $this->company,
-            null,
-            MarketplaceType::WILDBERRIES,
-        );
-        $this->wbListing->setMarketplaceSku('wb-sku-1');
-        $this->wbListing->setPrice('1000.00');
+        $this->wbListing = MarketplaceListingBuilder::aListing()
+            ->forCompany($this->company)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withMarketplaceSku('wb-sku-1')
+            ->build();
 
-        $this->ozonListing = new MarketplaceListing(
-            Uuid::uuid4()->toString(),
-            $this->company,
-            null,
-            MarketplaceType::OZON,
-        );
-        $this->ozonListing->setMarketplaceSku('ozon-sku-1');
-        $this->ozonListing->setPrice('1000.00');
+        $this->ozonListing = MarketplaceListingBuilder::aListing()
+            ->forCompany($this->company)
+            ->withMarketplace(MarketplaceType::OZON)
+            ->withMarketplaceSku('ozon-sku-1')
+            ->build();
 
         $this->em->persist($owner);
         $this->em->persist($this->company);
@@ -64,9 +62,9 @@ final class SalesListQueryTest extends IntegrationTestCase
 
     public function testDoesNotFilterWhenDatesAreNull(): void
     {
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-01'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-15'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-30'));
+        foreach (['2026-04-01', '2026-04-15', '2026-04-30'] as $date) {
+            $this->createSale($this->wbListing, new \DateTimeImmutable($date));
+        }
         $this->em->flush();
 
         $qb = $this->salesListQuery->buildQueryBuilder(
@@ -81,9 +79,9 @@ final class SalesListQueryTest extends IntegrationTestCase
 
     public function testFiltersByDateFromInclusive(): void
     {
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-01'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-15'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-30'));
+        foreach (['2026-04-01', '2026-04-15', '2026-04-30'] as $date) {
+            $this->createSale($this->wbListing, new \DateTimeImmutable($date));
+        }
         $this->em->flush();
 
         $qb = $this->salesListQuery->buildQueryBuilder(
@@ -102,9 +100,9 @@ final class SalesListQueryTest extends IntegrationTestCase
 
     public function testFiltersByDateToInclusive(): void
     {
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-01'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-15'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-30'));
+        foreach (['2026-04-01', '2026-04-15', '2026-04-30'] as $date) {
+            $this->createSale($this->wbListing, new \DateTimeImmutable($date));
+        }
         $this->em->flush();
 
         $qb = $this->salesListQuery->buildQueryBuilder(
@@ -123,10 +121,10 @@ final class SalesListQueryTest extends IntegrationTestCase
 
     public function testFiltersByDateRangeAndMarketplaceCombined(): void
     {
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-01'));
-        $this->createSale($this->wbListing, MarketplaceType::WILDBERRIES, new \DateTimeImmutable('2026-04-20'));
-        $this->createSale($this->ozonListing, MarketplaceType::OZON, new \DateTimeImmutable('2026-04-10'));
-        $this->createSale($this->ozonListing, MarketplaceType::OZON, new \DateTimeImmutable('2026-04-25'));
+        $this->createSale($this->wbListing, new \DateTimeImmutable('2026-04-01'));
+        $this->createSale($this->wbListing, new \DateTimeImmutable('2026-04-20'));
+        $this->createSale($this->ozonListing, new \DateTimeImmutable('2026-04-10'));
+        $this->createSale($this->ozonListing, new \DateTimeImmutable('2026-04-25'));
         $this->em->flush();
 
         $qb = $this->salesListQuery->buildQueryBuilder(
@@ -145,20 +143,13 @@ final class SalesListQueryTest extends IntegrationTestCase
 
     private function createSale(
         MarketplaceListing $listing,
-        MarketplaceType $marketplace,
         \DateTimeImmutable $saleDate,
     ): MarketplaceSale {
-        $sale = new MarketplaceSale(
-            Uuid::uuid4()->toString(),
-            $this->company,
-            $listing,
-            $marketplace,
-        );
-        $sale->setExternalOrderId('ext-' . Uuid::uuid4()->toString());
-        $sale->setSaleDate($saleDate);
-        $sale->setQuantity(1);
-        $sale->setPricePerUnit('1000.00');
-        $sale->setTotalRevenue('1000.00');
+        $sale = MarketplaceSaleBuilder::aSale()
+            ->forCompany($this->company)
+            ->forListing($listing)
+            ->withSaleDate($saleDate)
+            ->build();
         $this->em->persist($sale);
 
         return $sale;
