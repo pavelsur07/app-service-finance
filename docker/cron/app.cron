@@ -10,8 +10,11 @@
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
-# Ежедневная загрузка рекламы Ozon за вчера для всех компаний с активным Performance-подключением.
-30 4 * * * php bin/console app:marketplace-ads:ozon-daily-sync --no-interaction
+# Daily-sync: создаёт AdLoadJob за вчера для всех компаний с активным Ozon
+# Performance подключением. Дальше работу подхватывают cron-driven worker'ы
+# (scheduler → poller → finalizer → auto-extract), без ручных действий.
+# Scheduler-контейнер запущен с TZ=Europe/Moscow → 30 4 = 04:30 MSK.
+30 4 * * * php bin/console app:marketplace-ads:daily-sync --no-interaction --quiet
 
 # Poll Ozon Performance reports (async-poll redesign, step 5)
 # Picks up pending reports in REQUESTED state, transitions state via

@@ -462,6 +462,153 @@ final class AdLoadJobRepositoryTest extends IntegrationTestCase
         self::assertSame('something went wrong', $reloaded->getFailureReason());
     }
 
+    public function testExistsByDateRangeHappyPath(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $dateFrom = new \DateTimeImmutable('2026-04-20');
+        $dateTo = new \DateTimeImmutable('2026-04-20');
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withDateRange($dateFrom, $dateTo)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+
+        self::assertTrue($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            $dateFrom,
+            $dateTo,
+        ));
+    }
+
+    public function testExistsByDateRangeReturnsFalseWhenEmpty(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        self::assertFalse($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-04-20'),
+            new \DateTimeImmutable('2026-04-20'),
+        ));
+    }
+
+    public function testExistsByDateRangeIgnoresDifferentMarketplace(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $dateFrom = new \DateTimeImmutable('2026-04-20');
+        $dateTo = new \DateTimeImmutable('2026-04-20');
+
+        $wbJob = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withMarketplace(MarketplaceType::WILDBERRIES)
+            ->withDateRange($dateFrom, $dateTo)
+            ->build();
+        $this->repository->save($wbJob);
+        $this->em->flush();
+
+        // WB job за эту дату есть, но запрашиваем OZON — должно быть false.
+        self::assertFalse($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            $dateFrom,
+            $dateTo,
+        ));
+        // Свой маркетплейс находится.
+        self::assertTrue($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::WILDBERRIES->value,
+            $dateFrom,
+            $dateTo,
+        ));
+    }
+
+    public function testExistsByDateRangeIgnoresDifferentCompany(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->seedCompany(self::OTHER_COMPANY_ID, self::OTHER_OWNER_ID, 'b@example.test');
+        $this->em->flush();
+
+        $dateFrom = new \DateTimeImmutable('2026-04-20');
+        $dateTo = new \DateTimeImmutable('2026-04-20');
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withDateRange($dateFrom, $dateTo)
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+
+        self::assertFalse($this->repository->existsByDateRange(
+            self::OTHER_COMPANY_ID,
+            MarketplaceType::OZON->value,
+            $dateFrom,
+            $dateTo,
+        ));
+    }
+
+    public function testExistsByDateRangeIgnoresDifferentDate(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withDateRange(
+                new \DateTimeImmutable('2026-04-20'),
+                new \DateTimeImmutable('2026-04-20'),
+            )
+            ->build();
+        $this->repository->save($job);
+        $this->em->flush();
+
+        // Соседний день — не матчится.
+        self::assertFalse($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            new \DateTimeImmutable('2026-04-21'),
+            new \DateTimeImmutable('2026-04-21'),
+        ));
+    }
+
+    public function testExistsByDateRangeMatchesTerminalJobs(): void
+    {
+        $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
+        $this->em->flush();
+
+        $dateFrom = new \DateTimeImmutable('2026-04-20');
+        $dateTo = new \DateTimeImmutable('2026-04-20');
+
+        // Важно для идемпотентности daily-sync: повторный запуск не должен
+        // создавать дубликат, даже если предыдущий job упал в FAILED.
+        $failed = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withDateRange($dateFrom, $dateTo)
+            ->asFailed('Planning error')
+            ->build();
+        $this->repository->save($failed);
+        $this->em->flush();
+
+        self::assertTrue($this->repository->existsByDateRange(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            $dateFrom,
+            $dateTo,
+        ));
+    }
+
     public function testMarkCompletedIgnoresWrongCompanyIdIDOR(): void
     {
         $this->seedCompany(self::COMPANY_ID, self::OWNER_ID, 'a@example.test');
