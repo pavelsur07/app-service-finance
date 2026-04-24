@@ -232,6 +232,28 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         return $result;
     }
 
+    public function existsByDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): bool {
+        $count = (int) $this->createQueryBuilder('j')
+            ->select('COUNT(j.id)')
+            ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
+            ->andWhere('j.dateFrom = :dateFrom')
+            ->andWhere('j.dateTo = :dateTo')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', MarketplaceType::from($marketplace))
+            ->setParameter('dateFrom', $dateFrom->setTime(0, 0), 'date_immutable')
+            ->setParameter('dateTo', $dateTo->setTime(0, 0), 'date_immutable')
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        return $count > 0;
+    }
+
     private function atomicIncrement(string $column, string $jobId, string $companyId, int $delta): int
     {
         // Whitelist — защита от SQL-injection через имя колонки (параметризовать имя

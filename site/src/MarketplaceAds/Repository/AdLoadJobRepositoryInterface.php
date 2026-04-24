@@ -81,4 +81,20 @@ interface AdLoadJobRepositoryInterface
      * @return list<AdLoadJob>
      */
     public function findAllRunning(): array;
+
+    /**
+     * Существует ли хотя бы один job на точно этот (company, marketplace,
+     * dateFrom, dateTo)? Используется daily-sync cron для идемпотентности:
+     * повторный запуск в тот же день не должен создать второй job за вчера.
+     *
+     * Проверяется весь жизненный цикл (любой статус), т.к. факт «job за эту
+     * дату уже создавался» — повод не создавать дубликат, даже если
+     * предыдущая попытка закончилась FAILED.
+     */
+    public function existsByDateRange(
+        string $companyId,
+        string $marketplace,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): bool;
 }
