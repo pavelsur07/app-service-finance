@@ -26,11 +26,11 @@
                 <span>Unit-экономика</span>
             </a>
             {% set mp_ads_active = current_route starts with 'marketplace_ads_' %}
-            <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_index') }}">
+            <a class="dropdown-item {{ mp_ads_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">
                 <span>Реклама</span>
             </a>
-            {% set mp_reconciliation_active = current_route == 'marketplace_ads_efficiency_index' %}
-            <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_ads_efficiency_index') }}">
+            {% set mp_reconciliation_active = current_route == 'marketplace_efficiency' %}
+            <a class="dropdown-item {{ mp_reconciliation_active ? 'active' : '' }}" href="{{ path('marketplace_reconciliation') }}">
                 <span>Сверка</span>
             </a>
             {% if is_granted('ROLE_SUPER_ADMIN') %}
