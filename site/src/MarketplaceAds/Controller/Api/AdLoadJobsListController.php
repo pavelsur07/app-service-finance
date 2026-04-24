@@ -6,8 +6,10 @@ namespace App\MarketplaceAds\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Entity\AdRawDocument;
+use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use App\MarketplaceAds\Repository\AdRawDocumentRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,6 +26,7 @@ final class AdLoadJobsListController extends AbstractController
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly AdRawDocumentRepository $adRawDocumentRepository,
+        private readonly AdScheduledBatchRepository $adScheduledBatchRepository,
     ) {
     }
 
@@ -40,30 +43,26 @@ final class AdLoadJobsListController extends AbstractController
 
         $items = [];
         foreach ($jobs as $job) {
-            // Для каждого job'а подтягиваем raw-документы в его периоде и
-            // оставляем только те, у которых заполнен storage_path — т.е. есть
-            // файл для скачивания. UI рендерит по одной кнопке «Открыть» на
-            // каждую такую дату.
-            $documents = $this->adRawDocumentRepository->findByCompanyMarketplaceAndDateRange(
-                $companyId,
-                MarketplaceType::OZON->value,
-                $job->getDateFrom(),
-                $job->getDateTo(),
-            );
+            // Batch-агрегат для нового cron-driven pipeline (Task-11.3+).
+            // Для jobs старого Messenger-pipeline'а countStatesForJob вернёт [] —
+            // UI отрисует старый «Чанки: N» путь через hasBatches=false.
+            // Ключи — AdScheduledBatchState::value (см. countStatesForJob SQL).
+            $stats = $this->adScheduledBatchRepository->countStatesForJob($job->getId(), $companyId);
+            $ok = $stats[AdScheduledBatchState::OK->value] ?? 0;
+            $failedLike = ($stats[AdScheduledBatchState::FAILED->value] ?? 0)
+                + ($stats[AdScheduledBatchState::ABANDONED->value] ?? 0);
+            $pending = ($stats[AdScheduledBatchState::PLANNED->value] ?? 0)
+                + ($stats[AdScheduledBatchState::IN_FLIGHT->value] ?? 0);
+            $totalBatches = $ok + $failedLike + $pending;
+            $hasBatches = $totalBatches > 0;
 
-            $files = [];
-            foreach ($documents as $doc) {
-                if (!$doc instanceof AdRawDocument) {
-                    continue;
-                }
-                if (null === $doc->getStoragePath()) {
-                    continue;
-                }
-                $files[] = [
-                    'id' => $doc->getId(),
-                    'reportDate' => $doc->getReportDate()->format('Y-m-d'),
-                ];
-            }
+            // Источник файлов для скачивания зависит от pipeline'а:
+            //  - старый Messenger: AdRawDocument.storage_path (одна запись на день);
+            //  - новый cron: AdScheduledBatch.storage_path (одна запись на batch).
+            // Держим оба пути — старые job'ы остаются функциональными.
+            $files = $hasBatches
+                ? $this->collectBatchFiles($job->getId(), $companyId)
+                : $this->collectRawDocumentFiles($companyId, $job->getDateFrom(), $job->getDateTo());
 
             $items[] = [
                 'id' => $job->getId(),
@@ -74,10 +73,73 @@ final class AdLoadJobsListController extends AbstractController
                 'createdAt' => $job->getCreatedAt()->format('d.m.Y H:i'),
                 'finishedAt' => $job->getFinishedAt()?->format('d.m.Y H:i'),
                 'lastError' => $job->getFailureReason(),
+                'batchStats' => [
+                    'total' => $totalBatches,
+                    'ok' => $ok,
+                    'failed' => $failedLike,
+                    'pending' => $pending,
+                    'hasBatches' => $hasBatches,
+                ],
                 'files' => $files,
             ];
         }
 
         return $this->json(['items' => $items]);
+    }
+
+    /**
+     * @return list<array{id: string, reportDate: string, kind: 'raw'}>
+     */
+    private function collectRawDocumentFiles(
+        string $companyId,
+        \DateTimeImmutable $dateFrom,
+        \DateTimeImmutable $dateTo,
+    ): array {
+        $documents = $this->adRawDocumentRepository->findByCompanyMarketplaceAndDateRange(
+            $companyId,
+            MarketplaceType::OZON->value,
+            $dateFrom,
+            $dateTo,
+        );
+
+        $files = [];
+        foreach ($documents as $doc) {
+            if (!$doc instanceof AdRawDocument) {
+                continue;
+            }
+            if (null === $doc->getStoragePath()) {
+                continue;
+            }
+            $files[] = [
+                'id' => $doc->getId(),
+                'reportDate' => $doc->getReportDate()->format('Y-m-d'),
+                'kind' => 'raw',
+            ];
+        }
+
+        return $files;
+    }
+
+    /**
+     * @return list<array{id: string, batchIndex: int, dateFrom: string, dateTo: string, campaignCount: int, fileSize: ?int, kind: 'batch'}>
+     */
+    private function collectBatchFiles(string $jobId, string $companyId): array
+    {
+        $downloadable = $this->adScheduledBatchRepository->findDownloadableByJobId($jobId, $companyId);
+
+        $files = [];
+        foreach ($downloadable as $batch) {
+            $files[] = [
+                'id' => $batch->getId(),
+                'batchIndex' => $batch->getBatchIndex(),
+                'dateFrom' => $batch->getDateFrom()->format('Y-m-d'),
+                'dateTo' => $batch->getDateTo()->format('Y-m-d'),
+                'campaignCount' => count($batch->getCampaignIds()),
+                'fileSize' => $batch->getFileSize(),
+                'kind' => 'batch',
+            ];
+        }
+
+        return $files;
     }
 }

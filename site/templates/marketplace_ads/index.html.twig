@@ -70,6 +70,10 @@
                                         <div class="alert alert-success mb-0 py-2">
                                             <small>Реклама Ozon загружена</small>
                                         </div>
+                                    {% elseif activeAdLoadJob.status.value == 'partial_success' %}
+                                        <div class="alert alert-warning mb-0 py-2">
+                                            <small>Реклама Ozon загружена частично: {{ activeAdLoadJob.failureReason }}</small>
+                                        </div>
                                     {% else %}
                                         <div class="alert alert-danger mb-0 py-2">
                                             <small>Ошибка загрузки: {{ activeAdLoadJob.failureReason }}</small>
@@ -103,7 +107,7 @@
                         <tr>
                             <th>Период</th>
                             <th>Статус</th>
-                            <th>Чанки</th>
+                            <th>Прогресс</th>
                             <th>Создан</th>
                             <th>Завершён</th>
                             <th>Ошибка</th>
@@ -234,13 +238,35 @@
 
             var jobStatusBadge = function (status) {
                 var map = {
-                    pending:   ['bg-secondary', 'Ожидает'],
-                    running:   ['bg-info',      'Выполняется'],
-                    completed: ['bg-success',   'Завершён'],
-                    failed:    ['bg-danger',    'Ошибка'],
+                    pending:         ['bg-secondary', 'В очереди'],
+                    running:         ['bg-info',      'Выполняется'],
+                    completed:       ['bg-success',   'Выполнено'],
+                    failed:          ['bg-danger',    'Ошибка'],
+                    partial_success: ['bg-warning',   'Частично'],
                 };
                 var row = map[status] || ['bg-secondary', status];
                 return '<span class="badge ' + row[0] + '">' + escapeHtml(row[1]) + '</span>';
+            };
+
+            // Прогресс cron-driven pipeline (Task-11.8): три bootstrap-бейджа
+            // «OK / ошибок / ожидает». Для старых jobs (hasBatches=false)
+            // показываем прежний "Чанки: N".
+            var renderJobProgress = function (job) {
+                var stats = job.batchStats || {};
+                if (!stats.hasBatches) {
+                    return job.chunksTotal > 0
+                        ? 'Чанки: ' + escapeHtml(job.chunksTotal)
+                        : '—';
+                }
+                var parts = [];
+                parts.push('<span class="badge bg-success">' + stats.ok + '/' + stats.total + ' OK</span>');
+                if (stats.pending > 0) {
+                    parts.push('<span class="badge bg-info ms-1">' + stats.pending + ' в работе</span>');
+                }
+                if (stats.failed > 0) {
+                    parts.push('<span class="badge bg-danger ms-1">' + stats.failed + ' ошибок</span>');
+                }
+                return parts.join('');
             };
 
             var docStatusBadge = function (status) {
@@ -283,7 +309,7 @@
                             return '<tr>'
                                 + '<td><small>' + escapeHtml(job.dateFrom) + ' — ' + escapeHtml(job.dateTo) + '</small></td>'
                                 + '<td>' + jobStatusBadge(job.status) + '</td>'
-                                + '<td>' + escapeHtml(job.chunksTotal) + '</td>'
+                                + '<td><small>' + renderJobProgress(job) + '</small></td>'
                                 + '<td><small>' + escapeHtml(job.createdAt) + '</small></td>'
                                 + '<td><small>' + escapeHtml(job.finishedAt || '—') + '</small></td>'
                                 + '<td><small class="text-danger">' + escapeHtml(job.lastError || '') + '</small></td>'
@@ -311,6 +337,11 @@
                 return '/marketplace-ads/raw-documents/' + encodeURIComponent(documentId) + '/download';
             };
 
+            // Download-URL для батча нового cron-driven pipeline (Task-11.8).
+            var buildBatchDownloadUrl = function (batchId) {
+                return '/marketplace-ads/batches/' + encodeURIComponent(batchId) + '/download';
+            };
+
             var formatDateRu = function (isoDate) {
                 var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(isoDate || ''));
                 return m ? (m[3] + '.' + m[2] + '.' + m[1]) : escapeHtml(isoDate);
@@ -321,6 +352,16 @@
                     return '';
                 }
                 return files.map(function (f) {
+                    // Новый cron-driven pipeline: одна кнопка на batch.
+                    if (f.kind === 'batch') {
+                        var label = 'Открыть batch ' + f.batchIndex
+                            + ' (' + formatDateRu(f.dateFrom) + '—' + formatDateRu(f.dateTo) + ')';
+                        return '<a href="' + escapeHtml(buildBatchDownloadUrl(f.id)) + '" '
+                            + 'class="btn btn-sm btn-outline-primary me-1 mb-1">'
+                            + escapeHtml(label)
+                            + '</a>';
+                    }
+                    // Старый Messenger-pipeline: одна кнопка на день.
                     return '<a href="' + escapeHtml(buildDownloadUrl(f.id)) + '" '
                         + 'class="btn btn-sm btn-outline-primary me-1 mb-1">'
                         + 'Открыть ' + formatDateRu(f.reportDate)

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAds\Controller\Api;
 
 use App\Marketplace\Enum\MarketplaceType;
+use App\MarketplaceAds\Enum\AdScheduledBatchState;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
+use App\Tests\Builders\MarketplaceAds\AdScheduledBatchBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
 
 final class AdLoadJobsListControllerTest extends WebTestCaseBase
@@ -212,5 +214,137 @@ final class AdLoadJobsListControllerTest extends WebTestCaseBase
         self::assertContains($ozon1->getId(), $returnedIds);
         self::assertContains($ozon2->getId(), $returnedIds);
         self::assertNotContains($wb->getId(), $returnedIds);
+    }
+
+    public function testJobWithScheduledBatchesExposesBatchStatsAndBatchKindFiles(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('ads-jobs-batch@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(self::COMPANY_ID)
+            ->withOwner($owner)
+            ->build();
+
+        $em->persist($owner);
+        $em->persist($company);
+        $em->flush();
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->asRunning()
+            ->build();
+        $em->persist($job);
+        $em->flush();
+
+        // Три батча: 2 готовых со storagePath (должны попасть в files) + 1 IN_FLIGHT без файла.
+        $ok0 = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(0)
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage('marketplace-ads/'.self::COMPANY_ID.'/batch-0.csv', 'hash0', 100)
+            ->build();
+        $ok1 = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withState(AdScheduledBatchState::OK)
+            ->withStorage('marketplace-ads/'.self::COMPANY_ID.'/batch-1.csv', 'hash1', 200)
+            ->build();
+        $inFlight = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withState(AdScheduledBatchState::IN_FLIGHT)
+            ->withOzonUuid('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee')
+            ->build();
+
+        $em->persist($ok0);
+        $em->persist($ok1);
+        $em->persist($inFlight);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $session = $client->getContainer()->get('session');
+        $session->set('active_company_id', self::COMPANY_ID);
+        $session->save();
+
+        $client->request('GET', '/api/marketplace-ads/load-jobs');
+
+        self::assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        self::assertCount(1, $data['items']);
+        $item = $data['items'][0];
+
+        self::assertArrayHasKey('batchStats', $item);
+        self::assertTrue($item['batchStats']['hasBatches']);
+        self::assertSame(3, $item['batchStats']['total']);
+        self::assertSame(2, $item['batchStats']['ok']);
+        self::assertSame(0, $item['batchStats']['failed']);
+        self::assertSame(1, $item['batchStats']['pending']);
+
+        // files = только батчи со storagePath (IN_FLIGHT без файла не попадёт).
+        self::assertCount(2, $item['files']);
+        foreach ($item['files'] as $file) {
+            self::assertSame('batch', $file['kind']);
+            self::assertArrayHasKey('batchIndex', $file);
+            self::assertArrayHasKey('dateFrom', $file);
+            self::assertArrayHasKey('dateTo', $file);
+        }
+    }
+
+    public function testJobWithoutScheduledBatchesFallsBackToRawDocumentFilesAndHasBatchesFalse(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+        $em = $this->em();
+
+        $owner = UserBuilder::aUser()
+            ->withId(self::OWNER_ID)
+            ->withEmail('ads-jobs-legacy@example.test')
+            ->build();
+        $company = CompanyBuilder::aCompany()
+            ->withId(self::COMPANY_ID)
+            ->withOwner($owner)
+            ->build();
+
+        $em->persist($owner);
+        $em->persist($company);
+
+        $job = AdLoadJobBuilder::aJob()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withDateRange(new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-03'))
+            ->asCompleted()
+            ->build();
+        $em->persist($job);
+        $em->flush();
+
+        $client->loginUser($owner);
+        $session = $client->getContainer()->get('session');
+        $session->set('active_company_id', self::COMPANY_ID);
+        $session->save();
+
+        $client->request('GET', '/api/marketplace-ads/load-jobs');
+        self::assertResponseIsSuccessful();
+
+        $data = json_decode($client->getResponse()->getContent(), true);
+        self::assertCount(1, $data['items']);
+        $item = $data['items'][0];
+
+        // Legacy job: нет AdScheduledBatch → hasBatches=false, батч-статы нулевые.
+        self::assertFalse($item['batchStats']['hasBatches']);
+        self::assertSame(0, $item['batchStats']['total']);
+        // files может быть пустым (без AdRawDocument'ов в БД), главное что ключ есть.
+        self::assertArrayHasKey('files', $item);
+        self::assertSame([], $item['files']);
     }
 }

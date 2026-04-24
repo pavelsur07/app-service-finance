@@ -100,6 +100,25 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
     }
 
     /**
+     * IDOR-safe lookup по PK + companyId.
+     *
+     * Используется download-контроллером
+     * {@see \App\MarketplaceAds\Controller\AdScheduledBatchDownloadController}:
+     * подмена `{id}` в URL чужой компании возвращает null → 404. Паттерн
+     * консистентен с `OzonAdPendingReportRepository::findByIdAndCompany`.
+     */
+    public function findByIdAndCompany(string $id, string $companyId): ?AdScheduledBatch
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->findOneBy([
+            'id' => $id,
+            'companyId' => $companyId,
+        ]);
+    }
+
+    /**
      * Все батчи конкретного job'а (любого state).
      *
      * IDOR-guard: `companyId` в WHERE. Чужой `jobId`, случайно пробитый
