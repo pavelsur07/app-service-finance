@@ -17,6 +17,8 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
 #[IsGranted('ROLE_COMPANY_USER')]
 final class AdRawDocumentsListController extends AbstractController
 {
+    private const LIMIT = 20;
+
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly AdRawDocumentRepository $rawDocumentRepository,
@@ -42,11 +44,12 @@ final class AdRawDocumentsListController extends AbstractController
             }
         }
 
-        $documents = $this->rawDocumentRepository->findByCompanyMarketplaceAndDateRange(
+        $documents = $this->rawDocumentRepository->findRecentByCompanyMarketplaceAndDateRange(
             $companyId,
             MarketplaceType::OZON->value,
             $dateFrom,
             $dateTo,
+            self::LIMIT,
         );
 
         $items = array_map(
