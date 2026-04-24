@@ -48,11 +48,15 @@
                         </div>
                     {% else %}
                         <div class="btn-list">
-                            <button type="button" class="btn btn-indigo" data-ozon-initial-load="1">
-                                Загрузить с начала года
-                            </button>
+                            {# Кнопка «Загрузить с начала года» временно убрана (Task-11.9a):
+                               после включения 62-day guard в DispatchOzonAdLoadAction период
+                               Jan 1 → yesterday превышает лимит в большинстве месяцев года
+                               и возвращает 400. Multi-chunk поддержка — отдельная follow-up
+                               задача, до неё остаётся только «Загрузить за период». Сам
+                               endpoint `marketplace_ads_ozon_initial_load` доступен через
+                               прямой API — реактивируем UI одновременно с multi-chunk. #}
                             {% if is_granted('ROLE_COMPANY_OWNER') %}
-                                <button type="button" class="btn btn-outline-secondary"
+                                <button type="button" class="btn btn-indigo"
                                         data-bs-toggle="modal" data-bs-target="#modal-ozon-ad-load-range">
                                     Загрузить за период
                                 </button>
@@ -466,34 +470,11 @@
                 });
             });
 
-            // Кнопка «Загрузить с начала года»
-            document.querySelectorAll('[data-ozon-initial-load]').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    btn.disabled = true;
-                    var original = btn.innerHTML;
-                    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запуск...';
-                    fetch('{{ path('marketplace_ads_ozon_initial_load') }}', {
-                        method: 'POST',
-                        credentials: 'same-origin',
-                        headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    })
-                        .then(function (r) { return r.json().then(function (d) { return {ok: r.ok, data: d}; }); })
-                        .then(function (res) {
-                            if (res.ok) {
-                                window.location.reload();
-                            } else {
-                                alert('Ошибка: ' + ((res.data && res.data.message) || 'Неизвестная ошибка'));
-                                btn.disabled = false;
-                                btn.innerHTML = original;
-                            }
-                        })
-                        .catch(function (err) {
-                            alert('Ошибка сети: ' + err.message);
-                            btn.disabled = false;
-                            btn.innerHTML = original;
-                        });
-                });
-            });
+            // Handler кнопки «Загрузить с начала года» удалён вместе с самой
+            // кнопкой (см. комментарий в шаблоне выше). Endpoint
+            // marketplace_ads_ozon_initial_load остаётся доступен для прямого
+            // API-вызова; UI вернёт кнопку, когда будет multi-chunk поддержка
+            // периодов >62 дней.
 
             // Кнопка «Загрузить за период» в модалке
             var rangeBtn = document.getElementById('btn-ozon-ad-load-range');
