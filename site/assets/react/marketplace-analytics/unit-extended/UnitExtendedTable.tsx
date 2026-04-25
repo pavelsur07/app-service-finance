@@ -14,6 +14,8 @@ type SortField =
     | 'costPriceTotal'
     | 'costPriceUnit'
     | 'commission'
+    | 'adSpend'
+    | 'drrPercent'
     | 'logistics'
     | 'otherCosts'
     | 'totalCosts'
@@ -87,7 +89,7 @@ interface ExpandedState {
     type: ExpandedType;
 }
 
-const HEADERS: { field: SortField; label: string; align?: string }[] = [
+const HEADERS: { field: SortField; label: string; align?: string; tooltip?: string }[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
@@ -96,6 +98,8 @@ const HEADERS: { field: SortField; label: string; align?: string }[] = [
     { field: 'costPriceTotal', label: 'Себестоимость', align: 'text-end' },
     { field: 'costPriceUnit', label: 'Себест. ед.', align: 'text-end' },
     { field: 'commission', label: 'Комиссия', align: 'text-end' },
+    { field: 'adSpend', label: 'РР', align: 'text-end', tooltip: 'Рекламные расходы' },
+    { field: 'drrPercent', label: 'ДРР(п) %', align: 'text-end', tooltip: 'Доля рекламных расходов от продаж' },
     { field: 'logistics', label: 'Логистика', align: 'text-end' },
     { field: 'otherCosts', label: 'Прочие затраты', align: 'text-end' },
     { field: 'totalCosts', label: 'Итого затрат', align: 'text-end' },
@@ -204,6 +208,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                       }
                                     : {}),
                             }}
+                            title={h.tooltip}
                             onClick={() => handleSort(h.field)}
                         >
                             {h.label}
@@ -300,6 +305,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                         <td className="text-end">{formatMoney(row.costPriceTotal)}</td>
                                         <td className="text-end">{formatMoney(row.costPriceUnit)}</td>
                                         <td className="text-end">{formatMoney(row.commission)}</td>
+                                        <td className="text-end">{formatMoney(row.adSpend)}</td>
+                                        <td className="text-end">{formatPercent(row.drrPercent)}</td>
                                         <td className="text-end">{formatMoney(row.logistics)}</td>
                                         <td className="text-end">
                                             <button
@@ -370,6 +377,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                 <td className="text-end">{formatMoney(totals.costPriceTotal)}</td>
                                 <td className="text-end">{'—'}</td>
                                 <td className="text-end">{formatMoney(totals.commission)}</td>
+                                <td className="text-end">{formatMoney(totals.adSpend)}</td>
+                                <td className="text-end">{formatPercent(totals.drrPercent)}</td>
                                 <td className="text-end">{formatMoney(totals.logistics)}</td>
                                 <td className="text-end">{formatMoney(totals.otherCosts)}</td>
                                 <td className="text-end">{formatMoney(totals.totalCosts)}</td>
