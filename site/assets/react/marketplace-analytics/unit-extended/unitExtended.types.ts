@@ -25,6 +25,8 @@ export interface UnitExtendedItem {
     costPriceTotal: number;
     costPriceUnit: number;
     commission: number;
+    adSpend: number;
+    drrPercent: number | null;
     logistics: number;
     otherCosts: number;
     totalCosts: number;
@@ -41,6 +43,8 @@ export interface UnitExtendedTotals {
     returnsTotal: number;
     costPriceTotal: number;
     commission: number;
+    adSpend: number;
+    drrPercent: number | null;
     logistics: number;
     otherCosts: number;
     totalCosts: number;
