@@ -187,6 +187,64 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
         self::assertStringNotContainsString('25.04.2026', $body);
     }
 
+    public function testPaginationLinksPreserveFilters(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
+
+        for ($i = 1; $i <= 55; $i++) {
+            $day = (($i - 1) % 30) + 1;
+            $this->seedSale($wbListing, sprintf('2026-04-%02d', $day));
+        }
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $crawler = $client->request(
+            'GET',
+            '/marketplace/sales?marketplace=wildberries&date_from=2026-04-01&date_to=2026-04-30',
+        );
+
+        self::assertResponseIsSuccessful();
+
+        $nextPageLinks = $crawler->filter('a[href*="page=2"]');
+        self::assertGreaterThan(0, $nextPageLinks->count(), 'Pagerfanta next-page link not rendered');
+
+        $href = (string) $nextPageLinks->first()->attr('href');
+        self::assertStringContainsString('marketplace=wildberries', $href);
+        self::assertStringContainsString('date_from=2026-04-01', $href);
+        self::assertStringContainsString('date_to=2026-04-30', $href);
+    }
+
+    public function testPaginationLinksWithoutFiltersProduceCleanUrls(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
+
+        for ($i = 1; $i <= 55; $i++) {
+            $day = (($i - 1) % 30) + 1;
+            $this->seedSale($wbListing, sprintf('2026-04-%02d', $day));
+        }
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $crawler = $client->request('GET', '/marketplace/sales');
+        self::assertResponseIsSuccessful();
+
+        $nextPageLinks = $crawler->filter('a[href*="page=2"]');
+        self::assertGreaterThan(0, $nextPageLinks->count());
+
+        $href = (string) $nextPageLinks->first()->attr('href');
+        self::assertStringNotContainsString('marketplace=', $href);
+        self::assertStringNotContainsString('date_from=', $href);
+        self::assertStringNotContainsString('date_to=', $href);
+    }
+
     /**
      * @return array{0: User, 1: Company, 2: MarketplaceListing, 3: MarketplaceListing}
      */
