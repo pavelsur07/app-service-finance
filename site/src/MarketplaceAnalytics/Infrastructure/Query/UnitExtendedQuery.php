@@ -6,6 +6,7 @@ namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Application\Reconciliation\OzonXlsxServiceGroupMap;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 
 final readonly class UnitExtendedQuery
 {
@@ -17,6 +18,7 @@ final readonly class UnitExtendedQuery
 
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
+        private MarketplaceAdsFacade $adsFacade,
     ) {
     }
 
@@ -36,6 +38,17 @@ final readonly class UnitExtendedQuery
         $sales = $this->marketplaceFacade->getSalesAggregatesByListing($companyId, $marketplace, $from, $to);
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $from, $to);
         $costs = $this->marketplaceFacade->getCostAggregatesByListing($companyId, $marketplace, $from, $to);
+
+        // Per-listing ad spend (only attributed). Listings present here but absent from
+        // sales/returns/costs are intentionally NOT merged into $allListingIds — the row
+        // would be empty otherwise; their spend is still counted in totals via
+        // getTotalAdCostForPeriod() below (which includes non-attributed too).
+        $adSpendByListing = $this->adsFacade->getAdSpendByListingForPeriod(
+            $companyId,
+            $from,
+            $to,
+            $marketplace,
+        );
 
         // Merge all unique listing IDs from three sources so listings
         // with only returns or costs are not lost
@@ -59,6 +72,7 @@ final readonly class UnitExtendedQuery
             'returnsTotal' => 0.0,
             'costPriceTotal' => 0.0,
             'commission' => 0.0,
+            'adSpend' => 0.0,
             'logistics' => 0.0,
             'otherCosts' => 0.0,
             'totalCosts' => 0.0,
@@ -117,8 +131,14 @@ final readonly class UnitExtendedQuery
             $commission = round($commission, 2);
             $logistics = round($logistics, 2);
             $otherCosts = round($otherCosts, 2);
-            $totalCostsVal = round($commission + $logistics + $otherCosts, 2);
-            $profit = round($revenue - $returnsTotal - $costPriceTotal - $commission - $logistics - $otherCosts, 2);
+            $adSpend = round((float) ($adSpendByListing[$listingId] ?? '0'), 2);
+            $totalCostsVal = round($commission + $logistics + $otherCosts + $adSpend, 2);
+            $profit = round(
+                $revenue - $returnsTotal - $costPriceTotal
+                - $commission - $logistics - $otherCosts - $adSpend,
+                2,
+            );
+            $drrPercent = $revenue > 0 ? round($adSpend / $revenue * 100, 1) : null;
 
             // Build breakdown grouped by serviceGroup
             $otherBreakdown = $this->buildBreakdown($allCategoriesRaw, $categoryToGroup, $logisticsCodes);
@@ -135,6 +155,8 @@ final readonly class UnitExtendedQuery
                 'costPriceTotal' => round($costPriceTotal, 2),
                 'costPriceUnit' => $costPriceUnit,
                 'commission' => $commission,
+                'adSpend' => $adSpend,
+                'drrPercent' => $drrPercent,
                 'logistics' => $logistics,
                 'otherCosts' => $otherCosts,
                 'totalCosts' => $totalCostsVal,
@@ -145,7 +167,11 @@ final readonly class UnitExtendedQuery
                 'allCostsBreakdown' => $allBreakdown,
             ];
 
-            // Totals accumulate across ALL listings (not limited)
+            // Totals accumulate across ALL listings (not limited).
+            // adSpend/totalCosts/profit will be recomputed below from getTotalAdCostForPeriod()
+            // — sum of per-row adSpend may be < totals.adSpend by design (rows show only
+            // attributed ad spend; totals include non-attributed for parity with
+            // /marketplace-ads/efficiency).
             $totals['revenue'] += $revenue;
             $totals['quantity'] += $quantity;
             $totals['returnsTotal'] += $returnsTotal;
@@ -153,8 +179,6 @@ final readonly class UnitExtendedQuery
             $totals['commission'] += $commission;
             $totals['logistics'] += $logistics;
             $totals['otherCosts'] += $otherCosts;
-            $totals['totalCosts'] += $totalCostsVal;
-            $totals['profit'] += $profit;
         }
 
         // Sort by revenue DESC
@@ -165,6 +189,29 @@ final readonly class UnitExtendedQuery
             $totals[$key] = is_float($val) ? round($val, 2) : $val;
         }
 
+        // totals.adSpend — full ad cost for the period (including non-attributed),
+        // for parity with /marketplace-ads/efficiency. Recompute totalCosts/profit
+        // accordingly. Sum of per-row adSpend may be smaller — that is OK.
+        $totalAdSpend = round((float) $this->adsFacade->getTotalAdCostForPeriod(
+            $companyId,
+            $from,
+            $to,
+            $marketplace,
+        ), 2);
+
+        $totals['adSpend'] = $totalAdSpend;
+        $totals['drrPercent'] = $totals['revenue'] > 0
+            ? round($totalAdSpend / $totals['revenue'] * 100, 1)
+            : null;
+        $totals['totalCosts'] = round(
+            $totals['commission'] + $totals['logistics'] + $totals['otherCosts'] + $totalAdSpend,
+            2,
+        );
+        $totals['profit'] = round(
+            $totals['revenue'] - $totals['returnsTotal'] - $totals['costPriceTotal']
+            - $totals['commission'] - $totals['logistics'] - $totals['otherCosts'] - $totalAdSpend,
+            2,
+        );
         $totals['marginPercent'] = $totals['revenue'] > 0
             ? round($totals['profit'] / $totals['revenue'] * 100, 1)
             : null;
