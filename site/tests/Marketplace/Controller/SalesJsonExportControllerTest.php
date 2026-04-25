@@ -101,6 +101,29 @@ final class SalesJsonExportControllerTest extends WebTestCaseBase
         self::assertSame('2026-04-20', $payload['filters']['date_to']);
     }
 
+    public function testIgnoresArrayQueryParamsAndShowsAll(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyA();
+        $this->seedSale($wbListing, '2026-04-15');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request(
+            'GET',
+            '/marketplace/sales/export.json?marketplace[]=wildberries&date_from[]=2026-04-15',
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = $this->decodeJson($client);
+        self::assertSame(1, $payload['count']);
+        self::assertNull($payload['filters']['marketplace']);
+        self::assertNull($payload['filters']['date_from']);
+    }
+
     public function testReturnsEmptyArrayWhenNoMatches(): void
     {
         $client = static::createClient();

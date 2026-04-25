@@ -28,7 +28,7 @@ final class SalesJsonExportController extends AbstractController
     {
         $company     = $this->companyService->getActiveCompany();
         $companyId   = (string) $company->getId();
-        $marketplace = $request->query->get('marketplace') ?: null;
+        $marketplace = $this->stringOrNull($request->query->all()['marketplace'] ?? null);
         $dateFrom    = $this->parseDate($request->query->all()['date_from'] ?? null);
         $dateTo      = $this->parseDate($request->query->all()['date_to'] ?? null);
 
@@ -70,5 +70,10 @@ final class SalesJsonExportController extends AbstractController
         }
 
         return $date;
+    }
+
+    private function stringOrNull(mixed $raw): ?string
+    {
+        return is_string($raw) && $raw !== '' ? $raw : null;
     }
 }
