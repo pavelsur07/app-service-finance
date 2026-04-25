@@ -284,12 +284,17 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
         self::assertSame(self::LISTING_B_ID, $dtoB->items[0]->listingId);
     }
 
-    public function testOrphanedAdLineListingIdIsExcludedFromCountAndTotals(): void
+    public function testOrphanedAdLineListingIdIsExcludedFromItemsButCountedInTotalAdSpend(): void
     {
         // marketplace_ad_document_lines.listing_id не имеет FK на marketplace_listings:
-        // возможна ситуация, когда ad-строка ссылается на несуществующий листинг.
-        // Такие «висячие» id не должны попадать ни в total, ни в totalAdSpend,
-        // иначе API будет отдавать числа, несовместимые с отрисованной таблицей.
+        // возможна ситуация, когда ad-строка ссылается на несуществующий листинг
+        // («висячий» listing_id — например, листинг был удалён).
+        //
+        // Контракт:
+        // - total / items не должны раздуваться висячими id (нет видимой строки в таблице);
+        // - totalAdSpend ОБЯЗАН включать non-attributed РР — только так
+        //   суммы за период согласуются с /marketplace-analytics/unit-extended,
+        //   который через getTotalAdCostForPeriod() считает полную сумму за период.
         $orphanListingId = '99999999-9999-9999-9999-000000000001';
         $this->persistAdDocumentWithLine(
             companyId:   self::COMPANY_A_ID,
@@ -317,8 +322,9 @@ final class AdEfficiencyQueryTest extends IntegrationTestCase
         $ids = array_map(static fn ($i) => $i->listingId, $dto->items);
         self::assertNotContains($orphanListingId, $ids);
 
-        // totalAdSpend = 100 + 50 = 150 (висячие 42.00 не учтены)
-        self::assertEqualsWithDelta(150.0, (float) $dto->totalAdSpend, 0.01);
+        // totalAdSpend = 100 + 50 + 42 = 192 — non-attributed РР (42.00) включён
+        // в totals для согласованности с /marketplace-analytics/unit-extended.
+        self::assertEqualsWithDelta(192.0, (float) $dto->totalAdSpend, 0.01);
         self::assertEqualsWithDelta(1500.0, (float) $dto->totalRevenue, 0.01);
     }
 
