@@ -31,7 +31,7 @@ final class MarketplaceSalesController extends AbstractController
     {
         $company      = $this->companyService->getActiveCompany();
         $companyId    = (string) $company->getId();
-        $marketplace  = $request->query->get('marketplace') ?: null;
+        $marketplace  = $this->stringOrNull($request->query->all()['marketplace'] ?? null);
         $dateFrom     = $this->parseDate($request->query->all()['date_from'] ?? null);
         $dateTo       = $this->parseDate($request->query->all()['date_to'] ?? null);
         $page         = max(1, $request->query->getInt('page', 1));
@@ -68,5 +68,10 @@ final class MarketplaceSalesController extends AbstractController
         }
 
         return $date;
+    }
+
+    private function stringOrNull(mixed $raw): ?string
+    {
+        return is_string($raw) && $raw !== '' ? $raw : null;
     }
 }

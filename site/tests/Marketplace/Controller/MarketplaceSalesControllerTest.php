@@ -136,6 +136,32 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
         self::assertStringContainsString('30.04.2026', $body);
     }
 
+    public function testIgnoresArrayQueryParamsAndShowsAll(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
+
+        $this->seedSale($wbListing, '2026-04-01');
+        $this->seedSale($wbListing, '2026-04-15');
+        $this->seedSale($wbListing, '2026-04-30');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request(
+            'GET',
+            '/marketplace/sales?marketplace[]=foo&date_from[]=bar&date_to[]=baz',
+        );
+
+        self::assertResponseIsSuccessful();
+        $body = (string) $client->getResponse()->getContent();
+        self::assertStringContainsString('01.04.2026', $body);
+        self::assertStringContainsString('15.04.2026', $body);
+        self::assertStringContainsString('30.04.2026', $body);
+    }
+
     public function testCombinesMarketplaceAndDateFilters(): void
     {
         $client = static::createClient();
