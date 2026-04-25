@@ -3,14 +3,14 @@
 {% set active_tab = 'sales' %}
 
 {% block tab_content %}
-    {# Шапка: заголовок + фильтр + кнопка пересчёта #}
-    <div class="card-header d-flex align-items-center gap-3">
+    {# Шапка: заголовок + фильтры + кнопки пересчёта/экспорта #}
+    <div class="card-header d-flex align-items-center gap-3 flex-wrap">
         <h3 class="card-title me-auto mb-0">Продажи</h3>
 
-        {# Фильтр по маркетплейсу #}
-        <form method="get" action="{{ path('marketplace_sales_index') }}" class="d-flex align-items-center gap-2 mb-0">
-            <select name="marketplace" class="form-select form-select-sm w-auto"
-                    onchange="this.form.submit()">
+        {# Фильтр: маркетплейс + диапазон дат #}
+        <form method="get" action="{{ path('marketplace_sales_index') }}"
+              class="d-flex align-items-center gap-2 mb-0 flex-wrap">
+            <select name="marketplace" class="form-select form-select-sm w-auto">
                 <option value="">Все площадки</option>
                 {% for mp in available_marketplaces %}
                     <option value="{{ mp.value }}"
@@ -19,6 +19,26 @@
                     </option>
                 {% endfor %}
             </select>
+
+            <input type="date"
+                   name="date_from"
+                   class="form-control form-control-sm w-auto"
+                   value="{{ selected_date_from ?? '' }}"
+                   aria-label="Дата с">
+
+            <span class="text-muted">—</span>
+
+            <input type="date"
+                   name="date_to"
+                   class="form-control form-control-sm w-auto"
+                   value="{{ selected_date_to ?? '' }}"
+                   aria-label="Дата по">
+
+            <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+
+            {% if selected_marketplace or selected_date_from or selected_date_to %}
+                <a href="{{ path('marketplace_sales_index') }}" class="btn btn-sm btn-link">Сбросить</a>
+            {% endif %}
         </form>
 
         <button class="btn btn-sm btn-outline-secondary"
@@ -31,6 +51,15 @@
             </svg>
             Пересчитать себестоимость
         </button>
+
+        <a href="{{ path('marketplace_sales_export_json', {
+                marketplace: selected_marketplace,
+                date_from:   selected_date_from,
+                date_to:     selected_date_to,
+           }) }}"
+           class="btn btn-sm btn-outline-primary">
+            Скачать JSON
+        </a>
     </div>
 
     <div class="table-responsive">
