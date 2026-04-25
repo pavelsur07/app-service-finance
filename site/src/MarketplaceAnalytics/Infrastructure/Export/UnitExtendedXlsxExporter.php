@@ -37,6 +37,8 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Себестоимость',   'field' => 'costPriceTotal', 'type' => 'money'],
         ['label' => 'Себест. ед.',     'field' => 'costPriceUnit',  'type' => 'money'],
         ['label' => 'Комиссия',        'field' => 'commission',     'type' => 'money'],
+        ['label' => 'РР',              'field' => 'adSpend',        'type' => 'money'],
+        ['label' => 'ДРР(п) %',        'field' => 'drrPercent',     'type' => 'percent'],
         ['label' => 'Логистика',       'field' => 'logistics',      'type' => 'money'],
         ['label' => 'Прочие затраты',  'field' => 'otherCosts',     'type' => 'money'],
         ['label' => 'Итого затрат',    'field' => 'totalCosts',     'type' => 'money'],
