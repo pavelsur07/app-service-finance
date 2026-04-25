@@ -127,8 +127,12 @@
         <div class="card-footer d-flex align-items-center">
             {% include 'partials/_pagerfanta.html.twig' with {
                 'pager': pager,
-                'route_name': 'marketplace_sales_index',
-                'route_params': selected_marketplace ? {'marketplace': selected_marketplace} : {}
+                'route': 'marketplace_sales_index',
+                'params': {
+                    'marketplace': selected_marketplace,
+                    'date_from':   selected_date_from,
+                    'date_to':     selected_date_to,
+                },
             } %}
         </div>
     {% endif %}
