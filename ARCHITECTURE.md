@@ -274,6 +274,19 @@ getTotalAdCostForPeriod(
     \DateTimeImmutable $dateTo,
     ?string $marketplace = null,
 ): string
+
+// РР с разрезом по листингам за период.
+// Для построения строк отчётов с колонкой РР по листингу.
+// Возвращает только attributed listingId (те, что есть в marketplace_ad_document_lines).
+// Включает «висячие» listing_id без живого листинга — для согласованности с totals.
+// Для totals (полная сумма за период) использовать getTotalAdCostForPeriod().
+// @return array<string, string>  listingId => decimal-string adSpend
+getAdSpendByListingForPeriod(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    ?string $marketplace = null,
+): array
 ```
 
 ### `MarketplaceAnalyticsFacade` (`src/MarketplaceAnalytics/Facade/MarketplaceAnalyticsFacade.php`)
@@ -857,6 +870,23 @@ getPage(
   `items: list<AdEfficiencyItemDTO>`, `total`, `page`, `pageSize`, `totalRevenue`, `totalAdSpend`,
   `?totalDrrPercent`. Totals считаются по ВСЕМУ набору листингов, не только по странице.
 
+### `AdSpendByListingQuery` (`src/MarketplaceAds/Infrastructure/Query/AdSpendByListingQuery.php`)
+```php
+// РР с разрезом по листингам за период. Используется через MarketplaceAdsFacade
+// (getAdSpendByListingForPeriod) для построения строк отчётов другими модулями.
+// Семантически = CTE ads_agg из AdEfficiencyQuery, вынесенный в отдельный read-only query.
+// В отличие от AdEfficiencyQuery НЕ фильтрует по существованию листинга в marketplace_listings —
+// «висячие» listing_id попадают в выдачу (критично для согласованности totals на потребителях).
+// Денежные значения наружу — decimal-строки (bcmath-compatible).
+// @return array<string, string>  listingId => decimal-string adSpend
+getByListingForPeriod(
+    string $companyId,
+    \DateTimeImmutable $from,
+    \DateTimeImmutable $to,
+    ?string $marketplace = null,
+): array
+```
+
 ---
 
 ## Query — Marketplace
@@ -1355,6 +1385,7 @@ paths:
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.36 | 2026-04-25 | MarketplaceAds: новый read-only query `AdSpendByListingQuery` (`src/MarketplaceAds/Infrastructure/Query/AdSpendByListingQuery.php`) — РР с разрезом по листингам за период. Семантически = CTE `ads_agg` из `AdEfficiencyQuery`, вынесен в отдельный класс для переиспользования из других модулей через фасад. SQL = `SELECT adl.listing_id, SUM(adl.cost) FROM marketplace_ad_document_lines adl JOIN marketplace_ad_documents ad ON ad.id = adl.ad_document_id WHERE ad.company_id = :companyId AND ad.report_date BETWEEN :periodFrom AND :periodTo [AND ad.marketplace = :marketplace] GROUP BY adl.listing_id`. В отличие от `AdEfficiencyQuery` НЕ inner-join'ит на `marketplace_listings` — «висячие» listing_id (line.listing_id без живого листинга) попадают в выдачу; это критично для согласованности с `getTotalAdCostForPeriod` на потребителях. Возвращает `array<string, string>` (listingId → decimal-строка), без float — bcmath-совместимость модуля. `MarketplaceAdsFacade` получил конструктор-параметр `AdSpendByListingQuery` рядом с `AdDocumentQuery` и публичный метод `getAdSpendByListingForPeriod(companyId, from, to, ?marketplace=null): array`, делегирующий в новый query. Существующий `getTotalAdCostForPeriod` (полная сумма за период по `marketplace_ad_documents.total_cost`, включая non-attributed) не трогали — его роль totals на потребителях. `AdEfficiencyQuery` и `AdEfficiencyController` не менялись (CTE-дубликат из 6 строк допустим). Тесты: integration `AdSpendByListingQueryTest` (5 кейсов: happy / marketplace-фильтр / пустой период / non-attributed listing_id попадает в выдачу / IDOR другой компании); unit `MarketplaceAdsFacadeTest` (делегация getAdSpendByListingForPeriod через мок + дефолт `marketplace=null`). |
 | 1.35 | 2026-04-25 | Marketplace: рефакторинг UI `/marketplace/sales` — фильтр по диапазону дат и JSON-экспорт. `SalesListQuery::buildQueryBuilder` расширен опциональными `?\DateTimeImmutable $from, ?\DateTimeImmutable $to` (включительные границы `>=`/`<=`, формат `Y-m-d`); возвращает `QueryBuilder`, индексная страница оборачивает его в Pagerfanta-адаптер, экспорт читает напрямую через `fetchAllAssociative()`. Новый `SalesJsonExportController` — `GET /marketplace/sales/export.json` (route `marketplace_sales_export_json`), `JsonResponse` с `Content-Disposition: attachment`, payload `{exported_at, filters, count, sales[]}`, IDOR через `ActiveCompanyService`. Endpoint — page-route, не публичный API (OpenAPI и `schema.d.ts` не затронуты). `MarketplaceSalesController` читает `date_from`/`date_to` + hardened против `?key[]=foo`/массивных входов: невалидные query-параметры через `query->all()` + локальные `stringOrNull`/`parseDate` (с round-trip формата против rollover вроде `2026-04-31` → `2026-05-01`) трактуются как «фильтр не задан», без 4xx. Twig `marketplace/sales.html.twig`: в `.card-header` — два `<input type="date">`, кнопка «Применить», условная «Сбросить» + ссылка «Скачать JSON»; `onchange="this.form.submit()"` со `<select name="marketplace">` снят. Pagerfanta-навигация сохраняет активные фильтры через `routeParams` в include `partials/_pagerfanta.html.twig`. |
 | 1.34 | 2026-04-24 | MarketplaceAds / Task-16: UI рефакторинг после стабилизации cron-pipeline'а. (1) «История загрузок» ограничена top-10 job'ами: `AdLoadJobsListController::LIMIT` 20 → 10, `AdLoadJobRepository::findRecentByCompanyAndMarketplace` переиспользован (limit уже параметризован). (2) «Сырые документы» ограничены top-20 документами: новый метод `AdRawDocumentRepositoryInterface::findRecentByCompanyMarketplaceAndDateRange(companyId, marketplace, from, to, limit=20): list<AdRawDocument>` — фильтр по диапазону дат применяется ДО лимита, сортировка `createdAt DESC`; `AdRawDocumentsListController` переключён на него с `LIMIT=20`. Старый `findByCompanyMarketplaceAndDateRange` (без лимита, `reportDate DESC`) сохранён — им пользуется `DownloadOzonAdReportHandler`-integration-тест и другие non-UI места, где нужен полный список. (3) Кнопки «Открыть batch N (dateFrom—dateTo)» удалены из колонки «Действия» таблицы «История загрузок»: `AdLoadJobsListController` больше не вызывает `collectBatchFiles()`/`collectRawDocumentFiles()` и не возвращает поле `files` в JSON; JS-хелперы `renderJobFiles`, `buildBatchDownloadUrl`, `formatDateRu` удалены из `templates/marketplace_ads/index.html.twig`. Кнопки «Обработать» (для `completed`/`partial_success` jobs с батчами, CSRF `extract-batches-<jobId>`) и «Пометить FAILED» (для `pending`/`running` jobs) **сохранены**. Пустая колонка «Действия» для running-jobs без кнопок рисует плейсхолдер `<span class="text-muted">—</span>`. (4) Endpoint `GET /marketplace-ads/batches/{id}/download` (`AdScheduledBatchDownloadController`) и репозиторный метод `AdScheduledBatchRepository::findDownloadableByJobId` **не удалены** — endpoint остаётся доступен через прямой URL для admin-debug, `findDownloadableByJobId` используется `ExtractBatchesToRawDocumentsAction` (кнопка «Обработать»). DI `AdLoadJobsListController` упрощён: убраны `AdRawDocumentRepository` и `AdScheduledBatchRepository` не нужен для `files` (остаётся для `countStatesForJob` в batchStats). Integration-тесты обновлены: `AdLoadJobsListControllerTest::testLimitsTo10Items` (15 jobs → 10 items), `AdRawDocumentsListControllerTest::testLimitsTo20Items` (30 documents в 30-дневном диапазоне → 20 items). Существующие `testJobWithScheduledBatchesExposes*` и `testJobWithoutScheduledBatchesFallsBackTo*` переписаны: вместо `assertCount(N, $item['files'])` теперь `assertArrayNotHasKey('files', $item)` — поле убрано из контракта. |
 | 1.33 | 2026-04-24 | MarketplaceAds / Task-13b: `AdDailySyncCommand` (`app:marketplace-ads:daily-sync`) — ежедневная автоматическая точка инициации cron-driven pipeline'а. Для каждой компании с активным Ozon Performance подключением (`ActiveOzonPerformanceConnectionsQuery::getCompanyIds()`) создаёт один `AdLoadJob` на `dateFrom=dateTo=вчера в UTC`, синхронно планирует batch'и через `AdBatchPlanner::planBatchesForJob()` и переводит job в RUNNING (без этого Finalizer (v1.27) не подхватил бы его через `findAllRunning()`). Дальше работает автономно: scheduler → poller → finalizer → auto-extract (v1.31) → worker. Cron: `30 4 * * *` в scheduler-контейнере (`TZ=Europe/Moscow` → 04:30 MSK). `LockableTrait` — защита от наложения тиков; per-company isolation: сбой у одной компании (`Throwable`) не блокирует остальных, логируется `error`-уровнем. Идемпотентность: новый метод `AdLoadJobRepositoryInterface::existsByDateRange(companyId, marketplace, dateFrom, dateTo): bool` — повторный запуск в тот же день видит существующий job (любого статуса, включая FAILED/COMPLETED) и skipped'ит компанию; без него второй ручной запуск создавал бы дубликат. При ошибке Planner'а (например, `RuntimeException('No SKU campaigns found')`) job помечается `markFailed('Planning error: …')` — чтобы `existsByDateRange` видел его в следующий запуск и оператор видел причину в «Истории загрузок». Старый cron entry `30 4 * * * app:marketplace-ads:ozon-daily-sync` (Messenger event-driven pipeline) **удалён** из `docker/cron/app.cron`; сам класс `OzonAdDailySyncCommand` оставлен до Task-14, т.к. он диспатчит в Messenger-цепочку, которая ещё обслуживает остатки (выпиливание — отдельная задача). Тесты: unit `AdDailySyncCommandTest` (5 кейсов: happy path 3 компании с yesterday-UTC / empty company list / existsByDateRange → skipped / per-company isolation после Throwable / `existsByDateRange` зовётся с корректной UTC-датой и OZON marketplace.value); integration `Command/AdDailySyncCommandTest` (5 кейсов: 2 компании, только с PERFORMANCE-connection получает RUNNING job + PLANNED batch'и / повторный запуск в тот же день → skipped без дубликата / SELLER-only Ozon не попадает / Planner fail → job в FAILED, сиблинг получает RUNNING / no companies → SUCCESS message); integration `AdLoadJobRepositoryTest::testExistsByDateRange*` (5 кейсов: happy / empty → false / WB-job не матчится OZON-запросом / чужая компания → false / соседний день → false / терминальный FAILED job всё равно матчится — критично для идемпотентности). |
