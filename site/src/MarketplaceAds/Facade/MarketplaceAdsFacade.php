@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\Facade;
 
 use App\MarketplaceAds\Application\DTO\AdCostForListingDTO;
 use App\MarketplaceAds\Infrastructure\Query\AdDocumentQuery;
+use App\MarketplaceAds\Infrastructure\Query\AdSpendByListingQuery;
 
 /**
  * Публичный API модуля MarketplaceAds для других модулей.
@@ -20,6 +21,7 @@ final readonly class MarketplaceAdsFacade
 {
     public function __construct(
         private AdDocumentQuery $adDocumentQuery,
+        private AdSpendByListingQuery $adSpendByListingQuery,
     ) {
     }
 
@@ -54,5 +56,31 @@ final readonly class MarketplaceAdsFacade
         ?string $marketplace = null,
     ): string {
         return $this->adDocumentQuery->sumTotalCostForPeriod($companyId, $dateFrom, $dateTo, $marketplace);
+    }
+
+    /**
+     * РР с разрезом по листингам за период.
+     *
+     * Для построения строк отчётов с колонкой РР по листингу.
+     * Для totals (полная сумма за период, включая non-attributed) использовать
+     * {@see self::getTotalAdCostForPeriod()}.
+     *
+     * @param string|null $marketplace значение MarketplaceType::value ('wildberries', 'ozon').
+     *                                 Если null — суммируются все площадки.
+     *
+     * @return array<string, string>  listingId => decimal-string adSpend
+     */
+    public function getAdSpendByListingForPeriod(
+        string $companyId,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        ?string $marketplace = null,
+    ): array {
+        return $this->adSpendByListingQuery->getByListingForPeriod(
+            $companyId,
+            $from,
+            $to,
+            $marketplace,
+        );
     }
 }
