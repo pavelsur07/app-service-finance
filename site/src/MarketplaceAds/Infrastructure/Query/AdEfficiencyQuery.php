@@ -120,6 +120,9 @@ final class AdEfficiencyQuery
         // Count + totals одним запросом.
         // total / total_revenue — по visible-набору (base_listings, inner-join на listings):
         // total не больше числа реально отдаваемых строк, total_revenue согласован с items.
+        // sales_agg ⊆ base_listings (каждая marketplace_sales имеет FK на marketplace_listings,
+        // а base_listings включает все sales-листинги по построению), поэтому достаточно
+        // суммировать sales_agg напрямую — JOIN избыточен.
         //
         // total_ad_spend — по ВСЕМ ads_agg БЕЗ фильтра base_listings: «висячие» listing_id
         // (line.listing_id без живого листинга в marketplace_listings) тоже попадают в сумму.
@@ -131,11 +134,7 @@ final class AdEfficiencyQuery
             WITH {$baseListingsCte}, {$salesCte}, {$adsCte}
             SELECT
                 (SELECT COUNT(*) FROM base_listings) AS total,
-                COALESCE((
-                    SELECT SUM(sa.revenue)
-                    FROM sales_agg sa
-                    JOIN base_listings bl ON bl.listing_id = sa.listing_id
-                ), 0) AS total_revenue,
+                COALESCE((SELECT SUM(revenue) FROM sales_agg), 0) AS total_revenue,
                 COALESCE((SELECT SUM(ad_spend) FROM ads_agg), 0) AS total_ad_spend
             SQL;
 
