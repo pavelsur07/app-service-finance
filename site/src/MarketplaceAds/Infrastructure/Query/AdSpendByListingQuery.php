@@ -30,9 +30,15 @@ final readonly class AdSpendByListingQuery
 
     /**
      * РР с разрезом по листингам за период.
-     * Только attributed — listingId, существующие в выдаче (т.е. имеющие живой ad_document_lines).
      *
-     * @return array<string, string>  listingId => decimal-string adSpend ("0" если нет)
+     * Только attributed РР: listingId, упомянутые в marketplace_ad_document_lines
+     * за период. Листинги без записей в результат не попадают — caller сам
+     * решает дефолт ($map[$id] ?? '0').
+     *
+     * Для полной суммы за период (включая non-attributed) использовать
+     * MarketplaceAdsFacade::getTotalAdCostForPeriod().
+     *
+     * @return array<string, string>  listingId => decimal-string adSpend
      */
     public function getByListingForPeriod(
         string $companyId,
