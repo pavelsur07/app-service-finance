@@ -88,6 +88,54 @@ final class MarketplaceSalesControllerTest extends WebTestCaseBase
         self::assertStringContainsString('30.04.2026', $body);
     }
 
+    public function testIgnoresOutOfRangeDateAndShowsAll(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
+
+        $this->seedSale($wbListing, '2026-04-01');
+        $this->seedSale($wbListing, '2026-04-15');
+        $this->seedSale($wbListing, '2026-04-30');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        // April has 30 days; without strict validation PHP rolls 04-31 to 05-01,
+        // which would silently exclude every April sale.
+        $client->request('GET', '/marketplace/sales?date_from=2026-04-31');
+
+        self::assertResponseIsSuccessful();
+        $body = (string) $client->getResponse()->getContent();
+        self::assertStringContainsString('01.04.2026', $body);
+        self::assertStringContainsString('15.04.2026', $body);
+        self::assertStringContainsString('30.04.2026', $body);
+    }
+
+    public function testIgnoresArrayDateAndShowsAll(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $wbListing] = $this->seedCompanyAndListings();
+
+        $this->seedSale($wbListing, '2026-04-01');
+        $this->seedSale($wbListing, '2026-04-15');
+        $this->seedSale($wbListing, '2026-04-30');
+        $this->em()->flush();
+
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request('GET', '/marketplace/sales?date_from[]=2026-04-15');
+
+        self::assertResponseIsSuccessful();
+        $body = (string) $client->getResponse()->getContent();
+        self::assertStringContainsString('01.04.2026', $body);
+        self::assertStringContainsString('15.04.2026', $body);
+        self::assertStringContainsString('30.04.2026', $body);
+    }
+
     public function testCombinesMarketplaceAndDateFilters(): void
     {
         $client = static::createClient();

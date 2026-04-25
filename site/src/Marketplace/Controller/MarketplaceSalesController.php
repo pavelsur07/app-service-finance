@@ -32,8 +32,8 @@ final class MarketplaceSalesController extends AbstractController
         $company      = $this->companyService->getActiveCompany();
         $companyId    = (string) $company->getId();
         $marketplace  = $request->query->get('marketplace') ?: null;
-        $dateFrom     = $this->parseDate($request->query->get('date_from'));
-        $dateTo       = $this->parseDate($request->query->get('date_to'));
+        $dateFrom     = $this->parseDate($request->query->all()['date_from'] ?? null);
+        $dateTo       = $this->parseDate($request->query->all()['date_to'] ?? null);
         $page         = max(1, $request->query->getInt('page', 1));
 
         $qb      = $this->salesListQuery->buildQueryBuilder($companyId, $marketplace, $dateFrom, $dateTo);
@@ -56,14 +56,17 @@ final class MarketplaceSalesController extends AbstractController
         ]);
     }
 
-    private function parseDate(?string $raw): ?\DateTimeImmutable
+    private function parseDate(mixed $raw): ?\DateTimeImmutable
     {
-        if ($raw === null || $raw === '') {
+        if (!is_string($raw) || $raw === '') {
             return null;
         }
 
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $raw);
+        if ($date === false || $date->format('Y-m-d') !== $raw) {
+            return null;
+        }
 
-        return $date === false ? null : $date;
+        return $date;
     }
 }
