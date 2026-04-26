@@ -104,7 +104,13 @@ final class PLRegisterUpdater
      *   date: \DateTimeImmutable,
      *   projects: array<string, array{
      *     project: ProjectDirection,
-     *     categories: array<string, array{category: PLCategory, income: float, expense: float}>,
+     *     categories: array<string, array{
+     *       category: PLCategory,
+     *       income: float,
+     *       expense: float,
+     *       mpIncomeSigned: float,
+     *       mpExpenseSigned: float,
+     *     }>,
      *   }>,
      * }>
      */
@@ -177,18 +183,23 @@ final class PLRegisterUpdater
                         'category' => $category,
                         'income' => 0.0,
                         'expense' => 0.0,
+                        'mpIncomeSigned' => 0.0,
+                        'mpExpenseSigned' => 0.0,
                     ];
                 }
 
                 $rawAmount = (float) $operation->getAmount();
 
-                // marketplace_pl использует знаковую семантику amount: charge=-X,
-                // storno=+X. abs() здесь удваивал бы storno — отдельная ветка.
+                // marketplace_pl смешивает два соглашения о знаке в одном
+                // потоке: COGS/PROMO/OPEX (charge=-X, storno=+X) и REV_*_RETURNS
+                // (всегда +X). Накапливаем сумму со знаком, abs возьмём после
+                // агрегации всех операций категории за день — иначе REV_SPP_RETURNS
+                // с +X уйдёт в expense=-X и упрётся в CHECK chk_pl_daily_totals_amounts.
                 if (DocumentType::MARKETPLACE_PL === $document->getType()) {
                     if (PlNature::INCOME === $nature) {
-                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['income'] += $rawAmount;
+                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['mpIncomeSigned'] += $rawAmount;
                     } else {
-                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['expense'] += -$rawAmount;
+                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['mpExpenseSigned'] += $rawAmount;
                     }
 
                     continue;
@@ -216,8 +227,8 @@ final class PLRegisterUpdater
                 $project = $projectData['project'];
 
                 foreach ($projectData['categories'] as $categoryData) {
-                    $income = $categoryData['income'];
-                    $expense = $categoryData['expense'];
+                    $income = $categoryData['income'] + abs($categoryData['mpIncomeSigned'] ?? 0.0);
+                    $expense = $categoryData['expense'] + abs($categoryData['mpExpenseSigned'] ?? 0.0);
 
                     if (0.0 === $income && 0.0 === $expense) {
                         continue;
