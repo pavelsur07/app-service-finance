@@ -9,6 +9,7 @@ use App\Company\Infrastructure\Repository\CompanyRepository;
 use App\Finance\Application\Service\PLRegisterUpdater;
 use App\Finance\Application\Service\PLSnapshotBuilder;
 use Doctrine\DBAL\Connection;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Helper\Table;
@@ -39,9 +40,27 @@ final class RecalcPlRegisterCommand extends Command
         private readonly PLRegisterUpdater $registerUpdater,
         private readonly PLSnapshotBuilder $snapshotBuilder,
         private readonly Connection $connection,
+        private readonly EntityManagerInterface $em,
         private readonly LockFactory $lockFactory,
     ) {
         parent::__construct();
+    }
+
+    private function parseDate(string $value): ?\DateTimeImmutable
+    {
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+        if (!$date instanceof \DateTimeImmutable) {
+            return null;
+        }
+
+        // createFromFormat принимает невалидные даты с rollover (2026-02-30 →
+        // 2026-03-02). Round-trip-форматирование ловит это.
+        if ($date->format('Y-m-d') !== $value) {
+            return null;
+        }
+
+        return $date;
     }
 
     protected function configure(): void
@@ -70,11 +89,11 @@ final class RecalcPlRegisterCommand extends Command
             return Command::FAILURE;
         }
 
-        try {
-            $from = new \DateTimeImmutable($fromArg);
-            $to = new \DateTimeImmutable($toArg);
-        } catch (\Throwable) {
-            $io->error('Неверный формат дат. Используйте YYYY-MM-DD.');
+        $from = $this->parseDate($fromArg);
+        $to = $this->parseDate($toArg);
+
+        if (null === $from || null === $to) {
+            $io->error('Неверный формат дат. Используйте YYYY-MM-DD (без rollover невалидных дат вроде 2026-02-30).');
 
             return Command::FAILURE;
         }
@@ -86,7 +105,14 @@ final class RecalcPlRegisterCommand extends Command
         $dryRun = (bool) $input->getOption('dry-run');
 
         $companyIdArg = $input->getArgument('companyId');
-        $companies = $this->resolveCompanies(is_string($companyIdArg) && '' !== $companyIdArg ? $companyIdArg : null);
+
+        try {
+            $companies = $this->resolveCompanies(is_string($companyIdArg) && '' !== $companyIdArg ? $companyIdArg : null);
+        } catch (\InvalidArgumentException $e) {
+            $io->error($e->getMessage());
+
+            return Command::FAILURE;
+        }
 
         if ([] === $companies) {
             $io->warning('Не найдено ни одной компании для пересчёта.');
@@ -154,15 +180,11 @@ final class RecalcPlRegisterCommand extends Command
 
         $ids = $this->companyRepository->getAllActiveCompanyIds();
 
-        $companies = [];
-        foreach ($ids as $id) {
-            $company = $this->companyRepository->find($id);
-            if ($company instanceof Company) {
-                $companies[] = $company;
-            }
+        if ([] === $ids) {
+            return [];
         }
 
-        return $companies;
+        return array_values($this->companyRepository->findBy(['id' => $ids]));
     }
 
     private function rebuildMonthlySnapshots(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
@@ -180,19 +202,29 @@ final class RecalcPlRegisterCommand extends Command
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): void {
+        $io->writeln('<info>--dry-run: запускаем реальный пересчёт в транзакции и откатываем её, чтобы посмотреть diff.</info>');
+
         $before = $this->snapshotTotals($company, $from, $to);
 
-        $io->writeln('<info>--dry-run: рассчитываем целевое состояние без записи.</info>');
-
-        $aggregated = $this->computeTargetTotals($company, $from, $to);
+        // Запускаем настоящий пересчёт (через PLRegisterUpdater) внутри
+        // DBAL-транзакции и откатываем её — это гарантирует, что diff
+        // соответствует реальной логике агрегации, а не её SQL-симуляции.
+        $this->connection->beginTransaction();
+        try {
+            $this->registerUpdater->recalcRange($company, $from, $to);
+            $after = $this->snapshotTotals($company, $from, $to);
+        } finally {
+            $this->connection->rollBack();
+            $this->em->clear();
+        }
 
         $rows = [];
-        $allKeys = array_unique(array_merge(array_keys($before), array_keys($aggregated)));
+        $allKeys = array_unique(array_merge(array_keys($before), array_keys($after)));
         sort($allKeys);
 
         foreach ($allKeys as $key) {
             $beforeRow = $before[$key] ?? ['income' => '0.00', 'expense' => '0.00'];
-            $afterRow = $aggregated[$key] ?? ['income' => '0.00', 'expense' => '0.00'];
+            $afterRow = $after[$key] ?? ['income' => '0.00', 'expense' => '0.00'];
 
             $deltaIncome = (float) $afterRow['income'] - (float) $beforeRow['income'];
             $deltaExpense = (float) $afterRow['expense'] - (float) $beforeRow['expense'];
@@ -233,8 +265,6 @@ final class RecalcPlRegisterCommand extends Command
     }
 
     /**
-     * Текущие агрегированные суммы из pl_daily_totals.
-     *
      * @return array<string, array{income: string, expense: string}>
      */
     private function snapshotTotals(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
@@ -265,71 +295,5 @@ SQL,
         }
 
         return $result;
-    }
-
-    /**
-     * Целевое состояние: симулируем aggregateDocuments через прямой SQL поверх
-     * document_operations с учётом знаковой семантики marketplace_pl.
-     *
-     * @return array<string, array{income: string, expense: string}>
-     */
-    private function computeTargetTotals(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): array
-    {
-        $rows = $this->connection->fetchAllAssociative(
-            <<<'SQL'
-SELECT op.pl_category_id::text AS pl_category_id,
-       d.type AS doc_type,
-       c.flow AS flow,
-       SUM(op.amount) AS sum_amount,
-       SUM(ABS(op.amount)) AS sum_abs
-FROM document_operations op
-JOIN documents d ON d.id = op.document_id
-JOIN pl_categories c ON c.id = op.pl_category_id
-WHERE d.company_id = :company
-  AND d.status = 'ACTIVE'
-  AND d.date BETWEEN :from AND :to
-GROUP BY op.pl_category_id, d.type, c.flow
-SQL,
-            [
-                'company' => (string) $company->getId(),
-                'from' => $from->format('Y-m-d 00:00:00'),
-                'to' => $to->format('Y-m-d 23:59:59'),
-            ],
-        );
-
-        $result = [];
-        foreach ($rows as $row) {
-            $key = (string) ($row['pl_category_id'] ?? '__null__');
-            $result[$key] ??= ['income' => 0.0, 'expense' => 0.0];
-
-            $sumSigned = (float) $row['sum_amount'];
-            $sumAbs = (float) $row['sum_abs'];
-            $flow = (string) $row['flow'];
-            $isIncome = 'INCOME' === $flow;
-
-            if ('marketplace_pl' === (string) $row['doc_type']) {
-                if ($isIncome) {
-                    $result[$key]['income'] += $sumSigned;
-                } else {
-                    $result[$key]['expense'] += -$sumSigned;
-                }
-            } else {
-                if ($isIncome) {
-                    $result[$key]['income'] += $sumAbs;
-                } else {
-                    $result[$key]['expense'] += $sumAbs;
-                }
-            }
-        }
-
-        $formatted = [];
-        foreach ($result as $key => $values) {
-            $formatted[$key] = [
-                'income' => number_format($values['income'], 2, '.', ''),
-                'expense' => number_format($values['expense'], 2, '.', ''),
-            ];
-        }
-
-        return $formatted;
     }
 }
