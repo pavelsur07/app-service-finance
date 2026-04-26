@@ -178,7 +178,11 @@ final class RecalcPlRegisterCommand extends Command
             return [$company];
         }
 
-        $ids = $this->companyRepository->getAllActiveCompanyIds();
+        // Не используем CompanyRepository::getAllActiveCompanyIds() — там
+        // raw-SQL по таблице "company" с полем "is_active", которых нет в
+        // реальной схеме (table — `companies`, без soft-delete и без активного
+        // флага). Поэтому читаем напрямую через DBAL Connection.
+        $ids = $this->connection->fetchFirstColumn('SELECT id::text FROM companies ORDER BY id');
 
         if ([] === $ids) {
             return [];
