@@ -117,18 +117,25 @@ final class AdEfficiencyQuery
             )
             SQL;
 
-        // Count + totals — одним запросом по тому же visible-набору, что и items.
-        // Гарантирует, что total не больше числа реально отдаваемых строк,
-        // а totals.drrPercent согласован с суммой по items.
+        // Count + totals одним запросом.
+        // total / total_revenue — по visible-набору (base_listings, inner-join на listings):
+        // total не больше числа реально отдаваемых строк, total_revenue согласован с items.
+        // sales_agg ⊆ base_listings (каждая marketplace_sales имеет FK на marketplace_listings,
+        // а base_listings включает все sales-листинги по построению), поэтому достаточно
+        // суммировать sales_agg напрямую — JOIN избыточен.
+        //
+        // total_ad_spend — по ВСЕМ ads_agg БЕЗ фильтра base_listings: «висячие» listing_id
+        // (line.listing_id без живого листинга в marketplace_listings) тоже попадают в сумму.
+        // Это критично для согласованности totals.adSpend с
+        // /marketplace-analytics/unit-extended (тот использует
+        // MarketplaceAdsFacade::getTotalAdCostForPeriod() — полную сумму за период,
+        // включая non-attributed). Сами «висячие» строки в items не появляются.
         $aggSql = <<<SQL
             WITH {$baseListingsCte}, {$salesCte}, {$adsCte}
             SELECT
-                COUNT(*) AS total,
-                COALESCE(SUM(COALESCE(sa.revenue, 0)), 0) AS total_revenue,
-                COALESCE(SUM(COALESCE(aa.ad_spend, 0)), 0) AS total_ad_spend
-            FROM base_listings bl
-            LEFT JOIN sales_agg sa ON sa.listing_id = bl.listing_id
-            LEFT JOIN ads_agg aa ON aa.listing_id = bl.listing_id
+                (SELECT COUNT(*) FROM base_listings) AS total,
+                COALESCE((SELECT SUM(revenue) FROM sales_agg), 0) AS total_revenue,
+                COALESCE((SELECT SUM(ad_spend) FROM ads_agg), 0) AS total_ad_spend
             SQL;
 
         $aggRow = $this->connection->fetchAssociative($aggSql, $params);
