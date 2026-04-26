@@ -123,6 +123,27 @@ final class PLRegisterUpdaterStornoSymmetryTest extends IntegrationTestCase
         self::assertSame('0.00', $row['amount_expense']);
     }
 
+    public function testMarketplacePlPositiveExpenseCategory(): void
+    {
+        // REV_SPP_RETURNS-аналог: marketplace_pl + EXPENSE-категория, но операция
+        // приходит с положительным amount (is_negative=false в потоке storno-бакетов).
+        // До фикса инверсия per-operation давала expense=-12509.17 → SQLSTATE 23514
+        // на CHECK chk_pl_daily_totals_amounts. Сейчас abs() после агрегации.
+        $category = $this->createCategory('REV_SPP_RETURNS', PLFlow::EXPENSE);
+        $document = $this->createDocument(DocumentType::MARKETPLACE_PL, '2026-03-22');
+        $this->addOperation($document, $category, '12509.17');
+
+        $this->em->persist($document);
+        $this->em->flush();
+
+        $this->updater->updateForDocument($document);
+
+        $row = $this->fetchTotal($category);
+
+        self::assertSame('0.00', $row['amount_income']);
+        self::assertEqualsWithDelta(12509.17, (float) $row['amount_expense'], 0.005);
+    }
+
     public function testNetReportValueMatchesDocumentOperationsSumForMarketplace(): void
     {
         $category = $this->createCategory('COGS_MP_COMMISSION_NET', PLFlow::EXPENSE);
