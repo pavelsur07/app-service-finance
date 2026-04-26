@@ -11,6 +11,7 @@ use App\Finance\Entity\DocumentOperation;
 use App\Finance\Entity\PLCategory;
 use App\Finance\Entity\PLDailyTotal;
 use App\Company\Entity\ProjectDirection;
+use App\Finance\Enum\DocumentType;
 use App\Finance\Enum\PlNature;
 use App\Finance\Enum\DocumentStatus;
 use App\Finance\Repository\DocumentRepository;
@@ -179,7 +180,21 @@ final class PLRegisterUpdater
                     ];
                 }
 
-                $amount = abs((float) $operation->getAmount());
+                $rawAmount = (float) $operation->getAmount();
+
+                // marketplace_pl использует знаковую семантику amount: charge=-X,
+                // storno=+X. abs() здесь удваивал бы storno — отдельная ветка.
+                if (DocumentType::MARKETPLACE_PL === $document->getType()) {
+                    if (PlNature::INCOME === $nature) {
+                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['income'] += $rawAmount;
+                    } else {
+                        $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['expense'] += -$rawAmount;
+                    }
+
+                    continue;
+                }
+
+                $amount = abs($rawAmount);
 
                 if (PlNature::INCOME === $nature) {
                     $result[$dateKey]['projects'][$projectKey]['categories'][$categoryKey]['income'] += $amount;
