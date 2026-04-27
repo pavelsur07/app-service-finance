@@ -117,11 +117,13 @@ final class MonthClosePreflightAction
         if ($salesTotal === 0) {
             $checks[] = PreflightCheck::warning('sales_count', 'Продажи за период', 'Нет продаж за выбранный период', $salesTotal);
         } elseif ($salesWithoutCost > 0) {
+            $skus = $this->salesReturnsQuery->getSalesWithoutCostSkus($command->companyId, $command->marketplace, $periodFrom, $periodTo);
             $checks[] = PreflightCheck::error(
                 'sales_without_cost',
                 'Себестоимость продаж',
                 sprintf('Продажи без себестоимости: %d шт. Запустите пересчёт себестоимости.', $salesWithoutCost),
                 $salesWithoutCost,
+                $skus,
             );
         } else {
             $checks[] = PreflightCheck::ok('sales_without_cost', 'Себестоимость продаж', sprintf('Все продажи имеют себестоимость (%d шт.)', $salesTotal), $salesTotal);
@@ -134,11 +136,13 @@ final class MonthClosePreflightAction
         if ($returnsTotal === 0) {
             $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', 'Нет возвратов за период', 0);
         } elseif ($returnsWithoutCost > 0) {
+            $skus = $this->salesReturnsQuery->getReturnsWithoutCostSkus($command->companyId, $command->marketplace, $periodFrom, $periodTo);
             $checks[] = PreflightCheck::error(
                 'returns_without_cost',
                 'Себестоимость возвратов',
                 sprintf('Возвраты без себестоимости: %d шт. Запустите пересчёт себестоимости.', $returnsWithoutCost),
                 $returnsWithoutCost,
+                $skus,
             );
         } else {
             $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', sprintf('Все возвраты имеют себестоимость (%d шт.)', $returnsTotal), $returnsTotal);
@@ -200,6 +204,9 @@ final class MonthClosePreflightAction
             $command->companyId, $command->marketplace, $periodFrom, $periodTo,
         );
         if ($unknownCount > 0) {
+            $serviceNamesList = $this->costsQuery->getUnknownServiceNamesList(
+                $command->companyId, $command->marketplace, $periodFrom, $periodTo,
+            );
             $checks[] = PreflightCheck::error(
                 'costs_unknown_service_names',
                 'Нераспознанные операции',
@@ -208,6 +215,7 @@ final class MonthClosePreflightAction
                     $unknownCount,
                 ),
                 $unknownCount,
+                $serviceNamesList,
             );
         } else {
             $checks[] = PreflightCheck::ok('costs_unknown_service_names', 'Нераспознанные операции', 'Все операции распознаны');

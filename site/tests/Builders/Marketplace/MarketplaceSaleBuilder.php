@@ -100,6 +100,14 @@ final class MarketplaceSaleBuilder
         return $clone;
     }
 
+    public function withCostPrice(?string $costPrice): self
+    {
+        $clone = clone $this;
+        $clone->costPrice = $costPrice;
+
+        return $clone;
+    }
+
     public function build(): MarketplaceSale
     {
         if ($this->company === null) {

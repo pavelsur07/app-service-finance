@@ -71,6 +71,41 @@ final class PreflightCostsQuery
     }
 
     /**
+     * Список нераспознанных service names с их COUNT, сгруппированных по description.
+     *
+     * @return array<int, array{service_name: string, count: int}>
+     */
+    public function getUnknownServiceNamesList(
+        string $companyId,
+        string $marketplace,
+        string $periodFrom,
+        string $periodTo,
+    ): array {
+        return $this->connection->fetchAllAssociative(
+            <<<'SQL'
+            SELECT
+                c.description AS service_name,
+                COUNT(c.id)   AS count
+            FROM marketplace_costs c
+            INNER JOIN marketplace_cost_categories cc ON cc.id = c.category_id
+            WHERE c.company_id  = :companyId
+              AND c.marketplace = :marketplace
+              AND c.cost_date  >= :periodFrom
+              AND c.cost_date  <= :periodTo
+              AND cc.code       = 'ozon_other_service'
+            GROUP BY c.description
+            ORDER BY COUNT(c.id) DESC
+            SQL,
+            [
+                'companyId'   => $companyId,
+                'marketplace' => $marketplace,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+    }
+
+    /**
      * Количество нераспознанных service names за период.
      * Нераспознанные = category_code = 'ozon_other_service'.
      *
