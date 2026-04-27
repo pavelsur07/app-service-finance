@@ -116,21 +116,21 @@ final class InventoryController extends AbstractController
             $this->addFlash('error', 'Ошибка сохранения: ' . $e->getMessage());
         }
 
-        $referer = (string) $request->headers->get('referer', '');
+        $referer  = (string) $request->headers->get('referer', '');
+        $urlParts = $referer !== '' ? (parse_url($referer) ?: []) : [];
+        $path     = is_string($urlParts['path'] ?? null) ? $urlParts['path'] : '';
 
-        if ($referer !== '' && str_contains($referer, '/marketplace/inventory/' . $id . '/history')) {
+        if (str_contains($path, '/marketplace/inventory/' . $id . '/history')) {
             return $this->redirectToRoute('marketplace_inventory_history', ['id' => $id]);
         }
 
         $params = [];
-        if ($referer !== '') {
-            $query = parse_url($referer, PHP_URL_QUERY);
-            if (is_string($query) && $query !== '') {
-                parse_str($query, $parsed);
-                foreach (['marketplace', 'page'] as $key) {
-                    if (isset($parsed[$key]) && is_string($parsed[$key]) && $parsed[$key] !== '') {
-                        $params[$key] = $parsed[$key];
-                    }
+        $query  = is_string($urlParts['query'] ?? null) ? $urlParts['query'] : '';
+        if ($query !== '') {
+            parse_str($query, $parsed);
+            foreach (['marketplace', 'page'] as $key) {
+                if (isset($parsed[$key]) && is_string($parsed[$key]) && $parsed[$key] !== '') {
+                    $params[$key] = $parsed[$key];
                 }
             }
         }
