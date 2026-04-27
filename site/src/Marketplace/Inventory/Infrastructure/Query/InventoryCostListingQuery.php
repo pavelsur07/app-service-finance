@@ -32,8 +32,11 @@ final readonly class InventoryCostListingQuery
      *   product_id (null если не привязан), product_name (null), product_sku (null),
      *   cost_price (null если не задана), cost_currency, cost_from
      */
-    public function listingsQueryBuilder(string $companyId, ?string $marketplace): QueryBuilder
-    {
+    public function listingsQueryBuilder(
+        string $companyId,
+        ?string $marketplace,
+        ?string $search = null,
+    ): QueryBuilder {
         $today = (new \DateTimeImmutable())->format('Y-m-d');
 
         $qb = $this->connection->createQueryBuilder()
@@ -80,7 +83,32 @@ final readonly class InventoryCostListingQuery
                 ->setParameter('marketplace', $marketplace);
         }
 
+        if ($search !== null && $search !== '') {
+            $escaped = $this->escapeLikeOperand($search);
+            $qb->andWhere(
+                '(l.name ILIKE :search '
+                . 'OR l.marketplace_sku ILIKE :search '
+                . 'OR l.supplier_sku ILIKE :search '
+                . 'OR p.name ILIKE :search '
+                . 'OR p.sku ILIKE :search)'
+            )
+                ->setParameter('search', '%' . $escaped . '%');
+        }
+
         return $qb;
+    }
+
+    /**
+     * Экранирует LIKE-метасимволы PostgreSQL: \, %, _.
+     * Порядок важен — backslash первым, иначе уйдём в двойное экранирование.
+     */
+    private function escapeLikeOperand(string $value): string
+    {
+        return str_replace(
+            ['\\', '%', '_'],
+            ['\\\\', '\\%', '\\_'],
+            $value,
+        );
     }
 
     /**

@@ -5,22 +5,39 @@
 {% block tab_content %}
     <div class="p-3">
 
-        <div class="mb-3 d-flex align-items-center gap-2">
-            <select class="form-select w-auto"
-                    onchange="window.location.href = this.value">
-                <option value="{{ path('marketplace_inventory_index') }}"
-                    {{ marketplace is null ? 'selected' : '' }}>
-                    Все маркетплейсы
-                </option>
-                <option value="{{ path('marketplace_inventory_index', {marketplace: 'wildberries'}) }}"
-                    {{ marketplace == 'wildberries' ? 'selected' : '' }}>
-                    Wildberries
-                </option>
-                <option value="{{ path('marketplace_inventory_index', {marketplace: 'ozon'}) }}"
-                    {{ marketplace == 'ozon' ? 'selected' : '' }}>
-                    Ozon
-                </option>
-            </select>
+        <div class="mb-3 d-flex align-items-center gap-2 flex-wrap">
+
+            <form method="get"
+                  action="{{ path('marketplace_inventory_index') }}"
+                  class="d-flex align-items-center gap-2 mb-0 flex-wrap">
+
+                <select name="marketplace" class="form-select form-select-sm w-auto">
+                    <option value="" {{ marketplace is null ? 'selected' : '' }}>
+                        Все маркетплейсы
+                    </option>
+                    <option value="wildberries" {{ marketplace == 'wildberries' ? 'selected' : '' }}>
+                        Wildberries
+                    </option>
+                    <option value="ozon" {{ marketplace == 'ozon' ? 'selected' : '' }}>
+                        Ozon
+                    </option>
+                </select>
+
+                <input type="search"
+                       name="q"
+                       class="form-control form-control-sm"
+                       style="min-width: 280px;"
+                       placeholder="Поиск по названию, SKU или артикулу"
+                       value="{{ search ?? '' }}"
+                       autocomplete="off">
+
+                <button type="submit" class="btn btn-sm btn-primary">Применить</button>
+
+                {% if marketplace or search %}
+                    <a href="{{ path('marketplace_inventory_index') }}"
+                       class="btn btn-sm btn-link">Сбросить</a>
+                {% endif %}
+            </form>
 
             <button type="button"
                     class="btn btn-sm btn-outline-secondary ms-auto"
@@ -37,7 +54,7 @@
                 Загрузить из файла
             </button>
 
-            <form method="post" action="{{ path('marketplace_inventory_sync_barcodes') }}">
+            <form method="post" action="{{ path('marketplace_inventory_sync_barcodes') }}" class="mb-0">
                 <button type="submit" class="btn btn-sm btn-outline-secondary">
                     <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-sm me-1" width="24" height="24"
                          viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"

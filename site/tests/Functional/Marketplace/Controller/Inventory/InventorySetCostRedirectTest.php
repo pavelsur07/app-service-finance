@@ -63,6 +63,28 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
         self::assertResponseRedirects('/marketplace/inventory?marketplace=ozon&page=2');
     }
 
+    public function testRedirectsToInventoryIndexPreservesQueryParam(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-q@example.test', 'sku-redirect-q');
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request(
+            'POST',
+            sprintf('/marketplace/inventory/%s/set-cost', $listing->getId()),
+            [
+                'price_amount' => '500.00',
+                'effective_from' => '2026-04-19',
+            ],
+            [],
+            ['HTTP_REFERER' => 'http://localhost/marketplace/inventory?marketplace=ozon&q=test&page=2'],
+        );
+
+        self::assertResponseRedirects('/marketplace/inventory?marketplace=ozon&page=2&q=test');
+    }
+
     public function testRedirectsBackToHistoryWhenRefererIsHistory(): void
     {
         $client = static::createClient();

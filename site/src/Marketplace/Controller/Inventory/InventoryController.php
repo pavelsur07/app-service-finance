@@ -39,10 +39,21 @@ final class InventoryController extends AbstractController
     {
         $company     = $this->companyService->getActiveCompany();
         $companyId   = (string) $company->getId();
-        $marketplace = $request->query->get('marketplace') ?: null;
-        $page        = max(1, (int) $request->query->get('page', 1));
 
-        $qb = $this->query->listingsQueryBuilder($companyId, $marketplace);
+        $rawQuery    = $request->query->all();
+        $marketplace = self::stringOrNull($rawQuery['marketplace'] ?? null);
+        $search      = self::stringOrNull($rawQuery['q'] ?? null);
+        $pageRaw     = self::stringOrNull($rawQuery['page'] ?? null);
+        $page        = max(1, (int) ($pageRaw ?? '1'));
+
+        if ($search !== null) {
+            $search = trim($search);
+            if ($search === '') {
+                $search = null;
+            }
+        }
+
+        $qb = $this->query->listingsQueryBuilder($companyId, $marketplace, $search);
 
         $pager = Pagerfanta::createForCurrentPageWithMaxPerPage(
             new QueryAdapter($qb, static function (QueryBuilder $qb): void {
@@ -63,6 +74,7 @@ final class InventoryController extends AbstractController
             'active_tab'  => 'inventory',
             'pager'       => $pager,
             'marketplace' => $marketplace,
+            'search'      => $search,
             'job_logs'    => $jobLogs,
         ]);
     }
@@ -132,7 +144,7 @@ final class InventoryController extends AbstractController
         $query  = is_string($urlParts['query'] ?? null) ? $urlParts['query'] : '';
         if ($query !== '') {
             parse_str($query, $parsed);
-            foreach (['marketplace', 'page'] as $key) {
+            foreach (['marketplace', 'page', 'q'] as $key) {
                 if (isset($parsed[$key]) && is_string($parsed[$key]) && $parsed[$key] !== '') {
                     $params[$key] = $parsed[$key];
                 }
@@ -155,5 +167,10 @@ final class InventoryController extends AbstractController
         $this->addFlash('success', 'Синхронизация баркодов Ozon запущена.');
 
         return $this->redirectToRoute('marketplace_inventory_index');
+    }
+
+    private static function stringOrNull(mixed $raw): ?string
+    {
+        return is_string($raw) && $raw !== '' ? $raw : null;
     }
 }
