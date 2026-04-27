@@ -229,6 +229,54 @@ class MarketplaceMonthClose
     public function getStageCostsClosedAt(): ?\DateTimeImmutable { return $this->stageCostsClosedAt; }
     public function getStageCostsPLDocumentIds(): ?array { return $this->stageCostsPLDocumentIds; }
 
+    // --- Settings (общий JSON-blob) ---
+
+    public function getSettings(): ?array
+    {
+        return $this->settings;
+    }
+
+    public function setSettings(array $settings): void
+    {
+        $this->settings  = $settings;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    /**
+     * Был ли последний close данного этапа предварительным («оперативным»).
+     * Хранится per-stage в settings.last_close_was_preliminary[stageValue],
+     * чтобы preliminary-флаг одного этапа никогда не маскировал финальное
+     * закрытие соседнего этапа того же месяца.
+     */
+    public function isStageLastCloseWasPreliminary(CloseStage $stage): bool
+    {
+        $byStage = $this->settings['last_close_was_preliminary'] ?? null;
+        if (!is_array($byStage)) {
+            return false;
+        }
+
+        return (bool) ($byStage[$stage->value] ?? false);
+    }
+
+    public function getStagePreliminaryCalculatedAt(CloseStage $stage): ?\DateTimeImmutable
+    {
+        $byStage = $this->settings['preliminary_calculated_at'] ?? null;
+        if (!is_array($byStage)) {
+            return null;
+        }
+
+        $value = $byStage[$stage->value] ?? null;
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
     // --- Сверка с xlsx ---
 
     public function getCostsReconciliation(): ?array

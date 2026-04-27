@@ -8,3 +8,7 @@ framework:
             policy: fixed_window
             limit: 5
             interval: '10 minutes'
+        marketplace_preliminary_rebuild:
+            policy: fixed_window
+            limit: 1
+            interval: '1 minute'

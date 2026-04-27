@@ -45,12 +45,16 @@
                 {% set stageStatus = month_close ? month_close.getStageStatus(stage) : null %}
                 {% set isClosed = stageStatus and stageStatus.value == 'closed' %}
                 {% set isReopened = stageStatus and stageStatus.value == 'reopened' %}
+                {% set isPreliminary = isClosed and month_close and month_close.isStageLastCloseWasPreliminary(stage) %}
+                {% set preliminaryAt = isPreliminary ? month_close.getStagePreliminaryCalculatedAt(stage) : null %}
 
                 <div class="col-md-6">
-                    <div class="card h-100 {{ isClosed ? 'border-success' : (isReopened ? 'border-warning' : '') }}">
+                    <div class="card h-100 {{ isPreliminary ? 'border-warning' : (isClosed ? 'border-success' : (isReopened ? 'border-warning' : '')) }}">
                         <div class="card-header d-flex align-items-center">
                             <h4 class="card-title mb-0 me-auto">
-                                {% if isClosed %}
+                                {% if isPreliminary %}
+                                    <span class="text-warning me-2">●</span>
+                                {% elseif isClosed %}
                                     <span class="text-success me-2">✓</span>
                                 {% elseif isReopened %}
                                     <span class="text-warning me-2">↺</span>
@@ -59,7 +63,13 @@
                                 {% endif %}
                                 {{ stage.label }}
                             </h4>
-                            {% if isClosed %}
+                            {% if isPreliminary %}
+                                <span class="badge bg-warning-lt"
+                                      title="Документ ОПиУ создан автоматически и будет перезаписан при следующем закрытии">
+                                    Оперативное закрытие
+                                    {% if preliminaryAt %}· {{ preliminaryAt|date('d.m H:i') }}{% endif %}
+                                </span>
+                            {% elseif isClosed %}
                                 <span class="badge bg-success-lt">Закрыт</span>
                             {% elseif isReopened %}
                                 <span class="badge bg-warning-lt">Переоткрыт</span>
@@ -158,17 +168,30 @@
                                     </div>
                                 {% endif %}
 
-                                <form method="post"
-                                      action="{{ path('marketplace_month_close_reopen') }}">
-                                    <input type="hidden" name="marketplace" value="{{ marketplace }}">
-                                    <input type="hidden" name="year" value="{{ year }}">
-                                    <input type="hidden" name="month" value="{{ month }}">
-                                    <input type="hidden" name="stage" value="{{ stage.value }}">
-                                    <button type="submit" class="btn btn-sm btn-outline-warning"
-                                            onclick="return confirm('Переоткрыть этап? Документы ОПиУ нужно будет удалить вручную.')">
-                                        Переоткрыть
-                                    </button>
-                                </form>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <form method="post"
+                                          action="{{ path('marketplace_month_close_reopen') }}">
+                                        <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                        <input type="hidden" name="year" value="{{ year }}">
+                                        <input type="hidden" name="month" value="{{ month }}">
+                                        <input type="hidden" name="stage" value="{{ stage.value }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-warning"
+                                                onclick="return confirm('Переоткрыть этап? Документы ОПиУ нужно будет удалить вручную.')">
+                                            Переоткрыть
+                                        </button>
+                                    </form>
+                                    {% if is_current_month and isPreliminary %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-warning"
+                                                data-action="preliminary-rebuild"
+                                                data-marketplace="{{ marketplace }}"
+                                                data-year="{{ year }}"
+                                                data-month="{{ month }}"
+                                                onclick="runPreliminaryRebuild(this)">
+                                            Пересчитать сейчас
+                                        </button>
+                                    {% endif %}
+                                </div>
                             {% else %}
                                 {# Кнопка Preflight + закрытие #}
                                 <button type="button"
@@ -184,20 +207,33 @@
 
                                 <div id="preflight-result-{{ stage.value }}" class="mb-3" style="display:none"></div>
 
-                                <form method="post"
-                                      action="{{ path('marketplace_month_close_stage') }}"
-                                      id="form-close-{{ stage.value }}">
-                                    <input type="hidden" name="marketplace" value="{{ marketplace }}">
-                                    <input type="hidden" name="year" value="{{ year }}">
-                                    <input type="hidden" name="month" value="{{ month }}">
-                                    <input type="hidden" name="stage" value="{{ stage.value }}">
-                                    <button type="submit"
-                                            class="btn btn-primary btn-sm"
-                                            id="btn-close-{{ stage.value }}"
-                                            disabled>
-                                        Закрыть этап
-                                    </button>
-                                </form>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <form method="post"
+                                          action="{{ path('marketplace_month_close_stage') }}"
+                                          id="form-close-{{ stage.value }}">
+                                        <input type="hidden" name="marketplace" value="{{ marketplace }}">
+                                        <input type="hidden" name="year" value="{{ year }}">
+                                        <input type="hidden" name="month" value="{{ month }}">
+                                        <input type="hidden" name="stage" value="{{ stage.value }}">
+                                        <button type="submit"
+                                                class="btn btn-primary btn-sm"
+                                                id="btn-close-{{ stage.value }}"
+                                                disabled>
+                                            Закрыть этап
+                                        </button>
+                                    </form>
+                                    {% if is_current_month %}
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-warning"
+                                                data-action="preliminary-rebuild"
+                                                data-marketplace="{{ marketplace }}"
+                                                data-year="{{ year }}"
+                                                data-month="{{ month }}"
+                                                onclick="runPreliminaryRebuild(this)">
+                                            Пересчитать сейчас
+                                        </button>
+                                    {% endif %}
+                                </div>
                             {% endif %}
                         </div>
                     </div>
@@ -220,6 +256,8 @@
                     </thead>
                     <tbody>
                     {% for mc in history %}
+                        {% set salesReturnsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::SALES_RETURNS')) %}
+                        {% set costsPreliminary        = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::COSTS')) %}
                         <tr>
                             <td>
                                 <a href="{{ path('marketplace_month_close_index', {
@@ -234,7 +272,11 @@
                             </td>
                             <td>
                                 {% if mc.stageSalesReturnsStatus.value == 'closed' %}
-                                    <span class="badge bg-success-lt">Закрыт</span>
+                                    {% if salesReturnsPreliminary %}
+                                        <span class="badge bg-warning-lt">Оперативное закрытие</span>
+                                    {% else %}
+                                        <span class="badge bg-success-lt">Закрыт</span>
+                                    {% endif %}
                                     <span class="text-muted small ms-1">{{ mc.stageSalesReturnsClosedAt|date('d.m.Y') }}</span>
                                 {% elseif mc.stageSalesReturnsStatus.value == 'reopened' %}
                                     <span class="badge bg-warning-lt">Переоткрыт</span>
@@ -244,7 +286,11 @@
                             </td>
                             <td>
                                 {% if mc.stageCostsStatus.value == 'closed' %}
-                                    <span class="badge bg-success-lt">Закрыт</span>
+                                    {% if costsPreliminary %}
+                                        <span class="badge bg-warning-lt">Оперативное закрытие</span>
+                                    {% else %}
+                                        <span class="badge bg-success-lt">Закрыт</span>
+                                    {% endif %}
                                     <span class="text-muted small ms-1">{{ mc.stageCostsClosedAt|date('d.m.Y') }}</span>
                                 {% elseif mc.stageCostsStatus.value == 'reopened' %}
                                     <span class="badge bg-warning-lt">Переоткрыт</span>
@@ -364,5 +410,38 @@
                 btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Закрываем...';
             });
         });
+
+        function runPreliminaryRebuild(btn) {
+            const originalLabel = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Запускаем...';
+
+            fetch('{{ path('marketplace_month_preliminary_rebuild') }}', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    marketplace: btn.dataset.marketplace,
+                    year: parseInt(btn.dataset.year, 10),
+                    month: parseInt(btn.dataset.month, 10),
+                }),
+            })
+                .then(async r => {
+                    const data = await r.json().catch(() => ({}));
+                    if (r.status === 202) {
+                        alert('Запущен пересчёт. Обновите страницу через минуту.');
+                    } else if (r.status === 429) {
+                        alert(data.error || 'Подождите минуту перед следующим пересчётом.');
+                    } else {
+                        alert(data.error || 'Не удалось запустить пересчёт.');
+                    }
+                })
+                .catch(() => {
+                    alert('Ошибка сети. Попробуйте ещё раз.');
+                })
+                .finally(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = originalLabel;
+                });
+        }
     </script>
 {% endblock %}

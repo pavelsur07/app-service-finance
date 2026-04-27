@@ -56,11 +56,30 @@ final class MonthCloseController extends AbstractController
             $month,
         );
 
-        // История закрытий по маркетплейсу
-        $history = $this->monthCloseRepository->findByCompanyAndMarketplace(
+        // История закрытий по маркетплейсу.
+        // Если оба этапа закрыты как «оперативное закрытие» — пока это
+        // не финальное закрытие месяца, и в истории такие записи не показываем.
+        $allHistory = $this->monthCloseRepository->findByCompanyAndMarketplace(
             $companyId,
             $marketplaceType,
         );
+
+        $history = array_values(array_filter(
+            $allHistory,
+            static function ($mc): bool {
+                $bothClosed = $mc->getStageSalesReturnsStatus()->isClosed()
+                    && $mc->getStageCostsStatus()->isClosed();
+                // Скрываем только если ОБА этапа закрыты предварительно —
+                // частично-финальное закрытие (один этап final, другой prelim)
+                // должно остаться видимым в истории.
+                $bothPreliminary = $mc->isStageLastCloseWasPreliminary(CloseStage::SALES_RETURNS)
+                    && $mc->isStageLastCloseWasPreliminary(CloseStage::COSTS);
+
+                return !($bothClosed && $bothPreliminary);
+            },
+        ));
+
+        $isCurrentMonth = $year === (int) date('Y') && $month === (int) date('n');
 
         return $this->render('marketplace/month_close/index.html.twig', [
             'active_tab'          => 'month_close',
@@ -71,6 +90,7 @@ final class MonthCloseController extends AbstractController
             'month_close'         => $monthClose,
             'history'             => $history,
             'stages'              => CloseStage::cases(),
+            'is_current_month'    => $isCurrentMonth,
         ]);
     }
 
