@@ -542,6 +542,13 @@ final readonly class OzonCostCategory
                 serviceNames: ['MarketplaceSellerCorrectionOperation'],
             ),
             new self(
+                code: 'ozon_fines_prohibited_products',
+                name: 'Штрафы за запрещённые товары Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['FinesProhibitedProducts'],
+            ),
+            new self(
                 code: 'ozon_other_service',
                 name: 'Прочие услуги Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
