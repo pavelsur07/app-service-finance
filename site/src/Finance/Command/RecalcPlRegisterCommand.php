@@ -178,17 +178,12 @@ final class RecalcPlRegisterCommand extends Command
             return [$company];
         }
 
-        // Не используем CompanyRepository::getAllActiveCompanyIds() — там
-        // raw-SQL по таблице "company" с полем "is_active", которых нет в
-        // реальной схеме (table — `companies`, без soft-delete и без активного
-        // флага). Поэтому читаем напрямую через DBAL Connection.
-        $ids = $this->connection->fetchFirstColumn('SELECT id::text FROM companies ORDER BY id');
-
-        if ([] === $ids) {
-            return [];
-        }
-
-        return array_values($this->companyRepository->findBy(['id' => $ids]));
+        // CompanyRepository::getAllActiveCompanyIds() ходит в несуществующую
+        // таблицу `company` с несуществующим полем `is_active` — баг в репо
+        // выходит за рамки этой задачи. Здесь обходим его через стандартный
+        // ORM `findBy` с явной сортировкой: один запрос, гарантированный
+        // порядок обработки, без хардкода имени таблицы.
+        return array_values($this->companyRepository->findBy([], ['id' => 'ASC']));
     }
 
     private function rebuildMonthlySnapshots(Company $company, \DateTimeImmutable $from, \DateTimeImmutable $to): void
