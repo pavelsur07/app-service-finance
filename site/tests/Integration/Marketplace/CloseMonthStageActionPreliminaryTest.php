@@ -14,7 +14,11 @@ use App\Marketplace\Application\ReopenMonthStageAction;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceMonthClose;
+use App\Marketplace\Entity\MarketplaceSale;
+use App\Marketplace\Entity\MarketplaceSaleMapping;
+use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -223,7 +227,314 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         }
     }
 
+    // ── Stage 3 tests: soft-mode preflight bypass ────────────────────────────
+
+    /**
+     * Предзакрытие при продажах без себестоимости:
+     * - блокирующий preflight игнорируется
+     * - документ создаётся только с продажами у которых есть cost_price
+     *
+     * Используем SALE_REVENUE (total_revenue) чтобы продажа без cost_price
+     * вносила ненулевой вклад в финальном режиме но исключалась в preliminary,
+     * делая разницу в document_sum наблюдаемой.
+     */
+    public function testPreliminaryClose_BypassesSalesWithoutCostBlocker_AndExcludesThemFromDocument(): void
+    {
+        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $plCategory->setName('Выручка продаж тест');
+        $plCategory->setFlow(PLFlow::REVENUE);
+        $this->em->persist($plCategory);
+
+        $listing = new MarketplaceListing(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            null,
+            self::MARKETPLACE,
+        );
+        $listing->setMarketplaceSku('SKU-STAGE3-1');
+        $listing->setPrice('1000.00');
+        $this->em->persist($listing);
+
+        // SALE_REVENUE = total_revenue, не зависит от cost_price
+        $mapping = new MarketplaceSaleMapping(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+            AmountSource::SALE_REVENUE,
+            $plCategory,
+        );
+        $this->em->persist($mapping);
+
+        // Две продажи с себестоимостью: total_revenue = 1000 + 800 = 1800
+        $this->createSaleEntityWithRevenue($listing, costPrice: '300.00', date: '2026-02-10', totalRevenue: '1000.00');
+        $this->createSaleEntityWithRevenue($listing, costPrice: '500.00', date: '2026-02-15', totalRevenue: '800.00');
+        // Одна без себестоимости: total_revenue = 600 — исключается в preliminary
+        $this->createSaleEntityWithRevenue($listing, costPrice: null, date: '2026-02-20', totalRevenue: '600.00');
+
+        $this->em->flush();
+        $this->em->clear();
+
+        $action = self::getContainer()->get(CloseMonthStageAction::class);
+        $command = new CloseMonthStageCommand(
+            companyId:   self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year:        self::YEAR,
+            month:       self::MONTH,
+            stage:       CloseStage::SALES_RETURNS->value,
+            actorUserId: self::OWNER_ID,
+            preliminary: true,
+        );
+
+        // Не должно бросить исключение, несмотря на продажу без себестоимости
+        ($action)($command);
+
+        $conn = $this->em->getConnection();
+        $documentRows = (int) $conn->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(1, $documentRows, 'PLDocument должен быть создан при предзакрытии с soft-bypass.');
+
+        // Только 2 продажи с cost_price: total_revenue = 1000 + 800 = 1800
+        $operationSum = (float) $conn->fetchOne(
+            'SELECT COALESCE(SUM(ABS(do.amount)), 0)
+               FROM document_operations do
+               JOIN documents d ON d.id = do.document_id
+              WHERE d.company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertEqualsWithDelta(1800.0, $operationSum, 0.01,
+            'В документе должны быть только продажи с себестоимостью (1000+800=1800), продажа без cost_price (600) исключена.');
+    }
+
+    /**
+     * Предзакрытие при нераспознанных service names:
+     * - ozon_other_service исключается из документа
+     */
+    public function testPreliminaryClose_BypassesUnknownServiceNamesBlocker_AndExcludesThemFromDocument(): void
+    {
+        $knownPlCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $knownPlCategory->setName('Логистика тест');
+        $knownPlCategory->setFlow(PLFlow::EXPENSE);
+        $this->em->persist($knownPlCategory);
+
+        $unknownPlCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $unknownPlCategory->setName('Прочее тест');
+        $unknownPlCategory->setFlow(PLFlow::EXPENSE);
+        $this->em->persist($unknownPlCategory);
+
+        $knownCategory = new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+        );
+        $knownCategory->setCode('ozon_logistic_direct');
+        $knownCategory->setName('Логистика до покупателя');
+        $this->em->persist($knownCategory);
+
+        $unknownCategory = new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+        );
+        $unknownCategory->setCode('ozon_other_service');
+        $unknownCategory->setName('Прочие услуги Ozon');
+        $this->em->persist($unknownCategory);
+
+        $knownMapping = new MarketplaceCostPLMapping(
+            Uuid::uuid4()->toString(),
+            self::COMPANY_ID,
+            $knownCategory,
+            $knownPlCategory->getId(),
+            true,
+        );
+        $this->em->persist($knownMapping);
+
+        $unknownMapping = new MarketplaceCostPLMapping(
+            Uuid::uuid4()->toString(),
+            self::COMPANY_ID,
+            $unknownCategory,
+            $unknownPlCategory->getId(),
+            true,
+        );
+        $this->em->persist($unknownMapping);
+
+        // Известная затрата 1000
+        $this->createCost($knownCategory, '1000.00', MarketplaceCostOperationType::CHARGE, '2026-02-10');
+        // Неизвестная 400 — исключается в preliminary
+        $this->createCost($unknownCategory, '400.00', MarketplaceCostOperationType::CHARGE, '2026-02-15');
+
+        $this->em->flush();
+        $this->em->clear();
+
+        $action = self::getContainer()->get(CloseMonthStageAction::class);
+        $command = new CloseMonthStageCommand(
+            companyId:   self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year:        self::YEAR,
+            month:       self::MONTH,
+            stage:       CloseStage::COSTS->value,
+            actorUserId: self::OWNER_ID,
+            preliminary: true,
+        );
+
+        ($action)($command);
+
+        $conn = $this->em->getConnection();
+        $documentRows = (int) $conn->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(1, $documentRows, 'PLDocument должен быть создан при предзакрытии без ozon_other_service.');
+
+        $operationSum = (float) $conn->fetchOne(
+            'SELECT COALESCE(SUM(ABS(do.amount)), 0)
+               FROM document_operations do
+               JOIN documents d ON d.id = do.document_id
+              WHERE d.company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertEqualsWithDelta(1000.0, $operationSum, 0.01,
+            'Только известная затрата (1000) должна быть в документе, ozon_other_service исключена.');
+    }
+
+    /**
+     * costs_already_processed остаётся блокирующим даже в preliminary-режиме.
+     */
+    public function testPreliminaryClose_StillBlocksOnCostsAlreadyProcessed(): void
+    {
+        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $plCategory->setName('Логистика блок');
+        $plCategory->setFlow(PLFlow::EXPENSE);
+        $this->em->persist($plCategory);
+
+        $costCategory = new MarketplaceCostCategory(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+        );
+        $costCategory->setCode('ozon_logistic_block');
+        $costCategory->setName('Логистика блок');
+        $this->em->persist($costCategory);
+
+        $mapping = new MarketplaceCostPLMapping(
+            Uuid::uuid4()->toString(),
+            self::COMPANY_ID,
+            $costCategory,
+            $plCategory->getId(),
+            true,
+        );
+        $this->em->persist($mapping);
+
+        $cost = $this->createCost($costCategory, '500.00', MarketplaceCostOperationType::CHARGE, '2026-02-10');
+        $this->em->flush();
+
+        // Вручную проставляем document_id — симулируем уже обработанную затрату
+        $this->em->getConnection()->executeStatement(
+            'UPDATE marketplace_costs SET document_id = :docId WHERE id = :id',
+            ['docId' => Uuid::uuid4()->toString(), 'id' => $cost->getId()],
+        );
+        $this->em->clear();
+
+        $action = self::getContainer()->get(CloseMonthStageAction::class);
+        $command = new CloseMonthStageCommand(
+            companyId:   self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year:        self::YEAR,
+            month:       self::MONTH,
+            stage:       CloseStage::COSTS->value,
+            actorUserId: self::OWNER_ID,
+            preliminary: true,
+        );
+
+        $this->expectException(\DomainException::class);
+        ($action)($command);
+    }
+
+    /**
+     * Финальное закрытие по-прежнему блокируется на sales_without_cost.
+     */
+    public function testFinalCloseUnchanged_StillBlocksOnSalesWithoutCost(): void
+    {
+        $plCategory = new PLCategory(Uuid::uuid4()->toString(), $this->company);
+        $plCategory->setName('Себестоимость регрессия');
+        $plCategory->setFlow(PLFlow::EXPENSE);
+        $this->em->persist($plCategory);
+
+        $listing = new MarketplaceListing(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            null,
+            self::MARKETPLACE,
+        );
+        $listing->setMarketplaceSku('SKU-REGRESSION-1');
+        $listing->setPrice('1000.00');
+        $this->em->persist($listing);
+
+        $mapping = new MarketplaceSaleMapping(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            self::MARKETPLACE,
+            AmountSource::SALE_COST_PRICE,
+            $plCategory,
+        );
+        $this->em->persist($mapping);
+
+        // Продажа без себестоимости — в финальном режиме блокирует
+        $this->createSaleEntity($listing, null, '2026-02-10');
+
+        $this->em->flush();
+        $this->em->clear();
+
+        $action = self::getContainer()->get(CloseMonthStageAction::class);
+        $command = new CloseMonthStageCommand(
+            companyId:   self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year:        self::YEAR,
+            month:       self::MONTH,
+            stage:       CloseStage::SALES_RETURNS->value,
+            actorUserId: self::OWNER_ID,
+            preliminary: false,
+        );
+
+        $this->expectException(\DomainException::class);
+        ($action)($command);
+    }
+
     // --- helpers ---
+
+    private function createSaleEntity(
+        MarketplaceListing $listing,
+        ?string $costPrice,
+        string $date,
+    ): MarketplaceSale {
+        return $this->createSaleEntityWithRevenue($listing, $costPrice, $date, '500.00');
+    }
+
+    private function createSaleEntityWithRevenue(
+        MarketplaceListing $listing,
+        ?string $costPrice,
+        string $date,
+        string $totalRevenue,
+    ): MarketplaceSale {
+        $sale = new MarketplaceSale(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            $listing,
+            self::MARKETPLACE,
+        );
+        $sale->setExternalOrderId('ext-' . Uuid::uuid4()->toString());
+        $sale->setSaleDate(new \DateTimeImmutable($date));
+        $sale->setQuantity(1);
+        $sale->setPricePerUnit($totalRevenue);
+        $sale->setTotalRevenue($totalRevenue);
+        if ($costPrice !== null) {
+            $sale->setCostPrice($costPrice);
+        }
+        $this->em->persist($sale);
+
+        return $sale;
+    }
 
     private function seedCostsForCosts(): void
     {

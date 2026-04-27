@@ -113,10 +113,10 @@ final class CloseMonthStageActionRollbackTest extends IntegrationTestCase
                 return $this->real->execute($companyId, $marketplace, $periodFrom, $periodTo);
             }
 
-            public function getControlSum(string $companyId, string $marketplace, string $periodFrom, string $periodTo): string
+            public function getControlSum(string $companyId, string $marketplace, string $periodFrom, string $periodTo, bool $preliminary = false): string
             {
                 return bcadd(
-                    $this->real->getControlSum($companyId, $marketplace, $periodFrom, $periodTo),
+                    $this->real->getControlSum($companyId, $marketplace, $periodFrom, $periodTo, $preliminary),
                     '9999.00',
                     2,
                 );

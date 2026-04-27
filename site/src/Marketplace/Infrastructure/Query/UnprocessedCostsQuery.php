@@ -160,17 +160,26 @@ final class UnprocessedCostsQuery
      *
      * Возвращает net_amount всех затрат которые войдут в документ.
      * После создания PLDocument — сумма строк документа должна совпадать.
+     *
+     * $preliminary должен совпадать с флагом переданным в execute(),
+     * чтобы обе суммы считались на одном подмножестве строк.
      */
     public function getControlSum(
         string $companyId,
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): string {
+        $preliminaryFilter = $preliminary
+            ? "AND mcc.code != 'ozon_other_service'"
+            : '';
+
         $result = $this->connection->fetchOne(
-            <<<'SQL'
+            <<<SQL
             SELECT COALESCE(SUM(CASE WHEN c.operation_type = 'storno' THEN -ABS(c.amount) ELSE ABS(c.amount) END), 0)
             FROM marketplace_costs c
+            INNER JOIN marketplace_cost_categories mcc ON mcc.id = c.category_id
             INNER JOIN marketplace_cost_pl_mappings m
                 ON m.cost_category_id = c.category_id
                 AND m.company_id = c.company_id
@@ -181,6 +190,7 @@ final class UnprocessedCostsQuery
                 AND c.cost_date  <= :periodTo
                 AND m.include_in_pl = true
                 AND m.pl_category_id IS NOT NULL
+                $preliminaryFilter
             SQL,
             [
                 'companyId'   => $companyId,
