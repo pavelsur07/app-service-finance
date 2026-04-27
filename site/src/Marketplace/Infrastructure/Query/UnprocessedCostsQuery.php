@@ -56,6 +56,7 @@ final class UnprocessedCostsQuery
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
         // Получаем все строки с разбивкой по категории И знаку (costs vs storno).
         //
@@ -66,7 +67,11 @@ final class UnprocessedCostsQuery
         // Важно: все три поля (is_storno / costs_amount / storno_amount) используют одну
         // и ту же классификацию, иначе для Ozon storno (amount > 0, operation_type='storno')
         // строки помеченные is_storno=true попадут в costs_amount вместо storno_amount.
-        $sql = <<<'SQL'
+        $preliminaryFilter = $preliminary
+            ? "AND mcc.code != 'ozon_other_service'"
+            : '';
+
+        $sql = <<<SQL
             SELECT
                 mcc.code                                                        AS cost_category_code,
                 mcc.name                                                        AS cost_category_name,
@@ -99,6 +104,7 @@ final class UnprocessedCostsQuery
                 AND c.cost_date  <= :periodTo
                 AND m.include_in_pl = true
                 AND m.pl_category_id IS NOT NULL
+                $preliminaryFilter
             GROUP BY
                 mcc.code,
                 mcc.name,

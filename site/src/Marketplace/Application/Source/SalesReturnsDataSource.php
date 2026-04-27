@@ -50,14 +50,15 @@ final class SalesReturnsDataSource implements MarketplaceDataSourceInterface
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
         $entries = [];
 
-        foreach ($this->salesQuery->execute($companyId, $marketplace, $periodFrom, $periodTo) as $row) {
+        foreach ($this->salesQuery->execute($companyId, $marketplace, $periodFrom, $periodTo, $preliminary) as $row) {
             $entries[] = $row;
         }
 
-        foreach ($this->returnsQuery->execute($companyId, $marketplace, $periodFrom, $periodTo) as $row) {
+        foreach ($this->returnsQuery->execute($companyId, $marketplace, $periodFrom, $periodTo, $preliminary) as $row) {
             $entries[] = $row;
         }
 

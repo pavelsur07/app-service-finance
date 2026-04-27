@@ -51,8 +51,9 @@ final class CostsDataSource implements MarketplaceDataSourceInterface
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
-        return $this->costsQuery->execute($companyId, $marketplace, $periodFrom, $periodTo);
+        return $this->costsQuery->execute($companyId, $marketplace, $periodFrom, $periodTo, $preliminary);
     }
 
     public function markProcessed(
