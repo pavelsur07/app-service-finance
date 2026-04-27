@@ -82,6 +82,11 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
             ['HTTP_REFERER' => 'http://localhost/marketplace/inventory?marketplace=ozon&q=test&page=2'],
         );
 
+        // NOTE: exact-string assertion is intentional. Whitelist order in
+        // InventoryController::setCost (['marketplace', 'page', 'q']) is
+        // part of the user-visible redirect URL contract — reorder the
+        // whitelist and this test will fail loudly. Do not weaken to a
+        // parse-and-compare assertion without architect sign-off.
         self::assertResponseRedirects('/marketplace/inventory?marketplace=ozon&page=2&q=test');
     }
 

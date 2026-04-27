@@ -244,8 +244,8 @@
                     {% else %}
                         <tr>
                             <td colspan="8" class="text-center text-muted py-4">
-                                {% if marketplace is not null %}
-                                    Нет листингов для выбранного маркетплейса.
+                                {% if marketplace is not null or search is not null %}
+                                    Нет листингов под текущие фильтры.
                                 {% else %}
                                     Нет листингов. Добавьте подключение к маркетплейсу и запустите синхронизацию.
                                 {% endif %}

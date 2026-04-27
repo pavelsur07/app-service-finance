@@ -115,6 +115,21 @@ final class InventoryIndexFiltersTest extends WebTestCaseBase
         self::assertSame(0, $resetLink->count(), 'Empty q should not trigger Reset link');
     }
 
+    public function testEmptySearchResultShowsFilteredEmptyState(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company] = $this->seedCompanyWithListing($client);
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $client->request('GET', '/marketplace/inventory?q=zzznomatchzzz');
+
+        self::assertResponseIsSuccessful();
+        self::assertSelectorTextContains('table', 'под текущие фильтры');
+        self::assertSelectorTextNotContains('table', 'Добавьте подключение');
+    }
+
     /**
      * @return array{0: User, 1: Company}
      */
