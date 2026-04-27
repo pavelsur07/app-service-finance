@@ -373,7 +373,17 @@
                         if (check.details && check.details.length > 0) {
                             detailsHtml = '<ul class="mt-1 mb-0 small text-muted">';
                             check.details.forEach(item => {
-                                detailsHtml += `<li>${item.category_name} (${item.costs_count} шт.)</li>`;
+                                if (item.marketplace_sku !== undefined) {
+                                    // sales_without_cost / returns_without_cost
+                                    const supplier = item.supplier_sku ? ` (артикул: ${item.supplier_sku})` : '';
+                                    detailsHtml += `<li>SKU ${item.marketplace_sku}${supplier} — ${item.count} шт.</li>`;
+                                } else if (item.service_name !== undefined) {
+                                    // costs_unknown_service_names
+                                    detailsHtml += `<li>${item.service_name} — ${item.count} шт.</li>`;
+                                } else if (item.category_name !== undefined) {
+                                    // costs_without_mapping (existing)
+                                    detailsHtml += `<li>${item.category_name} (${item.costs_count} шт.)</li>`;
+                                }
                             });
                             detailsHtml += '</ul>';
                         }
