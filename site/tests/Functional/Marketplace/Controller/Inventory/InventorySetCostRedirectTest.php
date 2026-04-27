@@ -87,6 +87,29 @@ final class InventorySetCostRedirectTest extends WebTestCaseBase
         self::assertResponseRedirects(sprintf('/marketplace/inventory/%s/history', $listingId));
     }
 
+    public function testRedirectsToHistoryWhenReturnToFieldIsPresentWithoutReferer(): void
+    {
+        $client = static::createClient();
+        $this->resetDb();
+
+        [$owner, $company, $listing] = $this->seedCompanyAndListing('redirect-return-to@example.test', 'sku-redirect-4');
+        $this->loginWithActiveCompany($client, $owner, $company);
+
+        $listingId = (string) $listing->getId();
+
+        $client->request(
+            'POST',
+            sprintf('/marketplace/inventory/%s/set-cost', $listingId),
+            [
+                'price_amount' => '777.00',
+                'effective_from' => '2026-04-18',
+                'return_to' => 'history',
+            ],
+        );
+
+        self::assertResponseRedirects(sprintf('/marketplace/inventory/%s/history', $listingId));
+    }
+
     /**
      * @return array{0: User, 1: Company, 2: MarketplaceListing}
      */

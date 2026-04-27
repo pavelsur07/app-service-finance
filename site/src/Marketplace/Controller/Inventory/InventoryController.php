@@ -116,6 +116,10 @@ final class InventoryController extends AbstractController
             $this->addFlash('error', 'Ошибка сохранения: ' . $e->getMessage());
         }
 
+        if ($request->request->get('return_to') === 'history') {
+            return $this->redirectToRoute('marketplace_inventory_history', ['id' => $id]);
+        }
+
         $referer  = (string) $request->headers->get('referer', '');
         $urlParts = $referer !== '' ? (parse_url($referer) ?: []) : [];
         $path     = is_string($urlParts['path'] ?? null) ? $urlParts['path'] : '';
