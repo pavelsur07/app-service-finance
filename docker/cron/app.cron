@@ -49,6 +49,12 @@
 # 10-е число каждого месяца в 6:00 Загрузка отчётов о реализации Ozon
 0 6 5 * * php bin/console app:marketplace:ozon-realization-sync --env=prod
 
+# Ежедневная пересборка предварительного («оперативного») закрытия
+# текущего открытого месяца для всех активных SELLER-подключений.
+# Запуск после ozon-daily-sync (04:00) и marketplace-ads:daily-sync (04:30),
+# чтобы свежие сырые данные за вчера к этому моменту были загружены.
+45 4 * * * php bin/console app:marketplace:month-preliminary-rebuild --no-interaction --quiet
+
 # Раз в час: пересчёт оперативных P&L-агрегатов
 #5 * * * * php /app/bin/console app:pl:rebuild --no-interaction
 
