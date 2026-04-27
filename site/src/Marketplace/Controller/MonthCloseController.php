@@ -69,8 +69,13 @@ final class MonthCloseController extends AbstractController
             static function ($mc): bool {
                 $bothClosed = $mc->getStageSalesReturnsStatus()->isClosed()
                     && $mc->getStageCostsStatus()->isClosed();
+                // Скрываем только если ОБА этапа закрыты предварительно —
+                // частично-финальное закрытие (один этап final, другой prelim)
+                // должно остаться видимым в истории.
+                $bothPreliminary = $mc->isStageLastCloseWasPreliminary(CloseStage::SALES_RETURNS)
+                    && $mc->isStageLastCloseWasPreliminary(CloseStage::COSTS);
 
-                return !($bothClosed && $mc->isLastCloseWasPreliminary());
+                return !($bothClosed && $bothPreliminary);
             },
         ));
 

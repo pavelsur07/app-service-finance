@@ -242,14 +242,30 @@ class MarketplaceMonthClose
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function isLastCloseWasPreliminary(): bool
+    /**
+     * Был ли последний close данного этапа предварительным («оперативным»).
+     * Хранится per-stage в settings.last_close_was_preliminary[stageValue],
+     * чтобы preliminary-флаг одного этапа никогда не маскировал финальное
+     * закрытие соседнего этапа того же месяца.
+     */
+    public function isStageLastCloseWasPreliminary(CloseStage $stage): bool
     {
-        return (bool) ($this->settings['last_close_was_preliminary'] ?? false);
+        $byStage = $this->settings['last_close_was_preliminary'] ?? null;
+        if (!is_array($byStage)) {
+            return false;
+        }
+
+        return (bool) ($byStage[$stage->value] ?? false);
     }
 
-    public function getPreliminaryCalculatedAt(): ?\DateTimeImmutable
+    public function getStagePreliminaryCalculatedAt(CloseStage $stage): ?\DateTimeImmutable
     {
-        $value = $this->settings['preliminary_calculated_at'] ?? null;
+        $byStage = $this->settings['preliminary_calculated_at'] ?? null;
+        if (!is_array($byStage)) {
+            return null;
+        }
+
+        $value = $byStage[$stage->value] ?? null;
         if (!is_string($value) || $value === '') {
             return null;
         }

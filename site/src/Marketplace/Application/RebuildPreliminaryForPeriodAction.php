@@ -73,7 +73,9 @@ final class RebuildPreliminaryForPeriodAction
             $command->month,
         );
         $stageStatus   = $monthClose?->getStageStatus($stage) ?? MonthCloseStageStatus::PENDING;
-        $wasPreliminary = $monthClose?->isLastCloseWasPreliminary() ?? false;
+        // Per-stage флаг: финальное закрытие одного этапа нельзя путать
+        // с предварительным закрытием соседнего этапа того же месяца.
+        $wasPreliminary = $monthClose?->isStageLastCloseWasPreliminary($stage) ?? false;
 
         // Если этап закрыт и последнее закрытие НЕ было предварительным —
         // не трогаем (финальное закрытие остаётся неприкосновенным).

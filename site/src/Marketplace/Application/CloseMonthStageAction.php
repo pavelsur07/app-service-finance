@@ -276,14 +276,30 @@ final class CloseMonthStageAction
             $preflightResult->toArray(),
         );
 
-        // 5. Маркировка предзакрытия в settings.
-        // При финальном закрытии флаг обязательно сбрасывается в false,
-        // иначе после ручного закрытия на карточке останется жёлтый бейдж.
+        // 5. Маркировка предзакрытия в settings (per-stage).
+        // Флаги/таймстемпы хранятся раздельно по этапам:
+        //   settings.last_close_was_preliminary[stage] = bool
+        //   settings.preliminary_calculated_at[stage]  = ISO 8601 | null
+        // Это критично: финальное закрытие одного этапа НЕ должно ослаблять
+        // защиту соседнего этапа от автоматической пересборки.
         $settings = $monthClose->getSettings() ?? [];
-        $settings['last_close_was_preliminary'] = $command->preliminary;
-        $settings['preliminary_calculated_at']  = $command->preliminary
+
+        $flagsByStage = $settings['last_close_was_preliminary'] ?? [];
+        if (!is_array($flagsByStage)) {
+            $flagsByStage = [];
+        }
+        $flagsByStage[$command->stage] = $command->preliminary;
+        $settings['last_close_was_preliminary'] = $flagsByStage;
+
+        $datesByStage = $settings['preliminary_calculated_at'] ?? [];
+        if (!is_array($datesByStage)) {
+            $datesByStage = [];
+        }
+        $datesByStage[$command->stage] = $command->preliminary
             ? $closedAt->format(\DateTimeInterface::ATOM)
             : null;
+        $settings['preliminary_calculated_at'] = $datesByStage;
+
         $monthClose->setSettings($settings);
 
         $this->monthCloseRepository->save($monthClose);

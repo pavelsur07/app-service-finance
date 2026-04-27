@@ -27,8 +27,9 @@ use Ramsey\Uuid\Uuid;
 /**
  * Проверяет поведение флага CloseMonthStageCommand::preliminary:
  *  - префикс «[Оперативное закрытие …]» в comment у каждой DocumentOperation
- *  - settings.last_close_was_preliminary и preliminary_calculated_at в MarketplaceMonthClose
- *  - сброс флага при финальном закрытии
+ *  - per-stage флаг settings.last_close_was_preliminary[stage]
+ *    и settings.preliminary_calculated_at[stage] в MarketplaceMonthClose
+ *  - сброс флага при финальном закрытии (только для соответствующего этапа)
  *  - default-поведение (preliminary=false) идентично прежнему флоу
  */
 final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
@@ -105,16 +106,42 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 
         $settings = $monthClose->getSettings();
         self::assertIsArray($settings);
+        self::assertIsArray($settings['last_close_was_preliminary'] ?? null);
         self::assertTrue(
-            $settings['last_close_was_preliminary'] ?? false,
-            'Флаг last_close_was_preliminary должен быть true.',
+            $settings['last_close_was_preliminary'][CloseStage::COSTS->value] ?? false,
+            'Per-stage флаг last_close_was_preliminary[costs] должен быть true.',
         );
 
-        $calculatedAt = $settings['preliminary_calculated_at'] ?? null;
+        $calculatedAt = $settings['preliminary_calculated_at'][CloseStage::COSTS->value] ?? null;
         self::assertIsString($calculatedAt);
         self::assertNotFalse(
             \DateTimeImmutable::createFromFormat(\DateTimeInterface::ATOM, $calculatedAt),
-            'preliminary_calculated_at должен быть валидным ISO-таймстемпом.',
+            'preliminary_calculated_at[costs] должен быть валидным ISO-таймстемпом.',
+        );
+    }
+
+    /**
+     * Регрессия: предварительное закрытие одного этапа НЕ должно
+     * выставлять preliminary-флаг соседнего этапа того же месяца.
+     * Иначе при следующем rebuild финально закрытый этап будет ошибочно
+     * переоткрыт (см. P1-комментарий в PR #1673).
+     */
+    public function testPreliminaryFlagIsScopedToTheClosedStageOnly(): void
+    {
+        $this->seedCostsForCosts();
+
+        $this->closeCosts(preliminary: true);
+
+        $monthClose = $this->reloadMonthClose();
+        self::assertNotNull($monthClose);
+
+        self::assertTrue(
+            $monthClose->isStageLastCloseWasPreliminary(CloseStage::COSTS),
+            'Этап COSTS должен иметь per-stage preliminary-флаг = true.',
+        );
+        self::assertFalse(
+            $monthClose->isStageLastCloseWasPreliminary(CloseStage::SALES_RETURNS),
+            'Этап SALES_RETURNS не закрывался — его preliminary-флаг должен оставаться false.',
         );
     }
 
@@ -126,7 +153,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $this->closeCosts(preliminary: true);
         $afterPreliminary = $this->reloadMonthClose();
         self::assertNotNull($afterPreliminary);
-        self::assertTrue($afterPreliminary->isLastCloseWasPreliminary());
+        self::assertTrue($afterPreliminary->isStageLastCloseWasPreliminary(CloseStage::COSTS));
 
         // 2. Переоткрытие (та же стандартная процедура, что у финансиста)
         $this->reopenCosts();
@@ -137,14 +164,15 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
         $finalMonthClose = $this->reloadMonthClose();
         self::assertNotNull($finalMonthClose);
         self::assertFalse(
-            $finalMonthClose->isLastCloseWasPreliminary(),
-            'После финального закрытия флаг должен быть сброшен.',
+            $finalMonthClose->isStageLastCloseWasPreliminary(CloseStage::COSTS),
+            'После финального закрытия флаг этапа COSTS должен быть сброшен.',
         );
 
         $settings = $finalMonthClose->getSettings();
+        self::assertIsArray($settings['preliminary_calculated_at'] ?? null);
         self::assertNull(
-            $settings['preliminary_calculated_at'] ?? 'unset',
-            'preliminary_calculated_at должен быть null после финального закрытия.',
+            $settings['preliminary_calculated_at'][CloseStage::COSTS->value] ?? 'unset',
+            'preliminary_calculated_at[costs] должен быть null после финального закрытия.',
         );
 
         $conn = $this->em->getConnection();
@@ -174,7 +202,7 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 
         $monthClose = $this->reloadMonthClose();
         self::assertNotNull($monthClose);
-        self::assertFalse($monthClose->isLastCloseWasPreliminary());
+        self::assertFalse($monthClose->isStageLastCloseWasPreliminary(CloseStage::COSTS));
 
         $conn = $this->em->getConnection();
         $operationComments = $conn->fetchFirstColumn(

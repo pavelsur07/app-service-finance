@@ -74,7 +74,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             'COSTS должен стать CLOSED после первого rebuild.',
         );
         self::assertTrue(
-            $monthClose->isLastCloseWasPreliminary(),
+            $monthClose->isStageLastCloseWasPreliminary(CloseStage::COSTS),
             'Флаг last_close_was_preliminary должен быть true.',
         );
 
@@ -105,7 +105,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             $second->getStageStatus(CloseStage::COSTS),
             'После повторного rebuild этап остаётся CLOSED.',
         );
-        self::assertTrue($second->isLastCloseWasPreliminary());
+        self::assertTrue($second->isStageLastCloseWasPreliminary(CloseStage::COSTS));
 
         // Документ должен быть один — старый удалён, новый создан.
         $documentRows = (int) $this->em->getConnection()->fetchOne(
@@ -123,7 +123,7 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
         $this->closeFinal();
         $beforeRebuild = $this->reloadMonthClose();
         self::assertNotNull($beforeRebuild);
-        self::assertFalse($beforeRebuild->isLastCloseWasPreliminary());
+        self::assertFalse($beforeRebuild->isStageLastCloseWasPreliminary(CloseStage::COSTS));
         $beforeDocIds = $beforeRebuild->getStagePLDocumentIds(CloseStage::COSTS);
 
         // rebuild должен пропустить финально закрытый этап.
@@ -136,8 +136,8 @@ final class RebuildPreliminaryForPeriodActionTest extends IntegrationTestCase
             $after->getStageStatus(CloseStage::COSTS),
         );
         self::assertFalse(
-            $after->isLastCloseWasPreliminary(),
-            'Финальный флаг должен остаться false.',
+            $after->isStageLastCloseWasPreliminary(CloseStage::COSTS),
+            'Per-stage флаг для COSTS должен остаться false.',
         );
         self::assertSame(
             $beforeDocIds,

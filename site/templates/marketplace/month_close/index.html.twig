@@ -45,8 +45,8 @@
                 {% set stageStatus = month_close ? month_close.getStageStatus(stage) : null %}
                 {% set isClosed = stageStatus and stageStatus.value == 'closed' %}
                 {% set isReopened = stageStatus and stageStatus.value == 'reopened' %}
-                {% set isPreliminary = isClosed and month_close and month_close.lastCloseWasPreliminary %}
-                {% set preliminaryAt = isPreliminary ? month_close.preliminaryCalculatedAt : null %}
+                {% set isPreliminary = isClosed and month_close and month_close.isStageLastCloseWasPreliminary(stage) %}
+                {% set preliminaryAt = isPreliminary ? month_close.getStagePreliminaryCalculatedAt(stage) : null %}
 
                 <div class="col-md-6">
                     <div class="card h-100 {{ isPreliminary ? 'border-warning' : (isClosed ? 'border-success' : (isReopened ? 'border-warning' : '')) }}">
@@ -256,7 +256,8 @@
                     </thead>
                     <tbody>
                     {% for mc in history %}
-                        {% set rowPreliminary = mc.lastCloseWasPreliminary %}
+                        {% set salesReturnsPreliminary = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::SALES_RETURNS')) %}
+                        {% set costsPreliminary        = mc.isStageLastCloseWasPreliminary(constant('App\\Marketplace\\Enum\\CloseStage::COSTS')) %}
                         <tr>
                             <td>
                                 <a href="{{ path('marketplace_month_close_index', {
@@ -271,7 +272,7 @@
                             </td>
                             <td>
                                 {% if mc.stageSalesReturnsStatus.value == 'closed' %}
-                                    {% if rowPreliminary %}
+                                    {% if salesReturnsPreliminary %}
                                         <span class="badge bg-warning-lt">Оперативное закрытие</span>
                                     {% else %}
                                         <span class="badge bg-success-lt">Закрыт</span>
@@ -285,7 +286,7 @@
                             </td>
                             <td>
                                 {% if mc.stageCostsStatus.value == 'closed' %}
-                                    {% if rowPreliminary %}
+                                    {% if costsPreliminary %}
                                         <span class="badge bg-warning-lt">Оперативное закрытие</span>
                                     {% else %}
                                         <span class="badge bg-success-lt">Закрыт</span>
