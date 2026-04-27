@@ -37,6 +37,19 @@ use Ramsey\Uuid\Uuid;
  */
 final class CloseMonthStageAction
 {
+    /**
+     * Проверки которые в preliminary-режиме становятся предупреждениями.
+     * Данные без себестоимости / с unknown service name исключаются из расчёта
+     * через $preliminary=true в DataSource::getUnprocessedEntries().
+     *
+     * finance_lock, already_closed, costs_already_processed остаются
+     * блокирующими в обоих режимах — они не имеют «мягкого» обходного пути.
+     */
+    private const SOFT_IGNORABLE_IN_PRELIMINARY = [
+        'sales_without_cost',
+        'returns_without_cost',
+        'costs_unknown_service_names',
+    ];
     /** @param iterable<MarketplaceDataSourceInterface> $dataSources */
     public function __construct(
         private readonly MonthClosePreflightAction          $preflightAction,
@@ -100,7 +113,20 @@ final class CloseMonthStageAction
             stage:       $stage,
         ));
 
-        if (!$preflightResult->canClose()) {
+        if ($command->preliminary) {
+            // В preliminary-режиме блокируют только не-soft ошибки.
+            // Soft-ignorable (sales_without_cost, returns_without_cost,
+            // costs_unknown_service_names) игнорируем — DataSource
+            // уже исключил проблемные строки из выборки через $preliminary=true.
+            $hardErrors = array_filter(
+                $preflightResult->getErrors(),
+                static fn($c) => !in_array($c->key, self::SOFT_IGNORABLE_IN_PRELIMINARY, true),
+            );
+            if (!empty($hardErrors)) {
+                $errors = implode('; ', array_map(static fn($c) => $c->message, $hardErrors));
+                throw new \DomainException('Закрытие невозможно: ' . $errors);
+            }
+        } elseif (!$preflightResult->canClose()) {
             $errors = implode('; ', array_map(
                 static fn($c) => $c->message,
                 $preflightResult->getErrors(),
@@ -150,6 +176,7 @@ final class CloseMonthStageAction
                 $command->marketplace,
                 $periodFrom,
                 $periodTo,
+                $command->preliminary,
             );
 
             if (empty($entries)) {
@@ -190,7 +217,10 @@ final class CloseMonthStageAction
 
         // Создаём один документ для всех Source-ов этапа
         if (!empty($allPlEntries)) {
-            // Контрольная сумма ДО создания документа (только для COSTS)
+            // Контрольная сумма ДО создания документа (только для COSTS).
+            // Флаг $preliminary передаётся чтобы контрольная сумма и execute()
+            // считались на одном подмножестве строк — иначе в preliminary-режиме
+            // исключение ozon_other_service создаёт дельту и бросает RuntimeException.
             $controlSumBefore = null;
             if ($stage === CloseStage::COSTS) {
                 $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
@@ -198,6 +228,7 @@ final class CloseMonthStageAction
                     $command->marketplace,
                     $periodFrom,
                     $periodTo,
+                    $command->preliminary,
                 );
             }
 

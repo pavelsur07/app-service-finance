@@ -46,6 +46,11 @@ interface MarketplaceDataSourceInterface
     /**
      * Агрегировать данные для генерации записей ОПиУ.
      *
+     * При $preliminary=true каждая реализация исключает из выборки проблемные строки
+     * (продажи/возвраты без себестоимости, затраты с ozon_other_service),
+     * чтобы документ создавался без блокировки. Финальное закрытие использует
+     * default $preliminary=false — поведение идентично прежнему.
+     *
      * @return array<int, array<string, mixed>>  строки для PLEntryDTO
      */
     public function getUnprocessedEntries(
@@ -53,6 +58,7 @@ interface MarketplaceDataSourceInterface
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array;
 
     /**

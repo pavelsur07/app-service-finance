@@ -39,8 +39,13 @@ final class UnprocessedReturnsQuery
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
-        $sql = <<<'SQL'
+        $preliminaryFilter = $preliminary
+            ? 'AND r.cost_price IS NOT NULL AND r.cost_price > 0'
+            : '';
+
+        $sql = <<<SQL
             SELECT
                 m.pl_category_id,
                 m.project_direction_id,
@@ -79,6 +84,7 @@ final class UnprocessedReturnsQuery
                 AND r.document_id IS NULL
                 AND r.return_date >= :periodFrom
                 AND r.return_date <= :periodTo
+                $preliminaryFilter
             GROUP BY
                 m.pl_category_id,
                 m.project_direction_id,

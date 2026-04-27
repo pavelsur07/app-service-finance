@@ -342,6 +342,16 @@
             label.textContent = 'Обработка...';
         }
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) { return ''; }
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function runPreflight(btn) {
             const stage = btn.dataset.stage;
             const resultDiv = document.getElementById('preflight-result-' + stage);
@@ -373,7 +383,20 @@
                         if (check.details && check.details.length > 0) {
                             detailsHtml = '<ul class="mt-1 mb-0 small text-muted">';
                             check.details.forEach(item => {
-                                detailsHtml += `<li>${item.category_name} (${item.costs_count} шт.)</li>`;
+                                if (item.orphan === true) {
+                                    // sales/returns without a resolvable listing (no marketplace_sku)
+                                    detailsHtml += `<li>Без привязки к листингу — ${Number(item.count)} шт.</li>`;
+                                } else if (item.marketplace_sku !== undefined && item.marketplace_sku !== null) {
+                                    // sales_without_cost / returns_without_cost
+                                    const supplier = item.supplier_sku ? ` (артикул: ${escapeHtml(item.supplier_sku)})` : '';
+                                    detailsHtml += `<li>SKU ${escapeHtml(item.marketplace_sku)}${supplier} — ${Number(item.count)} шт.</li>`;
+                                } else if (item.service_name !== undefined) {
+                                    // costs_unknown_service_names
+                                    detailsHtml += `<li>${escapeHtml(item.service_name)} — ${Number(item.count)} шт.</li>`;
+                                } else if (item.category_name !== undefined) {
+                                    // costs_without_mapping (existing)
+                                    detailsHtml += `<li>${escapeHtml(item.category_name)} (${Number(item.costs_count)} шт.)</li>`;
+                                }
                             });
                             detailsHtml += '</ul>';
                         }

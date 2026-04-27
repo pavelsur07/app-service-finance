@@ -53,8 +53,10 @@ final class RealizationDataSource implements MarketplaceDataSourceInterface
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
         // marketplace параметр игнорируем — supports() гарантирует что это Ozon
+        // preliminary не применяется: в realization нет понятия «без себестоимости» на уровне строки
         return $this->realizationQuery->execute($companyId, $periodFrom, $periodTo);
     }
 

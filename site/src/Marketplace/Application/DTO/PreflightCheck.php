@@ -30,8 +30,8 @@ final class PreflightCheck
         return new self($key, $label, passed: false, blocking: false, message: $message, value: $value, details: $details);
     }
 
-    public static function error(string $key, string $label, string $message, mixed $value = null): self
+    public static function error(string $key, string $label, string $message, mixed $value = null, array $details = []): self
     {
-        return new self($key, $label, passed: false, blocking: true, message: $message, value: $value);
+        return new self($key, $label, passed: false, blocking: true, message: $message, value: $value, details: $details);
     }
 }

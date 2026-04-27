@@ -38,6 +38,7 @@ final class UnprocessedSalesQuery
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
         $marketplaceEnum = MarketplaceType::from($marketplace);
         $saleGrossExpr = AmountSource::SALE_GROSS->getSqlExpression($marketplaceEnum);
@@ -50,6 +51,10 @@ final class UnprocessedSalesQuery
                 ELSE 0
             END
         SQL;
+
+        $preliminaryFilter = $preliminary
+            ? 'AND s.cost_price IS NOT NULL AND s.cost_price > 0'
+            : '';
 
         $sql = <<<SQL
             SELECT
@@ -70,6 +75,7 @@ final class UnprocessedSalesQuery
                 AND s.document_id IS NULL
                 AND s.sale_date >= :periodFrom
                 AND s.sale_date <= :periodTo
+                $preliminaryFilter
             GROUP BY
                 m.pl_category_id,
                 m.project_direction_id,

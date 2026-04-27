@@ -57,7 +57,9 @@ final class RealizationReturnDataSource implements MarketplaceDataSourceInterfac
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
+        // preliminary не применяется: в realization нет понятия «без себестоимости» на уровне строки
         return $this->returnQuery->execute($companyId, $periodFrom, $periodTo);
     }
 

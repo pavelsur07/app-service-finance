@@ -36,6 +36,13 @@ final class UnprocessedCostsQuery
     }
 
     /**
+     * ВАЖНО: WHERE-условия и JOIN'ы должны зеркалить getControlSum().
+     * Если сюда добавляется новый фильтр или JOIN — он должен быть добавлен
+     * и в getControlSum(), иначе CloseMonthStageAction бросит RuntimeException
+     * при проверке контрольной суммы (delta != 0).
+     *
+     * Регрессионный тест coherence: tests/Integration/Marketplace/UnprocessedCostsQueryCoherenceTest.php
+     *
      * @return array<int, array{
      *     cost_category_code: string,
      *     cost_category_name: string,
@@ -56,6 +63,7 @@ final class UnprocessedCostsQuery
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): array {
         // Получаем все строки с разбивкой по категории И знаку (costs vs storno).
         //
@@ -66,7 +74,11 @@ final class UnprocessedCostsQuery
         // Важно: все три поля (is_storno / costs_amount / storno_amount) используют одну
         // и ту же классификацию, иначе для Ozon storno (amount > 0, operation_type='storno')
         // строки помеченные is_storno=true попадут в costs_amount вместо storno_amount.
-        $sql = <<<'SQL'
+        $preliminaryFilter = $preliminary
+            ? "AND mcc.code != 'ozon_other_service'"
+            : '';
+
+        $sql = <<<SQL
             SELECT
                 mcc.code                                                        AS cost_category_code,
                 mcc.name                                                        AS cost_category_name,
@@ -99,6 +111,7 @@ final class UnprocessedCostsQuery
                 AND c.cost_date  <= :periodTo
                 AND m.include_in_pl = true
                 AND m.pl_category_id IS NOT NULL
+                $preliminaryFilter
             GROUP BY
                 mcc.code,
                 mcc.name,
@@ -154,17 +167,33 @@ final class UnprocessedCostsQuery
      *
      * Возвращает net_amount всех затрат которые войдут в документ.
      * После создания PLDocument — сумма строк документа должна совпадать.
+     *
+     * ВАЖНО: WHERE-условия и JOIN'ы должны зеркалить execute().
+     * Если в execute() добавляется новый фильтр или JOIN — он должен быть
+     * добавлен и здесь, иначе CloseMonthStageAction бросит RuntimeException
+     * на проверке контрольной суммы (delta != 0).
+     *
+     * $preliminary должен совпадать с флагом переданным в execute(),
+     * чтобы обе суммы считались на одном подмножестве строк.
+     *
+     * Регрессионный тест coherence: tests/Integration/Marketplace/UnprocessedCostsQueryCoherenceTest.php
      */
     public function getControlSum(
         string $companyId,
         string $marketplace,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): string {
+        $preliminaryFilter = $preliminary
+            ? "AND mcc.code != 'ozon_other_service'"
+            : '';
+
         $result = $this->connection->fetchOne(
-            <<<'SQL'
+            <<<SQL
             SELECT COALESCE(SUM(CASE WHEN c.operation_type = 'storno' THEN -ABS(c.amount) ELSE ABS(c.amount) END), 0)
             FROM marketplace_costs c
+            INNER JOIN marketplace_cost_categories mcc ON mcc.id = c.category_id
             INNER JOIN marketplace_cost_pl_mappings m
                 ON m.cost_category_id = c.category_id
                 AND m.company_id = c.company_id
@@ -175,6 +204,7 @@ final class UnprocessedCostsQuery
                 AND c.cost_date  <= :periodTo
                 AND m.include_in_pl = true
                 AND m.pl_category_id IS NOT NULL
+                $preliminaryFilter
             SQL,
             [
                 'companyId'   => $companyId,
