@@ -54,6 +54,7 @@ framework:
             'App\Marketplace\Message\ProcessRawDocumentStepMessage': async_pipeline
             'App\Marketplace\Message\ReprocessCostsMessage': async_pipeline
             'App\Marketplace\Message\CloseMonthStageMessage': async_pipeline
+            'App\Marketplace\Message\RebuildPreliminaryForPeriodMessage': async_pipeline
             'App\Marketplace\Message\ImportInventoryCostPriceMessage': async_pipeline
             'App\Catalog\Message\ImportProductsMessage': async_pipeline
             'App\Message\ApplyAutoRulesForTransaction': async_pipeline
