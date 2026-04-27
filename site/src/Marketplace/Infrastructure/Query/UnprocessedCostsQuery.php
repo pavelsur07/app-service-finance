@@ -36,6 +36,13 @@ final class UnprocessedCostsQuery
     }
 
     /**
+     * ВАЖНО: WHERE-условия и JOIN'ы должны зеркалить getControlSum().
+     * Если сюда добавляется новый фильтр или JOIN — он должен быть добавлен
+     * и в getControlSum(), иначе CloseMonthStageAction бросит RuntimeException
+     * при проверке контрольной суммы (delta != 0).
+     *
+     * Регрессионный тест coherence: tests/Integration/Marketplace/UnprocessedCostsQueryCoherenceTest.php
+     *
      * @return array<int, array{
      *     cost_category_code: string,
      *     cost_category_name: string,
@@ -161,8 +168,15 @@ final class UnprocessedCostsQuery
      * Возвращает net_amount всех затрат которые войдут в документ.
      * После создания PLDocument — сумма строк документа должна совпадать.
      *
+     * ВАЖНО: WHERE-условия и JOIN'ы должны зеркалить execute().
+     * Если в execute() добавляется новый фильтр или JOIN — он должен быть
+     * добавлен и здесь, иначе CloseMonthStageAction бросит RuntimeException
+     * на проверке контрольной суммы (delta != 0).
+     *
      * $preliminary должен совпадать с флагом переданным в execute(),
      * чтобы обе суммы считались на одном подмножестве строк.
+     *
+     * Регрессионный тест coherence: tests/Integration/Marketplace/UnprocessedCostsQueryCoherenceTest.php
      */
     public function getControlSum(
         string $companyId,

@@ -383,7 +383,10 @@
                         if (check.details && check.details.length > 0) {
                             detailsHtml = '<ul class="mt-1 mb-0 small text-muted">';
                             check.details.forEach(item => {
-                                if (item.marketplace_sku !== undefined) {
+                                if (item.orphan === true) {
+                                    // sales/returns without a resolvable listing (no marketplace_sku)
+                                    detailsHtml += `<li>Без привязки к листингу — ${Number(item.count)} шт.</li>`;
+                                } else if (item.marketplace_sku !== undefined && item.marketplace_sku !== null) {
                                     // sales_without_cost / returns_without_cost
                                     const supplier = item.supplier_sku ? ` (артикул: ${escapeHtml(item.supplier_sku)})` : '';
                                     detailsHtml += `<li>SKU ${escapeHtml(item.marketplace_sku)}${supplier} — ${Number(item.count)} шт.</li>`;

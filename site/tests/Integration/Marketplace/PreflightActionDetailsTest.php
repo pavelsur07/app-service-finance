@@ -143,6 +143,53 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         self::assertSame(2, (int) $check->details[0]['count']);
     }
 
+    public function testSalesWithoutCostWithOrphanRowsAreReportedSeparately(): void
+    {
+        $listing = $this->createListing('SKU-WITH-LISTING');
+
+        // Sale 1: has a valid listing → will appear as a SKU entry
+        $this->createSale($listing, costPrice: null, date: '2026-03-10');
+
+        // Sale 2: also created with the listing (to satisfy DB constraints),
+        //         then its listing_id is updated to a non-existent UUID so the
+        //         LEFT JOIN in getSalesWithoutCostSkus() finds no match →
+        //         ml.marketplace_sku IS NULL → counted as orphan.
+        $orphanSale = $this->createSale($listing, costPrice: null, date: '2026-03-11');
+        $this->em->flush();
+
+        $orphanSaleId = $orphanSale->getId();
+        $this->em->clear();
+
+        // session_replication_role=replica disables FK trigger checks so we can
+        // point listing_id at a UUID that doesn't exist in marketplace_listings.
+        $conn = $this->em->getConnection();
+        $conn->executeStatement("SET session_replication_role = replica");
+        $conn->executeStatement(
+            'UPDATE marketplace_sales SET listing_id = :fakeId WHERE id = :id',
+            ['fakeId' => \Ramsey\Uuid\Uuid::uuid4()->toString(), 'id' => $orphanSaleId],
+        );
+        $conn->executeStatement("SET session_replication_role = DEFAULT");
+
+        $result = ($this->action)($this->makeSalesCommand());
+
+        $check = $this->findCheck($result->checks, 'sales_without_cost');
+        self::assertNotNull($check, 'Проверка sales_without_cost должна присутствовать');
+        self::assertFalse($check->passed);
+        self::assertCount(2, $check->details, 'details должен содержать SKU-элемент и orphan-элемент');
+
+        $skuItems    = array_values(array_filter($check->details, static fn($d) => !($d['orphan'] ?? false)));
+        $orphanItems = array_values(array_filter($check->details, static fn($d) => $d['orphan'] ?? false));
+
+        self::assertCount(1, $skuItems);
+        self::assertSame('SKU-WITH-LISTING', $skuItems[0]['marketplace_sku']);
+        self::assertSame(1, (int) $skuItems[0]['count']);
+
+        self::assertCount(1, $orphanItems);
+        self::assertNull($orphanItems[0]['marketplace_sku']);
+        self::assertSame(1, (int) $orphanItems[0]['count']);
+        self::assertTrue($orphanItems[0]['orphan']);
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
