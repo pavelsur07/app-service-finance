@@ -342,6 +342,16 @@
             label.textContent = 'Обработка...';
         }
 
+        function escapeHtml(str) {
+            if (str === null || str === undefined) { return ''; }
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
         function runPreflight(btn) {
             const stage = btn.dataset.stage;
             const resultDiv = document.getElementById('preflight-result-' + stage);
@@ -375,14 +385,14 @@
                             check.details.forEach(item => {
                                 if (item.marketplace_sku !== undefined) {
                                     // sales_without_cost / returns_without_cost
-                                    const supplier = item.supplier_sku ? ` (артикул: ${item.supplier_sku})` : '';
-                                    detailsHtml += `<li>SKU ${item.marketplace_sku}${supplier} — ${item.count} шт.</li>`;
+                                    const supplier = item.supplier_sku ? ` (артикул: ${escapeHtml(item.supplier_sku)})` : '';
+                                    detailsHtml += `<li>SKU ${escapeHtml(item.marketplace_sku)}${supplier} — ${Number(item.count)} шт.</li>`;
                                 } else if (item.service_name !== undefined) {
                                     // costs_unknown_service_names
-                                    detailsHtml += `<li>${item.service_name} — ${item.count} шт.</li>`;
+                                    detailsHtml += `<li>${escapeHtml(item.service_name)} — ${Number(item.count)} шт.</li>`;
                                 } else if (item.category_name !== undefined) {
                                     // costs_without_mapping (existing)
-                                    detailsHtml += `<li>${item.category_name} (${item.costs_count} шт.)</li>`;
+                                    detailsHtml += `<li>${escapeHtml(item.category_name)} (${Number(item.costs_count)} шт.)</li>`;
                                 }
                             });
                             detailsHtml += '</ul>';
