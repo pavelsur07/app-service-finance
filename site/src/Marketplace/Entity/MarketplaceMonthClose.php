@@ -229,6 +229,38 @@ class MarketplaceMonthClose
     public function getStageCostsClosedAt(): ?\DateTimeImmutable { return $this->stageCostsClosedAt; }
     public function getStageCostsPLDocumentIds(): ?array { return $this->stageCostsPLDocumentIds; }
 
+    // --- Settings (общий JSON-blob) ---
+
+    public function getSettings(): ?array
+    {
+        return $this->settings;
+    }
+
+    public function setSettings(array $settings): void
+    {
+        $this->settings  = $settings;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function isLastCloseWasPreliminary(): bool
+    {
+        return (bool) ($this->settings['last_close_was_preliminary'] ?? false);
+    }
+
+    public function getPreliminaryCalculatedAt(): ?\DateTimeImmutable
+    {
+        $value = $this->settings['preliminary_calculated_at'] ?? null;
+        if (!is_string($value) || $value === '') {
+            return null;
+        }
+
+        try {
+            return new \DateTimeImmutable($value);
+        } catch (\Exception) {
+            return null;
+        }
+    }
+
     // --- Сверка с xlsx ---
 
     public function getCostsReconciliation(): ?array

@@ -77,12 +77,18 @@ final class CloseMonthStageAction
         $periodFrom = sprintf('%d-%02d-01', $command->year, $command->month);
         $periodTo   = (new \DateTimeImmutable($periodFrom))->modify('last day of this month')->format('Y-m-d');
 
+        // Один таймстемп на всё закрытие — у всех операций предварительного
+        // документа одинаковая метка времени, чтобы их можно было сгруппировать
+        // и отличить от финального закрытия.
+        $closedAt = new \DateTimeImmutable();
+
         $this->logger->info('[MonthClose] Stage close started', [
             'company_id'  => $command->companyId,
             'marketplace' => $command->marketplace,
             'year'        => $command->year,
             'month'       => $command->month,
             'stage'       => $command->stage,
+            'preliminary' => $command->preliminary,
         ]);
 
         // 1. Повторный Preflight
@@ -154,12 +160,21 @@ final class CloseMonthStageAction
             }
 
             foreach ($entries as $row) {
+                $description = $row['description_template'] ?? $row['description'] ?? $dataSource->getLabel();
+                if ($command->preliminary) {
+                    $description = sprintf(
+                        '[Оперативное закрытие %s] %s',
+                        $closedAt->format('d.m.Y H:i'),
+                        $description,
+                    );
+                }
+
                 $allPlEntries[] = new PLEntryDTO(
                     plCategoryId: $row['pl_category_id'],
                     projectId:    $row['project_direction_id'] ?? $projectDirectionId,
                     amount:       $row['total_amount'],
                     periodDate:   $periodTo,
-                    description:  $row['description_template'] ?? $row['description'] ?? $dataSource->getLabel(),
+                    description:  $description,
                     isNegative:   (bool) ($row['is_negative'] ?? false),
                     sortOrder:    (int) ($row['sort_order'] ?? 0),
                 );
@@ -260,6 +275,16 @@ final class CloseMonthStageAction
             $plDocumentIds,
             $preflightResult->toArray(),
         );
+
+        // 5. Маркировка предзакрытия в settings.
+        // При финальном закрытии флаг обязательно сбрасывается в false,
+        // иначе после ручного закрытия на карточке останется жёлтый бейдж.
+        $settings = $monthClose->getSettings() ?? [];
+        $settings['last_close_was_preliminary'] = $command->preliminary;
+        $settings['preliminary_calculated_at']  = $command->preliminary
+            ? $closedAt->format(\DateTimeInterface::ATOM)
+            : null;
+        $monthClose->setSettings($settings);
 
         $this->monthCloseRepository->save($monthClose);
 

@@ -19,6 +19,7 @@ final class CloseMonthStageCommand
         public readonly int    $month,
         public readonly string $stage,      // CloseStage::value — scalar для Message
         public readonly string $actorUserId,
+        public readonly bool   $preliminary = false,
     ) {
     }
 }
