@@ -32,16 +32,46 @@ final class MarkProcessedQuery
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
+        $preliminaryFilter = $preliminary
+            ? 'AND s.cost_price IS NOT NULL AND s.cost_price > 0'
+            : '';
+
         return $this->connection->executeStatement(
             'UPDATE marketplace_sales
              SET document_id = :documentId,
                  updated_at = NOW()
-             WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND document_id IS NULL
-               AND sale_date >= :periodFrom
-               AND sale_date <= :periodTo',
+             WHERE id IN (
+                SELECT s.id
+                FROM marketplace_sales s
+                WHERE s.company_id = :companyId
+                  AND s.marketplace = :marketplace
+                  AND s.document_id IS NULL
+                  AND s.sale_date >= :periodFrom
+                  AND s.sale_date <= :periodTo
+                  ' . $preliminaryFilter . '
+                  AND EXISTS (
+                      SELECT 1
+                      FROM marketplace_sale_mappings m
+                      WHERE m.company_id = s.company_id
+                        AND m.marketplace = s.marketplace
+                        AND m.operation_type = \'sale\'
+                        AND m.is_active = true
+                        AND CASE m.amount_source
+                            WHEN \'sale_gross\' THEN (
+                                CASE
+                                    WHEN s.marketplace = \'ozon\' THEN COALESCE(s.price_per_unit, 0) * s.quantity
+                                    WHEN s.marketplace = \'wildberries\' THEN COALESCE(s.total_revenue, 0)
+                                    ELSE COALESCE(s.price_per_unit, 0) * s.quantity
+                                END
+                            )
+                            WHEN \'sale_revenue\' THEN COALESCE(s.total_revenue, 0)
+                            WHEN \'sale_cost_price\' THEN COALESCE(s.cost_price, 0) * s.quantity
+                            ELSE 0
+                        END != 0
+                  )
+             )',
             [
                 'documentId' => $documentId,
                 'companyId' => $companyId,
@@ -63,16 +93,43 @@ final class MarkProcessedQuery
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
+        $preliminaryFilter = $preliminary
+            ? 'AND r.cost_price IS NOT NULL AND r.cost_price > 0'
+            : '';
+
         return $this->connection->executeStatement(
             'UPDATE marketplace_returns
              SET document_id = :documentId,
                  updated_at = NOW()
-             WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND document_id IS NULL
-               AND return_date >= :periodFrom
-               AND return_date <= :periodTo',
+             WHERE id IN (
+                SELECT r.id
+                FROM marketplace_returns r
+                LEFT JOIN marketplace_sales ms
+                    ON ms.id = r.sale_id
+                WHERE r.company_id = :companyId
+                  AND r.marketplace = :marketplace
+                  AND r.document_id IS NULL
+                  AND r.return_date >= :periodFrom
+                  AND r.return_date <= :periodTo
+                  ' . $preliminaryFilter . '
+                  AND EXISTS (
+                      SELECT 1
+                      FROM marketplace_sale_mappings m
+                      WHERE m.company_id = r.company_id
+                        AND m.marketplace = r.marketplace
+                        AND m.operation_type = \'return\'
+                        AND m.amount_source != \'return_realization\'
+                        AND m.is_active = true
+                        AND CASE m.amount_source
+                            WHEN \'return_refund\' THEN COALESCE(r.refund_amount, 0)
+                            WHEN \'return_gross\' THEN COALESCE(ms.price_per_unit * r.quantity, r.refund_amount, 0)
+                            WHEN \'return_cost_price\' THEN COALESCE(r.cost_price * r.quantity, 0)
+                            ELSE 0
+                        END != 0
+                  )
+             )',
             [
                 'documentId' => $documentId,
                 'companyId' => $companyId,
@@ -94,16 +151,57 @@ final class MarkProcessedQuery
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
+        $preliminaryFilter = $preliminary
+            ? "AND mcc2.code != 'ozon_other_service'"
+            : '';
+
         return $this->connection->executeStatement(
             'UPDATE marketplace_costs
              SET document_id = :documentId,
                  updated_at = NOW()
-             WHERE company_id = :companyId
-               AND marketplace = :marketplace
-               AND document_id IS NULL
-               AND cost_date >= :periodFrom
-               AND cost_date <= :periodTo',
+             WHERE id IN (
+                 SELECT c.id
+                 FROM marketplace_costs c
+                 INNER JOIN marketplace_cost_categories mcc
+                     ON mcc.id = c.category_id
+                 INNER JOIN marketplace_cost_pl_mappings m
+                     ON m.cost_category_id = c.category_id
+                     AND m.company_id = c.company_id
+                 WHERE c.company_id = :companyId
+                   AND c.marketplace = :marketplace
+                   AND c.document_id IS NULL
+                   AND c.cost_date >= :periodFrom
+                   AND c.cost_date <= :periodTo
+                   AND m.include_in_pl = true
+                   AND m.pl_category_id IS NOT NULL
+                   AND EXISTS (
+                       SELECT 1
+                       FROM marketplace_costs c2
+                       INNER JOIN marketplace_cost_categories mcc2
+                           ON mcc2.id = c2.category_id
+                       INNER JOIN marketplace_cost_pl_mappings m2
+                           ON m2.cost_category_id = c2.category_id
+                           AND m2.company_id = c2.company_id
+                       WHERE c2.company_id = c.company_id
+                         AND c2.marketplace = c.marketplace
+                         AND c2.document_id IS NULL
+                         AND c2.cost_date >= :periodFrom
+                         AND c2.cost_date <= :periodTo
+                         AND c2.category_id = c.category_id
+                         AND (c2.operation_type = \'storno\') = (c.operation_type = \'storno\')
+                         AND m2.include_in_pl = true
+                         AND m2.pl_category_id IS NOT NULL
+                         ' . $preliminaryFilter . '
+                       GROUP BY
+                           m2.pl_category_id,
+                           m2.sort_order,
+                           m2.is_negative,
+                           (c2.operation_type = \'storno\')
+                       HAVING ABS(SUM(c2.amount)) > 0.001
+                   )
+             )',
             [
                 'documentId' => $documentId,
                 'companyId' => $companyId,

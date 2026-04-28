@@ -62,9 +62,10 @@ final class CostsDataSource implements MarketplaceDataSourceInterface
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
         return $this->markProcessedQuery->markCosts(
-            $companyId, $marketplace, $documentId, $periodFrom, $periodTo,
+            $companyId, $marketplace, $documentId, $periodFrom, $periodTo, $preliminary,
         );
     }
 }

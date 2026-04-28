@@ -71,13 +71,14 @@ final class SalesReturnsDataSource implements MarketplaceDataSourceInterface
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
         $count = $this->markProcessedQuery->markSales(
-            $companyId, $marketplace, $documentId, $periodFrom, $periodTo,
+            $companyId, $marketplace, $documentId, $periodFrom, $periodTo, $preliminary,
         );
 
         $count += $this->markProcessedQuery->markReturns(
-            $companyId, $marketplace, $documentId, $periodFrom, $periodTo,
+            $companyId, $marketplace, $documentId, $periodFrom, $periodTo, $preliminary,
         );
 
         return $count;

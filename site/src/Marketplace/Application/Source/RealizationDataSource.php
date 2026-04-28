@@ -66,7 +66,9 @@ final class RealizationDataSource implements MarketplaceDataSourceInterface
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
+        // preliminary не влияет на realization: маркировка идёт тем же диапазоном.
         return $this->realizationRepository->markProcessed(
             $companyId,
             $documentId,
