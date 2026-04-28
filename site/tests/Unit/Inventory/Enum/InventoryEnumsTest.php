@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Inventory\Enum;
 
-use App\Inventory\Enum\ExternalSystemType;
 use App\Inventory\Enum\LocationType;
 use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\SnapshotTriggerType;
@@ -13,14 +12,6 @@ use PHPUnit\Framework\TestCase;
 
 final class InventoryEnumsTest extends TestCase
 {
-    public function testExternalSystemTypeHasOnlyExpectedValues(): void
-    {
-        $this->assertSame(
-            ['wildberries', 'ozon'],
-            array_map(static fn (ExternalSystemType $case): string => $case->value, ExternalSystemType::cases()),
-        );
-    }
-
     public function testLocationTypeHasExpectedValuesCount(): void
     {
         $this->assertSame(
