@@ -135,7 +135,7 @@ final class MonthClosePreflightAction
                 'sales_already_processed',
                 'Уже обработанные продажи',
                 sprintf(
-                    'Найдено %d продаж с document_id IS NOT NULL. Этап был переоткрыт некорректно или данные уже закрывались.',
+                    'Найдено %d записей в sales_report с document_id IS NOT NULL. Этап не был переоткрыт корректно. Переоткройте этап и повторите.',
                     $salesAlreadyProcessed,
                 ),
                 $salesAlreadyProcessed,
@@ -169,7 +169,7 @@ final class MonthClosePreflightAction
                 'returns_already_processed',
                 'Уже обработанные возвраты',
                 sprintf(
-                    'Найдено %d возвратов с document_id IS NOT NULL. Этап был переоткрыт некорректно или данные уже закрывались.',
+                    'Найдено %d записей в sales_report с document_id IS NOT NULL. Этап не был переоткрыт корректно. Переоткройте этап и повторите.',
                     $returnsAlreadyProcessed,
                 ),
                 $returnsAlreadyProcessed,
