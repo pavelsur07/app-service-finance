@@ -14,7 +14,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: LocationRepository::class)]
 #[ORM\Table(name: 'inventory_locations')]
-#[ORM\UniqueConstraint(columns: ['company_id', 'code'], name: 'uniq_inventory_locations_company_code')]
+#[ORM\UniqueConstraint(name: 'uniq_inventory_locations_external', columns: ['company_id', 'external_system', 'external_id'], options: ['where' => 'external_id IS NOT NULL'])]
 #[ORM\Index(columns: ['company_id', 'type', 'is_active'], name: 'idx_inventory_locations_company_type_active')]
 #[ORM\Index(columns: ['company_id', 'external_system'], name: 'idx_inventory_locations_company_external_system')]
 class Location
@@ -35,22 +35,22 @@ class Location
     #[ORM\Column(type: Types::STRING, length: 255, nullable: true)]
     private ?string $externalId = null;
 
-    #[ORM\Column(type: Types::STRING, length: 255)]
+    #[ORM\Column(type: Types::STRING, length: 100)]
     private string $code;
 
     #[ORM\Column(type: Types::STRING, length: 255)]
     private string $name;
 
-    #[ORM\Column(type: Types::BOOLEAN)]
+    #[ORM\Column(type: Types::BOOLEAN, options: ['default' => true])]
     private bool $isActive = true;
 
-    #[ORM\Column(type: Types::JSON, nullable: true)]
+    #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
     private ?array $metadata = null;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $updatedAt;
 
     public function __construct(

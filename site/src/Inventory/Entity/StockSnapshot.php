@@ -14,9 +14,12 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: StockSnapshotRepository::class)]
 #[ORM\Table(name: 'inventory_stock_snapshots')]
-#[ORM\Index(columns: ['company_id', 'snapshot_date'], name: 'idx_inventory_stock_snapshots_company_date')]
-#[ORM\Index(columns: ['company_id', 'snapshot_session_id'], name: 'idx_inventory_stock_snapshots_company_session')]
-#[ORM\Index(columns: ['company_id', 'location_id'], name: 'idx_inventory_stock_snapshots_company_location')]
+#[ORM\UniqueConstraint(name: 'uniq_inventory_stock_snapshot_day_item', columns: ['company_id', 'snapshot_date', 'listing_id', 'product_id', 'location_id', 'status'])]
+#[ORM\Index(columns: ['company_id', 'snapshot_date'], name: 'idx_inventory_stock_company_date')]
+#[ORM\Index(columns: ['company_id', 'product_id', 'snapshot_date'], name: 'idx_inventory_stock_company_product_date')]
+#[ORM\Index(columns: ['company_id', 'listing_id', 'snapshot_date'], name: 'idx_inventory_stock_company_listing_date')]
+#[ORM\Index(columns: ['company_id', 'location_id', 'snapshot_date'], name: 'idx_inventory_stock_company_location_date')]
+#[ORM\Index(columns: ['snapshot_session_id'], name: 'idx_inventory_stock_session')]
 class StockSnapshot
 {
     #[ORM\Id]
@@ -32,7 +35,7 @@ class StockSnapshot
     #[ORM\Column(type: Types::DATE_IMMUTABLE)]
     private \DateTimeImmutable $snapshotDate;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $snapshotAt;
 
     #[ORM\Column(type: Types::GUID, nullable: true)]
@@ -56,7 +59,7 @@ class StockSnapshot
     #[ORM\Column(type: Types::GUID)]
     private string $rawSnapshotId;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
     public function __construct(

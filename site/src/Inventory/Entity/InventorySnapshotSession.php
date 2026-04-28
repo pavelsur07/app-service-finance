@@ -15,8 +15,10 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: InventorySnapshotSessionRepository::class)]
 #[ORM\Table(name: 'inventory_snapshot_sessions')]
-#[ORM\Index(columns: ['company_id', 'source', 'status'], name: 'idx_inv_snapshot_sessions_company_source_status')]
-#[ORM\Index(columns: ['correlation_id'], name: 'idx_inv_snapshot_sessions_correlation_id')]
+#[ORM\Index(columns: ['company_id', 'source', 'started_at'], name: 'idx_inventory_sessions_company_source_started')]
+#[ORM\Index(columns: ['company_id', 'status', 'started_at'], name: 'idx_inventory_sessions_company_status_started')]
+#[ORM\Index(columns: ['status'], name: 'idx_inventory_sessions_active', options: ['where' => "status IN ('pending', 'in_progress')"])]
+#[ORM\Index(columns: ['correlation_id'], name: 'idx_inventory_sessions_correlation')]
 class InventorySnapshotSession
 {
     #[ORM\Id]
@@ -35,19 +37,19 @@ class InventorySnapshotSession
     #[ORM\Column(type: Types::GUID, nullable: true)]
     private ?string $triggeredBy;
 
-    #[ORM\Column(type: Types::STRING, length: 50, enumType: SnapshotSessionStatus::class)]
+    #[ORM\Column(type: Types::STRING, length: 50, enumType: SnapshotSessionStatus::class, options: ['default' => SnapshotSessionStatus::Pending->value])]
     private SnapshotSessionStatus $status = SnapshotSessionStatus::Pending;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $startedAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
     private ?\DateTimeImmutable $completedAt = null;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $expectedPages;
 
-    #[ORM\Column(type: Types::INTEGER)]
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
     private int $receivedPages = 0;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -56,10 +58,10 @@ class InventorySnapshotSession
     #[ORM\Column(type: Types::GUID)]
     private string $correlationId;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $updatedAt;
 
     public function __construct(
