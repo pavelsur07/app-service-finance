@@ -189,6 +189,10 @@ final class CloseMonthStageAction
             ]);
         }
 
+        if ($allPlEntries === []) {
+            throw new \DomainException('Закрытие невозможно: нет строк для создания документа ОПиУ по этапу.');
+        }
+
         // Создаём один документ для всех Source-ов этапа
         if (!empty($allPlEntries)) {
             // Контрольная сумма ДО создания документа (только для COSTS).
