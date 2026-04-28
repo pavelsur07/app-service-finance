@@ -70,5 +70,6 @@ interface MarketplaceDataSourceInterface
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int;
 }

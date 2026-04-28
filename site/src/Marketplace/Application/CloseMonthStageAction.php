@@ -228,6 +228,7 @@ final class CloseMonthStageAction
                     $documentId,
                     $periodFrom,
                     $periodTo,
+                    $command->preliminary,
                 );
             }
 

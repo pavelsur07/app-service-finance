@@ -69,10 +69,12 @@ final class RealizationReturnDataSource implements MarketplaceDataSourceInterfac
         string $documentId,
         string $periodFrom,
         string $periodTo,
+        bool $preliminary = false,
     ): int {
         // Используем тот же markProcessed что и RealizationDataSource.
         // Фильтр WHERE pl_document_id IS NULL гарантирует что строки
         // не будут повторно помечены если SALE_REALIZATION отработал первым.
+        // preliminary не влияет на realization: поведение оставлено прежним.
         return $this->realizationRepository->markProcessed(
             $companyId,
             $documentId,
