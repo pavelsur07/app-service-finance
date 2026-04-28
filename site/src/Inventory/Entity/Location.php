@@ -14,6 +14,7 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: LocationRepository::class)]
 #[ORM\Table(name: 'inventory_locations')]
+#[ORM\UniqueConstraint(columns: ['company_id', 'code'], name: 'uniq_inventory_locations_company_code')]
 #[ORM\Index(columns: ['company_id', 'type', 'is_active'], name: 'idx_inventory_locations_company_type_active')]
 #[ORM\Index(columns: ['company_id', 'external_system'], name: 'idx_inventory_locations_company_external_system')]
 class Location
@@ -61,7 +62,12 @@ class Location
         ?string $externalId = null,
         ?array $metadata = null,
     ) {
+        $code = trim($code);
+        $name = trim($name);
+
         Assert::uuid($companyId);
+        Assert::notEmpty($code);
+        Assert::notEmpty($name);
 
         $this->id = Uuid::uuid7()->toString();
         $this->companyId = $companyId;

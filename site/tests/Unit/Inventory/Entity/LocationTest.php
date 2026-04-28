@@ -99,4 +99,30 @@ final class LocationTest extends TestCase
         self::assertFalse(method_exists(Location::class, 'setType'));
         self::assertFalse(method_exists(Location::class, 'setExternalSystem'));
     }
+
+    public function testConstructorThrowsWhenCodeIsEmpty(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new Location(
+            companyId: LocationBuilder::DEFAULT_COMPANY_ID,
+            type: LocationType::MpWarehouse,
+            externalSystem: MarketplaceType::WILDBERRIES,
+            code: '  ',
+            name: 'Valid name',
+        );
+    }
+
+    public function testConstructorThrowsWhenNameIsEmpty(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        new Location(
+            companyId: LocationBuilder::DEFAULT_COMPANY_ID,
+            type: LocationType::MpWarehouse,
+            externalSystem: MarketplaceType::WILDBERRIES,
+            code: 'VALID',
+            name: '   ',
+        );
+    }
 }
