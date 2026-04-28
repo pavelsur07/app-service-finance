@@ -351,7 +351,11 @@ services:
         container_name: scheduler
         user: root
         entrypoint: ["/usr/local/bin/supercronic"]
-        command: ["-json", "/etc/crontabs/app.cron"]
+        # supercronic v0.2.31 может логировать "waitid: no child processes"
+        # из-за race между встроенным reaper и основным wait-loop.
+        # Отключаем reaper, т.к. scheduler запускает только короткие php-команды
+        # и не нуждается в отдельной "подборке" orphan-процессов.
+        command: ["-no-reap", "-json", "/etc/crontabs/app.cron"]
         environment:
             TZ: Europe/Moscow
             DATABASE_URL: pgsql://app:${POSTGRES_PASSWORD}@site-postgres:5432/app
