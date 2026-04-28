@@ -189,89 +189,91 @@ final class CloseMonthStageAction
             ]);
         }
 
-        // Создаём один документ для всех Source-ов этапа
-        if (!empty($allPlEntries)) {
-            // Контрольная сумма ДО создания документа (только для COSTS).
-            // Флаг $preliminary передаётся чтобы контрольная сумма и execute()
-            // считались на одном подмножестве строк — иначе в preliminary-режиме
-            // исключение ozon_other_service создаёт дельту и бросает RuntimeException.
-            $controlSumBefore = null;
-            if ($stage === CloseStage::COSTS) {
-                $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
-                    $command->companyId,
-                    $command->marketplace,
-                    $periodFrom,
-                    $periodTo,
-                    $command->preliminary,
-                );
-            }
+        if ($allPlEntries === []) {
+            throw new \DomainException('Закрытие невозможно: нет строк для создания документа ОПиУ по этапу.');
+        }
 
-            $documentId = $this->financeFacade->createPLDocument(
-                companyId:          $command->companyId,
-                source:             $source,
-                stream:             $stream,
-                periodFrom:         $periodFrom,
-                periodTo:           $periodTo,
-                entries:            $allPlEntries,
-                projectDirectionId: $projectDirectionId,
+        // Создаём один документ для всех Source-ов этапа
+        // Контрольная сумма ДО создания документа (только для COSTS).
+        // Флаг $preliminary передаётся чтобы контрольная сумма и execute()
+        // считались на одном подмножестве строк — иначе в preliminary-режиме
+        // исключение ozon_other_service создаёт дельту и бросает RuntimeException.
+        $controlSumBefore = null;
+        if ($stage === CloseStage::COSTS) {
+            $controlSumBefore = $this->unprocessedCostsQuery->getControlSum(
+                $command->companyId,
+                $command->marketplace,
+                $periodFrom,
+                $periodTo,
+                $command->preliminary,
+            );
+        }
+
+        $documentId = $this->financeFacade->createPLDocument(
+            companyId:          $command->companyId,
+            source:             $source,
+            stream:             $stream,
+            periodFrom:         $periodFrom,
+            periodTo:           $periodTo,
+            entries:            $allPlEntries,
+            projectDirectionId: $projectDirectionId,
+        );
+
+        // Помечаем обработанными все Source-ы
+        foreach ($sourcesUsed as $dataSource) {
+            $dataSource->markProcessed(
+                $command->companyId,
+                $command->marketplace,
+                $documentId,
+                $periodFrom,
+                $periodTo,
+            );
+        }
+
+        // Контрольная сумма строк PLDocument vs marketplace_costs (только для COSTS)
+        if ($stage === CloseStage::COSTS && $controlSumBefore !== null) {
+            $plDocumentSum = array_reduce(
+                $allPlEntries,
+                static function (string $carry, PLEntryDTO $entry): string {
+                    // Сторно (is_negative=false для затрат) уменьшает сумму
+                    if (!$entry->isNegative) {
+                        return bcsub($carry, $entry->amount, 2);
+                    }
+                    return bcadd($carry, $entry->amount, 2);
+                },
+                '0',
             );
 
-            // Помечаем обработанными все Source-ы
-            foreach ($sourcesUsed as $dataSource) {
-                $dataSource->markProcessed(
-                    $command->companyId,
-                    $command->marketplace,
-                    $documentId,
-                    $periodFrom,
-                    $periodTo,
-                );
+            $delta = abs((float) $controlSumBefore - (float) $plDocumentSum);
+
+            if ($delta > 0.01) {
+                // Контрольная сумма не сошлась — бросаем исключение, внешний
+                // wrapInTransaction откатит создание PLDocument и UPDATE
+                // marketplace_costs.document_id (ручной deletePLDocument
+                // больше не нужен — раньше он оставлял висящий document_id,
+                // т.к. DELETE коммитился отдельно от UPDATE).
+                throw new \RuntimeException(sprintf(
+                    '[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.',
+                    $controlSumBefore,
+                    $plDocumentSum,
+                    $delta,
+                ));
             }
 
-            // Контрольная сумма строк PLDocument vs marketplace_costs (только для COSTS)
-            if ($stage === CloseStage::COSTS && $controlSumBefore !== null) {
-                $plDocumentSum = array_reduce(
-                    $allPlEntries,
-                    static function (string $carry, PLEntryDTO $entry): string {
-                        // Сторно (is_negative=false для затрат) уменьшает сумму
-                        if (!$entry->isNegative) {
-                            return bcsub($carry, $entry->amount, 2);
-                        }
-                        return bcadd($carry, $entry->amount, 2);
-                    },
-                    '0',
-                );
-
-                $delta = abs((float) $controlSumBefore - (float) $plDocumentSum);
-
-                if ($delta > 0.01) {
-                    // Контрольная сумма не сошлась — бросаем исключение, внешний
-                    // wrapInTransaction откатит создание PLDocument и UPDATE
-                    // marketplace_costs.document_id (ручной deletePLDocument
-                    // больше не нужен — раньше он оставлял висящий document_id,
-                    // т.к. DELETE коммитился отдельно от UPDATE).
-                    throw new \RuntimeException(sprintf(
-                        '[MonthClose] Контрольная сумма не сошлась: marketplace_costs=%s, PLDocument=%s, delta=%s. Документ удалён, закрытие отменено.',
-                        $controlSumBefore,
-                        $plDocumentSum,
-                        $delta,
-                    ));
-                }
-
-                $this->logger->info('[MonthClose] Control sum verified', [
-                    'control_sum_costs'    => $controlSumBefore,
-                    'control_sum_document' => $plDocumentSum,
-                    'delta'                => $delta,
-                ]);
-            }
-
-            $plDocumentIds[] = $documentId;
-
-            $this->logger->info('[MonthClose] PLDocument created', [
-                'document_id' => $documentId,
-                'entries'     => count($allPlEntries),
-                'sources'     => array_map(fn($s) => $s->getSourceId(), $sourcesUsed),
+            $this->logger->info('[MonthClose] Control sum verified', [
+                'control_sum_costs'    => $controlSumBefore,
+                'control_sum_document' => $plDocumentSum,
+                'delta'                => $delta,
             ]);
         }
+
+        $plDocumentIds[] = $documentId;
+
+        $this->logger->info('[MonthClose] PLDocument created', [
+            'document_id' => $documentId,
+            'entries'     => count($allPlEntries),
+            'sources'     => array_map(fn($s) => $s->getSourceId(), $sourcesUsed),
+        ]);
 
         // 4. Закрыть этап
         $monthClose->closeStage(
