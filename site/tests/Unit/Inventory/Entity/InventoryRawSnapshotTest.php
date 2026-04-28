@@ -82,7 +82,7 @@ final class InventoryRawSnapshotTest extends TestCase
         $snapshot->markAsFailed('Invalid schema in raw response payload');
 
         self::assertFalse($snapshot->isProcessed());
-        self::assertNull($snapshot->getProcessedAt());
+        self::assertInstanceOf(\DateTimeImmutable::class, $snapshot->getProcessedAt());
         self::assertSame('Invalid schema in raw response payload', $snapshot->getProcessingError());
     }
 
@@ -115,7 +115,7 @@ final class InventoryRawSnapshotTest extends TestCase
 
     public function testNegativeFetchDurationThrows(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         InventoryRawSnapshotBuilder::aRawSnapshot()
             ->withFetchDurationMs(-1)
@@ -124,7 +124,7 @@ final class InventoryRawSnapshotTest extends TestCase
 
     public function testPageNumberZeroThrows(): void
     {
-        $this->expectException(\DomainException::class);
+        $this->expectException(\InvalidArgumentException::class);
 
         InventoryRawSnapshotBuilder::aRawSnapshot()
             ->withPageNumber(0)

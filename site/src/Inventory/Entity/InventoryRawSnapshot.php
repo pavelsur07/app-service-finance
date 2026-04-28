@@ -91,21 +91,10 @@ class InventoryRawSnapshot
         Assert::uuid($snapshotSessionId);
         Assert::uuid($correlationId);
 
-        if ('' === trim($sourceEndpoint)) {
-            throw new \DomainException('sourceEndpoint must not be empty.');
-        }
-
-        if ($responseStatus <= 0) {
-            throw new \DomainException('responseStatus must be greater than 0.');
-        }
-
-        if ($fetchDurationMs < 0) {
-            throw new \DomainException('fetchDurationMs must be greater than or equal to 0.');
-        }
-
-        if ($pageNumber !== null && $pageNumber < 1) {
-            throw new \DomainException('pageNumber must be null or greater than or equal to 1.');
-        }
+        Assert::notEmpty(trim($sourceEndpoint), 'sourceEndpoint must not be empty.');
+        Assert::greaterThan($responseStatus, 0, 'responseStatus must be greater than 0.');
+        Assert::greaterThanEq($fetchDurationMs, 0, 'fetchDurationMs must be greater than or equal to 0.');
+        Assert::nullOrGreaterThanEq($pageNumber, 1, 'pageNumber must be null or greater than or equal to 1.');
 
         $this->id = Uuid::uuid7()->toString();
         $this->companyId = $companyId;
@@ -220,7 +209,7 @@ class InventoryRawSnapshot
         Assert::notEmpty(trim($processingError));
 
         $this->isProcessed = false;
-        $this->processedAt = null;
+        $this->processedAt = new \DateTimeImmutable();
         $this->processingError = $processingError;
     }
 }
