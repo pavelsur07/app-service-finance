@@ -171,6 +171,10 @@ class InventorySnapshotSession
 
     public function markInProgress(): void
     {
+        if ($this->status !== SnapshotSessionStatus::Pending) {
+            throw new \DomainException('Only pending sessions can be moved to in-progress status.');
+        }
+
         $this->status = SnapshotSessionStatus::InProgress;
         $this->touch();
     }

@@ -75,6 +75,17 @@ final class InventorySnapshotSessionTest extends TestCase
         self::assertSame(SnapshotSessionStatus::InProgress, $session->getStatus());
     }
 
+
+    public function testMarkInProgressThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markCompleted();
+
+        $this->expectException(\DomainException::class);
+
+        $session->markInProgress();
+    }
+
     public function testIncrementReceivedPagesIncreasesCounter(): void
     {
         $session = InventorySnapshotSessionBuilder::aSession()->build();
