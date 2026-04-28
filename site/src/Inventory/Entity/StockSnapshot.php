@@ -56,6 +56,18 @@ class StockSnapshot
     #[ORM\Column(type: Types::STRING, length: 50, enumType: MarketplaceType::class)]
     private MarketplaceType $source;
 
+    /**
+     * Указывает на InventoryRawSnapshot, из которого получены ТЕКУЩИЕ значения
+     * quantity и snapshot_at этой записи.
+     *
+     * При UPSERT-апдейте этой записи (повторная загрузка за тот же день) поле
+     * обновляется вместе с quantity, snapshot_at и snapshot_session_id.
+     *
+     * Для трассировки полной истории загрузок данной позиции (всех raw,
+     * которые её затрагивали) — запрашивать InventoryRawSnapshot с фильтром
+     * по company_id + listing_id + product_id + location_id + status,
+     * ORDER BY created_at.
+     */
     #[ORM\Column(type: Types::GUID)]
     private string $rawSnapshotId;
 
@@ -80,6 +92,10 @@ class StockSnapshot
         Assert::uuid($locationId);
         Assert::uuid($rawSnapshotId);
         Assert::numeric($quantity);
+        Assert::true(
+            bccomp($quantity, '0', 3) >= 0,
+            sprintf('Quantity must be non-negative, got: %s', $quantity),
+        );
 
         if ($listingId !== null) {
             Assert::uuid($listingId);
@@ -92,7 +108,11 @@ class StockSnapshot
         $this->id = Uuid::uuid7()->toString();
         $this->companyId = $companyId;
         $this->snapshotSessionId = $snapshotSessionId;
-        $this->snapshotDate = $snapshotDate->setTime(0, 0, 0);
+        $this->snapshotDate = \DateTimeImmutable::createFromFormat(
+            '!Y-m-d',
+            $snapshotDate->format('Y-m-d'),
+            new \DateTimeZone('UTC'),
+        );
         $this->snapshotAt = $snapshotAt;
         $this->listingId = $listingId;
         $this->productId = $productId;
