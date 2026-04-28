@@ -40,10 +40,10 @@ class InventorySnapshotSession
     #[ORM\Column(type: Types::STRING, length: 50, enumType: SnapshotSessionStatus::class, options: ['default' => SnapshotSessionStatus::Pending->value])]
     private SnapshotSessionStatus $status = SnapshotSessionStatus::Pending;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $startedAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
     private ?\DateTimeImmutable $completedAt = null;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
@@ -58,10 +58,10 @@ class InventorySnapshotSession
     #[ORM\Column(type: Types::GUID)]
     private string $correlationId;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $updatedAt;
 
     public function __construct(

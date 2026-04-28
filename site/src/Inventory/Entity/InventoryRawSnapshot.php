@@ -50,7 +50,7 @@ class InventoryRawSnapshot
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
     private ?int $pageNumber;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $fetchedAt;
 
     #[ORM\Column(type: Types::INTEGER)]
@@ -59,7 +59,7 @@ class InventoryRawSnapshot
     #[ORM\Column(type: Types::BOOLEAN, options: ['default' => false])]
     private bool $isProcessed = false;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6, nullable: true)]
     private ?\DateTimeImmutable $processedAt = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -68,7 +68,7 @@ class InventoryRawSnapshot
     #[ORM\Column(type: Types::GUID)]
     private string $correlationId;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
     /**

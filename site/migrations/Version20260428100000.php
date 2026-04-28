@@ -20,8 +20,8 @@ final class Version20260428100000 extends AbstractMigration
             CREATE TABLE inventory_locations (
                 id UUID NOT NULL,
                 company_id UUID NOT NULL,
-                type VARCHAR NOT NULL,
-                external_system VARCHAR NOT NULL,
+                type VARCHAR(50) NOT NULL,
+                external_system VARCHAR(50) NOT NULL,
                 external_id VARCHAR(255) DEFAULT NULL,
                 code VARCHAR(100) NOT NULL,
                 name VARCHAR(255) NOT NULL,

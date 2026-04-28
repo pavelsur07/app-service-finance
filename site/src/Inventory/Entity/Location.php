@@ -47,10 +47,10 @@ class Location
     #[ORM\Column(type: Types::JSON, nullable: true, options: ['jsonb' => true])]
     private ?array $metadata = null;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $createdAt;
 
-    #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, precision: 6)]
     private \DateTimeImmutable $updatedAt;
 
     public function __construct(

@@ -26,9 +26,9 @@ final class Version20260428102000 extends AbstractMigration
                 listing_id UUID DEFAULT NULL,
                 product_id UUID DEFAULT NULL,
                 location_id UUID NOT NULL,
-                status VARCHAR NOT NULL,
+                status VARCHAR(50) NOT NULL,
                 quantity NUMERIC(14, 3) NOT NULL,
-                source VARCHAR NOT NULL,
+                source VARCHAR(50) NOT NULL,
                 raw_snapshot_id UUID NOT NULL,
                 created_at TIMESTAMP(6) WITHOUT TIME ZONE NOT NULL,
                 PRIMARY KEY(id)
