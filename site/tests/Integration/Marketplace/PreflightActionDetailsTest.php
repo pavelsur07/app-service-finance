@@ -190,6 +190,79 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         self::assertTrue($orphanItems[0]['orphan']);
     }
 
+    public function testSalesAlreadyProcessedBlocksCloseAndCanCloseIsFalse(): void
+    {
+        $listing = $this->createListing('SKU-PROCESSED-SALE');
+        $sale    = $this->createSale($listing, costPrice: '100.00', date: '2026-03-10');
+        $this->em->flush();
+
+        $this->markRowAsProcessed('marketplace_sales', $sale->getId());
+
+        $result = ($this->action)($this->makeSalesCommand());
+        $check  = $this->findCheck($result->checks, 'sales_already_processed');
+
+        self::assertNotNull($check, 'Проверка sales_already_processed должна присутствовать');
+        self::assertFalse($check->passed);
+        self::assertTrue($check->blocking);
+        self::assertSame(1, (int) $check->value);
+        self::assertFalse($result->canClose(), 'canClose() должен быть false при blocking error');
+    }
+
+    public function testReturnsAlreadyProcessedBlocksCloseAndCanCloseIsFalse(): void
+    {
+        $listing = $this->createListing('SKU-PROCESSED-RETURN');
+        $return  = $this->createReturn($listing, costPrice: '120.00', date: '2026-03-10');
+        $this->em->flush();
+
+        $this->markRowAsProcessed('marketplace_returns', $return->getId());
+
+        $result = ($this->action)($this->makeSalesCommand());
+        $check  = $this->findCheck($result->checks, 'returns_already_processed');
+
+        self::assertNotNull($check, 'Проверка returns_already_processed должна присутствовать');
+        self::assertFalse($check->passed);
+        self::assertTrue($check->blocking);
+        self::assertSame(1, (int) $check->value);
+        self::assertFalse($result->canClose(), 'canClose() должен быть false при blocking error');
+    }
+
+    public function testAlreadyProcessedChecksAreOkWhenThereAreNoProcessedRows(): void
+    {
+        $listing = $this->createListing('SKU-NO-PROCESSED');
+        $this->createSale($listing, costPrice: '100.00', date: '2026-03-10');
+        $this->createReturn($listing, costPrice: '100.00', date: '2026-03-12');
+        $this->em->flush();
+
+        $result = ($this->action)($this->makeSalesCommand());
+
+        $salesCheck = $this->findCheck($result->checks, 'sales_already_processed');
+        self::assertNotNull($salesCheck);
+        self::assertTrue($salesCheck->passed);
+        self::assertFalse($salesCheck->blocking);
+
+        $returnsCheck = $this->findCheck($result->checks, 'returns_already_processed');
+        self::assertNotNull($returnsCheck);
+        self::assertTrue($returnsCheck->passed);
+        self::assertFalse($returnsCheck->blocking);
+    }
+
+    public function testWarningsDoNotBlockCanClose(): void
+    {
+        $result = ($this->action)($this->makeSalesCommand());
+
+        $salesCountCheck = $this->findCheck($result->checks, 'sales_count');
+        self::assertNotNull($salesCountCheck, 'Проверка sales_count должна присутствовать');
+        self::assertFalse($salesCountCheck->passed);
+        self::assertFalse($salesCountCheck->blocking);
+
+        $ozonCheck = $this->findCheck($result->checks, 'ozon_realization');
+        self::assertNotNull($ozonCheck, 'Проверка ozon_realization должна присутствовать');
+        self::assertFalse($ozonCheck->passed);
+        self::assertFalse($ozonCheck->blocking);
+
+        self::assertTrue($result->canClose(), 'warnings не должны блокировать canClose()');
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -315,5 +388,13 @@ final class PreflightActionDetailsTest extends IntegrationTestCase
         }
 
         return null;
+    }
+
+    private function markRowAsProcessed(string $table, string $id): void
+    {
+        $this->em->getConnection()->executeStatement(
+            sprintf('UPDATE %s SET document_id = :documentId WHERE id = :id', $table),
+            ['documentId' => Uuid::uuid4()->toString(), 'id' => $id],
+        );
     }
 }

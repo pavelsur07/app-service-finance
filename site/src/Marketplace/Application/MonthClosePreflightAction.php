@@ -113,6 +113,7 @@ final class MonthClosePreflightAction
         $salesStats       = $this->salesReturnsQuery->getSalesStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
         $salesTotal       = (int) $salesStats['total'];
         $salesWithoutCost = (int) $salesStats['without_cost'];
+        $salesAlreadyProcessed = (int) $salesStats['already_processed'];
 
         if ($salesTotal === 0) {
             $checks[] = PreflightCheck::warning('sales_count', 'Продажи за период', 'Нет продаж за выбранный период', $salesTotal);
@@ -129,9 +130,24 @@ final class MonthClosePreflightAction
             $checks[] = PreflightCheck::ok('sales_without_cost', 'Себестоимость продаж', sprintf('Все продажи имеют себестоимость (%d шт.)', $salesTotal), $salesTotal);
         }
 
+        if ($salesAlreadyProcessed > 0) {
+            $checks[] = PreflightCheck::error(
+                'sales_already_processed',
+                'Уже обработанные продажи',
+                sprintf(
+                    'Найдено %d продаж с document_id IS NOT NULL. Этап был переоткрыт некорректно или данные уже закрывались.',
+                    $salesAlreadyProcessed,
+                ),
+                $salesAlreadyProcessed,
+            );
+        } else {
+            $checks[] = PreflightCheck::ok('sales_already_processed', 'Уже обработанные продажи', 'Продажи готовы к обработке');
+        }
+
         $returnsStats       = $this->salesReturnsQuery->getReturnsStats($command->companyId, $command->marketplace, $periodFrom, $periodTo);
         $returnsTotal       = (int) $returnsStats['total'];
         $returnsWithoutCost = (int) $returnsStats['without_cost'];
+        $returnsAlreadyProcessed = (int) $returnsStats['already_processed'];
 
         if ($returnsTotal === 0) {
             $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', 'Нет возвратов за период', 0);
@@ -146,6 +162,20 @@ final class MonthClosePreflightAction
             );
         } else {
             $checks[] = PreflightCheck::ok('returns_without_cost', 'Себестоимость возвратов', sprintf('Все возвраты имеют себестоимость (%d шт.)', $returnsTotal), $returnsTotal);
+        }
+
+        if ($returnsAlreadyProcessed > 0) {
+            $checks[] = PreflightCheck::error(
+                'returns_already_processed',
+                'Уже обработанные возвраты',
+                sprintf(
+                    'Найдено %d возвратов с document_id IS NOT NULL. Этап был переоткрыт некорректно или данные уже закрывались.',
+                    $returnsAlreadyProcessed,
+                ),
+                $returnsAlreadyProcessed,
+            );
+        } else {
+            $checks[] = PreflightCheck::ok('returns_already_processed', 'Уже обработанные возвраты', 'Возвраты готовы к обработке');
         }
 
         if ($command->marketplace === MarketplaceType::OZON->value) {
