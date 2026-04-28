@@ -38,6 +38,13 @@ UNIQUE constraint в БД:
 (company_id, snapshot_date, listing_id, product_id, location_id, status)
 NULLS NOT DISTINCT
 ```
+Важно: `NULLS NOT DISTINCT` не поддерживается атрибутом
+`#[ORM\UniqueConstraint]` нативно — индекс создаётся вручную raw SQL в
+миграции (`migrations/Version20260428102000.php`). При schema diff/sync
+Doctrine может рапортовать расхождение с маппингом — это ожидаемо,
+синхронизировать схему по миграции, а не по `doctrine:schema:update`.
+Требует PostgreSQL ≥ 15.
+
 При обновлении меняются: `quantity`, `snapshot_at`, `snapshot_session_id`.
 Поле `snapshot_session_id` всегда указывает на последнюю сессию, обновившую
 запись. История загрузок прослеживается через `InventorySnapshotSession` и
