@@ -47,6 +47,14 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
 
     private Company $company;
 
+    public static function emptyEntriesModesProvider(): array
+    {
+        return [
+            'final-close' => [false],
+            'preliminary-close' => [true],
+        ];
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -225,6 +233,58 @@ final class CloseMonthStageActionPreliminaryTest extends IntegrationTestCase
                 'Default-флоу должен закрывать без префикса.',
             );
         }
+    }
+
+    /**
+     * Регрессия: даже если preflight не блокирует (warning-only),
+     * этап не должен закрываться при пустом наборе PL-entries.
+     *
+     * @dataProvider emptyEntriesModesProvider
+     */
+    public function testCloseCostsThrowsWhenEntriesAreEmptyEvenIfPreflightAllowsClose(bool $preliminary): void
+    {
+        /** @var CloseMonthStageAction $action */
+        $action = self::getContainer()->get(CloseMonthStageAction::class);
+
+        $command = new CloseMonthStageCommand(
+            companyId:   self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year:        self::YEAR,
+            month:       self::MONTH,
+            stage:       CloseStage::COSTS->value,
+            actorUserId: self::OWNER_ID,
+            preliminary: $preliminary,
+        );
+
+        $caught = null;
+        try {
+            ($action)($command);
+        } catch (\DomainException $e) {
+            $caught = $e;
+        }
+
+        self::assertNotNull($caught, 'CloseMonthStageAction должен бросать DomainException при пустых entries.');
+        self::assertStringContainsString('нет строк для создания документа ОПиУ', $caught->getMessage());
+
+        $conn = $this->em->getConnection();
+
+        $documentRows = (int) $conn->fetchOne(
+            'SELECT COUNT(*) FROM documents WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(0, $documentRows, 'PLDocument не должен создаваться при пустом наборе entries.');
+
+        $processedCosts = (int) $conn->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :c AND document_id IS NOT NULL',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(0, $processedCosts, 'markProcessed не должен выставлять document_id при пустом наборе entries.');
+
+        $monthCloseRows = (int) $conn->fetchOne(
+            'SELECT COUNT(*) FROM marketplace_month_closes WHERE company_id = :c',
+            ['c' => self::COMPANY_ID],
+        );
+        self::assertSame(0, $monthCloseRows, 'Этап не должен переходить в CLOSED при пустом наборе entries.');
     }
 
     /**
