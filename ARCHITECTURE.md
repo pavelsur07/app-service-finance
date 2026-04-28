@@ -25,7 +25,6 @@
 | `Analytics` | Аналитические запросы и дашборды | — |
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
 | `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
-| `Inventory` | Snapshot-based хранение остатков WB/Ozon | в разработке |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -194,18 +193,6 @@ pipeline'а (timeout, рестарт worker'а, exception) видимым для
 - `save(AdScheduledBatch $batch): void` — persist без flush (консистентно с `AdLoadJobRepository::save()`), вызывающий сам flush'ит в конце транзакции
 
 Dead code на Task-11.2: Repository ещё никем не вызывается, будет использован в Task-11.3+ (planner / poster / poller / finalizer).
-
----
-
-## Inventory — Enum контракт (task 1)
-
-Namespace: `App\Inventory\Enum`
-
-- `ExternalSystemType`: `wildberries`, `ozon`
-- `LocationType`: `mp_warehouse`, `mp_acceptance`, `mp_in_transit_to_customer`, `mp_in_transit_from_customer`
-- `StockStatus`: `available`, `in_transit_to_customer`, `in_transit_from_customer`, `on_acceptance`, `defect`, `blocked`
-- `SnapshotSessionStatus`: `pending`, `in_progress`, `completed`, `partial`, `failed`
-- `SnapshotTriggerType`: `scheduled_night`, `scheduled_day`, `manual`, `retry`
 
 ---
 

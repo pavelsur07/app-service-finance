@@ -23,32 +23,55 @@ final class InventoryEnumsTest extends TestCase
 
     public function testLocationTypeHasExpectedValuesCount(): void
     {
-        $this->assertCount(
-            4,
+        $this->assertSame(
+            [
+                'mp_warehouse',
+                'mp_acceptance',
+                'mp_in_transit_to_customer',
+                'mp_in_transit_from_customer',
+            ],
             array_map(static fn (LocationType $case): string => $case->value, LocationType::cases()),
         );
     }
 
     public function testStockStatusHasExpectedValuesCount(): void
     {
-        $this->assertCount(
-            6,
+        $this->assertSame(
+            [
+                'available',
+                'in_transit_to_customer',
+                'in_transit_from_customer',
+                'on_acceptance',
+                'defect',
+                'blocked',
+            ],
             array_map(static fn (StockStatus $case): string => $case->value, StockStatus::cases()),
         );
     }
 
     public function testSnapshotSessionStatusHasExpectedValuesCount(): void
     {
-        $this->assertCount(
-            5,
+        $this->assertSame(
+            [
+                'pending',
+                'in_progress',
+                'completed',
+                'partial',
+                'failed',
+            ],
             array_map(static fn (SnapshotSessionStatus $case): string => $case->value, SnapshotSessionStatus::cases()),
         );
     }
 
     public function testSnapshotTriggerTypeHasExpectedValuesCount(): void
     {
-        $this->assertCount(
-            4,
+        $this->assertSame(
+            [
+                'scheduled_night',
+                'scheduled_day',
+                'manual',
+                'retry',
+            ],
             array_map(static fn (SnapshotTriggerType $case): string => $case->value, SnapshotTriggerType::cases()),
         );
     }
