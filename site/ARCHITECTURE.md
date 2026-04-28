@@ -20,3 +20,32 @@
 
 ### CompanyId pattern
 Все Entity Inventory используют `string $companyId`.
+
+## Inventory — design decisions
+
+### Enum для источника данных
+Inventory использует `App\Marketplace\Enum\MarketplaceType` для идентификации
+источника snapshot'а (поле `source` в `InventorySnapshotSession`,
+`InventoryRawSnapshot`, `StockSnapshot` и поле `externalSystem` в `Location`).
+Локальный `ExternalSystemType` удалён (YAGNI). Когда появятся МойСклад/1С/другие
+не-маркетплейс источники — будет принято отдельное архитектурное решение.
+
+### UPSERT стратегия для StockSnapshot
+При повторной загрузке snapshot'а за ту же дату (например, ночной 04:00 +
+дневной 14:00) — записи обновляются через `INSERT ... ON CONFLICT DO UPDATE`.
+UNIQUE constraint в БД:
+```
+(company_id, snapshot_date, listing_id, product_id, location_id, status)
+NULLS NOT DISTINCT
+```
+При обновлении меняются: `quantity`, `snapshot_at`, `snapshot_session_id`.
+Поле `snapshot_session_id` всегда указывает на последнюю сессию, обновившую
+запись. История загрузок прослеживается через `InventorySnapshotSession` и
+`InventoryRawSnapshot`.
+
+### Идемпотентность cron-загрузки snapshot'ов
+Будущая Command для cron snapshot'ов будет использовать advisory lock через
+`LockFactory` (паттерн взят из `src/Finance/Command/RecalcPlRegisterCommand.php`).
+Ключ блокировки: `inventory_snapshot_{companyId}_{source}`. Это исключит
+параллельные запуски для одной компании и одного источника. Реализация —
+в задаче Фазы 2.
