@@ -13,10 +13,11 @@ use Webmozart\Assert\Assert;
 
 #[ORM\Entity(repositoryClass: InventoryRawSnapshotRepository::class)]
 #[ORM\Table(name: 'inventory_raw_snapshots')]
-#[ORM\Index(columns: ['company_id', 'snapshot_session_id'], name: 'idx_inv_raw_snapshots_company_session')]
-#[ORM\Index(columns: ['source', 'fetched_at'], name: 'idx_inv_raw_snapshots_source_fetched_at')]
-#[ORM\Index(columns: ['is_processed'], name: 'idx_inv_raw_snapshots_is_processed')]
-#[ORM\Index(columns: ['correlation_id'], name: 'idx_inv_raw_snapshots_correlation_id')]
+#[ORM\Index(columns: ['company_id', 'source', 'fetched_at'], name: 'idx_inventory_raw_company_source_fetched')]
+#[ORM\Index(columns: ['company_id', 'snapshot_session_id'], name: 'idx_inventory_raw_company_session')]
+#[ORM\Index(columns: ['snapshot_session_id', 'page_number'], name: 'idx_inventory_raw_session_page')]
+#[ORM\Index(columns: ['is_processed'], name: 'idx_inventory_raw_unprocessed', options: ['where' => 'is_processed = false'])]
+#[ORM\Index(columns: ['correlation_id'], name: 'idx_inventory_raw_correlation')]
 class InventoryRawSnapshot
 {
     #[ORM\Id]
@@ -36,14 +37,14 @@ class InventoryRawSnapshot
     private string $sourceEndpoint;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON)]
+    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
     private array $requestParams;
 
     #[ORM\Column(type: Types::INTEGER)]
     private int $responseStatus;
 
     /** @var array<string, mixed> */
-    #[ORM\Column(type: Types::JSON)]
+    #[ORM\Column(type: Types::JSON, options: ['jsonb' => true])]
     private array $responseBody;
 
     #[ORM\Column(type: Types::INTEGER, nullable: true)]
