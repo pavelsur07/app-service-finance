@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Query;
 
+use App\Marketplace\Enum\AmountSource;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
@@ -34,6 +36,17 @@ final class MarkProcessedQuery
         string $periodTo,
         bool $preliminary = false,
     ): int {
+        $marketplaceEnum = MarketplaceType::from($marketplace);
+        $saleGrossExpr = AmountSource::SALE_GROSS->getSqlExpression($marketplaceEnum);
+        $amountCase = <<<SQL
+            CASE m.amount_source
+                WHEN 'sale_gross'      THEN $saleGrossExpr
+                WHEN 'sale_revenue'    THEN s.total_revenue
+                WHEN 'sale_cost_price' THEN COALESCE(s.cost_price, 0) * s.quantity
+                ELSE 0
+            END
+        SQL;
+
         $preliminaryFilter = $preliminary
             ? 'AND s.cost_price IS NOT NULL AND s.cost_price > 0'
             : '';
@@ -58,18 +71,7 @@ final class MarkProcessedQuery
                         AND m.marketplace = s.marketplace
                         AND m.operation_type = \'sale\'
                         AND m.is_active = true
-                        AND CASE m.amount_source
-                            WHEN \'sale_gross\' THEN (
-                                CASE
-                                    WHEN s.marketplace = \'ozon\' THEN COALESCE(s.price_per_unit, 0) * s.quantity
-                                    WHEN s.marketplace = \'wildberries\' THEN COALESCE(s.total_revenue, 0)
-                                    ELSE COALESCE(s.price_per_unit, 0) * s.quantity
-                                END
-                            )
-                            WHEN \'sale_revenue\' THEN COALESCE(s.total_revenue, 0)
-                            WHEN \'sale_cost_price\' THEN COALESCE(s.cost_price, 0) * s.quantity
-                            ELSE 0
-                        END != 0
+                        AND ' . $amountCase . ' != 0
                   )
              )',
             [
