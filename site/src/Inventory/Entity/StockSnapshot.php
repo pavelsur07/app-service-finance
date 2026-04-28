@@ -76,6 +76,7 @@ class StockSnapshot
         Assert::uuid($snapshotSessionId);
         Assert::uuid($locationId);
         Assert::uuid($rawSnapshotId);
+        Assert::numeric($quantity);
 
         if ($listingId !== null) {
             Assert::uuid($listingId);
@@ -88,7 +89,7 @@ class StockSnapshot
         $this->id = Uuid::uuid7()->toString();
         $this->companyId = $companyId;
         $this->snapshotSessionId = $snapshotSessionId;
-        $this->snapshotDate = $snapshotDate;
+        $this->snapshotDate = $snapshotDate->setTime(0, 0, 0);
         $this->snapshotAt = $snapshotAt;
         $this->listingId = $listingId;
         $this->productId = $productId;

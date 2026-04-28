@@ -23,7 +23,7 @@ final class StockSnapshotTest extends TestCase
 
     public function testConstructorStoresAllFields(): void
     {
-        $snapshotDate = new \DateTimeImmutable('2026-04-22');
+        $snapshotDate = new \DateTimeImmutable('2026-04-22T21:45:33+00:00');
         $snapshotAt = new \DateTimeImmutable('2026-04-22T12:15:00+00:00');
 
         $snapshot = StockSnapshotBuilder::aStockSnapshot()
@@ -42,7 +42,7 @@ final class StockSnapshotTest extends TestCase
 
         self::assertSame(StockSnapshotBuilder::DEFAULT_COMPANY_ID, $snapshot->getCompanyId());
         self::assertSame(StockSnapshotBuilder::DEFAULT_SNAPSHOT_SESSION_ID, $snapshot->getSnapshotSessionId());
-        self::assertSame($snapshotDate, $snapshot->getSnapshotDate());
+        self::assertSame('2026-04-22 00:00:00', $snapshot->getSnapshotDate()->format('Y-m-d H:i:s'));
         self::assertSame($snapshotAt, $snapshot->getSnapshotAt());
         self::assertSame(StockSnapshotBuilder::DEFAULT_LISTING_ID, $snapshot->getListingId());
         self::assertSame(StockSnapshotBuilder::DEFAULT_PRODUCT_ID, $snapshot->getProductId());
@@ -142,6 +142,15 @@ final class StockSnapshotTest extends TestCase
 
         StockSnapshotBuilder::aStockSnapshot()
             ->withRawSnapshotId('not-a-uuid')
+            ->build();
+    }
+
+    public function testInvalidQuantityThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        StockSnapshotBuilder::aStockSnapshot()
+            ->withQuantity('not-a-number')
             ->build();
     }
 }
