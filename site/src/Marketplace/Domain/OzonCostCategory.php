@@ -549,6 +549,17 @@ final readonly class OzonCostCategory
                 serviceNames: ['FinesProhibitedProducts'],
             ),
             new self(
+                code: 'ozon_fines_shipment_delay',
+                name: 'Штраф за просроченную отгрузку Ozon',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['DefectFineShipmentDelay'],
+                operationTypes: [
+                    'DefectFineShipmentDelay',
+                    'Превышение индекса ошибок: просроченная отгрузка',
+                ],
+            ),
+            new self(
                 code: 'ozon_other_service',
                 name: 'Прочие услуги Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
