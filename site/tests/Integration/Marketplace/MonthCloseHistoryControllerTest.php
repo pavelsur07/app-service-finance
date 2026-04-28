@@ -10,6 +10,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\WebTestCaseBase;
+use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -38,9 +39,11 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
             costsPreliminary: true,
         );
 
+        $historyYear = $currentYear - 1;
+
         $this->persistMonthClose(
             id: '33333333-3333-3333-3333-c00000000002',
-            year: 2026,
+            year: $historyYear,
             month: 2,
             salesClosed: true,
             costsClosed: true,
@@ -50,10 +53,20 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
 
         $this->persistMonthClose(
             id: '33333333-3333-3333-3333-c00000000003',
-            year: 2026,
+            year: $historyYear,
             month: 3,
             salesClosed: true,
             costsClosed: true,
+            salesPreliminary: true,
+            costsPreliminary: false,
+        );
+
+        $this->persistMonthClose(
+            id: '33333333-3333-3333-3333-c00000000004',
+            year: $historyYear,
+            month: 4,
+            salesClosed: true,
+            costsClosed: false,
             salesPreliminary: true,
             costsPreliminary: false,
         );
@@ -66,16 +79,35 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
 
         self::assertResponseStatusCodeSame(Response::HTTP_OK);
 
-        $html = (string) $client->getResponse()->getContent();
+        $crawler = new Crawler((string) $client->getResponse()->getContent());
 
-        self::assertStringContainsString(
-            sprintf('year=%d&amp;month=%d', $currentYear, $currentMonth),
-            $html,
-            'Текущий fully preliminary период должен оставаться в истории.',
+        $this->assertHistoryRowContains(
+            crawler: $crawler,
+            year: $currentYear,
+            month: $currentMonth,
+            fragments: ['Оперативное закрытие'],
         );
-        self::assertStringContainsString('year=2026&amp;month=2', $html);
-        self::assertStringContainsString('year=2026&amp;month=3', $html);
-        self::assertStringContainsString('Оперативное закрытие', $html);
+
+        $this->assertHistoryRowContains(
+            crawler: $crawler,
+            year: $historyYear,
+            month: 2,
+            fragments: ['Закрыт'],
+        );
+
+        $this->assertHistoryRowContains(
+            crawler: $crawler,
+            year: $historyYear,
+            month: 3,
+            fragments: ['Оперативное закрытие', 'Закрыт'],
+        );
+
+        $this->assertHistoryRowContains(
+            crawler: $crawler,
+            year: $historyYear,
+            month: 4,
+            fragments: ['Оперативное закрытие', 'Не закрыт'],
+        );
     }
 
     private function seedActiveSession(KernelBrowser $client): void
@@ -136,5 +168,32 @@ final class MonthCloseHistoryControllerTest extends WebTestCaseBase
 
         $this->em()->persist($monthClose);
         $this->em()->flush();
+    }
+
+    /**
+     * @param list<string> $fragments
+     */
+    private function assertHistoryRowContains(Crawler $crawler, int $year, int $month, array $fragments): void
+    {
+        $rows = $crawler->filter('table tbody tr')->reduce(
+            static function (Crawler $row) use ($year, $month): bool {
+                $link = $row->filter('a[href*="marketplace/month-close"]');
+                if ($link->count() === 0) {
+                    return false;
+                }
+
+                $href = (string) $link->attr('href');
+
+                return str_contains($href, sprintf('year=%d', $year))
+                    && str_contains($href, sprintf('month=%d', $month));
+            },
+        );
+
+        self::assertSame(1, $rows->count(), sprintf('Период %d-%02d должен присутствовать в истории.', $year, $month));
+
+        $rowText = $rows->text();
+        foreach ($fragments as $fragment) {
+            self::assertStringContainsString($fragment, $rowText);
+        }
     }
 }
