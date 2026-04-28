@@ -191,4 +191,60 @@ final class InventorySnapshotSessionTest extends TestCase
 
         $session->setExpectedPages(-5);
     }
+
+    public function testMarkCompletedThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markInProgress();
+        $session->markFailed('initial error');
+
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessageMatches('/terminal status failed/i');
+
+        $session->markCompleted();
+    }
+
+    public function testMarkPartialThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markInProgress();
+        $session->markCompleted();
+
+        $this->expectException(\LogicException::class);
+
+        $session->markPartial();
+    }
+
+    public function testMarkFailedThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markInProgress();
+        $session->markCompleted();
+
+        $this->expectException(\LogicException::class);
+
+        $session->markFailed('too late');
+    }
+
+    public function testSetReceivedPagesThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markInProgress();
+        $session->markCompleted();
+
+        $this->expectException(\LogicException::class);
+
+        $session->setReceivedPages(99);
+    }
+
+    public function testSetExpectedPagesThrowsForTerminalStatus(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()->build();
+        $session->markInProgress();
+        $session->markFailed('error');
+
+        $this->expectException(\LogicException::class);
+
+        $session->setExpectedPages(50);
+    }
 }

@@ -153,4 +153,62 @@ final class StockSnapshotTest extends TestCase
             ->withQuantity('not-a-number')
             ->build();
     }
+
+    public function testSnapshotDateNormalizedToUtcMidnight(): void
+    {
+        $moscowMidnight = new \DateTimeImmutable(
+            '2026-04-22 00:00:00',
+            new \DateTimeZone('Europe/Moscow'),
+        );
+
+        $snapshot = StockSnapshotBuilder::aStockSnapshot()
+            ->withSnapshotDate($moscowMidnight)
+            ->build();
+
+        self::assertSame('UTC', $snapshot->getSnapshotDate()->getTimezone()->getName());
+        self::assertSame('2026-04-22 00:00:00', $snapshot->getSnapshotDate()->format('Y-m-d H:i:s'));
+    }
+
+    public function testSnapshotDateFromMoscowAfternoonStaysOnSameDate(): void
+    {
+        $moscowAfternoon = new \DateTimeImmutable(
+            '2026-04-22 15:00:00',
+            new \DateTimeZone('Europe/Moscow'),
+        );
+
+        $snapshot = StockSnapshotBuilder::aStockSnapshot()
+            ->withSnapshotDate($moscowAfternoon)
+            ->build();
+
+        self::assertSame('2026-04-22', $snapshot->getSnapshotDate()->format('Y-m-d'));
+        self::assertSame('UTC', $snapshot->getSnapshotDate()->getTimezone()->getName());
+    }
+
+    public function testQuantityCannotBeNegative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/non-negative/i');
+
+        StockSnapshotBuilder::aStockSnapshot()
+            ->withQuantity('-5.000')
+            ->build();
+    }
+
+    public function testQuantityCanBeZero(): void
+    {
+        $snapshot = StockSnapshotBuilder::aStockSnapshot()
+            ->withQuantity('0.000')
+            ->build();
+
+        self::assertSame('0.000', $snapshot->getQuantity());
+    }
+
+    public function testQuantityCanBePositive(): void
+    {
+        $snapshot = StockSnapshotBuilder::aStockSnapshot()
+            ->withQuantity('100.500')
+            ->build();
+
+        self::assertSame('100.500', $snapshot->getQuantity());
+    }
 }

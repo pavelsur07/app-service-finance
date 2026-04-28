@@ -183,6 +183,8 @@ class InventorySnapshotSession
 
     public function markCompleted(): void
     {
+        $this->assertNotTerminal(SnapshotSessionStatus::Completed);
+
         $this->status = SnapshotSessionStatus::Completed;
         $this->completedAt = new \DateTimeImmutable();
         $this->touch();
@@ -190,6 +192,8 @@ class InventorySnapshotSession
 
     public function markPartial(?string $errorMessage = null): void
     {
+        $this->assertNotTerminal(SnapshotSessionStatus::Partial);
+
         $this->status = SnapshotSessionStatus::Partial;
         $this->errorMessage = $errorMessage;
         $this->completedAt = new \DateTimeImmutable();
@@ -199,6 +203,7 @@ class InventorySnapshotSession
     public function markFailed(string $errorMessage): void
     {
         Assert::notEmpty(trim($errorMessage));
+        $this->assertNotTerminal(SnapshotSessionStatus::Failed);
 
         $this->status = SnapshotSessionStatus::Failed;
         $this->errorMessage = $errorMessage;
@@ -212,6 +217,8 @@ class InventorySnapshotSession
             throw new \DomainException('expectedPages must be greater than or equal to 0.');
         }
 
+        $this->assertNotTerminalForMutation('expected pages');
+
         $this->expectedPages = $expectedPages;
         $this->touch();
     }
@@ -221,6 +228,8 @@ class InventorySnapshotSession
         if ($by < 0) {
             throw new \DomainException('increment value must be greater than or equal to 0.');
         }
+
+        $this->assertNotTerminalForMutation('received pages');
 
         $this->receivedPages += $by;
         $this->touch();
@@ -232,8 +241,43 @@ class InventorySnapshotSession
             throw new \DomainException('receivedPages must be greater than or equal to 0.');
         }
 
+        $this->assertNotTerminalForMutation('received pages');
+
         $this->receivedPages = $receivedPages;
         $this->touch();
+    }
+
+    private function isTerminal(): bool
+    {
+        return in_array($this->status, [
+            SnapshotSessionStatus::Completed,
+            SnapshotSessionStatus::Partial,
+            SnapshotSessionStatus::Failed,
+        ], true);
+    }
+
+    private function assertNotTerminal(SnapshotSessionStatus $target): void
+    {
+        if ($this->isTerminal()) {
+            throw new \LogicException(sprintf(
+                'Cannot transition session %s from terminal status %s to %s',
+                $this->id,
+                $this->status->value,
+                $target->value,
+            ));
+        }
+    }
+
+    private function assertNotTerminalForMutation(string $field): void
+    {
+        if ($this->isTerminal()) {
+            throw new \LogicException(sprintf(
+                'Cannot modify %s on terminal session %s (status: %s)',
+                $field,
+                $this->id,
+                $this->status->value,
+            ));
+        }
     }
 
     private function touch(): void
