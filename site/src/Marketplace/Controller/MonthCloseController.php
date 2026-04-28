@@ -56,28 +56,12 @@ final class MonthCloseController extends AbstractController
             $month,
         );
 
-        // История закрытий по маркетплейсу.
-        // Если оба этапа закрыты как «оперативное закрытие» — пока это
-        // не финальное закрытие месяца, и в истории такие записи не показываем.
-        $allHistory = $this->monthCloseRepository->findByCompanyAndMarketplace(
+        // История закрытий по маркетплейсу должна содержать все периоды,
+        // включая полностью оперативно закрытые (оба этапа preliminary).
+        $history = $this->monthCloseRepository->findByCompanyAndMarketplace(
             $companyId,
             $marketplaceType,
         );
-
-        $history = array_values(array_filter(
-            $allHistory,
-            static function ($mc): bool {
-                $bothClosed = $mc->getStageSalesReturnsStatus()->isClosed()
-                    && $mc->getStageCostsStatus()->isClosed();
-                // Скрываем только если ОБА этапа закрыты предварительно —
-                // частично-финальное закрытие (один этап final, другой prelim)
-                // должно остаться видимым в истории.
-                $bothPreliminary = $mc->isStageLastCloseWasPreliminary(CloseStage::SALES_RETURNS)
-                    && $mc->isStageLastCloseWasPreliminary(CloseStage::COSTS);
-
-                return !($bothClosed && $bothPreliminary);
-            },
-        ));
 
         $isCurrentMonth = $year === (int) date('Y') && $month === (int) date('n');
 
