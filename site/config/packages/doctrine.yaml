@@ -90,6 +90,12 @@ doctrine:
                 dir: '%kernel.project_dir%/src/Catalog/Entity'
                 prefix: 'App\Catalog\Entity'
                 alias: Catalog
+            Inventory:
+                type: attribute
+                is_bundle: false
+                dir: '%kernel.project_dir%/src/Inventory/Entity'
+                prefix: 'App\Inventory\Entity'
+                alias: Inventory
             Marketplace:
                 type: attribute
                 is_bundle: false
