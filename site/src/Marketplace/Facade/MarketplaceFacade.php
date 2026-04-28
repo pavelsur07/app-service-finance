@@ -20,14 +20,17 @@ use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
 use Doctrine\DBAL\Connection;
+use Webmozart\Assert\Assert;
 
 final readonly class MarketplaceFacade
 {
     public function __construct(
         private MarketplaceAdvertisingCostRepositoryInterface $advertisingCostRepository,
         private MarketplaceOrderRepositoryInterface $orderRepository,
+        private MarketplaceListingRepository $listingRepository,
         private Connection $connection,
         private CostPriceResolverInterface $costPriceResolver,
         private CostCategoriesQuery $costCategoriesQuery,
@@ -423,5 +426,33 @@ final readonly class MarketplaceFacade
         array $listingIds,
     ): array {
         return $this->listingMetaQuery->findByIds($companyId, $listingIds);
+    }
+
+    /**
+     * Пакетно резолвит listingId в productId для заданной компании.
+     *
+     * Возвращает ассоциативный массив [listingId => productId|null]:
+     * - listingId присутствует в результате только если найден и принадлежит указанной компании (IDOR-защита)
+     * - productId = null если листинг существует, но не привязан к продукту (orphan)
+     * - listingId, который не существует или принадлежит другой компании — отсутствует в результирующем массиве
+     *
+     * Используется при парсинге raw snapshot'ов остатков в нормализованные StockSnapshot записи.
+     *
+     * @param  string         $companyId  UUID компании
+     * @param  array<string>  $listingIds массив UUID листингов (max 5000)
+     * @return array<string, string|null> map listingId → productId|null
+     */
+    public function resolveListingsToProducts(string $companyId, array $listingIds): array
+    {
+        Assert::uuid($companyId);
+        Assert::maxCount($listingIds, 5000);
+
+        if ([] === $listingIds) {
+            return [];
+        }
+
+        Assert::allUuid($listingIds);
+
+        return $this->listingRepository->findListingToProductMap($companyId, $listingIds);
     }
 }

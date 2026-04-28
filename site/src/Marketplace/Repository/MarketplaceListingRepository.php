@@ -243,6 +243,44 @@ class MarketplaceListingRepository extends ServiceEntityRepository
     }
 
     /**
+     * Возвращает map listingId → productId|null для листингов указанной компании.
+     *
+     * Не возвращает листинги, не принадлежащие компании (IDOR-защита через WHERE company_id).
+     * Листинги, не существующие в БД или принадлежащие другой компании, отсутствуют в результирующем массиве.
+     * productId = null если листинг существует, но не привязан к продукту (orphan).
+     *
+     * @param string         $companyId
+     * @param array<string>  $listingIds
+     * @return array<string, string|null> map listingId => productId|null
+     */
+    public function findListingToProductMap(string $companyId, array $listingIds): array
+    {
+        if ([] === $listingIds) {
+            return [];
+        }
+
+        $uniqueIds = array_values(array_unique($listingIds));
+
+        $rows = $this->createQueryBuilder('l')
+            ->select('l.id AS listingId', 'IDENTITY(l.product) AS productId')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.id IN (:listingIds)')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('listingIds', $uniqueIds)
+            ->getQuery()
+            ->getArrayResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $listingId = (string) $row['listingId'];
+            $productId = $row['productId'] !== null ? (string) $row['productId'] : null;
+            $map[$listingId] = $productId;
+        }
+
+        return $map;
+    }
+
+    /**
      * @param string[] $nmIds
      * @return array<string, MarketplaceListing> ['nmId_size' => Listing]
      */
