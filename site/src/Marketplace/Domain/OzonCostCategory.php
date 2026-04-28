@@ -553,7 +553,6 @@ final readonly class OzonCostCategory
                 name: 'Штраф за просроченную отгрузку Ozon',
                 widgetGroup: 'Другие услуги и штрафы',
                 xlsxGroup: 'Другие услуги и штрафы',
-                serviceNames: ['DefectFineShipmentDelay'],
                 operationTypes: [
                     'DefectFineShipmentDelay',
                     'Превышение индекса ошибок: просроченная отгрузка',
