@@ -197,7 +197,7 @@
             var hintEl = modalRoot.querySelector('[data-default-mapping-apply-hint]');
             var applyBtn = modalRoot.querySelector('[data-default-mapping-apply]');
 
-            var state = {preview: null, loading: false, applying: false};
+            var state = {preview: null, loading: false, applying: false, previewRequested: false};
             var statusLabels = {
                 will_create: 'Будет создано',
                 will_fill_empty: 'Будет дополнено',
@@ -314,6 +314,7 @@
                 if (state.loading) {
                     return;
                 }
+                state.previewRequested = true;
                 hideAlerts();
                 previewEl.innerHTML = '';
                 emptyEl.classList.add('d-none');
@@ -345,13 +346,21 @@
 
             if (openBtn) {
                 openBtn.addEventListener('click', function () {
-                    loadPreview();
+                    if (modalEl && modalEl.classList.contains('show')) {
+                        loadPreview();
+                    }
                 });
             }
 
             if (modalEl) {
                 modalEl.addEventListener('shown.bs.modal', function () {
+                    if (state.previewRequested) {
+                        return;
+                    }
                     loadPreview();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function () {
+                    state.previewRequested = false;
                 });
             }
 
