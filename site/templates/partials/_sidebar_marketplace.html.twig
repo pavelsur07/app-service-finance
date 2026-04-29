@@ -22,7 +22,7 @@
                 <span>Начисления</span>
             </a>
             {% set mp_unit_active = current_route starts with 'marketplace_analytics_' %}
-            <a class="dropdown-item {{ mp_unit_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_unit_economics_index') }}">
+            <a class="dropdown-item {{ mp_unit_active ? 'active' : '' }}" href="{{ path('marketplace_analytics_unit_extended_index') }}">
                 <span>Unit-экономика</span>
             </a>
             {% set mp_ads_active = current_route starts with 'marketplace_ads_' %}
