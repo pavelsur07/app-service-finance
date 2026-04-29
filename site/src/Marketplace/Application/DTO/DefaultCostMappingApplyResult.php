@@ -50,35 +50,4 @@ final readonly class DefaultCostMappingApplyResult
             'blocked' => $this->getBlockedCount(),
         ];
     }
-
-    public static function fromPreview(DefaultCostMappingPreviewResult $preview): self
-    {
-        $created = [];
-        $updated = [];
-        $skipped = [];
-        $blocked = [];
-
-        foreach ($preview->getItems() as $item) {
-            $costCode = $item->getCostCode();
-
-            if ($item->getStatus() === DefaultCostMappingPreviewStatus::WILL_CREATE) {
-                $created[] = $costCode;
-                continue;
-            }
-
-            if ($item->getStatus() === DefaultCostMappingPreviewStatus::WILL_FILL_EMPTY) {
-                $updated[] = $costCode;
-                continue;
-            }
-
-            if ($item->getStatus() === DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY || $item->getStatus() === DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY) {
-                $blocked[] = $costCode;
-                continue;
-            }
-
-            $skipped[] = $costCode;
-        }
-
-        return new self($preview->getMarketplace(), $preview, $created, $updated, $skipped, $blocked);
-    }
 }

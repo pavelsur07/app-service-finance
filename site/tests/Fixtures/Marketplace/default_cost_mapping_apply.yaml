@@ -1,6 +1,7 @@
+version: 1
 marketplaces:
   ozon:
-    rules:
+    cost_mappings:
       - cost_code: cost_create
         pl_code: PL_LEAF
         include_in_pl: true

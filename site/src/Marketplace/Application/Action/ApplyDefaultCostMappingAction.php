@@ -42,8 +42,12 @@ final readonly class ApplyDefaultCostMappingAction
 
                 if ($status === DefaultCostMappingPreviewStatus::WILL_CREATE) {
                     if ($item->getCostCategoryId() !== null && $item->getPlCategoryId() !== null) {
-                        $this->writer->createMapping($command->companyId, $item->getCostCategoryId(), $item->getPlCategoryId(), $item->isIncludeInPl(), $item->isNegative());
-                        $created[] = $costCode;
+                        $affected = $this->writer->createMapping($command->companyId, $item->getCostCategoryId(), $item->getPlCategoryId(), $item->isIncludeInPl(), $item->isNegative());
+                        if ($affected > 0) {
+                            $created[] = $costCode;
+                        } else {
+                            $skipped[] = $costCode;
+                        }
                     }
 
                     continue;
@@ -59,11 +63,6 @@ final readonly class ApplyDefaultCostMappingAction
                         }
                     }
 
-                    continue;
-                }
-
-                if ($status === DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY || $status === DefaultCostMappingPreviewStatus::INVALID_TARGET_CATEGORY) {
-                    $blocked[] = $costCode;
                     continue;
                 }
 

@@ -1,6 +1,7 @@
+version: 1
 marketplaces:
   ozon:
-    rules:
+    cost_mappings:
       - cost_code: cost_missing_pl
         pl_code: PL_MISSING
         include_in_pl: true

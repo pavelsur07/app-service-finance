@@ -10,7 +10,6 @@ use App\Finance\Enum\PLCategoryType;
 use App\Marketplace\Application\Action\ApplyDefaultCostMappingAction;
 use App\Marketplace\Application\Action\PreviewDefaultCostMappingAction;
 use App\Marketplace\Application\Command\ApplyDefaultCostMappingCommand;
-use App\Marketplace\Application\Command\PreviewDefaultCostMappingCommand;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
 use App\Marketplace\Enum\MarketplaceType;
@@ -85,9 +84,12 @@ final class ApplyDefaultCostMappingActionTest extends IntegrationTestCase
 
         $action = $this->buildApplyAction('default_cost_mapping_apply_blocked.yaml');
 
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('Базовый маппинг не может быть применён: есть отсутствующие или невалидные категории ОПиУ.');
-        $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, Uuid::uuid7()->toString()));
+        try {
+            $action(new ApplyDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value, Uuid::uuid7()->toString()));
+            self::fail('DomainException was expected.');
+        } catch (\DomainException $exception) {
+            self::assertSame('Базовый маппинг не может быть применён: есть отсутствующие или невалидные категории ОПиУ.', $exception->getMessage());
+        }
 
         $afterCount = (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM marketplace_cost_pl_mappings WHERE company_id = :companyId', ['companyId' => $companyId]);
         self::assertSame($beforeCount, $afterCount);

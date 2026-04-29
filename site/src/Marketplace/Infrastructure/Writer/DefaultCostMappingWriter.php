@@ -13,11 +13,11 @@ final readonly class DefaultCostMappingWriter
     {
     }
 
-    public function createMapping(string $companyId, string $costCategoryId, string $plCategoryId, bool $includeInPl, bool $isNegative): void
+    public function createMapping(string $companyId, string $costCategoryId, string $plCategoryId, bool $includeInPl, bool $isNegative): int
     {
         $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
-        $this->connection->executeStatement(
+        return $this->connection->executeStatement(
             <<<'SQL'
             INSERT INTO marketplace_cost_pl_mappings
                 (id, company_id, cost_category_id, pl_category_id, include_in_pl, is_negative, sort_order, created_at, updated_at)
