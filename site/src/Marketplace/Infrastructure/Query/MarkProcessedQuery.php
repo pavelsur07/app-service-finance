@@ -156,7 +156,7 @@ final class MarkProcessedQuery
         bool $preliminary = false,
     ): int {
         $preliminaryFilter = $preliminary
-            ? "AND mcc2.code != 'ozon_other_service'"
+            ? "AND mcc.code != 'ozon_other_service'"
             : '';
 
         return $this->connection->executeStatement(
@@ -178,31 +178,7 @@ final class MarkProcessedQuery
                    AND c.cost_date <= :periodTo
                    AND m.include_in_pl = true
                    AND m.pl_category_id IS NOT NULL
-                   AND EXISTS (
-                       SELECT 1
-                       FROM marketplace_costs c2
-                       INNER JOIN marketplace_cost_categories mcc2
-                           ON mcc2.id = c2.category_id
-                       INNER JOIN marketplace_cost_pl_mappings m2
-                           ON m2.cost_category_id = c2.category_id
-                           AND m2.company_id = c2.company_id
-                       WHERE c2.company_id = c.company_id
-                         AND c2.marketplace = c.marketplace
-                         AND c2.document_id IS NULL
-                         AND c2.cost_date >= :periodFrom
-                         AND c2.cost_date <= :periodTo
-                         AND c2.category_id = c.category_id
-                         AND (c2.operation_type = \'storno\') = (c.operation_type = \'storno\')
-                         AND m2.include_in_pl = true
-                         AND m2.pl_category_id IS NOT NULL
-                         ' . $preliminaryFilter . '
-                       GROUP BY
-                           m2.pl_category_id,
-                           m2.sort_order,
-                           m2.is_negative,
-                           (c2.operation_type = \'storno\')
-                       HAVING ABS(SUM(c2.amount)) > 0.001
-                   )
+                   ' . $preliminaryFilter . '
              )',
             [
                 'documentId' => $documentId,

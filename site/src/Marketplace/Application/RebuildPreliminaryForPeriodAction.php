@@ -76,6 +76,7 @@ final class RebuildPreliminaryForPeriodAction
         // Per-stage флаг: финальное закрытие одного этапа нельзя путать
         // с предварительным закрытием соседнего этапа того же месяца.
         $wasPreliminary = $monthClose?->isStageLastCloseWasPreliminary($stage) ?? false;
+        $wasReopened = false;
 
         // Если этап закрыт и последнее закрытие НЕ было предварительным —
         // не трогаем (финальное закрытие остаётся неприкосновенным).
@@ -100,6 +101,7 @@ final class RebuildPreliminaryForPeriodAction
                     month:       $command->month,
                     stage:       $stage,
                 ));
+                $wasReopened = true;
             } catch (\DomainException $e) {
                 $this->logger->warning('[PreliminaryRebuild] Reopen failed, skip stage', [
                     'company_id'  => $command->companyId,
@@ -130,9 +132,29 @@ final class RebuildPreliminaryForPeriodAction
             $this->logger->warning('[PreliminaryRebuild] Preflight failed, skip stage', [
                 'company_id'  => $command->companyId,
                 'marketplace' => $command->marketplace,
+                'year'        => $command->year,
+                'month'       => $command->month,
                 'stage'       => $stage->value,
                 'errors'      => $errorKeys,
+                'preliminary' => true,
             ]);
+
+            if ($wasReopened) {
+                $this->logger->error('[PreliminaryRebuild] Preflight failed after reopen', [
+                    'company_id'  => $command->companyId,
+                    'marketplace' => $command->marketplace,
+                    'year'        => $command->year,
+                    'month'       => $command->month,
+                    'stage'       => $stage->value,
+                    'errors'      => $errorKeys,
+                    'preliminary' => true,
+                ]);
+
+                throw new \DomainException(sprintf(
+                    'Preliminary rebuild cannot be completed after reopen for stage "%s": blocking preflight errors.',
+                    $stage->value,
+                ));
+            }
 
             return;
         }
@@ -149,13 +171,50 @@ final class RebuildPreliminaryForPeriodAction
                 preliminary: true,
             ));
         } catch (\DomainException $e) {
-            // Данные не готовы — логируем и продолжаем со следующим этапом.
             $this->logger->warning('[PreliminaryRebuild] Close skipped (domain)', [
                 'company_id'  => $command->companyId,
                 'marketplace' => $command->marketplace,
+                'year'        => $command->year,
+                'month'       => $command->month,
                 'stage'       => $stage->value,
-                'error'       => $e->getMessage(),
+                'preliminary' => true,
+                'exception_class' => $e::class,
+                'exception_message' => $e->getMessage(),
             ]);
+
+            if ($wasReopened) {
+                $this->logger->error('[PreliminaryRebuild] Close failed after reopen', [
+                    'company_id'        => $command->companyId,
+                    'marketplace'       => $command->marketplace,
+                    'year'              => $command->year,
+                    'month'             => $command->month,
+                    'stage'             => $stage->value,
+                    'preliminary'       => true,
+                    'exception_class'   => $e::class,
+                    'exception_message' => $e->getMessage(),
+                ]);
+
+                throw $e;
+            }
+        } catch (\Throwable $e) {
+            $this->logger->error(
+                $wasReopened
+                    ? '[PreliminaryRebuild] Close failed after reopen'
+                    : '[PreliminaryRebuild] Close failed',
+                [
+                    'company_id'        => $command->companyId,
+                    'marketplace'       => $command->marketplace,
+                    'year'              => $command->year,
+                    'month'             => $command->month,
+                    'stage'             => $stage->value,
+                    'preliminary'       => true,
+                    'was_reopened'      => $wasReopened,
+                    'exception_class'   => $e::class,
+                    'exception_message' => $e->getMessage(),
+                ],
+            );
+
+            throw $e;
         }
     }
 }

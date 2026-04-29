@@ -9,6 +9,8 @@ use App\Finance\Entity\PLCategory;
 use App\Finance\Enum\PLFlow;
 use App\Marketplace\Application\CloseMonthStageAction;
 use App\Marketplace\Application\Command\CloseMonthStageCommand;
+use App\Marketplace\Application\Command\PreflightMonthCloseCommand;
+use App\Marketplace\Application\MonthClosePreflightAction;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
@@ -20,6 +22,8 @@ use App\Marketplace\Enum\AmountSource;
 use App\Marketplace\Enum\CloseStage;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Query\MarkProcessedQuery;
+use App\Marketplace\Repository\MarketplaceMonthCloseRepository;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -79,25 +83,123 @@ final class CloseMonthStageActionMarkProcessedScopeTest extends IntegrationTestC
         $this->assertMarked($excludedCost->getId(), 'marketplace_costs', false);
     }
 
-    public function testCostsPreliminaryUsesSameFilterAsUnprocessedCostsQuery(): void
+    public function testCostsPreliminaryCloseSucceedsWithValidRowsOnly(): void
     {
         $plCategory = $this->createPlCategory('Затраты preliminary');
-
         $includedCategory = $this->createCostCategory('ozon_logistic_direct', 'Logistics');
-        $preliminaryExcludedCategory = $this->createCostCategory('ozon_other_service', 'Other service');
-
         $this->createCostMapping($includedCategory, $plCategory->getId(), true);
-        $this->createCostMapping($preliminaryExcludedCategory, $plCategory->getId(), true);
-
         $includedCost = $this->createCost($includedCategory, '150.00', '2026-02-15');
-        $excludedCost = $this->createCost($preliminaryExcludedCategory, '250.00', '2026-02-16');
 
         $this->em->flush();
 
         $this->closeStage(CloseStage::COSTS, preliminary: true);
 
         $this->assertMarked($includedCost->getId(), 'marketplace_costs', true);
+
+        /** @var MarketplaceMonthCloseRepository $monthCloseRepository */
+        $monthCloseRepository = self::getContainer()->get(MarketplaceMonthCloseRepository::class);
+        $monthClose = $monthCloseRepository->findByPeriod(
+            self::COMPANY_ID,
+            self::MARKETPLACE,
+            self::YEAR,
+            self::MONTH,
+        );
+
+        self::assertNotNull($monthClose);
+        self::assertTrue($monthClose->isStageLastCloseWasPreliminary(CloseStage::COSTS));
+    }
+
+    public function testMarkCostsDoesNotMarkRowsWithoutMapping(): void
+    {
+        $plCategory = $this->createPlCategory('Mapped for direct mark');
+        $mappedCategory = $this->createCostCategory('mapped_direct', 'Mapped direct');
+        $unmappedCategory = $this->createCostCategory('unmapped_direct', 'Unmapped direct');
+        $this->createCostMapping($mappedCategory, $plCategory->getId(), true);
+
+        $mappedCost = $this->createCost($mappedCategory, '110.00', '2026-02-05');
+        $unmappedCost = $this->createCost($unmappedCategory, '220.00', '2026-02-06');
+        $this->em->flush();
+
+        /** @var MarkProcessedQuery $markProcessedQuery */
+        $markProcessedQuery = self::getContainer()->get(MarkProcessedQuery::class);
+        $markProcessedQuery->markCosts(
+            self::COMPANY_ID,
+            self::MARKETPLACE_VALUE,
+            Uuid::uuid4()->toString(),
+            '2026-02-01',
+            '2026-02-28',
+            false,
+        );
+
+        $this->assertMarked($mappedCost->getId(), 'marketplace_costs', true);
+        $this->assertMarked($unmappedCost->getId(), 'marketplace_costs', false);
+    }
+
+    public function testMarkCostsDoesNotMarkRowsWithIncludeInPlFalse(): void
+    {
+        $plCategory = $this->createPlCategory('Include in PL switch');
+        $includedCategory = $this->createCostCategory('mapped_true_direct', 'Mapped true direct');
+        $excludedCategory = $this->createCostCategory('mapped_false_direct', 'Mapped false direct');
+        $this->createCostMapping($includedCategory, $plCategory->getId(), true);
+        $this->createCostMapping($excludedCategory, $plCategory->getId(), false);
+
+        $includedCost = $this->createCost($includedCategory, '330.00', '2026-02-07');
+        $excludedCost = $this->createCost($excludedCategory, '440.00', '2026-02-08');
+        $this->em->flush();
+
+        /** @var MarkProcessedQuery $markProcessedQuery */
+        $markProcessedQuery = self::getContainer()->get(MarkProcessedQuery::class);
+        $markProcessedQuery->markCosts(
+            self::COMPANY_ID,
+            self::MARKETPLACE_VALUE,
+            Uuid::uuid4()->toString(),
+            '2026-02-01',
+            '2026-02-28',
+            false,
+        );
+
+        $this->assertMarked($includedCost->getId(), 'marketplace_costs', true);
         $this->assertMarked($excludedCost->getId(), 'marketplace_costs', false);
+    }
+
+    public function testOzonOtherServiceBlocksPreliminaryClose(): void
+    {
+        $plCategory = $this->createPlCategory('Other service blocked');
+        $otherService = $this->createCostCategory('ozon_other_service', 'Other service');
+        $this->createCostMapping($otherService, $plCategory->getId(), true);
+        $this->createCost($otherService, '500.00', '2026-02-14');
+        $this->em->flush();
+
+        /** @var MonthClosePreflightAction $preflight */
+        $preflight = self::getContainer()->get(MonthClosePreflightAction::class);
+        $preflightResult = $preflight(new PreflightMonthCloseCommand(
+            companyId: self::COMPANY_ID,
+            marketplace: self::MARKETPLACE_VALUE,
+            year: self::YEAR,
+            month: self::MONTH,
+            stage: CloseStage::COSTS,
+        ));
+        self::assertFalse($preflightResult->canClose());
+
+        try {
+            $this->closeStage(CloseStage::COSTS, preliminary: true);
+            self::fail('Expected DomainException for blocking preflight error.');
+        } catch (\DomainException) {
+            // expected
+        }
+
+        /** @var MarketplaceMonthCloseRepository $monthCloseRepository */
+        $monthCloseRepository = self::getContainer()->get(MarketplaceMonthCloseRepository::class);
+        $monthClose = $monthCloseRepository->findByPeriod(
+            self::COMPANY_ID,
+            self::MARKETPLACE,
+            self::YEAR,
+            self::MONTH,
+        );
+        if ($monthClose !== null) {
+            self::assertFalse($monthClose->isStageClosed(CloseStage::COSTS));
+            self::assertSame([], $monthClose->getStagePLDocumentIds(CloseStage::COSTS));
+        }
     }
 
     public function testSalesPreliminaryDoesNotMarkRowsWithoutCostPrice(): void
