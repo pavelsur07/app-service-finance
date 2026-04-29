@@ -11,6 +11,12 @@ use Symfony\Component\DependencyInjection\Attribute\AutoconfigureTag;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[AutoconfigureTag('marketplace.fetcher')]
+/**
+ * @deprecated Legacy Wildberries fetcher pipeline.
+ *
+ * Основной WB initial/daily/manual sync использует WildberriesAdapter.
+ * Этот pipeline оставлен только для обратной совместимости; код не удалять.
+ */
 final readonly class WbFetcher implements MarketplaceFetcherInterface
 {
     private const BASE_URL = 'https://statistics-api.wildberries.ru';
