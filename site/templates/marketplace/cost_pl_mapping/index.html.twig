@@ -180,8 +180,8 @@
                 return;
             }
 
-            var modalEl = document.getElementById('modal-default-cost-mapping');
-            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            var modalEl = document.querySelector('#modal-default-cost-mapping');
+            var openBtn = document.querySelector('[data-default-mapping-open]');
             var previewUrl = modalRoot.getAttribute('data-preview-url');
             var applyUrl = modalRoot.getAttribute('data-apply-url');
             var token = modalRoot.getAttribute('data-csrf-token');
@@ -197,7 +197,7 @@
             var hintEl = modalRoot.querySelector('[data-default-mapping-apply-hint]');
             var applyBtn = modalRoot.querySelector('[data-default-mapping-apply]');
 
-            var state = {preview: null, loading: false, applying: false};
+            var state = {preview: null, loading: false, applying: false, previewRequested: false};
             var statusLabels = {
                 will_create: 'Будет создано',
                 will_fill_empty: 'Будет дополнено',
@@ -311,9 +311,14 @@
             }
 
             async function loadPreview() {
+                if (state.loading) {
+                    return;
+                }
+                state.previewRequested = true;
                 hideAlerts();
                 previewEl.innerHTML = '';
                 emptyEl.classList.add('d-none');
+                applyBtn.disabled = true;
                 var marketplace = currentMarketplace();
                 if (!marketplace) {
                     showError('Выберите маркетплейс перед настройкой базового маппинга.');
@@ -339,9 +344,25 @@
                 }
             }
 
-            modalEl.addEventListener('show.bs.modal', function () {
-                loadPreview();
-            });
+            if (openBtn) {
+                openBtn.addEventListener('click', function () {
+                    if (modalEl && modalEl.classList.contains('show')) {
+                        loadPreview();
+                    }
+                });
+            }
+
+            if (modalEl) {
+                modalEl.addEventListener('shown.bs.modal', function () {
+                    if (state.previewRequested) {
+                        return;
+                    }
+                    loadPreview();
+                });
+                modalEl.addEventListener('hidden.bs.modal', function () {
+                    state.previewRequested = false;
+                });
+            }
 
             applyBtn.addEventListener('click', async function () {
                 if (applyBtn.disabled) return;
