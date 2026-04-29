@@ -1,0 +1,8 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: ozon_sale_commission
+        pl_code: COGS_MP_COMMISSION
+        include_in_pl: true
+        confidence: certain

@@ -1,0 +1,6 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: ozon_sale_commission
+        include_in_pl: true
