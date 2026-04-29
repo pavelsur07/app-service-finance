@@ -222,14 +222,29 @@ final class CloseMonthStageAction
 
             // Помечаем обработанными все Source-ы
             foreach ($sourcesUsed as $dataSource) {
-                $dataSource->markProcessed(
-                    $command->companyId,
-                    $command->marketplace,
-                    $documentId,
-                    $periodFrom,
-                    $periodTo,
-                    $command->preliminary,
-                );
+                try {
+                    $dataSource->markProcessed(
+                        $command->companyId,
+                        $command->marketplace,
+                        $documentId,
+                        $periodFrom,
+                        $periodTo,
+                        $command->preliminary,
+                    );
+                } catch (\Throwable $e) {
+                    $this->logger->error('[MonthClose] markProcessed failed', [
+                        'company_id'        => $command->companyId,
+                        'marketplace'       => $command->marketplace,
+                        'stage'             => $command->stage,
+                        'source'            => $dataSource->getSourceId(),
+                        'document_id'       => $documentId,
+                        'preliminary'       => $command->preliminary,
+                        'exception_class'   => $e::class,
+                        'exception_message' => $e->getMessage(),
+                    ]);
+
+                    throw $e;
+                }
             }
 
             // Контрольная сумма строк PLDocument vs marketplace_costs (только для COSTS)
