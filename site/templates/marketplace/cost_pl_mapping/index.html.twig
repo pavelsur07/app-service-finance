@@ -264,7 +264,10 @@
                     return '<div class="col-md-3 col-sm-6"><div class="card card-sm"><div class="card-body"><div class="text-muted small">'+statusLabels[key]+'</div><div class="h2 m-0">'+(summary[key] || 0)+'</div></div></div></div>';
                 }).join('');
 
-                var tabs = Object.keys(statusLabels).map(function (key, i) {
+                var tabHeaders = [];
+                var tabPanes = [];
+
+                Object.keys(statusLabels).forEach(function (key, i) {
                     var items = (payload.groupedItems && payload.groupedItems[key]) ? payload.groupedItems[key] : [];
                     var active = i === 0 ? 'active' : '';
                     var show = i === 0 ? 'show active' : '';
@@ -273,13 +276,14 @@
                         var confClass = conf === 'high' ? 'bg-green-lt' : (conf === 'medium' ? 'bg-yellow-lt' : 'bg-red-lt');
                         return '<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between"><span class="badge bg-blue-lt">'+escapeHtml(statusLabels[item.status] || item.status || key)+'</span><span class="badge '+confClass+'">'+escapeHtml(conf)+'</span></div><div class="small mt-2"><strong>Затрата:</strong> '+escapeHtml(item.costCode)+' — '+escapeHtml(item.costCategoryName)+'</div><div class="small"><strong>ОПиУ:</strong> '+escapeHtml(item.plCode)+' — '+escapeHtml(item.plCategoryName)+'</div><div class="small text-muted">'+escapeHtml(item.note || '')+' '+escapeHtml(item.message || '')+'</div></div>';
                     }).join('') : '<div class="text-muted small">Нет элементов.</div>';
-                    return '<li class="nav-item" role="presentation"><button class="nav-link '+active+'" data-bs-toggle="tab" data-bs-target="#map-tab-'+key+'" type="button">'+statusLabels[key]+' <span class="badge bg-secondary-lt">'+items.length+'</span></button></li>' +
-                        '<div class="tab-pane fade '+show+'" id="map-tab-'+key+'" role="tabpanel">'+rows+'</div>';
+
+                    tabHeaders.push('<li class="nav-item" role="presentation"><button class="nav-link '+active+'" data-bs-toggle="tab" data-bs-target="#map-tab-'+key+'" type="button" role="tab">'+statusLabels[key]+' <span class="badge bg-secondary-lt">'+items.length+'</span></button></li>');
+                    tabPanes.push('<div class="tab-pane fade '+show+'" id="map-tab-'+key+'" role="tabpanel">'+rows+'</div>');
                 });
 
                 previewEl.innerHTML = '<div class="row g-2 mb-3">'+cards+'</div>'+
-                    '<ul class="nav nav-tabs mb-2" role="tablist">'+tabs.filter(function(_,i){return i%2===0;}).join('')+'</ul>'+
-                    '<div class="tab-content">'+tabs.filter(function(_,i){return i%2===1;}).join('')+'</div>';
+                    '<ul class="nav nav-tabs mb-2" role="tablist">'+tabHeaders.join('')+'</ul>'+
+                    '<div class="tab-content">'+tabPanes.join('')+'</div>';
             }
 
             async function fetchJson(url, payload) {
