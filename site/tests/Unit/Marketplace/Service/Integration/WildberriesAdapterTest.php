@@ -33,6 +33,31 @@ final class WildberriesAdapterTest extends TestCase
     {
         $adapter = $this->createAdapterWithResponse(429, '{"error":"rate limit"}', ['retry-after' => ['120']]);
 
+
+    public function testFetchRawReportParsesRetryAfterHttpDate(): void
+    {
+        $retryDate = (new \DateTimeImmutable('+90 seconds'))->format(DATE_RFC7231);
+        $adapter = $this->createAdapterWithResponse(429, '{"error":"rate limit"}', ['retry-after' => [$retryDate]]);
+
+        try {
+            $adapter->fetchRawReport(CompanyBuilder::aCompany()->build(), new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'));
+            self::fail('Expected MarketplaceRateLimitException was not thrown.');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertNotNull($e->getRetryAfter());
+            self::assertGreaterThanOrEqual(0, $e->getRetryAfter());
+            self::assertLessThanOrEqual(120, $e->getRetryAfter());
+        }
+    }
+
+
+    public function testFetchRawReportThrowsInvalidResponseExceptionForScalarListItems(): void
+    {
+        $adapter = $this->createAdapterWithResponse(200, '[1,2,3]');
+
+        $this->expectException(MarketplaceInvalidApiResponseException::class);
+        $adapter->fetchRawReport(CompanyBuilder::aCompany()->build(), new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'));
+    }
+
         $this->expectException(MarketplaceRateLimitException::class);
         $adapter->fetchRawReport(CompanyBuilder::aCompany()->build(), new \DateTimeImmutable('2026-04-01'), new \DateTimeImmutable('2026-04-02'));
     }

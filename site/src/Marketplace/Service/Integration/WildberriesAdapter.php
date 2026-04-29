@@ -78,10 +78,22 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 'dateTo' => $dateTo,
                 'limit' => 100000,
                 'rrdid' => 0,
-                $headers,
-        ]);
+        $normalizedBody = trim($body);
+        $excerpt = mb_substr($normalizedBody, 0, 500);
+            $retryAfter = $this->parseRetryAfter($headers['retry-after'][0] ?? null);
 
-        $statusCode = $response->getStatusCode();
+        if ('' === $normalizedBody) {
+        foreach ($decoded as $row) {
+            if (!is_array($row)) {
+                throw new MarketplaceInvalidApiResponseException(
+                    'Wildberries API returned list with non-object items.',
+                    $statusCode,
+                    $excerpt,
+                    $headers,
+                );
+            }
+        }
+
         $headers = $response->getHeaders(false);
         $body = $response->getContent(false);
         $excerpt = mb_substr(trim($body), 0, 500);
@@ -367,6 +379,26 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function getApiEndpointName(): string
     {
         return 'wildberries::reportDetailByPeriod';
+    }
+
+
+    /** @param null|string $retryAfterHeader */
+    private function parseRetryAfter(?string $retryAfterHeader): ?int
+    {
+        if (null === $retryAfterHeader || '' === trim($retryAfterHeader)) {
+            return null;
+        }
+
+        if (is_numeric($retryAfterHeader)) {
+            $seconds = (int) $retryAfterHeader;
+
+            return $seconds >= 0 ? $seconds : null;
+        }
+
+        $retryAt = new \DateTimeImmutable($retryAfterHeader);
+        $seconds = $retryAt->getTimestamp() - time();
+
+        return $seconds > 0 ? $seconds : 0;
     }
 
     private function getConnection(Company $company): ?MarketplaceConnection
