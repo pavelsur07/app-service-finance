@@ -1,0 +1,28 @@
+marketplaces:
+  ozon:
+    rules:
+      - cost_code: cost_create
+        pl_code: PL_LEAF
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+      - cost_code: cost_fill
+        pl_code: PL_LEAF
+        include_in_pl: true
+        is_negative: false
+        confidence: high
+      - cost_code: cost_existing
+        pl_code: PL_LEAF
+        include_in_pl: true
+        is_negative: false
+        confidence: medium
+      - cost_code: cost_disabled
+        pl_code: PL_LEAF
+        include_in_pl: true
+        is_negative: false
+        confidence: medium
+      - cost_code: cost_missing_cost
+        pl_code: PL_LEAF
+        include_in_pl: true
+        is_negative: false
+        confidence: low
