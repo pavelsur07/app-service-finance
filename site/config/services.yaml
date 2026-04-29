@@ -271,3 +271,7 @@ services:
     App\MarketplaceAds\Command\LoadAdDataCommand:
         arguments:
             $platformClients: !tagged_iterator marketplace_ads.platform_client
+
+    App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider:
+        arguments:
+            $configPath: "%kernel.project_dir%/config/marketplace/default_cost_mapping.yaml"
