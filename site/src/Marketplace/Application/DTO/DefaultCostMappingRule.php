@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Application\DTO;
 
+use App\Marketplace\Enum\DefaultCostMappingConfidence;
 use App\Marketplace\Enum\MarketplaceType;
 
 final readonly class DefaultCostMappingRule
@@ -14,7 +15,7 @@ final readonly class DefaultCostMappingRule
         private string $plCode,
         private bool $includeInPl,
         private bool $isNegative,
-        private string $confidence,
+        private DefaultCostMappingConfidence $confidence,
         private ?string $note,
     ) {}
 
@@ -43,7 +44,7 @@ final readonly class DefaultCostMappingRule
         return $this->isNegative;
     }
 
-    public function getConfidence(): string
+    public function getConfidence(): DefaultCostMappingConfidence
     {
         return $this->confidence;
     }

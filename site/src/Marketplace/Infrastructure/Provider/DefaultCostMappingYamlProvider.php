@@ -7,6 +7,7 @@ namespace App\Marketplace\Infrastructure\Provider;
 use App\Marketplace\Application\DTO\DefaultCostMappingRule;
 use App\Marketplace\Application\DTO\DefaultCostMappingRuleSet;
 use App\Marketplace\Application\Exception\DefaultCostMappingConfigException;
+use App\Marketplace\Enum\DefaultCostMappingConfidence;
 use App\Marketplace\Enum\MarketplaceType;
 use Symfony\Component\Yaml\Exception\ParseException;
 use Symfony\Component\Yaml\Yaml;
@@ -14,8 +15,7 @@ use Symfony\Component\Yaml\Yaml;
 final class DefaultCostMappingYamlProvider
 {
     private const SUPPORTED_VERSION = 1;
-    private const ALLOWED_CONFIDENCE = ['high', 'medium', 'low'];
-
+    
     /** @var array<string, DefaultCostMappingRuleSet>|null */
     private ?array $cachedRuleSets = null;
 
@@ -110,9 +110,10 @@ final class DefaultCostMappingYamlProvider
                     throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" has invalid "is_negative" value.', $index, $marketplace->value));
                 }
 
-                $confidence = $rawRule['confidence'] ?? 'high';
-                if (!is_string($confidence) || !in_array($confidence, self::ALLOWED_CONFIDENCE, true)) {
-                    throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" has invalid confidence "%s".', $index, $marketplace->value, (string) $confidence));
+                $rawConfidence = $rawRule['confidence'] ?? DefaultCostMappingConfidence::HIGH->value;
+                $confidence = is_string($rawConfidence) ? DefaultCostMappingConfidence::tryFrom($rawConfidence) : null;
+                if ($confidence === null) {
+                    throw new DefaultCostMappingConfigException(sprintf('Rule #%d in marketplace "%s" has invalid confidence "%s".', $index, $marketplace->value, (string) $rawConfidence));
                 }
 
                 $note = $rawRule['note'] ?? null;

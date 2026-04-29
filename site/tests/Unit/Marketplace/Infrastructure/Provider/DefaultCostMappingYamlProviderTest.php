@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\Infrastructure\Provider;
 
 use App\Marketplace\Application\Exception\DefaultCostMappingConfigException;
+use App\Marketplace\Enum\DefaultCostMappingConfidence;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider;
 use PHPUnit\Framework\TestCase;
@@ -90,6 +91,6 @@ final class DefaultCostMappingYamlProviderTest extends TestCase
 
         self::assertNotNull($rule);
         self::assertTrue($rule->isNegative());
-        self::assertSame('high', $rule->getConfidence());
+        self::assertSame(DefaultCostMappingConfidence::HIGH, $rule->getConfidence());
     }
 }
