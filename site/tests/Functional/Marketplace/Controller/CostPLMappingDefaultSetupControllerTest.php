@@ -105,6 +105,7 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         ]);
         $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
         self::assertFalse($payload['ok']);
+        self::assertArrayHasKey('message', $payload);
 
         $client->request('POST', '/marketplace/cost-pl-mapping/default/preview', [
             'marketplace' => 'unknown',

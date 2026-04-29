@@ -56,7 +56,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
 
         $user = $this->getUser();
         if ($user === null || !method_exists($user, 'getId')) {
-            throw $this->createAccessDeniedException('Пользователь не найден.');
+            return $this->json(['ok' => false, 'message' => 'Пользователь не найден.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
         try {
@@ -69,9 +69,6 @@ final class CostPLMappingDefaultSetupController extends AbstractController
             return $this->json(['ok' => false, 'message' => $e->getMessage()]);
         }
     }
-
-
-
     private function extractCsrfToken(Request $request): string
     {
         $token = $request->request->getString('_token', '');
@@ -79,10 +76,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
             return $token;
         }
 
-        $payload = json_decode((string) $request->getContent(), true);
-        if (!is_array($payload)) {
-            return '';
-        }
+        $payload = $this->extractJsonPayload($request);
 
         $value = $payload['_token'] ?? '';
 
@@ -96,15 +90,30 @@ final class CostPLMappingDefaultSetupController extends AbstractController
             return $marketplace;
         }
 
-        $payload = json_decode((string) $request->getContent(), true);
-        if (!is_array($payload)) {
-            return '';
-        }
+        $payload = $this->extractJsonPayload($request);
 
         $value = $payload['marketplace'] ?? '';
 
         return is_string($value) ? $value : '';
     }
+
+    /** @return array<string, mixed> */
+    private function extractJsonPayload(Request $request): array
+    {
+        $content = (string) $request->getContent();
+        if ($content === '') {
+            return [];
+        }
+
+        try {
+            $payload = json_decode($content, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (\JsonException) {
+            return [];
+        }
+
+        return is_array($payload) ? $payload : [];
+    }
+
     private function previewResultToArray(DefaultCostMappingPreviewResult $result): array
     {
         return [
