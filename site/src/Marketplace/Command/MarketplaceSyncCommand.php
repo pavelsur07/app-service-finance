@@ -20,6 +20,12 @@ use Symfony\Component\Console\Style\SymfonyStyle;
     name: 'marketplace:sync',
     description: 'Синхронизация данных с маркетплейсами'
 )]
+/**
+ * @deprecated Legacy CLI sync command.
+ *
+ * Основной WB initial/daily/manual sync использует WildberriesAdapter.
+ * Этот pipeline оставлен только для обратной совместимости; код не удалять.
+ */
 class MarketplaceSyncCommand extends Command
 {
     public function __construct(
