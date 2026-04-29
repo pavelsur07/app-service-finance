@@ -292,10 +292,21 @@
                     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
                     body: JSON.stringify(payload)
                 });
-                var data = await res.json();
-                if (!res.ok || data.ok === false) {
-                    throw new Error(data.message || 'Ошибка запроса.');
+
+                var responseText = await res.text();
+                var data = null;
+                if (responseText) {
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (e) {
+                        throw new Error('Сервер вернул неожиданный ответ. Обновите страницу и повторите попытку.');
+                    }
                 }
+
+                if (!res.ok || !data || data.ok === false) {
+                    throw new Error((data && data.message) ? data.message : 'Ошибка запроса. Попробуйте позже.');
+                }
+
                 return data;
             }
 
@@ -328,8 +339,7 @@
                 }
             }
 
-            document.querySelector('[data-default-mapping-open]').addEventListener('click', function () {
-                modal.show();
+            modalEl.addEventListener('show.bs.modal', function () {
                 loadPreview();
             });
 

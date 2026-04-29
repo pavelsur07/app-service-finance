@@ -26,14 +26,16 @@ final class CostPLMappingControllerTest extends WebTestCaseBase
         $html = (string) $client->getResponse()->getContent();
 
         self::assertStringContainsString('Настроить базовый маппинг', $html);
-        self::assertStringContainsString('modal-default-cost-mapping', $html);
-        self::assertStringContainsString('/marketplace/cost-pl-mapping/default/preview', $html);
-        self::assertStringContainsString('/marketplace/cost-pl-mapping/default/apply', $html);
+        self::assertSelectorExists('#modal-default-cost-mapping [data-default-mapping-modal]');
+        self::assertSelectorExists('#modal-default-cost-mapping [data-default-mapping-apply]');
+
+        self::assertSelectorExists('[data-preview-url="/marketplace/cost-pl-mapping/default/preview"]');
+        self::assertSelectorExists('[data-apply-url="/marketplace/cost-pl-mapping/default/apply"]');
 
         $csrf = $client->getContainer()->get('security.csrf.token_manager')
             ->getToken('marketplace_default_cost_mapping')
             ->getValue();
-        self::assertStringContainsString($csrf, $html);
+        self::assertSelectorExists(sprintf('[data-csrf-token="%s"]', $csrf));
     }
 
     private function loginWithActiveCompany(KernelBrowser $client, User $user, Company $company): void
