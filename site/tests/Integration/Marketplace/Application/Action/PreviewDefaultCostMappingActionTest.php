@@ -11,6 +11,7 @@ use App\Marketplace\Application\Action\PreviewDefaultCostMappingAction;
 use App\Marketplace\Application\Command\PreviewDefaultCostMappingCommand;
 use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Entity\MarketplaceCostPLMapping;
+use App\Marketplace\Enum\DefaultCostMappingConfidence;
 use App\Marketplace\Enum\DefaultCostMappingPreviewStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Provider\DefaultCostMappingYamlProvider;
@@ -67,6 +68,24 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
         self::assertTrue($result->hasBlockingIssues());
         self::assertSame(1, $result->getSummary()[DefaultCostMappingPreviewStatus::WILL_CREATE->value]);
 
+        $createItem = $this->findByCostCode($result, 'cost_create');
+        self::assertSame(DefaultCostMappingPreviewStatus::WILL_CREATE, $createItem->getStatus());
+        self::assertSame('PL_LEAF', $createItem->getPlCode());
+        self::assertSame('PL_LEAF', $createItem->getPlCategoryName());
+        self::assertTrue($createItem->isIncludeInPl());
+        self::assertTrue($createItem->isNegative());
+        self::assertSame(DefaultCostMappingConfidence::HIGH, $createItem->getConfidence());
+
+        $existingItem = $this->findByCostCode($result, 'cost_existing');
+        self::assertSame(DefaultCostMappingPreviewStatus::SKIPPED_EXISTING, $existingItem->getStatus());
+        self::assertNotNull($existingItem->getExistingMappingId());
+        self::assertSame('PL_LEAF', $existingItem->getExistingPlCategoryName());
+
+        $missingPlItem = $this->findByCostCode($result, 'cost_missing_pl');
+        self::assertSame(DefaultCostMappingPreviewStatus::MISSING_PL_CATEGORY, $missingPlItem->getStatus());
+        self::assertSame('Категория ОПиУ не найдена у компании.', $missingPlItem->getMessage());
+
+
         $afterCount = (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM marketplace_cost_pl_mappings WHERE company_id = :companyId', ['companyId' => $companyId]);
         self::assertSame($beforeCount, $afterCount);
         self::assertNotNull($create);
@@ -89,6 +108,37 @@ final class PreviewDefaultCostMappingActionTest extends IntegrationTestCase
 
         $result = $action(new PreviewDefaultCostMappingCommand($companyId, MarketplaceType::OZON->value));
         self::assertSame(0, $result->getTotal());
+    }
+
+
+    public function testInvalidMarketplaceThrows(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111113';
+        $this->createCompany($companyId);
+
+        $action = new PreviewDefaultCostMappingAction(
+            new DefaultCostMappingYamlProvider(__DIR__ . '/../../../../Fixtures/Marketplace/default_cost_mapping_preview.yaml'),
+            new MarketplaceCostCategoriesByCodeQuery($this->em->getConnection()),
+            new PLCategoriesByCodeQuery($this->em->getConnection()),
+            new MarketplaceCostPLMappingsByCostCategoryQuery($this->em->getConnection()),
+        );
+
+        $this->expectException(\DomainException::class);
+        $action(new PreviewDefaultCostMappingCommand($companyId, 'invalid_marketplace'));
+    }
+
+
+    private function findByCostCode(
+        \App\Marketplace\Application\DTO\DefaultCostMappingPreviewResult $result,
+        string $costCode,
+    ): \App\Marketplace\Application\DTO\DefaultCostMappingPreviewItem {
+        foreach ($result->getItems() as $item) {
+            if ($item->getCostCode() === $costCode) {
+                return $item;
+            }
+        }
+
+        self::fail(sprintf('Preview item for cost code "%s" not found.', $costCode));
     }
 
     private function createCompany(string $companyId): Company

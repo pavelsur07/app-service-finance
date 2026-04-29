@@ -30,5 +30,20 @@ final readonly class DefaultCostMappingPreviewItem
     ) {
     }
 
+    public function getMarketplace(): MarketplaceType { return $this->marketplace; }
+    public function getCostCode(): string { return $this->costCode; }
+    public function getCostCategoryId(): ?string { return $this->costCategoryId; }
+    public function getCostCategoryName(): ?string { return $this->costCategoryName; }
+    public function getPlCode(): string { return $this->plCode; }
+    public function getPlCategoryId(): ?string { return $this->plCategoryId; }
+    public function getPlCategoryName(): ?string { return $this->plCategoryName; }
+    public function getExistingMappingId(): ?string { return $this->existingMappingId; }
+    public function getExistingPlCategoryId(): ?string { return $this->existingPlCategoryId; }
+    public function getExistingPlCategoryName(): ?string { return $this->existingPlCategoryName; }
+    public function isIncludeInPl(): bool { return $this->includeInPl; }
+    public function isNegative(): bool { return $this->isNegative; }
+    public function getConfidence(): DefaultCostMappingConfidence { return $this->confidence; }
+    public function getNote(): ?string { return $this->note; }
     public function getStatus(): DefaultCostMappingPreviewStatus { return $this->status; }
+    public function getMessage(): string { return $this->message; }
 }
