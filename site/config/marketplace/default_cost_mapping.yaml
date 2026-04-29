@@ -1,0 +1,72 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: ozon_sale_commission
+        pl_code: COGS_MP_COMMISSION
+        include_in_pl: true
+        is_negative: true
+        confidence: high
+        note: "Комиссия Ozon за продажу"
+      - cost_code: ozon_logistic_direct
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_logistic_last_mile
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_logistic_return
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_acquiring
+        pl_code: COGS_ACQUIRING
+        include_in_pl: true
+      - cost_code: ozon_return_pvz
+        pl_code: COGS_RETURNS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_storage
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: ozon_storage_partner
+        pl_code: OPEX_WH_STORAGE
+        include_in_pl: true
+      - cost_code: ozon_logistic_pickup
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_package_labor
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "Маппинг требует бизнес-подтверждения"
+      - cost_code: ozon_package_materials
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: medium
+        note: "Маппинг требует бизнес-подтверждения"
+      - cost_code: ozon_cpc
+        pl_code: PROMO_INTERNAL
+        include_in_pl: true
+      - cost_code: ozon_delivery_to_handover_place
+        pl_code: COGS_DELIVERY
+        include_in_pl: true
+      - cost_code: ozon_supply_additional
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_crossdocking
+        pl_code: OPEX_WH_RECEIVING
+        include_in_pl: true
+      - cost_code: ozon_early_payment
+        pl_code: OVERHEAD_ADMIN_BANK
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза до финальной сверки с фин.методологией"
+      - cost_code: ozon_return_from_stock
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+      - cost_code: ozon_supply_shortage
+        pl_code: OPEX_WH_MP_DEDUCTIONS
+        include_in_pl: true
+        confidence: low
+        note: "Гипотеза до финальной сверки с фин.методологией"
+
+  wildberries:
+    cost_mappings: []
