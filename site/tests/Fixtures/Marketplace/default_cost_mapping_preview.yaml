@@ -1,0 +1,25 @@
+version: 1
+marketplaces:
+  ozon:
+    cost_mappings:
+      - cost_code: cost_create
+        pl_code: PL_LEAF
+        include_in_pl: true
+      - cost_code: cost_fill
+        pl_code: PL_LEAF
+        include_in_pl: true
+      - cost_code: cost_existing
+        pl_code: PL_LEAF
+        include_in_pl: true
+      - cost_code: cost_disabled
+        pl_code: PL_LEAF
+        include_in_pl: true
+      - cost_code: cost_missing
+        pl_code: PL_LEAF
+        include_in_pl: true
+      - cost_code: cost_missing_pl
+        pl_code: PL_MISSING
+        include_in_pl: true
+      - cost_code: cost_invalid_pl
+        pl_code: PL_SUBTOTAL
+        include_in_pl: true
