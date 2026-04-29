@@ -7,9 +7,14 @@ use App\Marketplace\DTO\CostData;
 use App\Marketplace\DTO\ReturnData;
 use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Exception\MarketplaceAuthException;
+use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
+use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class WildberriesAdapter implements MarketplaceAdapterInterface
@@ -19,6 +24,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceConnectionRepository $connectionRepository,
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -60,20 +66,94 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new \RuntimeException('Wildberries connection not found');
         }
 
+        $dateFrom = $fromDate->format('Y-m-d');
+        $dateTo = $toDate->format('Y-m-d');
+
         $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
             'query' => [
-                'dateFrom' => $fromDate->format('Y-m-d'),
-                'dateTo' => $toDate->format('Y-m-d'),
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo,
                 'limit' => 100000,
                 'rrdid' => 0,
                 'period' => 'daily',    // ← добавить
             ],
         ]);
 
-        return $response->toArray();
+        $statusCode = $response->getStatusCode();
+        $headers = $response->getHeaders(false);
+        $body = $response->getContent(false);
+        $excerpt = mb_substr(trim($body), 0, 500);
+
+        if (429 === $statusCode) {
+            $retryAfter = $headers['retry-after'][0] ?? null;
+            throw new MarketplaceRateLimitException(
+                'Wildberries API rate limit exceeded.',
+                $statusCode,
+                $retryAfter,
+                $excerpt,
+                $dateFrom,
+                $dateTo,
+            );
+        }
+
+        if (401 === $statusCode || 403 === $statusCode) {
+            throw new MarketplaceAuthException(
+                sprintf('Wildberries API auth failed with status %d.', $statusCode),
+                $statusCode,
+                $excerpt,
+            );
+        }
+
+        if ($statusCode >= 500) {
+            throw new MarketplaceTemporaryApiException(
+                sprintf('Wildberries API temporary error with status %d.', $statusCode),
+                $statusCode,
+                $excerpt,
+            );
+        }
+
+        if (200 !== $statusCode) {
+            throw new MarketplaceTemporaryApiException(
+                sprintf('Wildberries API unexpected status %d.', $statusCode),
+                $statusCode,
+                $excerpt,
+            );
+        }
+
+        if ('' === trim($body)) {
+            $this->logger->warning('Wildberries returned empty body for reportDetailByPeriod.', [
+                'status_code' => $statusCode,
+                'body_excerpt' => $excerpt,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]);
+
+            return [];
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new MarketplaceInvalidApiResponseException(
+                'Wildberries API returned invalid JSON.',
+                $statusCode,
+                $excerpt,
+                $e,
+            );
+        }
+
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            throw new MarketplaceInvalidApiResponseException(
+                'Wildberries API returned non-list JSON payload.',
+                $statusCode,
+                $excerpt,
+            );
+        }
+
+        return $decoded;
     }
 
     public function fetchSales(
