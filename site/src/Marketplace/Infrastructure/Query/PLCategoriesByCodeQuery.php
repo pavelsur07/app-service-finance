@@ -19,7 +19,7 @@ final readonly class PLCategoriesByCodeQuery
         }
 
         $rows = $this->connection->fetchAllAssociative(
-            'SELECT c.id, c.code, c.name, c.type, c.flow, c.is_visible FROM pl_categories c INNER JOIN company co ON c.company_id = co.id WHERE co.id = :companyId AND c.code IN (:codes)',
+            'SELECT c.id, c.code, c.name, c.type, c.flow, c.is_visible FROM pl_categories c WHERE c.company_id = :companyId AND c.code IN (:codes)',
             ['companyId' => $companyId, 'codes' => array_values(array_unique($codes))],
             ['codes' => ArrayParameterType::STRING],
         );

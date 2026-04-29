@@ -104,7 +104,7 @@ final readonly class PreviewDefaultCostMappingAction
             plCategoryName: $pl['name'] ?? null,
             existingMappingId: $existing['id'] ?? null,
             existingPlCategoryId: $existing['pl_category_id'] ?? null,
-            existingPlCategoryName: null,
+            existingPlCategoryName: $existing['pl_category_name'] ?? null,
             includeInPl: $rule->isIncludeInPl(),
             isNegative: $rule->isNegative(),
             confidence: $rule->getConfidence(),
