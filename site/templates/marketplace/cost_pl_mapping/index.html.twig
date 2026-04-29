@@ -180,8 +180,8 @@
                 return;
             }
 
-            var modalEl = document.getElementById('modal-default-cost-mapping');
-            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            var modalEl = document.querySelector('#modal-default-cost-mapping');
+            var openBtn = document.querySelector('[data-default-mapping-open]');
             var previewUrl = modalRoot.getAttribute('data-preview-url');
             var applyUrl = modalRoot.getAttribute('data-apply-url');
             var token = modalRoot.getAttribute('data-csrf-token');
@@ -311,9 +311,13 @@
             }
 
             async function loadPreview() {
+                if (state.loading) {
+                    return;
+                }
                 hideAlerts();
                 previewEl.innerHTML = '';
                 emptyEl.classList.add('d-none');
+                applyBtn.disabled = true;
                 var marketplace = currentMarketplace();
                 if (!marketplace) {
                     showError('Выберите маркетплейс перед настройкой базового маппинга.');
@@ -339,9 +343,17 @@
                 }
             }
 
-            modalEl.addEventListener('show.bs.modal', function () {
-                loadPreview();
-            });
+            if (openBtn) {
+                openBtn.addEventListener('click', function () {
+                    loadPreview();
+                });
+            }
+
+            if (modalEl) {
+                modalEl.addEventListener('shown.bs.modal', function () {
+                    loadPreview();
+                });
+            }
 
             applyBtn.addEventListener('click', async function () {
                 if (applyBtn.disabled) return;
