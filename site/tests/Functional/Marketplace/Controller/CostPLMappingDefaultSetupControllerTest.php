@@ -38,6 +38,31 @@ final class CostPLMappingDefaultSetupControllerTest extends WebTestCaseBase
         self::assertSame($before, $this->countMappings());
     }
 
+
+
+    public function testPreviewAcceptsJsonBody(): void
+    {
+        $this->resetDb();
+        $client = static::createClient();
+        [$user, $company] = $this->seedBaseData();
+        $this->loginWithActiveCompany($client, $user, $company);
+
+        $client->request(
+            'POST',
+            '/marketplace/cost-pl-mapping/default/preview',
+            server: ['CONTENT_TYPE' => 'application/json'],
+            content: json_encode([
+                'marketplace' => 'ozon',
+                '_token' => $this->csrf($client),
+            ], \JSON_THROW_ON_ERROR),
+        );
+
+        self::assertResponseIsSuccessful();
+        $payload = json_decode((string) $client->getResponse()->getContent(), true, 512, \JSON_THROW_ON_ERROR);
+        self::assertTrue($payload['ok']);
+        self::assertSame('ozon', $payload['marketplace']);
+    }
+
     public function testApplyIsIdempotentAndUsesActiveCompany(): void
     {
         $this->resetDb();

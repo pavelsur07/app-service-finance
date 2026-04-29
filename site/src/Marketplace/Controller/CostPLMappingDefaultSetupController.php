@@ -32,13 +32,13 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     #[Route('/preview', name: 'marketplace_cost_pl_mapping_default_preview', methods: ['POST'])]
     public function preview(Request $request): JsonResponse
     {
-        if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', $this->extractCsrfToken($request))) {
             return $this->json(['ok' => false, 'message' => 'Некорректный CSRF token.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
         try {
             $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
-            $marketplace = (string) $request->request->get('marketplace', '');
+            $marketplace = $this->extractMarketplace($request);
             $result = ($this->previewAction)(new PreviewDefaultCostMappingCommand($companyId, $marketplace));
 
             return $this->json($this->previewResultToArray($result));
@@ -50,7 +50,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
     #[Route('/apply', name: 'marketplace_cost_pl_mapping_default_apply', methods: ['POST'])]
     public function apply(Request $request): JsonResponse
     {
-        if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', (string) $request->request->get('_token'))) {
+        if (!$this->isCsrfTokenValid('marketplace_default_cost_mapping', $this->extractCsrfToken($request))) {
             return $this->json(['ok' => false, 'message' => 'Некорректный CSRF token.'], JsonResponse::HTTP_FORBIDDEN);
         }
 
@@ -61,7 +61,7 @@ final class CostPLMappingDefaultSetupController extends AbstractController
 
         try {
             $companyId = (string) $this->activeCompanyService->getActiveCompany()->getId();
-            $marketplace = (string) $request->request->get('marketplace', '');
+            $marketplace = $this->extractMarketplace($request);
             $result = ($this->applyAction)(new ApplyDefaultCostMappingCommand($companyId, $marketplace, (string) $user->getId()));
 
             return $this->json($this->applyResultToArray($result));
@@ -70,6 +70,41 @@ final class CostPLMappingDefaultSetupController extends AbstractController
         }
     }
 
+
+
+    private function extractCsrfToken(Request $request): string
+    {
+        $token = $request->request->getString('_token', '');
+        if ($token !== '') {
+            return $token;
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        if (!is_array($payload)) {
+            return '';
+        }
+
+        $value = $payload['_token'] ?? '';
+
+        return is_string($value) ? $value : '';
+    }
+
+    private function extractMarketplace(Request $request): string
+    {
+        $marketplace = $request->request->getString('marketplace', '');
+        if ($marketplace !== '') {
+            return $marketplace;
+        }
+
+        $payload = json_decode((string) $request->getContent(), true);
+        if (!is_array($payload)) {
+            return '';
+        }
+
+        $value = $payload['marketplace'] ?? '';
+
+        return is_string($value) ? $value : '';
+    }
     private function previewResultToArray(DefaultCostMappingPreviewResult $result): array
     {
         return [
