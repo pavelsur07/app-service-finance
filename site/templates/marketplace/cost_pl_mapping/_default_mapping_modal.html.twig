@@ -1,0 +1,42 @@
+<div class="modal modal-blur fade" id="modal-default-cost-mapping" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable" role="document">
+        <div class="modal-content"
+             data-default-mapping-modal
+             data-preview-url="{{ path('marketplace_cost_pl_mapping_default_preview') }}"
+             data-apply-url="{{ path('marketplace_cost_pl_mapping_default_apply') }}"
+             data-csrf-token="{{ csrf_token('marketplace_default_cost_mapping') }}">
+            <div class="modal-header">
+                <h5 class="modal-title">Базовый маппинг затрат</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger d-none" data-default-mapping-blocking>
+                    Есть блокирующие проблемы. Исправьте категории ОПиУ перед применением.
+                </div>
+                <div class="alert alert-warning d-none" data-default-mapping-warning>
+                    В части правил отсутствуют категории затрат маркетплейса. Эти элементы будут пропущены.
+                </div>
+                <div class="alert alert-danger d-none" data-default-mapping-error></div>
+                <div class="alert alert-success d-none" data-default-mapping-success></div>
+
+                <div class="d-flex align-items-center gap-2 text-muted d-none" data-default-mapping-loading>
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    Загрузка preview…
+                </div>
+
+                <div class="d-none" data-default-mapping-empty>
+                    <div class="alert alert-info mb-0">Для выбранного маркетплейса нет правил базового маппинга.</div>
+                </div>
+
+                <div data-default-mapping-preview></div>
+            </div>
+            <div class="modal-footer">
+                <small class="text-muted me-auto" data-default-mapping-apply-hint></small>
+                <button type="button" class="btn" data-bs-dismiss="modal">Закрыть</button>
+                <button type="button" class="btn btn-primary" data-default-mapping-apply disabled>
+                    Применить базовый маппинг
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

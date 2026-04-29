@@ -9,7 +9,7 @@
               class="mb-4 d-flex align-items-end gap-3">
             <div>
                 <label class="form-label">Маркетплейс</label>
-                <select name="marketplace" class="form-select w-auto" onchange="this.form.submit()">
+                <select name="marketplace" class="form-select w-auto" onchange="this.form.submit()" data-marketplace-select>
                     <option value="">Все маркетплейсы</option>
                     {% for mp in available_marketplaces %}
                         <option value="{{ mp.value }}"
@@ -19,6 +19,13 @@
                     {% endfor %}
                 </select>
             </div>
+            <button type="button"
+                    class="btn btn-outline-primary"
+                    data-default-mapping-open
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-default-cost-mapping">
+                Настроить базовый маппинг
+            </button>
         </form>
 
         {% if cost_categories is empty %}
@@ -116,6 +123,8 @@
 
     </div>
 
+    {% include 'marketplace/cost_pl_mapping/_default_mapping_modal.html.twig' %}
+
     {# Modal: Удалить категорию затрат #}
     <div class="modal modal-blur fade" id="modal-delete-cost-category" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered" role="document">
@@ -164,5 +173,181 @@
             document.getElementById('delete-modal-token').value = btn.getAttribute('data-token');
             document.getElementById('form-delete-cost-category').action = url;
         });
+
+        (function () {
+            var modalRoot = document.querySelector('[data-default-mapping-modal]');
+            if (!modalRoot) {
+                return;
+            }
+
+            var modalEl = document.getElementById('modal-default-cost-mapping');
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            var previewUrl = modalRoot.getAttribute('data-preview-url');
+            var applyUrl = modalRoot.getAttribute('data-apply-url');
+            var token = modalRoot.getAttribute('data-csrf-token');
+            var selectEl = document.querySelector('[data-marketplace-select]');
+
+            var loadingEl = modalRoot.querySelector('[data-default-mapping-loading]');
+            var previewEl = modalRoot.querySelector('[data-default-mapping-preview]');
+            var emptyEl = modalRoot.querySelector('[data-default-mapping-empty]');
+            var errorEl = modalRoot.querySelector('[data-default-mapping-error]');
+            var successEl = modalRoot.querySelector('[data-default-mapping-success]');
+            var blockingEl = modalRoot.querySelector('[data-default-mapping-blocking]');
+            var warningEl = modalRoot.querySelector('[data-default-mapping-warning]');
+            var hintEl = modalRoot.querySelector('[data-default-mapping-apply-hint]');
+            var applyBtn = modalRoot.querySelector('[data-default-mapping-apply]');
+
+            var state = {preview: null, loading: false, applying: false};
+            var statusLabels = {
+                will_create: 'Будет создано',
+                will_fill_empty: 'Будет дополнено',
+                skipped_existing: 'Уже настроено',
+                skipped_disabled: 'Отключено вручную',
+                missing_cost_category: 'Нет категории МП',
+                missing_pl_category: 'Нет статьи ОПиУ',
+                invalid_target_category: 'Невалидная статья ОПиУ'
+            };
+
+            function escapeHtml(text) {
+                return String(text ?? '').replace(/[&<>"']/g, function (char) {
+                    return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[char];
+                });
+            }
+
+            function currentMarketplace() {
+                return selectEl ? selectEl.value : '';
+            }
+
+            function showError(message) {
+                errorEl.textContent = message;
+                errorEl.classList.remove('d-none');
+            }
+
+            function hideAlerts() {
+                [errorEl, successEl, blockingEl, warningEl].forEach(function (el) {
+                    el.classList.add('d-none');
+                });
+            }
+
+            function updateApplyState() {
+                var summary = state.preview ? state.preview.summary || {} : {};
+                var actionable = (summary.will_create || 0) + (summary.will_fill_empty || 0);
+                var hasBlocking = Boolean(state.preview && state.preview.hasBlockingIssues);
+                var disabled = !state.preview || state.loading || state.applying || hasBlocking || actionable === 0;
+                applyBtn.disabled = disabled;
+
+                if (!state.preview) {
+                    hintEl.textContent = 'Сначала загрузите preview.';
+                } else if (hasBlocking) {
+                    hintEl.textContent = 'Применение недоступно из-за блокирующих проблем.';
+                } else if (actionable === 0) {
+                    hintEl.textContent = 'Нет новых маппингов для применения.';
+                } else {
+                    hintEl.textContent = '';
+                }
+            }
+
+            function renderPreview(payload) {
+                previewEl.innerHTML = '';
+                emptyEl.classList.add('d-none');
+
+                var summary = payload.summary || {};
+                if ((payload.total || 0) === 0) {
+                    emptyEl.classList.remove('d-none');
+                    return;
+                }
+
+                if (payload.hasBlockingIssues) blockingEl.classList.remove('d-none');
+                if ((summary.missing_cost_category || 0) > 0) warningEl.classList.remove('d-none');
+
+                var cards = Object.keys(statusLabels).map(function (key) {
+                    return '<div class="col-md-3 col-sm-6"><div class="card card-sm"><div class="card-body"><div class="text-muted small">'+statusLabels[key]+'</div><div class="h2 m-0">'+(summary[key] || 0)+'</div></div></div></div>';
+                }).join('');
+
+                var tabs = Object.keys(statusLabels).map(function (key, i) {
+                    var items = (payload.groupedItems && payload.groupedItems[key]) ? payload.groupedItems[key] : [];
+                    var active = i === 0 ? 'active' : '';
+                    var show = i === 0 ? 'show active' : '';
+                    var rows = items.length ? items.map(function (item) {
+                        var conf = item.confidence || 'n/a';
+                        var confClass = conf === 'high' ? 'bg-green-lt' : (conf === 'medium' ? 'bg-yellow-lt' : 'bg-red-lt');
+                        return '<div class="border rounded p-2 mb-2"><div class="d-flex justify-content-between"><span class="badge bg-blue-lt">'+escapeHtml(statusLabels[item.status] || item.status || key)+'</span><span class="badge '+confClass+'">'+escapeHtml(conf)+'</span></div><div class="small mt-2"><strong>Затрата:</strong> '+escapeHtml(item.costCode)+' — '+escapeHtml(item.costCategoryName)+'</div><div class="small"><strong>ОПиУ:</strong> '+escapeHtml(item.plCode)+' — '+escapeHtml(item.plCategoryName)+'</div><div class="small text-muted">'+escapeHtml(item.note || '')+' '+escapeHtml(item.message || '')+'</div></div>';
+                    }).join('') : '<div class="text-muted small">Нет элементов.</div>';
+                    return '<li class="nav-item" role="presentation"><button class="nav-link '+active+'" data-bs-toggle="tab" data-bs-target="#map-tab-'+key+'" type="button">'+statusLabels[key]+' <span class="badge bg-secondary-lt">'+items.length+'</span></button></li>' +
+                        '<div class="tab-pane fade '+show+'" id="map-tab-'+key+'" role="tabpanel">'+rows+'</div>';
+                });
+
+                previewEl.innerHTML = '<div class="row g-2 mb-3">'+cards+'</div>'+
+                    '<ul class="nav nav-tabs mb-2" role="tablist">'+tabs.filter(function(_,i){return i%2===0;}).join('')+'</ul>'+
+                    '<div class="tab-content">'+tabs.filter(function(_,i){return i%2===1;}).join('')+'</div>';
+            }
+
+            async function fetchJson(url, payload) {
+                var res = await fetch(url, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify(payload)
+                });
+                var data = await res.json();
+                if (!res.ok || data.ok === false) {
+                    throw new Error(data.message || 'Ошибка запроса.');
+                }
+                return data;
+            }
+
+            async function loadPreview() {
+                hideAlerts();
+                previewEl.innerHTML = '';
+                emptyEl.classList.add('d-none');
+                var marketplace = currentMarketplace();
+                if (!marketplace) {
+                    showError('Выберите маркетплейс перед настройкой базового маппинга.');
+                    state.preview = null;
+                    updateApplyState();
+                    return;
+                }
+
+                state.loading = true;
+                updateApplyState();
+                loadingEl.classList.remove('d-none');
+                try {
+                    var payload = await fetchJson(previewUrl, {marketplace: marketplace, _token: token});
+                    state.preview = payload;
+                    renderPreview(payload);
+                } catch (e) {
+                    state.preview = null;
+                    showError(e.message);
+                } finally {
+                    state.loading = false;
+                    loadingEl.classList.add('d-none');
+                    updateApplyState();
+                }
+            }
+
+            document.querySelector('[data-default-mapping-open]').addEventListener('click', function () {
+                modal.show();
+                loadPreview();
+            });
+
+            applyBtn.addEventListener('click', async function () {
+                if (applyBtn.disabled) return;
+                state.applying = true;
+                hideAlerts();
+                applyBtn.textContent = 'Применяем...';
+                updateApplyState();
+                try {
+                    var data = await fetchJson(applyUrl, {marketplace: currentMarketplace(), _token: token});
+                    successEl.textContent = 'Базовый маппинг применён. Создано: ' + (data.summary.created || 0) + ', дополнено: ' + (data.summary.updated || 0) + ', пропущено: ' + (data.summary.skipped || 0);
+                    successEl.classList.remove('d-none');
+                    setTimeout(function () { window.location.reload(); }, 1000);
+                } catch (e) {
+                    showError(e.message);
+                } finally {
+                    state.applying = false;
+                    applyBtn.textContent = 'Применить базовый маппинг';
+                    updateApplyState();
+                }
+            });
+        })();
     </script>
 {% endblock %}
