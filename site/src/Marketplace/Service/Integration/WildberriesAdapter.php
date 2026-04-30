@@ -77,8 +77,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 'dateFrom' => $dateFrom,
                 'dateTo' => $dateTo,
                 'limit' => 100000,
-                'rrdid' => 0,
-        ];
+                'rrdid' => 0
 
         $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', $requestOptions);
         $excerpt = mb_substr($normalizedBody, 0, 500);
