@@ -17,6 +17,7 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Tests\Builders\Company\CompanyBuilder;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -199,6 +200,59 @@ final class InitialSyncHandlerTest extends TestCase
         self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
     }
 
+    public function testUniqueViolationOnFlushIsTreatedAsIdempotentSkipAndDispatchesNextMessage(): void
+    {
+        $uniqueViolation = $this->createMock(UniqueConstraintViolationException::class);
+        [$handler, $captured, $em] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            flushException: $uniqueViolation,
+            entityManagerOpenAfterFlushException: false,
+            expectedFetchCalls: 1,
+        );
+
+        $em->expects(self::once())->method('persist')->with(self::isInstanceOf(MarketplaceRawDocument::class));
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
+    }
+
+    public function testUniqueViolationOnFinalBatchThrowsRecoverableWhenEntityManagerClosed(): void
+    {
+        $uniqueViolation = $this->createMock(UniqueConstraintViolationException::class);
+        [$handler, $captured] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            flushException: $uniqueViolation,
+            entityManagerOpenAfterFlushException: false,
+            expectedFetchCalls: 1,
+        );
+
+        $this->expectException(RecoverableMessageHandlingException::class);
+        $this->expectExceptionMessage('EntityManager closed after unique violation on final initial sync batch.');
+
+        try {
+            $handler(new InitialSyncMessage(
+                companyId: self::COMPANY_ID,
+                connectionId: self::CONNECTION_ID,
+                marketplace: MarketplaceType::OZON->value,
+                dateFrom: '2026-03-23 00:00:00',
+                dateTo: '2026-03-29 23:59:59',
+                nextDateFrom: null,
+                nextDateTo: null,
+            ));
+        } finally {
+            self::assertNull($captured->message);
+        }
+    }
+
     public function testRateLimitWithRetryAfterDoesNotDispatchNextMessageAndSetsDelay(): void
     {
         [$handler, $captured] = $this->createHandler(
@@ -277,6 +331,8 @@ final class InitialSyncHandlerTest extends TestCase
         bool $emptyRawData = false,
         ?MarketplaceRawDocument $existingRawDocument = null,
         ?int $expectedFetchCalls = null,
+        ?\Throwable $flushException = null,
+        bool $entityManagerOpenAfterFlushException = true,
     ): array
     {
         $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
@@ -301,6 +357,10 @@ final class InitialSyncHandlerTest extends TestCase
         $rawDocumentRepository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $rawDocumentRepository->method('findExistingInitialSyncDocument')->willReturn($existingRawDocument);
         $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($rawDocumentRepository);
+        if ($flushException !== null) {
+            $em->method('flush')->willThrowException($flushException);
+        }
+        $em->method('isOpen')->willReturn($entityManagerOpenAfterFlushException);
 
         $adapter = $this->createMock(MarketplaceAdapterInterface::class);
         $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);

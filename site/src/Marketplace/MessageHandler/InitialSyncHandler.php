@@ -15,6 +15,7 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
@@ -102,6 +103,7 @@ final class InitialSyncHandler
         $toDate      = new \DateTimeImmutable($message->dateTo);
 
         try {
+            $entityManagerClosedByUniqueViolation = false;
             $adapter = $this->adapterRegistry->get($marketplace);
             $apiEndpoint = $adapter->getApiEndpointName();
 
@@ -143,15 +145,31 @@ final class InitialSyncHandler
                     $rawDoc->setRecordsCount(count($rawData));
 
                     $this->em->persist($rawDoc);
-                    $this->em->flush();
 
-                    $this->logger->info('InitialSync: batch saved', [
-                        'company_id'    => $message->companyId,
-                        'marketplace'   => $message->marketplace,
-                        'date_from'     => $message->dateFrom,
-                        'date_to'       => $message->dateTo,
-                        'records_count' => count($rawData),
-                    ]);
+                    try {
+                        $this->em->flush();
+
+                        $this->logger->info('InitialSync: batch saved', [
+                            'company_id'    => $message->companyId,
+                            'marketplace'   => $message->marketplace,
+                            'date_from'     => $message->dateFrom,
+                            'date_to'       => $message->dateTo,
+                            'records_count' => count($rawData),
+                        ]);
+                    } catch (UniqueConstraintViolationException $e) {
+                        $entityManagerClosedByUniqueViolation = !$this->em->isOpen();
+
+                        $this->logger->info('InitialSync: idempotent skip after unique violation race', [
+                            'company_id' => $message->companyId,
+                            'connection_id' => $message->connectionId,
+                            'marketplace' => $message->marketplace,
+                            'date_from' => $message->dateFrom,
+                            'date_to' => $message->dateTo,
+                            'api_endpoint' => $apiEndpoint,
+                            'entity_manager_open' => !$entityManagerClosedByUniqueViolation,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 } else {
                     $this->logger->info('InitialSync: empty batch, skipping', [
                         'company_id'  => $message->companyId,
@@ -207,6 +225,18 @@ final class InitialSyncHandler
                     'date_to'     => $nextToStr,
                 ]);
             } else {
+                if ($entityManagerClosedByUniqueViolation) {
+                    $this->logger->warning('InitialSync: cannot mark final batch success because EntityManager is closed after unique violation', [
+                        'company_id' => $message->companyId,
+                        'connection_id' => $message->connectionId,
+                        'marketplace' => $message->marketplace,
+                        'date_from' => $message->dateFrom,
+                        'date_to' => $message->dateTo,
+                    ]);
+
+                    throw new RecoverableMessageHandlingException('EntityManager closed after unique violation on final initial sync batch.');
+                }
+
                 // Последняя партия — обновляем статус подключения
                 $connection = $this->em->find(MarketplaceConnection::class, $message->connectionId);
                 if ($connection) {
