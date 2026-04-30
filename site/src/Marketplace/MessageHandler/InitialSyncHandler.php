@@ -13,6 +13,7 @@ use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Message\InitialSyncMessage;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -102,38 +103,63 @@ final class InitialSyncHandler
 
         try {
             $adapter = $this->adapterRegistry->get($marketplace);
-            $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
+            $apiEndpoint = $adapter->getApiEndpointName();
 
-            if (!empty($rawData)) {
-                $rawDoc = new MarketplaceRawDocument(
-                    Uuid::uuid4()->toString(),
-                    $company,
-                    $marketplace,
-                    'sales_report',
-                );
-                $rawDoc->setPeriodFrom($fromDate);
-                $rawDoc->setPeriodTo($toDate);
-                $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-                $rawDoc->setRawData($rawData);
-                $rawDoc->setRecordsCount(count($rawData));
+            /** @var MarketplaceRawDocumentRepository $rawRepository */
+            $rawRepository = $this->em->getRepository(MarketplaceRawDocument::class);
+            $existingRawDocument = $rawRepository->findExistingInitialSyncDocument(
+                $company,
+                $marketplace,
+                'sales_report',
+                $fromDate,
+                $toDate,
+                $apiEndpoint,
+            );
 
-                $this->em->persist($rawDoc);
-                $this->em->flush();
-
-                $this->logger->info('InitialSync: batch saved', [
-                    'company_id'    => $message->companyId,
-                    'marketplace'   => $message->marketplace,
-                    'date_from'     => $message->dateFrom,
-                    'date_to'       => $message->dateTo,
-                    'records_count' => count($rawData),
+            if ($existingRawDocument !== null) {
+                $this->logger->info('InitialSync: idempotent skip, raw document already exists', [
+                    'company_id' => $message->companyId,
+                    'connection_id' => $message->connectionId,
+                    'marketplace' => $message->marketplace,
+                    'date_from' => $message->dateFrom,
+                    'date_to' => $message->dateTo,
+                    'raw_document_id' => $existingRawDocument->getId(),
+                    'api_endpoint' => $apiEndpoint,
                 ]);
             } else {
-                $this->logger->info('InitialSync: empty batch, skipping', [
-                    'company_id'  => $message->companyId,
-                    'marketplace' => $message->marketplace,
-                    'date_from'   => $message->dateFrom,
-                    'date_to'     => $message->dateTo,
-                ]);
+                $rawData = $adapter->fetchRawReport($company, $fromDate, $toDate);
+
+                if (!empty($rawData)) {
+                    $rawDoc = new MarketplaceRawDocument(
+                        Uuid::uuid4()->toString(),
+                        $company,
+                        $marketplace,
+                        'sales_report',
+                    );
+                    $rawDoc->setPeriodFrom($fromDate);
+                    $rawDoc->setPeriodTo($toDate);
+                    $rawDoc->setApiEndpoint($apiEndpoint);
+                    $rawDoc->setRawData($rawData);
+                    $rawDoc->setRecordsCount(count($rawData));
+
+                    $this->em->persist($rawDoc);
+                    $this->em->flush();
+
+                    $this->logger->info('InitialSync: batch saved', [
+                        'company_id'    => $message->companyId,
+                        'marketplace'   => $message->marketplace,
+                        'date_from'     => $message->dateFrom,
+                        'date_to'       => $message->dateTo,
+                        'records_count' => count($rawData),
+                    ]);
+                } else {
+                    $this->logger->info('InitialSync: empty batch, skipping', [
+                        'company_id'  => $message->companyId,
+                        'marketplace' => $message->marketplace,
+                        'date_from'   => $message->dateFrom,
+                        'date_to'     => $message->dateTo,
+                    ]);
+                }
             }
 
             // Диспатчим следующую партию если она есть

@@ -7,11 +7,13 @@ namespace App\Tests\Unit\Marketplace\MessageHandler;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\MessageHandler\InitialSyncHandler;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -132,7 +134,57 @@ final class InitialSyncHandlerTest extends TestCase
 
     public function testEmptyBatchStillDispatchesNextMessage(): void
     {
-        [$handler, $captured] = $this->createHandler(new MockClock('2026-04-10 12:00:00'), emptyRawData: true);
+        [$handler, $captured, $em] = $this->createHandler(new MockClock('2026-04-10 12:00:00'), emptyRawData: true, expectedFetchCalls: 1);
+
+        $em->expects(self::never())->method('persist');
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
+    }
+
+    public function testFirstRunPersistsRawDocumentAndDispatchesNextMessage(): void
+    {
+        [$handler, $captured, $em] = $this->createHandler(new MockClock('2026-04-10 12:00:00'), expectedFetchCalls: 1);
+
+        $em->expects(self::once())->method('persist')->with(self::isInstanceOf(MarketplaceRawDocument::class));
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
+    }
+
+    public function testSameBatchIdempotentSkipDispatchesNextMessageWithoutPersist(): void
+    {
+        $existingRawDoc = new MarketplaceRawDocument(
+            '33333333-3333-4333-8333-333333333333',
+            CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build(),
+            MarketplaceType::OZON,
+            'sales_report',
+        );
+        [$handler, $captured, $em] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            existingRawDocument: $existingRawDoc,
+            expectedFetchCalls: 0,
+        );
+
+        $em->expects(self::never())->method('persist');
 
         $handler(new InitialSyncMessage(
             companyId: self::COMPANY_ID,
@@ -216,13 +268,15 @@ final class InitialSyncHandlerTest extends TestCase
     }
 
     /**
-     * @return array{0: InitialSyncHandler, 1: \stdClass} captured->message хранит последнее задиспатченное сообщение
+     * @return array{0: InitialSyncHandler, 1: \stdClass, 2: EntityManagerInterface, 3: MarketplaceAdapterInterface} captured->message хранит последнее задиспатченное сообщение
      */
     private function createHandler(
         MockClock $clock,
         ?\Throwable $fetchException = null,
         bool $lockAcquired = true,
         bool $emptyRawData = false,
+        ?MarketplaceRawDocument $existingRawDocument = null,
+        ?int $expectedFetchCalls = null,
     ): array
     {
         $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
@@ -244,16 +298,24 @@ final class InitialSyncHandlerTest extends TestCase
             return null;
         });
 
+        $rawDocumentRepository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocumentRepository->method('findExistingInitialSyncDocument')->willReturn($existingRawDocument);
+        $em->method('getRepository')->with(MarketplaceRawDocument::class)->willReturn($rawDocumentRepository);
+
         $adapter = $this->createMock(MarketplaceAdapterInterface::class);
         $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
         $adapter->method('getApiEndpointName')->willReturn('test/endpoint');
         // Непустой raw → handler сохранит MarketplaceRawDocument и дойдёт до dispatch.
+        $fetchRawReportExpectation = $expectedFetchCalls !== null
+            ? $adapter->expects(self::exactly($expectedFetchCalls))
+            : $adapter->expects(self::any());
+
         if ($fetchException !== null) {
-            $adapter->method('fetchRawReport')->willThrowException($fetchException);
+            $fetchRawReportExpectation->method('fetchRawReport')->willThrowException($fetchException);
         } elseif ($emptyRawData) {
-            $adapter->method('fetchRawReport')->willReturn([]);
+            $fetchRawReportExpectation->method('fetchRawReport')->willReturn([]);
         } else {
-            $adapter->method('fetchRawReport')->willReturn([['ok' => 1]]);
+            $fetchRawReportExpectation->method('fetchRawReport')->willReturn([['ok' => 1]]);
         }
 
         $registry = new MarketplaceAdapterRegistry([$adapter]);
@@ -287,6 +349,6 @@ final class InitialSyncHandlerTest extends TestCase
             $clock,
         );
 
-        return [$handler, $captured];
+        return [$handler, $captured, $em, $adapter];
     }
 }
