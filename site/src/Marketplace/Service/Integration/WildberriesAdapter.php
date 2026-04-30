@@ -74,6 +74,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             'dateTo' => $dateTo,
             'limit' => 100000,
             'rrdid' => 0,
+            'period' => 'daily',
         ];
 
         $requestOptions = [
