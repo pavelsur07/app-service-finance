@@ -82,7 +82,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 'Authorization' => $connection->getApiKey(),
             ],
             'query' => $query,
-        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', $requestOptions);
+        $response = $this->httpClient->request(
+            'GET',
+            self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod',
+            $requestOptions
+        );
         $excerpt = mb_substr($normalizedBody, 0, 500);
             $retryAfter = $this->parseRetryAfter($headers['retry-after'][0] ?? null);
 
