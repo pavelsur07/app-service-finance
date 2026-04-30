@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Entity;
 
 use App\Company\Entity\Company;
@@ -201,6 +203,14 @@ class MarketplaceConnection
     public function setSettings(?array $settings): self
     {
         $this->settings = $settings;
+        $this->updatedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function mergeSettings(array $settings): self
+    {
+        $this->settings = array_merge($this->settings ?? [], $settings);
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;

@@ -151,6 +151,68 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         return $decoded;
     }
 
+    public function hasRawReportData(
+        Company $company,
+        \DateTimeInterface $fromDate,
+        \DateTimeInterface $toDate,
+    ): bool {
+        $connection = $this->getConnection($company);
+
+        if (!$connection) {
+            throw new \RuntimeException('Wildberries connection not found');
+        }
+
+        $dateFrom = $fromDate->format('Y-m-d');
+        $dateTo = $toDate->format('Y-m-d');
+
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
+            'headers' => [
+                'Authorization' => $connection->getApiKey(),
+            ],
+            'query' => [
+                'dateFrom' => $dateFrom,
+                'dateTo' => $dateTo,
+                'limit' => 1,
+                'rrdid' => 0,
+                'period' => 'daily',
+            ],
+        ]);
+
+        $statusCode = $response->getStatusCode();
+        $headers = $response->getHeaders(false);
+        $body = $response->getContent(false);
+        $excerpt = $this->createSafeExcerpt($body);
+
+        if (429 === $statusCode) {
+            $retryAfter = $this->extractRetryAfter($headers);
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
+        }
+        if (401 === $statusCode || 403 === $statusCode) {
+            throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if ($statusCode >= 500 && $statusCode <= 599) {
+            throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if (200 !== $statusCode) {
+            throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if ('' === trim($body)) {
+            return false;
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
+        }
+
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+
+        return [] !== $decoded;
+    }
+
     public function fetchSales(
         Company $company,
         \DateTimeInterface $fromDate,
