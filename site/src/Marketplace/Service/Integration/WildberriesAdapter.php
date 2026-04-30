@@ -398,7 +398,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             return $seconds >= 0 ? $seconds : null;
         }
 
-        $retryAt = new \DateTimeImmutable($retryAfterHeader);
+        try {
+            $retryAt = new \DateTimeImmutable($retryAfterHeader);
+        } catch (\Exception) {
+            return null;
+        }
+
         $seconds = $retryAt->getTimestamp() - time();
 
         return $seconds > 0 ? $seconds : 0;
