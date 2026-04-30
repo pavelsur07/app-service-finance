@@ -16,6 +16,9 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 final class WildberriesAdapterTest extends TestCase
 {
@@ -85,6 +88,67 @@ final class WildberriesAdapterTest extends TestCase
 
         $this->expectException(MarketplaceInvalidApiResponseException::class);
         $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+    }
+
+    public function testProbeReturnsFalseForEmptyListAndUsesLightweightQuery(): void
+    {
+        $captured = [];
+        $client = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = $options['query'];
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
+        $repo = $this->createMock(MarketplaceConnectionRepository::class);
+        $repo->method('findByMarketplace')->willReturn($this->connection());
+        $adapter = new WildberriesAdapter($client, $repo, new NullLogger());
+
+        self::assertFalse($adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
+        self::assertSame(1, $captured['limit']);
+        self::assertSame('daily', $captured['period']);
+        self::assertSame(0, $captured['rrdid']);
+    }
+
+    public function testProbeReturnsTrueForNonEmptyList(): void
+    {
+        $adapter = $this->createAdapter(new MockResponse('[{"id":1}]', ['http_code' => 200]));
+        self::assertTrue($adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
+    }
+
+    public function testFetchRawReportThrowsTemporaryExceptionOnTransportErrorWhileReadingBody(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getHeaders')->willReturn([]);
+        $response->method('getContent')->willThrowException($this->createMock(TransportExceptionInterface::class));
+
+        $client = $this->createMock(HttpClientInterface::class);
+        $client->method('request')->willReturn($response);
+
+        $repo = $this->createMock(MarketplaceConnectionRepository::class);
+        $repo->method('findByMarketplace')->willReturn($this->connection());
+
+        $adapter = new WildberriesAdapter($client, $repo, new NullLogger());
+
+        $this->expectException(MarketplaceTemporaryApiException::class);
+        $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+    }
+
+    public function testHasRawReportDataThrowsTemporaryExceptionOnTransportErrorWhileReadingBody(): void
+    {
+        $response = $this->createMock(ResponseInterface::class);
+        $response->method('getStatusCode')->willReturn(200);
+        $response->method('getHeaders')->willReturn([]);
+        $response->method('getContent')->willThrowException($this->createMock(TransportExceptionInterface::class));
+
+        $client = $this->createMock(HttpClientInterface::class);
+        $client->method('request')->willReturn($response);
+
+        $repo = $this->createMock(MarketplaceConnectionRepository::class);
+        $repo->method('findByMarketplace')->willReturn($this->connection());
+
+        $adapter = new WildberriesAdapter($client, $repo, new NullLogger());
+
+        $this->expectException(MarketplaceTemporaryApiException::class);
+        $adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
     }
 
     private function createAdapter(MockResponse $response): WildberriesAdapter
