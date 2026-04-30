@@ -52,6 +52,37 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Idempotency lookup for initial sync weekly/month-split batches.
+     */
+    public function findExistingInitialSyncDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+        string $apiEndpoint,
+    ): ?MarketplaceRawDocument {
+        return $this->createQueryBuilder('d')
+            ->where('d.company = :company')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.periodFrom = :periodFrom')
+            ->andWhere('d.periodTo = :periodTo')
+            ->andWhere('d.apiEndpoint = :apiEndpoint')
+            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->setParameter('periodFrom', $periodFrom)
+            ->setParameter('periodTo', $periodTo)
+            ->setParameter('apiEndpoint', $apiEndpoint)
+            ->setParameter('failed', PipelineStatus::FAILED)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    /**
      * @return MarketplaceRawDocument[]
      */
     public function findByCompany(Company $company, int $limit = 20): array
