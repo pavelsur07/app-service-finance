@@ -17,6 +17,7 @@ use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class WildberriesAdapter implements MarketplaceAdapterInterface
@@ -86,7 +87,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         $statusCode = $response->getStatusCode();
         $headers = $response->getHeaders(false);
-        $body = $response->getContent(false);
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface) {
+            $body = '';
+        }
         $excerpt = $this->createSafeExcerpt($body);
 
         if (429 === $statusCode) {
@@ -180,7 +185,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         $statusCode = $response->getStatusCode();
         $headers = $response->getHeaders(false);
-        $body = $response->getContent(false);
+        try {
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface) {
+            $body = '';
+        }
         $excerpt = $this->createSafeExcerpt($body);
 
         if (429 === $statusCode) {
@@ -208,6 +217,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         if (!is_array($decoded) || !array_is_list($decoded)) {
             throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+
+        foreach ($decoded as $row) {
+            if (!is_array($row)) {
+                throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
+            }
         }
 
         return [] !== $decoded;

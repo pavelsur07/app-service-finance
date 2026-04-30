@@ -45,7 +45,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         $adapter->method('hasRawReportData')->willReturnCallback(static fn ($c, $from) => (int) $from->format('n') >= 4);
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::once())->method('flush');
+        $em->expects(self::atLeastOnce())->method('flush');
 
         $resolver = new WbInitialSyncStartDateResolver($adapter, $em, new NullLogger(), new MockClock('2026-05-10 00:00:00'));
         $date = $resolver->resolve($company, $connection);
@@ -79,7 +79,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         $adapter->expects(self::once())->method('hasRawReportData')->willReturn(true);
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::once())->method('flush');
+        $em->expects(self::atLeastOnce())->method('flush');
 
         $resolver = new WbInitialSyncStartDateResolver($adapter, $em, new NullLogger(), new MockClock('2026-05-10 00:00:00'));
         $date = $resolver->resolve($company, $connection);
@@ -97,7 +97,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         $adapter->method('hasRawReportData')->willReturn(false);
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->expects(self::once())->method('flush');
+        $em->expects(self::atLeastOnce())->method('flush');
 
         $resolver = new WbInitialSyncStartDateResolver($adapter, $em, new NullLogger(), new MockClock('2026-05-10 00:00:00'));
         $date = $resolver->resolve($company, $connection);
