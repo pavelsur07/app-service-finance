@@ -89,8 +89,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $headers = $response->getHeaders(false);
         try {
             $body = $response->getContent(false);
-        } catch (TransportExceptionInterface) {
-            $body = '';
+        } catch (TransportExceptionInterface $e) {
+            throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
         }
         $excerpt = $this->createSafeExcerpt($body);
 
@@ -187,8 +187,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $headers = $response->getHeaders(false);
         try {
             $body = $response->getContent(false);
-        } catch (TransportExceptionInterface) {
-            $body = '';
+        } catch (TransportExceptionInterface $e) {
+            throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
         }
         $excerpt = $this->createSafeExcerpt($body);
 

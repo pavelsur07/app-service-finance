@@ -11,7 +11,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 
-final readonly class WbInitialSyncStartDateResolver
+class WbInitialSyncStartDateResolver
 {
     private const DISCOVERY_VERSION = '1';
 
@@ -59,10 +59,6 @@ final readonly class WbInitialSyncStartDateResolver
 
     private function parseCachedStartDate(array $settings, \DateTimeImmutable $yearStart, \DateTimeImmutable $yesterday): ?\DateTimeImmutable
     {
-        if (($settings['wb_initial_sync_discovery_version'] ?? null) !== self::DISCOVERY_VERSION) {
-            return null;
-        }
-
         $raw = $settings['wb_initial_sync_start_date'] ?? null;
         if (!is_string($raw) || '' === trim($raw)) {
             return null;
