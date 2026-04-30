@@ -69,7 +69,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $dateFrom = $fromDate->format('Y-m-d');
         $dateTo = $toDate->format('Y-m-d');
 
-        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
+        $requestOptions = [
             'headers' => [
                 'Authorization' => $connection->getApiKey(),
             ],
@@ -78,7 +78,9 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                 'dateTo' => $dateTo,
                 'limit' => 100000,
                 'rrdid' => 0,
-        $normalizedBody = trim($body);
+        ];
+
+        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', $requestOptions);
         $excerpt = mb_substr($normalizedBody, 0, 500);
             $retryAfter = $this->parseRetryAfter($headers['retry-after'][0] ?? null);
 
