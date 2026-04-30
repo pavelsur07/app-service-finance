@@ -8,6 +8,8 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\MarketplaceAuthException;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\MessageHandler\InitialSyncHandler;
 use App\Marketplace\Service\Integration\MarketplaceAdapterInterface;
@@ -17,7 +19,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\LockInterface;
 use Symfony\Component\Messenger\Envelope;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class InitialSyncHandlerTest extends TestCase
@@ -108,10 +113,92 @@ final class InitialSyncHandlerTest extends TestCase
         self::assertNull($dispatched->nextDateTo);
     }
 
+    public function testLockNotAcquiredSkipsBatch(): void
+    {
+        [$handler, $captured] = $this->createHandler(new MockClock('2026-04-10 12:00:00'), null, lockAcquired: false);
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertNull($captured->message);
+    }
+
+    public function testEmptyBatchStillDispatchesNextMessage(): void
+    {
+        [$handler, $captured] = $this->createHandler(new MockClock('2026-04-10 12:00:00'), emptyRawData: true);
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
+    }
+
+    public function testRateLimitDoesNotDispatchNextMessage(): void
+    {
+        [$handler, $captured] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            new MarketplaceRateLimitException(429, 'rate-limit', '2026-03-23', '2026-03-29', 60),
+        );
+
+        try {
+            $handler(new InitialSyncMessage(
+                companyId: self::COMPANY_ID,
+                connectionId: self::CONNECTION_ID,
+                marketplace: MarketplaceType::OZON->value,
+                dateFrom: '2026-03-23 00:00:00',
+                dateTo: '2026-03-29 23:59:59',
+                nextDateFrom: '2026-03-30 00:00:00',
+                nextDateTo: '2026-03-31 23:59:59',
+            ));
+            self::fail('Expected RecoverableMessageHandlingException was not thrown.');
+        } catch (RecoverableMessageHandlingException) {
+            self::assertNull($captured->message);
+        }
+    }
+
+    public function testAuthErrorDoesNotDispatchNextMessage(): void
+    {
+        [$handler, $captured] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            new MarketplaceAuthException('auth', 401, 'denied', '2026-03-23', '2026-03-29'),
+        );
+
+        $handler(new InitialSyncMessage(
+            companyId: self::COMPANY_ID,
+            connectionId: self::CONNECTION_ID,
+            marketplace: MarketplaceType::OZON->value,
+            dateFrom: '2026-03-23 00:00:00',
+            dateTo: '2026-03-29 23:59:59',
+            nextDateFrom: '2026-03-30 00:00:00',
+            nextDateTo: '2026-03-31 23:59:59',
+        ));
+
+        self::assertNull($captured->message);
+    }
+
     /**
      * @return array{0: InitialSyncHandler, 1: \stdClass} captured->message хранит последнее задиспатченное сообщение
      */
-    private function createHandler(MockClock $clock): array
+    private function createHandler(
+        MockClock $clock,
+        ?\Throwable $fetchException = null,
+        bool $lockAcquired = true,
+        bool $emptyRawData = false,
+    ): array
     {
         $company    = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(
@@ -136,7 +223,13 @@ final class InitialSyncHandlerTest extends TestCase
         $adapter->method('getMarketplaceType')->willReturn(MarketplaceType::OZON->value);
         $adapter->method('getApiEndpointName')->willReturn('test/endpoint');
         // Непустой raw → handler сохранит MarketplaceRawDocument и дойдёт до dispatch.
-        $adapter->method('fetchRawReport')->willReturn([['ok' => 1]]);
+        if ($fetchException !== null) {
+            $adapter->method('fetchRawReport')->willThrowException($fetchException);
+        } elseif ($emptyRawData) {
+            $adapter->method('fetchRawReport')->willReturn([]);
+        } else {
+            $adapter->method('fetchRawReport')->willReturn([['ok' => 1]]);
+        }
 
         $registry = new MarketplaceAdapterRegistry([$adapter]);
 
@@ -146,18 +239,23 @@ final class InitialSyncHandlerTest extends TestCase
         $captured->message = null;
 
         $messageBus = $this->createMock(MessageBusInterface::class);
-        $messageBus
-            ->expects(self::once())
-            ->method('dispatch')
-            ->willReturnCallback(static function (object $message) use ($captured): Envelope {
-                $captured->message = $message;
+        $messageBus->method('dispatch')->willReturnCallback(static function (object $message) use ($captured): Envelope {
+            $captured->message = $message;
 
-                return new Envelope($message);
-            });
+            return new Envelope($message);
+        });
+
+        $lock = $this->createMock(LockInterface::class);
+        $lock->method('acquire')->willReturn($lockAcquired);
+        $lock->method('release');
+
+        $lockFactory = $this->createMock(LockFactory::class);
+        $lockFactory->method('createLock')->willReturn($lock);
 
         $handler = new InitialSyncHandler(
             $em,
             $registry,
+            $lockFactory,
             $messageBus,
             new NullLogger(),
             new MarketplaceWeekPartitionService(),
