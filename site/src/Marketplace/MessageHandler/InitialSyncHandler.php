@@ -32,6 +32,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class InitialSyncHandler
 {
     private const LOCK_TTL_SECONDS = 300;
+    private const RATE_LIMIT_FALLBACK_DELAY_SECONDS = 90;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -188,6 +189,9 @@ final class InitialSyncHandler
                 ]);
             }
         } catch (MarketplaceRateLimitException $e) {
+            $retryAfterSeconds = $e->getRetryAfter() ?? self::RATE_LIMIT_FALLBACK_DELAY_SECONDS;
+            $retryAfterMs = max(1, $retryAfterSeconds) * 1000;
+
             $this->logger->warning('InitialSync: rate limit, batch retry scheduled', [
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
@@ -195,10 +199,12 @@ final class InitialSyncHandler
                 'date_from' => $message->dateFrom,
                 'date_to' => $message->dateTo,
                 'retry_after' => $e->getRetryAfter(),
+                'retry_after_fallback' => $e->getRetryAfter() === null,
+                'retry_delay_ms' => $retryAfterMs,
                 'error' => $e->getMessage(),
             ]);
 
-            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
+            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e, $retryAfterMs);
         } catch (MarketplaceAuthException $e) {
             $this->logger->error('InitialSync: auth error, stopping sync chain', [
                 'company_id' => $message->companyId,

@@ -147,7 +147,7 @@ final class InitialSyncHandlerTest extends TestCase
         self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
     }
 
-    public function testRateLimitDoesNotDispatchNextMessage(): void
+    public function testRateLimitWithRetryAfterDoesNotDispatchNextMessageAndSetsDelay(): void
     {
         [$handler, $captured] = $this->createHandler(
             new MockClock('2026-04-10 12:00:00'),
@@ -165,7 +165,32 @@ final class InitialSyncHandlerTest extends TestCase
                 nextDateTo: '2026-03-31 23:59:59',
             ));
             self::fail('Expected RecoverableMessageHandlingException was not thrown.');
-        } catch (RecoverableMessageHandlingException) {
+        } catch (RecoverableMessageHandlingException $e) {
+            self::assertSame(60_000, $e->getRetryDelay());
+            self::assertNull($captured->message);
+        }
+    }
+
+    public function testRateLimitWithoutRetryAfterUsesFallbackDelay(): void
+    {
+        [$handler, $captured] = $this->createHandler(
+            new MockClock('2026-04-10 12:00:00'),
+            new MarketplaceRateLimitException(429, 'rate-limit', '2026-03-23', '2026-03-29', null),
+        );
+
+        try {
+            $handler(new InitialSyncMessage(
+                companyId: self::COMPANY_ID,
+                connectionId: self::CONNECTION_ID,
+                marketplace: MarketplaceType::OZON->value,
+                dateFrom: '2026-03-23 00:00:00',
+                dateTo: '2026-03-29 23:59:59',
+                nextDateFrom: '2026-03-30 00:00:00',
+                nextDateTo: '2026-03-31 23:59:59',
+            ));
+            self::fail('Expected RecoverableMessageHandlingException was not thrown.');
+        } catch (RecoverableMessageHandlingException $e) {
+            self::assertSame(90_000, $e->getRetryDelay());
             self::assertNull($captured->message);
         }
     }
