@@ -9,13 +9,18 @@ use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\MarketplaceAuthException;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Service\Integration\MarketplaceAdapterRegistry;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\ClockInterface;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -31,6 +36,7 @@ final class InitialSyncHandler
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly MarketplaceAdapterRegistry $adapterRegistry,
+        private readonly LockFactory $lockFactory,
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
         private readonly MarketplaceWeekPartitionService $partitionService,
@@ -39,6 +45,32 @@ final class InitialSyncHandler
     }
 
     public function __invoke(InitialSyncMessage $message): void
+    {
+        $lock = $this->lockFactory->createLock(
+            sprintf('marketplace_initial_sync:%s:%s:%s', $message->companyId, $message->connectionId, $message->marketplace),
+            self::LOCK_TTL_SECONDS,
+        );
+
+        if (!$lock->acquire()) {
+            $this->logger->warning('InitialSync: lock not acquired, skipping batch', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'marketplace' => $message->marketplace,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+            ]);
+
+            return;
+        }
+
+        try {
+            $this->process($message);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    private function process(InitialSyncMessage $message): void
     {
         $company = $this->em->find(Company::class, $message->companyId);
         if (!$company) {
@@ -155,6 +187,41 @@ final class InitialSyncHandler
                     'marketplace' => $message->marketplace,
                 ]);
             }
+        } catch (MarketplaceRateLimitException $e) {
+            $this->logger->warning('InitialSync: rate limit, batch retry scheduled', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'marketplace' => $message->marketplace,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+                'retry_after' => $e->getRetryAfter(),
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
+        } catch (MarketplaceAuthException $e) {
+            $this->logger->error('InitialSync: auth error, stopping sync chain', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'marketplace' => $message->marketplace,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+                'error' => $e->getMessage(),
+            ]);
+
+            $connection->markSyncFailed($e->getMessage());
+            $this->em->flush();
+        } catch (MarketplaceTemporaryApiException $e) {
+            $this->logger->warning('InitialSync: temporary API error, retry scheduled', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'marketplace' => $message->marketplace,
+                'date_from' => $message->dateFrom,
+                'date_to' => $message->dateTo,
+                'error' => $e->getMessage(),
+            ]);
+
+            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e);
         } catch (\Throwable $e) {
             $this->logger->error('InitialSync: batch failed', [
                 'company_id'  => $message->companyId,
