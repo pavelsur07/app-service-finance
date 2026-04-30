@@ -61,6 +61,11 @@ final class InitialSyncHandler
                 'date_to' => $message->dateTo,
             ]);
 
+            // В текущей модели initial sync повторная обработка одного и того же batch
+            // не защищена от дублей MarketplaceRawDocument (нет уникального ключа/guard'а
+            // по company+marketplace+document_type+period). Поэтому lock-miss завершаем
+            // как "skip + ack", а не retry: это осознанная защита от потенциального
+            // повторного сохранения raw-документов до внедрения idempotency guard.
             return;
         }
 
