@@ -82,6 +82,40 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+    public function findMinPeriodFromForSuccessfulDocuments(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        string $apiEndpoint,
+        \DateTimeImmutable $yearStart,
+        \DateTimeImmutable $yesterday,
+    ): ?\DateTimeImmutable {
+        $value = $this->createQueryBuilder('d')
+            ->select('MIN(d.periodFrom) AS min_period_from')
+            ->where('d.company = :company')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.apiEndpoint = :apiEndpoint')
+            ->andWhere('d.periodFrom >= :yearStart')
+            ->andWhere('d.periodFrom <= :yesterday')
+            ->andWhere('d.processingStatus = :completed')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->setParameter('apiEndpoint', $apiEndpoint)
+            ->setParameter('yearStart', $yearStart)
+            ->setParameter('yesterday', $yesterday)
+            ->setParameter('completed', PipelineStatus::COMPLETED)
+            ->getQuery()
+            ->getSingleScalarResult();
+
+        if (!is_string($value) || '' === $value) {
+            return null;
+        }
+
+        return new \DateTimeImmutable($value . ' 00:00:00');
+    }
+
     /**
      * @return MarketplaceRawDocument[]
      */
