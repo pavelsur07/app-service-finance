@@ -6,6 +6,8 @@ namespace App\Marketplace\Application\Service;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use App\Marketplace\Service\Integration\WildberriesAdapter;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -14,9 +16,11 @@ use Symfony\Component\Clock\ClockInterface;
 class WbInitialSyncStartDateResolver
 {
     private const DISCOVERY_VERSION = '1';
+    private const DOCUMENT_TYPE = 'sales_report';
 
     public function __construct(
         private WildberriesAdapter $wildberriesAdapter,
+        private MarketplaceRawDocumentRepository $rawDocumentRepository,
         private EntityManagerInterface $entityManager,
         private LoggerInterface $logger,
         private ClockInterface $clock,
@@ -32,6 +36,27 @@ class WbInitialSyncStartDateResolver
 
         if (null !== $cached) {
             return $cached;
+        }
+
+        $localStartDate = $this->rawDocumentRepository->findMinPeriodFromForSuccessfulDocuments(
+            company: $company,
+            marketplace: $connection->getMarketplace(),
+            documentType: self::DOCUMENT_TYPE,
+            apiEndpoint: $this->wildberriesAdapter->getApiEndpointName(),
+            yearStart: $yearStart,
+            yesterday: $yesterday,
+        );
+
+        if (null !== $localStartDate) {
+            $connection->mergeSettings([
+                'wb_initial_sync_start_date' => $localStartDate->format('Y-m-d'),
+                'wb_initial_sync_discovery_at' => $this->clock->now()->format(\DateTimeInterface::ATOM),
+                'wb_initial_sync_discovery_source' => 'local_raw_documents',
+                'wb_initial_sync_discovery_version' => self::DISCOVERY_VERSION,
+            ]);
+            $this->entityManager->flush();
+
+            return $localStartDate;
         }
 
         $startDate = $this->discoverStartDate($company, $connection, $settings, $yearStart, $yesterday);
@@ -95,6 +120,27 @@ class WbInitialSyncStartDateResolver
         \DateTimeImmutable $yesterday,
     ): ?\DateTimeImmutable
     {
+        $retryNotBefore = $settings['wb_initial_sync_discovery_retry_not_before'] ?? null;
+        if (is_string($retryNotBefore) && '' !== trim($retryNotBefore)) {
+            try {
+                $notBefore = new \DateTimeImmutable($retryNotBefore);
+                if ($notBefore > $this->clock->now()) {
+                    $retryAfter = $notBefore->getTimestamp() - $this->clock->now()->getTimestamp();
+
+                    throw new MarketplaceRateLimitException(
+                        429,
+                        'Discovery paused after previous rate limit.',
+                        $yearStart->format('Y-m-d'),
+                        $yesterday->format('Y-m-d'),
+                        $retryAfter,
+                    );
+                }
+            } catch (MarketplaceRateLimitException $e) {
+                throw $e;
+            } catch (\Throwable) {
+            }
+        }
+
         $monthStart = $yearStart;
         $resumeMonth = $settings['wb_initial_sync_discovery_last_probed_month'] ?? null;
         if (is_string($resumeMonth) && '' !== trim($resumeMonth)) {
@@ -113,8 +159,21 @@ class WbInitialSyncStartDateResolver
                 $monthEnd = $yesterday;
             }
 
-            if ($this->wildberriesAdapter->hasRawReportData($company, $monthStart, $monthEnd)) {
-                return $monthStart;
+            try {
+                if ($this->wildberriesAdapter->hasRawReportData($company, $monthStart, $monthEnd)) {
+                    return $monthStart;
+                }
+            } catch (MarketplaceRateLimitException $e) {
+                $retryAfter = $e->getRetryAfter();
+                if (null !== $retryAfter && $retryAfter >= 300) {
+                    $connection->mergeSettings([
+                        'wb_initial_sync_discovery_retry_not_before' => $this->clock->now()->modify(sprintf('+%d seconds', $retryAfter))->format(\DateTimeInterface::ATOM),
+                        'wb_initial_sync_discovery_version' => self::DISCOVERY_VERSION,
+                    ]);
+                    $this->entityManager->flush();
+                }
+
+                throw $e;
             }
 
             $connection->mergeSettings([
