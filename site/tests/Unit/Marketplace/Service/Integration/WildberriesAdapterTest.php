@@ -69,6 +69,32 @@ final class WildberriesAdapterTest extends TestCase
         }
     }
 
+    public function testRateLimitUsesResetAsTimestampWhenValueLooksLikeUnixTime(): void
+    {
+        $resetTimestamp = time() + 300;
+        $adapter = $this->createAdapter(new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['X-Ratelimit-Reset: '.$resetTimestamp]]));
+
+        try {
+            $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+            self::fail('Expected MarketplaceRateLimitException was not thrown');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertGreaterThanOrEqual(299, $e->getRetryAfter());
+            self::assertLessThanOrEqual(300, $e->getRetryAfter());
+        }
+    }
+
+    public function testRateLimitAllowsZeroRetryAfterValue(): void
+    {
+        $adapter = $this->createAdapter(new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['X-Ratelimit-Retry: 0']]));
+
+        try {
+            $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+            self::fail('Expected MarketplaceRateLimitException was not thrown');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(0, $e->getRetryAfter());
+        }
+    }
+
     public function testThrowsAuthExceptionFor401And403(): void
     {
         $adapter401 = $this->createAdapter(new MockResponse('', ['http_code' => 401]));

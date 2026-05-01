@@ -474,7 +474,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         $reset = $this->extractHeaderInt($headers, self::WB_HEADER_RESET);
         if ($reset !== null) {
-            return $reset;
+            $now = (new \DateTimeImmutable())->getTimestamp();
+
+            return $reset > $now
+                ? max(0, $reset - $now)
+                : $reset;
         }
 
         return $this->extractHeaderInt($headers, 'retry-after');
@@ -487,13 +491,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         }
 
         $value = trim((string) $headers[$headerName][0]);
-        if ($value === '' || !is_numeric($value)) {
+        if ($value === '' || !ctype_digit($value)) {
             return null;
         }
 
-        $seconds = (int) $value;
-
-        return $seconds > 0 ? $seconds : null;
+        return (int) $value;
     }
 
     private function createSafeExcerpt(string $body): string
