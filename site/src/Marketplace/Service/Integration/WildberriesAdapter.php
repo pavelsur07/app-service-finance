@@ -23,6 +23,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 class WildberriesAdapter implements MarketplaceAdapterInterface
 {
     private const BASE_URL = 'https://statistics-api.wildberries.ru';
+    private const WB_HEADER_RETRY = 'x-ratelimit-retry';
+    private const WB_HEADER_RESET = 'x-ratelimit-reset';
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
@@ -93,6 +95,16 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
         }
         $excerpt = $this->createSafeExcerpt($body);
+
+        if (204 === $statusCode) {
+            $this->logger->info('WB API no data', [
+                'status_code' => $statusCode,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]);
+
+            return [];
+        }
 
         if (429 === $statusCode) {
             $retryAfter = $this->extractRetryAfter($headers);
@@ -191,6 +203,16 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
         }
         $excerpt = $this->createSafeExcerpt($body);
+
+        if (204 === $statusCode) {
+            $this->logger->debug('WB API no data', [
+                'status_code' => $statusCode,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ]);
+
+            return false;
+        }
 
         if (429 === $statusCode) {
             $retryAfter = $this->extractRetryAfter($headers);
@@ -445,14 +467,35 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     private function extractRetryAfter(array $headers): ?int
     {
-        $values = $headers['retry-after'] ?? $headers['Retry-After'] ?? null;
-        if (!is_array($values) || [] === $values) {
+        $retryAfter = $this->extractHeaderInt($headers, self::WB_HEADER_RETRY);
+        if ($retryAfter !== null) {
+            return $retryAfter;
+        }
+
+        $reset = $this->extractHeaderInt($headers, self::WB_HEADER_RESET);
+        if ($reset !== null) {
+            $now = (new \DateTimeImmutable())->getTimestamp();
+
+            return $reset > $now
+                ? max(0, $reset - $now)
+                : $reset;
+        }
+
+        return $this->extractHeaderInt($headers, 'retry-after');
+    }
+
+    private function extractHeaderInt(array $headers, string $headerName): ?int
+    {
+        if (!isset($headers[$headerName][0])) {
             return null;
         }
 
-        $raw = trim((string) $values[0]);
+        $value = trim((string) $headers[$headerName][0]);
+        if ($value === '' || !ctype_digit($value)) {
+            return null;
+        }
 
-        return ctype_digit($raw) ? (int) $raw : null;
+        return (int) $value;
     }
 
     private function createSafeExcerpt(string $body): string

@@ -296,7 +296,7 @@ final class InitialSyncHandlerTest extends TestCase
             ));
             self::fail('Expected RecoverableMessageHandlingException was not thrown.');
         } catch (RecoverableMessageHandlingException $e) {
-            self::assertSame(90_000, $e->getRetryDelay());
+            self::assertSame(600_000, $e->getRetryDelay());
             self::assertNull($captured->message);
         }
     }

@@ -29,6 +29,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 #[AsMessageHandler]
 final class TriggerInitialSyncHandler
 {
+    private const WB_RATE_LIMIT_FALLBACK_DELAY_SECONDS = 600;
     public function __construct(
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
@@ -65,7 +66,7 @@ final class TriggerInitialSyncHandler
             try {
                 $resolved = $this->wbStartDateResolver->resolve($connection->getCompany(), $connection);
             } catch (MarketplaceRateLimitException $e) {
-                $retrySeconds = max(1, $e->getRetryAfter() ?? 90);
+                $retrySeconds = max(1, $e->getRetryAfter() ?? self::WB_RATE_LIMIT_FALLBACK_DELAY_SECONDS);
                 $this->logger->warning('InitialSync trigger delayed by WB rate limit during discovery', [
                     'company_id' => $message->companyId,
                     'connection_id' => $message->connectionId,
