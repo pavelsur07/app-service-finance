@@ -62,7 +62,7 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             $handler(new TriggerInitialSyncMessage($company->getId(), $connection->getId(), MarketplaceType::WILDBERRIES->value));
             self::fail('Expected RecoverableMessageHandlingException');
         } catch (RecoverableMessageHandlingException $e) {
-            self::assertSame(90_000, $e->getRetryDelay());
+            self::assertSame(600_000, $e->getRetryDelay());
         }
     }
 

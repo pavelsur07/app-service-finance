@@ -31,14 +31,41 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testThrowsRateLimitExceptionFor429(): void
     {
-        $adapter = $this->createAdapter(new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['Retry-After: 15']]));
+        $adapter = $this->createAdapter(new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['X-Ratelimit-Retry: 120', 'Retry-After: 15']]));
 
         try {
             $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
             self::fail('Expected MarketplaceRateLimitException was not thrown');
         } catch (MarketplaceRateLimitException $e) {
             self::assertSame(429, $e->getStatusCode());
-            self::assertSame(15, $e->getRetryAfter());
+            self::assertSame(120, $e->getRetryAfter());
+        }
+    }
+
+
+    public function testReturnsEmptyArrayFor204NoData(): void
+    {
+        $adapter = $this->createAdapter(new MockResponse('', ['http_code' => 204]));
+
+        self::assertSame([], $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
+    }
+
+    public function testProbeReturnsFalseFor204NoData(): void
+    {
+        $adapter = $this->createAdapter(new MockResponse('', ['http_code' => 204]));
+
+        self::assertFalse($adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
+    }
+
+    public function testRateLimitUsesXRateLimitResetWhenRetryMissing(): void
+    {
+        $adapter = $this->createAdapter(new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['X-Ratelimit-Reset: 300']]));
+
+        try {
+            $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+            self::fail('Expected MarketplaceRateLimitException was not thrown');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(300, $e->getRetryAfter());
         }
     }
 

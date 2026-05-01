@@ -34,7 +34,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class InitialSyncHandler
 {
     private const LOCK_TTL_SECONDS = 300;
-    private const RATE_LIMIT_FALLBACK_DELAY_SECONDS = 90;
+    private const RATE_LIMIT_FALLBACK_DELAY_SECONDS = 600;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
