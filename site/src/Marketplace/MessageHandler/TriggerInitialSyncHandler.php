@@ -8,15 +8,12 @@ use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Message\InitialSyncMessage;
 use App\Marketplace\Message\TriggerInitialSyncMessage;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
-use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
@@ -29,7 +26,6 @@ use Symfony\Component\Messenger\MessageBusInterface;
 #[AsMessageHandler]
 final class TriggerInitialSyncHandler
 {
-    private const WB_RATE_LIMIT_FALLBACK_DELAY_SECONDS = 600;
     private const MAX_INITIAL_SPAN_DAYS = 60;
     public function __construct(
         private readonly MessageBusInterface $messageBus,
@@ -38,7 +34,6 @@ final class TriggerInitialSyncHandler
         private readonly ClockInterface $clock,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly WbInitialSyncStartDateResolver $wbStartDateResolver,
-        private readonly EntityManagerInterface $entityManager,
     ) {
     }
 
@@ -64,39 +59,7 @@ final class TriggerInitialSyncHandler
         $syncStart = $yearStart;
 
         if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
-            try {
-                $resolved = $this->wbStartDateResolver->resolve($connection->getCompany(), $connection);
-            } catch (MarketplaceRateLimitException $e) {
-                $retrySeconds = max(1, $e->getRetryAfter() ?? self::WB_RATE_LIMIT_FALLBACK_DELAY_SECONDS);
-                $this->logger->warning('InitialSync trigger delayed by WB rate limit during discovery', [
-                    'company_id' => $message->companyId,
-                    'connection_id' => $message->connectionId,
-                    'marketplace' => $message->marketplace,
-                    'date_from' => $e->getDateFrom(),
-                    'date_to' => $e->getDateTo(),
-                    'retry_after' => $e->getRetryAfter(),
-                ]);
-
-                throw new RecoverableMessageHandlingException(
-                    'InitialSync trigger rate limited by Wildberries discovery.',
-                    retryDelay: $retrySeconds * 1000,
-                    previous: $e,
-                );
-            }
-
-            if (null === $resolved) {
-                $connection->markSyncSuccess();
-                $this->entityManager->flush();
-                $this->logger->info('InitialSync: WB no data found for current year, sync completed without batches.', [
-                    'company_id' => $message->companyId,
-                    'connection_id' => $message->connectionId,
-                    'marketplace' => $message->marketplace,
-                ]);
-
-                return;
-            }
-
-            $syncStart = $resolved;
+            $syncStart = $this->wbStartDateResolver->resolve($connection->getCompany(), $connection);
         }
 
         $endDate = $syncStart->modify(sprintf('+%d days', self::MAX_INITIAL_SPAN_DAYS));
