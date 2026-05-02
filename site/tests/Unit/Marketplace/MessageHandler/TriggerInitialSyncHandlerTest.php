@@ -43,10 +43,22 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             return new Envelope($m);
         });
 
+        $partitionService = $this->createMock(MarketplaceWeekPartitionService::class);
+        $partitionService->expects(self::once())
+            ->method('buildPartitions')
+            ->with(
+                self::equalTo(new \DateTimeImmutable('2026-01-10 00:00:00')),
+                self::equalTo(new \DateTimeImmutable('2026-03-11 00:00:00')),
+            )
+            ->willReturn([
+                ['from' => '2026-01-10 00:00:00', 'to' => '2026-01-19 23:59:59'],
+                ['from' => '2026-01-20 00:00:00', 'to' => '2026-03-11 23:59:59'],
+            ]);
+
         $handler = new TriggerInitialSyncHandler(
             $bus,
             new NullLogger(),
-            new MarketplaceWeekPartitionService(),
+            $partitionService,
             new MockClock('2026-04-30 00:00:00'),
             $repo,
             $resolver,
@@ -57,11 +69,7 @@ final class TriggerInitialSyncHandlerTest extends TestCase
         self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
         self::assertSame('2026-01-10 00:00:00', $captured->message->dateFrom);
         self::assertSame('2026-01-19 23:59:59', $captured->message->dateTo);
-        self::assertNotNull($captured->message->nextDateTo);
-        self::assertLessThanOrEqual(
-            new \DateTimeImmutable('2026-03-11 23:59:59'),
-            new \DateTimeImmutable($captured->message->nextDateTo),
-        );
+        self::assertSame('2026-03-11 23:59:59', $captured->message->nextDateTo);
     }
 
     public function testNonWbDoesNotCallResolverAndUsesYearStartUntilYesterday(): void
@@ -83,10 +91,22 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             return new Envelope($m);
         });
 
+        $partitionService = $this->createMock(MarketplaceWeekPartitionService::class);
+        $partitionService->expects(self::once())
+            ->method('buildPartitions')
+            ->with(
+                self::equalTo(new \DateTimeImmutable('2026-01-01 00:00:00')),
+                self::equalTo(new \DateTimeImmutable('2026-04-29 00:00:00')),
+            )
+            ->willReturn([
+                ['from' => '2026-01-01 00:00:00', 'to' => '2026-01-11 23:59:59'],
+                ['from' => '2026-01-12 00:00:00', 'to' => '2026-04-29 23:59:59'],
+            ]);
+
         $handler = new TriggerInitialSyncHandler(
             $bus,
             new NullLogger(),
-            new MarketplaceWeekPartitionService(),
+            $partitionService,
             new MockClock('2026-04-30 00:00:00'),
             $repo,
             $resolver,

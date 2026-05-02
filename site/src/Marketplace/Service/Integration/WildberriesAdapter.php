@@ -165,6 +165,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             }
         }
 
+        if (count($decoded) > 100_000) {
+            $this->logger->warning('WB payload too large', [
+                'count' => count($decoded),
+            ]);
+        }
+
         return $decoded;
     }
 
