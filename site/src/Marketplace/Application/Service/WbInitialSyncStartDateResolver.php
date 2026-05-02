@@ -25,10 +25,10 @@ class WbInitialSyncStartDateResolver
         $now = $this->clock->now()->setTime(0, 0, 0);
         $yearStart = new \DateTimeImmutable((int) $now->format('Y') . '-01-01 00:00:00');
         $yesterday = $now->modify('-1 day');
-        $cached = $this->parseCachedStartDate($connection->getSettings() ?? [], $now);
+        $settingsOverride = $this->parseSettingsStartDateOverride($connection->getSettings() ?? [], $yesterday);
 
-        if (null !== $cached) {
-            return $cached;
+        if (null !== $settingsOverride) {
+            return $settingsOverride;
         }
 
         $localStartDate = $this->rawDocumentRepository->findMinPeriodFromForSuccessfulDocuments(
@@ -47,22 +47,28 @@ class WbInitialSyncStartDateResolver
         return $now->modify(sprintf('-%d days', self::DEFAULT_INITIAL_DAYS));
     }
 
-    private function parseCachedStartDate(array $settings, \DateTimeImmutable $now): ?\DateTimeImmutable
+    private function parseSettingsStartDateOverride(array $settings, \DateTimeImmutable $maxAllowedDate): ?\DateTimeImmutable
     {
         $raw = $settings['wb_initial_sync_start_date'] ?? null;
         if (!is_string($raw) || '' === trim($raw)) {
             return null;
         }
 
-        try {
-            $date = (new \DateTimeImmutable($raw))->setTime(0, 0, 0);
-            if ($date > $now) {
-                return null;
-            }
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($raw), $maxAllowedDate->getTimezone());
+        $errors = \DateTimeImmutable::getLastErrors();
 
-            return $date;
-        } catch (\Throwable) {
+        if (false === $date) {
             return null;
         }
+
+        if (is_array($errors) && (0 !== $errors['warning_count'] || 0 !== $errors['error_count'])) {
+            return null;
+        }
+
+        if ($date > $maxAllowedDate) {
+            return null;
+        }
+
+        return $date;
     }
 }
