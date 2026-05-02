@@ -25,7 +25,7 @@ class WbInitialSyncStartDateResolver
         $now = $this->clock->now()->setTime(0, 0, 0);
         $yearStart = new \DateTimeImmutable((int) $now->format('Y') . '-01-01 00:00:00');
         $yesterday = $now->modify('-1 day');
-        $cached = $this->parseCachedStartDate($connection->getSettings() ?? []);
+        $cached = $this->parseCachedStartDate($connection->getSettings() ?? [], $now);
 
         if (null !== $cached) {
             return $cached;
@@ -47,7 +47,7 @@ class WbInitialSyncStartDateResolver
         return $now->modify(sprintf('-%d days', self::DEFAULT_INITIAL_DAYS));
     }
 
-    private function parseCachedStartDate(array $settings): ?\DateTimeImmutable
+    private function parseCachedStartDate(array $settings, \DateTimeImmutable $now): ?\DateTimeImmutable
     {
         $raw = $settings['wb_initial_sync_start_date'] ?? null;
         if (!is_string($raw) || '' === trim($raw)) {
@@ -55,7 +55,12 @@ class WbInitialSyncStartDateResolver
         }
 
         try {
-            return (new \DateTimeImmutable($raw))->setTime(0, 0, 0);
+            $date = (new \DateTimeImmutable($raw))->setTime(0, 0, 0);
+            if ($date > $now) {
+                return null;
+            }
+
+            return $date;
         } catch (\Throwable) {
             return null;
         }

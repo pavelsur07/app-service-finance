@@ -62,9 +62,12 @@ final class TriggerInitialSyncHandler
             $syncStart = $this->wbStartDateResolver->resolve($connection->getCompany(), $connection);
         }
 
-        $endDate = $syncStart->modify(sprintf('+%d days', self::MAX_INITIAL_SPAN_DAYS));
-        if ($endDate > $yesterday) {
-            $endDate = $yesterday;
+        $endDate = $yesterday;
+        if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
+            $wbLimitedEndDate = $syncStart->modify(sprintf('+%d days', self::MAX_INITIAL_SPAN_DAYS));
+            if ($wbLimitedEndDate < $endDate) {
+                $endDate = $wbLimitedEndDate;
+            }
         }
 
         $weeks = $this->partitionService->buildPartitions($syncStart, $endDate);
