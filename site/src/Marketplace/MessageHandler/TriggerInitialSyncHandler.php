@@ -30,6 +30,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class TriggerInitialSyncHandler
 {
     private const WB_RATE_LIMIT_FALLBACK_DELAY_SECONDS = 600;
+    private const MAX_INITIAL_SPAN_DAYS = 60;
     public function __construct(
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
@@ -98,7 +99,12 @@ final class TriggerInitialSyncHandler
             $syncStart = $resolved;
         }
 
-        $weeks = $this->partitionService->buildPartitions($syncStart, $yesterday);
+        $endDate = $syncStart->modify(sprintf('+%d days', self::MAX_INITIAL_SPAN_DAYS));
+        if ($endDate > $yesterday) {
+            $endDate = $yesterday;
+        }
+
+        $weeks = $this->partitionService->buildPartitions($syncStart, $endDate);
 
         if (empty($weeks)) {
             $this->logger->warning('InitialSync: no weeks to sync', [
