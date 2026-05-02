@@ -13,6 +13,7 @@ use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Service\Integration\WildberriesAdapter;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
@@ -183,6 +184,25 @@ final class WildberriesAdapterTest extends TestCase
 
         $this->expectException(MarketplaceTemporaryApiException::class);
         $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+    }
+
+    public function testLogsWarningForPayloadLargerThanOneHundredThousandWithoutThrowing(): void
+    {
+        $payload = '['.str_repeat('{},', 100_000).'{}]';
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())
+            ->method('warning')
+            ->with('WB payload too large', ['count' => 100_001]);
+
+        $repo = $this->createMock(MarketplaceConnectionRepository::class);
+        $repo->method('findByMarketplace')->willReturn($this->connection());
+
+        $adapter = new WildberriesAdapter(new MockHttpClient(new MockResponse($payload, ['http_code' => 200])), $repo, $logger);
+
+        $decoded = $adapter->fetchRawReport($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02'));
+
+        self::assertCount(100_001, $decoded);
+        self::assertIsArray($decoded);
     }
 
     public function testHasRawReportDataThrowsTemporaryExceptionOnTransportErrorWhileReadingBody(): void
