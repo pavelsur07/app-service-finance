@@ -54,7 +54,7 @@ class WbInitialSyncStartDateResolver
             return null;
         }
 
-        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($raw));
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', trim($raw), $maxAllowedDate->getTimezone());
         $errors = \DateTimeImmutable::getLastErrors();
 
         if (false === $date) {

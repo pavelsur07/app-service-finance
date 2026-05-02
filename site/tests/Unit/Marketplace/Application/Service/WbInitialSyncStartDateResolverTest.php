@@ -28,6 +28,21 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         self::assertSame('2026-05-09', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 
+
+
+    public function testAcceptsYesterdayOverrideWithNonUtcClockTimezone(): void
+    {
+        $company = CompanyBuilder::aCompany()->build();
+        $connection = new MarketplaceConnection('22222222-2222-2222-2222-222222222222', $company, MarketplaceType::WILDBERRIES);
+        $connection->setSettings(['wb_initial_sync_start_date' => '2026-05-09']);
+
+        $rawRepository = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawRepository->expects(self::never())->method('findMinPeriodFromForSuccessfulDocuments');
+
+        $resolver = new WbInitialSyncStartDateResolver($rawRepository, new MockClock('2026-05-10 00:00:00 Europe/Moscow'));
+
+        self::assertSame('2026-05-09', $resolver->resolve($company, $connection)->format('Y-m-d'));
+    }
     public function testIgnoresTodayOverrideAndUsesLocalRawDocuments(): void
     {
         $company = CompanyBuilder::aCompany()->build();
