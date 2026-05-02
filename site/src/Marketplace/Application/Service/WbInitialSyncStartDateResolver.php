@@ -12,6 +12,7 @@ use Symfony\Component\Clock\ClockInterface;
 class WbInitialSyncStartDateResolver
 {
     private const DOCUMENT_TYPE = 'sales_report';
+    private const DEFAULT_INITIAL_DAYS = 60;
 
     public function __construct(
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
@@ -19,17 +20,18 @@ class WbInitialSyncStartDateResolver
     ) {
     }
 
-    public function resolve(Company $company, MarketplaceConnection $connection): ?\DateTimeImmutable
+    public function resolve(Company $company, MarketplaceConnection $connection): \DateTimeImmutable
     {
-        $yesterday = $this->clock->now()->modify('-1 day')->setTime(0, 0, 0);
-        $yearStart = new \DateTimeImmutable((int) $yesterday->format('Y') . '-01-01 00:00:00');
-        $cached = $this->parseCachedStartDate($connection->getSettings() ?? [], $yearStart, $yesterday);
+        $now = $this->clock->now()->setTime(0, 0, 0);
+        $yearStart = new \DateTimeImmutable((int) $now->format('Y') . '-01-01 00:00:00');
+        $yesterday = $now->modify('-1 day');
+        $cached = $this->parseCachedStartDate($connection->getSettings() ?? []);
 
         if (null !== $cached) {
             return $cached;
         }
 
-        return $this->rawDocumentRepository->findMinPeriodFromForSuccessfulDocuments(
+        $localStartDate = $this->rawDocumentRepository->findMinPeriodFromForSuccessfulDocuments(
             company: $company,
             marketplace: $connection->getMarketplace(),
             documentType: self::DOCUMENT_TYPE,
@@ -37,9 +39,15 @@ class WbInitialSyncStartDateResolver
             yearStart: $yearStart,
             yesterday: $yesterday,
         );
+
+        if (null !== $localStartDate) {
+            return $localStartDate->setTime(0, 0, 0);
+        }
+
+        return $now->modify(sprintf('-%d days', self::DEFAULT_INITIAL_DAYS));
     }
 
-    private function parseCachedStartDate(array $settings, \DateTimeImmutable $yearStart, \DateTimeImmutable $yesterday): ?\DateTimeImmutable
+    private function parseCachedStartDate(array $settings): ?\DateTimeImmutable
     {
         $raw = $settings['wb_initial_sync_start_date'] ?? null;
         if (!is_string($raw) || '' === trim($raw)) {
@@ -47,15 +55,9 @@ class WbInitialSyncStartDateResolver
         }
 
         try {
-            $date = new \DateTimeImmutable($raw . ' 00:00:00');
+            return (new \DateTimeImmutable($raw))->setTime(0, 0, 0);
         } catch (\Throwable) {
             return null;
         }
-
-        if ($date > $yesterday || $date < $yearStart) {
-            return null;
-        }
-
-        return $date;
     }
 }
