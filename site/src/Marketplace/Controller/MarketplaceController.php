@@ -516,12 +516,21 @@ class MarketplaceController extends AbstractController
     public function costsIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $query   = $request->query->all();
 
-        $categoryId = $request->query->get('category');
-        $mapped     = (string) $request->query->get('mapped', 'all');
+        $categoryId = $this->uuidOrNull($query['category'] ?? null);
+        $mapped     = $this->resolveMapped($query['mapped'] ?? null);
+        $now        = new \DateTimeImmutable();
+
+        $defaultDateFrom = $now->modify('first day of this month')->setTime(0, 0);
+        $defaultDateTo   = $now->modify('last day of this month')->setTime(23, 59, 59);
+
+        $marketplace = $this->resolveMarketplace($query['marketplace'] ?? null);
+        $dateFrom    = $this->resolveDate($query['date_from'] ?? null, $defaultDateFrom);
+        $dateTo      = $this->resolveDate($query['date_to'] ?? null, $defaultDateTo)->setTime(23, 59, 59);
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
-            ->getByCompanyQueryBuilder($company);
+            ->getByCompanyQueryBuilder($company, $marketplace, $dateFrom, $dateTo);
 
         if ($mapped === 'linked') {
             $queryBuilder->andWhere('c.listing IS NOT NULL');
@@ -547,11 +556,24 @@ class MarketplaceController extends AbstractController
         $categories = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCostCategory::class)
             ->findByCompany($company);
 
+        $routeParams = [
+            'category'    => $categoryId,
+            'mapped'      => $mapped,
+            'marketplace' => $marketplace->value,
+            'date_from'   => $dateFrom->format('Y-m-d'),
+            'date_to'     => $dateTo->format('Y-m-d'),
+        ];
+
         return $this->render('marketplace/costs.html.twig', [
             'pager'              => $pagerfanta,
             'categories'         => $categories,
             'selectedCategoryId' => $categoryId,
             'mapped'             => $mapped,
+            'availableMarketplaces' => MarketplaceType::cases(),
+            'selectedMarketplace' => $marketplace->value,
+            'selectedDateFrom' => $dateFrom->format('Y-m-d'),
+            'selectedDateTo' => $dateTo->format('Y-m-d'),
+            'routeParams' => $routeParams,
         ]);
     }
 
@@ -662,6 +684,61 @@ class MarketplaceController extends AbstractController
         }
 
         return $months;
+    }
+
+    private function stringOrNull(mixed $raw): ?string
+    {
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    private function uuidOrNull(mixed $raw): ?string
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null || !Uuid::isValid($value)) {
+            return null;
+        }
+
+        return $value;
+    }
+
+    private function resolveMapped(mixed $raw): string
+    {
+        $value = $this->stringOrNull($raw);
+
+        if ($value === 'all' || $value === 'linked' || $value === 'general') {
+            return $value;
+        }
+
+        return 'all';
+    }
+
+    private function resolveMarketplace(mixed $raw): MarketplaceType
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null) {
+            return MarketplaceType::OZON;
+        }
+
+        return MarketplaceType::tryFrom($value) ?? MarketplaceType::OZON;
+    }
+
+    private function resolveDate(mixed $raw, \DateTimeImmutable $default): \DateTimeImmutable
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null) {
+            return $default;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if ($date === false || $date->format('Y-m-d') !== $value) {
+            return $default;
+        }
+
+        return $date;
     }
 
     /**
