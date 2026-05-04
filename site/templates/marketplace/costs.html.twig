@@ -6,15 +6,15 @@
     <ul class="nav nav-tabs mb-3">
         <li class="nav-item">
             <a class="nav-link {{ mapped == 'all' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'all'}) }}">Все</a>
+               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'all'})) }}">Все</a>
         </li>
         <li class="nav-item">
             <a class="nav-link {{ mapped == 'linked' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'linked'}) }}">С листингом</a>
+               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'linked'})) }}">С листингом</a>
         </li>
         <li class="nav-item">
             <a class="nav-link {{ mapped == 'general' ? 'active' : '' }}"
-               href="{{ path('marketplace_costs_index', {'category': selectedCategoryId, 'mapped': 'general'}) }}">Общие</a>
+               href="{{ path('marketplace_costs_index', routeParams|default({'category': selectedCategoryId, 'mapped': mapped, 'marketplace': selectedMarketplace, 'date_from': selectedDateFrom, 'date_to': selectedDateTo})|merge({'mapped': 'general'})) }}">Общие</a>
         </li>
     </ul>
 
@@ -152,10 +152,13 @@
             {% include 'partials/_pagerfanta.html.twig' with {
                 'pager': pager,
                 'route': 'marketplace_costs_index',
-                'params': {
+                'params': routeParams|default({
                     'category': selectedCategoryId,
-                    'mapped': mapped
-                }
+                    'mapped': mapped,
+                    'marketplace': selectedMarketplace,
+                    'date_from': selectedDateFrom,
+                    'date_to': selectedDateTo
+                })
             } %}
         </div>
     {% endif %}
