@@ -118,4 +118,68 @@ class MarketplaceCostRepository extends ServiceEntityRepository
 
         return array_fill_keys($result, true);
     }
+
+    public function findExportRowsByCompanyAndFilters(
+        Company $company,
+        ?MarketplaceType $marketplace,
+        ?\DateTimeImmutable $dateFrom,
+        ?\DateTimeImmutable $dateTo,
+        ?string $categoryId,
+        string $mapped,
+    ): array {
+        $qb = $this->getEntityManager()->getConnection()->createQueryBuilder();
+        $qb
+            ->select(
+                'c.id',
+                'c.cost_date',
+                'c.marketplace',
+                'c.amount',
+                'c.operation_type',
+                'c.description',
+                'c.external_id',
+                'c.raw_document_id',
+                'cc.id AS category_id',
+                'cc.code AS category_code',
+                'cc.name AS category_name',
+                'l.id AS listing_id',
+                'l.marketplace_sku',
+                'l.supplier_sku',
+                'l.size AS listing_size',
+                'l.name AS listing_name',
+            )
+            ->from('marketplace_costs', 'c')
+            ->leftJoin('c', 'marketplace_cost_categories', 'cc', 'cc.id = c.category_id')
+            ->leftJoin('c', 'marketplace_listings', 'l', 'l.id = c.listing_id')
+            ->where('c.company_id = :companyId')
+            ->setParameter('companyId', (string) $company->getId())
+            ->orderBy('c.cost_date', 'DESC');
+
+        if ($marketplace !== null) {
+            $qb->andWhere('c.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace->value);
+        }
+
+        if ($dateFrom !== null) {
+            $qb->andWhere('c.cost_date >= :dateFrom')
+                ->setParameter('dateFrom', $dateFrom->format('Y-m-d'));
+        }
+
+        if ($dateTo !== null) {
+            $qb->andWhere('c.cost_date <= :dateTo')
+                ->setParameter('dateTo', $dateTo->format('Y-m-d'));
+        }
+
+        if ($categoryId !== null) {
+            $qb->andWhere('c.category_id = :categoryId')
+                ->setParameter('categoryId', $categoryId);
+        }
+
+        if ($mapped === 'linked') {
+            $qb->andWhere('c.listing_id IS NOT NULL');
+        } elseif ($mapped === 'general') {
+            $qb->andWhere('c.listing_id IS NULL');
+        }
+
+        return $qb->executeQuery()->fetchAllAssociative();
+    }
 }
