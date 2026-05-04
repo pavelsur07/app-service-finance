@@ -518,7 +518,7 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
         $query   = $request->query->all();
 
-        $categoryId = $this->stringOrNull($query['category'] ?? null);
+        $categoryId = $this->uuidOrNull($query['category'] ?? null);
         $mapped     = $this->resolveMapped($query['mapped'] ?? null);
         $now        = new \DateTimeImmutable();
 
@@ -693,6 +693,16 @@ class MarketplaceController extends AbstractController
         }
 
         return $raw;
+    }
+
+    private function uuidOrNull(mixed $raw): ?string
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null || !Uuid::isValid($value)) {
+            return null;
+        }
+
+        return $value;
     }
 
     private function resolveMapped(mixed $raw): string
