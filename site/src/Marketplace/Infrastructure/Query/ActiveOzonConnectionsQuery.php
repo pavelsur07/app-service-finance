@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Query;
 
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -26,9 +27,13 @@ final class ActiveOzonConnectionsQuery
             'SELECT mc.id, mc.company_id
              FROM marketplace_connections mc
              WHERE mc.marketplace = :marketplace
+               AND mc.connection_type = :connection_type
                AND mc.is_active = true
              ORDER BY mc.created_at ASC',
-            ['marketplace' => 'ozon'],
+            [
+                'marketplace' => 'ozon',
+                'connection_type' => MarketplaceConnectionType::SELLER->value,
+            ],
         );
     }
 }

@@ -21,13 +21,12 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 /**
- * Загружает сырые данные Ozon за последние 3 дня и сохраняет MarketplaceRawDocument.
+ * Загружает сырые данные Ozon за конкретную дату и сохраняет MarketplaceRawDocument.
  * После успешной загрузки диспатчит ProcessDayReportMessage для автозапуска pipeline.
  */
 #[AsMessageHandler]
 final class SyncOzonReportHandler
 {
-    private const SYNC_PERIOD_DAYS = 3;
     private const LOCK_TTL_SECONDS = 300;
 
     public function __construct(
