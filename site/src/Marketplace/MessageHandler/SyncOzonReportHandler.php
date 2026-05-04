@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
@@ -107,12 +108,12 @@ final class SyncOzonReportHandler
             $fromDate = $toDate;
         }
 
-        // Idempotency: skip если за эту дату уже есть raw_document в любом НЕ-FAILED статусе
-        // (null / pending / running / completed). Закрывает гонку между двумя
-        // SyncOzonReportMessage, когда первый прогон ещё in-flight (raw_document
-        // создан, pipeline не успел проставить completed) — без этого второй воркер
-        // создавал дубль. FAILED-документы в выборку не попадают — для них retry
-        // должен создать новый, что сохраняет существующую retry-семантику.
+        // existingDoc используется для двух сценариев:
+        // 1) refresh завершённого документа (status null/completed), чтобы дозагрузить
+        //    поздние корректировки из Ozon без создания дубля;
+        // 2) skip refresh для in-flight pipeline (pending/running), чтобы не обновлять
+        //    payload во время обработки и не получить смешанное состояние шагов.
+        // FAILED-документы в выборку не попадают — для них retry создаёт новый.
         $existingDoc = $this->rawDocumentRepository->findExistingDayDocument(
             $company,
             MarketplaceType::OZON,
@@ -120,13 +121,17 @@ final class SyncOzonReportHandler
             $fromDate,
         );
 
-        if ($existingDoc !== null) {
-            $this->logger->info('Skipping Ozon sync: raw document already exists for this day', [
-                'company_id'       => $companyId,
-                'connection_id'    => $connectionId,
-                'date'             => $fromDate->format('Y-m-d'),
-                'existing_doc_id'  => $existingDoc->getId(),
-                'existing_status'  => $existingDoc->getProcessingStatus()?->value,
+
+        if (
+            $existingDoc !== null
+            && in_array($existingDoc->getProcessingStatus(), [PipelineStatus::PENDING, PipelineStatus::RUNNING], true)
+        ) {
+            $this->logger->info('Skipping Ozon refresh: pipeline is still in progress for this raw document', [
+                'company_id'      => $companyId,
+                'connection_id'   => $connectionId,
+                'raw_document_id' => $existingDoc->getId(),
+                'status'          => $existingDoc->getProcessingStatus()?->value,
+                'date'            => $fromDate->format('Y-m-d'),
             ]);
 
             return;
@@ -153,30 +158,50 @@ final class SyncOzonReportHandler
                 return;
             }
 
-            $rawDoc = new MarketplaceRawDocument(
-                Uuid::uuid4()->toString(),
-                $company,
-                MarketplaceType::OZON,
-                'sales_report',
-            );
-            $rawDoc->setPeriodFrom($fromDate);
-            $rawDoc->setPeriodTo($toDate);
-            $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
-            $rawDoc->setRawData($rawData);
-            $rawDoc->setRecordsCount(count($rawData));
+            if ($existingDoc !== null) {
+                $existingDoc->refreshRawData(
+                    rawData: $rawData,
+                    apiEndpoint: $adapter->getApiEndpointName(),
+                    recordsCount: count($rawData),
+                );
 
-            $this->em->persist($rawDoc);
-            $this->em->flush();
+                $this->em->flush();
 
-            $rawDocId = $rawDoc->getId();
+                $rawDocId = $existingDoc->getId();
 
-            $this->logger->info('Ozon raw report saved', [
-                'company_id'    => $companyId,
-                'connection_id' => $connectionId,
-                'raw_doc_id'    => $rawDocId,
-                'records_count' => count($rawData),
-                'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
-            ]);
+                $this->logger->info('Ozon raw report refreshed', [
+                    'company_id'    => $companyId,
+                    'connection_id' => $connectionId,
+                    'raw_doc_id'    => $rawDocId,
+                    'records_count' => count($rawData),
+                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                ]);
+            } else {
+                $rawDoc = new MarketplaceRawDocument(
+                    Uuid::uuid4()->toString(),
+                    $company,
+                    MarketplaceType::OZON,
+                    'sales_report',
+                );
+                $rawDoc->setPeriodFrom($fromDate);
+                $rawDoc->setPeriodTo($toDate);
+                $rawDoc->setApiEndpoint($adapter->getApiEndpointName());
+                $rawDoc->setRawData($rawData);
+                $rawDoc->setRecordsCount(count($rawData));
+
+                $this->em->persist($rawDoc);
+                $this->em->flush();
+
+                $rawDocId = $rawDoc->getId();
+
+                $this->logger->info('Ozon raw report saved', [
+                    'company_id'    => $companyId,
+                    'connection_id' => $connectionId,
+                    'raw_doc_id'    => $rawDocId,
+                    'records_count' => count($rawData),
+                    'period'        => $fromDate->format('Y-m-d') . ' - ' . $toDate->format('Y-m-d'),
+                ]);
+            }
 
             $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
             $connection->markSyncSuccess();

@@ -24,9 +24,9 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
      * за конкретный день (periodFrom=periodTo), у которого processingStatus
      * НЕ равен FAILED (т.е. null / PENDING / RUNNING / COMPLETED).
      *
-     * Используется SyncOzonReportHandler'ом для skip'а повторной загрузки,
-     * пока первый прогон ещё in-flight или уже завершён успешно. FAILED
-     * документы в выборку не попадают, чтобы retry мог создать новый.
+     * Используется SyncOzonReportHandler'ом для поиска существующего документа
+     * за день: для refresh при повторной загрузке и для idempotency-контроля.
+     * FAILED документы в выборку не попадают, чтобы retry мог создать новый.
      */
     public function findExistingDayDocument(
         Company $company,

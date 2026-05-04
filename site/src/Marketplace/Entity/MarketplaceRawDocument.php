@@ -158,6 +158,28 @@ class MarketplaceRawDocument
         return $this;
     }
 
+    public function refreshRawData(
+        array $rawData,
+        string $apiEndpoint,
+        int $recordsCount,
+        ?\DateTimeImmutable $syncedAt = null
+    ): self
+    {
+        $this->rawData = $rawData;
+        $this->apiEndpoint = $apiEndpoint;
+        $this->recordsCount = $recordsCount;
+        $this->recordsCreated = 0;
+        $this->recordsSkipped = 0;
+        $this->unprocessedCostsCount = 0;
+        $this->unprocessedCostTypes = null;
+        $this->syncedAt = $syncedAt ?? new \DateTimeImmutable();
+
+        $this->resetProcessingStatus();
+        $this->addSyncNote('Raw document refreshed from Ozon API');
+
+        return $this;
+    }
+
     public function getApiEndpoint(): string
     {
         return $this->apiEndpoint;
