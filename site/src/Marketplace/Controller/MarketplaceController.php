@@ -516,38 +516,18 @@ class MarketplaceController extends AbstractController
     public function costsIndex(Request $request): Response
     {
         $company = $this->companyService->getActiveCompany();
+        $query   = $request->query->all();
 
-        $categoryId = $request->query->get('category');
-        $mapped     = (string) $request->query->get('mapped', 'all');
+        $categoryId = $this->stringOrNull($query['category'] ?? null);
+        $mapped     = $this->resolveMapped($query['mapped'] ?? null);
         $now        = new \DateTimeImmutable();
 
         $defaultDateFrom = $now->modify('first day of this month')->setTime(0, 0);
         $defaultDateTo   = $now->modify('last day of this month')->setTime(23, 59, 59);
 
-        $marketplaceRaw = $request->query->get('marketplace');
-        $marketplace = is_string($marketplaceRaw)
-            ? (MarketplaceType::tryFrom($marketplaceRaw) ?? MarketplaceType::OZON)
-            : MarketplaceType::OZON;
-
-        $dateFromRaw = $request->query->get('date_from');
-        $dateFrom    = $defaultDateFrom;
-        if (is_string($dateFromRaw) && $dateFromRaw !== '') {
-            try {
-                $dateFrom = new \DateTimeImmutable($dateFromRaw);
-            } catch (\Exception) {
-                $dateFrom = $defaultDateFrom;
-            }
-        }
-
-        $dateToRaw = $request->query->get('date_to');
-        $dateTo    = $defaultDateTo;
-        if (is_string($dateToRaw) && $dateToRaw !== '') {
-            try {
-                $dateTo = new \DateTimeImmutable($dateToRaw . ' 23:59:59');
-            } catch (\Exception) {
-                $dateTo = $defaultDateTo;
-            }
-        }
+        $marketplace = $this->resolveMarketplace($query['marketplace'] ?? null);
+        $dateFrom    = $this->resolveDate($query['date_from'] ?? null, $defaultDateFrom);
+        $dateTo      = $this->resolveDate($query['date_to'] ?? null, $defaultDateTo)->setTime(23, 59, 59);
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
             ->getByCompanyQueryBuilder($company, $marketplace, $dateFrom, $dateTo);
@@ -704,6 +684,51 @@ class MarketplaceController extends AbstractController
         }
 
         return $months;
+    }
+
+    private function stringOrNull(mixed $raw): ?string
+    {
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        return $raw;
+    }
+
+    private function resolveMapped(mixed $raw): string
+    {
+        $value = $this->stringOrNull($raw);
+
+        if ($value === 'all' || $value === 'linked' || $value === 'general') {
+            return $value;
+        }
+
+        return 'all';
+    }
+
+    private function resolveMarketplace(mixed $raw): MarketplaceType
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null) {
+            return MarketplaceType::OZON;
+        }
+
+        return MarketplaceType::tryFrom($value) ?? MarketplaceType::OZON;
+    }
+
+    private function resolveDate(mixed $raw, \DateTimeImmutable $default): \DateTimeImmutable
+    {
+        $value = $this->stringOrNull($raw);
+        if ($value === null) {
+            return $default;
+        }
+
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+        if ($date === false || $date->format('Y-m-d') !== $value) {
+            return $default;
+        }
+
+        return $date;
     }
 
     /**
