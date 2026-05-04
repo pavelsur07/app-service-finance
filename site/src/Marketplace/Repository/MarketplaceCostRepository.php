@@ -1,10 +1,13 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Repository;
 
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\ORM\QueryBuilder;
 use Doctrine\Persistence\ManagerRegistry;
@@ -16,14 +19,35 @@ class MarketplaceCostRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceCost::class);
     }
 
-    public function getByCompanyQueryBuilder(Company $company): QueryBuilder
+    public function getByCompanyQueryBuilder(
+        Company $company,
+        ?MarketplaceType $marketplace = null,
+        ?\DateTimeImmutable $dateFrom = null,
+        ?\DateTimeImmutable $dateTo = null
+    ): QueryBuilder
     {
-        return $this->createQueryBuilder('c')
+        $qb = $this->createQueryBuilder('c')
             ->leftJoin('c.category', 'cat')->addSelect('cat')
             ->leftJoin('c.listing', 'l')->addSelect('l')
             ->where('c.company = :company')
-            ->setParameter('company', $company)
-            ->orderBy('c.costDate', 'DESC');
+            ->setParameter('company', $company);
+
+        if ($marketplace !== null) {
+            $qb->andWhere('c.marketplace = :marketplace')
+                ->setParameter('marketplace', $marketplace);
+        }
+
+        if ($dateFrom !== null) {
+            $qb->andWhere('c.costDate >= :dateFrom')
+                ->setParameter('dateFrom', $dateFrom);
+        }
+
+        if ($dateTo !== null) {
+            $qb->andWhere('c.costDate <= :dateTo')
+                ->setParameter('dateTo', $dateTo);
+        }
+
+        return $qb->orderBy('c.costDate', 'DESC');
     }
 
     /**

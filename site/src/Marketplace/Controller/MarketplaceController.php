@@ -519,9 +519,35 @@ class MarketplaceController extends AbstractController
 
         $categoryId = $request->query->get('category');
         $mapped     = (string) $request->query->get('mapped', 'all');
+        $marketplace = MarketplaceType::tryFrom((string) $request->query->get('marketplace', ''));
+
+        $dateFrom = null;
+        $dateFromRaw = $request->query->get('date_from');
+        if (is_string($dateFromRaw) && $dateFromRaw !== '') {
+            try {
+                $dateFrom = new \DateTimeImmutable($dateFromRaw);
+            } catch (\Exception) {
+                $dateFrom = null;
+            }
+        }
+
+        $dateTo = null;
+        $dateToRaw = $request->query->get('date_to');
+        if (is_string($dateToRaw) && $dateToRaw !== '') {
+            try {
+                $dateTo = new \DateTimeImmutable($dateToRaw);
+            } catch (\Exception) {
+                $dateTo = null;
+            }
+        }
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
-            ->getByCompanyQueryBuilder($company);
+            ->getByCompanyQueryBuilder(
+                $company,
+                $marketplace,
+                $dateFrom,
+                $dateTo,
+            );
 
         if ($mapped === 'linked') {
             $queryBuilder->andWhere('c.listing IS NOT NULL');
