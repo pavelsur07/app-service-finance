@@ -519,9 +519,38 @@ class MarketplaceController extends AbstractController
 
         $categoryId = $request->query->get('category');
         $mapped     = (string) $request->query->get('mapped', 'all');
+        $now        = new \DateTimeImmutable();
+
+        $defaultDateFrom = $now->modify('first day of this month')->setTime(0, 0);
+        $defaultDateTo   = $now->modify('last day of this month')->setTime(23, 59, 59);
+
+        $marketplaceRaw = $request->query->get('marketplace');
+        $marketplace = is_string($marketplaceRaw)
+            ? (MarketplaceType::tryFrom($marketplaceRaw) ?? MarketplaceType::OZON)
+            : MarketplaceType::OZON;
+
+        $dateFromRaw = $request->query->get('date_from');
+        $dateFrom    = $defaultDateFrom;
+        if (is_string($dateFromRaw) && $dateFromRaw !== '') {
+            try {
+                $dateFrom = new \DateTimeImmutable($dateFromRaw);
+            } catch (\Exception) {
+                $dateFrom = $defaultDateFrom;
+            }
+        }
+
+        $dateToRaw = $request->query->get('date_to');
+        $dateTo    = $defaultDateTo;
+        if (is_string($dateToRaw) && $dateToRaw !== '') {
+            try {
+                $dateTo = new \DateTimeImmutable($dateToRaw . ' 23:59:59');
+            } catch (\Exception) {
+                $dateTo = $defaultDateTo;
+            }
+        }
 
         $queryBuilder = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCost::class)
-            ->getByCompanyQueryBuilder($company);
+            ->getByCompanyQueryBuilder($company, $marketplace, $dateFrom, $dateTo);
 
         if ($mapped === 'linked') {
             $queryBuilder->andWhere('c.listing IS NOT NULL');
@@ -547,11 +576,24 @@ class MarketplaceController extends AbstractController
         $categories = $this->em->getRepository(\App\Marketplace\Entity\MarketplaceCostCategory::class)
             ->findByCompany($company);
 
+        $routeParams = [
+            'category'    => $categoryId,
+            'mapped'      => $mapped,
+            'marketplace' => $marketplace->value,
+            'date_from'   => $dateFrom->format('Y-m-d'),
+            'date_to'     => $dateTo->format('Y-m-d'),
+        ];
+
         return $this->render('marketplace/costs.html.twig', [
             'pager'              => $pagerfanta,
             'categories'         => $categories,
             'selectedCategoryId' => $categoryId,
             'mapped'             => $mapped,
+            'availableMarketplaces' => MarketplaceType::cases(),
+            'selectedMarketplace' => $marketplace->value,
+            'selectedDateFrom' => $dateFrom->format('Y-m-d'),
+            'selectedDateTo' => $dateTo->format('Y-m-d'),
+            'routeParams' => $routeParams,
         ]);
     }
 
