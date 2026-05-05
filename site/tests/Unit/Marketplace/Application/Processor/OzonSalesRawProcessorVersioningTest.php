@@ -252,16 +252,14 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
                 return $result;
             });
+        $saleRepository->method('deleteByRawDocument')
+            ->willReturnCallback(function (Company $company, MarketplaceType $marketplace, string $rawDocumentId): int {
+                return $this->deletePersistedSalesByRawDocumentId($rawDocumentId);
+            });
 
         $connection = $this->createMock(Connection::class);
         $connection->method('isTransactionActive')->willReturn(false);
-        $connection->method('executeStatement')->willReturnCallback(function (string $sql, array $params = []): int {
-            if (str_contains($sql, 'DELETE FROM marketplace_sales') && isset($params['docId'])) {
-                return $this->deletePersistedSalesByRawDocumentId((string) $params['docId']);
-            }
-
-            return 0;
-        });
+        $connection->method('executeStatement')->willReturn(0);
 
         $processor = (new \ReflectionClass(OzonSalesRawProcessor::class))->newInstanceWithoutConstructor();
         $this->setProperty($processor, 'em', $em);
