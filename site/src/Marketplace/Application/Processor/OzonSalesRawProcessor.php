@@ -74,6 +74,12 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         }
     }
 
+
+    public function resetPerRunState(): void
+    {
+        $this->cleanedUpRawDocId = null;
+    }
+
     /**
      * @param array<int, array<string, mixed>> $rawRows
      */

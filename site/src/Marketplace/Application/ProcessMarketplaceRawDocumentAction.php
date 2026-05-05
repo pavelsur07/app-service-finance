@@ -110,6 +110,15 @@ final readonly class ProcessMarketplaceRawDocumentAction
         $classifier = $this->classifierRegistry->get($marketplace);
         $totalProcessed = 0;
 
+
+        // Reset per-run processor state: one raw document can be split into multiple
+        // batches in this invocation, but reprocessing the same rawDocId in another
+        // invocation must run cleanup again (idempotent replace-by-raw-document).
+        $processor = $this->processorRegistry->get(StagingRecordType::from($targetBucketKey), $marketplace);
+        if (method_exists($processor, 'resetPerRunState')) {
+            $processor->resetPerRunState();
+        }
+
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
@@ -121,7 +130,6 @@ final readonly class ProcessMarketplaceRawDocumentAction
 
             if (count($buckets[$bucketKey]) >= 500) {
                 if ($bucketKey === $targetBucketKey) {
-                    $processor = $this->processorRegistry->get($type, $marketplace);
                     $processor->processBatch(
                         $command->companyId,
                         $marketplace,
@@ -146,8 +154,6 @@ final readonly class ProcessMarketplaceRawDocumentAction
                 continue;
             }
 
-            $type = StagingRecordType::from($bucketKey);
-            $processor = $this->processorRegistry->get($type, $marketplace);
             $processor->processBatch(
                 $command->companyId,
                 $marketplace,

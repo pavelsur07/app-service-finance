@@ -7,6 +7,7 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -124,9 +125,9 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     /**
      * Регрессия: повторная обработка одного raw_document_id не должна создавать _v2 дубли.
      *
-     * Текущая реализация хранит in-memory marker cleanedUpRawDocId и при втором запуске
-     * в рамках того же инстанса процессора cleanup не выполняется, поэтому тест сейчас
-     * воспроизводит баг и может падать (ожидаемо до фикса).
+     * resetPerRunState() моделирует новый invocation ProcessMarketplaceRawDocumentAction.
+     * Внутри одного invocation cleanup должен выполниться только один раз, даже если
+     * документ разбит на несколько batch.
      */
     public function testReprocessingSameRawDocumentIdDoesNotCreateDuplicates(): void
     {
@@ -147,6 +148,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             '11111111-1111-1111-1111-111111111111',
         ], $this->getPersistedRawDocumentIds());
 
+        $processor->resetPerRunState();
         $processor->processBatch('company-1', MarketplaceType::OZON, $ops, '11111111-1111-1111-1111-111111111111');
 
         self::assertCount(2, $this->getPersistedExternalIds(), 'Повторная обработка не должна увеличивать количество продаж.');
@@ -221,8 +223,24 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $this->setProperty($listing, 'id', 'listing-1');
         $this->setProperty($listing, 'company', $company);
 
+        $rawDoc = (new \ReflectionClass(MarketplaceRawDocument::class))->newInstanceWithoutConstructor();
+        $this->setProperty($rawDoc, 'id', '11111111-1111-1111-1111-111111111111');
+        $this->setProperty($rawDoc, 'company', $company);
+        $this->setProperty($rawDoc, 'periodFrom', new \DateTimeImmutable('2026-03-01'));
+        $this->setProperty($rawDoc, 'periodTo', new \DateTimeImmutable('2026-03-01'));
+
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('find')->willReturn($company);
+        $em->method('find')->willReturnCallback(static function (string $className, mixed $id) use ($company, $rawDoc): object|null {
+            if ($className === Company::class) {
+                return $company;
+            }
+
+            if ($className === MarketplaceRawDocument::class && $id === '11111111-1111-1111-1111-111111111111') {
+                return $rawDoc;
+            }
+
+            return null;
+        });
         $em->method('persist')->willReturnCallback(function (object $entity): void {
             if ($entity instanceof MarketplaceSale) {
                 $this->persistedSales[] = [
