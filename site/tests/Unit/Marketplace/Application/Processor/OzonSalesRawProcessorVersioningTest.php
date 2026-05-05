@@ -21,8 +21,10 @@ use Psr\Log\NullLogger;
  */
 final class OzonSalesRawProcessorVersioningTest extends TestCase
 {
-    /** @var list<string> */
-    private array $persistedExternalIds = [];
+    /**
+     * @var list<array{externalOrderId: string, rawDocumentId: string|null, totalRevenue: float}>
+     */
+    private array $persistedSales = [];
 
     /**
      * Sale → storno → re-sale по одному posting_number.
@@ -38,7 +40,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('X', +1584, '2026-02-24 14:00:00'),
         ]);
 
-        self::assertSame(['X', 'X_storno', 'X_v2'], $this->persistedExternalIds);
+        self::assertSame(['X', 'X_storno', 'X_v2'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -55,7 +57,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', -1584, '2026-02-24 16:00:00'),
         ]);
 
-        self::assertSame(['A', 'A_storno', 'A_v2', 'A_storno_v2'], $this->persistedExternalIds);
+        self::assertSame(['A', 'A_storno', 'A_v2', 'A_storno_v2'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -69,7 +71,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', +1584, '2026-02-24 14:00:00'),
         ]);
 
-        self::assertSame(['A_v2'], $this->persistedExternalIds);
+        self::assertSame(['A_v2'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -85,7 +87,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('C', +500,  '2026-02-24 12:00:00'),
         ]);
 
-        self::assertSame(['A', 'B', 'C'], $this->persistedExternalIds);
+        self::assertSame(['A', 'B', 'C'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -99,7 +101,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', -1584, '2026-02-24 12:00:00'),
         ]);
 
-        self::assertSame(['A_storno'], $this->persistedExternalIds);
+        self::assertSame(['A_storno'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -115,7 +117,46 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('X', +1584, '2026-02-24 10:00:00'),
         ]);
 
-        self::assertSame(['X', 'X_storno', 'X_v2'], $this->persistedExternalIds);
+        self::assertSame(['X', 'X_storno', 'X_v2'], $this->getPersistedExternalIds());
+    }
+
+
+    /**
+     * Регрессия: повторная обработка одного raw_document_id не должна создавать _v2 дубли.
+     *
+     * Текущая реализация хранит in-memory marker cleanedUpRawDocId и при втором запуске
+     * в рамках того же инстанса процессора cleanup не выполняется, поэтому тест сейчас
+     * воспроизводит баг и может падать (ожидаемо до фикса).
+     */
+    public function testReprocessingSameRawDocumentIdDoesNotCreateDuplicates(): void
+    {
+        $processor = $this->buildProcessor(existingIds: []);
+
+        $ops = [
+            $this->makeOp('R-1', +1000, '2026-03-01 10:00:00'),
+            $this->makeOp('R-2', +2000, '2026-03-01 11:00:00'),
+        ];
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, $ops, '11111111-1111-1111-1111-111111111111');
+
+        self::assertCount(2, $this->getPersistedExternalIds());
+        self::assertSame(['R-1', 'R-2'], $this->getPersistedExternalIds());
+        self::assertSame(3000.0, $this->getSumPersistedAccruals());
+        self::assertSame([
+            '11111111-1111-1111-1111-111111111111',
+            '11111111-1111-1111-1111-111111111111',
+        ], $this->getPersistedRawDocumentIds());
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, $ops, '11111111-1111-1111-1111-111111111111');
+
+        self::assertCount(2, $this->getPersistedExternalIds(), 'Повторная обработка не должна увеличивать количество продаж.');
+        self::assertSame(3000.0, $this->getSumPersistedAccruals(), 'Повторная обработка не должна увеличивать total revenue.');
+        self::assertNotContains('R-1_v2', $this->getPersistedExternalIds());
+        self::assertNotContains('R-2_v2', $this->getPersistedExternalIds());
+        self::assertSame([
+            '11111111-1111-1111-1111-111111111111',
+            '11111111-1111-1111-1111-111111111111',
+        ], $this->getPersistedRawDocumentIds());
     }
 
     /**
@@ -130,7 +171,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', -1584, '2026-02-25 12:00:00'),
         ]);
 
-        self::assertSame(['A_v2', 'A_storno_v2'], $this->persistedExternalIds);
+        self::assertSame(['A_v2', 'A_storno_v2'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -144,7 +185,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', +1584, '2026-02-26 10:00:00'),
         ]);
 
-        self::assertSame(['A_v3'], $this->persistedExternalIds);
+        self::assertSame(['A_v3'], $this->getPersistedExternalIds());
     }
 
     /**
@@ -159,7 +200,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', -1584, '2026-02-27 12:00:00'),
         ]);
 
-        self::assertSame(['A_v3', 'A_storno_v3'], $this->persistedExternalIds);
+        self::assertSame(['A_v3', 'A_storno_v3'], $this->getPersistedExternalIds());
     }
 
     // -------------------------------------------------------------------------
@@ -171,7 +212,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
      */
     private function buildProcessor(array $existingIds): OzonSalesRawProcessor
     {
-        $this->persistedExternalIds = [];
+        $this->persistedSales = [];
 
         $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
         $this->setProperty($company, 'id', 'company-1');
@@ -184,7 +225,11 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $em->method('find')->willReturn($company);
         $em->method('persist')->willReturnCallback(function (object $entity): void {
             if ($entity instanceof MarketplaceSale) {
-                $this->persistedExternalIds[] = $entity->getExternalOrderId();
+                $this->persistedSales[] = [
+                    'externalOrderId' => $entity->getExternalOrderId(),
+                    'rawDocumentId' => $entity->getRawDocumentId(),
+                    'totalRevenue' => (float) $entity->getTotalRevenue(),
+                ];
             }
         });
 
@@ -192,18 +237,31 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('getExistingExternalIds')
-            ->willReturnCallback(static function (string $companyId, array $ids) use ($existingMap): array {
+            ->willReturnCallback(function (string $companyId, array $ids) use ($existingMap): array {
+                $dbMap = $existingMap;
+                foreach ($this->getPersistedExternalIds() as $externalId) {
+                    $dbMap[$externalId] = true;
+                }
+
                 $result = [];
                 foreach ($ids as $id) {
-                    if (isset($existingMap[$id])) {
+                    if (isset($dbMap[$id])) {
                         $result[$id] = true;
                     }
                 }
+
                 return $result;
             });
 
         $connection = $this->createMock(Connection::class);
         $connection->method('isTransactionActive')->willReturn(false);
+        $connection->method('executeStatement')->willReturnCallback(function (string $sql, array $params = []): int {
+            if (str_contains($sql, 'DELETE FROM marketplace_sales') && isset($params['docId'])) {
+                return $this->deletePersistedSalesByRawDocumentId((string) $params['docId']);
+            }
+
+            return 0;
+        });
 
         $processor = (new \ReflectionClass(OzonSalesRawProcessor::class))->newInstanceWithoutConstructor();
         $this->setProperty($processor, 'em', $em);
@@ -230,6 +288,45 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $this->setProperty($listingEnsureRef, 'upsertQuery', $upsertQuery);
 
         return $processor;
+    }
+
+
+    /** @return list<string> */
+    private function getPersistedExternalIds(): array
+    {
+        return array_map(
+            static fn (array $sale): string => $sale['externalOrderId'],
+            $this->persistedSales,
+        );
+    }
+
+    /** @return list<string|null> */
+    private function getPersistedRawDocumentIds(): array
+    {
+        return array_map(
+            static fn (array $sale): ?string => $sale['rawDocumentId'],
+            $this->persistedSales,
+        );
+    }
+
+    private function getSumPersistedAccruals(): float
+    {
+        return array_reduce(
+            $this->persistedSales,
+            static fn (float $sum, array $sale): float => $sum + $sale['totalRevenue'],
+            0.0,
+        );
+    }
+
+    private function deletePersistedSalesByRawDocumentId(string $rawDocumentId): int
+    {
+        $before = count($this->persistedSales);
+        $this->persistedSales = array_values(array_filter(
+            $this->persistedSales,
+            static fn (array $sale): bool => $sale['rawDocumentId'] !== $rawDocumentId,
+        ));
+
+        return $before - count($this->persistedSales);
     }
 
     private function setProperty(object $obj, string $name, mixed $value): void
