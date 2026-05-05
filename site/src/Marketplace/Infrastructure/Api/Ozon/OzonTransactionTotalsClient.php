@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Webmozart\Assert\Assert;
 
 final readonly class OzonTransactionTotalsClient
 {
@@ -36,6 +37,12 @@ final readonly class OzonTransactionTotalsClient
         \DateTimeImmutable $from,
         \DateTimeImmutable $to,
     ): array {
+        Assert::uuid($companyId);
+
+        if ($from > $to) {
+            throw new \InvalidArgumentException('Дата начала периода не может быть позже даты окончания.');
+        }
+
         $credentials = $this->credentialsQuery->getCredentials(
             $companyId,
             MarketplaceType::OZON,
@@ -78,23 +85,34 @@ final readonly class OzonTransactionTotalsClient
         }
 
         return [
-            'accruals_for_sale' => $this->decimalString($result['accruals_for_sale'] ?? null),
-            'sale_commission' => $this->decimalString($result['sale_commission'] ?? null),
-            'processing_and_delivery' => $this->decimalString($result['processing_and_delivery'] ?? null),
-            'services_amount' => $this->decimalString($result['services_amount'] ?? null),
-            'refunds_and_cancellations' => $this->decimalString($result['refunds_and_cancellations'] ?? null),
-            'compensation_amount' => $this->decimalString($result['compensation_amount'] ?? null),
-            'money_transfer' => $this->decimalString($result['money_transfer'] ?? null),
-            'others_amount' => $this->decimalString($result['others_amount'] ?? null),
+            'accruals_for_sale' => $this->decimalField($result, 'accruals_for_sale'),
+            'sale_commission' => $this->decimalField($result, 'sale_commission'),
+            'processing_and_delivery' => $this->decimalField($result, 'processing_and_delivery'),
+            'services_amount' => $this->decimalField($result, 'services_amount'),
+            'refunds_and_cancellations' => $this->decimalField($result, 'refunds_and_cancellations'),
+            'compensation_amount' => $this->decimalField($result, 'compensation_amount'),
+            'money_transfer' => $this->decimalField($result, 'money_transfer'),
+            'others_amount' => $this->decimalField($result, 'others_amount'),
         ];
     }
 
-    private function decimalString(mixed $value): string
+    private function decimalField(array $result, string $field): string
     {
+        if (!array_key_exists($field, $result)) {
+            return '0.00';
+        }
+
+        $value = $result[$field];
+
         if (null === $value || '' === $value) {
             return '0.00';
         }
 
+        return $this->decimalString($value, $field);
+    }
+
+    private function decimalString(mixed $value, string $field): string
+    {
         if (is_int($value)) {
             return sprintf('%d.00', $value);
         }
@@ -106,7 +124,10 @@ final readonly class OzonTransactionTotalsClient
         if (is_string($value)) {
             $normalized = str_replace(',', '.', trim($value));
             if (!preg_match('/^-?\d+(?:\.\d+)?$/', $normalized)) {
-                return '0.00';
+                throw new \RuntimeException(sprintf(
+                    'Некорректное числовое значение Ozon transaction totals в поле %s.',
+                    $field,
+                ));
             }
 
             $negative = str_starts_with($normalized, '-');
@@ -136,6 +157,9 @@ final readonly class OzonTransactionTotalsClient
             return $negative && '0.00' !== $result ? '-' . $result : $result;
         }
 
-        return '0.00';
+        throw new \RuntimeException(sprintf(
+            'Некорректное числовое значение Ozon transaction totals в поле %s.',
+            $field,
+        ));
     }
 }
