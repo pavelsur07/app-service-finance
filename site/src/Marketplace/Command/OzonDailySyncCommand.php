@@ -25,10 +25,11 @@ use Symfony\Component\Messenger\MessageBusInterface;
  */
 #[AsCommand(
     name: 'app:marketplace:ozon-daily-sync',
-    description: 'Ежедневная загрузка сырых данных Ozon за последние 3 дня',
+    description: 'Ежедневная загрузка и обновление сырых данных Ozon за последние 14 дней',
 )]
 final class OzonDailySyncCommand extends Command
 {
+    private const LOOKBACK_DAYS = 14;
     public function __construct(
         private readonly ActiveOzonConnectionsQuery $connectionsQuery,
         private readonly MessageBusInterface $messageBus,
@@ -51,23 +52,31 @@ final class OzonDailySyncCommand extends Command
 
         $dispatched = 0;
 
+        $timezone = new \DateTimeZone('Europe/Moscow');
+        $today = new \DateTimeImmutable('today', $timezone);
+
         foreach ($connections as $row) {
             $companyId    = (string) $row['company_id'];
             $connectionId = (string) $row['id'];
 
-            $this->messageBus->dispatch(
-                new SyncOzonReportMessage($companyId, $connectionId),
-            );
+            for ($offset = 1; $offset <= self::LOOKBACK_DAYS; $offset++) {
+                $date = $today->modify(sprintf('-%d day', $offset))->format('Y-m-d');
 
-            $dispatched++;
+                $this->messageBus->dispatch(
+                    new SyncOzonReportMessage($companyId, $connectionId, $date),
+                );
 
-            $this->logger->info('Dispatched Ozon sync message', [
-                'company_id'    => $companyId,
-                'connection_id' => $connectionId,
-            ]);
+                $dispatched++;
+
+                $this->logger->info('Dispatched Ozon rolling sync message', [
+                    'company_id'    => $companyId,
+                    'connection_id' => $connectionId,
+                    'date'          => $date,
+                ]);
+            }
         }
 
-        $io->success(sprintf('Отправлено %d задач на загрузку данных Ozon.', $dispatched));
+        $io->success(sprintf('Отправлено %d задач на rolling-загрузку данных Ozon за последние %d дней.', $dispatched, self::LOOKBACK_DAYS));
 
         return Command::SUCCESS;
     }
