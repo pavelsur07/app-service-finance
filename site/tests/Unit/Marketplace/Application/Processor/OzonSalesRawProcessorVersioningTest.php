@@ -24,6 +24,11 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     /** @var list<string> */
     private array $persistedExternalIds = [];
 
+    /** @var list<string|null> */
+    private array $persistedRawDocumentIds = [];
+
+    private float $sumPersistedAccruals = 0.0;
+
     /**
      * Sale → storno → re-sale по одному posting_number.
      * Третья операция должна получить суффикс _v2.
@@ -118,6 +123,45 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         self::assertSame(['X', 'X_storno', 'X_v2'], $this->persistedExternalIds);
     }
 
+
+    /**
+     * Регрессия: повторная обработка одного raw_document_id не должна создавать _v2 дубли.
+     *
+     * Текущая реализация хранит in-memory marker cleanedUpRawDocId и при втором запуске
+     * в рамках того же инстанса процессора cleanup не выполняется, поэтому тест сейчас
+     * воспроизводит баг и может падать (ожидаемо до фикса).
+     */
+    public function testReprocessingSameRawDocumentIdDoesNotCreateDuplicates(): void
+    {
+        $processor = $this->buildProcessor(existingIds: []);
+
+        $ops = [
+            $this->makeOp('R-1', +1000, '2026-03-01 10:00:00'),
+            $this->makeOp('R-2', +2000, '2026-03-01 11:00:00'),
+        ];
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, $ops, '11111111-1111-1111-1111-111111111111');
+
+        self::assertCount(2, $this->persistedExternalIds);
+        self::assertSame(['R-1', 'R-2'], $this->persistedExternalIds);
+        self::assertSame(3000.0, $this->sumPersistedAccruals);
+        self::assertSame([
+            '11111111-1111-1111-1111-111111111111',
+            '11111111-1111-1111-1111-111111111111',
+        ], $this->persistedRawDocumentIds);
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, $ops, '11111111-1111-1111-1111-111111111111');
+
+        self::assertCount(2, $this->persistedExternalIds, 'Повторная обработка не должна увеличивать количество продаж.');
+        self::assertSame(3000.0, $this->sumPersistedAccruals, 'Повторная обработка не должна увеличивать total revenue.');
+        self::assertNotContains('R-1_v2', $this->persistedExternalIds);
+        self::assertNotContains('R-2_v2', $this->persistedExternalIds);
+        self::assertSame([
+            '11111111-1111-1111-1111-111111111111',
+            '11111111-1111-1111-1111-111111111111',
+        ], $this->persistedRawDocumentIds);
+    }
+
     /**
      * Existing в БД + повтор в батче.
      */
@@ -172,6 +216,8 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     private function buildProcessor(array $existingIds): OzonSalesRawProcessor
     {
         $this->persistedExternalIds = [];
+        $this->persistedRawDocumentIds = [];
+        $this->sumPersistedAccruals = 0.0;
 
         $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
         $this->setProperty($company, 'id', 'company-1');
@@ -185,6 +231,8 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $em->method('persist')->willReturnCallback(function (object $entity): void {
             if ($entity instanceof MarketplaceSale) {
                 $this->persistedExternalIds[] = $entity->getExternalOrderId();
+                $this->persistedRawDocumentIds[] = $entity->getRawDocumentId();
+                $this->sumPersistedAccruals += (float) $entity->getTotalRevenue();
             }
         });
 
@@ -192,13 +240,19 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('getExistingExternalIds')
-            ->willReturnCallback(static function (string $companyId, array $ids) use ($existingMap): array {
+            ->willReturnCallback(function (string $companyId, array $ids) use ($existingMap): array {
+                $dbMap = $existingMap;
+                foreach ($this->persistedExternalIds as $externalId) {
+                    $dbMap[$externalId] = true;
+                }
+
                 $result = [];
                 foreach ($ids as $id) {
-                    if (isset($existingMap[$id])) {
+                    if (isset($dbMap[$id])) {
                         $result[$id] = true;
                     }
                 }
+
                 return $result;
             });
 
