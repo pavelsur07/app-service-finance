@@ -23,6 +23,8 @@ final class OzonDailySyncCommandTest extends TestCase
 
     public function testDispatchesFourteenMessagesForSingleConnectionWithExpectedDates(): void
     {
+        $referenceToday = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
+
         $query = $this->createMock(ActiveOzonConnectionsQuery::class);
         $query->method('execute')->willReturn([
             ['id' => self::CONNECTION_1, 'company_id' => self::COMPANY_1],
@@ -55,12 +57,14 @@ final class OzonDailySyncCommandTest extends TestCase
             self::assertNotNull($message->date);
         }
 
-        self::assertDatesCoverRollingD1ToD14($messages);
+        self::assertDatesCoverRollingD1ToD14($messages, $referenceToday);
         self::assertStringContainsString('Отправлено 14 задач', $tester->getDisplay());
     }
 
     public function testDispatchesTwentyEightMessagesForTwoConnections(): void
     {
+        $referenceToday = new \DateTimeImmutable('today', new \DateTimeZone('Europe/Moscow'));
+
         $query = $this->createMock(ActiveOzonConnectionsQuery::class);
         $query->method('execute')->willReturn([
             ['id' => self::CONNECTION_1, 'company_id' => self::COMPANY_1],
@@ -103,8 +107,8 @@ final class OzonDailySyncCommandTest extends TestCase
             self::assertSame(self::CONNECTION_2, $message->connectionId);
         }
 
-        self::assertDatesCoverRollingD1ToD14($messagesByConnection[self::CONNECTION_1]);
-        self::assertDatesCoverRollingD1ToD14($messagesByConnection[self::CONNECTION_2]);
+        self::assertDatesCoverRollingD1ToD14($messagesByConnection[self::CONNECTION_1], $referenceToday);
+        self::assertDatesCoverRollingD1ToD14($messagesByConnection[self::CONNECTION_2], $referenceToday);
         self::assertStringContainsString('Отправлено 28 задач', $tester->getDisplay());
     }
 
@@ -129,22 +133,19 @@ final class OzonDailySyncCommandTest extends TestCase
     /**
      * @param list<SyncOzonReportMessage> $messages
      */
-    private static function assertDatesCoverRollingD1ToD14(array $messages): void
+    private static function assertDatesCoverRollingD1ToD14(array $messages, \DateTimeImmutable $referenceToday): void
     {
-        $timezone = new \DateTimeZone('Europe/Moscow');
-        $today = new \DateTimeImmutable('today', $timezone);
-
         $expectedDates = [];
         for ($offset = 1; $offset <= 14; $offset++) {
-            $expectedDates[] = $today->modify(sprintf('-%d day', $offset))->format('Y-m-d');
+            $expectedDates[] = $referenceToday->modify(sprintf('-%d day', $offset))->format('Y-m-d');
         }
 
         $actualDates = array_map(static fn (SyncOzonReportMessage $message): ?string => $message->date, $messages);
 
-        self::assertContains($today->modify('-1 day')->format('Y-m-d'), $actualDates);
+        self::assertContains($referenceToday->modify('-1 day')->format('Y-m-d'), $actualDates);
         self::assertEqualsCanonicalizing($expectedDates, $actualDates);
-        self::assertNotContains($today->format('Y-m-d'), $actualDates, 'D-0 must not be dispatched');
-        self::assertNotContains($today->modify('-15 day')->format('Y-m-d'), $actualDates, 'D-15 must not be dispatched');
+        self::assertNotContains($referenceToday->format('Y-m-d'), $actualDates, 'D-0 must not be dispatched');
+        self::assertNotContains($referenceToday->modify('-15 day')->format('Y-m-d'), $actualDates, 'D-15 must not be dispatched');
     }
 
     private function makeTester(
