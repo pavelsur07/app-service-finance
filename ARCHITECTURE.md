@@ -1076,11 +1076,19 @@ enum ReconciliationSessionStatus: string
 ```
 
 ### `src/Marketplace/Enum/OzonTransactionTotalsCheckStatus.php`
+```php
+enum OzonTransactionTotalsCheckStatus: string
+{
+    case OK      = 'ok';
+    case WARNING = 'warning';
+    case FAILED  = 'failed';
+    case SKIPPED = 'skipped';
 
-- `OK` — сверка успешна
-- `WARNING` — сверка с предупреждениями
-- `FAILED` — сверка не пройдена (блокирующая)
-- `SKIPPED` — сверка пропущена
+    public function getLabel(): string;     // Успешно / Предупреждение / Ошибка / Пропущено
+    public function isSuccessful(): bool;   // true только для OK
+    public function isBlocking(): bool;     // true только для FAILED
+}
+```
 
 ### `src/Marketplace/Enum/PipelineStep.php`
 ```php

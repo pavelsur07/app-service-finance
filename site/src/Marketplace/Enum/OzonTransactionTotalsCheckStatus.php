@@ -14,10 +14,10 @@ enum OzonTransactionTotalsCheckStatus: string
     public function getLabel(): string
     {
         return match ($this) {
-            self::OK => 'OK',
-            self::WARNING => 'Warning',
-            self::FAILED => 'Failed',
-            self::SKIPPED => 'Skipped',
+            self::OK => 'Успешно',
+            self::WARNING => 'Предупреждение',
+            self::FAILED => 'Ошибка',
+            self::SKIPPED => 'Пропущено',
         };
     }
 
