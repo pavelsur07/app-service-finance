@@ -49,6 +49,7 @@
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
+| `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -1071,6 +1072,21 @@ enum ReconciliationSessionStatus: string
     public function getLabel(): string;    // Ожидает / Завершена / Ошибка
     public function isPending(): bool;     // true для PENDING
     public function isTerminal(): bool;    // true для COMPLETED, FAILED
+}
+```
+
+### `src/Marketplace/Enum/OzonTransactionTotalsCheckStatus.php`
+```php
+enum OzonTransactionTotalsCheckStatus: string
+{
+    case OK      = 'ok';
+    case WARNING = 'warning';
+    case FAILED  = 'failed';
+    case SKIPPED = 'skipped';
+
+    public function getLabel(): string;     // Успешно / Предупреждение / Ошибка / Пропущено
+    public function isSuccessful(): bool;   // true только для OK
+    public function isBlocking(): bool;     // true только для FAILED
 }
 ```
 
