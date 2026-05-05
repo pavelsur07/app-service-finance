@@ -49,6 +49,7 @@
 | `MarketplaceAdvertisingCost` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
+| `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -1073,6 +1074,13 @@ enum ReconciliationSessionStatus: string
     public function isTerminal(): bool;    // true для COMPLETED, FAILED
 }
 ```
+
+### `src/Marketplace/Enum/OzonTransactionTotalsCheckStatus.php`
+
+- `OK` — сверка успешна
+- `WARNING` — сверка с предупреждениями
+- `FAILED` — сверка не пройдена (блокирующая)
+- `SKIPPED` — сверка пропущена
 
 ### `src/Marketplace/Enum/PipelineStep.php`
 ```php
