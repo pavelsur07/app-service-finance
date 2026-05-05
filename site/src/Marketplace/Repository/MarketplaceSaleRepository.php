@@ -166,4 +166,22 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
 
         return $qb->getQuery()->getResult();
     }
+
+    public function deleteByRawDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $rawDocumentId,
+    ): int {
+        return (int) $this->createQueryBuilder('s')
+            ->delete()
+            ->where('s.company = :company')
+            ->andWhere('s.marketplace = :marketplace')
+            ->andWhere('s.rawDocumentId = :rawDocumentId')
+            ->andWhere('s.document IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->getQuery()
+            ->execute();
+    }
 }

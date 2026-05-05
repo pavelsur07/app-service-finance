@@ -277,12 +277,12 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
         $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
+        $company = $rawDoc->getCompany();
 
-        $deletedByDoc = (int) $this->connection->executeStatement(
-            'DELETE FROM marketplace_sales
-             WHERE raw_document_id = :docId
-               AND document_id IS NULL',
-            ['docId' => $rawDocId],
+        $deletedByDoc = $this->saleRepository->deleteByRawDocument(
+            company: $company,
+            marketplace: MarketplaceType::OZON,
+            rawDocumentId: $rawDocId,
         );
 
         $deletedLegacy = (int) $this->connection->executeStatement(
