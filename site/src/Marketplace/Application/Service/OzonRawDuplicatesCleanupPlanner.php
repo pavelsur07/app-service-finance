@@ -134,12 +134,66 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                   AND daily.document_type = 'sales_report'
                   AND daily.period_from = daily.period_to
                   AND daily.period_from BETWEEN :fromDate AND :toDate
+            ),
+            legacy_processed_days AS (
+                SELECT s.sale_date::date AS day
+                FROM marketplace_sales s
+                WHERE s.company_id = :companyId
+                  AND s.marketplace = :marketplace
+                  AND s.sale_date BETWEEN :fromDate AND :toDate
+                  AND s.document_id IS NULL
+                  AND s.raw_document_id IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM marketplace_raw_documents rd
+                      WHERE rd.company_id = :companyId
+                        AND rd.marketplace = :marketplace
+                        AND rd.document_type = 'sales_report'
+                        AND rd.period_from <= s.sale_date::date
+                        AND rd.period_to >= s.sale_date::date
+                  )
+                UNION
+                SELECT r.return_date::date AS day
+                FROM marketplace_returns r
+                WHERE r.company_id = :companyId
+                  AND r.marketplace = :marketplace
+                  AND r.return_date BETWEEN :fromDate AND :toDate
+                  AND r.document_id IS NULL
+                  AND r.raw_document_id IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM marketplace_raw_documents rd
+                      WHERE rd.company_id = :companyId
+                        AND rd.marketplace = :marketplace
+                        AND rd.document_type = 'sales_report'
+                        AND rd.period_from <= r.return_date::date
+                        AND rd.period_to >= r.return_date::date
+                  )
+                UNION
+                SELECT c.cost_date::date AS day
+                FROM marketplace_costs c
+                WHERE c.company_id = :companyId
+                  AND c.marketplace = :marketplace
+                  AND c.cost_date BETWEEN :fromDate AND :toDate
+                  AND c.document_id IS NULL
+                  AND c.raw_document_id IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM marketplace_raw_documents rd
+                      WHERE rd.company_id = :companyId
+                        AND rd.marketplace = :marketplace
+                        AND rd.document_type = 'sales_report'
+                        AND rd.period_from <= c.cost_date::date
+                        AND rd.period_to >= c.cost_date::date
+                  )
             )
             SELECT DISTINCT day
             FROM (
                 SELECT day FROM duplicate_processed_days
                 UNION
                 SELECT day FROM duplicate_raw_days
+                UNION
+                SELECT day FROM legacy_processed_days
             ) all_days
             ORDER BY day ASC
             SQL,
