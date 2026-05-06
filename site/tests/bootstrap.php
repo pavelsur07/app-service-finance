@@ -7,7 +7,15 @@ require dirname(__DIR__).'/vendor/autoload.php';
 DG\BypassFinals::enable();
 DG\BypassFinals::allowPaths([
     '*/src/Marketplace/Facade/MarketplaceFacade.php',
+    '*/src/Marketplace/Application/RebuildPreliminaryForPeriodAction.php',
     '*/src/Marketplace/Infrastructure/Query/UnprocessedCostsQuery.php',
+    '*/src/MarketplaceAds/Infrastructure/Query/AdSpendByListingQuery.php',
+    '*/src/MarketplaceAds/Infrastructure/Query/ActiveOzonPerformanceConnectionsQuery.php',
+    '*/src/MarketplaceAds/Application/ExtractBatchesToRawDocumentsAction.php',
+    '*/src/MarketplaceAds/Application/Service/AdBatchPlanner.php',
+    '*/src/Marketplace/Application/Service/MarketplaceWeekPartitionService.php',
+    '*/src/Marketplace/Infrastructure/Query/ActiveOzonConnectionsQuery.php',
+    '*/src/Marketplace/Infrastructure/Query/ActiveSellerConnectionsQuery.php',
     '*/src/MarketplaceAnalytics/Domain/Service/CostMappingResolver.php',
     '*/src/MarketplaceAnalytics/Domain/Service/DefaultCostMappingSeedPolicy.php',
     '*/src/MarketplaceAnalytics/Infrastructure/Query/UnitExtendedQuery.php',
