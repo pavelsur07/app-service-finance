@@ -60,6 +60,22 @@ final class MarketplaceSaleBuilder
         return $clone;
     }
 
+    public function withId(string $id): self
+    {
+        $clone = clone $this;
+        $clone->id = $id;
+
+        return $clone;
+    }
+
+    public function withIndex(int $index): self
+    {
+        $clone = clone $this;
+        $clone->id = sprintf('44444444-4444-4444-8444-%012d', $index);
+
+        return $clone;
+    }
+
     public function withExternalOrderId(string $externalOrderId): self
     {
         $clone = clone $this;
