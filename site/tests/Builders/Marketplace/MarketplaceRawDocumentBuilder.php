@@ -40,6 +40,23 @@ final class MarketplaceRawDocumentBuilder
         return $clone;
     }
 
+
+    public function withId(string $id): self
+    {
+        $clone = clone $this;
+        $clone->id = $id;
+
+        return $clone;
+    }
+
+    public function withIndex(int $index): self
+    {
+        $clone = clone $this;
+        $clone->id = sprintf('22222222-2222-2222-2222-%012d', $index);
+
+        return $clone;
+    }
+
     public function withMarketplace(MarketplaceType $marketplace): self
     {
         $clone              = clone $this;
