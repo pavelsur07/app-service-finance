@@ -13,6 +13,7 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Webmozart\Assert\Assert;
 
 #[AsCommand(
     name: 'app:marketplace:diagnose-sales-vn-duplicates',
@@ -72,6 +73,16 @@ final class DiagnoseSalesVnDuplicatesCommand extends Command
             $io->error('Параметр --limit должен быть > 0.');
 
             return Command::FAILURE;
+        }
+
+        if (is_string($companyId) && $companyId !== '') {
+            try {
+                Assert::uuid($companyId);
+            } catch (\InvalidArgumentException) {
+                $io->error('Некорректный формат --company-id, ожидается UUID.');
+
+                return Command::FAILURE;
+            }
         }
 
         $io->title('Диагностика _vN дублей marketplace_sales');
