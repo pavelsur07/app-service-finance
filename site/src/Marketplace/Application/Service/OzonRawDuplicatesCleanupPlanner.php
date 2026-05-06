@@ -8,6 +8,7 @@ use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupDayPlan;
 use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupPlan;
 use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
+use Webmozart\Assert\Assert;
 
 final readonly class OzonRawDuplicatesCleanupPlanner
 {
@@ -18,12 +19,14 @@ final readonly class OzonRawDuplicatesCleanupPlanner
 
     public function buildPlan(string $companyId, \DateTimeImmutable $from, \DateTimeImmutable $to): OzonRawDuplicatesCleanupPlan
     {
+        Assert::uuid($companyId);
+
         $days = $this->findAffectedDays($companyId, $from, $to);
         $dayPlans = [];
 
         foreach ($days as $day) {
             $rawDocuments = $this->findRawDocumentsForDay($companyId, $day);
-            if (count($rawDocuments) < 2) {
+            if ($rawDocuments === []) {
                 continue;
             }
 
