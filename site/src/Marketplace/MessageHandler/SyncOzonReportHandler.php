@@ -113,13 +113,25 @@ final class SyncOzonReportHandler
         // 2) skip refresh для in-flight pipeline (pending/running), чтобы не обновлять
         //    payload во время обработки и не получить смешанное состояние шагов.
         // FAILED-документы в выборку не попадают — для них retry создаёт новый.
-        $existingDoc = $this->rawDocumentRepository->findExistingDayDocument(
+        $existingDocs = $this->rawDocumentRepository->findActiveExactDayDocuments(
             $company,
             MarketplaceType::OZON,
             'sales_report',
             $fromDate,
         );
+        $existingDoc = $existingDocs[0] ?? null;
 
+        if (count($existingDocs) > 1) {
+            $this->logger->warning('Multiple active Ozon raw documents found for day, using latest as canonical', [
+                'company_id' => $companyId,
+                'connection_id' => $connectionId,
+                'date' => $fromDate->format('Y-m-d'),
+                'raw_document_ids' => array_map(
+                    static fn (MarketplaceRawDocument $rawDocument): string => $rawDocument->getId(),
+                    $existingDocs,
+                ),
+            ]);
+        }
 
         if (
             $existingDoc !== null
