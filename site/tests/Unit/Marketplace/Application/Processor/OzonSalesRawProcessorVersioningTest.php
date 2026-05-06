@@ -221,6 +221,46 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         self::assertNotContains('A_storno_v2', $this->getPersistedExternalIds());
     }
 
+    public function testReprocessThrowsWhenFinanceLockCoversRawDocumentPeriod(): void
+    {
+        $deleteByRawDocumentCalls = 0;
+        $processor = $this->buildProcessor(
+            existingIds: [],
+            financeLockBefore: new \DateTimeImmutable('2026-03-15'),
+            deleteByRawDocumentCalls: $deleteByRawDocumentCalls,
+        );
+
+        try {
+            $processor->processBatch('company-1', MarketplaceType::OZON, [
+                $this->makeOp('LOCK-1', +1000, '2026-03-01 10:00:00'),
+            ], '11111111-1111-1111-1111-111111111111');
+
+            self::fail('Expected DomainException for finance lock, but no exception was thrown.');
+        } catch (\DomainException $e) {
+            self::assertStringContainsString('заблокирован для переобработки', $e->getMessage());
+        }
+
+        self::assertSame(0, $deleteByRawDocumentCalls);
+        self::assertSame([], $this->getPersistedExternalIds());
+    }
+
+    public function testReprocessAllowedWhenFinanceLockIsEmptyOrOutsidePeriod(): void
+    {
+        $deleteByRawDocumentCalls = 0;
+        $processor = $this->buildProcessor(
+            existingIds: [],
+            financeLockBefore: new \DateTimeImmutable('2026-02-15'),
+            deleteByRawDocumentCalls: $deleteByRawDocumentCalls,
+        );
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('UNLOCK-1', +1000, '2026-03-01 10:00:00'),
+        ], '11111111-1111-1111-1111-111111111111');
+
+        self::assertSame(1, $deleteByRawDocumentCalls);
+        self::assertSame(['UNLOCK-1'], $this->getPersistedExternalIds());
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -228,12 +268,17 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     /**
      * @param list<string> $existingIds
      */
-    private function buildProcessor(array $existingIds): OzonSalesRawProcessor
+    private function buildProcessor(
+        array $existingIds,
+        ?\DateTimeImmutable $financeLockBefore = null,
+        int &$deleteByRawDocumentCalls = 0,
+    ): OzonSalesRawProcessor
     {
         $this->persistedSales = [];
 
         $company = (new \ReflectionClass(Company::class))->newInstanceWithoutConstructor();
         $this->setProperty($company, 'id', 'company-1');
+        $this->setProperty($company, 'financeLockBefore', $financeLockBefore?->setTime(0, 0));
 
         $listing = (new \ReflectionClass(MarketplaceListing::class))->newInstanceWithoutConstructor();
         $this->setProperty($listing, 'id', 'listing-1');
@@ -287,7 +332,8 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
                 return $result;
             });
         $saleRepository->method('deleteByRawDocument')
-            ->willReturnCallback(function (Company $company, MarketplaceType $marketplace, string $rawDocumentId): int {
+            ->willReturnCallback(function (Company $company, MarketplaceType $marketplace, string $rawDocumentId) use (&$deleteByRawDocumentCalls): int {
+                $deleteByRawDocumentCalls++;
                 return $this->deletePersistedSalesByRawDocumentId($rawDocumentId);
             });
 

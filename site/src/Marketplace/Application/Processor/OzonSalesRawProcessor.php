@@ -289,6 +289,8 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
      * и legacy-записи без raw_document_id за тот же период.
      *
      * - `document_id IS NULL` — не трогаем уже закрытые в ОПиУ записи.
+     * - Перед DELETE применяется guard по Company::financeLockBefore:
+     *   reprocess запрещён, если период raw-документа пересекается с закрытым диапазоном.
      * - `price_per_unit > 0` в легаси-DELETE — отсекает storno-записи
      *   (negative accruals_for_sale, суффикс `_storno`, price_per_unit < 0),
      *   которых у старого потока `ProcessOzonSalesAction` не было.
@@ -303,6 +305,16 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
         $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
         $periodTo   = $rawDoc->getPeriodTo()->format('Y-m-d');
         $company = $rawDoc->getCompany();
+        $lockBefore = $company->getFinanceLockBefore();
+
+        if ($lockBefore !== null && $rawDoc->getPeriodFrom() <= $lockBefore) {
+            throw new \DomainException(sprintf(
+                'Период raw-документа заблокирован для переобработки (financeLockBefore: %s, period: %s—%s).',
+                $lockBefore->format('d.m.Y'),
+                $periodFrom,
+                $periodTo,
+            ));
+        }
 
         $deletedByDoc = $this->saleRepository->deleteByRawDocument(
             company: $company,
