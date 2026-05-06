@@ -45,12 +45,17 @@ final readonly class OzonRawDuplicatesCleanupPlanner
 
             $warnings = [];
             $hasPendingOrRunning = $this->hasPendingOrRunningRawDocument($rawDocuments);
+            $canonicalStatus = $this->findRawDocumentStatusById($rawDocuments, $canonical);
+            $canonicalFailed = $canonicalStatus === 'failed';
 
             if ($closedSales > 0 || $closedReturns > 0 || $closedCosts > 0) {
                 $warnings[] = 'Найдены closed rows (document_id IS NOT NULL), auto-cleanup отключён для этого дня.';
             }
             if ($hasPendingOrRunning) {
                 $warnings[] = 'Есть PENDING/RUNNING rawDoc, auto-cleanup запрещён до завершения pipeline.';
+            }
+            if ($canonicalFailed) {
+                $warnings[] = 'Canonical rawDoc имеет FAILED статус, auto-cleanup запрещён до успешной перезагрузки/пересборки документа.';
             }
 
             if ($staleSales + $staleReturns + $staleCosts === 0) {
@@ -69,7 +74,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 closedSalesRowsCount: $closedSales,
                 closedReturnsRowsCount: $closedReturns,
                 closedCostsRowsCount: $closedCosts,
-                canAutoCleanup: !$hasPendingOrRunning && $closedSales === 0 && $closedReturns === 0 && $closedCosts === 0,
+                canAutoCleanup: !$hasPendingOrRunning && !$canonicalFailed && $closedSales === 0 && $closedReturns === 0 && $closedCosts === 0,
                 safeToDeleteRawDocumentIds: $safeToDeleteRawDocs,
                 warnings: $warnings,
             );
@@ -304,6 +309,19 @@ final readonly class OzonRawDuplicatesCleanupPlanner
         }
 
         return false;
+    }
+
+    private function findRawDocumentStatusById(array $rawDocuments, string $rawDocumentId): ?string
+    {
+        foreach ($rawDocuments as $rawDocument) {
+            if ((string) $rawDocument['id'] !== $rawDocumentId) {
+                continue;
+            }
+
+            return $rawDocument['processing_status'] === null ? null : (string) $rawDocument['processing_status'];
+        }
+
+        return null;
     }
 
     /** @param list<string> $rawDocumentIds */
