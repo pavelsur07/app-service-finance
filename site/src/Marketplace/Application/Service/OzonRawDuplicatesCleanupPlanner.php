@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupDayPlan;
 use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupPlan;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 
 final readonly class OzonRawDuplicatesCleanupPlanner
@@ -40,8 +41,13 @@ final readonly class OzonRawDuplicatesCleanupPlanner
             $closedCosts = $this->countStaleRows('marketplace_costs', 'cost_date', $companyId, $day, $canonical, true);
 
             $warnings = [];
+            $hasPendingOrRunning = $this->hasPendingOrRunningRawDocument($rawDocuments);
+
             if ($closedSales > 0 || $closedReturns > 0 || $closedCosts > 0) {
                 $warnings[] = 'Найдены closed rows (document_id IS NOT NULL), auto-cleanup отключён для этого дня.';
+            }
+            if ($hasPendingOrRunning) {
+                $warnings[] = 'Есть PENDING/RUNNING rawDoc, auto-cleanup запрещён до завершения pipeline.';
             }
 
             if ($staleSales + $staleReturns + $staleCosts === 0) {
@@ -60,7 +66,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 closedSalesRowsCount: $closedSales,
                 closedReturnsRowsCount: $closedReturns,
                 closedCostsRowsCount: $closedCosts,
-                canAutoCleanup: $closedSales === 0 && $closedReturns === 0 && $closedCosts === 0,
+                canAutoCleanup: !$hasPendingOrRunning && $closedSales === 0 && $closedReturns === 0 && $closedCosts === 0,
                 safeToDeleteRawDocumentIds: $safeToDeleteRawDocs,
                 warnings: $warnings,
             );
@@ -78,7 +84,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 SELECT s.sale_date::date AS day
                 FROM marketplace_sales s
                 WHERE s.company_id = :companyId
-                  AND s.marketplace = 'ozon'
+                  AND s.marketplace = :marketplace
                   AND s.sale_date BETWEEN :fromDate AND :toDate
                   AND s.raw_document_id IS NOT NULL
                 GROUP BY s.sale_date::date
@@ -87,7 +93,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 SELECT r.return_date::date AS day
                 FROM marketplace_returns r
                 WHERE r.company_id = :companyId
-                  AND r.marketplace = 'ozon'
+                  AND r.marketplace = :marketplace
                   AND r.return_date BETWEEN :fromDate AND :toDate
                   AND r.raw_document_id IS NOT NULL
                 GROUP BY r.return_date::date
@@ -96,7 +102,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 SELECT c.cost_date::date AS day
                 FROM marketplace_costs c
                 WHERE c.company_id = :companyId
-                  AND c.marketplace = 'ozon'
+                  AND c.marketplace = :marketplace
                   AND c.cost_date BETWEEN :fromDate AND :toDate
                   AND c.raw_document_id IS NOT NULL
                 GROUP BY c.cost_date::date
@@ -106,7 +112,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 SELECT rd.period_from::date AS day
                 FROM marketplace_raw_documents rd
                 WHERE rd.company_id = :companyId
-                  AND rd.marketplace = 'ozon'
+                  AND rd.marketplace = :marketplace
                   AND rd.document_type = 'sales_report'
                   AND rd.period_from BETWEEN :fromDate AND :toDate
                   AND rd.period_to BETWEEN :fromDate AND :toDate
@@ -124,7 +130,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                    AND range_doc.period_to >= daily.period_to
                    AND range_doc.period_from <> range_doc.period_to
                 WHERE daily.company_id = :companyId
-                  AND daily.marketplace = 'ozon'
+                  AND daily.marketplace = :marketplace
                   AND daily.document_type = 'sales_report'
                   AND daily.period_from = daily.period_to
                   AND daily.period_from BETWEEN :fromDate AND :toDate
@@ -141,6 +147,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
                 'companyId' => $companyId,
                 'fromDate' => $from->format('Y-m-d'),
                 'toDate' => $to->format('Y-m-d'),
+                'marketplace' => MarketplaceType::OZON->value,
             ],
         );
 
@@ -158,7 +165,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
             SELECT rd.id, rd.period_from, rd.period_to, rd.processing_status, rd.synced_at, rd.records_count
             FROM marketplace_raw_documents rd
             WHERE rd.company_id = :companyId
-              AND rd.marketplace = 'ozon'
+              AND rd.marketplace = :marketplace
               AND rd.document_type = 'sales_report'
               AND rd.period_from <= :day
               AND rd.period_to >= :day
@@ -166,6 +173,7 @@ final readonly class OzonRawDuplicatesCleanupPlanner
             [
                 'companyId' => $companyId,
                 'day' => $day->format('Y-m-d'),
+                'marketplace' => MarketplaceType::OZON->value,
             ],
         );
     }
@@ -181,11 +189,11 @@ final readonly class OzonRawDuplicatesCleanupPlanner
 
             $statusRank = static function (?string $status): int {
                 return match ($status) {
-                    'completed' => 4,
-                    'running' => 3,
-                    'pending' => 2,
-                    null => 1,
-                    default => 0,
+                    'completed' => 3,
+                    null => 2,
+                    'failed' => 1,
+                    'pending', 'running' => 0,
+                    default => 1,
                 };
             };
 
@@ -214,18 +222,31 @@ final readonly class OzonRawDuplicatesCleanupPlanner
     {
         return (int) $this->connection->fetchOne(
             sprintf(
-                'SELECT COUNT(*) FROM %s t WHERE t.company_id = :companyId AND t.marketplace = :marketplace AND t.%s = :day AND t.raw_document_id IS NOT NULL AND t.raw_document_id <> :canonicalRawDocumentId AND t.document_id IS %s NULL',
+                'SELECT COUNT(*) FROM %s t WHERE t.company_id = :companyId AND t.marketplace = :marketplace AND t.%s = :day AND %s',
                 $table,
                 $dateField,
-                $closed ? 'NOT' : '',
+                $closed
+                    ? 't.document_id IS NOT NULL AND t.raw_document_id IS NOT NULL AND t.raw_document_id <> :canonicalRawDocumentId'
+                    : 't.document_id IS NULL AND (t.raw_document_id IS NULL OR t.raw_document_id <> :canonicalRawDocumentId)',
             ),
             [
                 'companyId' => $companyId,
-                'marketplace' => 'ozon',
+                'marketplace' => MarketplaceType::OZON->value,
                 'day' => $day->format('Y-m-d'),
                 'canonicalRawDocumentId' => $canonicalRawDocumentId,
             ],
         );
+    }
+
+    private function hasPendingOrRunningRawDocument(array $rawDocuments): bool
+    {
+        foreach ($rawDocuments as $rawDocument) {
+            if (in_array($rawDocument['processing_status'], ['pending', 'running'], true)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param list<string> $rawDocumentIds */

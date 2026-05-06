@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupExecutionResult;
 use App\Marketplace\Application\DTO\OzonRawDuplicatesCleanupPlan;
+use App\Marketplace\Enum\MarketplaceType;
 use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 
@@ -33,11 +34,19 @@ final readonly class OzonRawDuplicatesCleanupExecutor
                     continue;
                 }
 
-                $deletedSalesRows += $this->deleteStaleRows('marketplace_sales', 'sale_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
-                $deletedReturnsRows += $this->deleteStaleRows('marketplace_returns', 'return_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
-                $deletedCostsRows += $this->deleteStaleRows('marketplace_costs', 'cost_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
-                ++$cleanedDays;
-                $canonicalRawDocumentIds[] = $dayPlan->canonicalRawDocumentId;
+                $deletedSalesForDay = $this->deleteStaleRows('marketplace_sales', 'sale_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
+                $deletedReturnsForDay = $this->deleteStaleRows('marketplace_returns', 'return_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
+                $deletedCostsForDay = $this->deleteStaleRows('marketplace_costs', 'cost_date', $plan->companyId, $dayPlan->day, $dayPlan->canonicalRawDocumentId);
+
+                $deletedSalesRows += $deletedSalesForDay;
+                $deletedReturnsRows += $deletedReturnsForDay;
+                $deletedCostsRows += $deletedCostsForDay;
+
+                $deletedForDay = $deletedSalesForDay + $deletedReturnsForDay + $deletedCostsForDay;
+                if ($deletedForDay > 0) {
+                    ++$cleanedDays;
+                    $canonicalRawDocumentIds[] = $dayPlan->canonicalRawDocumentId;
+                }
             }
 
             $this->connection->commit();
@@ -72,13 +81,13 @@ final readonly class OzonRawDuplicatesCleanupExecutor
     {
         return $this->connection->executeStatement(
             sprintf(
-                'DELETE FROM %s t WHERE t.company_id = :companyId AND t.marketplace = :marketplace AND t.%s = :day AND t.raw_document_id IS NOT NULL AND t.raw_document_id <> :canonicalRawDocumentId AND t.document_id IS NULL',
+                'DELETE FROM %s t WHERE t.company_id = :companyId AND t.marketplace = :marketplace AND t.%s = :day AND t.document_id IS NULL AND (t.raw_document_id IS NULL OR t.raw_document_id <> :canonicalRawDocumentId)',
                 $table,
                 $dateField,
             ),
             [
                 'companyId' => $companyId,
-                'marketplace' => 'ozon',
+                'marketplace' => MarketplaceType::OZON->value,
                 'day' => $day->format('Y-m-d'),
                 'canonicalRawDocumentId' => $canonicalRawDocumentId,
             ],
