@@ -34,6 +34,11 @@ use Ramsey\Uuid\Uuid;
  */
 final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 {
+    /**
+     * Последний rawDocId, для которого уже выполнена очистка legacy/stale-записей
+     * в рамках текущего жизненного цикла процессора.
+     */
+    private ?string $cleanedUpRawDocId = null;
 
     public function __construct(
         private readonly EntityManagerInterface $em,
@@ -63,19 +68,6 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
     public function process(string $companyId, string $rawDocId): int
     {
-        // Удаляем старые затраты по raw_document_id (только незакрытые в ОПиУ)
-        $deleted = $this->connection->executeStatement(
-            'DELETE FROM marketplace_costs WHERE raw_document_id = :rawDocId AND document_id IS NULL',
-            ['rawDocId' => $rawDocId],
-        );
-
-        if ($deleted > 0) {
-            $this->logger->info('[Ozon] Deleted existing costs for reprocessing', [
-                'raw_doc_id' => $rawDocId,
-                'deleted'    => $deleted,
-            ]);
-        }
-
         // Читаем все операции из raw документа включая type=orders.
         // processBatch() получает только COST-bucket (type=services/returns/other),
         // но комиссия и логистика из type=orders тоже являются затратами.
@@ -140,11 +132,23 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             $listingsIdCache[$sku] = $listing->getId();
         }
 
-        $this->categoryResolver->preload($company, MarketplaceType::OZON);
+        $shouldCleanup = $rawDocId !== null && $this->cleanedUpRawDocId !== $rawDocId;
+        $useTransaction = $rawDocId !== null;
 
-        // Генерируем cost entries
-        $allEntries = [];
-        foreach ($rawRows as $op) {
+        if ($useTransaction) {
+            $this->connection->beginTransaction();
+        }
+
+        try {
+            if ($shouldCleanup) {
+                $this->cleanupLegacyCosts($companyId, $rawDocId);
+            }
+
+            $this->categoryResolver->preload($company, MarketplaceType::OZON);
+
+            // Генерируем cost entries
+            $allEntries = [];
+            foreach ($rawRows as $op) {
             $operationId = (string) ($op['operation_id'] ?? '');
             if ($operationId === '') {
                 continue;
@@ -194,20 +198,26 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
 
                 $allEntries[] = ['entry' => $entry, 'listingId' => $listingId];
             }
-        }
+            }
 
-        if (empty($allEntries)) {
-            return;
-        }
+            if (empty($allEntries)) {
+                if ($useTransaction) {
+                    $this->connection->commit();
+                }
+                if ($shouldCleanup) {
+                    $this->cleanedUpRawDocId = $rawDocId;
+                }
+                return;
+            }
 
-        // Дедупликация
-        $allExternalIds = array_unique(array_map(
-            static fn (array $row): string => $row['entry']['external_id'],
-            $allEntries,
-        ));
-        $existingMap = $this->costExistingIdsQuery->execute($companyId, $allExternalIds);
+            // Дедупликация
+            $allExternalIds = array_unique(array_map(
+                static fn (array $row): string => $row['entry']['external_id'],
+                $allEntries,
+            ));
+            $existingMap = $this->costExistingIdsQuery->execute($companyId, $allExternalIds);
 
-        foreach ($allEntries as $row) {
+            foreach ($allEntries as $row) {
             $entry      = $row['entry'];
             $externalId = $entry['external_id'];
 
@@ -242,12 +252,73 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
                 $cost->setListing($this->em->getReference(MarketplaceListing::class, $row['listingId']));
             }
 
-            $this->em->persist($cost);
-            $existingMap[$externalId] = true;
+                $this->em->persist($cost);
+                $existingMap[$externalId] = true;
+            }
+
+            $this->em->flush();
+            $this->mappingErrorLogger->resetBatch();
+
+            if ($useTransaction) {
+                $this->connection->commit();
+            }
+            if ($shouldCleanup) {
+                $this->cleanedUpRawDocId = $rawDocId;
+            }
+        } catch (\Throwable $e) {
+            if ($useTransaction && $this->connection->isTransactionActive()) {
+                $this->connection->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    private function cleanupLegacyCosts(string $companyId, string $rawDocId): void
+    {
+        $rawDoc = $this->em->find(MarketplaceRawDocument::class, $rawDocId);
+        if (!$rawDoc instanceof MarketplaceRawDocument) {
+            return;
         }
 
-        $this->em->flush();
-        $this->mappingErrorLogger->resetBatch();
+        $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
+        $periodTo = $rawDoc->getPeriodTo()->format('Y-m-d');
+
+        $deletedByDoc = (int) $this->connection->executeStatement(
+            'DELETE FROM marketplace_costs
+             WHERE raw_document_id = :rawDocId
+               AND document_id IS NULL',
+            ['rawDocId' => $rawDocId],
+        );
+
+        $deletedStale = (int) $this->connection->executeStatement(
+            'DELETE FROM marketplace_costs
+             WHERE document_id IS NULL
+               AND company_id = :companyId
+               AND marketplace = :marketplace
+               AND cost_date BETWEEN :periodFrom AND :periodTo
+               AND (raw_document_id IS NULL OR raw_document_id != :rawDocId)',
+            [
+                'companyId' => $companyId,
+                'marketplace' => MarketplaceType::OZON->value,
+                'periodFrom' => $periodFrom,
+                'periodTo' => $periodTo,
+                'rawDocId' => $rawDocId,
+            ],
+        );
+
+        if ($deletedByDoc > 0 || $deletedStale > 0) {
+            $this->logger->info(
+                '[Ozon] Deleted costs before reprocessing raw doc',
+                [
+                    'raw_doc_id' => $rawDocId,
+                    'company_id' => $companyId,
+                    'period_from' => $periodFrom,
+                    'period_to' => $periodTo,
+                    'deleted_by_doc' => $deletedByDoc,
+                    'deleted_stale' => $deletedStale,
+                ],
+            );
+        }
     }
 
     /**

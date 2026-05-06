@@ -218,7 +218,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
     /**
      * Удаляет записи текущего raw-документа (идемпотентный повтор обработки)
-     * и legacy-записи без raw_document_id за тот же период.
+     * и открытые stale-записи за период от других raw_document_id.
      *
      * `document_id IS NULL` — не трогаем уже закрытые в ОПиУ записи.
      */
@@ -239,27 +239,28 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
             ['docId' => $rawDocId],
         );
 
-        $deletedLegacy = (int) $this->connection->executeStatement(
+        $deletedStale = (int) $this->connection->executeStatement(
             'DELETE FROM marketplace_returns
-             WHERE raw_document_id IS NULL
-               AND document_id IS NULL
+             WHERE document_id IS NULL
                AND company_id = :companyId
                AND marketplace = :marketplace
-               AND return_date BETWEEN :periodFrom AND :periodTo',
+               AND return_date BETWEEN :periodFrom AND :periodTo
+               AND (raw_document_id IS NULL OR raw_document_id != :rawDocId)',
             [
                 'companyId'   => $companyId,
                 'marketplace' => MarketplaceType::OZON->value,
                 'periodFrom'  => $periodFrom,
                 'periodTo'    => $periodTo,
+                'rawDocId'    => $rawDocId,
             ],
         );
 
-        if ($deletedByDoc > 0 || $deletedLegacy > 0) {
+        if ($deletedByDoc > 0 || $deletedStale > 0) {
             $this->logger->info(
                 sprintf(
-                    '[Ozon] Очищено %d returns (по raw_document_id) + %d legacy returns за период %s—%s перед обработкой документа %s',
+                    '[Ozon] Очищено %d returns (по raw_document_id) + %d stale returns за период %s—%s перед обработкой документа %s',
                     $deletedByDoc,
-                    $deletedLegacy,
+                    $deletedStale,
                     $periodFrom,
                     $periodTo,
                     $rawDocId,
@@ -268,7 +269,7 @@ final class OzonReturnsRawProcessor implements MarketplaceRawProcessorInterface
                     'raw_doc_id'     => $rawDocId,
                     'company_id'     => $companyId,
                     'deleted_by_doc' => $deletedByDoc,
-                    'deleted_legacy' => $deletedLegacy,
+                    'deleted_stale'  => $deletedStale,
                     'period_from'    => $periodFrom,
                     'period_to'      => $periodTo,
                 ],
