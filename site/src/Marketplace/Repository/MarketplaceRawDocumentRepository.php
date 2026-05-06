@@ -19,7 +19,6 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         parent::__construct($registry, MarketplaceRawDocument::class);
     }
 
-
     /**
      * Deterministic lookup for daily sync: returns all exact-day active documents
      * (processingStatus is null or not FAILED) sorted by newest first.
@@ -38,7 +37,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->andWhere('d.documentType = :documentType')
             ->andWhere('d.periodFrom = :day')
             ->andWhere('d.periodTo = :day')
-            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('documentType', $documentType)
@@ -91,7 +90,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->andWhere('d.periodFrom = :periodFrom')
             ->andWhere('d.periodTo = :periodTo')
             ->andWhere('d.apiEndpoint = :apiEndpoint')
-            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('documentType', $documentType)
