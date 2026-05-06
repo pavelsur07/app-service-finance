@@ -20,6 +20,10 @@ final readonly class RawDocumentsListQuery
         return $this->rawDocumentRepository->createQueryBuilder('d')
             ->where('d.company = :company')
             ->setParameter('company', $company)
-            ->orderBy('d.syncedAt', 'DESC');
+            ->orderBy('d.periodTo', 'DESC')
+            ->addOrderBy('d.periodFrom', 'DESC')
+            ->addOrderBy('d.marketplace', 'ASC')
+            ->addOrderBy('d.documentType', 'ASC')
+            ->addOrderBy('d.syncedAt', 'DESC');
     }
 }
