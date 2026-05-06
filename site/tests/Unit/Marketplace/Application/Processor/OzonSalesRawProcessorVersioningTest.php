@@ -62,9 +62,9 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     }
 
     /**
-     * Базовый ключ уже есть в БД → первая regular получает _v2.
+     * Базовый ключ уже есть в БД: не создаём искусственный _v2, строка пропускается.
      */
-    public function testExistingInDbStartsFromV2(): void
+    public function testExistingInDbIsSkippedWithoutArtificialVersioning(): void
     {
         $processor = $this->buildProcessor(existingIds: ['A']);
 
@@ -72,7 +72,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
             $this->makeOp('A', +1584, '2026-02-24 14:00:00'),
         ]);
 
-        self::assertSame(['A_v2'], $this->getPersistedExternalIds());
+        self::assertSame([], $this->getPersistedExternalIds());
     }
 
     /**
@@ -162,47 +162,63 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     }
 
     /**
-     * Existing в БД + повтор в батче.
+     * Две разные строки в одном raw-документе с одинаковым base ключом не теряются.
      */
-    public function testExistingPlusRepeatInBatch(): void
+    public function testDuplicateRowsInsideSingleBatchArePreserved(): void
     {
-        $processor = $this->buildProcessor(existingIds: ['A', 'A_storno']);
+        $processor = $this->buildProcessor(existingIds: []);
 
         $processor->processBatch('company-1', MarketplaceType::OZON, [
-            $this->makeOp('A', +1584, '2026-02-25 10:00:00'),
-            $this->makeOp('A', -1584, '2026-02-25 12:00:00'),
-        ]);
+            $this->makeOp('DUP', +1000, '2026-03-02 10:00:00'),
+            $this->makeOp('DUP', +1100, '2026-03-02 10:05:00'),
+        ], '11111111-1111-1111-1111-111111111111');
 
-        self::assertSame(['A_v2', 'A_storno_v2'], $this->getPersistedExternalIds());
+        self::assertSame(['DUP', 'DUP_v2'], $this->getPersistedExternalIds());
+        self::assertSame(2100.0, $this->getSumPersistedAccruals());
     }
 
-    /**
-     * В БД уже есть A и A_v2 → следующая sale должна получить A_v3, не A_v2.
-     */
-    public function testExistingVersionedInDbBumpsToNextFree(): void
+    public function testDuplicateRowsAcrossTwoBatchesInOneRunArePreserved(): void
     {
-        $processor = $this->buildProcessor(existingIds: ['A', 'A_v2']);
+        $processor = $this->buildProcessor(existingIds: []);
 
         $processor->processBatch('company-1', MarketplaceType::OZON, [
-            $this->makeOp('A', +1584, '2026-02-26 10:00:00'),
-        ]);
+            $this->makeOp('DUP', +1000, '2026-03-02 10:00:00'),
+        ], '11111111-1111-1111-1111-111111111111');
 
-        self::assertSame(['A_v3'], $this->getPersistedExternalIds());
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('DUP', +1100, '2026-03-02 10:05:00'),
+        ], '11111111-1111-1111-1111-111111111111');
+
+        self::assertSame(['DUP', 'DUP_v2'], $this->getPersistedExternalIds());
+        self::assertSame(2100.0, $this->getSumPersistedAccruals());
     }
 
-    /**
-     * В БД A, A_storno, A_v2, A_storno_v2 → следующая пара получает _v3.
-     */
-    public function testFullCycleExistingBumpsToV3(): void
+    public function testExistingBaseKeyDoesNotCreateArtificialVersionOnSecondRow(): void
     {
-        $processor = $this->buildProcessor(existingIds: ['A', 'A_storno', 'A_v2', 'A_storno_v2']);
+        $processor = $this->buildProcessor(existingIds: ['A']);
 
         $processor->processBatch('company-1', MarketplaceType::OZON, [
-            $this->makeOp('A', +1584, '2026-02-27 10:00:00'),
-            $this->makeOp('A', -1584, '2026-02-27 12:00:00'),
+            $this->makeOp('A', +1000, '2026-03-03 10:00:00'),
+            $this->makeOp('A', +1100, '2026-03-03 10:05:00'),
         ]);
 
-        self::assertSame(['A_v3', 'A_storno_v3'], $this->getPersistedExternalIds());
+        self::assertSame([], $this->getPersistedExternalIds());
+        self::assertSame(0.0, $this->getSumPersistedAccruals());
+        self::assertNotContains('A_v2', $this->getPersistedExternalIds());
+    }
+
+    public function testExistingStornoBaseKeyDoesNotCreateArtificialVersionOnSecondRow(): void
+    {
+        $processor = $this->buildProcessor(existingIds: ['A_storno']);
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('A', -1000, '2026-03-03 10:00:00'),
+            $this->makeOp('A', -1100, '2026-03-03 10:05:00'),
+        ]);
+
+        self::assertSame([], $this->getPersistedExternalIds());
+        self::assertSame(0.0, $this->getSumPersistedAccruals());
+        self::assertNotContains('A_storno_v2', $this->getPersistedExternalIds());
     }
 
     // -------------------------------------------------------------------------
@@ -285,6 +301,8 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         $this->setProperty($processor, 'saleRepository', $saleRepository);
         $this->setProperty($processor, 'logger', new NullLogger());
         $this->setProperty($processor, 'cleanedUpRawDocId', null);
+        $this->setProperty($processor, 'perRunVersionCounters', []);
+        $this->setProperty($processor, 'perRunBlockedBaseKeys', []);
 
         // OzonListingEnsureService — final class, create via reflection
         $listingEnsureRef = (new \ReflectionClass(\App\Marketplace\Application\Service\OzonListingEnsureService::class))->newInstanceWithoutConstructor();
