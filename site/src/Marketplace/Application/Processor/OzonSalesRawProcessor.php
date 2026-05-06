@@ -286,7 +286,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
 
     /**
      * Удаляет записи текущего raw-документа (идемпотентный повтор обработки)
-     * и legacy-записи без raw_document_id за тот же период.
+     * и открытые stale-записи за период от других raw_document_id.
      *
      * - `document_id IS NULL` — не трогаем уже закрытые в ОПиУ записи.
      * - Перед DELETE применяется guard по Company::financeLockBefore:
@@ -338,12 +338,30 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
             ],
         );
 
-        if ($deletedByDoc > 0 || $deletedLegacy > 0) {
+        $deletedStale = (int) $this->connection->executeStatement(
+            'DELETE FROM marketplace_sales
+             WHERE raw_document_id IS NOT NULL
+               AND raw_document_id != :rawDocId
+               AND document_id IS NULL
+               AND company_id = :companyId
+               AND marketplace = :marketplace
+               AND sale_date BETWEEN :periodFrom AND :periodTo',
+            [
+                'rawDocId'    => $rawDocId,
+                'companyId'   => $companyId,
+                'marketplace' => MarketplaceType::OZON->value,
+                'periodFrom'  => $periodFrom,
+                'periodTo'    => $periodTo,
+            ],
+        );
+
+        if ($deletedByDoc > 0 || $deletedLegacy > 0 || $deletedStale > 0) {
             $this->logger->info(
                 sprintf(
-                    '[Ozon] Очищено %d sales (по raw_document_id) + %d legacy sales за период %s—%s перед обработкой документа %s',
+                    '[Ozon] Очищено %d sales (по raw_document_id) + %d legacy sales + %d stale sales за период %s—%s перед обработкой документа %s',
                     $deletedByDoc,
                     $deletedLegacy,
+                    $deletedStale,
                     $periodFrom,
                     $periodTo,
                     $rawDocId,
@@ -353,6 +371,7 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                     'company_id'     => $companyId,
                     'deleted_by_doc' => $deletedByDoc,
                     'deleted_legacy' => $deletedLegacy,
+                    'deleted_stale'  => $deletedStale,
                     'period_from'    => $periodFrom,
                     'period_to'      => $periodTo,
                 ],
