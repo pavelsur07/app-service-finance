@@ -53,6 +53,22 @@ final class MarketplaceListingBuilder
         return $clone;
     }
 
+    public function withId(string $id): self
+    {
+        $clone = clone $this;
+        $clone->id = $id;
+
+        return $clone;
+    }
+
+    public function withIndex(int $index): self
+    {
+        $clone = clone $this;
+        $clone->id = sprintf('33333333-3333-4333-8333-%012d', $index);
+
+        return $clone;
+    }
+
     public function withPrice(string $price): self
     {
         $clone = clone $this;
