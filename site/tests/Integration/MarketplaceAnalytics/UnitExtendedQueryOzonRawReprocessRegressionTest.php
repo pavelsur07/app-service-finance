@@ -47,7 +47,7 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         $firstImportRevenue = $this->getTotalRevenueFromSalesTable();
         $firstImportRows = $this->countRawSalesRows($rawDocument->getId());
 
-        self::assertSame(15488951.02, $firstImportRevenue, 'Санити-чек: первая обработка должна записать ожидаемую выручку.');
+        self::assertEqualsWithDelta(15488951.02, $firstImportRevenue, 0.01, 'Санити-чек: первая обработка должна записать ожидаемую выручку.');
         self::assertSame(1, $firstImportRows, 'Санити-чек: первая обработка должна записать одну строку продажи.');
 
         $this->rawProcessor->resetPerRunState();
@@ -61,9 +61,10 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             limit: 100,
         );
 
-        self::assertSame(
+        self::assertEqualsWithDelta(
             15488951.02,
             (float) $queryResult['totals']['revenue'],
+            0.01,
             'Регрессия: Unit Extended не должен показывать удвоенную выручку после повторной обработки того же raw-документа.',
         );
 
@@ -71,6 +72,12 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             1,
             $this->countRawSalesRows($rawDocument->getId()),
             'Регрессия: количество строк marketplace_sales по raw_document_id не должно удваиваться при повторной обработке.',
+        );
+
+        self::assertSame(
+            ['OZON-POSTING-REG-1'],
+            $this->getExternalOrderIds($rawDocument->getId()),
+            'Регрессия: после повторной обработки должен остаться только базовый external_order_id без _v2.',
         );
     }
 
@@ -151,5 +158,19 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             'SELECT COALESCE(SUM(total_revenue), 0) FROM marketplace_sales WHERE company_id = :companyId',
             ['companyId' => self::COMPANY_ID],
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function getExternalOrderIds(string $rawDocId): array
+    {
+        /** @var list<string> $ids */
+        $ids = $this->em->getConnection()->fetchFirstColumn(
+            'SELECT external_order_id FROM marketplace_sales WHERE company_id = :companyId AND raw_document_id = :rawDocId ORDER BY external_order_id ASC',
+            ['companyId' => self::COMPANY_ID, 'rawDocId' => $rawDocId],
+        );
+
+        return $ids;
     }
 }
