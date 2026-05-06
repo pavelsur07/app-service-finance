@@ -26,6 +26,20 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
      * когда один rawDocument разбит на несколько батчей (>500 строк).
      */
     private ?string $cleanedUpRawDocId = null;
+    /**
+     * Per-run счётчики версий external_order_id.
+     * Позволяют продолжать _vN между batch одного raw-документа внутри одного invocation.
+     *
+     * @var array<string, int>
+     */
+    private array $perRunVersionCounters = [];
+    /**
+     * Base keys, already existing in DB after cleanup, for which _vN generation is forbidden
+     * within current run to avoid artificial duplicate bypass.
+     *
+     * @var array<string, true>
+     */
+    private array $perRunBlockedBaseKeys = [];
 
     public function __construct(
         private readonly ProcessOzonSalesAction $action,
@@ -78,6 +92,8 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
     public function resetPerRunState(): void
     {
         $this->cleanedUpRawDocId = null;
+        $this->perRunVersionCounters = [];
+        $this->perRunBlockedBaseKeys = [];
     }
 
     /**
@@ -161,41 +177,44 @@ final class OzonSalesRawProcessor implements MarketplaceRawProcessorInterface
                 $baseKeysMap[$i] = $baseKey;
             }
 
-            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($baseKeysMap)));
+            $newBaseKeysForDbProbe = [];
+            foreach (array_unique($baseKeysMap) as $baseKey) {
+                if (isset($this->perRunVersionCounters[$baseKey]) || isset($this->perRunBlockedBaseKeys[$baseKey])) {
+                    continue;
+                }
 
-            $counters = [];
+                $newBaseKeysForDbProbe[] = $baseKey;
+            }
+
+            $existingBaseMap = $newBaseKeysForDbProbe === []
+                ? []
+                : $this->saleRepository->getExistingExternalIds($companyId, $newBaseKeysForDbProbe);
+            foreach ($existingBaseMap as $existingBaseKey => $_) {
+                $this->perRunBlockedBaseKeys[$existingBaseKey] = true;
+            }
+
+            // ВАЖНО: версии (_v2/_v3/...) генерируются только в рамках текущего run/invocation.
+            // Не отталкиваемся от уже существующих строк БД, чтобы повторный импорт
+            // не создавал искусственные новые external_order_id.
             $computedIds = [];
             foreach ($salesData as $i => $op) {
                 $baseKey = $baseKeysMap[$i];
-
-                if (!isset($counters[$baseKey])) {
-                    $counters[$baseKey] = isset($existingMap[$baseKey]) ? 1 : 0;
+                if (isset($this->perRunBlockedBaseKeys[$baseKey])) {
+                    $computedIds[$i] = $baseKey;
+                    continue;
                 }
 
-                $counters[$baseKey]++;
-                $computedIds[$i] = $counters[$baseKey] > 1
-                    ? $baseKey . '_v' . $counters[$baseKey]
+                $this->perRunVersionCounters[$baseKey] = ($this->perRunVersionCounters[$baseKey] ?? 0) + 1;
+
+                $computedIds[$i] = $this->perRunVersionCounters[$baseKey] > 1
+                    ? $baseKey . '_v' . $this->perRunVersionCounters[$baseKey]
                     : $baseKey;
             }
 
-            $versionedKeys = array_filter($computedIds, static fn (string $id): bool => (bool) preg_match('/_v\d+$/', $id));
-            if ($versionedKeys !== []) {
-                $versionedExisting = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($versionedKeys)));
-                if ($versionedExisting !== []) {
-                    $existingMap = array_merge($existingMap, $versionedExisting);
-                    foreach ($computedIds as $i => $id) {
-                        if (!isset($versionedExisting[$id])) {
-                            continue;
-                        }
-                        $baseKey = $baseKeysMap[$i];
-                        while (isset($existingMap[$id])) {
-                            $counters[$baseKey]++;
-                            $id = $baseKey . '_v' . $counters[$baseKey];
-                        }
-                        $computedIds[$i] = $id;
-                    }
-                }
-            }
+            // Для idempotency сверяем только уже вычисленные ключи (base + batch versions).
+            // TODO: если Ozon начнёт присылать устойчивые multi-line ключи, перейти на более
+            // строгий natural key (например posting_number + SKU + operation_id) и убрать _vN.
+            $existingMap = $this->saleRepository->getExistingExternalIds($companyId, array_values(array_unique($computedIds)));
 
             foreach ($salesData as $i => $op) {
                 $externalId = $computedIds[$i];
