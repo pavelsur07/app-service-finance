@@ -20,6 +20,36 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
     }
 
     /**
+     * Deterministic lookup for daily sync: returns all exact-day active documents
+     * (processingStatus is null or not FAILED) sorted by newest first.
+     *
+     * @return list<MarketplaceRawDocument>
+     */
+    public function findActiveExactDayDocuments(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        \DateTimeImmutable $day,
+    ): array {
+        return $this->createQueryBuilder('d')
+            ->where('d.company = :company')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.periodFrom = :day')
+            ->andWhere('d.periodTo = :day')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->setParameter('day', $day)
+            ->setParameter('failed', PipelineStatus::FAILED)
+            ->orderBy('d.syncedAt', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Idempotency lookup for daily sync: возвращает существующий raw_document
      * за конкретный день (periodFrom=periodTo), у которого processingStatus
      * НЕ равен FAILED (т.е. null / PENDING / RUNNING / COMPLETED).
@@ -34,21 +64,12 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         string $documentType,
         \DateTimeImmutable $day,
     ): ?MarketplaceRawDocument {
-        return $this->createQueryBuilder('d')
-            ->where('d.company = :company')
-            ->andWhere('d.marketplace = :marketplace')
-            ->andWhere('d.documentType = :documentType')
-            ->andWhere('d.periodFrom = :day')
-            ->andWhere('d.periodTo = :day')
-            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
-            ->setParameter('company', $company)
-            ->setParameter('marketplace', $marketplace)
-            ->setParameter('documentType', $documentType)
-            ->setParameter('day', $day)
-            ->setParameter('failed', PipelineStatus::FAILED)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
+        return $this->findActiveExactDayDocuments(
+            $company,
+            $marketplace,
+            $documentType,
+            $day,
+        )[0] ?? null;
     }
 
     /**
@@ -69,7 +90,7 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->andWhere('d.periodFrom = :periodFrom')
             ->andWhere('d.periodTo = :periodTo')
             ->andWhere('d.apiEndpoint = :apiEndpoint')
-            ->andWhere('d.processingStatus IS NULL OR d.processingStatus != :failed')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
             ->setParameter('company', $company)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('documentType', $documentType)
