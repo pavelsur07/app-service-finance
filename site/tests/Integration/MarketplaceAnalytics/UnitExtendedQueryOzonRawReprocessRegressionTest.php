@@ -44,16 +44,23 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         $this->rawProcessor->resetPerRunState();
         $this->rawProcessor->processBatch(self::COMPANY_ID, MarketplaceType::OZON, $rawRows, $rawDocument->getId());
 
-        $firstImportRevenue = $this->getTotalRevenueFromSalesTable();
-        $firstImportRows = $this->countRawSalesRows($rawDocument->getId());
+        $firstQueryResult = $this->unitExtendedQuery->execute(
+            self::COMPANY_ID,
+            MarketplaceType::OZON->value,
+            self::PERIOD_FROM,
+            self::PERIOD_TO,
+            limit: 100,
+        );
 
-        self::assertEqualsWithDelta(15488951.02, $firstImportRevenue, 0.01, 'Санити-чек: первая обработка должна записать ожидаемую выручку.');
-        self::assertSame(1, $firstImportRows, 'Санити-чек: первая обработка должна записать одну строку продажи.');
+        $firstRevenue = (float) $firstQueryResult['totals']['revenue'];
+
+        self::assertEqualsWithDelta(15488951.02, $firstRevenue, 0.01, 'Санити-чек: первая обработка должна дать ожидаемую выручку в Unit Extended.');
+        self::assertSame(1, $this->countRawSalesRows($rawDocument->getId()), 'Санити-чек: первая обработка должна записать одну строку продажи.');
 
         $this->rawProcessor->resetPerRunState();
         $this->rawProcessor->processBatch(self::COMPANY_ID, MarketplaceType::OZON, $rawRows, $rawDocument->getId());
 
-        $queryResult = $this->unitExtendedQuery->execute(
+        $secondQueryResult = $this->unitExtendedQuery->execute(
             self::COMPANY_ID,
             MarketplaceType::OZON->value,
             self::PERIOD_FROM,
@@ -62,8 +69,8 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
 
         self::assertEqualsWithDelta(
-            15488951.02,
-            (float) $queryResult['totals']['revenue'],
+            $firstRevenue,
+            (float) $secondQueryResult['totals']['revenue'],
             0.01,
             'Регрессия: Unit Extended не должен показывать удвоенную выручку после повторной обработки того же raw-документа.',
         );
@@ -152,13 +159,6 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
     }
 
-    private function getTotalRevenueFromSalesTable(): float
-    {
-        return (float) $this->em->getConnection()->fetchOne(
-            'SELECT COALESCE(SUM(total_revenue), 0) FROM marketplace_sales WHERE company_id = :companyId',
-            ['companyId' => self::COMPANY_ID],
-        );
-    }
 
     /**
      * @return list<string>
