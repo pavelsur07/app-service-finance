@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\MarketplaceAds\Command;
 
 use App\Marketplace\Enum\MarketplaceType;
-use App\MarketplaceAds\Application\DispatchOzonAdLoadAction;
+use App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface;
 use App\MarketplaceAds\Command\OzonAdDailySyncCommand;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
@@ -28,7 +28,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
         $query->method('getCompanyIds')->willReturn($companyIds);
 
-        $action = $this->createMock(DispatchOzonAdLoadAction::class);
+        $action = $this->createMock(DispatchOzonAdLoadActionInterface::class);
 
         $receivedCompanies = [];
         $action
@@ -63,7 +63,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
         $query->method('getCompanyIds')->willReturn([]);
 
-        $action = $this->createMock(DispatchOzonAdLoadAction::class);
+        $action = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $action->expects(self::never())->method('__invoke');
 
         $logger = $this->createMock(LoggerInterface::class);
@@ -82,7 +82,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
         $query->method('getCompanyIds')->willReturn($companyIds);
 
-        $action = $this->createMock(DispatchOzonAdLoadAction::class);
+        $action = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $received = [];
         $action
             ->expects(self::exactly(3))
@@ -115,7 +115,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
         $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
         $query->method('getCompanyIds')->willReturn($companyIds);
 
-        $action = $this->createMock(DispatchOzonAdLoadAction::class);
+        $action = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $received = [];
         $action
             ->expects(self::exactly(3))
@@ -143,7 +143,7 @@ final class OzonAdDailySyncCommandTest extends TestCase
 
     private function makeTester(
         ActiveOzonPerformanceConnectionsQuery $query,
-        DispatchOzonAdLoadAction $action,
+        DispatchOzonAdLoadActionInterface $action,
         LoggerInterface $logger,
     ): CommandTester {
         $command = new OzonAdDailySyncCommand($query, $action, $logger);
