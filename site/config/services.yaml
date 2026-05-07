@@ -77,6 +77,7 @@ services:
     App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface: '@App\MarketplaceAds\Repository\AdRawDocumentRepository'
     App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface: '@App\MarketplaceAds\Repository\AdLoadJobRepository'
     App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface: '@App\MarketplaceAds\Application\DispatchOzonAdLoadAction'
+    App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface: '@App\MarketplaceAds\Infrastructure\Query\AdDocumentQuery'
 
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:

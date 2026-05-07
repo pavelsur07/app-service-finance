@@ -14,7 +14,7 @@ use Doctrine\DBAL\Connection;
  * Работает напрямую с DBAL (без ORM hydration) — таблицы только читаются,
  * никаких изменений здесь не происходит.
  */
-final readonly class AdDocumentQuery
+final readonly class AdDocumentQuery implements AdDocumentQueryInterface
 {
     public function __construct(
         private Connection $connection,

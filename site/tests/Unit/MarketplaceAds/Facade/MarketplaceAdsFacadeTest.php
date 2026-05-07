@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\MarketplaceAds\Facade;
 
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
-use App\MarketplaceAds\Infrastructure\Query\AdDocumentQuery;
+use App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface;
 use App\MarketplaceAds\Infrastructure\Query\AdSpendByListingQuery;
 use PHPUnit\Framework\TestCase;
 
@@ -30,7 +30,7 @@ final class MarketplaceAdsFacadeTest extends TestCase
             ->with($companyId, $from, $to, $marketplace)
             ->willReturn($expected);
 
-        $adDocumentQuery = $this->createMock(AdDocumentQuery::class);
+        $adDocumentQuery = $this->createMock(AdDocumentQueryInterface::class);
         $adDocumentQuery->expects(self::never())->method(self::anything());
 
         $facade = new MarketplaceAdsFacade($adDocumentQuery, $adSpendByListingQuery);
@@ -53,7 +53,7 @@ final class MarketplaceAdsFacadeTest extends TestCase
             ->with($companyId, $from, $to, null)
             ->willReturn([]);
 
-        $adDocumentQuery = $this->createMock(AdDocumentQuery::class);
+        $adDocumentQuery = $this->createMock(AdDocumentQueryInterface::class);
 
         $facade = new MarketplaceAdsFacade($adDocumentQuery, $adSpendByListingQuery);
 
