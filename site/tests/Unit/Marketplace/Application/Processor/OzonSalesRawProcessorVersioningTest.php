@@ -73,6 +73,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         ]);
 
         self::assertSame([], $this->getPersistedExternalIds());
+        self::assertNotContains('A_v2', $this->getPersistedExternalIds());
     }
 
     /**
@@ -259,6 +260,7 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
         self::assertSame([], $this->getPersistedExternalIds());
         self::assertSame(0.0, $this->getSumPersistedAccruals());
         self::assertNotContains('A_v2', $this->getPersistedExternalIds());
+        self::assertNotContains('A_v3', $this->getPersistedExternalIds());
     }
 
     public function testExistingStornoBaseKeyDoesNotCreateArtificialVersionOnSecondRow(): void
