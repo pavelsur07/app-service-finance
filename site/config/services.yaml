@@ -76,6 +76,7 @@ services:
     App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface: '@App\MarketplaceAds\Repository\AdChunkProgressRepository'
     App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface: '@App\MarketplaceAds\Repository\AdRawDocumentRepository'
     App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface: '@App\MarketplaceAds\Repository\AdLoadJobRepository'
+    App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface: '@App\MarketplaceAds\Application\DispatchOzonAdLoadAction'
 
     # ---------- Balance value providers ------------ #
     App\Balance\Provider\:

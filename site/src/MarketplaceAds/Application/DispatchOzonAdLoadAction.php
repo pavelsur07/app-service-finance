@@ -28,7 +28,7 @@ use Doctrine\ORM\EntityManagerInterface;
  * удаляются — они обслуживают job'ы, дошедшие до `AdLoadJob(status=pending)`
  * ДО деплоя. Новые загрузки идут через Planner. Удаление — Task-11.9b.
  */
-final class DispatchOzonAdLoadAction
+final class DispatchOzonAdLoadAction implements DispatchOzonAdLoadActionInterface
 {
     /**
      * Ozon Performance API лимит — максимум 62 дня в POST `/statistics`

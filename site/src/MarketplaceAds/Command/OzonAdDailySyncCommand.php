@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAds\Command;
 
-use App\MarketplaceAds\Application\DispatchOzonAdLoadAction;
+use App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -19,7 +19,7 @@ use Symfony\Component\Console\Output\OutputInterface;
  * Cron: 30 4 * * * php bin/console app:marketplace-ads:ozon-daily-sync
  *
  * Команда тонкая: получает список активных Ozon Performance подключений через DBAL Query,
- * для каждой компании вызывает {@see DispatchOzonAdLoadAction} с датой = «вчера».
+ * для каждой компании вызывает {@see DispatchOzonAdLoadActionInterface} с датой = «вчера».
  * Ошибки отдельной компании не должны прерывать обработку остальных.
  */
 #[AsCommand(
@@ -30,7 +30,7 @@ final class OzonAdDailySyncCommand extends Command
 {
     public function __construct(
         private readonly ActiveOzonPerformanceConnectionsQuery $connectionsQuery,
-        private readonly DispatchOzonAdLoadAction $dispatchAction,
+        private readonly DispatchOzonAdLoadActionInterface $dispatchAction,
         private readonly LoggerInterface $logger,
     ) {
         parent::__construct();
