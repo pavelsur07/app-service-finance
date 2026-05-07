@@ -16,11 +16,13 @@ final readonly class DefaultCostMappingRuleSet
         private MarketplaceType $marketplace,
         array $rules,
     ) {
-        $this->rulesByCostCode = [];
+        $rulesByCostCode = [];
 
         foreach ($rules as $rule) {
-            $this->rulesByCostCode[$rule->getCostCode()] = $rule;
+            $rulesByCostCode[$rule->getCostCode()] = $rule;
         }
+
+        $this->rulesByCostCode = $rulesByCostCode;
     }
 
     public function getMarketplace(): MarketplaceType
