@@ -162,6 +162,44 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     }
 
     /**
+     * Ozon дополнил rawDoc новой строкой: повторная обработка должна заменить
+     * результат raw_document_id на актуальный, без искусственных _v2 дублей.
+     */
+    public function testReprocessingSameRawDocumentIdWithNewRowReplacesResultWithoutVersionDuplicates(): void
+    {
+        $deleteByRawDocumentCalls = 0;
+        $processor = $this->buildProcessor(
+            existingIds: [],
+            deleteByRawDocumentCalls: $deleteByRawDocumentCalls,
+        );
+        $rawDocumentId = '11111111-1111-1111-1111-111111111111';
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('A', +1000, '2026-03-01 10:00:00'),
+            $this->makeOp('B', +2000, '2026-03-01 11:00:00'),
+        ], $rawDocumentId);
+
+        self::assertSame(1, $deleteByRawDocumentCalls);
+        self::assertSame(['A', 'B'], $this->getPersistedExternalIds());
+        self::assertSame(3000.0, $this->getSumPersistedAccruals());
+
+        $processor->resetPerRunState();
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('A', +1000, '2026-03-01 10:00:00'),
+            $this->makeOp('B', +2500, '2026-03-01 11:00:00'),
+            $this->makeOp('C', +500, '2026-03-01 12:00:00'),
+        ], $rawDocumentId);
+
+        self::assertSame(2, $deleteByRawDocumentCalls);
+        self::assertSame(['A', 'B', 'C'], $this->getPersistedExternalIds());
+        self::assertSame(4000.0, $this->getSumPersistedAccruals());
+        self::assertNotContains('A_v2', $this->getPersistedExternalIds());
+        self::assertNotContains('B_v2', $this->getPersistedExternalIds());
+        self::assertNotContains('C_v2', $this->getPersistedExternalIds());
+    }
+
+    /**
      * Две разные строки в одном raw-документе с одинаковым base ключом не теряются.
      */
     public function testDuplicateRowsInsideSingleBatchArePreserved(): void
