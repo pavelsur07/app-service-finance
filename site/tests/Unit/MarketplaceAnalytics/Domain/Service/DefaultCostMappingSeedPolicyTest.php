@@ -21,9 +21,9 @@ final class DefaultCostMappingSeedPolicyTest extends TestCase
         $saved = [];
 
         $repo = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
-        $repo->method('hasCompanyMappings')
-            ->with(self::COMPANY_ID, MarketplaceType::WILDBERRIES)
-            ->willReturn(false);
+        $repo->method('findByCompanyAndMarketplace')
+            ->with(self::COMPANY_ID, MarketplaceType::WILDBERRIES->value)
+            ->willReturn([]);
         $repo->method('save')
             ->willReturnCallback(static function (UnitEconomyCostMapping $mapping) use (&$saved): void {
                 $saved[] = $mapping;
@@ -35,16 +35,19 @@ final class DefaultCostMappingSeedPolicyTest extends TestCase
         self::assertCount(6, $saved);
 
         foreach ($saved as $mapping) {
-            self::assertTrue($mapping->isSystem());
+            self::assertSame(self::COMPANY_ID, $mapping->getCompanyId());
+            self::assertSame(MarketplaceType::WILDBERRIES, $mapping->getMarketplace());
         }
     }
 
     public function testSeedIsIdempotent(): void
     {
         $repo = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
-        $repo->method('hasCompanyMappings')
-            ->with(self::COMPANY_ID, MarketplaceType::WILDBERRIES)
-            ->willReturn(true);
+        $repo->method('findByCompanyAndMarketplace')
+            ->with(self::COMPANY_ID, MarketplaceType::WILDBERRIES->value)
+            ->willReturn([
+                $this->createMock(UnitEconomyCostMapping::class),
+            ]);
         $repo->expects(self::never())->method('save');
 
         $policy = new DefaultCostMappingSeedPolicy($repo);
@@ -56,7 +59,7 @@ final class DefaultCostMappingSeedPolicyTest extends TestCase
         $saved = [];
 
         $repo = $this->createMock(UnitEconomyCostMappingRepositoryInterface::class);
-        $repo->method('hasCompanyMappings')->willReturn(false);
+        $repo->method('findByCompanyAndMarketplace')->willReturn([]);
         $repo->method('save')
             ->willReturnCallback(static function (UnitEconomyCostMapping $mapping) use (&$saved): void {
                 $saved[] = $mapping;
@@ -65,16 +68,16 @@ final class DefaultCostMappingSeedPolicyTest extends TestCase
         $policy = new DefaultCostMappingSeedPolicy($repo);
         $policy->seedForCompanyAndMarketplace(self::COMPANY_ID, self::MARKETPLACE);
 
-        $typesByCode = [];
+        $typesByCategoryName = [];
         foreach ($saved as $mapping) {
-            $typesByCode[$mapping->getCostCategoryCode()] = $mapping->getUnitEconomyCostType();
+            $typesByCategoryName[$mapping->getCostCategoryName()] = $mapping->getUnitEconomyCostType();
         }
 
-        self::assertSame(UnitEconomyCostType::ADVERTISING_CPC, $typesByCode['advertising_cpc']);
-        self::assertSame(UnitEconomyCostType::ADVERTISING_OTHER, $typesByCode['advertising_other']);
-        self::assertSame(UnitEconomyCostType::LOGISTICS_TO, $typesByCode['logistics_delivery']);
-        self::assertSame(UnitEconomyCostType::LOGISTICS_BACK, $typesByCode['logistics_return']);
-        self::assertSame(UnitEconomyCostType::STORAGE, $typesByCode['storage']);
-        self::assertSame(UnitEconomyCostType::COMMISSION, $typesByCode['commission']);
+        self::assertSame(UnitEconomyCostType::ADVERTISING_CPC, $typesByCategoryName['Реклама (CPC)']);
+        self::assertSame(UnitEconomyCostType::ADVERTISING_OTHER, $typesByCategoryName['Реклама (прочая)']);
+        self::assertSame(UnitEconomyCostType::LOGISTICS_TO, $typesByCategoryName['Логистика (доставка)']);
+        self::assertSame(UnitEconomyCostType::LOGISTICS_BACK, $typesByCategoryName['Логистика (возврат)']);
+        self::assertSame(UnitEconomyCostType::STORAGE, $typesByCategoryName['Хранение']);
+        self::assertSame(UnitEconomyCostType::COMMISSION, $typesByCategoryName['Комиссия']);
     }
 }
