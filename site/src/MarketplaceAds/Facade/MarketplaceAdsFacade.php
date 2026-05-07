@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Facade;
 
 use App\MarketplaceAds\Application\DTO\AdCostForListingDTO;
-use App\MarketplaceAds\Infrastructure\Query\AdDocumentQuery;
+use App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface;
 use App\MarketplaceAds\Infrastructure\Query\AdSpendByListingQuery;
 
 /**
@@ -20,7 +20,7 @@ use App\MarketplaceAds\Infrastructure\Query\AdSpendByListingQuery;
 final readonly class MarketplaceAdsFacade
 {
     public function __construct(
-        private AdDocumentQuery $adDocumentQuery,
+        private AdDocumentQueryInterface $adDocumentQuery,
         private AdSpendByListingQuery $adSpendByListingQuery,
     ) {
     }
