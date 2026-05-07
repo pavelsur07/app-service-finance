@@ -218,17 +218,33 @@ final class OzonSalesRawProcessorVersioningTest extends TestCase
     public function testDuplicateRowsAcrossTwoBatchesInOneRunArePreserved(): void
     {
         $processor = $this->buildProcessor(existingIds: []);
+        $rawDocumentId = '11111111-1111-1111-1111-111111111111';
 
         $processor->processBatch('company-1', MarketplaceType::OZON, [
             $this->makeOp('DUP', +1000, '2026-03-02 10:00:00'),
-        ], '11111111-1111-1111-1111-111111111111');
+        ], $rawDocumentId);
 
         $processor->processBatch('company-1', MarketplaceType::OZON, [
             $this->makeOp('DUP', +1100, '2026-03-02 10:05:00'),
-        ], '11111111-1111-1111-1111-111111111111');
+        ], $rawDocumentId);
 
         self::assertSame(['DUP', 'DUP_v2'], $this->getPersistedExternalIds());
         self::assertSame(2100.0, $this->getSumPersistedAccruals());
+
+        $processor->resetPerRunState();
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('DUP', +1000, '2026-03-02 10:00:00'),
+        ], $rawDocumentId);
+
+        $processor->processBatch('company-1', MarketplaceType::OZON, [
+            $this->makeOp('DUP', +1100, '2026-03-02 10:05:00'),
+        ], $rawDocumentId);
+
+        self::assertSame(['DUP', 'DUP_v2'], $this->getPersistedExternalIds());
+        self::assertSame(2100.0, $this->getSumPersistedAccruals());
+        self::assertNotContains('DUP_v3', $this->getPersistedExternalIds());
+        self::assertNotContains('DUP_v4', $this->getPersistedExternalIds());
     }
 
     public function testExistingBaseKeyDoesNotCreateArtificialVersionOnSecondRow(): void
