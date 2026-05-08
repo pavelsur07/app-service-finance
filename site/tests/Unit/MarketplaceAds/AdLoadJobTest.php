@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class AdLoadJobTest extends TestCase
@@ -243,9 +244,7 @@ final class AdLoadJobTest extends TestCase
         $job->setChunksTotal(5);
     }
 
-    /**
-     * @dataProvider invalidChunksTotalProvider
-     */
+    #[DataProvider('invalidChunksTotalProvider')]
     public function testSetChunksTotalRejectsZeroOrNegative(int $total): void
     {
         $job = AdLoadJobBuilder::aJob()->build();
