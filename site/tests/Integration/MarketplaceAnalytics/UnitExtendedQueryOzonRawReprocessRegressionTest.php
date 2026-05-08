@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\MarketplaceAnalytics;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Marketplace\Application\Processor\OzonSalesRawProcessor;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
@@ -93,6 +94,9 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
     private function cleanupTestData(): void
     {
         $connection = $this->em->getConnection();
+        $platform = $connection->getDatabasePlatform();
+        $companyTable = $this->em->getClassMetadata(Company::class)->getQuotedTableName($platform);
+        $userTable = $this->em->getClassMetadata(User::class)->getQuotedTableName($platform);
 
         $connection->executeStatement(
             'DELETE FROM marketplace_sales WHERE company_id = :companyId',
@@ -110,14 +114,16 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
 
         $connection->executeStatement(
-            'DELETE FROM company WHERE id = :companyId',
+            sprintf('DELETE FROM %s WHERE id = :companyId', $companyTable),
             ['companyId' => self::COMPANY_ID],
         );
 
         $connection->executeStatement(
-            'DELETE FROM "user" WHERE id = :ownerId',
+            sprintf('DELETE FROM %s WHERE id = :ownerId', $userTable),
             ['ownerId' => self::OWNER_ID],
         );
+
+        $this->em->clear();
     }
 
     private function seedCompanyAndListing(): void
