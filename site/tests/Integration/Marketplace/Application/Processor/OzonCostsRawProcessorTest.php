@@ -45,6 +45,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $outside = new \DateTimeImmutable('2026-03-20');
         $rawDocA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12';
         $rawDocB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb12';
+        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocA)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
 
         $stale = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
         $stale->setExternalId('stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId($rawDocA);
@@ -94,6 +95,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $stale = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
         $stale->setExternalId('locked-stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId(self::LEGACY_RAW_DOC_ID);
         $this->em->persist($stale);
+        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId(self::LEGACY_RAW_DOC_ID)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
         $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
         $this->em->flush();
 
