@@ -286,11 +286,12 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'legacy-raw-doc',
         ];
 
-        $companyTable = $this->em->getClassMetadata(Company::class)->getTableName();
-        $userTable = $this->em->getClassMetadata(User::class)->getTableName();
-        $documentTable = $this->em->getClassMetadata(Document::class)->getTableName();
+        $platform = $this->connection->getDatabasePlatform();
+        $companyTable = $platform->quoteIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
+        $userTable = $platform->quoteIdentifier($this->em->getClassMetadata(User::class)->getTableName());
+        $documentTable = $platform->quoteIdentifier($this->em->getClassMetadata(Document::class)->getTableName());
 
-        $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id = ANY(:companyIds) OR raw_document_id = ANY(:rawDocIds)', [
+        $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id IN (:companyIds) OR raw_document_id IN (:rawDocIds)', [
             'companyIds' => $companyIds,
             'rawDocIds' => $rawDocIds,
         ], [
@@ -298,7 +299,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'rawDocIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id = ANY(:companyIds) OR id = ANY(:rawDocIds)', [
+        $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id IN (:companyIds) OR id IN (:rawDocIds)', [
             'companyIds' => $companyIds,
             'rawDocIds' => $rawDocIds,
         ], [
@@ -306,25 +307,25 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'rawDocIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE company_id = ANY(:companyIds)', $documentTable), [
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE company_id IN (:companyIds)', $documentTable), [
             'companyIds' => $companyIds,
         ], [
             'companyIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement('DELETE FROM marketplace_listings WHERE company_id = ANY(:companyIds)', [
+        $this->connection->executeStatement('DELETE FROM marketplace_listings WHERE company_id IN (:companyIds)', [
             'companyIds' => $companyIds,
         ], [
             'companyIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id = ANY(:companyIds)', $companyTable), [
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:companyIds)', $companyTable), [
             'companyIds' => $companyIds,
         ], [
             'companyIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id = ANY(:userIds)', $userTable), [
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:userIds)', $userTable), [
             'userIds' => array_values(array_filter($userIds)),
         ], [
             'userIds' => Connection::PARAM_STR_ARRAY,
