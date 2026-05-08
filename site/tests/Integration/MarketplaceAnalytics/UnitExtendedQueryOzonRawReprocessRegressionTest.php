@@ -105,8 +105,8 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         );
 
         $connection->executeStatement(
-            'DELETE FROM marketplace_listings WHERE company_id = :companyId OR sku = :sku',
-            ['companyId' => self::COMPANY_ID, 'sku' => self::LISTING_SKU],
+            'DELETE FROM marketplace_listings WHERE company_id = :companyId',
+            ['companyId' => self::COMPANY_ID],
         );
 
         $connection->executeStatement(
