@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\Application\Processor;
 
+use App\Company\Entity\Company;
 use App\Finance\Entity\Document;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
@@ -22,8 +23,8 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     {
         $company = CompanyBuilder::aCompany()->withIndex(301)->build();
         $foreignCompany = CompanyBuilder::aCompany()->withIndex(302)->build();
-        $this->em->persist($company);
-        $this->em->persist($foreignCompany);
+        $this->persistCompanyWithUser($company);
+        $this->persistCompanyWithUser($foreignCompany);
         $day = new \DateTimeImmutable('2026-03-12');
         $outside = new \DateTimeImmutable('2026-03-20');
         $rawDocA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12';
@@ -69,7 +70,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     {
         $company = CompanyBuilder::aCompany()->withIndex(303)->build();
         $company->setFinanceLockBefore(new \DateTimeImmutable('2026-03-15'));
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $day = new \DateTimeImmutable('2026-03-12');
         $rawDocId = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12';
@@ -99,7 +100,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     public function testReprocessAllowedWhenFinanceLockIsNull(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(304)->build();
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $day = new \DateTimeImmutable('2026-03-12');
         $rawDocId = 'dddddddd-dddd-4ddd-8ddd-dddddddddd12';
@@ -119,7 +120,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     {
         $company = CompanyBuilder::aCompany()->withIndex(305)->build();
         $company->setFinanceLockBefore(new \DateTimeImmutable('2026-03-01'));
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $day = new \DateTimeImmutable('2026-03-12');
         $rawDocId = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee12';
@@ -138,7 +139,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     public function testCostsReprocessSameRawDocIsIdempotent(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(306)->build();
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111306';
         $day = new \DateTimeImmutable('2026-03-12');
@@ -164,7 +165,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     public function testCostsReprocessAddsOnlyNewRowsWhenRawDocIsExtended(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(307)->build();
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111307';
         $day = new \DateTimeImmutable('2026-03-12');
@@ -199,7 +200,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     public function testCostsReprocessReplacesOpenRowsWithUpdatedAmountsAndKeepsClosedRows(): void
     {
         $company = CompanyBuilder::aCompany()->withIndex(308)->build();
-        $this->em->persist($company);
+        $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111308';
         $day = new \DateTimeImmutable('2026-03-12');
@@ -233,6 +234,17 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         self::assertSame('350.00', (string) $this->connection->fetchOne("SELECT CAST(COALESCE(SUM(amount),0) AS DECIMAL(12,2)) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL", ['companyId' => $company->getId()]));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL AND external_id LIKE 'B_%' AND amount = 250", ['companyId' => $company->getId()]));
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NOT NULL AND external_id = 'closed-legacy-row'", ['companyId' => $company->getId()]));
+    }
+
+
+    private function persistCompanyWithUser(Company $company): void
+    {
+        $user = $company->getUser();
+        if ($user !== null) {
+            $this->em->persist($user);
+        }
+
+        $this->em->persist($company);
     }
 
     /**
