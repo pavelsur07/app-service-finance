@@ -47,8 +47,12 @@ final class TriggerInitialSyncHandlerTest extends TestCase
         $partitionService->expects(self::once())
             ->method('buildPartitions')
             ->with(
-                self::equalTo(new \DateTimeImmutable('2026-01-10 00:00:00')),
-                self::equalTo(new \DateTimeImmutable('2026-03-11 00:00:00')),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-01-10 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-03-11 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
             )
             ->willReturn([
                 ['from' => '2026-01-10 00:00:00', 'to' => '2026-01-19 23:59:59'],
@@ -95,8 +99,12 @@ final class TriggerInitialSyncHandlerTest extends TestCase
         $partitionService->expects(self::once())
             ->method('buildPartitions')
             ->with(
-                self::equalTo(new \DateTimeImmutable('2026-01-01 00:00:00')),
-                self::equalTo(new \DateTimeImmutable('2026-04-29 00:00:00')),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-01-01 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-04-29 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
             )
             ->willReturn([
                 ['from' => '2026-01-01 00:00:00', 'to' => '2026-01-11 23:59:59'],
