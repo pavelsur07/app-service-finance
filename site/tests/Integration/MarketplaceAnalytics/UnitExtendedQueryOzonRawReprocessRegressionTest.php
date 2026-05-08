@@ -33,6 +33,7 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
         $this->unitExtendedQuery = self::getContainer()->get(UnitExtendedQuery::class);
         $this->rawProcessor = self::getContainer()->get(OzonSalesRawProcessor::class);
 
+        $this->cleanupTestData();
         $this->seedCompanyAndListing();
     }
 
@@ -85,6 +86,37 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             ['OZON-POSTING-REG-1'],
             $this->getExternalOrderIds($rawDocument->getId()),
             'Регрессия: после повторной обработки должен остаться только базовый external_order_id без _v2.',
+        );
+    }
+
+
+    private function cleanupTestData(): void
+    {
+        $connection = $this->em->getConnection();
+
+        $connection->executeStatement(
+            'DELETE FROM marketplace_sales WHERE company_id = :companyId',
+            ['companyId' => self::COMPANY_ID],
+        );
+
+        $connection->executeStatement(
+            'DELETE FROM marketplace_raw_documents WHERE company_id = :companyId',
+            ['companyId' => self::COMPANY_ID],
+        );
+
+        $connection->executeStatement(
+            'DELETE FROM marketplace_listings WHERE company_id = :companyId OR sku = :sku',
+            ['companyId' => self::COMPANY_ID, 'sku' => self::LISTING_SKU],
+        );
+
+        $connection->executeStatement(
+            'DELETE FROM company WHERE id = :companyId',
+            ['companyId' => self::COMPANY_ID],
+        );
+
+        $connection->executeStatement(
+            'DELETE FROM "user" WHERE id = :ownerId',
+            ['ownerId' => self::OWNER_ID],
         );
     }
 
