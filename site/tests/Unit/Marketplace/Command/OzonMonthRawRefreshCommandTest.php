@@ -107,6 +107,23 @@ final class OzonMonthRawRefreshCommandTest extends TestCase
         self::assertSame(Command::SUCCESS, $exitCode);
     }
 
+    public function testPreviousMonthUsesMoscowTimezoneBoundary(): void
+    {
+        $planner = $this->createMock(OzonMonthRawRefreshPlanner::class);
+        $planner->expects(self::once())
+            ->method('plan')
+            ->with(2026, 3, null)
+            ->willReturn([]);
+
+        $bus = $this->createMock(MessageBusInterface::class);
+        $bus->expects(self::never())->method('dispatch');
+
+        $tester = $this->makeTester($planner, $bus, new MockClock('2026-03-31 22:30:00+00:00'));
+        $exitCode = $tester->execute(['--previous-month' => true]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
     public function testInvalidInputReturnsFailure(): void
     {
         $planner = $this->createMock(OzonMonthRawRefreshPlanner::class);
@@ -122,6 +139,8 @@ final class OzonMonthRawRefreshCommandTest extends TestCase
         self::assertSame(Command::FAILURE, $tester->execute(['--year' => '2026']));
         self::assertSame(Command::FAILURE, $tester->execute(['--month' => '4']));
         self::assertSame(Command::FAILURE, $tester->execute(['--year' => '2026', '--month' => '13']));
+        self::assertSame(Command::FAILURE, $tester->execute(['--year' => '2026foo', '--month' => '4']));
+        self::assertSame(Command::FAILURE, $tester->execute(['--year' => '2026', '--month' => '4bar']));
     }
 
     public function testEmptyPlanReturnsSuccessWithoutDispatch(): void

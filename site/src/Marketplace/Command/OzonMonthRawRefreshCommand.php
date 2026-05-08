@@ -118,7 +118,7 @@ final class OzonMonthRawRefreshCommand extends Command
         }
 
         if ($previousMonth) {
-            $periodDate = $this->clock->now()->setTimezone(new \DateTimeZone('UTC'))->modify('first day of previous month');
+            $periodDate = $this->clock->now()->setTimezone(new \DateTimeZone('Europe/Moscow'))->modify('first day of previous month');
 
             return [
                 'year' => (int) $periodDate->format('Y'),
@@ -134,6 +134,12 @@ final class OzonMonthRawRefreshCommand extends Command
 
         if (!$yearProvided && !$monthProvided) {
             $io->error('Укажите период: либо --previous-month, либо пару --year и --month.');
+
+            return null;
+        }
+
+        if (!is_string($yearRaw) || !is_string($monthRaw) || !ctype_digit($yearRaw) || !ctype_digit($monthRaw)) {
+            $io->error('Параметры --year и --month должны быть целыми числовыми значениями.');
 
             return null;
         }
