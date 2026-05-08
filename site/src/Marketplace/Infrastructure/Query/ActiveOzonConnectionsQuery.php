@@ -19,21 +19,29 @@ final class ActiveOzonConnectionsQuery
     }
 
     /**
-     * @return array<int, array{id: string, company_id: string}>
+     * @return array<int, array{id: string, company_id: string, finance_lock_before: null|string}>
      */
-    public function execute(): array
+    public function execute(?string $companyId = null): array
     {
-        return $this->connection->fetchAllAssociative(
-            'SELECT mc.id, mc.company_id
-             FROM marketplace_connections mc
-             WHERE mc.marketplace = :marketplace
-               AND mc.connection_type = :connection_type
-               AND mc.is_active = true
-             ORDER BY mc.created_at ASC',
-            [
-                'marketplace' => 'ozon',
-                'connection_type' => MarketplaceConnectionType::SELLER->value,
-            ],
-        );
+        $sql = 'SELECT mc.id, mc.company_id, c.finance_lock_before
+                FROM marketplace_connections mc
+                INNER JOIN companies c ON c.id = mc.company_id
+                WHERE mc.marketplace = :marketplace
+                  AND mc.connection_type = :connection_type
+                  AND mc.is_active = true';
+
+        $params = [
+            'marketplace' => 'ozon',
+            'connection_type' => MarketplaceConnectionType::SELLER->value,
+        ];
+
+        if (null !== $companyId) {
+            $sql .= ' AND mc.company_id = :company_id';
+            $params['company_id'] = $companyId;
+        }
+
+        $sql .= ' ORDER BY mc.created_at ASC';
+
+        return $this->connection->fetchAllAssociative($sql, $params);
     }
 }
