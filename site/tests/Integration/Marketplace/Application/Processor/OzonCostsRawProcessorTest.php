@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\Application\Processor;
 
 use App\Finance\Entity\Document;
+use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Application\Processor\OzonCostsRawProcessor;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
@@ -131,5 +133,131 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         ]], $rawDocId);
 
         self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE raw_document_id=:raw", ['raw' => $rawDocId]));
+    }
+
+    public function testCostsReprocessSameRawDocIsIdempotent(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(306)->build();
+        $this->em->persist($company);
+
+        $rawDocId = '11111111-1111-4111-8111-111111111306';
+        $day = new \DateTimeImmutable('2026-03-12');
+
+        $rawDoc = MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build();
+        $rawDoc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+            ['id' => 'B', 'commission' => -200.0],
+        ])]]);
+        $this->em->persist($rawDoc);
+        $this->em->flush();
+
+        $action = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class);
+        $command = new ProcessMarketplaceRawDocumentCommand($company->getId(), $rawDocId, 'costs');
+        $action($command);
+        $action($command);
+
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId', ['companyId' => $company->getId()]));
+        self::assertSame('300.00', (string) $this->connection->fetchOne('SELECT CAST(COALESCE(SUM(amount),0) AS DECIMAL(12,2)) FROM marketplace_costs WHERE company_id = :companyId', ['companyId' => $company->getId()]));
+        self::assertSame(2, (int) $this->connection->fetchOne('SELECT COUNT(DISTINCT external_id) FROM marketplace_costs WHERE company_id = :companyId', ['companyId' => $company->getId()]));
+    }
+
+    public function testCostsReprocessAddsOnlyNewRowsWhenRawDocIsExtended(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(307)->build();
+        $this->em->persist($company);
+
+        $rawDocId = '11111111-1111-4111-8111-111111111307';
+        $day = new \DateTimeImmutable('2026-03-12');
+
+        $rawDoc = MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build();
+        $rawDoc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+            ['id' => 'B', 'commission' => -200.0],
+        ])]]);
+        $this->em->persist($rawDoc);
+        $this->em->flush();
+
+        $action = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class);
+        $command = new ProcessMarketplaceRawDocumentCommand($company->getId(), $rawDocId, 'costs');
+        $action($command);
+
+        $rawDoc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+            ['id' => 'B', 'commission' => -200.0],
+            ['id' => 'C', 'commission' => -300.0],
+        ])]]);
+        $this->em->flush();
+
+        $action($command);
+
+        self::assertSame(3, (int) $this->connection->fetchOne('SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId', ['companyId' => $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND external_id LIKE 'A_%'", ['companyId' => $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND external_id LIKE 'B_%'", ['companyId' => $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND external_id LIKE 'C_%'", ['companyId' => $company->getId()]));
+    }
+
+    public function testCostsReprocessReplacesOpenRowsWithUpdatedAmountsAndKeepsClosedRows(): void
+    {
+        $company = CompanyBuilder::aCompany()->withIndex(308)->build();
+        $this->em->persist($company);
+
+        $rawDocId = '11111111-1111-4111-8111-111111111308';
+        $day = new \DateTimeImmutable('2026-03-12');
+
+        $rawDoc = MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build();
+        $rawDoc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+            ['id' => 'B', 'commission' => -200.0],
+        ])]]);
+        $this->em->persist($rawDoc);
+
+        $closedDocument = new Document(Uuid::uuid4()->toString(), $company);
+        $this->em->persist($closedDocument);
+        $closedCost = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
+        $closedCost->setExternalId('closed-legacy-row')->setRawDocumentId($rawDocId)->setCostDate($day)->setAmount('999')->setOperationType(MarketplaceCostOperationType::CHARGE)->setDocument($closedDocument);
+        $this->em->persist($closedCost);
+        $this->em->flush();
+
+        $action = self::getContainer()->get(ProcessMarketplaceRawDocumentAction::class);
+        $command = new ProcessMarketplaceRawDocumentCommand($company->getId(), $rawDocId, 'costs');
+        $action($command);
+
+        $rawDoc->setRawData(['result' => ['operations' => $this->buildOrderOperations([
+            ['id' => 'A', 'commission' => -100.0],
+            ['id' => 'B', 'commission' => -250.0],
+        ])]]);
+        $this->em->flush();
+
+        $action($command);
+
+        self::assertSame('350.00', (string) $this->connection->fetchOne("SELECT CAST(COALESCE(SUM(amount),0) AS DECIMAL(12,2)) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL", ['companyId' => $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NULL AND external_id LIKE 'B_%' AND amount = 250", ['companyId' => $company->getId()]));
+        self::assertSame(1, (int) $this->connection->fetchOne("SELECT COUNT(*) FROM marketplace_costs WHERE company_id = :companyId AND document_id IS NOT NULL AND external_id = 'closed-legacy-row'", ['companyId' => $company->getId()]));
+    }
+
+    /**
+     * @param list<array{id: string, commission: float}> $rows
+     * @return list<array<string, mixed>>
+     */
+    private function buildOrderOperations(array $rows): array
+    {
+        $operations = [];
+        foreach ($rows as $row) {
+            $operations[] = [
+                'operation_id' => $row['id'],
+                'operation_date' => '2026-03-12 10:00:00',
+                'operation_type' => 'MarketplaceSellerCompensationOperation',
+                'operation_type_name' => 'Продажа',
+                'sale_commission' => $row['commission'],
+                'delivery_charge' => 0,
+                'return_delivery_charge' => 0,
+                'amount' => 0,
+                'type' => 'orders',
+                'items' => [['sku' => 'sku-' . $row['id'], 'name' => 'SKU ' . $row['id']]],
+                'services' => [],
+            ];
+        }
+
+        return $operations;
     }
 }
