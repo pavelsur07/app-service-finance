@@ -22,6 +22,8 @@ use Ramsey\Uuid\Uuid;
 
 final class OzonCostsRawProcessorTest extends IntegrationTestCase
 {
+    private const LEGACY_RAW_DOC_ID = '99999999-9999-4999-8999-999999999999';
+
     private Connection $connection;
 
     protected function setUp(): void
@@ -90,7 +92,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $rawDocId = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12';
 
         $stale = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
-        $stale->setExternalId('locked-stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId('legacy-raw-doc');
+        $stale->setExternalId('locked-stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId(self::LEGACY_RAW_DOC_ID);
         $this->em->persist($stale);
         $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
         $this->em->flush();
@@ -284,7 +286,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             '11111111-1111-4111-8111-111111111307',
             '11111111-1111-4111-8111-111111111308',
         ];
-        $costRawDocumentIds = [...$rawDocumentIds, 'legacy-raw-doc'];
+        $costRawDocumentIds = [...$rawDocumentIds, self::LEGACY_RAW_DOC_ID];
 
         $platform = $this->connection->getDatabasePlatform();
         $companyTable = $platform->quoteIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
