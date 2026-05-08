@@ -9,6 +9,7 @@ use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
+use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncOzonReportMessage;
 use App\Marketplace\MessageHandler\SyncOzonReportHandler;
@@ -295,7 +296,7 @@ final class SyncOzonReportHandlerTest extends TestCase
 
         $failedDoc = $this->buildDocForDate($company);
         $failedDoc->setRawData([['failed' => true]])->setRecordsCount(1);
-        $failedDoc->markFailed('boom');
+        $failedDoc->markStepFailed(PipelineStep::DOWNLOAD);
 
         $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
