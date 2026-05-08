@@ -274,7 +274,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             $userIds[] = $company->getUser()?->getId();
         }
 
-        $rawDocIds = [
+        $rawDocumentIds = [
             'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12',
             'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb12',
             'cccccccc-cccc-4ccc-8ccc-cccccccccc12',
@@ -283,28 +283,28 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             '11111111-1111-4111-8111-111111111306',
             '11111111-1111-4111-8111-111111111307',
             '11111111-1111-4111-8111-111111111308',
-            'legacy-raw-doc',
         ];
+        $costRawDocumentIds = [...$rawDocumentIds, 'legacy-raw-doc'];
 
         $platform = $this->connection->getDatabasePlatform();
         $companyTable = $platform->quoteIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
         $userTable = $platform->quoteIdentifier($this->em->getClassMetadata(User::class)->getTableName());
         $documentTable = $platform->quoteIdentifier($this->em->getClassMetadata(Document::class)->getTableName());
 
-        $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id IN (:companyIds) OR raw_document_id IN (:rawDocIds)', [
+        $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id IN (:companyIds) OR raw_document_id IN (:costRawDocumentIds)', [
             'companyIds' => $companyIds,
-            'rawDocIds' => $rawDocIds,
+            'costRawDocumentIds' => $costRawDocumentIds,
         ], [
             'companyIds' => Connection::PARAM_STR_ARRAY,
-            'rawDocIds' => Connection::PARAM_STR_ARRAY,
+            'costRawDocumentIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
-        $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id IN (:companyIds) OR id IN (:rawDocIds)', [
+        $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id IN (:companyIds) OR id IN (:rawDocumentIds)', [
             'companyIds' => $companyIds,
-            'rawDocIds' => $rawDocIds,
+            'rawDocumentIds' => $rawDocumentIds,
         ], [
             'companyIds' => Connection::PARAM_STR_ARRAY,
-            'rawDocIds' => Connection::PARAM_STR_ARRAY,
+            'rawDocumentIds' => Connection::PARAM_STR_ARRAY,
         ]);
 
         $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE company_id IN (:companyIds)', $documentTable), [
