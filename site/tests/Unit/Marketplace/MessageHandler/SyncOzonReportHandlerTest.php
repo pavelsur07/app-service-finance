@@ -296,7 +296,7 @@ final class SyncOzonReportHandlerTest extends TestCase
 
         $failedDoc = $this->buildDocForDate($company);
         $failedDoc->setRawData([['failed' => true]])->setRecordsCount(1);
-        $failedDoc->markStepFailed(PipelineStep::DOWNLOAD);
+        $failedDoc->markStepFailed(PipelineStep::SALES);
 
         $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
         $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
