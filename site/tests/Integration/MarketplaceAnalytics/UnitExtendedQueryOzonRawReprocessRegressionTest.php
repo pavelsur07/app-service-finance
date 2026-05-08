@@ -94,9 +94,6 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
     private function cleanupTestData(): void
     {
         $connection = $this->em->getConnection();
-        $platform = $connection->getDatabasePlatform();
-        $companyTable = $this->em->getClassMetadata(Company::class)->getQuotedTableName($platform);
-        $userTable = $this->em->getClassMetadata(User::class)->getQuotedTableName($platform);
 
         $connection->executeStatement(
             'DELETE FROM marketplace_sales WHERE company_id = :companyId',
@@ -113,15 +110,17 @@ final class UnitExtendedQueryOzonRawReprocessRegressionTest extends IntegrationT
             ['companyId' => self::COMPANY_ID],
         );
 
-        $connection->executeStatement(
-            sprintf('DELETE FROM %s WHERE id = :companyId', $companyTable),
-            ['companyId' => self::COMPANY_ID],
-        );
+        $company = $this->em->find(Company::class, self::COMPANY_ID);
+        if ($company !== null) {
+            $this->em->remove($company);
+            $this->em->flush();
+        }
 
-        $connection->executeStatement(
-            sprintf('DELETE FROM %s WHERE id = :ownerId', $userTable),
-            ['ownerId' => self::OWNER_ID],
-        );
+        $owner = $this->em->find(User::class, self::OWNER_ID);
+        if ($owner !== null) {
+            $this->em->remove($owner);
+            $this->em->flush();
+        }
 
         $this->em->clear();
     }
