@@ -280,6 +280,18 @@ final class OzonCostsRawProcessor implements MarketplaceRawProcessorInterface
             return;
         }
 
+        $company = $rawDoc->getCompany();
+        $lockBefore = $company->getFinanceLockBefore();
+
+        if ($lockBefore !== null && $rawDoc->getPeriodFrom() <= $lockBefore) {
+            throw new \DomainException(sprintf(
+                'Период raw-документа заблокирован для переобработки затрат (financeLockBefore: %s, period: %s—%s).',
+                $lockBefore->format('d.m.Y'),
+                $rawDoc->getPeriodFrom()->format('Y-m-d'),
+                $rawDoc->getPeriodTo()->format('Y-m-d'),
+            ));
+        }
+
         $periodFrom = $rawDoc->getPeriodFrom()->format('Y-m-d');
         $periodTo = $rawDoc->getPeriodTo()->format('Y-m-d');
 
