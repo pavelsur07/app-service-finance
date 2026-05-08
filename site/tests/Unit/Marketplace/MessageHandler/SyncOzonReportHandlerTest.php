@@ -118,6 +118,44 @@ final class SyncOzonReportHandlerTest extends TestCase
     }
 
 
+
+    public function testRefreshesExistingRawDocumentWithNullStatusAndKeepsId(): void
+    {
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+        $existingDoc = $this->buildDocForDate($company);
+        $existingDoc->setRawData([['old' => 'payload']])->setRecordsCount(1);
+        self::assertNull($existingDoc->getProcessingStatus());
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([$existingDoc]);
+
+        $em = $this->createEmMock($company, $connection);
+        $em->expects(self::never())->method('persist');
+
+        $adapter = $this->createAdapterMock([['operation_id' => 501], ['operation_id' => 502]]);
+
+        $dispatchedMessage = null;
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())->method('dispatch')->willReturnCallback(static function (object $message) use (&$dispatchedMessage): Envelope {
+            $dispatchedMessage = $message;
+
+            return new Envelope($message);
+        });
+
+        $existingId = $existingDoc->getId();
+
+        $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo);
+        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertSame($existingId, $existingDoc->getId());
+        self::assertSame([['operation_id' => 501], ['operation_id' => 502]], $existingDoc->getRawData());
+        self::assertSame(2, $existingDoc->getRecordsCount());
+        self::assertSame(PipelineStatus::PENDING, $existingDoc->getProcessingStatus());
+        self::assertInstanceOf(ProcessDayReportMessage::class, $dispatchedMessage);
+        self::assertSame($existingId, $dispatchedMessage->rawDocumentId);
+    }
+
     public function testUsesCanonicalDocumentWhenMultipleActiveDuplicatesExist(): void
     {
         $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
@@ -196,6 +234,7 @@ final class SyncOzonReportHandlerTest extends TestCase
         $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
         $doc = $this->buildDocForDate($company);
+        $doc->setRawData([['keep' => 'pending']])->setRecordsCount(1);
         $doc->resetProcessingStatus();
         self::assertSame(PipelineStatus::PENDING, $doc->getProcessingStatus());
 
@@ -215,6 +254,9 @@ final class SyncOzonReportHandlerTest extends TestCase
 
         $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo);
         $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertSame([['keep' => 'pending']], $doc->getRawData());
+        self::assertSame(1, $doc->getRecordsCount());
     }
 
     public function testSkipsWhenRunningRawDocumentExists(): void
@@ -222,6 +264,7 @@ final class SyncOzonReportHandlerTest extends TestCase
         $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
         $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
         $doc = $this->buildDocForDate($company);
+        $doc->setRawData([['keep' => 'running']])->setRecordsCount(1);
         $this->forceProcessingStatus($doc, PipelineStatus::RUNNING);
 
         $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
@@ -240,6 +283,44 @@ final class SyncOzonReportHandlerTest extends TestCase
 
         $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo);
         $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertSame([['keep' => 'running']], $doc->getRawData());
+        self::assertSame(1, $doc->getRecordsCount());
+    }
+
+    public function testCreatesNewRawDocumentWhenFailedDocumentIsNotActive(): void
+    {
+        $company = CompanyBuilder::aCompany()->withId(self::COMPANY_ID)->build();
+        $connection = new MarketplaceConnection(self::CONNECTION_ID, $company, MarketplaceType::OZON);
+
+        $failedDoc = $this->buildDocForDate($company);
+        $failedDoc->setRawData([['failed' => true]])->setRecordsCount(1);
+        $failedDoc->markFailed('boom');
+
+        $rawDocRepo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $rawDocRepo->method('findActiveExactDayDocuments')->willReturn([]);
+
+        $capturedPersistedDoc = null;
+        $em = $this->createEmMock($company, $connection);
+        $em->expects(self::once())
+            ->method('persist')
+            ->with(self::isInstanceOf(MarketplaceRawDocument::class))
+            ->willReturnCallback(function (object $entity) use (&$capturedPersistedDoc): void {
+                $capturedPersistedDoc = $entity;
+            });
+
+        $adapter = $this->createAdapterMock([['operation_id' => 777]]);
+
+        $messageBus = $this->createMock(MessageBusInterface::class);
+        $messageBus->expects(self::once())->method('dispatch')->willReturnCallback(static fn (object $m): Envelope => new Envelope($m));
+
+        $handler = $this->createHandler($em, $adapter, $messageBus, $rawDocRepo);
+        $handler(new SyncOzonReportMessage(self::COMPANY_ID, self::CONNECTION_ID, self::DATE));
+
+        self::assertInstanceOf(MarketplaceRawDocument::class, $capturedPersistedDoc);
+        self::assertNotSame($failedDoc->getId(), $capturedPersistedDoc->getId());
+        self::assertSame([['failed' => true]], $failedDoc->getRawData());
+        self::assertSame(1, $failedDoc->getRecordsCount());
     }
 
     public function testHandlerLooksUpExistingRawDocumentByCurrentCompany(): void
