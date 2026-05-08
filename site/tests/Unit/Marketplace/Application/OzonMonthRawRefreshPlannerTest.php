@@ -35,6 +35,7 @@ final class OzonMonthRawRefreshPlannerTest extends TestCase
     public function testCurrentMonthExcludesTodayAndFutureDates(): void
     {
         $today = new \DateTimeImmutable('today');
+        $dayOfMonth = (int) $today->format('j');
 
         $query = $this->createMock(ActiveOzonConnectionsQuery::class);
         $query->method('execute')->willReturn([
@@ -46,9 +47,14 @@ final class OzonMonthRawRefreshPlannerTest extends TestCase
 
         $dates = array_map(static fn ($item) => $item->date, $plan);
 
-        self::assertContains($today->modify('-1 day')->format('Y-m-d'), $dates);
         self::assertNotContains($today->format('Y-m-d'), $dates);
         self::assertNotContains($today->modify('+1 day')->format('Y-m-d'), $dates);
+
+        if ($dayOfMonth > 1) {
+            self::assertContains($today->modify('-1 day')->format('Y-m-d'), $dates);
+        } else {
+            self::assertSame([], $dates);
+        }
     }
 
     public function testFiltersByCompanyId(): void
