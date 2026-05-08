@@ -45,7 +45,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $outside = new \DateTimeImmutable('2026-03-20');
         $rawDocA = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12';
         $rawDocB = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb12';
-        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocA)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
+        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocA)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day->modify('-1 day'), $day->modify('-1 day'))->build());
 
         $stale = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
         $stale->setExternalId('stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId($rawDocA);
@@ -92,11 +92,13 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
         $day = new \DateTimeImmutable('2026-03-12');
         $rawDocId = 'cccccccc-cccc-4ccc-8ccc-cccccccccc12';
 
+        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId(self::LEGACY_RAW_DOC_ID)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day->modify('-1 day'), $day->modify('-1 day'))->build());
+        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
+        $this->em->flush();
+
         $stale = new MarketplaceCost(Uuid::uuid4()->toString(), $company, MarketplaceType::OZON, null);
         $stale->setExternalId('locked-stale-cost')->setCostDate($day)->setAmount('100')->setOperationType(MarketplaceCostOperationType::CHARGE)->setRawDocumentId(self::LEGACY_RAW_DOC_ID);
         $this->em->persist($stale);
-        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId(self::LEGACY_RAW_DOC_ID)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
-        $this->em->persist(MarketplaceRawDocumentBuilder::aDocument()->withId($rawDocId)->forCompany($company)->withMarketplace(MarketplaceType::OZON)->withPeriod($day, $day)->build());
         $this->em->flush();
 
         try {
