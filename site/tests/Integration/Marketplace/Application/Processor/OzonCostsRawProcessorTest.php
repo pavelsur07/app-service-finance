@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Integration\Marketplace\Application\Processor;
 
 use App\Company\Entity\Company;
+use App\Company\Entity\User;
 use App\Finance\Entity\Document;
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
@@ -13,16 +14,29 @@ use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Company\CompanyBuilder;
+use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
 
 final class OzonCostsRawProcessorTest extends IntegrationTestCase
 {
+    private Connection $connection;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->connection = $this->em->getConnection();
+        $this->cleanupTestData();
+        $this->em->clear();
+    }
+
     public function testCleanupRemovesOnlyStaleOpenCosts(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(301)->build();
-        $foreignCompany = CompanyBuilder::aCompany()->withIndex(302)->build();
+        $company = $this->buildCompanyWithOwnerIndex(301);
+        $foreignCompany = $this->buildCompanyWithOwnerIndex(302);
         $this->persistCompanyWithUser($company);
         $this->persistCompanyWithUser($foreignCompany);
         $day = new \DateTimeImmutable('2026-03-12');
@@ -68,7 +82,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testReprocessFailsWhenFinanceLockCoversRawDocPeriod(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(303)->build();
+        $company = $this->buildCompanyWithOwnerIndex(303);
         $company->setFinanceLockBefore(new \DateTimeImmutable('2026-03-15'));
         $this->persistCompanyWithUser($company);
 
@@ -99,7 +113,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testReprocessAllowedWhenFinanceLockIsNull(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(304)->build();
+        $company = $this->buildCompanyWithOwnerIndex(304);
         $this->persistCompanyWithUser($company);
 
         $day = new \DateTimeImmutable('2026-03-12');
@@ -118,7 +132,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testReprocessAllowedWhenFinanceLockBeforeRawDocPeriod(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(305)->build();
+        $company = $this->buildCompanyWithOwnerIndex(305);
         $company->setFinanceLockBefore(new \DateTimeImmutable('2026-03-01'));
         $this->persistCompanyWithUser($company);
 
@@ -138,7 +152,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testCostsReprocessSameRawDocIsIdempotent(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(306)->build();
+        $company = $this->buildCompanyWithOwnerIndex(306);
         $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111306';
@@ -164,7 +178,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testCostsReprocessAddsOnlyNewRowsWhenRawDocIsExtended(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(307)->build();
+        $company = $this->buildCompanyWithOwnerIndex(307);
         $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111307';
@@ -199,7 +213,7 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
 
     public function testCostsReprocessReplacesOpenRowsWithUpdatedAmountsAndKeepsClosedRows(): void
     {
-        $company = CompanyBuilder::aCompany()->withIndex(308)->build();
+        $company = $this->buildCompanyWithOwnerIndex(308);
         $this->persistCompanyWithUser($company);
 
         $rawDocId = '11111111-1111-4111-8111-111111111308';
@@ -237,13 +251,90 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
     }
 
 
-    private function persistCompanyWithUser(Company $company): void
+
+    private function buildCompanyWithOwnerIndex(int $index): Company
     {
-        $user = $company->getUser();
-        if ($user !== null) {
-            $this->em->persist($user);
+        $owner = UserBuilder::aUser()
+            ->withIndex($index)
+            ->build();
+
+        return CompanyBuilder::aCompany()
+            ->withIndex($index)
+            ->withOwner($owner)
+            ->build();
+    }
+
+    private function cleanupTestData(): void
+    {
+        $companyIds = [];
+        $userIds = [];
+        for ($i = 301; $i <= 308; ++$i) {
+            $company = $this->buildCompanyWithOwnerIndex($i);
+            $companyIds[] = $company->getId();
+            $userIds[] = $company->getUser()?->getId();
         }
 
+        $rawDocumentIds = [
+            'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa12',
+            'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb12',
+            'cccccccc-cccc-4ccc-8ccc-cccccccccc12',
+            'dddddddd-dddd-4ddd-8ddd-dddddddddd12',
+            'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee12',
+            '11111111-1111-4111-8111-111111111306',
+            '11111111-1111-4111-8111-111111111307',
+            '11111111-1111-4111-8111-111111111308',
+        ];
+        $costRawDocumentIds = [...$rawDocumentIds, 'legacy-raw-doc'];
+
+        $platform = $this->connection->getDatabasePlatform();
+        $companyTable = $platform->quoteIdentifier($this->em->getClassMetadata(Company::class)->getTableName());
+        $userTable = $platform->quoteIdentifier($this->em->getClassMetadata(User::class)->getTableName());
+        $documentTable = $platform->quoteIdentifier($this->em->getClassMetadata(Document::class)->getTableName());
+
+        $this->connection->executeStatement('DELETE FROM marketplace_costs WHERE company_id IN (:companyIds) OR raw_document_id IN (:costRawDocumentIds)', [
+            'companyIds' => $companyIds,
+            'costRawDocumentIds' => $costRawDocumentIds,
+        ], [
+            'companyIds' => Connection::PARAM_STR_ARRAY,
+            'costRawDocumentIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+
+        $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id IN (:companyIds) OR id IN (:rawDocumentIds)', [
+            'companyIds' => $companyIds,
+            'rawDocumentIds' => $rawDocumentIds,
+        ], [
+            'companyIds' => Connection::PARAM_STR_ARRAY,
+            'rawDocumentIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE company_id IN (:companyIds)', $documentTable), [
+            'companyIds' => $companyIds,
+        ], [
+            'companyIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+
+        $this->connection->executeStatement('DELETE FROM marketplace_listings WHERE company_id IN (:companyIds)', [
+            'companyIds' => $companyIds,
+        ], [
+            'companyIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:companyIds)', $companyTable), [
+            'companyIds' => $companyIds,
+        ], [
+            'companyIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+
+        $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:userIds)', $userTable), [
+            'userIds' => array_values(array_filter($userIds)),
+        ], [
+            'userIds' => Connection::PARAM_STR_ARRAY,
+        ]);
+    }
+
+    private function persistCompanyWithUser(Company $company): void
+    {
+        $this->em->persist($company->getUser());
         $this->em->persist($company);
     }
 
