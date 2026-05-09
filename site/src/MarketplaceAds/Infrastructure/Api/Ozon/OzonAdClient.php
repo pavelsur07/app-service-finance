@@ -14,6 +14,8 @@ use App\MarketplaceAds\Exception\OzonStatisticsQueueFullException;
 use App\MarketplaceAds\Infrastructure\Api\Contract\AdPlatformClientInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\Clock\ClockInterface;
+use Symfony\Component\Clock\NativeClock;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
@@ -111,6 +113,8 @@ class OzonAdClient implements AdPlatformClientInterface
      */
     private array $lastChunkDownloads = [];
 
+    private readonly ClockInterface $clock;
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceFacade $marketplaceFacade,
@@ -119,7 +123,9 @@ class OzonAdClient implements AdPlatformClientInterface
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
         private readonly OzonAdPendingReportRepository $pendingReportRepo,
+        ?ClockInterface $clock = null,
     ) {
+        $this->clock = $clock ?? new NativeClock();
     }
 
     public function supports(string $marketplace): bool
@@ -1526,7 +1532,7 @@ class OzonAdClient implements AdPlatformClientInterface
         string $uuid,
         ?float $pollStartedAt = null,
     ): string {
-        $startedAt = $pollStartedAt ?? microtime(true);
+        $startedAt = $pollStartedAt ?? (float) $this->clock->now()->format('U.u');
 
         for ($attempt = 1; $attempt <= self::POLL_MAX_ATTEMPTS; ++$attempt) {
             $this->lastPollAttempts = $attempt;
@@ -1538,8 +1544,8 @@ class OzonAdClient implements AdPlatformClientInterface
             $data = $this->decodeJson($response->getContent(false), 'statistics state');
 
             $state = $this->stringifyApiField($data['state'] ?? null);
-            $now = new \DateTimeImmutable();
-            $waitedSecondsFloat = microtime(true) - $startedAt;
+            $now = $this->clock->now();
+            $waitedSecondsFloat = $now->format('U.u') - $startedAt;
             $waitedSeconds = round($waitedSecondsFloat, 1);
             $isNotStartedPhase = 'NOT_STARTED' === $state;
 
@@ -1621,7 +1627,7 @@ class OzonAdClient implements AdPlatformClientInterface
                 throw new \RuntimeException($errorMessage);
             }
 
-            sleep(self::POLL_INTERVAL_SECONDS);
+            $this->clock->sleep(self::POLL_INTERVAL_SECONDS);
         }
 
         $timeoutSeconds = self::POLL_MAX_ATTEMPTS * self::POLL_INTERVAL_SECONDS;
