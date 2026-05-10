@@ -112,6 +112,18 @@ final class RequestOzonInventorySnapshotActionTest extends IntegrationTestCase
         self::assertNull($session, 'Session must not remain active pending/in_progress when all dispatches failed.');
     }
 
+    public function testInvalidConnectionIdScenarioIsNotReachableBecauseMarketplaceConnectionIdMustBeUuid(): void
+    {
+        $company = $this->createCompany(105);
+
+        $this->expectException(\InvalidArgumentException::class);
+        // Intentional invariant check:
+        // MarketplaceConnection validates UUID in constructor (Assert::uuid),
+        // therefore integration scenario with invalid connectionId from MarketplaceFacade
+        // is not reachable without breaking Entity/DB constraints.
+        new MarketplaceConnection('invalid-connection-id', $company, MarketplaceType::OZON, MarketplaceConnectionType::SELLER);
+    }
+
     private function createCompany(int $index): Company
     {
         $user = UserBuilder::aUser()->withIndex($index)->build();
