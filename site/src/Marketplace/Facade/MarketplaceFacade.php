@@ -18,6 +18,7 @@ use App\Marketplace\Infrastructure\Query\ListingCostAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingMetaQuery;
 use App\Marketplace\Infrastructure\Query\ListingReturnAggregateQuery;
 use App\Marketplace\Infrastructure\Query\ListingSalesAggregateQuery;
+use App\Marketplace\Infrastructure\Query\ActiveOzonConnectionsQuery;
 use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
@@ -39,7 +40,39 @@ final readonly class MarketplaceFacade
         private ListingCostAggregateQuery $costAggregateQuery,
         private ListingMetaQuery $listingMetaQuery,
         private MarketplaceCredentialsQuery $credentialsQuery,
+        private ActiveOzonConnectionsQuery $activeOzonConnectionsQuery,
     ) {}
+
+    /**
+     * Публичный безопасный контракт для активных Ozon SELLER-подключений.
+     *
+     * @return array<int, array{
+     *     connectionId: string,
+     *     companyId: string,
+     *     marketplace: string,
+     *     connectionType: string,
+     *     clientId: ?string
+     * }>
+     */
+    public function getActiveOzonSellerConnections(?string $companyId = null): array
+    {
+        if (null !== $companyId) {
+            Assert::uuid($companyId);
+        }
+
+        $rows = $this->activeOzonConnectionsQuery->execute($companyId);
+
+        return array_map(
+            static fn (array $row): array => [
+                'connectionId' => $row['id'],
+                'companyId' => $row['company_id'],
+                'marketplace' => MarketplaceType::OZON->value,
+                'connectionType' => MarketplaceConnectionType::SELLER->value,
+                'clientId' => $row['client_id'],
+            ],
+            $rows,
+        );
+    }
 
     /**
      * Получить учётные данные подключения к API маркетплейса.

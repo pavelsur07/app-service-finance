@@ -6,7 +6,9 @@ namespace App\Tests\Integration\Marketplace\Facade;
 
 use App\Catalog\Entity\Product;
 use App\Company\Entity\Company;
+use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -183,6 +185,129 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         self::assertSame($expectedMap, $result);
     }
 
+    public function testGetActiveOzonSellerConnectionsReturnsOnlySafeActiveOzonSellerConnections(): void
+    {
+        $companyA = $this->seedCompany(self::COMPANY_A_ID, 'ozon-a@example.test');
+        $companyB = $this->seedCompany(self::COMPANY_B_ID, 'ozon-b@example.test', '22222222-2222-2222-2222-000000000b02');
+        $companyC = $this->seedCompany(
+            '11111111-1111-1111-1111-000000000c01',
+            'ozon-c@example.test',
+            '22222222-2222-2222-2222-000000000c02',
+        );
+
+        $activeOzonSellerA = $this->seedConnection(
+            $companyA,
+            '77777777-7777-7777-7777-000000000001',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
+            true,
+            'client-a',
+        );
+
+        $this->seedConnection(
+            $companyC,
+            '77777777-7777-7777-7777-000000000002',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
+            false,
+            'client-inactive',
+        );
+        $this->seedConnection(
+            $companyA,
+            '77777777-7777-7777-7777-000000000003',
+            MarketplaceType::WILDBERRIES,
+            MarketplaceConnectionType::SELLER,
+            true,
+            'client-wb',
+        );
+        $this->seedConnection(
+            $companyA,
+            '77777777-7777-7777-7777-000000000004',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::PERFORMANCE,
+            true,
+            'client-performance',
+        );
+
+        $activeOzonSellerB = $this->seedConnection(
+            $companyB,
+            '77777777-7777-7777-7777-000000000005',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
+            true,
+            'client-b',
+        );
+
+        $this->em->flush();
+
+        $all = $this->facade->getActiveOzonSellerConnections();
+        self::assertCount(2, $all);
+
+        self::assertSame(
+            [$activeOzonSellerA->getId(), $activeOzonSellerB->getId()],
+            array_column($all, 'connectionId'),
+        );
+        self::assertSame(
+            [self::COMPANY_A_ID, self::COMPANY_B_ID],
+            array_column($all, 'companyId'),
+        );
+        self::assertSame(
+            [MarketplaceType::OZON->value, MarketplaceType::OZON->value],
+            array_column($all, 'marketplace'),
+        );
+        self::assertSame(
+            [MarketplaceConnectionType::SELLER->value, MarketplaceConnectionType::SELLER->value],
+            array_column($all, 'connectionType'),
+        );
+        self::assertSame(['client-a', 'client-b'], array_column($all, 'clientId'));
+
+        foreach ($all as $row) {
+            self::assertArrayNotHasKey('apiKey', $row);
+            self::assertArrayNotHasKey('clientSecret', $row);
+            self::assertArrayNotHasKey('credentials', $row);
+            self::assertArrayNotHasKey('settings', $row);
+        }
+    }
+
+    public function testGetActiveOzonSellerConnectionsFiltersByCompanyId(): void
+    {
+        $companyA = $this->seedCompany(self::COMPANY_A_ID, 'ozon-filter-a@example.test');
+        $companyB = $this->seedCompany(self::COMPANY_B_ID, 'ozon-filter-b@example.test', '22222222-2222-2222-2222-000000000b03');
+
+        $this->seedConnection(
+            $companyA,
+            '77777777-7777-7777-7777-000000000011',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
+            true,
+            'client-filter-a',
+        );
+        $this->seedConnection(
+            $companyB,
+            '77777777-7777-7777-7777-000000000012',
+            MarketplaceType::OZON,
+            MarketplaceConnectionType::SELLER,
+            true,
+            'client-filter-b',
+        );
+        $this->em->flush();
+
+        $filtered = $this->facade->getActiveOzonSellerConnections(self::COMPANY_A_ID);
+
+        self::assertCount(1, $filtered);
+        self::assertSame(self::COMPANY_A_ID, $filtered[0]['companyId']);
+        self::assertSame('77777777-7777-7777-7777-000000000011', $filtered[0]['connectionId']);
+        self::assertArrayNotHasKey('apiKey', $filtered[0]);
+        self::assertArrayNotHasKey('clientSecret', $filtered[0]);
+    }
+
+    public function testGetActiveOzonSellerConnectionsWithInvalidCompanyIdThrows(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->facade->getActiveOzonSellerConnections('not-a-uuid');
+    }
+
     private function seedCompany(
         string $companyId,
         string $ownerEmail,
@@ -236,5 +361,23 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         $this->em->persist($listing);
 
         return $listing;
+    }
+
+    private function seedConnection(
+        Company $company,
+        string $connectionId,
+        MarketplaceType $marketplace,
+        MarketplaceConnectionType $connectionType,
+        bool $isActive,
+        ?string $clientId,
+    ): MarketplaceConnection {
+        $connection = new MarketplaceConnection($connectionId, $company, $marketplace, $connectionType);
+        $connection->setApiKey('test-secret');
+        $connection->setClientId($clientId);
+        $connection->setIsActive($isActive);
+
+        $this->em->persist($connection);
+
+        return $connection;
     }
 }
