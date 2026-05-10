@@ -58,6 +58,14 @@ final class OzonInventoryClientTest extends TestCase
         $client->fetchStocks('cid', 'key');
     }
 
+    public function testUnauthorized401MapsToApiException(): void
+    {
+        $client = new OzonInventoryClient(new MockHttpClient(new MockResponse('{"message":"unauthorized"}', ['http_code' => 401])));
+
+        $this->expectException(OzonInventoryApiException::class);
+        $client->fetchStocks('cid', 'key');
+    }
+
     public function testServerError5xxThrowsRetryableRuntimeException(): void
     {
         $client = new OzonInventoryClient(new MockHttpClient(new MockResponse('{"message":"server"}', ['http_code' => 500])));
