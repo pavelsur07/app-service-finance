@@ -189,6 +189,11 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
     {
         $companyA = $this->seedCompany(self::COMPANY_A_ID, 'ozon-a@example.test');
         $companyB = $this->seedCompany(self::COMPANY_B_ID, 'ozon-b@example.test', '22222222-2222-2222-2222-000000000b02');
+        $companyC = $this->seedCompany(
+            '11111111-1111-1111-1111-000000000c01',
+            'ozon-c@example.test',
+            '22222222-2222-2222-2222-000000000c02',
+        );
 
         $activeOzonSellerA = $this->seedConnection(
             $companyA,
@@ -200,7 +205,7 @@ final class MarketplaceFacadeTest extends IntegrationTestCase
         );
 
         $this->seedConnection(
-            $companyA,
+            $companyC,
             '77777777-7777-7777-7777-000000000002',
             MarketplaceType::OZON,
             MarketplaceConnectionType::SELLER,
