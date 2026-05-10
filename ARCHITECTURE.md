@@ -391,9 +391,9 @@ getConnectionCredentials(string $companyId, MarketplaceType $marketplace, Market
 // @return list<array{connectionId: string, companyId: string, marketplace: string, connectionType: string, clientId: ?string}>
 getActiveOzonSellerConnections(?string $companyId = null): array
 
-// Пакетный резолв listingId → productId|null. Используется Inventory модулем
-// для маппинга raw API ответов в StockSnapshot записи. IDOR-защита через
-// WHERE company_id, чужие листинги отсутствуют в результате. Для orphan-
+// Пакетный резолв listingId → productId|null. Доступен как публичный
+// контракт для Inventory-модуля и других кросс-модульных сценариев.
+// IDOR-защита через WHERE company_id, чужие листинги отсутствуют в результате. Для orphan-
 // листингов (product = null) возвращается null. Limit 5000 listingIds за вызов.
 // @param  array<string>             $listingIds
 // @return array<string, string|null> map listingId → productId|null
@@ -1415,6 +1415,186 @@ paths:
 
 ---
 
+## Inventory: Ozon Inventory Snapshot Pipeline
+
+### Границы модулей Inventory ↔ Marketplace
+
+- Inventory получает список активных Ozon SELLER-подключений только через публичный контракт `MarketplaceFacade::getActiveOzonSellerConnections(?string $companyId = null): array`.
+- Метод валидирует `companyId` как UUID (если фильтр передан) и фильтрует подключения по трём условиям: `is_active=true`, `marketplace=ozon`, `connection_type=seller`.
+- Возвращаются только безопасные поля: `connectionId`, `companyId`, `marketplace`, `connectionType`, `clientId` (если присутствует).
+- Метод **не** возвращает `apiKey`, `clientSecret`, `credentials` и `settings` с секретами.
+- Credentials конкретного подключения handler получает через публичный `MarketplaceFacade`-контракт; Inventory не импортирует Repository/Query/Infrastructure из Marketplace напрямую.
+
+### Snapshot sessions (`InventorySnapshotSession`)
+
+- `InventorySnapshotSession` — история запусков загрузки остатков по компании.
+- Сессия создаётся при ручном запуске из Inventory UI или cron-запуске.
+- Active-guard: `companyId` + `source=Ozon` + `status in (pending, in_progress)`.
+- Terminal statuses: `completed`, `partial`, `failed`.
+- Ключевые методы `InventorySnapshotSessionRepository`:
+  - `findLatestActiveByCompanyAndSource(...)`
+  - `findByIdAndCompany(...)`
+- `findByIdAndCompany(snapshotSessionId, companyId)` используется в handler для IDOR-safe загрузки сессии.
+- Отдельная колонка `connection_id` в `InventorySnapshotSession` не добавлялась.
+
+### Raw snapshots (`InventoryRawSnapshot`)
+
+- `InventoryRawSnapshot` хранит raw-response Ozon Seller API без нормализации.
+- `connectionId` сохраняется в JSON `requestParams` рядом с прочими metadata; отдельной колонки `connection_id` нет.
+- `requestParams` содержит: `connectionId`, `marketplace`, `page`, `last_id` (если был), `limit`, `requestedAt`, `correlationId`.
+- `responseBody` хранит raw payload ответа.
+- `pageNumber` используется для постраничного сохранения страниц.
+
+### Inventory API client (`site/src/Inventory/Infrastructure/Api/Ozon/OzonInventoryClient.php`)
+
+- Клиент реализован внутри модуля Inventory.
+- Клиент не использует `Marketplace\Infrastructure\Api\Ozon\OzonFetcher`.
+- Используется endpoint Ozon Seller API: `POST /v4/product/info/stocks`.
+- Credentials передаются параметрами метода; клиент их не хранит.
+- HTTP request:
+  - Header `Client-Id`
+  - Header `Api-Key`
+  - `limit`
+  - `last_id` передаётся только для последующих страниц, когда есть cursor.
+- На первой странице `last_id=null` не отправляется.
+- Ответ возвращается как raw DTO `OzonInventoryResponse`.
+- Клиент не работает с `EntityManager`, не делает retry/sleep.
+- Ошибки:
+  - `400` → `OzonInventoryApiException`
+  - `401/403` → `OzonInventoryApiException`
+  - `429` → `OzonInventoryRateLimitException`
+  - `5xx`/network → `RuntimeException`
+  - invalid JSON → `OzonInventoryApiException`
+
+### Messenger: message + handler
+
+- Message: `site/src/Inventory/Message/SyncOzonInventorySnapshotMessage.php`.
+- Payload только scalar: `companyId`, `connectionId`, `snapshotSessionId`, `triggerType`.
+- Routing: `async_sync` (в handler есть внешний HTTP-вызов к Ozon Seller API).
+- `async_pipeline` для этого сообщения не используется.
+
+Handler `site/src/Inventory/MessageHandler/SyncOzonInventorySnapshotHandler.php`:
+- работает в CLI/Messenger context;
+- не использует `Request`/`Session`/`Security`;
+- загружает session через `findByIdAndCompany(snapshotSessionId, companyId)`;
+- terminal-session обрабатывает как no-op;
+- получает credentials через `MarketplaceFacade`;
+- делает `markInProgress` перед HTTP-загрузкой;
+- сохраняет raw-страницы постранично;
+- делает `flush` после каждой страницы;
+- success → `markCompleted`;
+- ошибка до первой страницы → `markFailed`;
+- ошибка после сохранённых страниц → `markPartial`;
+- rate-limit до первой страницы → `markFailed`;
+- rate-limit после сохранённых страниц → `markPartial`;
+- после выставления terminal-статуса не rethrow-ит ошибку (без ложных retry).
+
+### Application action + result DTO
+
+`site/src/Inventory/Application/RequestOzonInventorySnapshotAction.php`:
+- используется и UI, и cron-командой;
+- получает active Ozon SELLER connections через `MarketplaceFacade`;
+- фильтрует/валидирует `connectionId`;
+- если нет active connections — возвращает result без создания session;
+- если уже есть active session — не создаёт дубль;
+- создаёт `InventorySnapshotSession`;
+- делает `flush` session до dispatch;
+- dispatch `SyncOzonInventorySnapshotMessage` на каждое подключение;
+- если все dispatch завершились ошибкой — переводит session в `failed`;
+- Action не делает HTTP-запросов к Ozon.
+
+DTO `site/src/Inventory/Application/DTO/OzonInventorySnapshotRequestResult.php` содержит:
+- `queuedCount`
+- `skippedCount`
+- `hasConnections`
+- `hasActiveSession`
+- `messages`
+
+### Inventory UI: routes/controllers/template
+
+GET `/inventory/snapshots` (`inventory_snapshots_index`):
+- `site/src/Inventory/Controller/SnapshotIndexController.php`
+- `site/templates/inventory/snapshots/index.html.twig`
+- UI принадлежит модулю Inventory (не `Marketplace\Controller\Inventory`, не `templates/marketplace/inventory`).
+- Показывает список загрузок active company.
+- Данные списка: `InventorySnapshotSessionListQuery`.
+- Пагинация: Pagerfanta, `perPage = 30`.
+- Колонки: `Дата`, `Маркетплейс`, `Статус`.
+- Есть empty state.
+- Есть форма «Получить остатки» с CSRF.
+
+POST `/inventory/snapshots/request` (`inventory_snapshots_request`):
+- `site/src/Inventory/Controller/SnapshotRequestController.php`
+- требует `ROLE_COMPANY_OWNER`;
+- проверяет CSRF;
+- вызывает `RequestOzonInventorySnapshotAction` с `triggerType=Manual`;
+- не делает HTTP-запрос к Ozon;
+- redirect на `inventory_snapshots_index`;
+- flash:
+  - `success`: задача запущена;
+  - `warning`: нет active Ozon SELLER connection;
+  - `warning`: синхронизация уже выполняется;
+  - `danger`: ошибка запуска / неверный CSRF.
+
+### List query
+
+`site/src/Inventory/Infrastructure/Query/InventorySnapshotSessionListQuery.php`:
+- read-model для списка загрузок;
+- фильтр строго по `companyId`;
+- сортировка: `created_at DESC`, `id DESC`;
+- явный `SELECT` без raw payload;
+- `getPage()` возвращает `Pagerfanta`;
+- `perPage` default = `30`;
+- `page` нормализуется минимум до `1`;
+- `perPage` ограничен.
+
+### Cron orchestration
+
+`site/src/Inventory/Command/OzonInventoryDailySyncCommand.php`
+- command: `app:inventory:ozon-daily-sync`
+- использует `LockableTrait`;
+- получает active Ozon SELLER connections через `MarketplaceFacade`;
+- группирует подключения по `companyId`;
+- вызывает `RequestOzonInventorySnapshotAction`;
+- `triggerType = ScheduledNight`;
+- не делает HTTP-запрос к Ozon;
+- не зависит от `OzonInventoryClient`;
+- пишет в output: start, active connections count, queued count, skipped count, errors count, finish;
+- ошибка одной company не валит весь запуск;
+- orchestration-failure возвращает `FAILURE`.
+
+Cron entry (`docker/cron/app.cron`):
+
+`5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2`
+
+- Запуск в `04:05 MSK`.
+- Время `04:05` выбрано, чтобы не стартовать одновременно с Ozon marketplace sync в `04:00`.
+- Cron только инициирует snapshot-pipeline; HTTP-загрузка выполняется асинхронным worker-ом.
+
+### Config
+
+Используются следующие конфигурации:
+
+- `config/routes.yaml`
+  - `inventory_controllers`
+  - `path: ../src/Inventory/Controller/`
+  - `namespace: App\Inventory\Controller`
+- `config/packages/twig.yaml`
+  - `'%kernel.project_dir%/templates/inventory': Inventory`
+- `config/packages/messenger.yaml`
+  - `App\Inventory\Message\SyncOzonInventorySnapshotMessage: async_sync`
+
+### Tests / coverage
+
+- Краткий аудит покрытия и пробелов зафиксирован в `site/tests/InventoryPipelineCoverageReport.md`.
+- Task 12 выполнен как аудит покрытия.
+- Task 12.1 закрыл обязательные пробелы:
+  - `InventorySnapshotSessionRepository::findByIdAndCompany()`
+  - `OzonInventoryClient` HTTP 401
+  - invariant invalid `connectionId`
+  - отсутствие `connection_id`-колонки в `inventory_raw_snapshots`
+- Anti-HTTP/архитектурные guard-тесты отмечены как дополнительные, не обязательные для текущего этапа.
+
 ## Решения принятых в Projects-чатах
 
 > Сюда переносить итоги проектирования из Claude.ai Projects.
@@ -1431,6 +1611,7 @@ paths:
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.46 | 2026-05-10 | docs(inventory): в `ARCHITECTURE.md` задокументирован фактически реализованный Ozon Inventory Snapshot Pipeline: выделенный Inventory UI (GET/POST routes), `RequestOzonInventorySnapshotAction`, async message `SyncOzonInventorySnapshotMessage` (`async_sync`) и handler, `OzonInventoryClient` в модуле Inventory, daily cron `app:inventory:ozon-daily-sync` в 04:05 MSK, хранение `connectionId` в `requestParams` JSON без отдельной колонки, сохранение raw Ozon response в `InventoryRawSnapshot` без нормализации. Зафиксированы границы модулей: Inventory работает с Marketplace только через публичный `MarketplaceFacade`-контракт (без прямых импортов Marketplace Infrastructure/Repository/Query). |
 | 1.45 | 2026-05-10 | feat(marketplace): добавлен публичный контракт `MarketplaceFacade::getActiveOzonSellerConnections(?string $companyId = null): array` для кросс-модульного доступа (в т.ч. Inventory) к активным Ozon SELLER-подключениям **без утечки секретов**. Метод строится на `ActiveOzonConnectionsQuery` и возвращает только безопасные поля: `connectionId`, `companyId`, `marketplace`, `connectionType`, `clientId`. Query минимально расширен полем `client_id` (сохранён `finance_lock_before` для существующих потребителей). Добавлены интеграционные тесты `MarketplaceFacadeTest`: фильтры `is_active=true`, `marketplace=ozon`, `connection_type=seller`, фильтрация по `companyId`, и проверка отсутствия `apiKey/clientSecret/credentials/settings` в результате. |
 | 1.44 | 2026-04-28 | feat(marketplace): новый публичный метод `MarketplaceFacade::resolveListingsToProducts(string $companyId, array $listingIds): array` — пакетный резолв `listingId → productId|null` для будущего парсинга raw snapshot'ов в Inventory модуле. Один DQL-запрос с `IDENTITY(l.product)` и `getArrayResult()` — без N+1 и без загрузки Entity. IDOR через `IDENTITY(l.company) = :companyId`: листинги чужих компаний не появляются в результате (отсутствует ключ, не `null`). `productId = null` только для orphan-листингов (легитимный кейс). Валидация: `Assert::uuid($companyId)`, `Assert::allUuid($listingIds)`, `Assert::maxCount(5000)` — защита от случайного огромного массива; пустой массив возвращается без запроса в БД. Реализация — новый метод `MarketplaceListingRepository::findListingToProductMap(string $companyId, array $listingIds): array` (стиль уже существующего `findMarketplaceNamesByProductIds`). Дедупликация входа через `array_unique` перед `IN (:listingIds)`. **Не тронуто:** Entity `MarketplaceListing`, схема БД, существующие методы фасада. Тесты — `tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php` (8 кейсов: empty / invalid companyId / invalid listingId / 5001 limit / mapped listing / orphan listing / другая компания / non-existent listing / batch 100 листингов 60 mapped + 40 orphan). |
 | 1.43 | 2026-04-27 | revert(marketplace): откат soft-режима в `CloseMonthStageAction` — preliminary close проходит только при зелёном preflight. Удалена константа `SOFT_IGNORABLE_IN_PRELIMINARY` и ветка фильтрации hard или soft ошибок; восстановлена простая проверка `if (!$preflightResult->canClose()) throw DomainException`. Параметр `$preliminary` в вызовах `DataSource::getUnprocessedEntries()` и `UnprocessedCostsQuery::getControlSum()` **сохранён** как dormant hook — фильтры в `Unprocessed*Query` при `$preliminary=true` корректны, но на практике не будут отфильтровывать данные, так как при наличии soft-ошибок (например, `sales_without_cost`) preflight-проверка в `RebuildPreliminaryForPeriodAction` завершится неудачей, и вызов `CloseMonthStageAction` будет пропущен. Префикс `[Оперативное закрытие DD.MM.YYYY HH:MM]` в comment операций и запись `settings.last_close_was_preliminary[stage]` или `settings.preliminary_calculated_at[stage]` — **оставлены**. Удалены тесты `testPreliminaryClose_BypassesSalesWithoutCostBlocker_AndExcludesThemFromDocument` и `testPreliminaryClose_BypassesUnknownServiceNamesBlocker_AndExcludesThemFromDocument`; `testPreliminaryClose_StillBlocksOnCostsAlreadyProcessed` переименован в `testPreliminaryClose_BlocksOnAnyPreflightError`. `DataSourcePreliminaryModeTest`, `UnprocessedCostsQueryCoherenceTest`, `PreflightActionDetailsTest`, `RebuildPreliminaryForPeriodActionTest` — **не тронуты**. |
