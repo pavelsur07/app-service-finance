@@ -22,6 +22,7 @@ use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Shared\Service\SlugifyService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -88,7 +89,7 @@ final class WbCostsRawProcessorTest extends TestCase
     // ProcessWbCostsAction::__invoke() — отдельные тесты ниже.
     // -------------------------------------------------------------------------
 
-    /** @dataProvider commissionScenarios */
+    #[DataProvider('commissionScenarios')]
     public function testWbCommissionCalculatorEmitsPositiveAmount(
         float $retailPrice,
         float $acquiringFee,

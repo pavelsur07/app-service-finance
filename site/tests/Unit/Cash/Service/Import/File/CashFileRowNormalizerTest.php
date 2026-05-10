@@ -6,6 +6,7 @@ namespace App\Tests\Unit\Cash\Service\Import\File;
 
 use App\Cash\Enum\Transaction\CashDirection;
 use App\Cash\Service\Import\File\CashFileRowNormalizer;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class CashFileRowNormalizerTest extends TestCase
@@ -34,9 +35,7 @@ final class CashFileRowNormalizerTest extends TestCase
         self::assertSame($expected, $result['externalId']);
     }
 
-    /**
-     * @dataProvider inflowOutflowProvider
-     */
+    #[DataProvider('inflowOutflowProvider')]
     public function testInflowOutflowModeDetectsDirection(array $row, CashDirection $direction, string $amount): void
     {
         $normalizer = new CashFileRowNormalizer();
