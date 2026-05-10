@@ -20,13 +20,13 @@
 | InventorySnapshotSessionRepository | чужая company не видна | Да | `site/tests/Integration/Inventory/Repository/InventorySnapshotSessionRepositoryTest.php` | `testForeignCompanySessionIsNotVisible`. |
 | InventorySnapshotSessionRepository | другой marketplace/source не блокирует | Да | `site/tests/Integration/Inventory/Repository/InventorySnapshotSessionRepositoryTest.php` | `testOtherSourceDoesNotBlockRequestedSource`. |
 | InventorySnapshotSessionRepository | invalid companyId | Да | `site/tests/Integration/Inventory/Repository/InventorySnapshotSessionRepositoryTest.php` | `testFindLatestActiveByCompanyAndSourceThrowsForInvalidCompanyId`. |
-| InventorySnapshotSessionRepository | findByIdAndCompany(), если уже добавлен | Нет | — | Нужен integration-тест метода `findByIdAndCompany` (если метод присутствует в репозитории). |
+| InventorySnapshotSessionRepository | findByIdAndCompany(), если уже добавлен | Да | `site/tests/Integration/Inventory/Repository/InventorySnapshotSessionRepositoryTest.php` | Покрыты успешный поиск по id+companyId, null для чужой company, invalid id и invalid companyId. |
 | RequestOzonInventorySnapshotAction | нет активных Ozon connections | Да | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | `testNoActiveConnectionReturnsHasConnectionsFalse`. |
 | RequestOzonInventorySnapshotAction | active connection создаёт InventorySnapshotSession | Да | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | Проверяется в `testActiveConnectionCreatesSessionAndDispatchesMessage` через результат + side effect. |
 | RequestOzonInventorySnapshotAction | active connection dispatch-ит SyncOzonInventorySnapshotMessage | Да | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | Проверяется `InMemoryBus`. |
 | RequestOzonInventorySnapshotAction | active session guard не создаёт дубль | Да | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | `testActiveSessionSkipsDuplicateDispatch`. |
 | RequestOzonInventorySnapshotAction | dispatch failure не оставляет pending session навсегда | Да | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | `testAllDispatchFailuresMarkSessionFailed`. |
-| RequestOzonInventorySnapshotAction | connectionId валидируется | Нет | — | Нужен integration-тест с невалидным `MarketplaceConnection.id` или assertion на reject до dispatch. |
+| RequestOzonInventorySnapshotAction | connectionId валидируется | Частично | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | Интеграционный сценарий с невалидным connectionId недостижим через реальную модель, потому что MarketplaceConnection валидирует UUID в конструкторе и id хранится как guid. Это зафиксировано отдельным invariant-тестом. |
 | RequestOzonInventorySnapshotAction | Action не делает HTTP-запрос к Ozon | Частично | `site/tests/Integration/Inventory/Application/RequestOzonInventorySnapshotActionTest.php` | Косвенно видно по in-memory bus и отсутствию клиента, но прямого guard-теста (например, spy HTTP client) нет. |
 | SyncOzonInventorySnapshotMessage | payload scalar-only | Да | `site/tests/Unit/Inventory/Message/SyncOzonInventorySnapshotMessageTest.php` | Проверяется создание сообщения с scalar-полями. |
 | SyncOzonInventorySnapshotMessage | companyId | Да | `site/tests/Unit/Inventory/Message/SyncOzonInventorySnapshotMessageTest.php` | Есть explicit assert. |
@@ -40,7 +40,7 @@
 | OzonInventoryClient | first page не отправляет last_id=null | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | `testRequestBodyDoesNotContainLastIdWhenCursorIsNull`. |
 | OzonInventoryClient | next page отправляет last_id | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | Покрыто в `testCredentialsAndRequestBodyArePassedCorrectly`. |
 | OzonInventoryClient | 400 → OzonInventoryApiException | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | `testBadRequest400MapsToApiException`. |
-| OzonInventoryClient | 401/403 → OzonInventoryApiException | Частично | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | Есть тест на 403, отдельного теста на 401 нет. |
+| OzonInventoryClient | 401/403 → OzonInventoryApiException | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | Есть отдельные тесты на 401 и 403. |
 | OzonInventoryClient | 429 → OzonInventoryRateLimitException | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | `testRateLimit429MapsToRateLimitException`. |
 | OzonInventoryClient | 5xx → RuntimeException | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | `testServerError5xxThrowsRetryableRuntimeException`. |
 | OzonInventoryClient | invalid JSON | Да | `site/tests/Unit/Inventory/Infrastructure/Api/Ozon/OzonInventoryClientTest.php` | `testInvalidJsonThrowsException`. |
@@ -56,7 +56,7 @@
 | SyncOzonInventorySnapshotHandler | error after first page → partial без throw | Да | `site/tests/Integration/Inventory/MessageHandler/SyncOzonInventorySnapshotHandlerTest.php` | `testErrorAfterFirstPageMarksPartialWithoutThrow`. |
 | SyncOzonInventorySnapshotHandler | rate limit before first page → failed без throw | Да | `site/tests/Integration/Inventory/MessageHandler/SyncOzonInventorySnapshotHandlerTest.php` | `testRateLimitBeforeFirstPageMarksFailedWithoutThrow`. |
 | SyncOzonInventorySnapshotHandler | requestParams содержит connectionId | Да | `site/tests/Integration/Inventory/MessageHandler/SyncOzonInventorySnapshotHandlerTest.php` | Проверка `getRequestParams()['connectionId']`. |
-| SyncOzonInventorySnapshotHandler | connectionId не добавляется отдельной колонкой | Частично | `site/tests/Integration/Inventory/MessageHandler/SyncOzonInventorySnapshotHandlerTest.php` | Косвенно подтверждается хранением в `requestParams`, но нет отдельной schema/assert-проверки отсутствия колонки. |
+| SyncOzonInventorySnapshotHandler | connectionId не добавляется отдельной колонкой | Да | `site/tests/Integration/Inventory/MessageHandler/SyncOzonInventorySnapshotHandlerTest.php` | Проверяется, что connectionId есть в requestParams raw snapshot и что в inventory_raw_snapshots отсутствует колонка connection_id через DBAL SchemaManager. |
 | Inventory UI GET /inventory/snapshots | страница доступна авторизованному пользователю | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | `testPageIsAvailableForAuthorizedUserAndShowsOnlyOwnCompanyRows`. |
 | Inventory UI GET /inventory/snapshots | список фильтруется по active company | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Тест логинит пользователя с active company и проверяет 1 строку своей компании. |
 | Inventory UI GET /inventory/snapshots | чужие загрузки не отображаются | Да | `site/tests/Functional/Inventory/Controller/SnapshotIndexControllerTest.php` | Проверка отсутствия `WILDBERRIES` из foreign company. |
@@ -86,12 +86,16 @@
 
 ## Итог
 
-3. Покрытие недостаточное, перечислены недостающие тесты, но production-код не менялся.
+Покрытие минимально достаточное для текущего этапа.
+Задача 12.1 закрыла обязательные пробелы:
+- findByIdAndCompany()
+- HTTP 401
+- invariant invalid connectionId
+- отсутствие connection_id column
 
-Недостающие/частично покрытые точки:
-- `InventorySnapshotSessionRepository::findByIdAndCompany()` — добавить integration-тест, если метод существует.
-- `RequestOzonInventorySnapshotAction` — добавить integration-проверку валидации `connectionId` и явный guard, что action не делает HTTP.
-- `OzonInventoryClient` — добавить отдельный unit-тест для HTTP 401 → `OzonInventoryApiException`.
-- `SyncOzonInventorySnapshotHandler` — добавить schema/assert-тест, что `connectionId` не хранится отдельной колонкой.
-- `SnapshotRequestController` — добавить явный anti-HTTP integration-тест (через fail-fast HTTP client), что контроллер только dispatch-ит action.
-- `OzonInventoryDailySyncCommand` — добавить integration-тест на вызов Action (а не прямого Handler/Client).
+Оставшиеся пункты являются дополнительными архитектурными guard-тестами и могут быть вынесены в отдельную задачу только при необходимости.
+
+Оставшиеся частично/дополнительно:
+- `RequestOzonInventorySnapshotAction` — прямой anti-HTTP guard (опционально).
+- `SnapshotRequestController` — anti-HTTP guard (опционально).
+- `OzonInventoryDailySyncCommand` — прямой assertion, что command вызывает Action, а не Handler/Client.
