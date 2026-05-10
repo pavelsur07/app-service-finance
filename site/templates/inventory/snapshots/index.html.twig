@@ -1,0 +1,83 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Загрузка остатков{% endblock %}
+
+{% block content %}
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">Загрузка остатков</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body d-flex align-items-center justify-content-between gap-3 flex-wrap">
+            <div>
+                <div class="fw-medium">Получение актуальных остатков из маркетплейса</div>
+                <div class="text-muted small">Запускает асинхронную загрузку и обновляет историю ниже.</div>
+            </div>
+            <div class="d-flex flex-column align-items-end gap-1">
+                <button type="button" class="btn btn-primary" disabled>Получить остатки</button>
+                <span class="text-muted small">Ручной запуск будет подключён отдельной задачей.</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">История загрузок</h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                <tr>
+                    <th>Дата</th>
+                    <th>Маркетплейс</th>
+                    <th>Статус</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in pager.currentPageResults %}
+                    <tr>
+                        <td>{{ row.created_at|date('d.m.Y H:i') }}</td>
+                        <td><span class="badge bg-azure-lt">{{ row.source|upper }}</span></td>
+                        <td>
+                            {% set statusClass = {
+                                'pending': 'bg-yellow-lt',
+                                'in_progress': 'bg-blue-lt',
+                                'completed': 'bg-green-lt',
+                                'partial': 'bg-orange-lt',
+                                'failed': 'bg-red-lt'
+                            } %}
+                            <span class="badge {{ statusClass[row.status]|default('bg-secondary-lt') }}">{{ row.status }}</span>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">Загрузок пока нет.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pager.haveToPaginate %}
+            <div class="card-footer d-flex align-items-center">
+                <ul class="pagination m-0 ms-auto">
+                    <li class="page-item {{ pager.currentPage == 1 ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('inventory_snapshots_index', {page: pager.currentPage - 1}) }}">‹</a>
+                    </li>
+                    {% for p in 1..pager.nbPages %}
+                        <li class="page-item {{ p == pager.currentPage ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('inventory_snapshots_index', {page: p}) }}">{{ p }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="page-item {{ pager.currentPage == pager.nbPages ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('inventory_snapshots_index', {page: pager.currentPage + 1}) }}">›</a>
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
