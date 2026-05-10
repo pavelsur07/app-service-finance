@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.45 / 2026-05-10
+> Версия: 1.47 / 2026-05-10
 
 ---
 
@@ -1454,9 +1454,10 @@ paths:
 - HTTP request:
   - Header `Client-Id`
   - Header `Api-Key`
+  - `filter.visibility = ALL`
   - `limit`
-  - `last_id` передаётся только для последующих страниц, когда есть cursor.
-- На первой странице `last_id=null` не отправляется.
+  - `last_id` передаётся только для последующих страниц, когда курсор уже получен из предыдущего ответа.
+- На первой странице `last_id=null` не отправляется (поле отсутствует в JSON body).
 - Ответ возвращается как raw DTO `OzonInventoryResponse`.
 - Клиент не работает с `EntityManager`, не делает retry/sleep.
 - Ошибки:
@@ -1611,6 +1612,7 @@ Cron entry (`docker/cron/app.cron`):
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.47 | 2026-05-10 | fix(inventory): для Ozon `POST /v4/product/info/stocks` в request body добавлен `filter.visibility=ALL`; это устраняет `HTTP 400` и `failed`-сессии загрузки остатков при корректных credentials. |
 | 1.46 | 2026-05-10 | docs(inventory): в `ARCHITECTURE.md` задокументирован фактически реализованный Ozon Inventory Snapshot Pipeline: выделенный Inventory UI (GET/POST routes), `RequestOzonInventorySnapshotAction`, async message `SyncOzonInventorySnapshotMessage` (`async_sync`) и handler, `OzonInventoryClient` в модуле Inventory, daily cron `app:inventory:ozon-daily-sync` в 04:05 MSK, хранение `connectionId` в `requestParams` JSON без отдельной колонки, сохранение raw Ozon response в `InventoryRawSnapshot` без нормализации. Зафиксированы границы модулей: Inventory работает с Marketplace только через публичный `MarketplaceFacade`-контракт (без прямых импортов Marketplace Infrastructure/Repository/Query). |
 | 1.45 | 2026-05-10 | feat(marketplace): добавлен публичный контракт `MarketplaceFacade::getActiveOzonSellerConnections(?string $companyId = null): array` для кросс-модульного доступа (в т.ч. Inventory) к активным Ozon SELLER-подключениям **без утечки секретов**. Метод строится на `ActiveOzonConnectionsQuery` и возвращает только безопасные поля: `connectionId`, `companyId`, `marketplace`, `connectionType`, `clientId`. Query минимально расширен полем `client_id` (сохранён `finance_lock_before` для существующих потребителей). Добавлены интеграционные тесты `MarketplaceFacadeTest`: фильтры `is_active=true`, `marketplace=ozon`, `connection_type=seller`, фильтрация по `companyId`, и проверка отсутствия `apiKey/clientSecret/credentials/settings` в результате. |
 | 1.44 | 2026-04-28 | feat(marketplace): новый публичный метод `MarketplaceFacade::resolveListingsToProducts(string $companyId, array $listingIds): array` — пакетный резолв `listingId → productId|null` для будущего парсинга raw snapshot'ов в Inventory модуле. Один DQL-запрос с `IDENTITY(l.product)` и `getArrayResult()` — без N+1 и без загрузки Entity. IDOR через `IDENTITY(l.company) = :companyId`: листинги чужих компаний не появляются в результате (отсутствует ключ, не `null`). `productId = null` только для orphan-листингов (легитимный кейс). Валидация: `Assert::uuid($companyId)`, `Assert::allUuid($listingIds)`, `Assert::maxCount(5000)` — защита от случайного огромного массива; пустой массив возвращается без запроса в БД. Реализация — новый метод `MarketplaceListingRepository::findListingToProductMap(string $companyId, array $listingIds): array` (стиль уже существующего `findMarketplaceNamesByProductIds`). Дедупликация входа через `array_unique` перед `IN (:listingIds)`. **Не тронуто:** Entity `MarketplaceListing`, схема БД, существующие методы фасада. Тесты — `tests/Integration/Marketplace/Facade/MarketplaceFacadeTest.php` (8 кейсов: empty / invalid companyId / invalid listingId / 5001 limit / mapped listing / orphan listing / другая компания / non-existent listing / batch 100 листингов 60 mapped + 40 orphan). |

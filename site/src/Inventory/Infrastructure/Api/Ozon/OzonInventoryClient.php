@@ -24,7 +24,10 @@ final readonly class OzonInventoryClient
     {
         $this->assertInput($clientId, $apiKey, $limit);
 
-        $body = ['limit' => $limit];
+        $body = [
+            'filter' => ['visibility' => 'ALL'],
+            'limit' => $limit,
+        ];
         if (null !== $lastId && '' !== $lastId) {
             $body['last_id'] = $lastId;
         }
