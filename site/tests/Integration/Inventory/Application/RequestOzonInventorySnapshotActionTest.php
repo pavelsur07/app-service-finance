@@ -13,6 +13,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Shared\Service\AppLogger;
 use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
@@ -40,6 +41,7 @@ final class RequestOzonInventorySnapshotActionTest extends IntegrationTestCase
             $this->sessionRepository,
             $this->em,
             new InMemoryBus(),
+            self::getContainer()->get(AppLogger::class),
         );
 
         $result = $action($company->getId(), SnapshotTriggerType::Manual);
@@ -59,6 +61,7 @@ final class RequestOzonInventorySnapshotActionTest extends IntegrationTestCase
             $this->sessionRepository,
             $this->em,
             $bus,
+            self::getContainer()->get(AppLogger::class),
         );
 
         $result = $action($company->getId(), SnapshotTriggerType::Manual);
@@ -81,6 +84,7 @@ final class RequestOzonInventorySnapshotActionTest extends IntegrationTestCase
             $this->sessionRepository,
             $this->em,
             $bus,
+            self::getContainer()->get(AppLogger::class),
         );
 
         self::assertSame(1, $action($company->getId(), SnapshotTriggerType::Manual)->queuedCount);
@@ -101,6 +105,7 @@ final class RequestOzonInventorySnapshotActionTest extends IntegrationTestCase
             $this->sessionRepository,
             $this->em,
             new FailingBus(),
+            self::getContainer()->get(AppLogger::class),
         );
 
         $result = $action($company->getId(), SnapshotTriggerType::Manual);

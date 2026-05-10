@@ -56,6 +56,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('credentials', (string) $session->getErrorMessage());
     }
 
     public function testSuccessOnePageSavesRawAndCompleted(): void
@@ -112,6 +113,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('HTTP 500', (string) $session->getErrorMessage());
     }
 
     public function testErrorAfterFirstPageMarksPartialWithoutThrow(): void
@@ -144,6 +146,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('Rate limit', (string) $session->getErrorMessage());
     }
 
     private function createCompany(int $index): Company
