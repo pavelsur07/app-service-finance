@@ -16,6 +16,7 @@ use PHPUnit\Framework\TestCase;
 use Psr\Log\AbstractLogger;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Contracts\HttpClient\ResponseInterface;
@@ -91,7 +92,8 @@ final class OzonAdClientTest extends TestCase
             downloadCsv: $csv,
         );
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+        $clock = new MockClock('2026-04-23 10:00:00');
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo, $clock);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -998,7 +1000,8 @@ final class OzonAdClientTest extends TestCase
                 return 1;
             });
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+        $clock = new MockClock('2026-04-23 10:00:00');
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo, $clock);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -1052,7 +1055,8 @@ final class OzonAdClientTest extends TestCase
             });
         $repo->expects(self::once())->method('markFinalized')->with(self::COMPANY_ID, 'uuid-log-1', 'OK', null);
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+        $clock = new MockClock('2026-04-23 10:00:00');
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo, $clock);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -1083,10 +1087,7 @@ final class OzonAdClientTest extends TestCase
     //  • firstNonPendingAt == null на iter1 (NOT_STARTED), не-null на iter2/iter3;
     //  • ровно одна finalization (OK) в самом конце.
     //
-    // pollReport() делает sleep(POLL_INTERVAL_SECONDS=5) между итерациями,
-    // поэтому тест занимает ~10 секунд реального времени. Это сознательный
-    // trade-off: альтернатива — refactor под инжектируемый sleeper, что
-    // ломает сигнатуру и плодит моки.
+    // Polling выполняется через MockClock, поэтому итерации не ждут реальный sleep(5).
     // -----------------------------------------------------------------
     public function testPollReportCapturesFirstNonPendingAtOnceAcrossIterations(): void
     {
@@ -1132,7 +1133,8 @@ final class OzonAdClientTest extends TestCase
             ->with(self::COMPANY_ID, 'uuid-multi', 'OK', null)
             ->willReturn(1);
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo);
+        $clock = new MockClock('2026-04-23 10:00:00');
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $repo, $clock);
 
         $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
@@ -1300,7 +1302,7 @@ final class OzonAdClientTest extends TestCase
     // -----------------------------------------------------------------
     // Счётчик NOT_STARTED не ломает обычный путь: отчёт идёт NOT_STARTED →
     // IN_PROGRESS → OK в пределах 5-минутного окна, early-fail не срабатывает.
-    // Реальный sleep(5) × 2 = ~10 секунд — сознательный trade-off.
+    // Polling выполняется через MockClock без реального sleep(5).
     // -----------------------------------------------------------------
     public function testPollReportNotStartedFollowedByProgressCompletesSuccessfully(): void
     {
@@ -1308,15 +1310,16 @@ final class OzonAdClientTest extends TestCase
             new MockResponse($this->tokenBody('TKN-OK-NS')),
             new MockResponse($this->campaignListBody(1)),
             new MockResponse('{"UUID":"uuid-ok-ns"}'),
-            // NOT_STARTED → IN_PROGRESS → OK: каждая итерация требует sleep(5)
-            // между запросами (кроме последней), итого ~10 сек реального времени.
+            // NOT_STARTED → IN_PROGRESS → OK: последовательность проверяется без
+            // ожидания реального времени благодаря MockClock.
             new MockResponse(json_encode(['state' => 'NOT_STARTED'], JSON_THROW_ON_ERROR)),
             new MockResponse(json_encode(['state' => 'IN_PROGRESS'], JSON_THROW_ON_ERROR)),
             new MockResponse($this->stateReadyBody('/api/client/statistics/report?UUID=uuid-ok-ns')),
             new MockResponse("date;campaign_id;campaign_name;sku;spend;views;clicks\n2026-03-01;111;Campaign A;SKU-1;1;1;1\n"),
         ]);
 
-        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo);
+        $clock = new MockClock('2026-04-23 10:00:00');
+        $client = new OzonAdClient($http, $this->facade, new ArrayAdapter(), $this->logger, $this->logger, $this->pendingReportRepo, $clock);
 
         $result = $client->fetchAdStatisticsRange(
             self::COMPANY_ID,
