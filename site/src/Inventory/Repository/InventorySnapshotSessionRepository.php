@@ -18,6 +18,15 @@ final class InventorySnapshotSessionRepository extends ServiceEntityRepository
         parent::__construct($registry, InventorySnapshotSession::class);
     }
 
+
+    public function findByIdAndCompany(string $id, string $companyId): ?InventorySnapshotSession
+    {
+        Assert::uuid($id);
+        Assert::uuid($companyId);
+
+        return $this->findOneBy(['id' => $id, 'companyId' => $companyId]);
+    }
+
     public function findLatestActiveByCompanyAndSource(string $companyId, MarketplaceType $source): ?InventorySnapshotSession
     {
         Assert::uuid($companyId);
