@@ -48,6 +48,7 @@ framework:
             'Symfony\Component\Mailer\Messenger\SendEmailMessage': async_sync
             'Symfony\Component\Notifier\Message\ChatMessage': async_sync
             'Symfony\Component\Notifier\Message\SmsMessage': async_sync
+            'App\Inventory\Message\SyncOzonInventorySnapshotMessage': async_sync
 
             # --- async_pipeline: local CPU/DB processing of already-fetched data ---
             'App\Marketplace\Message\ProcessDayReportMessage': async_pipeline
