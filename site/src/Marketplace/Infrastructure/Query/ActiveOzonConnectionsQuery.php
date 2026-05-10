@@ -19,11 +19,11 @@ final class ActiveOzonConnectionsQuery
     }
 
     /**
-     * @return array<int, array{id: string, company_id: string, finance_lock_before: null|string}>
+     * @return array<int, array{id: string, company_id: string, client_id: null|string, finance_lock_before: null|string}>
      */
     public function execute(?string $companyId = null): array
     {
-        $sql = 'SELECT mc.id, mc.company_id, c.finance_lock_before
+        $sql = 'SELECT mc.id, mc.company_id, mc.client_id, c.finance_lock_before
                 FROM marketplace_connections mc
                 INNER JOIN companies c ON c.id = mc.company_id
                 WHERE mc.marketplace = :marketplace
@@ -40,7 +40,7 @@ final class ActiveOzonConnectionsQuery
             $params['company_id'] = $companyId;
         }
 
-        $sql .= ' ORDER BY mc.created_at ASC';
+        $sql .= ' ORDER BY mc.created_at ASC, mc.id ASC';
 
         return $this->connection->fetchAllAssociative($sql, $params);
     }
