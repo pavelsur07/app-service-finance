@@ -55,7 +55,9 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
         self::assertStringContainsString('OZON', (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('WILDBERRIES', (string) $client->getResponse()->getContent());
         self::assertStringContainsString('Получить остатки', (string) $client->getResponse()->getContent());
-        self::assertGreaterThan(0, $crawler->filter('button[disabled]')->count());
+        self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request"][method="post"]')->count());
+        self::assertGreaterThan(0, $crawler->filter('form[action="/inventory/snapshots/request"] input[type="hidden"][name="_token"]')->count());
+        self::assertSame('Получить остатки', trim((string) $crawler->filter('form[action="/inventory/snapshots/request"] button[type="submit"]')->text()));
 
         $headers = $crawler->filter('table thead th')->each(static fn ($node) => trim((string) $node->text()));
         self::assertSame(['Дата', 'Маркетплейс', 'Статус'], $headers);

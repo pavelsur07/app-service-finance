@@ -17,10 +17,10 @@
                 <div class="fw-medium">Получение актуальных остатков из маркетплейса</div>
                 <div class="text-muted small">Запускает асинхронную загрузку и обновляет историю ниже.</div>
             </div>
-            <div class="d-flex flex-column align-items-end gap-1">
-                <button type="button" class="btn btn-primary" disabled>Получить остатки</button>
-                <span class="text-muted small">Ручной запуск будет подключён отдельной задачей.</span>
-            </div>
+            <form method="post" action="{{ path('inventory_snapshots_request') }}" class="mb-0">
+                <input type="hidden" name="_token" value="{{ csrf_token('inventory_snapshots_request') }}">
+                <button type="submit" class="btn btn-primary">Получить остатки</button>
+            </form>
         </div>
     </div>
 
