@@ -10,6 +10,9 @@
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
 
+# Inventory Ozon snapshot: запуск в 04:05 MSK, команда только инициирует pipeline; HTTP-загрузка выполняется async worker'ом.
+5 4 * * * cd /app && php bin/console app:inventory:ozon-daily-sync --no-interaction >> /proc/1/fd/1 2>> /proc/1/fd/2
+
 # Daily-sync: создаёт AdLoadJob за вчера для всех компаний с активным Ozon
 # Performance подключением. Дальше работу подхватывают cron-driven worker'ы
 # (scheduler → poller → finalizer → auto-extract), без ручных действий.
