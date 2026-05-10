@@ -41,18 +41,28 @@ final readonly class OzonInventoryClient
 
         $statusCode = $response->getStatusCode();
         $payload = $response->getContent(false);
+        $payloadFragment = mb_substr(trim($payload), 0, 1000);
+        $message = sprintf(
+            'Ozon Inventory API returned HTTP %d for %s: %s',
+            $statusCode,
+            self::STOCKS_ENDPOINT,
+            $payloadFragment !== '' ? $payloadFragment : '[empty response body]',
+        );
 
         if (429 === $statusCode) {
-            throw new OzonInventoryRateLimitException('Ozon Inventory API returned HTTP 429.');
+            throw new OzonInventoryRateLimitException($message.' Rate limit exceeded, retry later.');
         }
         if (401 === $statusCode || 403 === $statusCode) {
-            throw new OzonInventoryApiException(sprintf('Ozon Inventory API returned HTTP %d.', $statusCode));
+            throw new OzonInventoryApiException($message.' Authentication/authorization failed.');
+        }
+        if (400 === $statusCode) {
+            throw new OzonInventoryApiException($message.' Invalid request payload or parameters.');
         }
         if ($statusCode >= 400 && $statusCode < 500) {
-            throw new OzonInventoryApiException(sprintf('Ozon Inventory API returned HTTP %d.', $statusCode));
+            throw new OzonInventoryApiException($message.' Client-side API error.');
         }
         if ($statusCode >= 500) {
-            throw new \RuntimeException(sprintf('Ozon Inventory API returned HTTP %d.', $statusCode));
+            throw new \RuntimeException($message.' Ozon server-side error.');
         }
 
         try {
@@ -89,4 +99,3 @@ final readonly class OzonInventoryClient
         }
     }
 }
-

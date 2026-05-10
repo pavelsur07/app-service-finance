@@ -30,7 +30,7 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
             ->withCompanyId($activeCompany->getId())
             ->withSource(MarketplaceType::OZON)
             ->build();
-        $ownSession->markCompleted();
+        $ownSession->markFailed('Ozon Inventory API returned HTTP 403 for /v4/product/info/stocks');
 
         $foreignSession = InventorySnapshotSessionBuilder::aSession()
             ->withCompanyId($otherCompany->getId())
@@ -60,7 +60,9 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
         self::assertSame('Получить остатки', trim((string) $crawler->filter('form[action="/inventory/snapshots/request"] button[type="submit"]')->text()));
 
         $headers = $crawler->filter('table thead th')->each(static fn ($node) => trim((string) $node->text()));
-        self::assertSame(['Дата', 'Маркетплейс', 'Статус'], $headers);
+        self::assertSame(['Дата', 'Маркетплейс', 'Статус', 'Страницы', 'Ошибка'], $headers);
+        self::assertStringContainsString('Ozon Inventory API returned HTTP 403', (string) $client->getResponse()->getContent());
+        self::assertStringNotContainsString('foreign', (string) $client->getResponse()->getContent());
     }
 
     public function testPaginationWorksWithThirtyItemsPerPage(): void

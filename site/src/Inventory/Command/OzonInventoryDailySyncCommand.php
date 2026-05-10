@@ -49,6 +49,7 @@ final class OzonInventoryDailySyncCommand extends Command
             $companyIds = array_values(array_filter($companyIds, static fn (string $companyId): bool => '' !== $companyId));
 
             $output->writeln(sprintf('active connections count: %d / queued count: %d', count($connections), 0));
+            $output->writeln(sprintf('unique companies count: %d', count($companyIds)));
 
             $queuedCount = 0;
             $skippedCount = 0;
@@ -70,6 +71,7 @@ final class OzonInventoryDailySyncCommand extends Command
             }
 
             $output->writeln(sprintf('active connections count: %d / queued count: %d', count($connections), $queuedCount));
+            $output->writeln(sprintf('unique companies count: %d', count($companyIds)));
             $output->writeln(sprintf('skipped count: %d', $skippedCount));
             $output->writeln(sprintf('errors count: %d', $errorsCount));
             $output->writeln('finish');
