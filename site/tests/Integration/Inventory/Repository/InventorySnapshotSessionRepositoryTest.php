@@ -121,11 +121,60 @@ final class InventorySnapshotSessionRepositoryTest extends IntegrationTestCase
         $count = (int) $this->em->getConnection()->fetchOne('SELECT COUNT(*) FROM inventory_snapshot_sessions');
         self::assertSame(0, $count);
     }
+
+    public function testFindByIdAndCompanyReturnsSessionForMatchingPair(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()
+            ->withCompanyId(self::COMPANY_ID)
+            ->withSource(MarketplaceType::OZON)
+            ->withCorrelationId('33333333-3333-7333-8333-000000000707')
+            ->build();
+
+        $this->em->persist($session);
+        $this->em->flush();
+        $this->em->clear();
+
+        $found = $this->repository->findByIdAndCompany($session->getId(), self::COMPANY_ID);
+
+        self::assertNotNull($found);
+        self::assertSame($session->getId(), $found->getId());
+    }
+
+    public function testFindByIdAndCompanyReturnsNullForForeignCompany(): void
+    {
+        $session = InventorySnapshotSessionBuilder::aSession()
+            ->withCompanyId(self::OTHER_COMPANY_ID)
+            ->withSource(MarketplaceType::OZON)
+            ->withCorrelationId('33333333-3333-7333-8333-000000000708')
+            ->build();
+
+        $this->em->persist($session);
+        $this->em->flush();
+        $this->em->clear();
+
+        $found = $this->repository->findByIdAndCompany($session->getId(), self::COMPANY_ID);
+
+        self::assertNull($found);
+    }
+
+    public function testFindByIdAndCompanyThrowsForInvalidId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->repository->findByIdAndCompany('not-a-uuid', self::COMPANY_ID);
+    }
+
+    public function testFindByIdAndCompanyThrowsForInvalidCompanyId(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->repository->findByIdAndCompany('33333333-3333-7333-8333-000000000709', 'not-a-uuid');
+    }
+
     public function testFindLatestActiveByCompanyAndSourceThrowsForInvalidCompanyId(): void
     {
         $this->expectException(\InvalidArgumentException::class);
 
         $this->repository->findLatestActiveByCompanyAndSource('not-a-uuid', MarketplaceType::OZON);
     }
-
 }
