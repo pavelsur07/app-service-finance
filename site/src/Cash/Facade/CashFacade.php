@@ -50,7 +50,7 @@ final readonly class CashFacade
                 throw $e;
             }
 
-            $existingId = $this->cashTransactionRepository->findIdByCompanyImportSourceExternalIdDbal(
+            $existingId = $this->cashTransactionRepository->findAnyIdByCompanyImportSourceExternalIdDbal(
                 $command->companyId,
                 $command->importSource,
                 $command->externalId,
@@ -70,7 +70,7 @@ final readonly class CashFacade
             return null;
         }
 
-        return $this->cashTransactionRepository->findOneByCompanyImportSourceExternalId(
+        return $this->cashTransactionRepository->findAnyByCompanyImportSourceExternalId(
             $command->companyId,
             $command->importSource,
             $command->externalId,
