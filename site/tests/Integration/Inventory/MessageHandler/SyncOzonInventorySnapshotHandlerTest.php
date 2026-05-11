@@ -56,6 +56,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('credentials', (string) $session->getErrorMessage());
     }
 
     public function testSuccessOnePageSavesRawAndCompleted(): void
@@ -75,6 +76,11 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         $raw = $this->findRawBySession($session->getId());
         self::assertCount(1, $raw);
         self::assertSame('77777777-7777-7777-7777-000000000404', $raw[0]->getRequestParams()['connectionId']);
+
+        $columns = $this->em->getConnection()
+            ->createSchemaManager()
+            ->listTableColumns('inventory_raw_snapshots');
+        self::assertArrayNotHasKey('connection_id', $columns);
     }
 
     public function testSuccessSeveralPagesSavesSeveralRawSnapshots(): void
@@ -107,6 +113,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('HTTP 500', (string) $session->getErrorMessage());
     }
 
     public function testErrorAfterFirstPageMarksPartialWithoutThrow(): void
@@ -139,6 +146,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
 
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
+        self::assertStringContainsString('Rate limit', (string) $session->getErrorMessage());
     }
 
     private function createCompany(int $index): Company

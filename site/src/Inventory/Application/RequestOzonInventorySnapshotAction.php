@@ -11,6 +11,7 @@ use App\Inventory\Message\SyncOzonInventorySnapshotMessage;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Ramsey\Uuid\Uuid;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -23,6 +24,7 @@ final readonly class RequestOzonInventorySnapshotAction
         private InventorySnapshotSessionRepository $sessionRepository,
         private EntityManagerInterface $entityManager,
         private MessageBusInterface $messageBus,
+        private AppLogger $logger,
     ) {
     }
 
@@ -37,6 +39,10 @@ final readonly class RequestOzonInventorySnapshotAction
         $connections = $this->marketplaceFacade->getActiveOzonSellerConnections($companyId);
 
         if ($connections === []) {
+            $this->logger->info('Inventory snapshot request skipped: no active Ozon SELLER connections.', [
+                'companyId' => $companyId,
+                'triggerType' => $triggerType->value,
+            ]);
             return new OzonInventorySnapshotRequestResult(
                 queuedCount: 0,
                 skippedCount: 0,
@@ -53,6 +59,12 @@ final readonly class RequestOzonInventorySnapshotAction
         foreach ($connections as $connection) {
             $connectionId = (string) ($connection['connectionId'] ?? '');
             if ($connectionId === '') {
+                $this->logger->warning('Inventory snapshot request skipped: empty connectionId.', [
+                    'companyId' => $companyId,
+                    'triggerType' => $triggerType->value,
+                    'queuedCount' => 0,
+                    'skippedCount' => $skippedCount + 1,
+                ]);
                 ++$skippedCount;
                 $messages[] = 'Skipped one connection: empty connectionId.';
 
@@ -60,6 +72,13 @@ final readonly class RequestOzonInventorySnapshotAction
             }
 
             if (!Uuid::isValid($connectionId)) {
+                $this->logger->warning('Inventory snapshot request skipped: invalid connectionId.', [
+                    'companyId' => $companyId,
+                    'connectionId' => $connectionId,
+                    'triggerType' => $triggerType->value,
+                    'queuedCount' => 0,
+                    'skippedCount' => $skippedCount + 1,
+                ]);
                 ++$skippedCount;
                 $messages[] = sprintf('Skipped connection with invalid UUID: %s', $connectionId);
 
@@ -82,6 +101,13 @@ final readonly class RequestOzonInventorySnapshotAction
         $activeSession = $this->sessionRepository->findLatestActiveByCompanyAndSource($companyId, MarketplaceType::OZON);
 
         if ($activeSession !== null) {
+            $this->logger->info('Inventory snapshot request skipped: active session already exists.', [
+                'companyId' => $companyId,
+                'snapshotSessionId' => $activeSession->getId(),
+                'triggerType' => $triggerType->value,
+                'queuedCount' => 0,
+                'skippedCount' => $skippedCount + count($validConnectionIds),
+            ]);
             return new OzonInventorySnapshotRequestResult(
                 queuedCount: 0,
                 skippedCount: $skippedCount + count($validConnectionIds),
@@ -100,6 +126,11 @@ final readonly class RequestOzonInventorySnapshotAction
 
         $this->entityManager->persist($session);
         $this->entityManager->flush();
+        $this->logger->info('Inventory snapshot session created.', [
+            'companyId' => $companyId,
+            'snapshotSessionId' => $session->getId(),
+            'triggerType' => $triggerType->value,
+        ]);
 
         $queuedCount = 0;
 
@@ -113,8 +144,28 @@ final readonly class RequestOzonInventorySnapshotAction
                     triggerType: $triggerType->value,
                 ));
                 ++$queuedCount;
+                $this->logger->info('Inventory snapshot message dispatched.', [
+                    'companyId' => $companyId,
+                    'snapshotSessionId' => $session->getId(),
+                    'connectionId' => $connectionId,
+                    'triggerType' => $triggerType->value,
+                    'queuedCount' => $queuedCount,
+                    'skippedCount' => $skippedCount,
+                ]);
             } catch (\Throwable $e) {
                 ++$skippedCount;
+                $this->logger->error('Inventory snapshot message dispatch failed.', [
+                    'companyId' => $companyId,
+                    'snapshotSessionId' => $session->getId(),
+                    'connectionId' => $connectionId,
+                    'triggerType' => $triggerType->value,
+                    'queuedCount' => $queuedCount,
+                    'skippedCount' => $skippedCount,
+                    'exceptionClass' => $e::class,
+                    'errorMessage' => $e->getMessage(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
                 $messages[] = sprintf('Failed to queue connection %s: %s', $connectionId, $e->getMessage());
             }
         }

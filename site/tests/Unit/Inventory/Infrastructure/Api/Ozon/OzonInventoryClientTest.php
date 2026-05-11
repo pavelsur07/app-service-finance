@@ -15,7 +15,7 @@ final class OzonInventoryClientTest extends TestCase
 {
     /**
      * Contract for Ozon Seller API POST /v4/product/info/stocks:
-     * request uses `limit` + `last_id`, response cursor is `result.last_id`, items are in `result.items`.
+     * request uses `filter.visibility=ALL` + `limit` + optional `last_id`, response cursor is `result.last_id`, items are in `result.items`.
      */
     public function testSuccessReturnsRawResponseWithoutNormalizationForV4ProductInfoStocksContract(): void
     {
@@ -53,6 +53,14 @@ final class OzonInventoryClientTest extends TestCase
     public function testForbidden403MapsToPermanentException(): void
     {
         $client = new OzonInventoryClient(new MockHttpClient(new MockResponse('{"message":"forbidden"}', ['http_code' => 403])));
+
+        $this->expectException(OzonInventoryApiException::class);
+        $client->fetchStocks('cid', 'key');
+    }
+
+    public function testUnauthorized401MapsToApiException(): void
+    {
+        $client = new OzonInventoryClient(new MockHttpClient(new MockResponse('{"message":"unauthorized"}', ['http_code' => 401])));
 
         $this->expectException(OzonInventoryApiException::class);
         $client->fetchStocks('cid', 'key');
@@ -112,7 +120,7 @@ final class OzonInventoryClientTest extends TestCase
         $client = new OzonInventoryClient($http);
         $client->fetchStocks('client-1', 'api-1', 100, null);
 
-        self::assertSame(['limit' => 100], $captured);
+        self::assertSame(['filter' => ['visibility' => 'ALL'], 'limit' => 100], $captured);
         self::assertArrayNotHasKey('last_id', $captured);
     }
 
@@ -132,6 +140,7 @@ final class OzonInventoryClientTest extends TestCase
         self::assertStringEndsWith('/v4/product/info/stocks', $captured['url']);
         self::assertSame('client-1', $captured['options']['headers']['Client-Id']);
         self::assertSame('api-1', $captured['options']['headers']['Api-Key']);
+        self::assertSame(['visibility' => 'ALL'], $captured['options']['json']['filter']);
         self::assertSame(321, $captured['options']['json']['limit']);
         self::assertSame('last-42', $captured['options']['json']['last_id']);
     }

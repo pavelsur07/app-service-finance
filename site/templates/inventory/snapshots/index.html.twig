@@ -35,6 +35,8 @@
                     <th>Дата</th>
                     <th>Маркетплейс</th>
                     <th>Статус</th>
+                    <th>Страницы</th>
+                    <th>Ошибка</th>
                 </tr>
                 </thead>
                 <tbody>
@@ -52,10 +54,24 @@
                             } %}
                             <span class="badge {{ statusClass[row.status]|default('bg-secondary-lt') }}">{{ row.status }}</span>
                         </td>
+                        <td>
+                            {% if row.expected_pages is not null and row.received_pages is not null %}
+                                {{ row.received_pages }} / {{ row.expected_pages }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-muted small">
+                            {% if row.error_message %}
+                                <div class="text-truncate" style="max-width: 420px;" title="{{ row.error_message }}">{{ row.error_message }}</div>
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="3" class="text-center text-muted py-4">Загрузок пока нет.</td>
+                        <td colspan="5" class="text-center text-muted py-4">Загрузок пока нет.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
