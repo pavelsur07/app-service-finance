@@ -250,4 +250,60 @@ final class CashFacadeTest extends IntegrationTestCase
         self::assertNotSame($first->transactionId, $second->transactionId);
     }
 
+    public function testCreateTransactionTreatsSoftDeletedImportAsDuplicate(): void
+    {
+        $user = UserBuilder::aUser()->withEmail('facade6@example.com')->withPasswordHash('pass')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->withName('Facade Company 6')->build();
+
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $account->setOpeningBalance('0');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $first = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '100.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-12'),
+            description: 'Telegram tx initial',
+            importSource: 'telegram',
+            externalId: 'telegram:test',
+        ));
+
+        $stored = $this->cashTransactionRepository->find($first->transactionId);
+        self::assertNotNull($stored);
+        $stored->markDeleted('test-user', 'manual soft delete');
+        $this->em->flush();
+
+        $second = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '100.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-12'),
+            description: 'Telegram tx repeated webhook',
+            importSource: 'telegram',
+            externalId: 'telegram:test',
+        ));
+
+        self::assertFalse($second->created);
+        self::assertTrue($second->duplicate);
+        self::assertSame($first->transactionId, $second->transactionId);
+
+        $rows = $this->cashTransactionRepository->findBy([
+            'company' => $company,
+            'importSource' => 'telegram',
+            'externalId' => 'telegram:test',
+        ]);
+
+        self::assertCount(1, $rows);
+    }
+
 }

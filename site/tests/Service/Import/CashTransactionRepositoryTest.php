@@ -62,4 +62,31 @@ class CashTransactionRepositoryTest extends ClientBank1CImportServiceTestCase
         self::assertSame($transaction->getId(), $foundId);
     }
 
+    public function testFindAnyIdByCompanyImportSourceExternalIdDbalReturnsSoftDeletedTransactionId(): void
+    {
+        $transaction = new CashTransaction(
+            Uuid::uuid4()->toString(),
+            $this->company,
+            $this->account,
+            CashDirection::OUTFLOW,
+            '200.00',
+            'RUB',
+            new \DateTimeImmutable('2024-01-12')
+        );
+        $transaction->setImportSource('telegram');
+        $transaction->setExternalId('ext-dbal-soft-deleted');
+        $transaction->markDeleted('test-user', 'soft delete for idempotency');
+
+        $this->em->persist($transaction);
+        $this->em->flush();
+
+        $foundId = $this->transactionRepository->findAnyIdByCompanyImportSourceExternalIdDbal(
+            $this->company->getId(),
+            'telegram',
+            'ext-dbal-soft-deleted',
+        );
+
+        self::assertSame($transaction->getId(), $foundId);
+    }
+
 }
