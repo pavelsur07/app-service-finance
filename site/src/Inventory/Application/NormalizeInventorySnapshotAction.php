@@ -98,13 +98,14 @@ final readonly class NormalizeInventorySnapshotAction
         }
 
         $productsByListing = $this->marketplaceFacade->resolveListingsToProducts($companyId, array_values(array_unique($mappedListingIds)));
+        $locationByFulfillmentType = $this->resolveLocationsByFulfillmentType($companyId, $source, $rowsByRaw);
 
         foreach ($rawSnapshots as $rawSnapshot) {
             foreach ($rowsByRaw[$rawSnapshot->getId()] ?? [] as $row) {
                 $mapping = $mappingBySku[$row->sourceSku] ?? ['status' => StockSnapshotMappingStatus::Unmapped, 'listingId' => null];
                 $listingId = $mapping['listingId'];
                 $productId = $listingId !== null ? ($productsByListing[$listingId] ?? null) : null;
-                $location = $this->findOrCreateLocation($companyId, $source, $row->fulfillmentType);
+                $location = $locationByFulfillmentType[$this->normalizeFulfillmentType($row->fulfillmentType)];
 
                 $this->stockSnapshotRepository->upsertDaySnapshot(new StockSnapshot(
                     companyId: $companyId,
@@ -132,9 +133,31 @@ final readonly class NormalizeInventorySnapshotAction
         $this->entityManager->flush();
     }
 
+    /**
+     * @param array<string, list<\App\Inventory\Application\DTO\NormalizedStockRow>> $rowsByRaw
+     *
+     * @return array<string, Location>
+     */
+    private function resolveLocationsByFulfillmentType(string $companyId, MarketplaceType $source, array $rowsByRaw): array
+    {
+        $locations = [];
+        foreach ($rowsByRaw as $rows) {
+            foreach ($rows as $row) {
+                $normalizedFulfillmentType = $this->normalizeFulfillmentType($row->fulfillmentType);
+                if (isset($locations[$normalizedFulfillmentType])) {
+                    continue;
+                }
+
+                $locations[$normalizedFulfillmentType] = $this->findOrCreateLocation($companyId, $source, $row->fulfillmentType);
+            }
+        }
+
+        return $locations;
+    }
+
     private function findOrCreateLocation(string $companyId, MarketplaceType $source, ?string $fulfillmentType): Location
     {
-        $externalId = $fulfillmentType ?? 'unknown';
+        $externalId = $this->normalizeFulfillmentType($fulfillmentType);
         $location = $this->locationRepository->findOneBy([
             'companyId' => $companyId,
             'externalSystem' => $source,
@@ -156,5 +179,12 @@ final readonly class NormalizeInventorySnapshotAction
         $this->entityManager->persist($location);
 
         return $location;
+    }
+
+    private function normalizeFulfillmentType(?string $fulfillmentType): string
+    {
+        $normalizedValue = trim((string) $fulfillmentType);
+
+        return $normalizedValue !== '' ? mb_strtolower($normalizedValue) : 'unknown';
     }
 }

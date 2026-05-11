@@ -17,8 +17,8 @@ final class InventorySchemaTest extends IntegrationTestCase
         self::assertSame('inventory_raw_snapshots', $conn->fetchOne("SELECT to_regclass('public.inventory_raw_snapshots')"));
         self::assertSame('inventory_stock_snapshots', $conn->fetchOne("SELECT to_regclass('public.inventory_stock_snapshots')"));
 
-        $locationIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uniq_inventory_locations_external'");
-        self::assertStringContainsString('UNIQUE INDEX uniq_inventory_locations_external', $locationIndex);
+        $locationIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uniq_inventory_location_company_external'");
+        self::assertStringContainsString('UNIQUE INDEX uniq_inventory_location_company_external', $locationIndex);
 
         $rawUnprocessedIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_inventory_raw_unprocessed'");
         self::assertStringContainsString('WHERE (is_processed = false)', $rawUnprocessedIndex);
