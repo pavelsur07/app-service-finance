@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.45 / 2026-05-10
+> Версия: 1.46 / 2026-05-11
 
 ---
 
@@ -266,6 +266,63 @@ updatePLRegisterForDocument(string $documentId): void
 ```
 
 > **Остальные Facade** добавлять сюда по мере реализации модулей.
+
+### `CashFacade` (`src/Cash/Facade/CashFacade.php`)
+```php
+// Создать ДДС-транзакцию из внешнего модуля (идемпотентно для внешних источников)
+createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
+```
+
+**Назначение:** `CashFacade` — единственный публичный контракт Cash-модуля для создания ДДС-транзакций из других модулей.
+
+Другие модули не должны:
+- создавать `CashTransaction` напрямую;
+- вызывать `CashTransactionService` напрямую;
+- делать `persist/flush` `CashTransaction` самостоятельно.
+
+**DTO команды:** `CreateCashTransactionCommand` (`src/Cash/Application/DTO/CreateCashTransactionCommand.php`)
+- `companyId`
+- `moneyAccountId`
+- `direction`
+- `amount`
+- `currency`
+- `occurredAt`
+- `description` (`nullable`)
+- `counterpartyId` (`nullable`)
+- `cashflowCategoryId` (`nullable`)
+- `projectDirectionId` (`nullable`)
+- `importSource` (`nullable`)
+- `externalId` (`nullable`)
+- `dedupeHash` (`nullable`)
+- `rawData` (`nullable`)
+
+**DTO результата:** `CreateCashTransactionResult` (`src/Cash/Application/DTO/CreateCashTransactionResult.php`)
+- `transactionId: string`
+- `created: bool`
+- `duplicate: bool`
+
+**Side effects:** создание через `CashFacade::createTransaction()` сохраняет все side effects `CashTransactionService::add()`:
+- VAT logic;
+- `PaymentPlanMatcher`;
+- `ApplyAutoRulesForTransaction`;
+- `DailyBalanceRecalculator`;
+- `SnapshotCacheInvalidator`.
+
+**Идемпотентность внешних источников:**
+- Для внешних источников нужно заполнять `importSource` и `externalId`.
+- Идемпотентность обеспечивается unique constraint `uniq_cashflow_import(company_id, import_source, external_id)`.
+- Если запись с тем же `companyId + importSource + externalId` уже существует, `CashFacade` возвращает:
+  - `created=false`
+  - `duplicate=true`
+
+Важно: одинаковые `amount`/`description`/`occurredAt` **не** являются жёстким ключом дедубликации. Две реальные одинаковые операции разрешены, если `externalId` разный.
+
+**Race-safe поведение:**
+- При `UniqueConstraintViolationException` `CashFacade` делает DBAL lookup по:
+  - `company_id`
+  - `import_source`
+  - `external_id`
+- Если запись найдена, возвращается duplicate-result (без HTTP 500).
 
 ### `MarketplaceAdsFacade` (`src/MarketplaceAds/Facade/MarketplaceAdsFacade.php`)
 ```php
@@ -962,6 +1019,32 @@ buildQueryBuilder(
 
 ---
 
+## Telegram → Cash: контракт интеграции
+
+Telegram создаёт ДДС-транзакции только через цепочку:
+
+`TelegramWebhookController` → `CreateTelegramCashTransactionAction` → `CashFacade::createTransaction()`.
+
+**Telegram externalId:**
+- `telegram:{sha256(botId|chatId|messageId)}`
+- Технически: `externalId = 'telegram:' . hash('sha256', botId . '|' . chatId . '|' . messageId)`
+
+**Telegram rawData:**
+- `source = telegram`
+- `update_id`
+- `message_id`
+- `chat_id`
+- `from_id`
+- `message_date`
+- `text`
+- `bot_id_fallback`
+
+Если `chatId`/`messageId` отсутствуют:
+- `CashTransaction` не создаётся;
+- webhook отвечает `ok`;
+- пишется warning.
+
+
 ## Enum — актуальные значения
 
 > Используй **только** эти значения. Не придумывай новые без обновления файла.
@@ -1478,6 +1561,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.46 | 2026-05-11 | Cash/Telegram: добавлен публичный контракт `CashFacade::createTransaction()` и зафиксировано идемпотентное создание Telegram-транзакций через `importSource`/`externalId` |
 | 1.45 | 2026-05-10 | `MarketplaceFacade::getActiveOzonSellerConnections()` — безопасный публичный контракт без секретов |
 | 1.44 | 2026-04-28 | `MarketplaceFacade::resolveListingsToProducts()` — batch резолв listingId→productId для Inventory |
 | 1.43 | 2026-04-27 | revert: откат soft-mode в `CloseMonthStageAction`, preflight снова строгий |
