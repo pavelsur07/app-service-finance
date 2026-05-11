@@ -160,7 +160,7 @@ final class SyncOzonInventorySnapshotHandler
 
             return;
         } catch (\Throwable $e) {
-            $this->logger->error('Inventory snapshot fetching failed with unhandled exception.', [
+            $this->logger->error('Inventory snapshot fetching failed with unhandled exception.', $e, [
                 'snapshotSessionId' => $session->getId(),
                 'companyId' => $message->companyId,
                 'connectionId' => $message->connectionId,

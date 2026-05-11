@@ -44,12 +44,12 @@ final readonly class NormalizeInventorySnapshotHandler
                 'source' => $message->source,
             ]);
         } catch (\Throwable $e) {
-            $this->logger->error('Inventory normalization failed.', [
+            $this->logger->error('Inventory normalization failed.', $e, [
                 'companyId' => $message->companyId,
                 'snapshotSessionId' => $message->snapshotSessionId,
                 'source' => $message->source,
                 'exceptionClass' => $e::class,
-                'message' => $e->getMessage(),
+                'errorMessage' => $e->getMessage(),
             ]);
 
             throw $e;

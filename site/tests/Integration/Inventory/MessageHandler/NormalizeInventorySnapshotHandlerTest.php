@@ -78,6 +78,16 @@ final class NormalizeInventorySnapshotHandlerTest extends IntegrationTestCase
         self::assertSame(SnapshotSessionStatus::Completed, $session->getStatus());
     }
 
+
+    public function testTechnicalExceptionIsRethrownForMessengerRetry(): void
+    {
+        $company = $this->createCompany(953);
+
+        $handler = self::getContainer()->get(NormalizeInventorySnapshotHandler::class);
+
+        $this->expectException(\Throwable::class);
+        $handler(new NormalizeInventorySnapshotMessage($company->getId(), 'not-a-uuid', MarketplaceType::OZON->value));
+    }
     private function createCompany(int $index): Company
     {
         $user = UserBuilder::aUser()->withIndex($index)->build();
