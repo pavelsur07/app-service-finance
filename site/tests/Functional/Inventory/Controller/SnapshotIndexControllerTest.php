@@ -60,7 +60,13 @@ final class SnapshotIndexControllerTest extends WebTestCaseBase
         self::assertSame('Получить остатки', trim((string) $crawler->filter('form[action="/inventory/snapshots/request"] button[type="submit"]')->text()));
 
         $headers = $crawler->filter('table thead th')->each(static fn ($node) => trim((string) $node->text()));
-        self::assertSame(['Дата', 'Маркетплейс', 'Статус', 'Страницы', 'Ошибка'], $headers);
+        self::assertSame(['Дата', 'Маркетплейс', 'Статус', 'Страницы', 'JSON', 'Ошибка'], $headers);
+
+        $jsonLink = $crawler->filter(sprintf('a[href="/inventory/snapshots/%s/json"]', $ownSession->getId()));
+        self::assertSame(1, $jsonLink->count());
+        self::assertSame('JSON', trim((string) $jsonLink->text()));
+        self::assertSame('_blank', $jsonLink->attr('target'));
+        self::assertStringContainsString('noopener', (string) $jsonLink->attr('rel'));
         self::assertStringContainsString('Ozon Inventory API returned HTTP 403', (string) $client->getResponse()->getContent());
         self::assertStringNotContainsString('foreign', (string) $client->getResponse()->getContent());
     }

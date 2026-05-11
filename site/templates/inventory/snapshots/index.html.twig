@@ -36,6 +36,7 @@
                     <th>Маркетплейс</th>
                     <th>Статус</th>
                     <th>Страницы</th>
+                    <th>JSON</th>
                     <th>Ошибка</th>
                 </tr>
                 </thead>
@@ -61,6 +62,11 @@
                                 —
                             {% endif %}
                         </td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-secondary" href="{{ path('inventory_snapshots_json', {id: row.id}) }}" target="_blank" rel="noopener noreferrer">
+                                JSON
+                            </a>
+                        </td>
                         <td class="text-muted small">
                             {% if row.error_message %}
                                 <div class="text-truncate" style="max-width: 420px;" title="{{ row.error_message }}">{{ row.error_message }}</div>
@@ -71,7 +77,7 @@
                     </tr>
                 {% else %}
                     <tr>
-                        <td colspan="5" class="text-center text-muted py-4">Загрузок пока нет.</td>
+                        <td colspan="6" class="text-center text-muted py-4">Загрузок пока нет.</td>
                     </tr>
                 {% endfor %}
                 </tbody>
