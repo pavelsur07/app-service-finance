@@ -125,11 +125,19 @@ final class SyncOzonInventorySnapshotHandler
 
             $session->markCompleted();
             $this->entityManager->flush();
+
             $this->messageBus->dispatch(new NormalizeInventorySnapshotMessage(
                 companyId: $message->companyId,
                 snapshotSessionId: $session->getId(),
                 source: MarketplaceType::OZON->value,
             ));
+
+            $this->logger->info('Inventory normalization dispatched after completed raw snapshot sync.', [
+                'companyId' => $message->companyId,
+                'snapshotSessionId' => $session->getId(),
+                'source' => MarketplaceType::OZON->value,
+                'correlationId' => $session->getCorrelationId(),
+            ]);
         } catch (OzonInventoryRateLimitException $e) {
             $this->logger->warning('Ozon inventory rate limit while fetching raw snapshots.', [
                 'snapshotSessionId' => $session->getId(),
@@ -141,6 +149,15 @@ final class SyncOzonInventorySnapshotHandler
                 ? $session->markPartial('Rate limit exceeded while fetching Ozon inventory snapshots.')
                 : $session->markFailed('Rate limit exceeded before first Ozon inventory page was saved.');
             $this->entityManager->flush();
+
+            $this->logger->info('Inventory normalization skipped because snapshot session is not completed.', [
+                'companyId' => $message->companyId,
+                'snapshotSessionId' => $session->getId(),
+                'source' => MarketplaceType::OZON->value,
+                'correlationId' => $session->getCorrelationId(),
+                'status' => $session->getStatus()->value,
+            ]);
+
             return;
         } catch (\Throwable $e) {
             $this->logger->error('Inventory snapshot fetching failed with unhandled exception.', [
@@ -157,6 +174,15 @@ final class SyncOzonInventorySnapshotHandler
                 ? $session->markPartial('Inventory snapshot fetching failed after partial save: '.$e->getMessage())
                 : $session->markFailed('Inventory snapshot fetching failed before saving pages: '.$e->getMessage());
             $this->entityManager->flush();
+
+            $this->logger->info('Inventory normalization skipped because snapshot session is not completed.', [
+                'companyId' => $message->companyId,
+                'snapshotSessionId' => $session->getId(),
+                'source' => MarketplaceType::OZON->value,
+                'correlationId' => $session->getCorrelationId(),
+                'status' => $session->getStatus()->value,
+            ]);
+
             return;
         }
     }
