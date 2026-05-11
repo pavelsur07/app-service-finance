@@ -154,7 +154,7 @@ final readonly class RequestOzonInventorySnapshotAction
                 ]);
             } catch (\Throwable $e) {
                 ++$skippedCount;
-                $this->logger->error('Inventory snapshot message dispatch failed.', [
+                $this->logger->error('Inventory snapshot message dispatch failed.', $e, [
                     'companyId' => $companyId,
                     'snapshotSessionId' => $session->getId(),
                     'connectionId' => $connectionId,
