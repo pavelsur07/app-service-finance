@@ -77,11 +77,64 @@ final class CashTransactionServiceTest extends IntegrationTestCase
         $dto->description = 'Test tx';
         $dto->cashflowCategoryId = $category->getId();
         $dto->counterpartyId = $counterparty->getId();
+        $dto->importSource = 'telegram';
+        $dto->externalId = 'telegram:service:test';
+        $dto->dedupeHash = 'telegram:dedupe:test';
+        $dto->rawData = ['source' => 'telegram', 'message_id' => 12345];
 
         $tx = $this->txService->add($dto);
 
         $this->assertSame('Test tx', $tx->getDescription());
         $this->assertSame($category->getId(), $tx->getCashflowCategory()->getId());
         $this->assertSame($counterparty->getId(), $tx->getCounterparty()->getId());
+        $this->assertSame('telegram', $tx->getImportSource());
+        $this->assertSame('telegram:service:test', $tx->getExternalId());
+        $this->assertSame('telegram:dedupe:test', $tx->getDedupeHash());
+        $this->assertSame(['source' => 'telegram', 'message_id' => 12345], $tx->getRawData());
+    }
+
+    public function testAddWithoutImportFieldsKeepsBackwardCompatibility(): void
+    {
+        $user = UserBuilder::aUser()
+            ->withEmail('compat@example.com')
+            ->withPasswordHash('pass')
+            ->build();
+
+        $company = CompanyBuilder::aCompany()
+            ->withOwner($user)
+            ->withName('Compat')
+            ->build();
+
+        $account = new MoneyAccount(
+            Uuid::uuid4()->toString(),
+            $company,
+            MoneyAccountType::BANK,
+            'Main',
+            'USD'
+        );
+        $account->setOpeningBalance('0');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $dto = new CashTransactionDTO();
+        $dto->companyId = $company->getId();
+        $dto->moneyAccountId = $account->getId();
+        $dto->direction = CashDirection::OUTFLOW;
+        $dto->amount = '11.50';
+        $dto->currency = 'USD';
+        $dto->occurredAt = new \DateTimeImmutable('2024-01-11');
+        $dto->description = 'Legacy tx';
+
+        $tx = $this->txService->add($dto);
+
+        $this->assertSame('Legacy tx', $tx->getDescription());
+        $this->assertNull($tx->getImportSource());
+        $this->assertNull($tx->getExternalId());
+        $this->assertNull($tx->getDedupeHash());
+        $this->assertSame([], $tx->getRawData());
     }
 }
