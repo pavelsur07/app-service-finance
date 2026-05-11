@@ -3,12 +3,12 @@
 namespace App\Telegram\Controller;
 
 use App\Cash\Entity\Accounts\MoneyAccount;
-use App\Cash\Entity\Transaction\CashTransaction;
-use App\Cash\Enum\Transaction\CashDirection;
 use App\Telegram\Entity\ClientBinding;
 use App\Telegram\Entity\ImportJob;
 use App\Telegram\Entity\ReportSubscription;
 use App\Telegram\Entity\TelegramBot;
+use App\Telegram\Application\CreateTelegramCashTransactionAction;
+use App\Telegram\Application\DTO\CreateTelegramCashTransactionCommand;
 use App\Telegram\Entity\TelegramUser;
 use App\Telegram\Repository\BotLinkRepository;
 use App\Telegram\Repository\TelegramBotRepository;
@@ -30,6 +30,7 @@ class TelegramWebhookController extends AbstractController
         private readonly EntityManagerInterface $entityManager,
         private readonly HttpClientInterface $httpClient,
         private readonly LoggerInterface $logger,
+        private readonly CreateTelegramCashTransactionAction $createTelegramCashTransactionAction,
     ) {
     }
 
@@ -101,7 +102,7 @@ class TelegramWebhookController extends AbstractController
                 return $this->handleReports($bot, $message);
             }
 
-            return $this->handleTextMessage($bot, $message, $text);
+            return $this->handleTextMessage($bot, $update, $message, $text);
         } catch (\Throwable $e) {
             error_log('[TELEGRAM_WEBHOOK_EXCEPTION] '.$e->getMessage());
             error_log('[TELEGRAM_WEBHOOK_EXCEPTION] file='.$e->getFile().':'.$e->getLine());
@@ -745,7 +746,7 @@ class TelegramWebhookController extends AbstractController
         return $this->respondWithMessage($bot, $message, $messageText);
     }
 
-    private function handleTextMessage(TelegramBot $bot, array $message, string $text): Response
+    private function handleTextMessage(TelegramBot $bot, array $update, array $message, string $text): Response
     {
         $normalizedText = trim($text);
 
@@ -823,120 +824,50 @@ class TelegramWebhookController extends AbstractController
             return $this->respondWithMessage($bot, $message, 'Сначала выберите кассу: /set_cash');
         }
 
-        $amount = $this->parseAmountFromText($text);
-        if (null === $amount) {
+        $result = ($this->createTelegramCashTransactionAction)(new CreateTelegramCashTransactionCommand(
+            botId: $bot->getId(),
+            companyId: $clientBinding->getCompany()->getId(),
+            moneyAccountId: $moneyAccount->getId(),
+            currency: $moneyAccount->getCurrency(),
+            chatId: isset($message['chat']['id']) ? (string) $message['chat']['id'] : null,
+            messageId: isset($message['message_id']) ? (string) $message['message_id'] : null,
+            fromId: isset($message['from']['id']) ? (string) $message['from']['id'] : null,
+            updateId: isset($update['update_id']) ? (int) $update['update_id'] : null,
+            messageDate: isset($message['date']) ? (int) $message['date'] : null,
+            text: $text,
+        ));
+
+        if (null === $result) {
             return $this->respondWithMessage($bot, $message, 'Формат: потратил 2500 на рекламу');
         }
 
-        // MVP: определяем направление по ключевым словам, по умолчанию считаем расход
-        $direction = $this->detectDirection($text);
 
-        $now = new \DateTimeImmutable();
+        if ($result->skippedMissingMessageIdentity) {
+            $this->logger->warning('Telegram cash transaction skipped: message identity is incomplete.', [
+                'update_id' => $update['update_id'] ?? null,
+                'chat_id' => $message['chat']['id'] ?? null,
+                'message_id' => $message['message_id'] ?? null,
+            ]);
 
-        if ($this->isRecentDuplicate($moneyAccount, $amount, $text, $now)) {
             return new JsonResponse(['status' => 'ok']);
         }
 
-        $transaction = new CashTransaction(
-            Uuid::uuid4()->toString(),
-            $clientBinding->getCompany(),
-            $moneyAccount,
-            $direction,
-            $amount,
-            $moneyAccount->getCurrency(),
-            $now,
-        );
+        if ($result->duplicate) {
+            $this->logger->info('Telegram duplicate cash transaction skipped.', [
+                'company_id' => $clientBinding->getCompany()->getId(),
+                'money_account_id' => $moneyAccount->getId(),
+            ]);
 
-        $transaction->setDescription($text);
-        $transaction->setImportSource('telegram');
+            return new JsonResponse(['status' => 'ok']);
+        }
 
-        $this->entityManager->persist($transaction);
-        $this->entityManager->flush();
-
-        $directionLabel = CashDirection::INFLOW === $direction ? 'доход' : 'расход';
-        $formattedAmount = $this->formatAmountForMessage($amount, $moneyAccount->getCurrency());
+        $formattedAmount = $this->formatAmountForMessage($result->amount, $moneyAccount->getCurrency());
 
         return $this->respondWithMessage(
             $bot,
             $message,
-            sprintf('Записал %s %s', $directionLabel, $formattedAmount)
+            sprintf('Записал %s %s', $result->directionLabel, $formattedAmount)
         );
-    }
-
-    private function parseAmountFromText(string $text): ?string
-    {
-        if (!preg_match('/\d[\d\s.,]*/u', $text, $matches)) {
-            return null;
-        }
-
-        $raw = preg_replace('/\s+/u', '', $matches[0]);
-        if (null === $raw || '' === $raw) {
-            return null;
-        }
-
-        $lastDot = strrpos($raw, '.');
-        $lastComma = strrpos($raw, ',');
-        $decimalSeparator = null;
-
-        if (false !== $lastDot && false !== $lastComma) {
-            $decimalSeparator = $lastDot > $lastComma ? '.' : ',';
-        } elseif (false !== $lastDot) {
-            $decimalSeparator = '.';
-        } elseif (false !== $lastComma) {
-            $decimalSeparator = ',';
-        }
-
-        if (',' === $decimalSeparator) {
-            $raw = str_replace('.', '', $raw);
-            $raw = str_replace(',', '.', $raw);
-        } else {
-            $raw = str_replace(',', '', $raw);
-        }
-
-        [$integerPart, $fractionalPart] = array_pad(explode('.', $raw, 2), 2, '');
-        $integerPart = ltrim($integerPart, '0');
-        $integerPart = '' === $integerPart ? '0' : $integerPart;
-
-        $fractionalPart = substr($fractionalPart, 0, 2);
-        $fractionalPart = str_pad($fractionalPart, 2, '0');
-
-        return sprintf('%s.%s', $integerPart, $fractionalPart);
-    }
-
-    private function detectDirection(string $text): CashDirection
-    {
-        $normalized = mb_strtolower($text);
-
-        if (preg_match('/потрат|расход|купил|оплат/u', $normalized)) {
-            return CashDirection::OUTFLOW;
-        }
-
-        if (preg_match('/пришло|поступ|доход|получил/u', $normalized)) {
-            return CashDirection::INFLOW;
-        }
-
-        // MVP: по умолчанию считаем расход
-        return CashDirection::OUTFLOW;
-    }
-
-    private function isRecentDuplicate(MoneyAccount $account, string $amount, string $description, \DateTimeImmutable $now): bool
-    {
-        $since = $now->modify('-2 minutes');
-
-        return (bool) $this->entityManager->getRepository(CashTransaction::class)
-            ->createQueryBuilder('t')
-            ->select('1')
-            ->andWhere('t.moneyAccount = :account')
-            ->andWhere('t.amount = :amount')
-            ->andWhere('t.description = :description')
-            ->andWhere('t.createdAt >= :since')
-            ->setParameter('account', $account)
-            ->setParameter('amount', $amount)
-            ->setParameter('description', $description)
-            ->setParameter('since', $since)
-            ->setMaxResults(1)
-            ->getQuery()
-            ->getOneOrNullResult();
     }
 
     private function formatAmountForMessage(string $amount, string $currency): string
