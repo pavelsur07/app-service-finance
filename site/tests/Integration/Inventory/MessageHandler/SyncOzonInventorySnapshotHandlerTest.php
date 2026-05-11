@@ -81,6 +81,8 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
             ->createSchemaManager()
             ->listTableColumns('inventory_raw_snapshots');
         self::assertArrayNotHasKey('connection_id', $columns);
+
+        self::assertGreaterThan(0, $this->countNormalizeMessages($session->getId(), $company->getId()));
     }
 
     public function testSuccessSeveralPagesSavesSeveralRawSnapshots(): void
@@ -114,6 +116,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
         self::assertStringContainsString('HTTP 500', (string) $session->getErrorMessage());
+        self::assertSame(0, $this->countNormalizeMessages($session->getId(), $company->getId()));
     }
 
     public function testErrorAfterFirstPageMarksPartialWithoutThrow(): void
@@ -132,6 +135,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Partial, $session->getStatus());
         self::assertCount(1, $this->findRawBySession($session->getId()));
+        self::assertSame(0, $this->countNormalizeMessages($session->getId(), $company->getId()));
     }
 
     public function testRateLimitBeforeFirstPageMarksFailedWithoutThrow(): void
@@ -193,4 +197,30 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
     {
         return $this->em->getRepository(InventoryRawSnapshot::class)->count([]);
     }
+
+
+    private function countNormalizeMessages(string $sessionId, string $companyId): int
+    {
+        $cnt = (int) $this->em->getConnection()->fetchOne(
+            "SELECT COUNT(*) FROM messenger_messages WHERE body LIKE :needle1 AND body LIKE :needle2 AND body LIKE :needle3",
+            [
+                'needle1' => '%NormalizeInventorySnapshotMessage%',
+                'needle2' => '%"snapshotSessionId":"'.$sessionId.'"%',
+                'needle3' => '%"companyId":"'.$companyId.'"%',
+            ],
+        );
+
+        $body = (string) $this->em->getConnection()->fetchOne(
+            "SELECT body FROM messenger_messages WHERE body LIKE :needle ORDER BY available_at DESC LIMIT 1",
+            ['needle' => '%NormalizeInventorySnapshotMessage%'],
+        );
+        if ($body !== '') {
+            self::assertStringContainsString('"source":"ozon"', $body);
+            self::assertStringNotContainsString('api_key', $body);
+            self::assertStringNotContainsString('client_id', $body);
+        }
+
+        return $cnt;
+    }
+
 }

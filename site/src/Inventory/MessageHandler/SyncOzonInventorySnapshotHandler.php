@@ -9,6 +9,7 @@ use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Exception\OzonInventoryRateLimitException;
 use App\Inventory\Infrastructure\Api\Ozon\OzonInventoryClient;
 use App\Inventory\Message\SyncOzonInventorySnapshotMessage;
+use App\Inventory\Message\NormalizeInventorySnapshotMessage;
 use App\Inventory\Repository\InventorySnapshotSessionRepository;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -16,6 +17,7 @@ use App\Marketplace\Facade\MarketplaceFacade;
 use App\Shared\Service\AppLogger;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 #[AsMessageHandler]
 final class SyncOzonInventorySnapshotHandler
@@ -28,6 +30,7 @@ final class SyncOzonInventorySnapshotHandler
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly OzonInventoryClient $ozonInventoryClient,
         private readonly EntityManagerInterface $entityManager,
+        private readonly MessageBusInterface $messageBus,
         private readonly AppLogger $logger,
     ) {
     }
@@ -122,6 +125,11 @@ final class SyncOzonInventorySnapshotHandler
 
             $session->markCompleted();
             $this->entityManager->flush();
+            $this->messageBus->dispatch(new NormalizeInventorySnapshotMessage(
+                companyId: $message->companyId,
+                snapshotSessionId: $session->getId(),
+                source: MarketplaceType::OZON->value,
+            ));
         } catch (OzonInventoryRateLimitException $e) {
             $this->logger->warning('Ozon inventory rate limit while fetching raw snapshots.', [
                 'snapshotSessionId' => $session->getId(),
