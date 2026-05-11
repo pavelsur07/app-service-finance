@@ -217,83 +217,169 @@ paths:
 
 ---
 
+## Обработка ошибок
+
+### Где живут исключения
+
+- Доменные исключения → `src/{Module}/Exception/`
+- Каждое исключение — `final class`, extends `\RuntimeException` или базовый `AppException`
+- Имя отражает причину: `DocumentNotFoundException`, `InsufficientBalanceException`
+
+### Поток исключений
+
+```
+Domain / Action бросает исключение
+    → ExceptionListener ловит (src/EventSubscriber/ или src/Shared/)
+    → Маппит в HTTP-статус + JSON-ответ
+    → Controller не содержит try/catch (кроме технических кейсов)
+```
+
+### Стандарт формата ошибок (вводим сейчас — новый код только так)
+
+```json
+{
+  "error": {
+    "code": "document_not_found",
+    "message": "Документ не найден"
+  }
+}
+```
+
+- `code` — snake_case-идентификатор, стабильный (фронт и интеграции на него завязываются)
+- `message` — человекочитаемый текст (можно показывать пользователю)
+- HTTP-статус несёт семантику: 404 / 422 / 403 / 500 — не всё в 200
+
+### Запрещено
+
+```
+try/catch с пустым телом          — глотать исключения молча нельзя
+throw new \Exception('ошибка')    — только конкретные доменные классы
+return null вместо исключения     — если сущность обязана существовать, бросить исключение
+```
+
+---
+
+## Логирование
+
+Стек: **Sentry** для ошибок. Monolog — только для структурированных INFO/DEBUG-событий локально.
+
+### Уровни
+
+| Уровень | Когда |
+|---|---|
+| `ERROR` | Необработанное исключение, сбой внешнего сервиса — Sentry отправляет алерт |
+| `WARNING` | Нештатное, но ожидаемое (retry, таймаут API, невалидный входящий вебхук) |
+| `INFO` | Бизнес-события: старт/финиш async-задачи, отправка документа, импорт завершён |
+| `DEBUG` | Только для локальной отладки, не должен попадать в прод |
+
+### Что логировать обязательно
+
+```
+- Старт и финиш каждого MessageHandler (с ID сообщения и companyId)
+- Внешние HTTP-запросы: метод, URL, HTTP-статус ответа, время (без тела)
+- Изменение критичных статусов Entity (смена статуса документа, закрытие периода)
+```
+
+### Что запрещено логировать
+
+```
+пароли, токены, API-ключи         — даже в DEBUG
+персональные данные (ФИО, ИНН)    — только если явно требуется и задокументировано
+тело HTTP-ответа внешних API       — только ID/статус, не весь payload
+```
+
+### Как инжектировать
+
+```php
+use Psr\Log\LoggerInterface;
+
+public function __construct(
+    private readonly LoggerInterface $logger,
+) {}
+```
+
+Sentry подхватывает ERROR автоматически через Monolog-handler — отдельно бросать в Sentry не нужно.
+
+---
+
+## Производительность
+
+### N+1 — запрещено
+
+```php
+// ❌ N+1: запрос в цикле
+foreach ($documents as $document) {
+    $counterparty = $this->counterpartyRepo->find($document->getCounterpartyId());
+}
+
+// ✅ Загрузить всё одним запросом через Query-класс с JOIN или WHERE IN
+$counterparties = $this->counterpartyQuery->findByIds($counterpartyIds, $companyId);
+```
+
+Обнаружил N+1 → исправь, прежде чем отдавать на ревью. Используй Symfony Profiler / `doctrine.debug` локально.
+
+### Пагинация — обязательна для списков
+
+Используем **Pagerfanta** (`pagerfanta/doctrine-dbal-adapter` или `doctrine-orm-adapter`).
+
+```php
+// Query-класс возвращает QueryBuilder, не массив:
+public function createByCompanyQueryBuilder(string $companyId): QueryBuilder
+{
+    return $this->connection->createQueryBuilder()
+        ->select('d.id, d.number, d.status')
+        ->from('document', 'd')
+        ->where('d.company_id = :companyId')
+        ->setParameter('companyId', $companyId);
+}
+```
+
+```php
+// В Controller:
+$qb = $this->documentQuery->createByCompanyQueryBuilder($company->getId());
+
+$adapter    = new DoctrineDbalAdapter($qb, /* countQueryModifier */);
+$pagerfanta = new Pagerfanta($adapter);
+$pagerfanta->setMaxPerPage(min((int) $request->query->get('limit', 50), 200));
+$pagerfanta->setCurrentPage(max(1, (int) $request->query->get('page', 1)));
+
+return $this->json([
+    'items'    => iterator_to_array($pagerfanta->getCurrentPageResults()),
+    'total'    => $pagerfanta->getNbResults(),
+    'pages'    => $pagerfanta->getNbPages(),
+    'page'     => $pagerfanta->getCurrentPage(),
+    'per_page' => $pagerfanta->getMaxPerPage(),
+]);
+```
+
+Параметры запроса: `?page=1&limit=50`
+
+- `limit` — максимум 200, дефолт 50; значения сверх лимита → 422
+- `setCurrentPage()` бросает `OutOfRangeCurrentPageException` — ловить в ExceptionListener → 422
+- Списочный endpoint без пагинации — **запрещено** (риск OOM на больших данных)
+- Query-класс отдаёт `QueryBuilder`, не `array` — иначе Pagerfanta не сможет сделать COUNT
+
+### Индексы при новых FK-полях
+
+Добавил `string $counterpartyId` в Entity → в миграции обязательно:
+
+```sql
+CREATE INDEX idx_document_counterparty_id ON document (counterparty_id);
+-- Составной индекс если фильтруем всегда по companyId + полю:
+CREATE INDEX idx_document_company_counterparty ON document (company_id, counterparty_id);
+```
+
+### Прочее
+
+```
+batch-операции (>100 записей)  — flush() каждые N итераций, не в конце цикла
+raw SQL с SELECT *             — запрещено (явное перечисление колонок)
+Query без companyId            — запрещено (IDOR + полный скан таблицы)
+```
+
+---
+
 ## После реализации
 
 Добавил Facade, Facade-метод или Enum → **обнови `ARCHITECTURE.md`**.
 Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
-
----
-
-## Что стоит добавить (рекомендации)
-
-### 1. Политика именования
-
-Явные соглашения убирают разночтения на code review:
-
-```
-Классы:    PascalCase
-Методы:    camelCase
-Таблицы:   snake_case (например: company_document)
-Enum кейсы: SCREAMING_SNAKE_CASE
-Файлы конфигов: kebab-case
-```
-
-### 2. Обработка ошибок
-
-```
-- Домен бросает доменные исключения (src/{Module}/Exception/)
-- Controller перехватывает через ExceptionListener → HTTP-ответ
-- В Action: не глотать исключения молча — либо бросить, либо залогировать
-- Logger инжектируется через LoggerInterface (Monolog PSR-3)
-```
-
-### 3. Валидация
-
-```
-- Валидация входных данных — через Symfony Validator (#[Assert\...]) в DTO
-- Доменные инварианты — в конструкторе / методах Entity
-- Нельзя валидировать бизнес-правила в Controller
-```
-
-### 4. Производительность и запросы
-
-```
-- N+1 запрос — запрещён; использовать JOIN или batch-загрузку
-- Raw SQL в Query-классах только с явным перечислением колонок
-- Индексы: создавать миграцией при добавлении нового FK-поля
-- Пагинация обязательна для любого списочного endpoint (limit/offset или cursor)
-```
-
-### 5. Миграции
-
-```
-- Только через Doctrine Migrations (bin/console doctrine:migrations:generate)
-- Нельзя менять уже применённую миграцию — создавать новую
-- Деструктивные операции (DROP COLUMN, DROP TABLE) — отдельная миграция с комментарием
-- Миграция не должна содержать бизнес-логику
-```
-
-### 6. API-контракт
-
-```
-- Изменение формата ответа — версионирование (/api/v2/...)
-- Новые поля — добавлять backward-compatible
-- Удаление полей — только через deprecation-период
-- Формат ошибок: {"error": {"code": "...", "message": "..."}}
-```
-
-### 7. Авторизация
-
-```
-- Проверка прав — через Symfony Voter, не if ($user->isAdmin()) в Controller
-- Новый ресурс → новый Voter в src/{Module}/Security/
-- Никогда не доверять ID из тела запроса для определения владельца (только из токена/сессии)
-```
-
-### 8. Логирование
-
-```
-- Уровни: DEBUG (отладка), INFO (бизнес-события), WARNING (нештатное), ERROR (сбой)
-- Логировать: старт/финиш async-задач, внешние HTTP-запросы, изменения критичных сущностей
-- Не логировать: пароли, токены, персональные данные
-```
