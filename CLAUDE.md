@@ -1,198 +1,205 @@
 # CLAUDE.md — VashFinDir
 
 > Этот файл читается Claude Code автоматически при старте.
-> Содержит правила и запреты. Паттерны с примерами кода → `PATTERNS.md`.
+> Паттерны с примерами кода → `PATTERNS.md`.
 
----
-
-## Файлы проекта
+## Карта файлов
 
 | Файл | Назначение | Когда читать |
 |---|---|---|
-| `CLAUDE.md` | Правила, запреты, чеклисты (backend) | Всегда автоматически |
-| `CLAUDE.frontend.md` | Правила React / TypeScript / Tabler | При любой frontend-задаче |
-| `PATTERNS.md` | Паттерны с примерами кода (backend) | По задаче, нужный раздел |
+| `CLAUDE.md` | Правила и запреты (backend PHP/Symfony) | Всегда автоматически |
+| `CLAUDE.frontend.md` | Правила React / TypeScript / Tabler | При фронтенд-задаче |
+| `PATTERNS.md` | Паттерны с примерами кода | По задаче, нужный раздел |
 | `ARCHITECTURE.md` | Живые данные: Facade, Enum, Entity | Перед написанием кода |
 
 ---
 
-## Задача на фронтенд?
+## Фронтенд-задача?
 
-Если задача касается React, TypeScript, Vite, Tabler, хуков, компонентов, entrypoints —
-пользователь укажет это явно в начале задачи одной из фраз:
+Если задача касается React / TypeScript / Vite / Tabler — пользователь укажет:
 
 ```
 Фронтенд задача. Читай CLAUDE.frontend.md
-Задача на React. Читай CLAUDE.frontend.md
-UI: читай CLAUDE.frontend.md
 ```
 
-При получении такой фразы:
-1. Прочитай `CLAUDE.frontend.md` полностью
-2. Правила ниже в этом файле для этой задачи **не применяются** — они только для PHP/Symfony
+→ Прочитай `CLAUDE.frontend.md` полностью. Правила ниже **не применяются** (только для PHP/Symfony).
 
 ---
 
-## Перед написанием любого кода (backend)
+## До написания любого backend-кода
 
 1. Прочитай `ARCHITECTURE.md` — актуальные Facade-методы, Enum-значения, статус Entity
-2. Уточни модуль если не указан явно
+2. Уточни модуль, если не указан явно
 3. Используй **только** Facade и Enum из `ARCHITECTURE.md` — не выдумывай
-4. Нет нужного Facade/метода — **спроси**, не создавай самостоятельно
-5. Нужен паттерн реализации → читай соответствующий раздел `PATTERNS.md`
+4. Нет нужного Facade/метода → **спроси**, не создавай самостоятельно
+5. Нужен паттерн → читай соответствующий раздел `PATTERNS.md`
 
 ---
 
-## Куда класть новый код
+## Структура файлов
 
 ### ✅ Разрешено
+
 ```
-src/{Module}/Controller/
-src/{Module}/Controller/Api/
-src/{Module}/Entity/
-src/{Module}/Repository/
-src/{Module}/Application/
-src/{Module}/Application/Command/
-src/{Module}/Application/DTO/
-src/{Module}/Application/Processor/
-src/{Module}/Application/Service/
-src/{Module}/Application/Source/
-src/{Module}/Domain/
-src/{Module}/Domain/ValueObject/
-src/{Module}/Domain/Service/
-src/{Module}/Infrastructure/
-src/{Module}/Infrastructure/Api/
-src/{Module}/Infrastructure/Query/
-src/{Module}/Infrastructure/Normalizer/
-src/{Module}/DTO/
-src/{Module}/Enum/
-src/{Module}/Facade/
-src/{Module}/Form/
-src/{Module}/Message/
-src/{Module}/MessageHandler/
-src/{Module}/EventSubscriber/
-src/{Module}/Exception/
-tests/Builders/{Module}/
+src/{Module}/Controller/          src/{Module}/Application/
+src/{Module}/Controller/Api/      src/{Module}/Application/Command/
+src/{Module}/Entity/              src/{Module}/Application/DTO/
+src/{Module}/Repository/          src/{Module}/Application/Processor/
+src/{Module}/Facade/              src/{Module}/Application/Service/
+src/{Module}/Enum/                src/{Module}/Application/Source/
+src/{Module}/Form/                src/{Module}/Domain/
+src/{Module}/DTO/                 src/{Module}/Domain/ValueObject/
+src/{Module}/Message/             src/{Module}/Domain/Service/
+src/{Module}/MessageHandler/      src/{Module}/Infrastructure/
+src/{Module}/EventSubscriber/     src/{Module}/Infrastructure/Api/
+src/{Module}/Exception/           src/{Module}/Infrastructure/Query/
+tests/Builders/{Module}/          src/{Module}/Infrastructure/Normalizer/
 ```
 
 ### ❌ Запрещено — legacy-зона, не создавать новые файлы
+
 ```
-src/Entity/
-src/Service/
-src/Repository/
-src/Controller/
+src/Entity/   src/Service/   src/Repository/   src/Controller/
 ```
 
 ---
 
-## Обязательные правила
+## Правила PHP
 
-### Каждый PHP-файл
+### Каждый файл
+
 ```php
 <?php
 
 declare(strict_types=1);
 ```
-`final class` по умолчанию · `readonly class` для DTO и stateless-сервисов · constructor injection `private readonly`
 
-**Исключение — Entity: только `class`, не `final class`.**
-Doctrine генерирует proxy-класс наследованием от Entity.
-`final` блокирует это → ошибка `"Cannot generate lazy ghost: class X is final"`.
+**Модификаторы классов:**
 
-Итого по модификаторам:
-- `class` — Entity
-- `final class` — Builder, Action, Policy, Controller, Facade, Repository, Query, Handler
-- `final readonly class` — DTO, Message, stateless-сервисы
-- `enum` — без `final`. PHP enum'ы implicitly final, `final enum` — синтаксическая ошибка.
+| Модификатор | Когда |
+|---|---|
+| `class` | Entity (Doctrine генерирует proxy наследованием — `final` ломает это) |
+| `final class` | Builder, Action, Controller, Facade, Repository, Query, Handler |
+| `final readonly class` | DTO, Message, stateless-сервисы |
+| `enum` | без `final` — PHP enum implicitly final, `final enum` — синтаксическая ошибка |
+
+Конструктор: `private readonly`, только constructor injection.
+
+---
 
 ### Entity — новые модули
-- UUID v7: `Uuid::uuid7()->toString()` — генерируется в **конструкторе Entity**
-- `#[ORM\Table(name: '...')]` — явное имя таблицы **всегда**
+
+- UUID v7: `Uuid::uuid7()->toString()` — в конструкторе Entity
+- `#[ORM\Table(name: '...')]` — явное имя таблицы всегда
 - `string $companyId` вместо `#[ManyToOne] Company $company`
 - `companyId` неизменяем (нет setter'а), валидируется через `Assert::uuid()`
 - Ссылки на Entity других модулей: `string $counterpartyId`, не `#[ManyToOne]`
 - `DateTimeImmutable` везде, не `DateTime`
-- Паттерн полностью → `PATTERNS.md` раздел 11
+- Паттерн → `PATTERNS.md` §11
+
+---
 
 ### Безопасность — IDOR (критично)
-- Каждый Repository-метод обязан принимать `string $companyId`
+
+- Каждый Repository-метод **обязан** принимать `string $companyId`
 - В контроллере всегда: `$company = $this->activeCompanyService->getActiveCompany()`
-- `$repo->find($id)` без company — **запрещено**, это IDOR-уязвимость
-- Паттерн полностью → `PATTERNS.md` раздел 14
+- `$repo->find($id)` без companyId — **запрещено** (IDOR-уязвимость)
+- Паттерн → `PATTERNS.md` §14
+
+---
 
 ### Controller
+
 - Один контроллер = один action = метод `__invoke`
 - Маршруты через `#[Route]` атрибуты, не YAML
 - Ноль бизнес-логики — только HTTP in/out
-- Паттерн полностью → `PATTERNS.md` раздел 2
+- Паттерн → `PATTERNS.md` §2
+
+---
 
 ### Action
+
 - `final class`, метод `__invoke`, без `Request`, без `Response`
 - `flush()` — только в Action, не в Repository
-- Паттерн полностью → `PATTERNS.md` раздел 3
+- Паттерн → `PATTERNS.md` §3
+
+---
 
 ### Facade
+
 - Единственная точка входа между модулями
 - Запрещено импортировать `Service/`, `Repository/`, `Application/`, `Infrastructure/` чужого модуля
-- Паттерн полностью → `PATTERNS.md` раздел 7
+- Паттерн → `PATTERNS.md` §7
+
+---
 
 ### Message (Messenger)
-- `readonly class` только с scalar ID — не Entity
-- Новый Message → добавить routing в `config/packages/messenger.yaml`
-- **Выбор транспорта обязателен** — ровно один из трёх:
-  - `async_sync` — внешние HTTP-запросы (marketplace/банк API, отправка email)
-  - `async_pipeline` — локальная обработка данных, DB-heavy (процессинг raw-документов, импорты, auto-rules, close-month, analytics recalc)
-  - `async_ads` — Ozon Performance polling (изолирован, т.к. handler может висеть до 10 минут)
-- Handler: нет `Request`/`Session`/`Security` — CLI-контекст
-- Паттерн полностью → `PATTERNS.md` раздел 10
 
-### Формы с данными чужого модуля
+- `readonly class` только со scalar ID — не Entity
+- Новый Message → добавить routing в `config/packages/messenger.yaml`
+- **Транспорт — ровно один:**
+
+| Транспорт | Когда |
+|---|---|
+| `async_sync` | Внешние HTTP-запросы (marketplace/банк API, email) |
+| `async_pipeline` | Локальная обработка данных, DB-heavy (импорты, analytics recalc) |
+| `async_ads` | Ozon Performance polling (handler может висеть до 10 мин) |
+
+- Handler: нет `Request`/`Session`/`Security` — CLI-контекст
+- Паттерн → `PATTERNS.md` §10
+
+---
+
+### Формы
+
 - `ChoiceType` с данными из Facade — не `EntityType` с чужой Entity
-- Паттерн полностью → `PATTERNS.md` раздел 8
+- Паттерн → `PATTERNS.md` §8
 
 ---
 
 ## Глобальные запреты
 
 ```
-dump() / dd() / var_dump()               — нельзя в коммитах
-new SomeService()                        — только constructor injection
-flush() в Repository                     — только в Action
-хардкод секретов / URL / API-ключей     — только через .env
-бизнес-логика в Controller               — вынести в Action
-бизнес-логика в Entity                   — только инварианты в конструкторе
-import Service/Repository из чужого модуля — только через Facade
-ManyToOne на Entity чужого модуля        — только string $entityId
-EntityType с чужой Entity в формах       — только ChoiceType + Facade
-SELECT * в raw SQL                        — явное перечисление колонок
-циклические зависимости между модулями   — нельзя
-getRepository() чужого модуля            — только через Facade
+dump() / dd() / var_dump()                — нельзя в коммитах
+new SomeService()                         — только constructor injection
+flush() в Repository                      — только в Action
+хардкод секретов / URL / API-ключей      — только через .env
+бизнес-логика в Controller                — вынести в Action
+бизнес-логика в Entity                    — только инварианты в конструкторе
+import Service/Repository чужого модуля   — только через Facade
+#[ManyToOne] на Entity чужого модуля      — только string $entityId
+EntityType с чужой Entity в формах        — только ChoiceType + Facade
+SELECT * в raw SQL                         — явное перечисление колонок
+циклические зависимости между модулями    — нельзя
+getRepository() чужого модуля             — только через Facade
 ```
 
 ---
 
-## Тесты — минимальные требования перед merge
+## Тесты — минимум перед merge
 
-- Новый Action → минимум один happy-path тест
-- Новый Domain Policy → unit-тесты на все ветки
-- Новая Entity → Builder в `tests/Builders/{Module}/`
-- Исправление бага → регрессионный тест
+| Что сделал | Что написать |
+|---|---|
+| Новый Action | happy-path тест |
+| Новый Domain Policy | unit-тесты на все ветки |
+| Новая Entity | Builder в `tests/Builders/{Module}/` |
+| Исправление бага | регрессионный тест |
 
-Паттерны тестов и Builder → `PATTERNS.md` разделы 16, 17
+Паттерны → `PATTERNS.md` §16, §17
 
 ---
 
-## Новый модуль — чеклист конфигурации
+## Новый модуль — конфигурация
 
 ```yaml
-# 1. config/routes.yaml
+# config/routes.yaml
 newmodule_controllers:
     resource:
         path: ../src/NewModule/Controller/
         namespace: App\NewModule\Controller
     type: attribute
 
-# 2. config/packages/doctrine.yaml
+# config/packages/doctrine.yaml
 NewModule:
     type: attribute
     is_bundle: false
@@ -200,21 +207,93 @@ NewModule:
     prefix: 'App\NewModule\Entity'
     alias: NewModule
 
-# 3. config/packages/messenger.yaml (если есть async Messages)
-#    Выбрать ровно ОДИН транспорт под характер задачи:
-#    - async_sync      — внешние HTTP (marketplace/банк API, email)
-#    - async_pipeline  — локальная обработка (DB/CPU, импорты, analytics)
-#    - async_ads       — Ozon Performance polling (изолирован)
+# config/packages/messenger.yaml (если есть async Messages)
 App\NewModule\Message\SomeMessage: async_pipeline
 
-# 4. config/packages/twig.yaml (если есть шаблоны)
+# config/packages/twig.yaml (если есть шаблоны)
 paths:
     '%kernel.project_dir%/templates/newmodule': NewModule
 ```
 
 ---
 
-## После реализации — обязательно
+## После реализации
 
-Добавил новый Facade, Facade-метод или Enum → **обнови `ARCHITECTURE.md`**.
+Добавил Facade, Facade-метод или Enum → **обнови `ARCHITECTURE.md`**.
 Это источник правды для Projects-чатов. Без обновления — Projects будет выдумывать интерфейсы.
+
+---
+
+## Что стоит добавить (рекомендации)
+
+### 1. Политика именования
+
+Явные соглашения убирают разночтения на code review:
+
+```
+Классы:    PascalCase
+Методы:    camelCase
+Таблицы:   snake_case (например: company_document)
+Enum кейсы: SCREAMING_SNAKE_CASE
+Файлы конфигов: kebab-case
+```
+
+### 2. Обработка ошибок
+
+```
+- Домен бросает доменные исключения (src/{Module}/Exception/)
+- Controller перехватывает через ExceptionListener → HTTP-ответ
+- В Action: не глотать исключения молча — либо бросить, либо залогировать
+- Logger инжектируется через LoggerInterface (Monolog PSR-3)
+```
+
+### 3. Валидация
+
+```
+- Валидация входных данных — через Symfony Validator (#[Assert\...]) в DTO
+- Доменные инварианты — в конструкторе / методах Entity
+- Нельзя валидировать бизнес-правила в Controller
+```
+
+### 4. Производительность и запросы
+
+```
+- N+1 запрос — запрещён; использовать JOIN или batch-загрузку
+- Raw SQL в Query-классах только с явным перечислением колонок
+- Индексы: создавать миграцией при добавлении нового FK-поля
+- Пагинация обязательна для любого списочного endpoint (limit/offset или cursor)
+```
+
+### 5. Миграции
+
+```
+- Только через Doctrine Migrations (bin/console doctrine:migrations:generate)
+- Нельзя менять уже применённую миграцию — создавать новую
+- Деструктивные операции (DROP COLUMN, DROP TABLE) — отдельная миграция с комментарием
+- Миграция не должна содержать бизнес-логику
+```
+
+### 6. API-контракт
+
+```
+- Изменение формата ответа — версионирование (/api/v2/...)
+- Новые поля — добавлять backward-compatible
+- Удаление полей — только через deprecation-период
+- Формат ошибок: {"error": {"code": "...", "message": "..."}}
+```
+
+### 7. Авторизация
+
+```
+- Проверка прав — через Symfony Voter, не if ($user->isAdmin()) в Controller
+- Новый ресурс → новый Voter в src/{Module}/Security/
+- Никогда не доверять ID из тела запроса для определения владельца (только из токена/сессии)
+```
+
+### 8. Логирование
+
+```
+- Уровни: DEBUG (отладка), INFO (бизнес-события), WARNING (нештатное), ERROR (сбой)
+- Логировать: старт/финиш async-задач, внешние HTTP-запросы, изменения критичных сущностей
+- Не логировать: пароли, токены, персональные данные
+```
