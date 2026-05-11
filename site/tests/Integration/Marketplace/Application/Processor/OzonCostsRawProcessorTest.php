@@ -17,6 +17,7 @@ use App\Tests\Builders\Company\CompanyBuilder;
 use App\Tests\Builders\Company\UserBuilder;
 use App\Tests\Builders\Marketplace\MarketplaceRawDocumentBuilder;
 use App\Tests\Support\Kernel\IntegrationTestCase;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Ramsey\Uuid\Uuid;
 
@@ -301,40 +302,40 @@ final class OzonCostsRawProcessorTest extends IntegrationTestCase
             'companyIds' => $companyIds,
             'costRawDocumentIds' => $costRawDocumentIds,
         ], [
-            'companyIds' => Connection::PARAM_STR_ARRAY,
-            'costRawDocumentIds' => Connection::PARAM_STR_ARRAY,
+            'companyIds' => ArrayParameterType::STRING,
+            'costRawDocumentIds' => ArrayParameterType::STRING,
         ]);
 
         $this->connection->executeStatement('DELETE FROM marketplace_raw_documents WHERE company_id IN (:companyIds) OR id IN (:rawDocumentIds)', [
             'companyIds' => $companyIds,
             'rawDocumentIds' => $rawDocumentIds,
         ], [
-            'companyIds' => Connection::PARAM_STR_ARRAY,
-            'rawDocumentIds' => Connection::PARAM_STR_ARRAY,
+            'companyIds' => ArrayParameterType::STRING,
+            'rawDocumentIds' => ArrayParameterType::STRING,
         ]);
 
         $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE company_id IN (:companyIds)', $documentTable), [
             'companyIds' => $companyIds,
         ], [
-            'companyIds' => Connection::PARAM_STR_ARRAY,
+            'companyIds' => ArrayParameterType::STRING,
         ]);
 
         $this->connection->executeStatement('DELETE FROM marketplace_listings WHERE company_id IN (:companyIds)', [
             'companyIds' => $companyIds,
         ], [
-            'companyIds' => Connection::PARAM_STR_ARRAY,
+            'companyIds' => ArrayParameterType::STRING,
         ]);
 
         $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:companyIds)', $companyTable), [
             'companyIds' => $companyIds,
         ], [
-            'companyIds' => Connection::PARAM_STR_ARRAY,
+            'companyIds' => ArrayParameterType::STRING,
         ]);
 
         $this->connection->executeStatement(sprintf('DELETE FROM %s WHERE id IN (:userIds)', $userTable), [
             'userIds' => array_values(array_filter($userIds)),
         ], [
-            'userIds' => Connection::PARAM_STR_ARRAY,
+            'userIds' => ArrayParameterType::STRING,
         ]);
     }
 

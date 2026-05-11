@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Query;
 
 use App\Marketplace\Enum\MarketplaceType;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 
 final readonly class MarketplaceSaleExistingExternalIdsQuery
@@ -44,7 +45,7 @@ final readonly class MarketplaceSaleExistingExternalIdsQuery
                     'ids' => $externalIds,
                 ],
                 [
-                    'ids' => Connection::PARAM_STR_ARRAY,
+                    'ids' => ArrayParameterType::STRING,
                 ],
             )->fetchFirstColumn(),
         );

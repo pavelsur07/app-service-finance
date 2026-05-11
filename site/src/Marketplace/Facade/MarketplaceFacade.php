@@ -23,6 +23,7 @@ use App\Marketplace\Infrastructure\Query\MarketplaceCredentialsQuery;
 use App\Marketplace\Repository\MarketplaceAdvertisingCostRepositoryInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceOrderRepositoryInterface;
+use Doctrine\DBAL\ArrayParameterType;
 use Doctrine\DBAL\Connection;
 use Webmozart\Assert\Assert;
 
@@ -361,7 +362,7 @@ final readonly class MarketplaceFacade
                 'marketplace'     => $marketplace,
                 'marketplaceSkus' => array_values(array_unique($marketplaceSkus)),
             ],
-            ['marketplaceSkus' => Connection::PARAM_STR_ARRAY],
+            ['marketplaceSkus' => ArrayParameterType::STRING],
         );
 
         $result = [];
@@ -403,7 +404,7 @@ final readonly class MarketplaceFacade
                 'listingIds' => $listingIds,
                 'date'       => $date->format('Y-m-d'),
             ],
-            ['listingIds' => Connection::PARAM_STR_ARRAY],
+            ['listingIds' => ArrayParameterType::STRING],
         );
 
         $result = [];
