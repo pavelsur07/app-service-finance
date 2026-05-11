@@ -8,6 +8,9 @@ use App\Cash\Enum\Transaction\CashDirection;
 
 final readonly class CreateCashTransactionCommand
 {
+    /**
+     * @param array<string, mixed>|null $rawData
+     */
     public function __construct(
         public string $companyId,
         public string $moneyAccountId,
