@@ -63,6 +63,7 @@ framework:
             'App\MarketplaceAnalytics\Message\RecalcSnapshotsMessage': async_pipeline
             'App\MarketplaceAds\Message\ProcessAdRawDocumentMessage': async_pipeline
             'App\MarketplaceAds\Message\DownloadOzonAdReportMessage': async_pipeline
+            'App\Inventory\Message\NormalizeInventorySnapshotMessage': async_pipeline
 
             # --- async_ads: Ozon Performance polling (may block up to 10 min per message) ---
             'App\MarketplaceAds\Message\LoadOzonAdStatisticsRangeMessage': async_ads
