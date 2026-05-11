@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.46 / 2026-05-11
+> Версия: 1.47 / 2026-05-11
 
 ---
 
@@ -25,6 +25,7 @@
 | `Analytics` | Аналитические запросы и дашборды | — |
 | `MarketplaceAnalytics` | Аналитика маркетплейсов (витрина) | — |
 | `MarketplaceAds` | Рекламные отчёты WB/Ozon: загрузка raw → распределение затрат | `string $companyId` ✅ |
+| `Inventory` | Загрузка raw-остатков маркетплейсов, нормализация в StockSnapshot, UI-отчёт остатков | `string $companyId` ✅ |
 | `Notification` | Каналы уведомлений (email и др.) | — |
 | `Shared` | Общий код: ActiveCompanyService, аудит, безопасность, storage | — |
 | `Admin` | Административная панель (отдельный firewall) | — |
@@ -59,6 +60,10 @@
 | `AdChunkProgress` | MarketplaceAds | через `jobId` (IDOR через AdLoadJob) |
 | `OzonAdPendingReport` | MarketplaceAds | `string $companyId` ✅ |
 | `AdScheduledBatch` | MarketplaceAds | `string $companyId` ✅ |
+| `InventorySnapshotSession` | Inventory | `string $companyId` ✅ |
+| `InventoryRawSnapshot` | Inventory | `string $companyId` ✅ |
+| `Location` | Inventory | `string $companyId` ✅ |
+| `StockSnapshot` | Inventory | `string $companyId` ✅ |
 | `ProductImport` | Catalog | `string $companyId` ✅ |
 | `ProductBarcode` | Catalog | `string $companyId` ✅ |
 | `ProductPurchasePrice` | Catalog | `string $companyId` ✅ |
@@ -102,6 +107,106 @@
 | `createdAt` / `updatedAt` | `DateTimeImmutable` | — |
 
 **Уникальность:** `UniqueConstraint` по `(company_id, marketplace, connection_type)` — одна компания может иметь два подключения к одному маркетплейсу (Seller + Performance), но только по одному каждого типа.
+
+### `InventorySnapshotSession` — поля
+
+- `id` — UUID;
+- `companyId` — string UUID;
+- `source` — `MarketplaceType`;
+- `status` — `SnapshotSessionStatus`;
+- `triggerType` — `SnapshotTriggerType`;
+- `triggeredBy` — UUID пользователя (для manual-trigger), nullable;
+- `expectedPages` — ожидаемое число страниц, nullable;
+- `receivedPages` — число сохранённых raw-страниц;
+- `errorMessage` — текст ошибки для `partial/failed`;
+- `correlationId` — UUID трассировки;
+- `startedAt` — время старта загрузки;
+- `finishedAt` — фактическое поле `completedAt`;
+- `requestParams` на уровне session в текущей реализации отсутствует; технические параметры (включая `connectionId`) фиксируются в `InventoryRawSnapshot.requestParams`;
+- `createdAt` / `updatedAt`.
+
+Семантика:
+- одна session = одна raw-загрузка;
+- только `completed` session становится входом для async-normalization;
+- `partial` / `failed` автоматически не нормализуются.
+
+### `InventoryRawSnapshot` — поля
+
+- `id`;
+- `companyId`;
+- `snapshotSessionId`;
+- `source`;
+- `sourceEndpoint`;
+- `requestParams`;
+- `responseStatus`;
+- `responseBody`;
+- `fetchedAt`;
+- `fetchDurationMs`;
+- `correlationId`;
+- `pageNumber`;
+- `isProcessed`;
+- `processedAt`;
+- `processingError`;
+- `createdAt`.
+
+Семантика:
+- хранит raw-страницу ответа Ozon;
+- raw JSON используется для диагностики и повторной нормализации;
+- raw-слой не используется напрямую UI-отчётом остатков.
+
+### `StockSnapshot` — поля
+
+| Поле | Тип | Описание |
+|---|---|---|
+| `id` | `string` UUID | PK |
+| `companyId` | `string` UUID | IDOR-ключ |
+| `snapshotSessionId` | `string` UUID | Ссылка на InventorySnapshotSession |
+| `snapshotDate` | `DateTimeImmutable/date` | День snapshot |
+| `snapshotAt` | `DateTimeImmutable` | Точное время snapshot |
+| `locationId` | `string` UUID | Ссылка на Inventory Location |
+| `source` | `MarketplaceType` | Источник: сейчас Ozon |
+| `sourceSku` | `string` | SKU источника, для Ozon = `stocks[].sku` |
+| `sourceOfferId` | `?string` | Для Ozon = `item.offer_id` |
+| `fulfillmentType` | `?string` | Для Ozon = `stocks[].type` (`fbo`, `fbs`, `rfbs`) |
+| `listingId` | `?string` UUID | ID MarketplaceListing, если найден |
+| `productId` | `?string` UUID | Product ID, если listing связан с товаром |
+| `status` | `StockStatus` | Для этапа 1 всегда `Available` |
+| `mappingStatus` | `StockSnapshotMappingStatus` | `mapped` / `unmapped` / `ambiguous` |
+| `quantity` | `numeric(14,3)` | Для Ozon = `stocks[].present` |
+| `reservedQuantity` | `numeric(14,3)` | Для Ozon = `stocks[].reserved` |
+| `rawSnapshotId` | `string` UUID | Ссылка на raw page |
+| `createdAt` | `DateTimeImmutable` | — |
+
+Зафиксировано:
+- `availableForSale` не хранится в БД;
+- `availableForSale = quantity - reservedQuantity` считается в Query/UI;
+- `reserved` не является отдельным `StockStatus`;
+- `StockStatus::Reserved` не существует и не добавляется на этапе 1.
+
+**Уникальность StockSnapshot (этап 1):**
+- `company_id`
+- `snapshot_date`
+- `source`
+- `source_sku`
+- `fulfillment_type`
+- `location_id`
+- `status`
+
+Почему так:
+- `source_sku` обязателен в ключе, чтобы unmapped SKU за один день не конфликтовали;
+- `listing_id` и `product_id` могут быть `null`, это ненадёжный ключ идемпотентности;
+- upsert выполняется по day-level snapshot key.
+
+### `Location` — Inventory
+
+- используется как универсальная локация остатка;
+- на этапе 1 для Ozon создаются агрегированные технические локации по fulfillment bucket:
+  - `fbo`;
+  - `fbs`;
+  - `rfbs`;
+  - `unknown` (если `fulfillmentType` отсутствует);
+- это summary-location первого этапа, не детализация по складам Ozon;
+- складская детализация — отдельный этап.
 
 ### `AdLoadJob` — поля
 
@@ -424,6 +529,9 @@ findListingsByMarketplaceSku(string $companyId, string $marketplace, string $mar
 // @return array<string, list<array{id: string, parentSku: string}>> parentSku => listings
 findListingsByMarketplaceSkus(string $companyId, string $marketplace, array $marketplaceSkus): array
 
+// Inventory использует этот метод как первый шаг маппинга:
+// sourceSku → listings (0 => unmapped, 1 => mapped, >1 => ambiguous)
+
 // Bulk-запрос продаж для набора листингов за одну дату (GROUP BY listing_id)
 // Листинги без продаж отсутствуют в результате (caller сам подставляет 0)
 // @param  string[]           $listingIds
@@ -456,6 +564,12 @@ getActiveOzonSellerConnections(?string $companyId = null): array
 // @return array<string, string|null> map listingId → productId|null
 resolveListingsToProducts(string $companyId, array $listingIds): array
 ```
+
+**Inventory mapping-контракт через Facade:**
+- `sourceSku` → `MarketplaceFacade::findListingsByMarketplaceSkus(companyId, marketplace, sourceSkus)`;
+- найденные `listingId` → `MarketplaceFacade::resolveListingsToProducts(companyId, listingIds)`;
+- Inventory не импортирует напрямую Marketplace repository/service;
+- связь с MarketplaceListing в `StockSnapshot` хранится как `listingId: ?string` (без ManyToOne).
 
 ---
 
@@ -1000,6 +1114,24 @@ buildQueryBuilder(
 ): \Doctrine\DBAL\Query\QueryBuilder
 ```
 
+## Query — Inventory
+
+### `InventoryStockReportQuery`
+
+- DBAL read-model для `GET /inventory/stocks`;
+- обязательный IDOR-фильтр `company_id = :companyId`;
+- `source` фильтруется через `MarketplaceType`;
+- `mappingStatus` фильтруется через `StockSnapshotMappingStatus`;
+- поддерживает фильтры:
+  - `snapshotSessionId`;
+  - `snapshotAt`;
+  - `source`;
+  - `search` по `sourceSku` / `sourceOfferId`;
+  - `mappingStatus`;
+- pagination через Pagerfanta;
+- `available_for_sale = quantity - reserved_quantity`;
+- `SELECT *` не используется.
+
 **Потребители:**
 - `MarketplaceSalesController` (`GET /marketplace/sales`, route `marketplace_sales_index`) —
   оборачивает `QueryBuilder` в `Pagerfanta\Doctrine\DBAL\QueryAdapter`, per_page=50.
@@ -1066,6 +1198,70 @@ enum AdvertisingType: string
     case CPC = 'cpc';
     case OTHER = 'other';
     case EXTERNAL = 'external';
+}
+```
+
+### `src/Inventory/Enum/SnapshotSessionStatus.php`
+```php
+enum SnapshotSessionStatus: string
+{
+    case Pending = 'pending';
+    case InProgress = 'in_progress';
+    case Completed = 'completed';
+    case Partial = 'partial';
+    case Failed = 'failed';
+}
+```
+
+### `src/Inventory/Enum/SnapshotTriggerType.php`
+```php
+enum SnapshotTriggerType: string
+{
+    case ScheduledNight = 'scheduled_night';
+    case ScheduledDay = 'scheduled_day';
+    case Manual = 'manual';
+    case Retry = 'retry';
+}
+```
+
+### `src/Inventory/Enum/StockStatus.php`
+```php
+enum StockStatus: string
+{
+    case Available = 'available';
+    case InTransitToCustomer = 'in_transit_to_customer';
+    case InTransitFromCustomer = 'in_transit_from_customer';
+    case OnAcceptance = 'on_acceptance';
+    case Defect = 'defect';
+    case Blocked = 'blocked';
+}
+```
+
+Важно: `reserved` не является значением `StockStatus`.
+
+### `src/Inventory/Enum/StockSnapshotMappingStatus.php`
+```php
+enum StockSnapshotMappingStatus: string
+{
+    case Unmapped = 'unmapped';
+    case Mapped = 'mapped';
+    case Ambiguous = 'ambiguous';
+}
+```
+
+Семантика:
+- `unmapped` — по `sourceSku` не найден `MarketplaceListing`;
+- `mapped` — найден ровно один `MarketplaceListing`;
+- `ambiguous` — найдено больше одного `MarketplaceListing`, автоматически не выбираем.
+
+### `src/Inventory/Enum/LocationType.php`
+```php
+enum LocationType: string
+{
+    case MpWarehouse = 'mp_warehouse';
+    case MpAcceptance = 'mp_acceptance';
+    case MpInTransitToCustomer = 'mp_in_transit_to_customer';
+    case MpInTransitFromCustomer = 'mp_in_transit_from_customer';
 }
 ```
 
@@ -1421,6 +1617,69 @@ POST /api/{module}/{resource}          — API создание
 GET  /api/public/{resource}?token=...  — публичный API
 ```
 
+### Inventory routes
+
+- `GET /inventory/snapshots` — список raw-загрузок;
+- `POST /inventory/snapshots/request` — ручной запуск raw-загрузки;
+- `GET /inventory/snapshots/{id}/json` — raw JSON по session;
+- `GET /inventory/stocks` — UI-отчёт по нормализованным остаткам.
+
+## Inventory — Ozon stock normalization
+
+Первый этап Inventory для Ozon:
+
+```text
+SyncOzonInventorySnapshotMessage (async_sync)
+↓
+SyncOzonInventorySnapshotHandler
+↓ Ozon Seller API POST /v4/product/info/stocks
+InventoryRawSnapshot
+↓ completed session
+NormalizeInventorySnapshotMessage (async_pipeline)
+↓
+NormalizeInventorySnapshotHandler
+↓
+NormalizeInventorySnapshotAction
+↓
+OzonProductStocksRawNormalizer
+↓
+StockSnapshot
+↓
+GET /inventory/stocks
+```
+
+Семантика Ozon:
+- `stocks[].sku` → `StockSnapshot.sourceSku`;
+- `item.offer_id` → `StockSnapshot.sourceOfferId`;
+- `stocks[].type` → `StockSnapshot.fulfillmentType`;
+- `stocks[].present` → `StockSnapshot.quantity`;
+- `stocks[].reserved` → `StockSnapshot.reservedQuantity`;
+- `status = StockStatus::Available`;
+- `source = MarketplaceType::OZON`;
+- `availableForSale = quantity - reservedQuantity` считается в Query/UI.
+
+Маппинг:
+- `sourceSku` ищется в MarketplaceListing через MarketplaceFacade;
+- 0 листингов → `StockSnapshotMappingStatus::Unmapped`;
+- 1 листинг → `StockSnapshotMappingStatus::Mapped`;
+- >1 листинга → `StockSnapshotMappingStatus::Ambiguous`;
+- при orphan listing `productId = null`, но `mappingStatus = mapped`.
+
+Ограничение этапа:
+- не покрывает остатки по каждому складу Ozon;
+- не покрывает товары в пути к клиенту;
+- не покрывает возвраты от клиента;
+- эти потоки добавляются отдельными загрузками/normalizer-ами.
+
+## Messenger routing — Inventory
+
+- `App\Inventory\Message\SyncOzonInventorySnapshotMessage` → `async_sync`;
+- `App\Inventory\Message\NormalizeInventorySnapshotMessage` → `async_pipeline`.
+
+Объяснение:
+- `SyncOzonInventorySnapshotMessage` выполняет внешний HTTP-запрос к Ozon;
+- `NormalizeInventorySnapshotMessage` выполняет локальную DB-heavy обработку raw JSON.
+
 ---
 
 ## Redis — три назначения
@@ -1519,6 +1778,7 @@ paths:
 | `app:marketplace-ads:finalizer` | `* * * * *` | RUNNING jobs → COMPLETED / FAILED / PARTIAL_SUCCESS |
 | `app:marketplace-ads:ozon-poll-reports` | `*/2 * * * *` | Legacy Messenger-pipeline: per-UUID polling (оставлен до Task-11.9b) |
 | `app:marketplace:daily-sync` | `04:30 daily` | Диспатч загрузки данных по активным подключениям |
+| `app:inventory:ozon-daily-sync` | `04:05 daily` | Диспатч загрузки Ozon Inventory snapshot по активным Ozon SELLER подключениям |
 
 **Правила для новых cron-команд:**
 - Класс в `src/{Module}/Command/`, `final class`, `#[AsCommand]`
@@ -1561,6 +1821,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |
 | 1.46 | 2026-05-11 | Cash/Telegram: добавлен публичный контракт `CashFacade::createTransaction()` и зафиксировано идемпотентное создание Telegram-транзакций через `importSource`/`externalId` |
 | 1.45 | 2026-05-10 | `MarketplaceFacade::getActiveOzonSellerConnections()` — безопасный публичный контракт без секретов |
 | 1.44 | 2026-04-28 | `MarketplaceFacade::resolveListingsToProducts()` — batch резолв listingId→productId для Inventory |
@@ -1589,3 +1850,6 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 | 2026-04-23 | MarketplaceAds | `FOR UPDATE SKIP LOCKED` в `findNextPlanned()` | Защита от race condition при параллельных cron-тиках |
 | 2026-04-23 | MarketplaceAds | `pollOneReport()` вместо `/statistics/list` | Инцидент 23.04.2026: list возвращал total=0 при реальных OK отчётах |
 | 2026-04-27 | Marketplace | Откат soft-mode в `CloseMonthStageAction` | Preflight должен быть строгим; soft-режим создавал непредсказуемые результаты |
+| 2026-05-11 | Inventory | `present` хранится как `quantity`, `reserved` как `reservedQuantity`, без `StockStatus::Reserved` | `reserved` — количественная компонента текущего остатка, а не отдельное физическое состояние товара |
+| 2026-05-11 | Inventory | Нормализация raw snapshot запускается через `async_pipeline` после completed raw-загрузки | Raw-загрузка = внешний HTTP, нормализация = локальная DB-heavy обработка |
+| 2026-05-11 | Inventory | Маппинг Inventory → Marketplace идёт через MarketplaceFacade по `sourceSku` | Соблюдение границ модулей и запрет прямого импорта Marketplace repository/service |
