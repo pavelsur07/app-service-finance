@@ -75,19 +75,44 @@ class CashTransactionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
-    public function findOneByImport(string $companyId, string $source, string $externalId): ?CashTransaction
+    public function findOneByCompanyImportSourceExternalId(string $companyId, string $importSource, string $externalId): ?CashTransaction
     {
         return $this->createQueryBuilder('t')
             ->andWhere('IDENTITY(t.company) = :companyId')
-            ->andWhere('t.importSource = :source')
+            ->andWhere('t.importSource = :importSource')
             ->andWhere('t.externalId = :externalId')
             ->andWhere('t.deletedAt IS NULL')
             ->setMaxResults(1)
             ->setParameter('companyId', $companyId)
-            ->setParameter('source', $source)
+            ->setParameter('importSource', $importSource)
             ->setParameter('externalId', $externalId)
             ->getQuery()
             ->getOneOrNullResult();
+    }
+
+    public function findOneByImport(string $companyId, string $source, string $externalId): ?CashTransaction
+    {
+        return $this->findOneByCompanyImportSourceExternalId($companyId, $source, $externalId);
+    }
+
+
+
+    public function findIdByCompanyImportSourceExternalIdDbal(string $companyId, string $importSource, string $externalId): ?string
+    {
+        $id = $this->getEntityManager()->getConnection()->fetchOne(
+            'SELECT id FROM cash_transaction WHERE company_id = :companyId AND import_source = :importSource AND external_id = :externalId AND deleted_at IS NULL LIMIT 1',
+            [
+                'companyId' => $companyId,
+                'importSource' => $importSource,
+                'externalId' => $externalId,
+            ],
+        );
+
+        if (false === $id || null === $id) {
+            return null;
+        }
+
+        return (string) $id;
     }
 
     public function findActiveByCompanyAccountExternalId(

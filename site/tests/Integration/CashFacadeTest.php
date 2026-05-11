@@ -47,7 +47,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $this->em->persist($counterparty);
         $this->em->flush();
 
-        $id = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+        $result = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
             companyId: $company->getId(),
             moneyAccountId: $account->getId(),
             direction: CashDirection::INFLOW,
@@ -58,8 +58,10 @@ final class CashFacadeTest extends IntegrationTestCase
             counterpartyId: $counterparty->getId(),
         ));
 
-        $saved = $this->cashTransactionRepository->find($id);
+        $saved = $this->cashTransactionRepository->find($result->transactionId);
 
+        self::assertTrue($result->created);
+        self::assertFalse($result->duplicate);
         self::assertNotNull($saved);
         self::assertSame('Facade tx', $saved->getDescription());
         self::assertSame($counterparty->getId(), $saved->getCounterparty()?->getId());
@@ -90,7 +92,7 @@ final class CashFacadeTest extends IntegrationTestCase
             'text' => 'расход 100 такси',
         ];
 
-        $id = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+        $result = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
             companyId: $company->getId(),
             moneyAccountId: $account->getId(),
             direction: CashDirection::OUTFLOW,
@@ -104,8 +106,10 @@ final class CashFacadeTest extends IntegrationTestCase
             rawData: $rawData,
         ));
 
-        $saved = $this->cashTransactionRepository->find($id);
+        $saved = $this->cashTransactionRepository->find($result->transactionId);
 
+        self::assertTrue($result->created);
+        self::assertFalse($result->duplicate);
         self::assertNotNull($saved);
         self::assertSame('telegram', $saved->getImportSource());
         self::assertSame('telegram:test', $saved->getExternalId());
@@ -127,7 +131,7 @@ final class CashFacadeTest extends IntegrationTestCase
         $this->em->persist($account);
         $this->em->flush();
 
-        $id = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+        $result = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
             companyId: $company->getId(),
             moneyAccountId: $account->getId(),
             direction: CashDirection::OUTFLOW,
@@ -137,12 +141,113 @@ final class CashFacadeTest extends IntegrationTestCase
             description: 'No import fields',
         ));
 
-        $saved = $this->cashTransactionRepository->find($id);
+        $saved = $this->cashTransactionRepository->find($result->transactionId);
 
+        self::assertTrue($result->created);
+        self::assertFalse($result->duplicate);
         self::assertNotNull($saved);
         self::assertNull($saved->getImportSource());
         self::assertNull($saved->getExternalId());
         self::assertNull($saved->getDedupeHash());
         self::assertSame([], $saved->getRawData());
     }
+
+    public function testCreateTransactionReturnsDuplicateForSameImportSourceAndExternalId(): void
+    {
+        $user = UserBuilder::aUser()->withEmail('facade4@example.com')->withPasswordHash('pass')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->withName('Facade Company 4')->build();
+
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $account->setOpeningBalance('0');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $first = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '100.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-10'),
+            description: 'Telegram tx',
+            importSource: 'telegram',
+            externalId: 'telegram:dedupe',
+        ));
+
+        $second = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '100.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-10'),
+            description: 'Telegram tx duplicate delivery',
+            importSource: 'telegram',
+            externalId: 'telegram:dedupe',
+        ));
+
+        self::assertTrue($first->created);
+        self::assertFalse($first->duplicate);
+        self::assertFalse($second->created);
+        self::assertTrue($second->duplicate);
+        self::assertSame($first->transactionId, $second->transactionId);
+
+        $rows = $this->cashTransactionRepository->findBy([
+            'company' => $company,
+            'importSource' => 'telegram',
+            'externalId' => 'telegram:dedupe',
+        ]);
+
+        self::assertCount(1, $rows);
+    }
+
+    public function testCreateTransactionDoesNotTreatDifferentExternalIdsAsDuplicate(): void
+    {
+        $user = UserBuilder::aUser()->withEmail('facade5@example.com')->withPasswordHash('pass')->build();
+        $company = CompanyBuilder::aCompany()->withOwner($user)->withName('Facade Company 5')->build();
+
+        $account = new MoneyAccount(Uuid::uuid4()->toString(), $company, MoneyAccountType::BANK, 'Main', 'USD');
+        $account->setOpeningBalance('0');
+        $account->setOpeningBalanceDate(new \DateTimeImmutable('2024-01-01'));
+
+        $this->em->persist($user);
+        $this->em->persist($company);
+        $this->em->persist($account);
+        $this->em->flush();
+
+        $first = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '250.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-11'),
+            description: 'Taxi',
+            importSource: 'telegram',
+            externalId: 'telegram:100',
+        ));
+
+        $second = $this->cashFacade->createTransaction(new CreateCashTransactionCommand(
+            companyId: $company->getId(),
+            moneyAccountId: $account->getId(),
+            direction: CashDirection::OUTFLOW,
+            amount: '250.00',
+            currency: 'USD',
+            occurredAt: new \DateTimeImmutable('2024-03-11'),
+            description: 'Taxi',
+            importSource: 'telegram',
+            externalId: 'telegram:101',
+        ));
+
+        self::assertTrue($first->created);
+        self::assertTrue($second->created);
+        self::assertFalse($first->duplicate);
+        self::assertFalse($second->duplicate);
+        self::assertNotSame($first->transactionId, $second->transactionId);
+    }
+
 }

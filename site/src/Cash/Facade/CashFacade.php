@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Cash\Facade;
 
 use App\Cash\Application\DTO\CreateCashTransactionCommand;
+use App\Cash\Application\DTO\CreateCashTransactionResult;
 use App\Cash\DTO\CashTransactionDTO;
+use App\Cash\Repository\Transaction\CashTransactionRepository;
 use App\Cash\Service\Transaction\CashTransactionService;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 final readonly class CashFacade
 {
     public function __construct(
         private CashTransactionService $cashTransactionService,
+        private CashTransactionRepository $cashTransactionRepository,
     ) {}
 
-    public function createTransaction(CreateCashTransactionCommand $command): string
+    public function createTransaction(CreateCashTransactionCommand $command): CreateCashTransactionResult
     {
         $dto = new CashTransactionDTO();
         $dto->companyId = $command->companyId;
@@ -32,8 +36,45 @@ final readonly class CashFacade
         $dto->dedupeHash = $command->dedupeHash;
         $dto->rawData = $command->rawData;
 
-        $transaction = $this->cashTransactionService->add($dto);
+        $existing = $this->findExistingByImport($command);
+        if (null !== $existing) {
+            return new CreateCashTransactionResult((string) $existing->getId(), false, true);
+        }
 
-        return (string) $transaction->getId();
+        try {
+            $transaction = $this->cashTransactionService->add($dto);
+
+            return new CreateCashTransactionResult((string) $transaction->getId(), true, false);
+        } catch (UniqueConstraintViolationException $e) {
+            if (null === $command->importSource || null === $command->externalId) {
+                throw $e;
+            }
+
+            $existingId = $this->cashTransactionRepository->findIdByCompanyImportSourceExternalIdDbal(
+                $command->companyId,
+                $command->importSource,
+                $command->externalId,
+            );
+
+            if (null !== $existingId) {
+                return new CreateCashTransactionResult($existingId, false, true);
+            }
+
+            throw $e;
+        }
     }
+
+    private function findExistingByImport(CreateCashTransactionCommand $command): ?\App\Cash\Entity\Transaction\CashTransaction
+    {
+        if (null === $command->importSource || null === $command->externalId) {
+            return null;
+        }
+
+        return $this->cashTransactionRepository->findOneByCompanyImportSourceExternalId(
+            $command->companyId,
+            $command->importSource,
+            $command->externalId,
+        );
+    }
+
 }
