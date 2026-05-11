@@ -46,6 +46,14 @@ class CashTransactionDTO
      */
     public ?string $externalId = null;
 
+    /**
+     * Дедупликационный хэш транзакции.
+     */
+    public ?string $dedupeHash = null;
+
+    /** @var array<string, mixed>|null */
+    public ?array $rawData = null;
+
     public ?string $payerInn = null;
     public ?string $payeeInn = null;
     public ?string $counterpartyNameRaw = null;
