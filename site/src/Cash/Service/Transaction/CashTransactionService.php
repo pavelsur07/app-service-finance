@@ -127,6 +127,8 @@ class CashTransactionService
 
         $tx->setImportSource($dto->importSource);
         $tx->setExternalId($dto->externalId);
+        $tx->setDedupeHash($dto->dedupeHash);
+        $tx->setRawData($dto->rawData ?? []);
 
         $this->applyVat($tx, $company, $dto->direction, $dto->amount);
 
