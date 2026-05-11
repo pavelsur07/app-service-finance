@@ -30,6 +30,7 @@ final class InventorySchemaTest extends IntegrationTestCase
 
         $stockUniqueIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'uniq_inventory_stock_snapshot_day_item'");
         self::assertStringContainsString('NULLS NOT DISTINCT', $stockUniqueIndex);
+        self::assertStringContainsString('(company_id, snapshot_date, source, source_sku, fulfillment_type, location_id, status)', $stockUniqueIndex);
 
         $quantityDef = $conn->fetchAssociative(<<<'SQL'
             SELECT data_type, numeric_precision, numeric_scale
@@ -42,6 +43,26 @@ final class InventorySchemaTest extends IntegrationTestCase
         self::assertSame('numeric', $quantityDef['data_type']);
         self::assertSame(14, (int) $quantityDef['numeric_precision']);
         self::assertSame(3, (int) $quantityDef['numeric_scale']);
+        $reservedQuantityDef = $conn->fetchAssociative(<<<'SQL'
+            SELECT data_type, numeric_precision, numeric_scale
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'inventory_stock_snapshots'
+              AND column_name = 'reserved_quantity'
+        SQL);
+        self::assertIsArray($reservedQuantityDef);
+        self::assertSame('numeric', $reservedQuantityDef['data_type']);
+        self::assertSame(14, (int) $reservedQuantityDef['numeric_precision']);
+        self::assertSame(3, (int) $reservedQuantityDef['numeric_scale']);
+
+        $mappingStatusDefault = $conn->fetchOne("SELECT column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_stock_snapshots' AND column_name = 'mapping_status'");
+        self::assertStringContainsString('unmapped', (string) $mappingStatusDefault);
+
+        $companySourceSkuIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_inventory_stock_company_source_sku'");
+        self::assertStringContainsString('(company_id, source_sku)', $companySourceSkuIndex);
+
+        $companyMappingStatusIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_inventory_stock_company_mapping_status'");
+        self::assertStringContainsString('(company_id, mapping_status)', $companyMappingStatusIndex);
 
         $requestParamsType = $conn->fetchOne("SELECT udt_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_raw_snapshots' AND column_name = 'request_params'");
         $responseBodyType = $conn->fetchOne("SELECT udt_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_raw_snapshots' AND column_name = 'response_body'");
