@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Builders\Inventory;
 
 use App\Inventory\Entity\StockSnapshot;
+use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
 
@@ -26,7 +27,12 @@ final class StockSnapshotBuilder
     private string $locationId = self::DEFAULT_LOCATION_ID;
     private StockStatus $status = StockStatus::Available;
     private string $quantity = '12.345';
+    private string $reservedQuantity = '0.000';
     private MarketplaceType $source = MarketplaceType::WILDBERRIES;
+    private ?string $sourceSku = null;
+    private ?string $sourceOfferId = null;
+    private ?string $fulfillmentType = null;
+    private StockSnapshotMappingStatus $mappingStatus = StockSnapshotMappingStatus::Unmapped;
     private string $rawSnapshotId = self::DEFAULT_RAW_SNAPSHOT_ID;
 
     private function __construct()
@@ -120,6 +126,46 @@ final class StockSnapshotBuilder
         return $clone;
     }
 
+    public function withReservedQuantity(string $reservedQuantity): self
+    {
+        $clone = clone $this;
+        $clone->reservedQuantity = $reservedQuantity;
+
+        return $clone;
+    }
+
+    public function withSourceSku(?string $sourceSku): self
+    {
+        $clone = clone $this;
+        $clone->sourceSku = $sourceSku;
+
+        return $clone;
+    }
+
+    public function withSourceOfferId(?string $sourceOfferId): self
+    {
+        $clone = clone $this;
+        $clone->sourceOfferId = $sourceOfferId;
+
+        return $clone;
+    }
+
+    public function withFulfillmentType(?string $fulfillmentType): self
+    {
+        $clone = clone $this;
+        $clone->fulfillmentType = $fulfillmentType;
+
+        return $clone;
+    }
+
+    public function withMappingStatus(StockSnapshotMappingStatus $mappingStatus): self
+    {
+        $clone = clone $this;
+        $clone->mappingStatus = $mappingStatus;
+
+        return $clone;
+    }
+
     public function withRawSnapshotId(string $rawSnapshotId): self
     {
         $clone = clone $this;
@@ -138,10 +184,15 @@ final class StockSnapshotBuilder
             locationId: $this->locationId,
             status: $this->status,
             quantity: $this->quantity,
+            reservedQuantity: $this->reservedQuantity,
             source: $this->source,
             rawSnapshotId: $this->rawSnapshotId,
             listingId: $this->listingId,
             productId: $this->productId,
+            sourceSku: $this->sourceSku,
+            sourceOfferId: $this->sourceOfferId,
+            fulfillmentType: $this->fulfillmentType,
+            mappingStatus: $this->mappingStatus,
         );
     }
 }

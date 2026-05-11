@@ -8,6 +8,8 @@ use App\Inventory\Entity\InventoryRawSnapshot;
 use App\Inventory\Entity\InventorySnapshotSession;
 use App\Inventory\Entity\Location;
 use App\Inventory\Entity\StockSnapshot;
+use App\Inventory\Enum\StockSnapshotMappingStatus;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Inventory\InventoryRawSnapshotBuilder;
 use App\Tests\Builders\Inventory\InventorySnapshotSessionBuilder;
 use App\Tests\Builders\Inventory\LocationBuilder;
@@ -43,6 +45,11 @@ final class InventoryPersistenceTest extends IntegrationTestCase
             ->withListingId(null)
             ->withProductId(null)
             ->withQuantity('42.125')
+            ->withReservedQuantity('5.000')
+            ->withSourceSku('SKU-42')
+            ->withSourceOfferId('OFFER-42')
+            ->withFulfillmentType('fbs')
+            ->withMappingStatus(StockSnapshotMappingStatus::Unmapped)
             ->build();
 
         $this->em->persist($location);
@@ -67,7 +74,65 @@ final class InventoryPersistenceTest extends IntegrationTestCase
         self::assertSame(['rows' => [['sku' => 'SKU-42', 'qty' => 12.345]]], $loadedRaw->getResponseBody());
 
         self::assertSame('42.125', $loadedStock->getQuantity());
+        self::assertSame('5.000', $loadedStock->getReservedQuantity());
+        self::assertSame('SKU-42', $loadedStock->getSourceSku());
+        self::assertSame('OFFER-42', $loadedStock->getSourceOfferId());
+        self::assertSame('fbs', $loadedStock->getFulfillmentType());
+        self::assertSame(StockSnapshotMappingStatus::Unmapped, $loadedStock->getMappingStatus());
         self::assertNull($loadedStock->getListingId());
         self::assertNull($loadedStock->getProductId());
+    }
+
+    public function testUnmappedSnapshotsWithDifferentSourceSkuDoNotConflictWithinSameDay(): void
+    {
+        $location = LocationBuilder::aLocation()
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->build();
+
+        $session = InventorySnapshotSessionBuilder::aSession()
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->build();
+
+        $rawSnapshot = InventoryRawSnapshotBuilder::aRawSnapshot()
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withSnapshotSessionId($session->getId())
+            ->build();
+
+        $first = StockSnapshotBuilder::aStockSnapshot()
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withSnapshotSessionId($session->getId())
+            ->withSnapshotDate(new \DateTimeImmutable('2026-05-11T00:00:00+00:00'))
+            ->withLocationId($location->getId())
+            ->withRawSnapshotId($rawSnapshot->getId())
+            ->withSource(MarketplaceType::OZON)
+            ->withListingId(null)
+            ->withProductId(null)
+            ->withFulfillmentType('fbo')
+            ->withSourceSku('SKU-111')
+            ->withMappingStatus(StockSnapshotMappingStatus::Unmapped)
+            ->build();
+
+        $second = StockSnapshotBuilder::aStockSnapshot()
+            ->withCompanyId('11111111-1111-1111-1111-111111111111')
+            ->withSnapshotSessionId($session->getId())
+            ->withSnapshotDate(new \DateTimeImmutable('2026-05-11T00:00:00+00:00'))
+            ->withLocationId($location->getId())
+            ->withRawSnapshotId($rawSnapshot->getId())
+            ->withSource(MarketplaceType::OZON)
+            ->withListingId(null)
+            ->withProductId(null)
+            ->withFulfillmentType('fbo')
+            ->withSourceSku('SKU-222')
+            ->withMappingStatus(StockSnapshotMappingStatus::Unmapped)
+            ->build();
+
+        $this->em->persist($location);
+        $this->em->persist($session);
+        $this->em->persist($rawSnapshot);
+        $this->em->persist($first);
+        $this->em->persist($second);
+        $this->em->flush();
+
+        self::assertNotSame($first->getId(), $second->getId());
     }
 }

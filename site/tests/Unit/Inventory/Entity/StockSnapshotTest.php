@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Inventory\Entity;
 
 use App\Inventory\Entity\StockSnapshot;
+use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Tests\Builders\Inventory\StockSnapshotBuilder;
@@ -36,7 +37,12 @@ final class StockSnapshotTest extends TestCase
             ->withLocationId(StockSnapshotBuilder::DEFAULT_LOCATION_ID)
             ->withStatus(StockStatus::InTransitToCustomer)
             ->withQuantity('9999.125')
+            ->withReservedQuantity('120.500')
             ->withSource(MarketplaceType::OZON)
+            ->withSourceSku('SKU-123')
+            ->withSourceOfferId('OFFER-123')
+            ->withFulfillmentType('fbo')
+            ->withMappingStatus(StockSnapshotMappingStatus::Mapped)
             ->withRawSnapshotId(StockSnapshotBuilder::DEFAULT_RAW_SNAPSHOT_ID)
             ->build();
 
@@ -49,7 +55,12 @@ final class StockSnapshotTest extends TestCase
         self::assertSame(StockSnapshotBuilder::DEFAULT_LOCATION_ID, $snapshot->getLocationId());
         self::assertSame(StockStatus::InTransitToCustomer, $snapshot->getStatus());
         self::assertSame('9999.125', $snapshot->getQuantity());
+        self::assertSame('120.500', $snapshot->getReservedQuantity());
         self::assertSame(MarketplaceType::OZON, $snapshot->getSource());
+        self::assertSame('SKU-123', $snapshot->getSourceSku());
+        self::assertSame('OFFER-123', $snapshot->getSourceOfferId());
+        self::assertSame('fbo', $snapshot->getFulfillmentType());
+        self::assertSame(StockSnapshotMappingStatus::Mapped, $snapshot->getMappingStatus());
         self::assertSame(StockSnapshotBuilder::DEFAULT_RAW_SNAPSHOT_ID, $snapshot->getRawSnapshotId());
     }
 
@@ -210,5 +221,15 @@ final class StockSnapshotTest extends TestCase
             ->build();
 
         self::assertSame('100.500', $snapshot->getQuantity());
+    }
+
+    public function testReservedQuantityCannotBeNegative(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageMatches('/reserved quantity must be non-negative/i');
+
+        StockSnapshotBuilder::aStockSnapshot()
+            ->withReservedQuantity('-1.000')
+            ->build();
     }
 }
