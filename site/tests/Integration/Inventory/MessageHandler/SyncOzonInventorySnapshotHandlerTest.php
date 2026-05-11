@@ -44,6 +44,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         $handler(new SyncOzonInventorySnapshotMessage($company->getId(), '77777777-7777-7777-7777-000000000402', $session->getId(), 'manual'));
 
         self::assertSame(0, $this->countRawSnapshots());
+        self::assertSame(0, $this->countNormalizeMessages($session->getId(), $company->getId()));
     }
 
     public function testNoCredentialsMarksFailed(): void
@@ -151,6 +152,7 @@ final class SyncOzonInventorySnapshotHandlerTest extends IntegrationTestCase
         $this->em->refresh($session);
         self::assertSame(SnapshotSessionStatus::Failed, $session->getStatus());
         self::assertStringContainsString('Rate limit', (string) $session->getErrorMessage());
+        self::assertSame(0, $this->countNormalizeMessages($session->getId(), $company->getId()));
     }
 
     private function createCompany(int $index): Company
