@@ -1,32 +1,32 @@
 # PATTERNS.md — VashFinDir
 
-> Справочник паттернов для Claude Code.
-> Читай когда нужно реализовать конкретный паттерн — не весь файл сразу.
-> Актуальная версия: 1.0 / 2026-03-28
-
----
+> Читай нужный раздел по задаче, не весь файл.
+> Версия: 1.1 / 2026-05-11
 
 ## Навигация
 
 - [1. Слои и ответственность](#1-слои-и-ответственность)
-- [2. Controller → Action → Domain → Infrastructure](#2-controller--action--domain--infrastructure)
-- [3. Action (Application Layer)](#3-action-application-layer)
+- [2. Controller](#2-controller)
+- [3. Action](#3-action)
 - [4. Domain: Policy и Value Object](#4-domain-policy-и-value-object)
-- [5. Infrastructure: Contracts и реализации](#5-infrastructure-contracts-и-реализации)
-- [6. Infrastructure: Query-объекты](#6-infrastructure-query-объекты)
-- [7. Facade — публичный API модуля](#7-facade--публичный-api-модуля)
+- [5. Infrastructure: Contracts](#5-infrastructure-contracts)
+- [6. Infrastructure: Query](#6-infrastructure-query)
+- [7. Facade](#7-facade)
 - [8. Формы с данными чужого модуля](#8-формы-с-данными-чужого-модуля)
-- [9. Tagged Services (Strategy / Chain)](#9-tagged-services-strategy--chain)
+- [9. Tagged Services](#9-tagged-services)
 - [10. Messenger: Message и Handler](#10-messenger-message-и-handler)
-- [11. Entity: конструктор и guard-методы](#11-entity-конструктор-и-guard-методы)
+- [11. Entity](#11-entity)
 - [12. DTO](#12-dto)
 - [13. Обработка ошибок](#13-обработка-ошибок)
 - [14. Multi-tenancy: изоляция данных](#14-multi-tenancy-изоляция-данных)
 - [15. Doctrine Listeners](#15-doctrine-listeners)
-- [16. Тесты: Unit и Integration](#16-тесты-unit-и-integration)
+- [16. Тесты](#16-тесты)
 - [17. Entity Builder](#17-entity-builder)
 - [18. Decision Matrix](#18-decision-matrix)
-- [19. API Documentation (OpenAPI / Nelmio)](#19-api-documentation-openapi--nelmio)
+- [19. OpenAPI / Nelmio](#19-openapi--nelmio)
+- [20. Событийная модель: Доменные события](#20-событийная-модель-доменные-события)
+- [21. Оптимистичная блокировка](#21-оптимистичная-блокировка)
+- [22. Idempotency в Messenger](#22-idempotency-в-messenger)
 
 ---
 
@@ -34,41 +34,60 @@
 
 | Слой | Отвечает за | НЕ отвечает за |
 |---|---|---|
-| **Controller** | HTTP: десериализация Request → вызов Action → Response | Бизнес-логика, SQL, валидация правил |
-| **Application (Action)** | Оркестрация: загрузка Entity, вызов Domain-политик, persist/flush | HTTP, Session, шаблоны |
+| **Controller** | HTTP: десериализация → Action → Response | Бизнес-логика, SQL, валидация |
+| **Action** | Оркестрация: Entity, Domain-политики, flush | HTTP, Session, шаблоны |
 | **Domain** | Бизнес-правила, инварианты, Value Objects | Doctrine, HTTP, внешние API |
 | **Infrastructure** | БД-запросы, HTTP-клиенты, внешние системы | Бизнес-решения |
 | **Facade** | Публичный API модуля для других модулей | Собственная бизнес-логика |
 
----
-
-## 2. Controller → Action → Domain → Infrastructure
-
-Эталонный поток вызовов в проекте:
-
+Эталонный поток:
 ```
-Controller (ProductEditController)
-    → вызывает Action (UpdateProductAction)
-        → вызывает Domain (ProductSkuPolicy.assertSkuIsUnique)
-            → использует Infrastructure (ProductSkuUniquenessCheckerDoctrine)
+Controller → Action → Domain Policy → Infrastructure (Checker/Query)
 ```
-
-Контроллер не знает о проверке SKU. Action не знает о SQL. Domain не знает о Doctrine.
 
 ---
 
-## 3. Action (Application Layer)
+## 2. Controller
 
-Один Action = один use-case. `final class`, метод `__invoke`.
+```php
+// src/Catalog/Controller/Api/ProductCreateController.php
+#[OA\Tag(name: 'Catalog')]
+final class ProductCreateController extends AbstractController
+{
+    public function __construct(
+        private readonly ActiveCompanyService $companyService,
+        private readonly CreateProductAction $action,
+    ) {}
+
+    #[Route('/api/products', methods: ['POST'])]
+    public function __invoke(#[MapRequestPayload] CreateProductRequest $request): JsonResponse
+    {
+        $companyId = $this->companyService->getActiveCompany()->getId();
+
+        try {
+            $id = ($this->action)($companyId, CreateProductCommand::fromRequest($request));
+            return $this->json(['data' => ['id' => $id]], 201);
+        } catch (\DomainException $e) {
+            return $this->json(['error' => ['code' => 'domain_error', 'message' => $e->getMessage()]], 422);
+        }
+    }
+}
+```
+
+**Правила:** один контроллер = один `__invoke` · маршруты через `#[Route]` · ноль бизнес-логики
+
+---
+
+## 3. Action
 
 ```php
 // src/Catalog/Application/CreateProductAction.php
 final class CreateProductAction
 {
     public function __construct(
-        private readonly ProductSkuPolicy $productSkuPolicy,
-        private readonly CompanyFacade $companyFacade,        // межмодульное — через Facade
-        private readonly EntityManagerInterface $entityManager,
+        private readonly ProductSkuPolicy $skuPolicy,
+        private readonly CompanyFacade $companyFacade,
+        private readonly EntityManagerInterface $em,
     ) {}
 
     public function __invoke(string $companyId, CreateProductCommand $cmd): string
@@ -76,37 +95,32 @@ final class CreateProductAction
         $company = $this->companyFacade->findById($companyId)
             ?? throw new \DomainException('Компания не найдена.');
 
-        $this->productSkuPolicy->assertSkuIsUnique($cmd->sku, $companyId);
+        $this->skuPolicy->assertSkuIsUnique($cmd->sku, $companyId);
 
         $product = new Product(Uuid::uuid7()->toString(), $companyId, $cmd->name);
         $product->setSku($cmd->sku);
 
-        $this->entityManager->persist($product);
-        $this->entityManager->flush();                        // flush — только здесь
+        $this->em->persist($product);
+        $this->em->flush(); // flush — только здесь
 
         return $product->getId();
     }
 }
 ```
 
-**Правила:**
-- Не принимает `Request`, не возвращает `Response`
-- Бросает `\DomainException` при нарушении бизнес-правил
-- Максимум ~100 строк. Если больше — выделить Domain-сервис или Policy
-- Побочные эффекты (email, уведомления) → dispatch через Messenger, не напрямую
+**Правила:** без `Request`/`Response` · flush только в Action · максимум ~100 строк · побочные эффекты → Messenger dispatch
 
 ---
 
 ## 4. Domain: Policy и Value Object
 
-### Policy — проверка бизнес-правил
+### Policy
 
 ```php
-// src/Catalog/Domain/ProductSkuPolicy.php
 final class ProductSkuPolicy
 {
     public function __construct(
-        private readonly ProductSkuUniquenessChecker $checker, // интерфейс, не Doctrine
+        private readonly ProductSkuUniquenessChecker $checker,
     ) {}
 
     public function assertSkuIsUnique(string $sku, string $companyId): void
@@ -118,10 +132,9 @@ final class ProductSkuPolicy
 }
 ```
 
-### Value Object — иммутабельные доменные значения
+### Value Object
 
 ```php
-// src/Marketplace/Domain/ValueObject/ListingKey.php
 final readonly class ListingKey
 {
     public function __construct(
@@ -129,10 +142,7 @@ final readonly class ListingKey
         public readonly string $size,
     ) {}
 
-    public function toString(): string
-    {
-        return sprintf('%s:%s', $this->marketplaceSku, $this->size);
-    }
+    public function toString(): string { return "{$this->marketplaceSku}:{$this->size}"; }
 
     public static function fromString(string $key): self
     {
@@ -142,27 +152,22 @@ final readonly class ListingKey
 }
 ```
 
-**Когда выделять в Domain:**
-- Логика используется в нескольких Actions
-- Правило сложнее одной проверки `if`
-- Есть понятие из предметной области (ListingKey, Period, Money)
+**Когда выделять:** логика нужна в нескольких Actions · правило сложнее одного `if` · есть понятие из предметной области
 
 ---
 
-## 5. Infrastructure: Contracts и реализации
+## 5. Infrastructure: Contracts
 
-Domain объявляет **что** нужно (интерфейс). Infrastructure реализует **как**.
+Domain объявляет интерфейс — Infrastructure реализует.
 
 ```php
-// src/Catalog/Domain/ProductSkuUniquenessChecker.php — ИНТЕРФЕЙС в Domain
+// Domain — что нужно
 interface ProductSkuUniquenessChecker
 {
     public function isUnique(string $sku, string $companyId): bool;
 }
-```
 
-```php
-// src/Catalog/Infrastructure/ProductSkuUniquenessCheckerDoctrine.php — РЕАЛИЗАЦИЯ
+// Infrastructure — как
 final class ProductSkuUniquenessCheckerDoctrine implements ProductSkuUniquenessChecker
 {
     public function __construct(private readonly Connection $connection) {}
@@ -171,7 +176,7 @@ final class ProductSkuUniquenessCheckerDoctrine implements ProductSkuUniquenessC
     {
         $count = $this->connection->fetchOne(
             'SELECT COUNT(*) FROM products WHERE sku = :sku AND company_id = :companyId',
-            ['sku' => $sku, 'companyId' => $companyId],
+            compact('sku', 'companyId'),
         );
         return (int) $count === 0;
     }
@@ -179,68 +184,52 @@ final class ProductSkuUniquenessCheckerDoctrine implements ProductSkuUniquenessC
 ```
 
 ```yaml
-# config/services.yaml — привязка интерфейса к реализации
+# config/services.yaml
 App\Catalog\Domain\ProductSkuUniquenessChecker:
     '@App\Catalog\Infrastructure\ProductSkuUniquenessCheckerDoctrine'
 ```
 
-**Для внешних API — тот же принцип:**
-
-```
-Infrastructure/Api/Contract/MarketplaceFetcherInterface.php  — интерфейс
-Infrastructure/Api/Wildberries/WildberriesFetcher.php        — реализация WB
-Infrastructure/Api/Ozon/OzonFetcher.php                      — реализация Ozon
-```
+Для внешних API — та же структура: `Infrastructure/Api/Contract/` → `Infrastructure/Api/Wildberries/`.
 
 ---
 
-## 6. Infrastructure: Query-объекты
+## 6. Infrastructure: Query
 
-Для сложных read-моделей (отчёты, агрегации, multi-join) — DBAL QueryBuilder в `Infrastructure/Query/`, минуя ORM hydration.
+Для сложных read-моделей — DBAL QueryBuilder, минуя ORM hydration.
+**Query-класс возвращает `QueryBuilder`, не массив** — обязательно для Pagerfanta.
 
 ```php
-// src/Catalog/Infrastructure/Query/ProductQuery.php
 final class ProductQuery
 {
     public function __construct(private readonly Connection $connection) {}
 
-    public function findForListing(string $companyId, ProductListFilter $filter): array
+    public function createByCompanyQB(string $companyId, ProductListFilter $filter): QueryBuilder
     {
         $qb = $this->connection->createQueryBuilder()
             ->select('p.id', 'p.name', 'p.sku', 'p.status')
             ->from('products', 'p')
             ->where('p.company_id = :companyId')
-            ->setParameter('companyId', $companyId);
+            ->setParameter('companyId', $companyId)
+            ->orderBy('p.created_at', 'DESC');
 
         if ($filter->status !== null) {
-            $qb->andWhere('p.status = :status')
-               ->setParameter('status', $filter->status->value);
+            $qb->andWhere('p.status = :status')->setParameter('status', $filter->status->value);
         }
 
         if ($filter->search !== null) {
-            $qb->andWhere('p.name ILIKE :search')
-               ->setParameter('search', '%' . $filter->search . '%');
+            $qb->andWhere('p.name ILIKE :search')->setParameter('search', '%'.$filter->search.'%');
         }
 
-        return $qb->orderBy('p.created_at', 'DESC')
-                  ->setMaxResults($filter->perPage)
-                  ->setFirstResult(($filter->page - 1) * $filter->perPage)
-                  ->fetchAllAssociative();
+        return $qb;
     }
 }
 ```
 
-**Когда использовать Query вместо Repository:**
-- Сложные JOIN с несколькими таблицами
-- Агрегации (COUNT, SUM, GROUP BY)
-- Отчёты и дашборды
-- Когда ORM hydration избыточен (нужны только скалярные данные)
+**Когда Query вместо Repository:** сложные JOIN · агрегации (COUNT, SUM, GROUP BY) · отчёты · нужны только скалярные данные
 
 ---
 
-## 7. Facade — публичный API модуля
-
-Единственная точка входа для межмодульного взаимодействия.
+## 7. Facade
 
 ```php
 // src/Company/Facade/CounterpartyFacade.php
@@ -248,18 +237,13 @@ final readonly class CounterpartyFacade
 {
     public function __construct(private readonly CounterpartyRepository $repository) {}
 
-    /**
-     * @return list<array{id: string, name: string}>
-     */
+    /** @return list<array{id: string, name: string}> */
     public function getChoicesForCompany(string $companyId): array
     {
         return $this->repository->findChoicesForCompany($companyId);
     }
 
-    /**
-     * @param string[] $ids
-     * @return array<string, string>  uuid => name
-     */
+    /** @return array<string, string> uuid => name */
     public function getNamesByIds(array $ids): array
     {
         return $this->repository->findNamesByIds($ids);
@@ -267,92 +251,37 @@ final readonly class CounterpartyFacade
 }
 ```
 
-**Правила Facade:**
-- `final readonly class`
-- Принимает скалярные типы и DTO, не Entity чужого модуля
-- Возвращает скаляры, DTO или Entity **своего** модуля
-- Без бизнес-логики — только делегирование в Actions/Repository
-- Минимальный интерфейс: выставлять только то, что реально нужно другим
+**Правила:** `final readonly class` · принимает скаляры/DTO, не Entity чужого модуля · без бизнес-логики · минимальный публичный интерфейс
 
 ---
 
 ## 8. Формы с данными чужого модуля
 
-### Шаг 1. Facade возвращает простые данные
-
 ```php
-// src/Company/Facade/CounterpartyFacade.php
-public function getChoicesForCompany(string $companyId): array
-{
-    return $this->repository->findChoicesForCompany($companyId);
-    // [['id' => 'uuid', 'name' => 'ООО Ромашка'], ...]
-}
-```
+// Controller: получить данные через Facade
+$choices = $this->counterpartyFacade->getChoicesForCompany($companyId);
+$form = $this->createForm(CreateDealType::class, null, ['counterparty_choices' => $choices]);
 
-### Шаг 2. Controller получает данные и передаёт в форму
-
-```php
-// src/Deals/Controller/DealCreateController.php
-final class DealCreateController extends AbstractController
-{
-    public function __construct(
-        private readonly ActiveCompanyService $companyService,
-        private readonly CounterpartyFacade $counterpartyFacade,  // Facade, не Repository
-        private readonly CreateDealAction $createDealAction,
-    ) {}
-
-    public function __invoke(Request $request): Response
-    {
-        $companyId = $this->companyService->getActiveCompany()->getId();
-        $choices = $this->counterpartyFacade->getChoicesForCompany($companyId);
-
-        $form = $this->createForm(CreateDealType::class, null, [
-            'counterparty_choices' => $choices,
-        ]);
-        // ...
-    }
-}
-```
-
-### Шаг 3. Form использует ChoiceType
-
-```php
-// src/Deals/Form/CreateDealType.php
+// Form: ChoiceType, не EntityType
 $builder->add('counterpartyId', ChoiceType::class, [
     'label'       => 'Контрагент',
-    'required'    => false,
     'placeholder' => 'Без контрагента',
     'choices'     => array_column($options['counterparty_choices'], 'id', 'name'),
 ]);
-```
 
-### Отображение имени по ID в шаблоне
-
-```php
-// В контроллере
-$counterpartyNames = $this->counterpartyFacade->getNamesByIds($counterpartyIds);
-```
-
-```twig
-{# В шаблоне #}
-{{ counterparty_names[deal.counterpartyId] ?? '—' }}
+// Шаблон: имена по ID
+$counterpartyNames = $this->counterpartyFacade->getNamesByIds($ids);
+// {{ counterparty_names[deal.counterpartyId] ?? '—' }}
 ```
 
 ---
 
-## 9. Tagged Services (Strategy / Chain)
-
-Для набора однотипных обработчиков где новый добавляется без изменения ядра.
+## 9. Tagged Services
 
 ```yaml
 # config/services.yaml
-App\Marketplace\Service\CostCalculator\WbCommissionCalculator:
-    tags:
-        - { name: 'app.marketplace.cost_calculator', priority: 110 }
-
-App\Marketplace\Service\CostCalculator\WbLogisticsCalculator:
-    tags:
-        - { name: 'app.marketplace.cost_calculator', priority: 108 }
+App\Marketplace\Service\WbCommissionCalculator:
+    tags: [{ name: 'app.marketplace.cost_calculator', priority: 110 }]
 
 App\Marketplace\Application\ProcessWbCostsAction:
     arguments:
@@ -360,13 +289,10 @@ App\Marketplace\Application\ProcessWbCostsAction:
 ```
 
 ```php
-// src/Marketplace/Application/ProcessWbCostsAction.php
 final class ProcessWbCostsAction
 {
     /** @param iterable<CostCalculatorInterface> $costCalculators */
-    public function __construct(
-        private readonly iterable $costCalculators,
-    ) {}
+    public function __construct(private readonly iterable $costCalculators) {}
 
     public function __invoke(Sale $sale): void
     {
@@ -377,121 +303,95 @@ final class ProcessWbCostsAction
 }
 ```
 
-**Текущие tag-группы в проекте:**
+**Текущие теги:**
 
 | Тег | Назначение |
 |---|---|
 | `app.marketplace.cost_calculator` | Калькуляторы WB-затрат |
-| `app.marketplace.adapter` | Адаптеры маркетплейсов (WB, Ozon) |
+| `app.marketplace.adapter` | Адаптеры маркетплейсов |
 | `app.balance.value_provider` | Провайдеры значений баланса |
 | `marketplace.data_source` | Источники данных для закрытия месяца |
 | `app.notification.sender` | Каналы отправки уведомлений |
 
-**Когда использовать:**
-- Набор однотипных обработчиков (калькуляторы, адаптеры, провайдеры)
-- Новый обработчик = новый класс + тег, без изменения ядра (Open/Closed Principle)
+**Когда:** набор однотипных обработчиков · новый обработчик = новый класс + тег (OCP)
 
 ---
 
 ## 10. Messenger: Message и Handler
 
-### Когда sync, когда async
+### Выбор транспорта
 
-| Критерий | Sync (Action) | Async (Messenger) |
+| Транспорт | Когда | Примеры |
 |---|---|---|
-| Время < 2 сек, пользователь ждёт | ✅ | — |
-| Время > 3 сек, внешний API, импорт | — | ✅ |
-| Побочный эффект (email, уведомление) | — | ✅ |
-| Может временно упасть (retry нужен) | — | ✅ |
-| Тяжёлая цепочка шагов | — | ✅ (каждый шаг = Message) |
+| `async_sync` | Внешние HTTP (marketplace, банк, email) | `SyncWbReportMessage`, `SendEmailMessage` |
+| `async_pipeline` | Локальная обработка, DB/CPU-heavy | `ProcessRawDocumentMessage`, `RecalcSnapshotsMessage` |
+| `async_ads` | Ozon Performance polling (до 10 мин) | `FetchOzonAdStatisticsMessage` |
 
-### Message — только scalar ID
+### Message
 
 ```php
-// src/Marketplace/Message/SyncWbReportMessage.php
 final readonly class SyncWbReportMessage
 {
     public function __construct(
         public string $companyId,
-        public string $connectionId,    // ID, не объект
-        public string $actorUserId,     // кто инициировал — передавать явно
+        public string $connectionId, // ID, не Entity
+        public string $actorUserId,  // кто инициировал — явно
     ) {}
 }
 ```
 
-После создания → добавить в `config/packages/messenger.yaml` с выбором транспорта:
-
-| Транспорт | Когда использовать | Примеры сообщений |
-|---|---|---|
-| `async_sync` | Внешние HTTP-запросы, отправка email | `SyncWbReportMessage`, `SyncOzonReportMessage`, `BankImportMessage`, `SendEmailMessage` |
-| `async_pipeline` | Локальная обработка, DB/CPU-heavy | `ProcessDayReportMessage`, `ProcessRawDocumentStepMessage`, `ApplyAutoRulesForTransaction`, `RecalcSnapshotsMessage` |
-| `async_ads` | Ozon Performance polling (handler может висеть до 10 минут) | `FetchOzonAdStatisticsMessage`, `LoadOzonAdStatisticsRangeMessage` |
-
-Правило выбора:
-- Handler делает внешний HTTP-запрос к marketplace/банку/email → `async_sync`
-- Handler читает/пишет в БД, парсит локальные файлы, считает агрегаты → `async_pipeline`
-- Handler — часть Ozon Ads pipeline (выделенная очередь из-за долгого polling) → `async_ads`
-
 ```yaml
+# config/packages/messenger.yaml
 App\Marketplace\Message\SyncWbReportMessage: async_sync
 ```
 
 ### Handler
 
 ```php
-// src/Marketplace/MessageHandler/SyncWbReportMessageHandler.php
 #[AsMessageHandler]
 final class SyncWbReportMessageHandler
 {
     public function __construct(
-        private readonly MoySkladConnectionRepository $connectionRepository,
-        private readonly SyncWbReportAction $syncAction,
-        private readonly AppLogger $logger,
+        private readonly ConnectionRepository $connectionRepository,
+        private readonly SyncWbReportAction $action,
+        private readonly LoggerInterface $logger,
     ) {}
 
     public function __invoke(SyncWbReportMessage $message): void
     {
-        // Загружаем Entity заново — данные могли измениться с момента dispatch
         $connection = $this->connectionRepository
             ->findByIdAndCompany($message->connectionId, $message->companyId);
 
         if ($connection === null) {
-            $this->logger->warning('Соединение не найдено', [
-                'connectionId' => $message->connectionId,
-            ]);
+            $this->logger->warning('Соединение не найдено', ['connectionId' => $message->connectionId]);
             return;
         }
 
         try {
-            ($this->syncAction)($connection, $message->actorUserId);
+            ($this->action)($connection, $message->actorUserId);
         } catch (\Exception $e) {
             $this->logger->error('Ошибка синхронизации WB', [
-                'error' => $e->getMessage(),
+                'error'        => $e->getMessage(),
                 'connectionId' => $message->connectionId,
             ]);
-            throw $e; // перебросить чтобы Messenger мог сделать retry
+            throw $e; // перебросить для retry
         }
     }
 }
 ```
 
-**Правила Handler:**
-- Нет `Request`, `Session`, `Security->getUser()` — CLI-контекст воркера
-- Всегда загружать Entity заново по ID из Message
-- Оборачивать в try/catch → логировать → перебрасывать для retry
+**Правила:** нет `Request`/`Session`/`Security` · Entity загружать заново по ID из Message · catch → log → rethrow
 
 ---
 
-## 11. Entity: конструктор и guard-методы
+## 11. Entity
 
 ```php
-// src/Marketplace/Entity/MarketplaceMonthClose.php
 #[ORM\Entity]
 #[ORM\Table(name: 'marketplace_month_closes')]
 class MarketplaceMonthClose
 {
-    #[ORM\Id]
-    #[ORM\Column(type: 'guid')]
+    #[ORM\Id, ORM\Column(type: 'guid')]
     private string $id;
 
     #[ORM\Column(type: 'guid')]
@@ -517,7 +417,6 @@ class MarketplaceMonthClose
         $this->updatedAt   = new \DateTimeImmutable();
     }
 
-    // Guard-метод — инвариант: нельзя закрыть уже закрытый
     public function close(): void
     {
         if ($this->status === 'closed') {
@@ -527,7 +426,6 @@ class MarketplaceMonthClose
         $this->updatedAt = new \DateTimeImmutable();
     }
 
-    // Guard-метод — инвариант: нельзя открыть уже открытый
     public function reopen(): void
     {
         if ($this->status === 'open') {
@@ -539,20 +437,15 @@ class MarketplaceMonthClose
 }
 ```
 
-**Правила:**
-- `new Entity(...)` — только в Application-слое (Action)
-- Guard-методы бросают `\DomainException` при нарушении инварианта
-- Не помещать в Entity: Repository, Messenger dispatch, другие сервисы
-- `DateTimeImmutable` везде
+**Правила:** `new Entity()` только в Action · guard-методы бросают `\DomainException` · нет Repository/Messenger внутри · `DateTimeImmutable` везде
 
 ---
 
 ## 12. DTO
 
-### Command DTO (входные данные для Action)
+### Command DTO
 
 ```php
-// src/Catalog/Application/DTO/CreateProductCommand.php
 final readonly class CreateProductCommand
 {
     public function __construct(
@@ -560,45 +453,45 @@ final readonly class CreateProductCommand
         public string $sku,
         public ?string $barcode = null,
     ) {}
+
+    public static function fromRequest(CreateProductRequest $request): self
+    {
+        return new self($request->name, $request->sku, $request->barcode);
+    }
 }
 ```
 
-### Filter DTO (параметры списка)
+### Filter DTO
 
 ```php
-// src/Catalog/DTO/ProductListFilter.php
 final class ProductListFilter
 {
-    public string $companyId = '';
+    public string $companyId     = '';
     public ?ProductStatus $status = null;
-    public ?string $search = null;
-    public int $page = 1;
-    public int $perPage = 20;
+    public ?string $search        = null;
+    public int $page              = 1;
+    public int $perPage           = 50;
 
     public static function fromRequest(Request $request): self
     {
-        $filter = new self();
-        $filter->search   = $request->query->get('search');
-        $filter->status   = ProductStatus::tryFrom($request->query->get('status', ''));
-        $filter->page     = max(1, $request->query->getInt('page', 1));
-        $filter->perPage  = min(100, $request->query->getInt('per_page', 20));
-        return $filter;
+        $f          = new self();
+        $f->search  = $request->query->get('search');
+        $f->status  = ProductStatus::tryFrom($request->query->get('status', ''));
+        $f->page    = max(1, $request->query->getInt('page', 1));
+        $f->perPage = min(200, $request->query->getInt('limit', 50));
+        return $f;
     }
 
     public function withCompanyId(string $companyId): self
     {
-        $clone = clone $this;
+        $clone            = clone $this;
         $clone->companyId = $companyId;
         return $clone;
     }
 }
 ```
 
-**Правила:**
-- `readonly class` для Command DTO
-- Без логики — только данные
-- Не использовать Entity как DTO — всегда маппить
-- `fromRequest()` допустим только в Filter DTO
+**Правила:** `readonly` для Command · `fromRequest()` только в Filter DTO · не использовать Entity как DTO
 
 ---
 
@@ -606,46 +499,24 @@ final class ProductListFilter
 
 ### Стратегия по слоям
 
-| Слой | Как сигнализирует | Пример |
-|---|---|---|
-| Domain / Entity | `throw new \DomainException(...)` | «SKU уже занят» |
-| Application (Action) | `throw new \DomainException(...)` | «Компания не найдена» |
-| Infrastructure | Оборачивает в `DomainException` | `UniqueConstraintViolation → DomainException` |
-| Controller | Ловит `\DomainException` → flash или JSON | — |
+| Слой | Действие |
+|---|---|
+| Domain / Entity | `throw new \DomainException(...)` |
+| Action | `throw new \DomainException(...)` или кастомное из `Exception/` |
+| Infrastructure | Оборачивает техническое в `\DomainException` |
+| Controller | Ловит `\DomainException` → JSON 422 или flash-redirect |
 
-### Обёртка инфраструктурной ошибки в Action
+### Инфраструктурная ошибка → доменная
 
 ```php
 try {
-    $this->entityManager->flush();
+    $this->em->flush();
 } catch (UniqueConstraintViolationException) {
     throw new \DomainException('Товар с таким SKU уже существует.');
 }
 ```
 
-### Контроллер ловит доменную ошибку
-
-```php
-// Web-контроллер
-try {
-    ($this->createAction)($companyId, $cmd);
-} catch (\DomainException $e) {
-    $this->addFlash('error', $e->getMessage());
-    return $this->redirectToRoute('catalog_products_new');
-}
-
-// API-контроллер
-try {
-    $id = ($this->createAction)($companyId, $cmd);
-    return $this->json(['data' => ['id' => $id]], 201);
-} catch (\DomainException $e) {
-    return $this->json(['error' => ['message' => $e->getMessage()]], 422);
-}
-```
-
 ### Кастомные исключения
-
-Создавать в `{Module}/Exception/` когда нужно ловить конкретный тип:
 
 ```php
 // src/Deals/Exception/DealNotFoundException.php
@@ -658,42 +529,39 @@ final class DealNotFoundException extends \DomainException
 }
 ```
 
+### Формат ответа (новый код — только так)
+
+```json
+{ "error": { "code": "deal_not_found", "message": "Сделка не найдена." } }
+```
+
+`code` — snake_case, стабильный идентификатор (фронт завязывается на него).
+
 ---
 
 ## 14. Multi-tenancy: изоляция данных
 
-Три уровня защиты от IDOR:
-
-### Entity-уровень
+### Entity
 
 ```php
-// Новые модули — string $companyId
 #[ORM\Column(type: 'guid')]
-private string $companyId;
-
-// Старые модули — ManyToOne (допустимо, не переписывать без причины)
-#[ORM\ManyToOne(targetEntity: Company::class)]
-#[ORM\JoinColumn(nullable: false)]
-private Company $company;
+private string $companyId; // string, не ManyToOne на Company
 ```
 
-### Repository-уровень
+### Repository
 
 ```php
-// ✅ Всегда с companyId
+// ✅ всегда с companyId
 public function findByIdAndCompany(string $id, string $companyId): ?Product
 {
     return $this->findOneBy(['id' => $id, 'companyId' => $companyId]);
 }
 
-// ❌ IDOR — никогда
-public function findById(string $id): ?Product
-{
-    return $this->find($id);
-}
+// ❌ IDOR — запрещено
+public function findById(string $id): ?Product { return $this->find($id); }
 ```
 
-### Controller-уровень
+### Controller
 
 ```php
 $company = $this->activeCompanyService->getActiveCompany();
@@ -703,50 +571,38 @@ if ($product === null) {
 }
 ```
 
-### В Messenger Handler (нет сессии)
+### Handler (нет сессии)
 
-`companyId` передаётся через Message, не берётся из сессии.
+`companyId` передаётся через Message, не берётся из Security.
 
 ---
 
 ## 15. Doctrine Listeners
 
 ```php
-// ✅ Атрибут вместо интерфейса EventSubscriber
 #[AsDoctrineListener(event: Events::postPersist)]
 #[AsDoctrineListener(event: Events::postUpdate)]
 final class AuditLogSubscriber
 {
     public function postPersist(LifecycleEventArgs $args): void
     {
-        $entity = $args->getObject();
-        if (!$entity instanceof CashTransaction) {
-            return; // реагируем только на нужные Entity
+        if (!$args->getObject() instanceof CashTransaction) {
+            return;
         }
-        // создать AuditLog — но не вызывать flush()!
+        // side-effect: не вызывать flush()!
     }
 }
 ```
 
-**Когда использовать:**
-- Аудит и логирование (side-effect, не влияет на бизнес-поток)
-- Автоматическое обновление `updatedAt`
-- Денормализация в read-модели
+**Когда:** аудит · автообновление `updatedAt` · денормализация read-моделей
 
-**Когда НЕ использовать:**
-- Бизнес-логика которая должна быть явной → в Action
-- Отправка email/уведомлений → через Messenger
-- Всё что зависит от контекста запроса (текущий пользователь, URL)
-
-**Правила:**
-- Listener не вызывает `flush()` — бесконечная рекурсия
-- Listener не бросает исключения прерывающие основную транзакцию (если это побочный эффект)
+**Нельзя:** flush() · бросать исключения · зависеть от Request/Session
 
 ---
 
-## 16. Тесты: Unit и Integration
+## 16. Тесты
 
-### Unit — Domain Policy (без БД, быстро)
+### Unit — Domain Policy
 
 ```php
 final class ProductSkuPolicyTest extends TestCase
@@ -756,12 +612,8 @@ final class ProductSkuPolicyTest extends TestCase
         $checker = $this->createMock(ProductSkuUniquenessChecker::class);
         $checker->method('isUnique')->willReturn(false);
 
-        $policy = new ProductSkuPolicy($checker);
-
         $this->expectException(\DomainException::class);
-        $this->expectExceptionMessage('SKU уже занят');
-
-        $policy->assertSkuIsUnique('SKU-001', 'company-uuid');
+        (new ProductSkuPolicy($checker))->assertSkuIsUnique('SKU-001', 'company-uuid');
     }
 
     public function testPassesWhenSkuIsUnique(): void
@@ -769,9 +621,7 @@ final class ProductSkuPolicyTest extends TestCase
         $checker = $this->createMock(ProductSkuUniquenessChecker::class);
         $checker->method('isUnique')->willReturn(true);
 
-        $policy = new ProductSkuPolicy($checker);
-        $policy->assertSkuIsUnique('SKU-001', 'company-uuid'); // не бросает
-
+        (new ProductSkuPolicy($checker))->assertSkuIsUnique('SKU-001', 'company-uuid');
         $this->addToAssertionCount(1);
     }
 }
@@ -788,28 +638,21 @@ final class CreateProductActionTest extends KernelTestCase
         $em     = self::getContainer()->get(EntityManagerInterface::class);
         $action = self::getContainer()->get(CreateProductAction::class);
 
-        $owner   = UserBuilder::aUser()->withIndex(1)->build();
-        $company = CompanyBuilder::aCompany()->withOwner($owner)->build();
-        $em->persist($owner);
+        $company = CompanyBuilder::aCompany()->withIndex(1)->build();
         $em->persist($company);
         $em->flush();
 
-        $productId = ($action)(
-            $company->getId(),
-            new CreateProductCommand(name: 'Тест', sku: 'TST-001'),
-        );
+        $id = ($action)($company->getId(), new CreateProductCommand('Тест', 'TST-001'));
 
-        $this->assertNotEmpty($productId);
-
-        $product = $em->find(Product::class, $productId);
+        $product = $em->find(Product::class, $id);
         $this->assertSame('TST-001', $product->getSku());
     }
 
     public function testThrowsOnDuplicateSku(): void
     {
-        // ... создать первый продукт, затем попытаться создать с тем же SKU
+        // создать первый → пытаться создать с тем же SKU
         $this->expectException(\DomainException::class);
-        ($action)($companyId, new CreateProductCommand(name: 'Дубль', sku: 'TST-001'));
+        ($action)($companyId, new CreateProductCommand('Дубль', 'TST-001'));
     }
 }
 ```
@@ -828,21 +671,18 @@ final class CreateProductActionTest extends KernelTestCase
 
 ## 17. Entity Builder
 
-Обязателен для каждой новой Entity. Расположение: `tests/Builders/{Module}/{Entity}Builder.php`.
-
 ```php
 // tests/Builders/Catalog/ProductBuilder.php
 final class ProductBuilder
 {
-    // Детерминированные UUID — по первой цифре видно что это за сущность
     public const DEFAULT_ID         = '33333333-3333-3333-3333-333333333333';
     public const DEFAULT_COMPANY_ID = '11111111-1111-1111-1111-111111111111';
 
     private string $id;
     private string $companyId;
-    private string $name   = 'Тестовый товар';
-    private string $sku    = 'TST-001';
-    private ProductStatus $status = ProductStatus::Active;
+    private string $name             = 'Тестовый товар';
+    private string $sku              = 'TST-001';
+    private ProductStatus $status    = ProductStatus::Active;
 
     private function __construct()
     {
@@ -852,292 +692,314 @@ final class ProductBuilder
 
     public static function aProduct(): self { return new self(); }
 
-    // with*() всегда clone — иммутабельность
-    public function withIndex(int $index): self
+    public function withIndex(int $i): self
     {
-        $clone     = clone $this;
-        $clone->id  = sprintf('33333333-3333-3333-3333-%012d', $index);
-        $clone->sku = sprintf('TST-%03d', $index);
-        return $clone;
+        $c = clone $this;
+        $c->id  = sprintf('33333333-3333-3333-3333-%012d', $i);
+        $c->sku = sprintf('TST-%03d', $i);
+        return $c;
     }
 
-    public function withName(string $name): self
-    {
-        $clone       = clone $this;
-        $clone->name = $name;
-        return $clone;
-    }
-
-    public function withCompanyId(string $companyId): self
-    {
-        $clone            = clone $this;
-        $clone->companyId = $companyId;
-        return $clone;
-    }
-
-    // Семантические методы — читаются как бизнес-фраза
-    public function asArchived(): self
-    {
-        $clone         = clone $this;
-        $clone->status = ProductStatus::Archived;
-        return $clone;
-    }
-
-    public function asDraft(): self
-    {
-        $clone         = clone $this;
-        $clone->status = ProductStatus::Draft;
-        return $clone;
-    }
+    public function withCompanyId(string $id): self { $c = clone $this; $c->companyId = $id; return $c; }
+    public function withName(string $name): self    { $c = clone $this; $c->name = $name; return $c; }
+    public function asArchived(): self              { $c = clone $this; $c->status = ProductStatus::Archived; return $c; }
+    public function asDraft(): self                 { $c = clone $this; $c->status = ProductStatus::Draft; return $c; }
 
     public function build(): Product
     {
-        $product = new Product($this->id, $this->companyId, $this->name);
-        $product->setSku($this->sku);
-        $product->setStatus($this->status);
-        return $product;
+        $p = new Product($this->id, $this->companyId, $this->name);
+        $p->setSku($this->sku);
+        $p->setStatus($this->status);
+        return $p;
     }
 }
 ```
 
-**Использование в тестах:**
-
-```php
-// Минимум — дефолты покрывают всё
-$product = ProductBuilder::aProduct()->build();
-
-// Фокус на том что важно для теста
-$archived = ProductBuilder::aProduct()->asArchived()->build();
-
-// Серия с детерминированными ID
-$p1 = ProductBuilder::aProduct()->withIndex(1)->build();
-$p2 = ProductBuilder::aProduct()->withIndex(2)->build();
-
-// Компания через другой Builder
-$company = CompanyBuilder::aCompany()->withIndex(1)->build();
-$product = ProductBuilder::aProduct()->withCompanyId($company->getId())->build();
-```
-
-**Правила Builder:**
-
-| Правило | Зачем |
-|---|---|
-| `final class` | Builder не наследуется |
-| `private __construct()` | Создание только через `aProduct()` |
-| `with*()` возвращают `clone $this` | Иммутабельность, повторное использование |
-| `DEFAULT_*` константы | Тесты ссылаются на `ProductBuilder::DEFAULT_ID` |
-| `withIndex(int)` | Серийное создание с детерминированными UUID |
-| Семантические методы | Тест читается как бизнес-сценарий |
+**Правила:** `private __construct()` · `with*()` всегда clone · `DEFAULT_*` константы · `withIndex()` для серийного создания · семантические методы (`asArchived()`) читаются как бизнес-фраза
 
 ---
 
 ## 18. Decision Matrix
 
-### Где разместить код?
+### Куда положить код?
 
 | Вопрос | Размещение |
 |---|---|
-| Код обрабатывает HTTP? | `Controller/` |
-| Код оркестрирует бизнес-процесс? | `Application/{Verb}{Noun}Action` |
-| Код описывает правило предметной области? | `Domain/Policy` или `Domain/Service` |
-| Код — неизменяемое значение? | `Domain/ValueObject/` |
-| Код делает SQL-запрос (простой)? | `Repository/` |
-| Код делает сложный SQL (отчёт, агрегация)? | `Infrastructure/Query/` |
-| Код общается с внешним API? | `Infrastructure/Api/` |
-| Код нужен другому модулю? | Обернуть в `Facade/` |
-| Код нужен всем модулям? | `Shared/` |
+| Обрабатывает HTTP? | `Controller/` |
+| Оркестрирует бизнес-процесс? | `Application/{Verb}{Noun}Action` |
+| Описывает правило предметной области? | `Domain/Policy` или `Domain/Service` |
+| Неизменяемое значение? | `Domain/ValueObject/` |
+| Простой SQL-запрос? | `Repository/` |
+| Сложный SQL (отчёт, агрегация)? | `Infrastructure/Query/` |
+| Общается с внешним API? | `Infrastructure/Api/` |
+| Нужен другому модулю? | `Facade/` |
+| Нужен всем модулям? | `Shared/` |
 
-### Как общаться между модулями?
+### Межмодульное взаимодействие
 
 | Нужно | Решение |
 |---|---|
 | Прочитать данные другого модуля | `{Module}/Facade` → read-метод |
 | Изменить данные другого модуля | `{Module}/Facade` → command-метод |
-| Реагировать на событие | Messenger: dispatch из источника → Handler в получателе |
+| Реагировать на событие | Messenger: dispatch из источника → Handler |
 | Использовать Enum другого модуля | Напрямую (допустимо) |
 
-### Sync vs Async?
+### Sync vs Async
 
-| Критерий | Sync | Async |
-|---|---|---|
-| < 2 сек, пользователь ждёт | ✅ | — |
-| > 3 сек или внешний API | — | ✅ |
-| Побочный эффект (email, пуш) | — | ✅ |
-| Нужен retry при падении | — | ✅ |
-| Цепочка тяжёлых шагов | — | ✅ каждый шаг = Message |
+| < 2 сек, пользователь ждёт | → Sync (Action) |
+|---|---|
+| > 3 сек или внешний API | → Async (Messenger) |
+| Побочный эффект (email, пуш) | → Async |
+| Нужен retry при падении | → Async |
+| Цепочка тяжёлых шагов | → Async, каждый шаг = Message |
 
 ---
 
-## 19. API Documentation (OpenAPI / Nelmio)
+## 19. OpenAPI / Nelmio
 
-### Инструмент
+Инструмент: `nelmio/api-doc-bundle` + `zircote/swagger-php`. UI: `/api/doc`.
 
-`nelmio/api-doc-bundle` + `zircote/swagger-php`. UI на `/api/doc`, спека на `/api/doc.json`.
+### Область
 
-### Область действия
+- Документируем: `src/{Module}/Controller/Api/`
+- НЕ документируем: `/api/public/`, debug/admin-эндпоинты, Facade-методы
 
-- Документируем контроллеры под `src/{Module}/Controller/Api/`
-- НЕ документируем: `/api/public/` (публичные отчёты — отдельный security scheme), debug/admin-эндпоинты
-- НЕ документируем внутренние Facade-методы — они не HTTP
-
-### Правило: не менять логику
-
-Атрибуты `#[OA\*]` вешаются над классом контроллера и над методом `__invoke` / action-методом. Код внутри метода не меняется. DTO не переименовываются и не реструктурируются.
-
-### Документирование Response-DTO
-
-**Важно:** если Response-DTO имеет ручной `toArray()` со snake_case или другими переименованиями полей — `#[Model(type: ...)]` даст неправильную схему. Используем `#[OA\Schema]` вручную над классом.
+### Response DTO — когда есть `toArray()` со snake_case
 
 ```php
-use OpenApi\Attributes as OA;
-
+// ❌ #[Model(type: Dto::class)] даст неправильную схему
+// ✅ Описать вручную
 #[OA\Schema(
     schema: 'SnapshotResponse',
-    description: 'Снэпшот аналитики',
     required: ['id', 'company_id'],
     properties: [
         new OA\Property(property: 'id', type: 'string', format: 'uuid'),
         new OA\Property(property: 'company_id', type: 'string', format: 'uuid'),
         new OA\Property(property: 'created_at', type: 'string', format: 'date-time'),
-        // перечисляем все поля в том виде, как они реально возвращаются
     ]
 )]
-final readonly class SnapshotResponse { /* не трогаем */ }
+final readonly class SnapshotResponse {}
 ```
 
-Если поля в PHP и в JSON совпадают один в один (редкий случай) — можно использовать `#[Model(type: Dto::class)]`.
-
-### Вложенные ссылки между схемами
-
-Строковые ref (`ref: '#/components/schemas/X'`) ВНУТРИ `OA\Schema` НЕ работают — Nelmio не резолвит такой класс и не регистрирует его в `components.schemas`. JSON-фрагмент выглядит корректным, но цепочка вложенных схем обрывается: в спеке появится ссылка на `#/components/schemas/X`, но самого описания `X` в `components.schemas` не будет.
-
-**Правило:** для любой ссылки на другой PHP-класс-схему используй `ref: new Model(type: X::class)`. swagger-php сам отрендерит корректный `#/components/schemas/X` в итоговом JSON, а Nelmio при этом каскадно зарегистрирует всю цепочку вложенных классов.
+### Вложенные ссылки — только `new Model(type: X::class)`
 
 ```php
-use Nelmio\ApiDocBundle\Attribute\Model;
-use OpenApi\Attributes as OA;
+// ❌ Nelmio не зарегистрирует схему
+new OA\Property(property: 'cost', ref: '#/components/schemas/CostBreakdown'),
 
-#[OA\Schema(
-    schema: 'SnapshotResponse',
-    properties: [
-        // ❌ НЕ работает — Nelmio не увидит CostBreakdown
-        new OA\Property(property: 'cost_breakdown', ref: '#/components/schemas/CostBreakdown'),
+// ✅
+new OA\Property(property: 'cost', ref: new Model(type: CostBreakdown::class)),
 
-        // ✅ работает — Nelmio резолвит класс и регистрирует схему
-        new OA\Property(property: 'cost_breakdown', ref: new Model(type: CostBreakdown::class)),
-
-        // ✅ для массивов — Model внутри OA\Items
-        new OA\Property(
-            property: 'data',
-            type: 'array',
-            items: new OA\Items(ref: new Model(type: SnapshotResponse::class)),
-        ),
-    ]
-)]
+// ✅ массивы
+new OA\Property(property: 'items', type: 'array', items: new OA\Items(ref: new Model(type: Dto::class))),
 ```
 
-**Исключение:** ссылка на схему, описанную inline в `config/packages/nelmio_api_doc.yaml` (например, `Problem`), — там PHP-класса нет, используется строковый ref. Это работает, потому что схема регистрируется из YAML напрямую.
-
-### Документирование Request-DTO
-
-Для DTO, которые биндятся через `#[MapRequestPayload]`, описываем схему атрибутом над классом. Валидация (`#[Assert\*]`) Nelmio подхватывает автоматически в части required/min/max/pattern.
+### Контроллер
 
 ```php
-#[OA\Schema(
-    schema: 'CreateMarketplaceAnalyticsRequest',
-    required: ['title'],
-    properties: [
-        new OA\Property(property: 'title', type: 'string', minLength: 1),
-    ]
-)]
-final class CreateMarketplaceAnalyticsRequest { /* не трогаем */ }
-```
-
-### Документирование контроллера
-
-```php
-use OpenApi\Attributes as OA;
-
 #[OA\Tag(name: 'Marketplace Analytics')]
 final class SnapshotShowController extends AbstractController
 {
-    #[OA\Get(
-        summary: 'Снэпшот по ID',
-        description: 'Проверяет принадлежность активной компании.',
-        tags: ['Marketplace Analytics']
-    )]
-    #[OA\Parameter(
-        name: 'id',
-        in: 'path',
-        required: true,
-        schema: new OA\Schema(type: 'string', format: 'uuid')
-    )]
-    #[OA\Response(
-        response: 200,
-        description: 'Найдено',
-        content: new OA\JsonContent(ref: '#/components/schemas/SnapshotResponse')
-    )]
+    #[OA\Get(summary: 'Снэпшот по ID', tags: ['Marketplace Analytics'])]
+    #[OA\Parameter(name: 'id', in: 'path', required: true, schema: new OA\Schema(type: 'string', format: 'uuid'))]
+    #[OA\Response(response: 200, description: 'Найдено', content: new OA\JsonContent(ref: '#/components/schemas/SnapshotResponse'))]
     #[OA\Response(response: 404, description: 'Не найдено')]
     #[Route('/api/marketplace-analytics/snapshots/{id}', methods: ['GET'])]
-    public function __invoke(string $id): JsonResponse
-    {
-        // логика не меняется
-    }
+    public function __invoke(string $id): JsonResponse { /* логика не меняется */ }
 }
 ```
 
-### Чеклист при добавлении нового API-эндпоинта
+### Чеклист нового эндпоинта
 
-1. У контроллера есть `#[OA\Tag]` (на классе) и `#[OA\Get|Post|...]` (на методе) с `summary` на русском
-2. Если принимает body — есть `#[OA\RequestBody]` со ссылкой на схему
-3. Если есть path/query параметры — каждый описан `#[OA\Parameter]` (кроме `companyId` — он из сессии, не документируется)
-4. Перечислены ВСЕ возможные HTTP-коды ответа, включая 401, 404, 422
-5. Response-DTO имеет `#[OA\Schema]` с перечислением полей в том виде, как они уходят в JSON (учитывая snake_case из `toArray()`)
-6. Новый тег зарегистрирован в `config/packages/nelmio_api_doc.yaml` в секции `tags`
-7. Счётчик coverage в `ARCHITECTURE.md` обновлён
+- [ ] `#[OA\Tag]` на классе, `#[OA\Get|Post|...]` с `summary` на методе
+- [ ] `#[OA\RequestBody]` если принимает body
+- [ ] `#[OA\Parameter]` для path/query (кроме `companyId` — из сессии, не документировать)
+- [ ] Все HTTP-коды ответа включая 401, 422
+- [ ] Response-DTO имеет `#[OA\Schema]` с полями как в JSON
+- [ ] Новый тег зарегистрирован в `nelmio_api_doc.yaml`
+- [ ] Запущен `make api-types`, `schema.d.ts` закоммичен
 
-### Анти-паттерны
-
-- ❌ Использовать `#[Model(type: SomeDto::class)]`, если у DTO есть `toArray()` с переименованиями
-- ❌ Документировать `companyId` как query-параметр
-- ❌ Документировать debug/admin-эндпоинты в публичной area
-- ❌ Менять логику контроллера «заодно с документацией»
-- ❌ Выдумывать HTTP-коды, которых контроллер не возвращает
-
-### Контур фронт-бэк
-
-TypeScript-типы фронта генерируются из OpenAPI-спеки бэка. Мост лежит в `site/assets/api/`:
-
-- `schema.d.ts` — автогенерируется, коммитится в git
-- `client.ts` — типизированный клиент `openapi-fetch`
-
-**Инструменты:**
-- `openapi-typescript` — генератор TS-типов из OpenAPI-спеки (devDep)
-- `openapi-fetch` — рантайм-клиент, строго типизирован по `paths` из `schema.d.ts` (dep)
-
-**Разработчик:**
-1. Изменил контроллер / DTO / `#[OA\Schema]`
-2. Запустил `make api-types`
-3. Закоммитил `site/assets/api/schema.d.ts` вместе с бэк-изменениями
-
-**Использование на фронте:**
+### TypeScript-контур
 
 ```typescript
+// site/assets/api/client.ts
 import { api } from '@/api/client';
-
 const { data, error } = await api.GET('/api/marketplace-analytics/snapshots', {
     params: { query: { page: 1 } },
 });
 ```
 
-**Что НЕ делать:**
+`schema.d.ts` генерируется через `make api-types`, коммитится в git. CI проверяет соответствие.
+**Нельзя:** править `schema.d.ts` руками · использовать сырой `fetch()`.
 
-- НЕ править `schema.d.ts` руками — перезапишется следующей генерацией
-- НЕ использовать сырой `fetch('/api/...')` — теряется типобезопасность
-- НЕ оборачивать `api.GET` в кастомные обёртки без необходимости — усложняет отладку
+### Анти-паттерны
 
-**Продакшн-деплой** не запускает генерацию типов. Бандл собирается из закоммиченного `schema.d.ts`. CI проверяет, что закоммиченный файл соответствует текущей спеке (см. CI-гейт ниже).
+```
+#[Model(type: Dto::class)] при наличии toArray() со snake_case  — неправильная схема
+Документировать companyId как query-параметр                    — он из сессии
+Менять логику контроллера «заодно с документацией»             — отдельный PR
+Строковый ref: '#/components/schemas/X' для PHP-классов        — Nelmio не зарегистрирует
+```
 
-**CI-гейт:** при PR job `api-types-check` проверяет, что `site/assets/api/schema.d.ts` соответствует актуальной OpenAPI-спеке. Если забыл запустить `make api-types` перед коммитом — PR не пройдёт. Фикс: запустить `make api-types` локально, закоммитить обновлённый `schema.d.ts`.
+---
 
-**Демо-компонент:** `site/assets/react/marketplace-analytics/SnapshotListDemo.tsx` — референс использования типизированного клиента, не монтируется на страницы.
+## 20. Событийная модель: Доменные события
+
+Когда нужно уведомить другой модуль о факте — без прямого вызова его Facade.
+
+```php
+// src/Deals/Domain/Event/DealStatusChangedEvent.php
+final readonly class DealStatusChangedEvent
+{
+    public function __construct(
+        public string $dealId,
+        public string $companyId,
+        public DealStatus $oldStatus,
+        public DealStatus $newStatus,
+        public \DateTimeImmutable $occurredAt,
+    ) {}
+}
+```
+
+```php
+// src/Deals/Entity/Deal.php
+class Deal
+{
+    /** @var list<object> */
+    private array $domainEvents = [];
+
+    public function changeStatus(DealStatus $new): void
+    {
+        if ($this->status === $new) return;
+        $old = $this->status;
+        $this->status = $new;
+        $this->domainEvents[] = new DealStatusChangedEvent($this->id, $this->companyId, $old, $new, new \DateTimeImmutable());
+    }
+
+    public function pullDomainEvents(): array
+    {
+        $events = $this->domainEvents;
+        $this->domainEvents = [];
+        return $events;
+    }
+}
+```
+
+```php
+// src/Deals/Application/ChangeDealStatusAction.php
+public function __invoke(string $dealId, string $companyId, DealStatus $new): void
+{
+    $deal = $this->dealRepository->findByIdAndCompany($dealId, $companyId)
+        ?? throw new DealNotFoundException($dealId);
+
+    $deal->changeStatus($new);
+    $this->em->flush();
+
+    foreach ($deal->pullDomainEvents() as $event) {
+        $this->eventDispatcher->dispatch($event);
+    }
+}
+```
+
+**Правила:** события — `readonly class` только со scalar ID · `pullDomainEvents()` вызывать после `flush()` · подписчики в других модулях — через `EventSubscriber`, не напрямую · тяжёлые подписчики (email, пересчёт) → dispatch через Messenger
+
+---
+
+## 21. Оптимистичная блокировка
+
+Защита от race condition при параллельных обновлениях одной Entity.
+
+```php
+// Entity
+use Doctrine\ORM\Mapping as ORM;
+
+class Document
+{
+    #[ORM\Version]
+    #[ORM\Column(type: 'integer')]
+    private int $version = 1;
+}
+```
+
+```php
+// Action: передавать version из запроса
+public function __invoke(string $id, string $companyId, int $expectedVersion, UpdateCommand $cmd): void
+{
+    $document = $this->repo->findByIdAndCompany($id, $companyId)
+        ?? throw new DocumentNotFoundException($id);
+
+    try {
+        $document->update($cmd);
+        $this->em->flush(); // Doctrine проверит version автоматически
+    } catch (OptimisticLockException) {
+        throw new \DomainException('Документ был изменён другим пользователем. Обновите страницу.');
+    }
+}
+```
+
+```php
+// Controller: принимать version в теле запроса
+// Request: { "version": 3, "name": "..." }
+// Response 422 при конфликте версий
+```
+
+**Когда использовать:** Entity, которую могут редактировать несколько пользователей одновременно (документы, настройки). Не нужно для append-only Entity (транзакции, логи).
+
+---
+
+## 22. Idempotency в Messenger
+
+Защита от дублирования при retry — если Handler упал после flush, но до успешного ack.
+
+```php
+// Entity для хранения обработанных сообщений
+// src/Shared/Entity/ProcessedMessage.php
+#[ORM\Entity]
+#[ORM\Table(name: 'processed_messages')]
+class ProcessedMessage
+{
+    #[ORM\Id, ORM\Column]
+    private string $messageId;
+
+    #[ORM\Column]
+    private \DateTimeImmutable $processedAt;
+}
+```
+
+```php
+// src/Shared/Messenger/IdempotentHandlerTrait.php
+trait IdempotentHandlerTrait
+{
+    private function isAlreadyProcessed(string $messageId): bool
+    {
+        return $this->em->find(ProcessedMessage::class, $messageId) !== null;
+    }
+
+    private function markAsProcessed(string $messageId): void
+    {
+        $this->em->persist(new ProcessedMessage($messageId, new \DateTimeImmutable()));
+        // flush вызывает Action — не здесь
+    }
+}
+```
+
+```php
+#[AsMessageHandler]
+final class ImportBankStatementHandler
+{
+    use IdempotentHandlerTrait;
+
+    public function __invoke(ImportBankStatementMessage $message): void
+    {
+        if ($this->isAlreadyProcessed($message->idempotencyKey)) {
+            $this->logger->info('Сообщение уже обработано, пропускаем', ['key' => $message->idempotencyKey]);
+            return;
+        }
+
+        ($this->action)($message->companyId, $message->statementId);
+        $this->markAsProcessed($message->idempotencyKey);
+    }
+}
+```
+
+**Когда:** импорты из внешних систем · финансовые операции · любой Handler с деструктивными или неотменяемыми эффектами. Не нужно для read-only и вычислительных Handler.
