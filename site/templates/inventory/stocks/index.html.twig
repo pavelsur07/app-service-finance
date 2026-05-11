@@ -1,0 +1,124 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Отчёт по остаткам{% endblock %}
+
+{% block content %}
+    <div class="page-header d-print-none mb-3">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">Отчёт по остаткам</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{{ path('inventory_snapshots_index') }}" class="btn btn-outline-secondary">К загрузкам</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mb-3">
+        <div class="card-body">
+            <form method="get" class="row g-2">
+                <div class="col-md-2">
+                    <label class="form-label">Источник</label>
+                    <select name="source" class="form-select">
+                        {% for item in sources %}
+                            <option value="{{ item.value }}" {{ source.value == item.value ? 'selected' : '' }}>{{ item.getDisplayName() }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Snapshot session ID</label>
+                    <input name="snapshotSessionId" value="{{ filters.snapshotSessionId }}" class="form-control" placeholder="UUID">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Snapshot date/time</label>
+                    <input name="snapshotAt" value="{{ filters.snapshotAt }}" class="form-control" placeholder="2026-05-10 12:00:00">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Поиск SKU / Offer ID</label>
+                    <input name="search" value="{{ filters.search }}" class="form-control" placeholder="sku / offer">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Mapping status</label>
+                    <select name="mappingStatus" class="form-select">
+                        <option value="">Все</option>
+                        {% for status in mappingStatuses %}
+                            <option value="{{ status.value }}" {{ filters.mappingStatus == status.value ? 'selected' : '' }}>{{ status.value }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 d-flex gap-2">
+                    <button class="btn btn-primary" type="submit">Применить</button>
+                    <a class="btn btn-outline-secondary" href="{{ path('inventory_stocks_index') }}">Сбросить</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-vcenter card-table">
+                <thead>
+                <tr>
+                    <th>Дата-время snapshot</th>
+                    <th>Marketplace/source</th>
+                    <th>SKU</th>
+                    <th>Offer ID</th>
+                    <th>Листинг</th>
+                    <th>Product</th>
+                    <th>fulfillmentType</th>
+                    <th>Остаток</th>
+                    <th>Зарезервировано</th>
+                    <th>Доступно расчётно</th>
+                    <th>mappingStatus</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in pager.currentPageResults %}
+                    <tr>
+                        <td>{{ row.snapshot_at|date('d.m.Y H:i:s') }}</td>
+                        <td><span class="badge bg-azure-lt">{{ row.source|upper }}</span></td>
+                        <td>{{ row.source_sku ?: '—' }}</td>
+                        <td>{{ row.source_offer_id ?: '—' }}</td>
+                        <td>{{ row.listing_id ?: '—' }}</td>
+                        <td>{{ row.product_id ?: '—' }}</td>
+                        <td>{{ row.fulfillment_type ?: '—' }}</td>
+                        <td>{{ row.quantity }}</td>
+                        <td>{{ row.reserved_quantity }}</td>
+                        <td>{{ row.available_for_sale }}</td>
+                        <td>
+                            {% set mapClass = {
+                                'mapped': 'bg-green-lt',
+                                'unmapped': 'bg-yellow-lt',
+                                'ambiguous': 'bg-red-lt'
+                            } %}
+                            <span class="badge {{ mapClass[row.mapping_status]|default('bg-secondary-lt') }}">{{ row.mapping_status }}</span>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="11" class="text-center text-muted py-4">Нет нормализованных остатков по выбранным фильтрам.</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if pager.haveToPaginate %}
+            <div class="card-footer d-flex align-items-center">
+                <ul class="pagination m-0 ms-auto">
+                    <li class="page-item {{ pager.currentPage == 1 ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('inventory_stocks_index', app.request.query.all|merge({page: pager.currentPage - 1})) }}">‹</a>
+                    </li>
+                    {% for p in 1..pager.nbPages %}
+                        <li class="page-item {{ p == pager.currentPage ? 'active' : '' }}">
+                            <a class="page-link" href="{{ path('inventory_stocks_index', app.request.query.all|merge({page: p})) }}">{{ p }}</a>
+                        </li>
+                    {% endfor %}
+                    <li class="page-item {{ pager.currentPage == pager.nbPages ? 'disabled' : '' }}">
+                        <a class="page-link" href="{{ path('inventory_stocks_index', app.request.query.all|merge({page: pager.currentPage + 1})) }}">›</a>
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
