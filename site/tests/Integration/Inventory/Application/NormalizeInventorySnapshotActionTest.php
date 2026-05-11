@@ -9,6 +9,7 @@ use App\Company\Entity\Company;
 use App\Inventory\Application\NormalizeInventorySnapshotAction;
 use App\Inventory\Entity\InventoryRawSnapshot;
 use App\Inventory\Entity\InventorySnapshotSession;
+use App\Inventory\Entity\Location;
 use App\Inventory\Entity\StockSnapshot;
 use App\Inventory\Enum\SnapshotTriggerType;
 use App\Inventory\Enum\StockSnapshotMappingStatus;
@@ -55,6 +56,7 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
 
         $rows = $this->em->getRepository(StockSnapshot::class)->findBy(['companyId' => $company->getId()]);
         self::assertCount(4, $rows);
+        self::assertSame(2, $this->em->getRepository(Location::class)->count(['companyId' => $company->getId(), 'externalSystem' => MarketplaceType::OZON]));
 
         $bySku = [];
         foreach ($rows as $row) { $bySku[$row->getSourceSku()] = $row; }
@@ -81,6 +83,30 @@ final class NormalizeInventorySnapshotActionTest extends IntegrationTestCase
         self::assertSame('3.000', $bySku['SKU-M']->getReservedQuantity());
         self::assertSame('OF-M', $bySku['SKU-M']->getSourceOfferId());
         self::assertSame('fbs', $bySku['SKU-M']->getFulfillmentType());
+    }
+
+    public function testSingleSkuHasSingleSnapshotRowWithinSession(): void
+    {
+        $company = $this->createCompany(903);
+        $session = new InventorySnapshotSession($company->getId(), MarketplaceType::OZON, SnapshotTriggerType::Manual);
+        $session->markCompleted();
+        $this->em->persist($session);
+
+        $this->em->persist($this->raw($company->getId(), $session->getId(), '220282262', 11, 0, 'fbo', 'OF-220282262'));
+        $this->em->flush();
+
+        $action = self::getContainer()->get(NormalizeInventorySnapshotAction::class);
+        $action($company->getId(), $session->getId(), MarketplaceType::OZON);
+        $action($company->getId(), $session->getId(), MarketplaceType::OZON);
+
+        self::assertSame(1, $this->em->getRepository(StockSnapshot::class)->count([
+            'companyId' => $company->getId(),
+            'snapshotSessionId' => $session->getId(),
+            'source' => MarketplaceType::OZON,
+            'sourceSku' => '220282262',
+            'fulfillmentType' => 'fbo',
+            'status' => StockStatus::Available,
+        ]));
     }
 
 
