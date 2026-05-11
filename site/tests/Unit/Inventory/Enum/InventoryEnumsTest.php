@@ -7,6 +7,7 @@ namespace Tests\Unit\Inventory\Enum;
 use App\Inventory\Enum\LocationType;
 use App\Inventory\Enum\SnapshotSessionStatus;
 use App\Inventory\Enum\SnapshotTriggerType;
+use App\Inventory\Enum\StockSnapshotMappingStatus;
 use App\Inventory\Enum\StockStatus;
 use PHPUnit\Framework\TestCase;
 
@@ -64,6 +65,18 @@ final class InventoryEnumsTest extends TestCase
                 'retry',
             ],
             array_map(static fn (SnapshotTriggerType $case): string => $case->value, SnapshotTriggerType::cases()),
+        );
+    }
+
+    public function testStockSnapshotMappingStatusHasExpectedValuesCount(): void
+    {
+        $this->assertSame(
+            [
+                'unmapped',
+                'mapped',
+                'ambiguous',
+            ],
+            array_map(static fn (StockSnapshotMappingStatus $case): string => $case->value, StockSnapshotMappingStatus::cases()),
         );
     }
 }

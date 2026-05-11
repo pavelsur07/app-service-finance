@@ -144,6 +144,8 @@ final class StockReportControllerTest extends WebTestCaseBase
         $html = (string) $client->getResponse()->getContent();
         self::assertStringContainsString('UNMAPPED-SKU', $html);
         self::assertStringNotContainsString('MAPPED-SKU', $html);
+        self::assertStringContainsString('10.000', $html);
+        self::assertStringContainsString('3.000', $html);
         self::assertStringContainsString('7.000', $html);
 
         $client->request('GET', '/inventory/snapshots');

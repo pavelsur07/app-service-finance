@@ -55,8 +55,17 @@ final class InventorySchemaTest extends IntegrationTestCase
         self::assertSame(14, (int) $reservedQuantityDef['numeric_precision']);
         self::assertSame(3, (int) $reservedQuantityDef['numeric_scale']);
 
-        $mappingStatusDefault = $conn->fetchOne("SELECT column_default FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_stock_snapshots' AND column_name = 'mapping_status'");
-        self::assertStringContainsString('unmapped', (string) $mappingStatusDefault);
+        $mappingStatusDef = $conn->fetchAssociative(<<<'SQL'
+            SELECT data_type, character_maximum_length, column_default
+            FROM information_schema.columns
+            WHERE table_schema = 'public'
+              AND table_name = 'inventory_stock_snapshots'
+              AND column_name = 'mapping_status'
+        SQL);
+        self::assertIsArray($mappingStatusDef);
+        self::assertSame('character varying', $mappingStatusDef['data_type']);
+        self::assertSame(50, (int) $mappingStatusDef['character_maximum_length']);
+        self::assertStringContainsString('unmapped', (string) $mappingStatusDef['column_default']);
 
         $companySourceSkuIndex = (string) $conn->fetchOne("SELECT indexdef FROM pg_indexes WHERE schemaname = 'public' AND indexname = 'idx_inventory_stock_company_source_sku'");
         self::assertStringContainsString('(company_id, source_sku)', $companySourceSkuIndex);
