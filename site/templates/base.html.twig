@@ -11,6 +11,8 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
         {% block stylesheets %}{% endblock %}
+            {{ vite_entry_link_tags('design_tokens') }}
+            {{ vite_entry_link_tags('vf_custom_classes') }}
             {{ vite_entry_link_tags('app') }}
     {% endblock %}
     {% block importmap %}
