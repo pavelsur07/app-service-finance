@@ -164,4 +164,26 @@ final class OzonServiceCategoryMapTest extends TestCase
             );
         }
     }
+
+    public function testNewCodesResolveAsExactKnownAndNotFallback(): void
+    {
+        $logger = new WarningCapturingLogger();
+
+        $cases = [
+            'DefectFineShipmentDelayRated' => 'ozon_fines_shipment_delay_rated',
+            'DefectFineCancellation' => 'ozon_fines_cancellation',
+            'MarketplaceServiceItemServiceFeeRFBS' => 'ozon_service_fee_rfbs',
+            'DefectFineShipmentDelay' => 'ozon_fines_shipment_delay',
+        ];
+
+        foreach ($cases as $input => $expectedCode) {
+            $logger->reset();
+            $resolved = OzonServiceCategoryMap::resolve($input, $logger);
+
+            $this->assertSame($expectedCode, $resolved, sprintf('"%s" должен резолвиться в "%s"', $input, $expectedCode));
+            $this->assertTrue(OzonServiceCategoryMap::isKnown($input), sprintf('"%s" должен считаться known', $input));
+            $this->assertNotSame('ozon_other_service', $resolved, sprintf('"%s" не должен уходить в fallback ozon_other_service', $input));
+            $this->assertFalse($logger->hasWarnings(), sprintf('"%s" не должен логировать warning как unknown', $input));
+        }
+    }
 }

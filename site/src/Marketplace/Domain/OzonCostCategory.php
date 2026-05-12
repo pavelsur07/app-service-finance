@@ -559,6 +559,27 @@ final readonly class OzonCostCategory
                 ],
             ),
             new self(
+                code: 'ozon_fines_shipment_delay_rated',
+                name: 'Отгрузка в нерекомендованный слот',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                operationTypes: ['DefectFineShipmentDelayRated'],
+            ),
+            new self(
+                code: 'ozon_fines_cancellation',
+                name: 'Превышение индекса ошибок: отмена',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                operationTypes: ['DefectFineCancellation'],
+            ),
+            new self(
+                code: 'ozon_service_fee_rfbs',
+                name: 'Сервисный сбор за интеграцию с логистической платформой',
+                widgetGroup: 'Другие услуги и штрафы',
+                xlsxGroup: 'Другие услуги и штрафы',
+                serviceNames: ['MarketplaceServiceItemServiceFeeRFBS'],
+            ),
+            new self(
                 code: 'ozon_other_service',
                 name: 'Прочие услуги Ozon',
                 widgetGroup: 'Другие услуги и штрафы',

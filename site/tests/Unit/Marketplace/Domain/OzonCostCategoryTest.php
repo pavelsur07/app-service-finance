@@ -244,4 +244,24 @@ final class OzonCostCategoryTest extends TestCase
 
         $this->assertCount(count($all), $byCode);
     }
+
+    public function testNewOperationTypesAndServiceNameResolveToDedicatedCategories(): void
+    {
+        $this->assertSame(
+            'ozon_fines_shipment_delay_rated',
+            OzonCostCategory::findByOperationType('DefectFineShipmentDelayRated')?->code,
+        );
+        $this->assertSame(
+            'ozon_fines_cancellation',
+            OzonCostCategory::findByOperationType('DefectFineCancellation')?->code,
+        );
+        $this->assertSame(
+            'ozon_service_fee_rfbs',
+            OzonCostCategory::findByServiceName('MarketplaceServiceItemServiceFeeRFBS')?->code,
+        );
+        $this->assertSame(
+            'ozon_fines_shipment_delay',
+            OzonCostCategory::findByOperationType('DefectFineShipmentDelay')?->code,
+        );
+    }
 }
