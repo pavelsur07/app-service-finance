@@ -12,11 +12,12 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Formatter\OutputFormatter;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 #[AsCommand(
     name: 'app:user:reset-password',
-    description: 'Сбрасывает пароль пользователя по email и выводит новый временный пароль.',
+    description: 'Resets a user password by email and displays a new temporary password.',
 )]
 final class ResetUserPasswordCommand extends Command
 {
@@ -30,22 +31,23 @@ final class ResetUserPasswordCommand extends Command
 
     protected function configure(): void
     {
-        $this->addArgument('email', InputArgument::REQUIRED, 'Email пользователя');
+        $this->addArgument('email', InputArgument::REQUIRED, 'User email');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $email = User::normalizeEmail((string) $input->getArgument('email'));
+        $escapedEmail = OutputFormatter::escape($email);
 
         if (false === filter_var($email, FILTER_VALIDATE_EMAIL)) {
-            $output->writeln(sprintf('<error>Некорректный формат email: "%s".</error>', $email));
+            $output->writeln(sprintf('<error>Invalid email format: "%s".</error>', $escapedEmail));
 
             return Command::FAILURE;
         }
 
         $user = $this->userRepository->findOneBy(['email' => $email]);
         if (null === $user) {
-            $output->writeln(sprintf('<error>Пользователь с email "%s" не найден.</error>', $email));
+            $output->writeln(sprintf('<error>User with email "%s" was not found.</error>', $escapedEmail));
 
             return Command::FAILURE;
         }
@@ -56,8 +58,8 @@ final class ResetUserPasswordCommand extends Command
         $user->setPassword($hashedPassword);
         $this->entityManager->flush();
 
-        $output->writeln(sprintf('<info>Пароль пользователя %s успешно обновлён.</info>', $email));
-        $output->writeln(sprintf('<comment>Новый временный пароль: %s</comment>', $plainPassword));
+        $output->writeln(sprintf('<info>Password for user %s has been updated.</info>', $escapedEmail));
+        $output->writeln(sprintf('<comment>New temporary password: %s</comment>', OutputFormatter::escape($plainPassword)));
 
         return Command::SUCCESS;
     }

@@ -29,7 +29,7 @@ final class ResetUserPasswordCommandTest extends TestCase
         $exitCode = $tester->execute(['email' => 'not-an-email']);
 
         self::assertSame(Command::FAILURE, $exitCode);
-        self::assertStringContainsString('Некорректный формат email', $tester->getDisplay());
+        self::assertStringContainsString('Invalid email format', $tester->getDisplay());
     }
 
     public function testExecuteReturnsFailureWhenUserIsNotFound(): void
@@ -52,7 +52,7 @@ final class ResetUserPasswordCommandTest extends TestCase
         $exitCode = $tester->execute(['email' => 'missing@example.com']);
 
         self::assertSame(Command::FAILURE, $exitCode);
-        self::assertStringContainsString('не найден', $tester->getDisplay());
+        self::assertStringContainsString('was not found', $tester->getDisplay());
     }
 
     public function testExecuteResetsPasswordAndFlushesEntityManager(): void
@@ -86,7 +86,7 @@ final class ResetUserPasswordCommandTest extends TestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
         self::assertSame('new-hash', $user->getPassword());
-        self::assertStringContainsString('успешно обновлён', $tester->getDisplay());
-        self::assertMatchesRegularExpression('/Новый временный пароль:\s*\S+/', $tester->getDisplay());
+        self::assertStringContainsString('has been updated', $tester->getDisplay());
+        self::assertMatchesRegularExpression('/New temporary password:\s*\S+/', $tester->getDisplay());
     }
 }
