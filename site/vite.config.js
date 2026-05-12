@@ -22,6 +22,8 @@ export default defineConfig({
         rollupOptions: {
             input: {
                 app: "./assets/app.js",
+                design_tokens: "./assets/styles/design-tokens.css",
+                vf_custom_classes: "./assets/styles/vf-custom-classes.css",
                 dashboard: "./assets/react/dashboard_started.tsx", // Точка ./ обязательна!
                 marketplace_analytics_kpi: "./assets/react/marketplace_analytics_kpi.tsx",
                 marketplace_analytics_page: "./assets/react/marketplace-analytics-page.tsx",

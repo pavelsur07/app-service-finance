@@ -9,7 +9,9 @@
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.2.0/dist/css/tabler.min.css" />
         <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.39.0/tabler-icons.min.css"/>
         {# Подключаем CSS, который Vite собрал для точки входа 'app' #}
-        {{ vite_entry_link_tags('app') }}
+        {{ vite_entry_link_tags('design_tokens') }}
+            {{ vite_entry_link_tags('vf_custom_classes') }}
+            {{ vite_entry_link_tags('app') }}
     {% endblock %}
 </head>
 <body>

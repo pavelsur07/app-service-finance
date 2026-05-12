@@ -1,0 +1,60 @@
+/* Clean VF custom classes (normalized, no mojibake, no undefined vars). */
+
+.vf-scope {
+  font-family: var(--vf-font-sans);
+  font-size: var(--vf-size-base);
+  line-height: var(--vf-leading-normal);
+  color: var(--vf-text-dashboard);
+  background: var(--vf-bg);
+  font-feature-settings: var(--vf-feature-settings);
+}
+
+.vf-h1 { font-size: var(--vf-size-h1); font-weight: var(--vf-weight-bold); line-height: var(--vf-leading-tight); }
+.vf-h2 { font-size: var(--vf-size-h2); font-weight: var(--vf-weight-bold); line-height: var(--vf-leading-snug); }
+.vf-h3 { font-size: var(--vf-size-h3); font-weight: var(--vf-weight-semibold); line-height: var(--vf-leading-snug); }
+.vf-p { font-size: var(--vf-size-base); color: var(--vf-text-muted); }
+.vf-small { font-size: var(--vf-size-sm); color: var(--vf-text-secondary); }
+.vf-uppercase, .vf-label-uppercase { text-transform: uppercase; letter-spacing: var(--vf-tracking-wide); }
+.vf-num, .vf-numeric { font-family: var(--vf-font-numeric); font-variant-numeric: tabular-nums; }
+
+.vf-text-positive { color: var(--vf-green); }
+.vf-text-negative { color: var(--vf-red); }
+.vf-text-warning { color: var(--vf-yellow); }
+.vf-text-info { color: var(--vf-primary); }
+.vf-text-ai { color: var(--vf-ai-indigo); }
+.vf-ai-badge { background: var(--vf-ai-gradient); color: #fff; border-radius: var(--vf-radius-sm); padding: 2px 7px; font-size: 10px; font-weight: var(--vf-weight-bold); }
+
+.vf-pnl-wrap { background: var(--vf-bg); min-height: 100vh; }
+.vf-pnl-sticky { position: sticky; top: 0; z-index: 20; background: var(--vf-bg); }
+.vf-pnl-toolbar { display: flex; flex-wrap: wrap; gap: var(--vf-space-2); padding: 12px 16px; background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: var(--vf-radius-md) var(--vf-radius-md) 0 0; }
+.vf-pnl-search { display: flex; align-items: center; gap: 6px; background: var(--vf-surface-alt); border: 1px solid var(--vf-border); border-radius: var(--vf-radius); padding: 5px 10px; }
+
+.vf-fchip, .vf-chip, .vf-filter-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: var(--vf-radius);
+  padding: 5px 10px; font-size: var(--vf-size-sm); color: var(--vf-text-dashboard);
+}
+.vf-fchip.active, .vf-filter-btn.has-active { border-color: var(--vf-primary); background: var(--vf-primary-lt); color: var(--vf-primary); }
+
+.vf-ops { background: var(--vf-surface); border: 1px solid var(--vf-border); border-radius: 0 0 var(--vf-radius-md) var(--vf-radius-md); }
+.vf-ops-table-wrap { max-width: 100%; }
+.vf-ops-foot { background: var(--vf-surface-alt); border-top: 1px solid var(--vf-border); padding: 10px 16px; }
+
+.vf-src { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: var(--vf-radius-pill); font-size: .7rem; border: 1px solid var(--vf-border); }
+.vf-st, .vf-flag { display: inline-flex; align-items: center; gap: 4px; border-radius: var(--vf-radius-sm); font-size: .7rem; padding: 2px 8px; }
+
+.vf-filter-backdrop, .vf-op-drawer-backdrop { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.28); }
+.vf-filter-panel, .vf-op-drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  background: var(--vf-surface); box-shadow: var(--vf-shadow-lg);
+}
+
+/* Keep class names available for migration (no-op shims). */
+.vf-brand-mark, .vf-cal, .vf-card-dividends, .vf-chev, .vf-cs, .vf-cs-add, .vf-cs-badge, .vf-cs-caret,
+.vf-cs-item, .vf-cs-lbl, .vf-cs-list, .vf-cs-pop, .vf-cs-pop-foot, .vf-cs-pop-head, .vf-cs-trigger,
+.vf-delta-down, .vf-delta-up, .vf-filter-chips, .vf-kpi, .vf-hero, .vf-op-drawer, .vf-pnl-kpi,
+.vf-sb, .vf-sb-brand, .vf-sb-child, .vf-sb-co-lbl, .vf-sb-co-nm, .vf-sb-co-sw, .vf-sb-foot,
+.vf-sb-group, .vf-sb-kids, .vf-sb-link, .vf-sb-nav, .vf-section-title, .vf-spark, .vf-tx-cat,
+.vf-tx-table, .vf-active-filters, .vf-amount-in, .vf-amount-out {
+  /* intentionally left as migration hooks */
+}
