@@ -154,3 +154,66 @@ html {
 .pd-selected { font-weight: 600; }
 
 .pd-children { margin-left: 14px; border-left: 1px dashed rgba(10,21,72,.15); padding-left: 10px; }
+
+:root {
+    --vf-brand: #0A1548;
+    --vf-brand-05: rgba(10, 21, 72, .05);
+}
+
+.nav-item.active > a {
+    background: var(--vf-brand-05);
+    color: var(--vf-brand);
+    border-left: 2px solid var(--vf-brand);
+}
+
+.nav-item a:hover {
+    background: var(--vf-brand-05);
+    color: var(--vf-brand);
+}
+
+.nav-section-title {
+    font-size: .75rem;
+    letter-spacing: .04em;
+    color: #8a94a6;
+    text-transform: uppercase;
+    padding: .5rem 1rem;
+}
+
+.nav-link-icon i {
+    font-size: 1.5em;
+    line-height: 1;
+}
+
+aside.navbar .navbar-brand {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    padding-inline: .75rem;
+    margin-bottom: 0;
+}
+
+.navbar-brand img {
+    height: 40px;
+    width: auto;
+}
+
+.vf-sidebar {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.vf-sidebar-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.vf-sidebar-footer {
+    flex: 0 0 auto;
+}
+
+.vf-sidebar-company-name {
+    word-break: break-word;
+}
