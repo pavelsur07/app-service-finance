@@ -30,8 +30,8 @@ final readonly class UnitExtendedXlsxExporter
     private const COLUMNS = [
         ['label' => 'SKU',             'field' => 'sku',            'type' => 'string'],
         ['label' => 'Наименование',    'field' => 'title',          'type' => 'string'],
-        ['label' => 'Маркетплейс',     'field' => 'marketplace',    'type' => 'string'],
         ['label' => 'Артикул',         'field' => 'sellerArticle',  'type' => 'string'],
+        ['label' => 'Маркетплейс',     'field' => 'marketplace',    'type' => 'string'],
         ['label' => 'Выручка',         'field' => 'revenue',        'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'quantity',       'type' => 'integer'],
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],

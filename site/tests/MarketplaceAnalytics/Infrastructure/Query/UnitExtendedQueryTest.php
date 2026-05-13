@@ -89,6 +89,9 @@ final class UnitExtendedQueryTest extends TestCase
         $this->stubSales([
             new ListingSalesAggregateDTO('l-3', 'Без РР', 'SKU-3', 'ozon', '500.00', 2, '100.00', 2),
         ]);
+        $this->stubMeta([
+            new ListingMetaDTO('l-3', 'Без РР', 'SKU-3', 'ozon', 'SUP-3'),
+        ]);
         // No ad spend for this listing
         $this->stubAdSpend([]);
         $this->stubTotalAdSpend('0');
@@ -97,9 +100,17 @@ final class UnitExtendedQueryTest extends TestCase
 
         $row = $this->findRow($result['items'], 'l-3');
         self::assertNotNull($row);
+        self::assertArrayHasKey('sellerArticle', $row);
+        self::assertSame('SUP-3', $row['sellerArticle']);
+        self::assertSame('SKU-3', $row['sku']);
         self::assertSame(0.0, $row['adSpend']);
         // revenue > 0, adSpend = 0 → drrPercent = 0.0 (not null)
         self::assertSame(0.0, $row['drrPercent']);
+        self::assertSame(500.0, $row['revenue']);
+        self::assertSame(400.0, $row['profit']);
+        self::assertSame(0.0, $result['totals']['adSpend']);
+        self::assertSame(500.0, $result['totals']['revenue']);
+        self::assertSame(400.0, $result['totals']['profit']);
     }
 
     public function testListingWithAdSpendOnlyDoesNotAppearInRows(): void
