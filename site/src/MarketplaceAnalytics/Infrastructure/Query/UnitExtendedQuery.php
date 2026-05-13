@@ -4,21 +4,16 @@ declare(strict_types=1);
 
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
-use App\Marketplace\Application\Reconciliation\OzonXlsxServiceGroupMap;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
+use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 
 final readonly class UnitExtendedQuery
 {
-    /** Category codes considered as "commission" */
-    private const COMMISSION_CODES = [
-        'ozon_sale_commission',
-        'ozon_brand_commission',
-    ];
-
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
         private MarketplaceAdsFacade $adsFacade,
+        private MarketplaceCostAnalyticsGroupResolver $groupResolver,
     ) {
     }
 
@@ -61,9 +56,6 @@ final readonly class UnitExtendedQuery
         // Fetch metadata (title, sku, marketplace) for listings not present in sales
         $nonSalesIds = array_values(array_diff($allListingIds, array_keys($sales)));
         $listingMeta = $this->marketplaceFacade->getListingsMetaByIds($companyId, $nonSalesIds);
-
-        $categoryToGroup = OzonXlsxServiceGroupMap::getCategoryToServiceGroup();
-        $logisticsCodes = $this->getLogisticsCodes($categoryToGroup);
 
         $items = [];
         $totals = [
@@ -112,7 +104,10 @@ final readonly class UnitExtendedQuery
                 $costsAmt = (float) $cat->costsAmount;
                 $stornoAmt = (float) $cat->stornoAmount;
 
+                $costMarketplace = $mp !== '' ? $mp : $marketplace;
+
                 $allCategoriesRaw[] = [
+                    'marketplace' => $costMarketplace !== '' ? $costMarketplace : null,
                     'code' => $code,
                     'name' => $cat->categoryName,
                     'costsAmount' => round($costsAmt, 2),
@@ -120,9 +115,15 @@ final readonly class UnitExtendedQuery
                     'netAmount' => round($net, 2),
                 ];
 
-                if (in_array($code, self::COMMISSION_CODES, true)) {
+                $unitBucket = $this->groupResolver->resolveUnitBucket(
+                    $costMarketplace !== '' ? $costMarketplace : null,
+                    $code,
+                    $cat->categoryName,
+                );
+
+                if ($unitBucket === 'commission') {
                     $commission += $net;
-                } elseif (in_array($code, $logisticsCodes, true)) {
+                } elseif ($unitBucket === 'logistics') {
                     $logistics += $net;
                 } else {
                     $otherCosts += $net;
@@ -142,8 +143,8 @@ final readonly class UnitExtendedQuery
             $drrPercent = $revenue > 0 ? round($adSpend / $revenue * 100, 1) : null;
 
             // Build breakdown grouped by serviceGroup
-            $otherBreakdown = $this->buildBreakdown($allCategoriesRaw, $categoryToGroup, $logisticsCodes);
-            $allBreakdown = $this->buildBreakdown($allCategoriesRaw, $categoryToGroup, []);
+            $otherBreakdown = $this->buildBreakdown($allCategoriesRaw, true);
+            $allBreakdown = $this->buildBreakdown($allCategoriesRaw, false);
 
             $items[] = [
                 'listingId' => $listingId,
@@ -228,25 +229,23 @@ final readonly class UnitExtendedQuery
     }
 
     /**
-     * @param list<array{code: string, name: string, costsAmount: float, stornoAmount: float, netAmount: float}> $categories
-     * @param array<string, string> $categoryToGroup
-     * @param list<string> $excludeCodes codes to exclude (logistics for "other" breakdown)
+     * @param list<array{marketplace: ?string, code: string, name: string, costsAmount: float, stornoAmount: float, netAmount: float}> $categories
      * @return list<array<string, mixed>>
      */
-    private function buildBreakdown(array $categories, array $categoryToGroup, array $excludeCodes): array
+    private function buildBreakdown(array $categories, bool $excludeUnitColumns): array
     {
-        $commissionCodes = self::COMMISSION_CODES;
-
         $grouped = [];
         foreach ($categories as $cat) {
-            // For "other" breakdown: skip commission and logistics
-            if (!empty($excludeCodes)) {
-                if (in_array($cat['code'], $commissionCodes, true) || in_array($cat['code'], $excludeCodes, true)) {
+            $marketplace = is_string($cat['marketplace']) ? $cat['marketplace'] : null;
+
+            if ($excludeUnitColumns) {
+                $unitBucket = $this->groupResolver->resolveUnitBucket($marketplace, $cat['code'], $cat['name']);
+                if ($unitBucket === 'commission' || $unitBucket === 'logistics') {
                     continue;
                 }
             }
 
-            $group = $categoryToGroup[$cat['code']] ?? 'Прочее';
+            $group = $this->groupResolver->resolveBreakdownGroup($marketplace, $cat['code'], $cat['name']);
 
             if (!isset($grouped[$group])) {
                 $grouped[$group] = [
@@ -261,10 +260,11 @@ final readonly class UnitExtendedQuery
             $grouped[$group]['costsAmount'] += $cat['costsAmount'];
             $grouped[$group]['stornoAmount'] += $cat['stornoAmount'];
             $grouped[$group]['netAmount'] += $cat['netAmount'];
-            $grouped[$group]['categories'][] = $cat;
+            $categoryForResponse = $cat;
+            unset($categoryForResponse['marketplace']);
+            $grouped[$group]['categories'][] = $categoryForResponse;
         }
 
-        // Round and sort
         $result = [];
         foreach ($grouped as $group) {
             $group['costsAmount'] = round($group['costsAmount'], 2);
@@ -276,21 +276,5 @@ final readonly class UnitExtendedQuery
         usort($result, static fn (array $a, array $b): int => $b['netAmount'] <=> $a['netAmount']);
 
         return $result;
-    }
-
-    /**
-     * @param array<string, string> $categoryToGroup
-     * @return list<string>
-     */
-    private function getLogisticsCodes(array $categoryToGroup): array
-    {
-        $codes = [];
-        foreach ($categoryToGroup as $code => $group) {
-            if ($group === 'Услуги доставки') {
-                $codes[] = $code;
-            }
-        }
-
-        return $codes;
     }
 }
