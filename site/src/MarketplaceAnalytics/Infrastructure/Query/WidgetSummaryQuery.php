@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Facade\MarketplaceFacade;
-use App\MarketplaceAnalytics\Application\Service\WidgetServiceGroupMap;
+use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -21,8 +21,6 @@ use Doctrine\DBAL\Connection;
  */
 final readonly class WidgetSummaryQuery
 {
-    private const FALLBACK_GROUP = 'Другие услуги и штрафы';
-
     /** @var list<string> */
     private const WIDGET_GROUPS = [
         'Вознаграждение',
@@ -35,6 +33,7 @@ final readonly class WidgetSummaryQuery
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
         private Connection $connection,
+        private MarketplaceCostAnalyticsGroupResolver $groupResolver,
     ) {
     }
 
@@ -59,7 +58,6 @@ final readonly class WidgetSummaryQuery
         $returns = $this->marketplaceFacade->getReturnAggregatesByListing($companyId, $marketplace, $dateFrom, $dateTo);
         $costRows = $this->getCostAggregates($companyId, $marketplace, $dateFrom, $dateTo);
 
-        $codeToGroup = WidgetServiceGroupMap::getCategoryToWidgetGroup();
 
         $revenue = 0.0;
         $returnsTotal = 0.0;
@@ -94,7 +92,8 @@ final readonly class WidgetSummaryQuery
             $stornoAmt = (float) $row['storno_amount'];
             $netAmt = (float) $row['net_amount'];
 
-            $group = $codeToGroup[$code] ?? self::FALLBACK_GROUP;
+            $marketplaceFromRow = (string) $row['marketplace'];
+            $group = $this->groupResolver->resolveWidgetGroup($marketplaceFromRow, $code, $name);
 
             $groups[$group]['costsAmount'] += $costsAmt;
             $groups[$group]['stornoAmount'] += $stornoAmt;
@@ -102,8 +101,10 @@ final readonly class WidgetSummaryQuery
 
             // Агрегируем одинаковые categoryCode внутри группы
             // (на всякий случай — SQL уже группирует по cc.code, cc.name)
-            if (!isset($groups[$group]['categories'][$code])) {
-                $groups[$group]['categories'][$code] = [
+            $categoryKey = $marketplaceFromRow . ':' . $code;
+
+            if (!isset($groups[$group]['categories'][$categoryKey])) {
+                $groups[$group]['categories'][$categoryKey] = [
                     'code'         => $code,
                     'name'         => $name,
                     'costsAmount'  => 0.0,
@@ -112,9 +113,9 @@ final readonly class WidgetSummaryQuery
                 ];
             }
 
-            $groups[$group]['categories'][$code]['costsAmount'] += $costsAmt;
-            $groups[$group]['categories'][$code]['stornoAmount'] += $stornoAmt;
-            $groups[$group]['categories'][$code]['netAmount'] += $netAmt;
+            $groups[$group]['categories'][$categoryKey]['costsAmount'] += $costsAmt;
+            $groups[$group]['categories'][$categoryKey]['stornoAmount'] += $stornoAmt;
+            $groups[$group]['categories'][$categoryKey]['netAmount'] += $netAmt;
         }
 
         // Build widgetGroups list with rounding and sorting
@@ -180,6 +181,7 @@ final readonly class WidgetSummaryQuery
      * где бэкфилл-миграция сохранила положительные компенсации как charge.
      *
      * @return list<array{
+     *     marketplace: string,
      *     category_code: string,
      *     category_name: string,
      *     net_amount: string,
@@ -203,6 +205,7 @@ final readonly class WidgetSummaryQuery
         $rows = $this->connection->fetchAllAssociative(
             <<<SQL
             SELECT
+                marketplace,
                 category_code,
                 category_name,
                 SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE -ABS(amount) END) AS net_amount,
@@ -210,6 +213,7 @@ final readonly class WidgetSummaryQuery
                 SUM(CASE WHEN effective_op = 'storno' THEN  ABS(amount) ELSE 0             END) AS storno_amount
             FROM (
                 SELECT
+                    c.marketplace AS marketplace,
                     cc.code  AS category_code,
                     cc.name  AS category_name,
                     c.amount AS amount,
@@ -225,7 +229,7 @@ final readonly class WidgetSummaryQuery
                   AND c.cost_date <= :periodTo
                   {$mpFilter}
             ) AS normalized
-            GROUP BY category_code, category_name
+            GROUP BY marketplace, category_code, category_name
             ORDER BY costs_amount ASC
             SQL,
             array_filter([
@@ -237,6 +241,7 @@ final readonly class WidgetSummaryQuery
         );
 
         /** @var list<array{
+         *     marketplace: string,
          *     category_code: string,
          *     category_name: string,
          *     net_amount: string,

@@ -7,6 +7,7 @@ namespace App\Tests\MarketplaceAnalytics\Infrastructure\Query;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\WidgetSummaryQuery;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -17,13 +18,15 @@ final class WidgetSummaryQueryPnlTest extends TestCase
 
     private MarketplaceFacade $facade;
     private Connection $connection;
+    private MarketplaceCostAnalyticsGroupResolver $groupResolver;
     private WidgetSummaryQuery $query;
 
     protected function setUp(): void
     {
         $this->facade = $this->createMock(MarketplaceFacade::class);
         $this->connection = $this->createMock(Connection::class);
-        $this->query = new WidgetSummaryQuery($this->facade, $this->connection);
+        $this->groupResolver = new MarketplaceCostAnalyticsGroupResolver();
+        $this->query = new WidgetSummaryQuery($this->facade, $this->connection, $this->groupResolver);
     }
 
     public function testReturnsNegativeReturnsTotal(): void
@@ -61,7 +64,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-500.00', 'storno_amount' => '0.00', 'net_amount' => '-500.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-500.00', 'storno_amount' => '0.00', 'net_amount' => '-500.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -78,7 +81,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-1000.00', 'storno_amount' => '300.00', 'net_amount' => '-700.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-1000.00', 'storno_amount' => '300.00', 'net_amount' => '-700.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -98,8 +101,8 @@ final class WidgetSummaryQueryPnlTest extends TestCase
             new ListingReturnAggregateDTO('l1', '200.00', 1),
         ]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-800.00', 'storno_amount' => '0.00', 'net_amount' => '-800.00'],
-            ['category_code' => 'ozon_logistic_direct', 'category_name' => 'FBO', 'costs_amount' => '-500.00', 'storno_amount' => '100.00', 'net_amount' => '-400.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-800.00', 'storno_amount' => '0.00', 'net_amount' => '-800.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_logistic_direct', 'category_name' => 'FBO', 'costs_amount' => '-500.00', 'storno_amount' => '100.00', 'net_amount' => '-400.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -120,7 +123,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         ]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_sale_commission', 'category_name' => 'K', 'costs_amount' => '-3000.00', 'storno_amount' => '0.00', 'net_amount' => '-3000.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'K', 'costs_amount' => '-3000.00', 'storno_amount' => '0.00', 'net_amount' => '-3000.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -152,9 +155,9 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-300.00', 'storno_amount' => '0.00', 'net_amount' => '-300.00'],
-            ['category_code' => 'ozon_logistic_direct', 'category_name' => 'FBO', 'costs_amount' => '-700.00', 'storno_amount' => '0.00', 'net_amount' => '-700.00'],
-            ['category_code' => 'ozon_cpc', 'category_name' => 'Реклама', 'costs_amount' => '-100.00', 'storno_amount' => '0.00', 'net_amount' => '-100.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_sale_commission', 'category_name' => 'Комиссия', 'costs_amount' => '-300.00', 'storno_amount' => '0.00', 'net_amount' => '-300.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_logistic_direct', 'category_name' => 'FBO', 'costs_amount' => '-700.00', 'storno_amount' => '0.00', 'net_amount' => '-700.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_cpc', 'category_name' => 'Реклама', 'costs_amount' => '-100.00', 'storno_amount' => '0.00', 'net_amount' => '-100.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -175,7 +178,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_compensation', 'category_name' => 'Компенсация', 'costs_amount' => '0.00', 'storno_amount' => '1799.00', 'net_amount' => '1799.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_compensation', 'category_name' => 'Компенсация', 'costs_amount' => '0.00', 'storno_amount' => '1799.00', 'net_amount' => '1799.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -204,7 +207,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -227,7 +230,7 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -252,8 +255,8 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         $this->stubSales([]);
         $this->stubReturns([]);
         $this->stubCostRows([
-            ['category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
-            ['category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_compensation', 'category_name' => 'Компенсации и декомпенсации Ozon', 'costs_amount' => '0.00', 'storno_amount' => '5480.00', 'net_amount' => '5480.00'],
+            ['marketplace' => 'ozon', 'category_code' => 'ozon_decompensation', 'category_name' => 'Декомпенсация Ozon', 'costs_amount' => '-1274.00', 'storno_amount' => '0.00', 'net_amount' => '-1274.00'],
         ]);
 
         $result = $this->executeSummary();
@@ -288,6 +291,57 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         self::assertStringContainsString("cc.code = 'ozon_compensation'", $capturedSql);
         self::assertStringContainsString("cc.code = 'ozon_decompensation'", $capturedSql);
         self::assertStringContainsString('effective_op', $capturedSql);
+        self::assertStringContainsString('c.marketplace AS marketplace', $capturedSql);
+        self::assertStringContainsString('GROUP BY marketplace, category_code, category_name', $capturedSql);
+    }
+
+    public function testWbCategoriesAreGroupedByWbMapping(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['marketplace' => 'wildberries', 'category_code' => 'commission', 'category_name' => 'Комиссия', 'costs_amount' => '-100.00', 'storno_amount' => '0.00', 'net_amount' => '-100.00'],
+            ['marketplace' => 'wildberries', 'category_code' => 'logistics_delivery', 'category_name' => 'Логистика', 'costs_amount' => '-200.00', 'storno_amount' => '0.00', 'net_amount' => '-200.00'],
+            ['marketplace' => 'wildberries', 'category_code' => 'acquiring', 'category_name' => 'Эквайринг', 'costs_amount' => '-300.00', 'storno_amount' => '0.00', 'net_amount' => '-300.00'],
+            ['marketplace' => 'wildberries', 'category_code' => 'wb_okazanie_uslug_wb_prodvizhenie', 'category_name' => 'Продвижение', 'costs_amount' => '-400.00', 'storno_amount' => '0.00', 'net_amount' => '-400.00'],
+            ['marketplace' => 'wildberries', 'category_code' => 'penalty', 'category_name' => 'Штраф', 'costs_amount' => '-500.00', 'storno_amount' => '0.00', 'net_amount' => '-500.00'],
+        ]);
+
+        $result = $this->executeSummaryFor('wildberries');
+
+        self::assertSame('commission', $this->findCategory($result['widgetGroups'], 'Вознаграждение')['code']);
+        self::assertSame('logistics_delivery', $this->findCategory($result['widgetGroups'], 'Услуги доставки и FBO')['code']);
+        self::assertSame('acquiring', $this->findCategory($result['widgetGroups'], 'Услуги партнёров')['code']);
+        self::assertSame('wb_okazanie_uslug_wb_prodvizhenie', $this->findCategory($result['widgetGroups'], 'Продвижение и реклама')['code']);
+        self::assertSame('penalty', $this->findCategory($result['widgetGroups'], 'Другие услуги и штрафы')['code']);
+    }
+
+    public function testUnknownWbCodeFallsBackToOtherServicesAndPenalties(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['marketplace' => 'wildberries', 'category_code' => 'wb_unknown_code', 'category_name' => 'Неизвестно', 'costs_amount' => '-50.00', 'storno_amount' => '0.00', 'net_amount' => '-50.00'],
+        ]);
+
+        $result = $this->executeSummaryFor('wildberries');
+        self::assertSame('wb_unknown_code', $this->findCategory($result['widgetGroups'], 'Другие услуги и штрафы')['code']);
+    }
+
+    public function testMarketplaceNullDoesNotMergeCategoriesWithSameCode(): void
+    {
+        $this->stubSales([]);
+        $this->stubReturns([]);
+        $this->stubCostRows([
+            ['marketplace' => 'ozon', 'category_code' => 'same_unknown_code', 'category_name' => 'Ozon unknown', 'costs_amount' => '-70.00', 'storno_amount' => '0.00', 'net_amount' => '-70.00'],
+            ['marketplace' => 'wildberries', 'category_code' => 'same_unknown_code', 'category_name' => 'WB unknown', 'costs_amount' => '-30.00', 'storno_amount' => '0.00', 'net_amount' => '-30.00'],
+        ]);
+
+        $result = $this->executeSummaryFor(null);
+
+        $group = $this->findGroup($result['widgetGroups'], 'Другие услуги и штрафы');
+        self::assertNotNull($group);
+        self::assertCount(2, $group['categories']);
     }
 
     /**
@@ -315,10 +369,14 @@ final class WidgetSummaryQueryPnlTest extends TestCase
     }
 
     /**
-     * @param list<array{category_code: string, category_name: string, costs_amount: string, storno_amount: string, net_amount: string}> $rows
+     * @param list<array{marketplace?: string, category_code: string, category_name: string, costs_amount: string, storno_amount: string, net_amount: string}> $rows
      */
     private function stubCostRows(array $rows): void
     {
+        foreach ($rows as &$row) {
+            $row['marketplace'] = $row['marketplace'] ?? 'ozon';
+        }
+        unset($row);
         $this->connection->method('fetchAllAssociative')->willReturn($rows);
     }
 
@@ -327,9 +385,17 @@ final class WidgetSummaryQueryPnlTest extends TestCase
      */
     private function executeSummary(): array
     {
+        return $this->executeSummaryFor('ozon');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function executeSummaryFor(?string $marketplace): array
+    {
         return $this->query->getSummary(
             self::COMPANY_ID,
-            'ozon',
+            $marketplace,
             new \DateTimeImmutable('2026-01-01'),
             new \DateTimeImmutable('2026-01-31'),
         );
@@ -348,5 +414,20 @@ final class WidgetSummaryQueryPnlTest extends TestCase
         }
 
         return null;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $widgetGroups
+     * @return array<string, mixed>
+     */
+    private function findCategory(array $widgetGroups, string $serviceGroup): array
+    {
+        $group = $this->findGroup($widgetGroups, $serviceGroup);
+        self::assertNotNull($group);
+        $category = $group['categories'][0] ?? null;
+        self::assertNotNull($category);
+
+        /** @var array<string, mixed> $category */
+        return $category;
     }
 }
