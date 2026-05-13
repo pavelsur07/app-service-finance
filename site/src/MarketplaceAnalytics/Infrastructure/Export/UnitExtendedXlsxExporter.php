@@ -31,6 +31,7 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'SKU',             'field' => 'sku',            'type' => 'string'],
         ['label' => 'Наименование',    'field' => 'title',          'type' => 'string'],
         ['label' => 'Маркетплейс',     'field' => 'marketplace',    'type' => 'string'],
+        ['label' => 'Артикул',         'field' => 'sellerArticle',  'type' => 'string'],
         ['label' => 'Выручка',         'field' => 'revenue',        'type' => 'money'],
         ['label' => 'Кол-во',          'field' => 'quantity',       'type' => 'integer'],
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],
@@ -152,7 +153,7 @@ final readonly class UnitExtendedXlsxExporter
             }
 
             // Totals are computed per-listing and not aggregated for these fields.
-            if (in_array($column['field'], ['title', 'marketplace', 'costPriceUnit'], true)) {
+            if (in_array($column['field'], ['title', 'marketplace', 'sellerArticle', 'costPriceUnit'], true)) {
                 $cells[] = Cell::fromValue('', $styles['blank']);
 
                 continue;
