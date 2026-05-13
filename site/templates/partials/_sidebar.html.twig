@@ -18,8 +18,8 @@
         </a>
     </h1>
     <div class="collapse navbar-collapse d-flex flex-column vf-sidebar" id="sidebar-menu">
-
-        <ul class="navbar-nav vf-sidebar-body">
+        <div class="vf-sidebar-body">
+        <ul class="navbar-nav">
             <!-- Dashboard -->
             {% set dashboard_active = current_route == 'app_home_index' %}
             <li class="nav-item {{ dashboard_active ? 'active' : '' }}">
@@ -307,6 +307,7 @@
                 </div>
             </li>
         </ul>
+        </div>
 
         <div class="vf-sidebar-footer border-top px-3 py-3 mt-auto">
             <div class="text-muted text-uppercase small">КОМПАНИЯ</div>
