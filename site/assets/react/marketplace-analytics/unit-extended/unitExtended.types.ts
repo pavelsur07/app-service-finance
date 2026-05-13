@@ -18,6 +18,7 @@ export interface UnitExtendedItem {
     listingId: string;
     title: string;
     sku: string;
+    sellerArticle: string;
     marketplace: string;
     revenue: number;
     quantity: number;

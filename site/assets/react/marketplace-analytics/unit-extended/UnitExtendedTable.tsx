@@ -8,6 +8,7 @@ import { useFixedHeader } from './useFixedHeader';
 type SortField =
     | 'sku'
     | 'title'
+    | 'sellerArticle'
     | 'revenue'
     | 'quantity'
     | 'returnsTotal'
@@ -92,6 +93,7 @@ interface ExpandedState {
 const HEADERS: { field: SortField; label: string; align?: string; tooltip?: string }[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
+    { field: 'sellerArticle', label: 'Артикул' },
     { field: 'revenue', label: 'Выручка', align: 'text-end' },
     { field: 'quantity', label: 'Кол-во', align: 'text-end' },
     { field: 'returnsTotal', label: 'Возвраты', align: 'text-end' },
@@ -114,6 +116,9 @@ function comparator(a: UnitExtendedItem, b: UnitExtendedItem, field: SortField):
     }
     if (field === 'sku') {
         return a.sku.localeCompare(b.sku, 'ru');
+    }
+    if (field === 'sellerArticle') {
+        return (a.sellerArticle ?? '').localeCompare(b.sellerArticle ?? '', 'ru');
     }
     const valA = (a[field] as number | null) ?? -Infinity;
     const valB = (b[field] as number | null) ?? -Infinity;
@@ -299,6 +304,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                                         <td className="ue-ext-frozen ue-ext-frozen-title">
                                             <div className="text-truncate">{row.title || '—'}</div>
                                         </td>
+                                        <td>
+                                            <div className="text-truncate">{row.sellerArticle || '—'}</div>
+                                        </td>
                                         <td className="text-end">{formatMoney(row.revenue)}</td>
                                         <td className="text-end">{row.quantity.toLocaleString('ru-RU')}</td>
                                         <td className="text-end text-red">{formatMoney(row.returnsTotal)}</td>
@@ -371,6 +379,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                             <tr className="fw-bold">
                                 <td className="ue-ext-frozen ue-ext-frozen-sku"></td>
                                 <td className="ue-ext-frozen ue-ext-frozen-title">Итого</td>
+                                <td></td>
                                 <td className="text-end">{formatMoney(totals.revenue)}</td>
                                 <td className="text-end">{totals.quantity.toLocaleString('ru-RU')}</td>
                                 <td className="text-end text-red">{formatMoney(totals.returnsTotal)}</td>
