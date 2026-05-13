@@ -11,5 +11,6 @@ final readonly class ListingMetaDTO
         public ?string $title,
         public string $sku,
         public string $marketplace,
+        public ?string $supplierSku = null,
     ) {}
 }

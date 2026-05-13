@@ -98,6 +98,7 @@ final readonly class UnitExtendedQuery
             $title = $sale?->title ?? $meta?->title ?? '';
             $sku = $sale?->sku ?? $meta?->sku ?? '';
             $mp = $sale?->marketplace ?? $meta?->marketplace ?? '';
+            $sellerArticle = $sale?->supplierSku ?? $meta?->supplierSku ?? '';
 
             // Classify costs
             $commission = 0.0;
@@ -148,6 +149,7 @@ final readonly class UnitExtendedQuery
                 'listingId' => $listingId,
                 'title' => $title,
                 'sku' => $sku,
+                'sellerArticle' => $sellerArticle,
                 'marketplace' => $mp,
                 'revenue' => round($revenue, 2),
                 'quantity' => $quantity,

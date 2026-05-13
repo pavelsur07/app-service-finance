@@ -31,7 +31,8 @@ final readonly class ListingMetaQuery
                 l.id,
                 l.name            AS listing_title,
                 l.marketplace_sku AS listing_sku,
-                l.marketplace     AS listing_marketplace
+                l.marketplace     AS listing_marketplace,
+                l.supplier_sku    AS supplier_sku
             FROM marketplace_listings l
             WHERE l.id IN (:ids)
               AND l.company_id = :companyId
@@ -50,6 +51,7 @@ final readonly class ListingMetaQuery
                 title:       $row['listing_title'],
                 sku:         $row['listing_sku'],
                 marketplace: $row['listing_marketplace'],
+                supplierSku: $row['supplier_sku'] !== null ? (string) $row['supplier_sku'] : null,
             );
         }
 

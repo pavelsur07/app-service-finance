@@ -33,17 +33,20 @@ final readonly class ListingSalesAggregateQuery
                 l.name                AS listing_title,
                 l.marketplace_sku     AS listing_sku,
                 l.marketplace         AS listing_marketplace,
+                l.supplier_sku        AS supplier_sku,
                 SUM(s.total_revenue)  AS revenue,
                 SUM(s.quantity)       AS quantity,
                 SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.cost_price * s.quantity ELSE 0 END) AS cost_price_total,
                 SUM(CASE WHEN s.cost_price IS NOT NULL THEN s.quantity ELSE 0 END) AS cost_price_quantity
             FROM marketplace_sales s
-            JOIN marketplace_listings l ON l.id = s.listing_id
+            JOIN marketplace_listings l
+              ON l.id = s.listing_id
+             AND l.company_id = s.company_id
             WHERE s.company_id = :companyId
               AND s.sale_date >= :periodFrom
               AND s.sale_date <= :periodTo
               {$mpFilter}
-            GROUP BY s.listing_id, l.name, l.marketplace_sku, l.marketplace
+            GROUP BY s.listing_id, l.name, l.marketplace_sku, l.marketplace, l.supplier_sku
             SQL,
             array_filter([
                 'companyId'   => $companyId,
@@ -64,6 +67,7 @@ final readonly class ListingSalesAggregateQuery
                 quantity:          (int) $row['quantity'],
                 costPriceTotal:    (string) $row['cost_price_total'],
                 costPriceQuantity: (int) $row['cost_price_quantity'],
+                supplierSku:       $row['supplier_sku'] !== null ? (string) $row['supplier_sku'] : null,
             );
         }
 
