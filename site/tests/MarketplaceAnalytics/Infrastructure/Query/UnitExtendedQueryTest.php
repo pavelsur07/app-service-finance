@@ -10,6 +10,7 @@ use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
+use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
 use PHPUnit\Framework\TestCase;
 
@@ -27,7 +28,11 @@ final class UnitExtendedQueryTest extends TestCase
     {
         $this->marketplaceFacade = $this->createMock(MarketplaceFacade::class);
         $this->adsFacade = $this->createMock(MarketplaceAdsFacade::class);
-        $this->query = new UnitExtendedQuery($this->marketplaceFacade, $this->adsFacade);
+        $this->query = new UnitExtendedQuery(
+            $this->marketplaceFacade,
+            $this->adsFacade,
+            new MarketplaceCostAnalyticsGroupResolver(),
+        );
 
         // Defaults — overridden per test where needed
         $this->marketplaceFacade->method('getReturnAggregatesByListing')->willReturn([]);
@@ -66,7 +71,7 @@ final class UnitExtendedQueryTest extends TestCase
         $this->stubSales([]);
         $this->stubCosts([
             'l-2' => [
-                new ListingCostCategoryAggregateDTO('l-2', 'ozon_other', 'Other', '-50.00', '-50.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('l-2', 'ozon_other', 'Other', '50.00', '50.00', '0.00'),
             ],
         ]);
         $this->stubMeta([
@@ -158,6 +163,63 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(150.0, $result['totals']['roiPercent']);
     }
 
+    public function testWbAndOzonClassificationAndTotalsBeforeLimit(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('wb-1', 'WB Товар', 'WB-SKU', 'wildberries', '1000.00', 3, '200.00', 3),
+            new ListingSalesAggregateDTO('oz-1', 'Ozon Товар', 'OZ-SKU', 'ozon', '400.00', 2, '120.00', 2),
+        ]);
+
+        $this->stubCosts([
+            'wb-1' => [
+                new ListingCostCategoryAggregateDTO('wb-1', 'commission', 'Комиссия WB', '100.00', '100.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'logistics_delivery', 'Логистика доставка', '50.00', '50.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'logistics_return', 'Логистика возврат', '20.00', '20.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'warehouse_logistics', 'Логистика склада', '30.00', '30.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'acquiring', 'Эквайринг', '10.00', '10.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'wb_okazanie_uslug_wb_prodvizhenie', 'Продвижение WB', '15.00', '15.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('wb-1', 'penalty', 'Штраф', '5.00', '5.00', '0.00'),
+            ],
+            'oz-1' => [
+                new ListingCostCategoryAggregateDTO('oz-1', 'ozon_sale_commission', 'Комиссия Ozon', '40.00', '40.00', '0.00'),
+                new ListingCostCategoryAggregateDTO('oz-1', 'ozon_logistic_direct', 'Логистика Ozon', '12.00', '12.00', '0.00'),
+            ],
+        ]);
+
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+
+        $result = $this->query->execute(self::COMPANY_ID, null, self::PERIOD_FROM, self::PERIOD_TO, 1);
+
+        self::assertCount(1, $result['items'], 'limit applies to rows only');
+        self::assertSame(140.0, $result['totals']['commission']);
+        self::assertSame(112.0, $result['totals']['logistics']);
+        self::assertSame(30.0, $result['totals']['otherCosts']);
+
+        $fullResult = $this->query->execute(self::COMPANY_ID, null, self::PERIOD_FROM, self::PERIOD_TO);
+        $wb = $this->findRow($fullResult['items'], 'wb-1');
+        self::assertNotNull($wb);
+
+        self::assertSame(100.0, $wb['commission']);
+        self::assertSame(100.0, $wb['logistics']);
+        self::assertSame(30.0, $wb['otherCosts']);
+
+        $allGroups = array_column($wb['allCostsBreakdown'], 'serviceGroup');
+        self::assertContains('Услуги партнёров', $allGroups);
+        self::assertContains('Продвижение и реклама', $allGroups);
+        self::assertContains('Другие услуги и штрафы', $allGroups);
+
+        $partners = $this->findBreakdownGroup($wb['allCostsBreakdown'], 'Услуги партнёров');
+        self::assertNotNull($partners);
+        self::assertSame('acquiring', $partners['categories'][0]['code']);
+        self::assertArrayNotHasKey('marketplace', $partners['categories'][0]);
+
+        $promo = $this->findBreakdownGroup($wb['allCostsBreakdown'], 'Продвижение и реклама');
+        self::assertNotNull($promo);
+
+        $penalty = $this->findBreakdownGroup($wb['allCostsBreakdown'], 'Другие услуги и штрафы');
+        self::assertNotNull($penalty);
+    }
     public function testMarketplaceFilterIsPropagatedToBothAdsFacadeCalls(): void
     {
         $this->stubSales([]);
@@ -245,6 +307,22 @@ final class UnitExtendedQueryTest extends TestCase
         $this->adsFacade->method('getTotalAdCostForPeriod')->willReturn($value);
     }
 
+
+
+    /**
+     * @param list<array<string, mixed>> $groups
+     * @return array<string, mixed>|null
+     */
+    private function findBreakdownGroup(array $groups, string $serviceGroup): ?array
+    {
+        foreach ($groups as $group) {
+            if (($group['serviceGroup'] ?? null) === $serviceGroup) {
+                return $group;
+            }
+        }
+
+        return null;
+    }
     /**
      * @return array{items: list<array<string, mixed>>, totals: array<string, mixed>}
      */
