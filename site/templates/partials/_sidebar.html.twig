@@ -3,20 +3,9 @@
 {% if app.user %}
     {% set user_roles = app.user.roles|default([]) %}
 {% endif %}
-<style>
-    :root{
-        --brand:#0A1548; /* основной брендовый */
-        --brand-05: rgba(10,21,72,.05);
-        --sidebar-w: 280px;
-        --sidebar-w-collapsed: 80px;
-    }
-    .nav-item.active > a { background: var(--brand-05); color: var(--brand); border-left: 2px solid var(--brand); }
-    .nav-item a:hover { background: var(--brand-05); color: var(--brand); }
-    .nav-section-title { font-size:.75rem; letter-spacing:.04em; color:#8a94a6; text-transform:uppercase; padding: .5rem 1rem; }
-    .nav-link-icon i { font-size: 1.5em; line-height: 1; }
-    aside.navbar .navbar-brand { display: flex; align-items: center; justify-content: flex-start; padding-inline: .75rem; margin-bottom: 0; }
-    .navbar-brand img { height: 40px; width: auto; }
-</style>
+{% set active_company_id = app.session.get('active_company_id') %}
+{% set active_company = app.user and app.user.companies is defined ? (app.user.companies|filter(c => c.id == active_company_id)|first) : null %}
+{% set active_company_name = active_company ? active_company.name : 'Компания не выбрана' %}
 
 <!-- Sidebar -->
 
@@ -28,9 +17,9 @@
             <img src="{{ asset('static/logo-vf-001.png') }}" alt="Ваш ФинДир" />
         </a>
     </h1>
-    <div class="collapse navbar-collapse" id="sidebar-menu">
+    <div class="collapse navbar-collapse d-flex flex-column vf-sidebar" id="sidebar-menu">
 
-        <ul class="navbar-nav">
+        <ul class="navbar-nav vf-sidebar-body">
             <!-- Dashboard -->
             {% set dashboard_active = current_route == 'app_home_index' %}
             <li class="nav-item {{ dashboard_active ? 'active' : '' }}">
@@ -318,4 +307,10 @@
                 </div>
             </li>
         </ul>
+
+        <div class="vf-sidebar-footer border-top px-3 py-3 mt-auto">
+            <div class="text-muted text-uppercase small">КОМПАНИЯ</div>
+            <div class="fw-bold vf-sidebar-company-name">{{ active_company_name }}</div>
+            <a class="text-muted small" href="{{ path('company_index') }}">Переключить -&gt;</a>
+        </div>
     </div>
