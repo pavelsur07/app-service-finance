@@ -32,6 +32,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-1',
                 'title' => 'Товар А',
                 'sku' => 'SKU-A',
+                'sellerArticle' => 'ART-A',
                 'marketplace' => 'ozon',
                 'revenue' => 1000.0,
                 'quantity' => 5,
@@ -52,6 +53,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-2',
                 'title' => 'Товар Б',
                 'sku' => 'SKU-B',
+                'sellerArticle' => 'ART-B',
                 'marketplace' => 'ozon',
                 'revenue' => 500.0,
                 'quantity' => 2,
@@ -72,6 +74,7 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'listingId' => 'l-3',
                 'title' => 'Товар В',
                 'sku' => 'SKU-C',
+                'sellerArticle' => '',
                 'marketplace' => 'wildberries',
                 'revenue' => 0.0,
                 'quantity' => 0,
@@ -140,14 +143,33 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         }
 
         self::assertNotNull($headerRowIndex, 'Header row with "SKU" not found');
-        self::assertContains('Наименование', $rows[$headerRowIndex]);
-        self::assertContains('ROI %', $rows[$headerRowIndex]);
+        $header = $rows[$headerRowIndex];
+        self::assertContains('Наименование', $header);
+        self::assertContains('ROI %', $header);
+
+        $skuColumnIndex = array_search('SKU', $header, true);
+        $titleColumnIndex = array_search('Наименование', $header, true);
+        $articleColumnIndex = array_search('Артикул', $header, true);
+        $marketplaceColumnIndex = array_search('Маркетплейс', $header, true);
+        $revenueColumnIndex = array_search('Выручка', $header, true);
+
+        self::assertNotFalse($skuColumnIndex);
+        self::assertNotFalse($titleColumnIndex);
+        self::assertNotFalse($articleColumnIndex);
+        self::assertNotFalse($marketplaceColumnIndex);
+        self::assertNotFalse($revenueColumnIndex);
+
+        self::assertSame($titleColumnIndex + 1, $articleColumnIndex, '"Артикул" должен быть сразу после "Наименование"');
+        self::assertLessThan($revenueColumnIndex, $articleColumnIndex, '"Артикул" должен быть перед "Выручка"');
 
         $dataRows = array_slice($rows, $headerRowIndex + 1, 3);
         self::assertCount(3, $dataRows, 'Expected exactly 3 data rows');
 
         $skus = array_map(static fn (array $row): string => (string) ($row[0] ?? ''), $dataRows);
         self::assertSame(['SKU-A', 'SKU-B', 'SKU-C'], $skus);
+        self::assertSame('ART-A', (string) ($dataRows[0][$articleColumnIndex] ?? ''));
+        self::assertSame('ART-B', (string) ($dataRows[1][$articleColumnIndex] ?? ''));
+        self::assertSame('', (string) ($dataRows[2][$articleColumnIndex] ?? ''));
 
         $totalsRow = $rows[$headerRowIndex + 4];
         self::assertSame('ИТОГО', (string) $totalsRow[0]);
