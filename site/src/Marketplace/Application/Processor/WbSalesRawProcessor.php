@@ -12,6 +12,7 @@ use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -28,6 +29,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
+        private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -65,9 +67,10 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $salesData = array_filter($rawRows, static function (array $item): bool {
-            return ($item['doc_type_name'] ?? '') === 'Продажа'
-                && (float) ($item['retail_amount'] ?? 0) > 0;
+        $salesData = array_filter($rawRows, function (array $item): bool {
+            return $this->normalizer->isSale($item)
+                && $this->normalizer->quantity($item) > 0
+                && $this->normalizer->retailPriceWithDisc($item) > 0;
         });
 
         if (empty($salesData)) {
@@ -76,7 +79,10 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         $this->barcodeCatalog->fillFromWbRows($companyId, array_values($salesData));
 
-        $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
+        $allNmIds = array_values(array_unique(array_map(
+            fn (array $item): string => $this->normalizer->nmId($item),
+            $salesData,
+        )));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             MarketplaceType::WILDBERRIES,
@@ -85,8 +91,8 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
         $newListings = 0;
         foreach ($salesData as $item) {
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
@@ -94,12 +100,12 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $barcode = (string) ($item['barcode'] ?? '');
+            $barcode = (string) ($this->normalizer->barcode($item) ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => (string) ($item['sa_name'] ?? ''),
-                'brand_name'   => (string) ($item['brand_name'] ?? ''),
-                'subject_name' => (string) ($item['subject_name'] ?? ''),
-                'retail_price' => (string) ($item['retail_price'] ?? '0'),
+                'sa_name'      => $this->normalizer->vendorCode($item),
+                'brand_name'   => (string) ($item['brand_name'] ?? $item['brandName'] ?? ''),
+                'subject_name' => (string) ($item['subject_name'] ?? $item['subjectName'] ?? ''),
+                'retail_price' => (string) ($item['retail_price'] ?? $item['retailPrice'] ?? '0'),
             ], $barcode);
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
@@ -120,8 +126,8 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $listing = $listingsCache[$nmId . '_' . $size] ?? null;
 
@@ -130,7 +136,7 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+            $saleDate = $this->normalizer->operationDate($item);
 
             $sale = new MarketplaceSale(
                 Uuid::uuid4()->toString(),
@@ -141,9 +147,13 @@ final class WbSalesRawProcessor implements MarketplaceRawProcessorInterface
 
             $sale->setExternalOrderId($srid);
             $sale->setSaleDate($saleDate);
-            $sale->setQuantity(abs((int) ($item['quantity'] ?? 1)));
-            $sale->setPricePerUnit((string) ($item['retail_price'] ?? '0'));
-            $sale->setTotalRevenue((string) abs((float) ($item['retail_amount'] ?? 0)));
+            $quantity = abs($this->normalizer->quantity($item));
+            $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
+            $pricePerUnit = $quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0;
+
+            $sale->setQuantity($quantity);
+            $sale->setPricePerUnit((string) $pricePerUnit);
+            $sale->setTotalRevenue((string) $retailPriceWithDisc);
             $sale->setCostPrice($this->costPriceResolver->resolveForSale($listing, $saleDate));
             $sale->setRawData($item);
             if ($rawDocId !== null) {

@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,7 @@ final class ProcessWbSalesAction
         private readonly MarketplaceSaleRepository $saleRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
+        private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -43,9 +45,10 @@ final class ProcessWbSalesAction
         $synced = 0;
         $batchSize = 250;
 
-        $salesData = array_filter($rawData, static function (array $item): bool {
-            return ($item['doc_type_name'] ?? '') === 'Продажа'
-                && (float) ($item['retail_amount'] ?? 0) > 0;
+        $salesData = array_filter($rawData, function (array $item): bool {
+            return $this->normalizer->isSale($item)
+                && $this->normalizer->quantity($item) > 0
+                && $this->normalizer->retailPriceWithDisc($item) > 0;
         });
 
         if (empty($salesData)) {
@@ -60,7 +63,10 @@ final class ProcessWbSalesAction
         $allSrids = array_column($salesData, 'srid');
         $existingSridsMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
 
-        $allNmIds = array_values(array_unique(array_column($salesData, 'nm_id')));
+        $allNmIds = array_values(array_unique(array_map(
+            fn (array $item): string => $this->normalizer->nmId($item),
+            $salesData,
+        )));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             MarketplaceType::WILDBERRIES,
@@ -69,17 +75,17 @@ final class ProcessWbSalesAction
 
         $newListingsCreated = 0;
         foreach ($salesData as $item) {
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = (trim((string) $tsName) !== '') ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
             if (!isset($listingsCache[$cacheKey])) {
                 $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                    'sa_name'      => $item['sa_name'] ?? '',
-                    'brand_name'   => $item['brand_name'] ?? '',
-                    'subject_name' => $item['subject_name'] ?? '',
-                    'retail_price' => $item['retail_price'] ?? 0,
+                    'sa_name'      => $this->normalizer->vendorCode($item),
+                    'brand_name'   => (string) ($item['brand_name'] ?? $item['brandName'] ?? ''),
+                    'subject_name' => (string) ($item['subject_name'] ?? $item['subjectName'] ?? ''),
+                    'retail_price' => (string) ($item['retail_price'] ?? $item['retailPrice'] ?? '0'),
                 ]);
                 $listingsCache[$cacheKey] = $listing;
                 $newListingsCreated++;
@@ -99,8 +105,8 @@ final class ProcessWbSalesAction
                     continue;
                 }
 
-                $nmId = (string) ($item['nm_id'] ?? '');
-                $tsName = $item['ts_name'] ?? null;
+                $nmId = $this->normalizer->nmId($item);
+                $tsName = $this->normalizer->techSize($item);
                 $size = (trim((string) $tsName) !== '') ? trim((string) $tsName) : 'UNKNOWN';
                 $cacheKey = $nmId . '_' . $size;
                 $listing = $listingsCache[$cacheKey] ?? null;
@@ -118,11 +124,16 @@ final class ProcessWbSalesAction
                 );
 
                 $sale->setExternalOrderId($externalOrderId);
-                $sale->setSaleDate(new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']));
-                $sale->setQuantity(abs((int) $item['quantity']));
-                $sale->setPricePerUnit((string) $item['retail_price']);
-                $sale->setTotalRevenue((string) abs((float) $item['retail_amount']));
+                $sale->setSaleDate($this->normalizer->operationDate($item));
+                $quantity = abs($this->normalizer->quantity($item));
+                $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
+                $pricePerUnit = $quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0;
+
+                $sale->setQuantity($quantity);
+                $sale->setPricePerUnit((string) $pricePerUnit);
+                $sale->setTotalRevenue((string) $retailPriceWithDisc);
                 $sale->setRawDocumentId($rawDocId);
+                $sale->setRawData($item);
 
                 $this->em->persist($sale);
                 $existingSridsMap[$externalOrderId] = true;
