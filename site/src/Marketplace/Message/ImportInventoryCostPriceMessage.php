@@ -16,6 +16,7 @@ final readonly class ImportInventoryCostPriceMessage
         public string $originalFilename,
         public string $effectiveFrom,  // Y-m-d
         public string $marketplace,    // MarketplaceType::value
+        public string $identifierType = 'barcode',
     ) {
     }
 }

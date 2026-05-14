@@ -36,10 +36,24 @@ final class InventoryImportController extends AbstractController
         $file          = $request->files->get('cost_file');
         $effectiveFrom = (string) $request->request->get('effective_from', '');
         $marketplace   = (string) $request->request->get('marketplace', '');
+        $identifierType = (string) $request->request->get('identifier_type', 'barcode');
 
         $marketplaceType = $marketplace ? MarketplaceType::tryFrom($marketplace) : null;
         if ($marketplaceType === null) {
             $this->addFlash('error', 'Укажите маркетплейс.');
+
+            return $this->redirectToRoute('marketplace_inventory_index');
+        }
+
+        $allowedIdentifierTypes = ['barcode', 'marketplace_sku', 'supplier_sku'];
+        if (!in_array($identifierType, $allowedIdentifierTypes, true)) {
+            $this->addFlash('error', 'Некорректный тип идентификатора для импорта.');
+
+            return $this->redirectToRoute('marketplace_inventory_index');
+        }
+
+        if ($marketplaceType !== MarketplaceType::OZON && $identifierType !== 'barcode') {
+            $this->addFlash('error', 'Для не-Ozon импорта разрешён только barcode.');
 
             return $this->redirectToRoute('marketplace_inventory_index');
         }
@@ -86,6 +100,7 @@ final class InventoryImportController extends AbstractController
             originalFilename: $stored['originalFilename'],
             effectiveFrom:    $effectiveFrom,
             marketplace:      $marketplaceType->value,
+            identifierType:   $identifierType,
         ));
 
         $this->addFlash('success', sprintf(

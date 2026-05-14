@@ -18,6 +18,7 @@ final class ImportInventoryCostPriceFromFileCommand
         public readonly string          $originalFilename,
         public readonly \DateTimeImmutable $effectiveFrom,
         public readonly MarketplaceType $marketplace,
+        public readonly string          $identifierType = 'barcode',
     ) {
     }
 }

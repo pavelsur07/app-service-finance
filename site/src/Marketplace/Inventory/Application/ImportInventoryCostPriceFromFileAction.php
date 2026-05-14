@@ -8,6 +8,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Inventory\Application\Command\ImportInventoryCostPriceFromFileCommand;
 use App\Marketplace\Inventory\Application\Command\SetInventoryCostPriceCommand;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use OpenSpout\Reader\XLS\Reader as XlsReader;
 use OpenSpout\Reader\XLSX\Reader as XlsxReader;
 use Psr\Log\LoggerInterface;
@@ -32,6 +33,7 @@ final class ImportInventoryCostPriceFromFileAction
     public function __construct(
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
         private readonly SetInventoryCostPriceAction         $setAction,
+        private readonly MarketplaceListingRepository        $listingRepository,
         private readonly LoggerInterface                     $logger,
     ) {
     }
@@ -45,30 +47,30 @@ final class ImportInventoryCostPriceFromFileAction
         $errors   = [];
 
         foreach ($rows as $rowNum => $row) {
-            $barcode = trim((string) ($row[0] ?? ''));
+            $identifier = trim((string) ($row[0] ?? ''));
             $price   = trim((string) ($row[1] ?? ''));
 
-            if ($barcode === '' || $price === '') {
+            if ($identifier === '' || $price === '') {
                 $skipped++;
                 continue;
             }
 
             if (!is_numeric($price) || (float) $price < 0) {
-                $errors[] = sprintf('Строка %d: некорректная цена "%s" для баркода %s', $rowNum, $price, $barcode);
+                $errors[] = sprintf('Строка %d: некорректная цена "%s" для идентификатора %s', $rowNum, $price, $identifier);
                 $skipped++;
                 continue;
             }
 
-            $listing = $this->resolveListing($command->companyId, $command->marketplace, $barcode);
+            [$listing, $resolveError] = $this->resolveListing($command->companyId, $command->marketplace, $identifier, $command->identifierType);
 
             if ($listing === null) {
                 $this->logger->warning('[InventoryImport] Listing not found by barcode', [
                     'company_id'  => $command->companyId,
                     'marketplace' => $command->marketplace->value,
-                    'barcode'     => $barcode,
+                    'identifier'  => $identifier,
                     'row'         => $rowNum,
                 ]);
-                $errors[] = sprintf('Строка %d: баркод %s не найден', $rowNum, $barcode);
+                $errors[] = $resolveError ?? sprintf('Строка %d: идентификатор %s не найден', $rowNum, $identifier);
                 $skipped++;
                 continue;
             }
@@ -85,7 +87,7 @@ final class ImportInventoryCostPriceFromFileAction
 
                 $imported++;
             } catch (\DomainException $e) {
-                $errors[] = sprintf('Строка %d: баркод %s — %s', $rowNum, $barcode, $e->getMessage());
+                $errors[] = sprintf('Строка %d: идентификатор %s — %s', $rowNum, $identifier, $e->getMessage());
                 $skipped++;
             }
         }
@@ -93,6 +95,7 @@ final class ImportInventoryCostPriceFromFileAction
         $this->logger->info('[InventoryImport] Completed', [
             'company_id'  => $command->companyId,
             'marketplace' => $command->marketplace->value,
+            'identifier_type' => $command->identifierType,
             'imported'    => $imported,
             'skipped'     => $skipped,
             'errors'      => count($errors),
@@ -113,20 +116,55 @@ final class ImportInventoryCostPriceFromFileAction
     private function resolveListing(
         string $companyId,
         \App\Marketplace\Enum\MarketplaceType $marketplace,
-        string $barcode,
-    ): ?MarketplaceListing {
+        string $identifier,
+        string $identifierType,
+    ): array {
+        if ($identifierType === 'marketplace_sku') {
+            $matches = $this->listingRepository->findAllByCompanyMarketplaceAndMarketplaceSku($companyId, $marketplace, $identifier);
+
+            return $this->resolveSingleMatch($matches, $identifierType, $identifier);
+        }
+
+        if ($identifierType === 'supplier_sku') {
+            $matches = $this->listingRepository->findAllByCompanyMarketplaceAndSupplierSku($companyId, $marketplace, $identifier);
+
+            return $this->resolveSingleMatch($matches, $identifierType, $identifier);
+        }
+
         $barcodeEntity = $this->barcodeRepository->findByBarcode(
             $companyId,
-            $barcode,
+            $identifier,
             $marketplace,
         );
 
-        return $barcodeEntity?->getListing();
+        $listing = $barcodeEntity?->getListing();
+        if ($listing === null) {
+            return [null, sprintf('идентификатор %s не найден', $identifier)];
+        }
+
+        return [$listing, null];
+    }
+
+    /**
+     * @param MarketplaceListing[] $matches
+     * @return array{0: MarketplaceListing|null, 1: string|null}
+     */
+    private function resolveSingleMatch(array $matches, string $identifierType, string $identifier): array
+    {
+        $count = count($matches);
+        if ($count === 0) {
+            return [null, sprintf('идентификатор %s не найден', $identifier)];
+        }
+        if ($count > 1) {
+            return [null, sprintf('неоднозначный %s "%s": найдено %d листинга', $identifierType, $identifier, $count)];
+        }
+
+        return [$matches[0], null];
     }
 
     /**
      * Парсит xls или xlsx файл.
-     * Первая строка пропускается если первая ячейка не число (заголовок).
+     * Первая строка пропускается как заголовок только если и identifier, и price нечисловые.
      *
      * @return array<int, array<int, mixed>>
      */
@@ -154,8 +192,8 @@ final class ImportInventoryCostPriceFromFileAction
 
                 $firstCell = trim((string) ($cells[0]?->getValue() ?? ''));
 
-                // Пропускаем заголовок — первую строку если первая ячейка не число
-                if ($rowNum === 1 && !is_numeric($firstCell)) {
+                $secondCell = trim((string) ($cells[1]?->getValue() ?? ''));
+                if ($rowNum === 1 && !is_numeric($firstCell) && !is_numeric($secondCell)) {
                     continue;
                 }
 

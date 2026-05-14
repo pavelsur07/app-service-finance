@@ -57,6 +57,7 @@ final class ImportInventoryCostPriceHandler
                 originalFilename: $message->originalFilename,
                 effectiveFrom:    new \DateTimeImmutable($message->effectiveFrom),
                 marketplace:      MarketplaceType::from($message->marketplace),
+                identifierType:   $message->identifierType,
             );
 
             $result = ($this->action)($command);
@@ -73,6 +74,7 @@ final class ImportInventoryCostPriceHandler
                 'errors'    => count($result['errors']),
                 'file'      => $message->originalFilename,
                 'marketplace' => $message->marketplace,
+                'identifier_type' => $message->identifierType,
             ];
 
             $jobLog->complete($summary, $details);
