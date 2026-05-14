@@ -1,11 +1,25 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
 {
+    private WbSalesReportRowNormalizer $normalizer;
+    private WbCostExternalIdBuilder $externalIdBuilder;
+
+    public function __construct(?WbSalesReportRowNormalizer $normalizer = null, ?LoggerInterface $logger = null)
+    {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+        $this->externalIdBuilder = new WbCostExternalIdBuilder($this->normalizer, $logger ?? new NullLogger());
+    }
+
     public function supports(array $item): bool
     {
         return ($item['supplier_oper_name'] ?? '') === 'Возмещение издержек по перевозке/по складским операциям с товаром';
@@ -25,7 +39,11 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $srid = (string)$item['srid'];
+        $externalId = $this->externalIdBuilder->build($item, 'warehouse_logistics');
+        if ($externalId === null) {
+            return [];
+        }
+
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 
         // Привязываем к товару только если listing найден (nm_id + sa_name были заполнены)
@@ -35,7 +53,7 @@ class WbWarehouseLogisticsCalculator implements CostCalculatorInterface
             [
                 'category_code' => 'warehouse_logistics',
                 'amount' => (string)abs($rebillLogisticCost),
-                'external_id' => $srid . '_warehouse_logistics',
+                'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Логистика складские операции',
                 'product' => $product, // null если нет привязки
