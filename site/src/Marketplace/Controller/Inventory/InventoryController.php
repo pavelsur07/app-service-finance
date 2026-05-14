@@ -164,7 +164,7 @@ final class InventoryController extends AbstractController
             companyId: $companyId,
         ));
 
-        $this->addFlash('success', 'Синхронизация баркодов Ozon запущена.');
+        $this->addFlash('success', 'Синхронизация баркодов Ozon запущена. Данные обновятся в течение нескольких секунд.');
 
         return $this->redirectToRoute('marketplace_inventory_index');
     }
