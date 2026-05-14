@@ -247,7 +247,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             $cost->setCostDate($costData['cost_date']);
             $cost->setAmount($costData['amount']);
             $cost->setDescription($costData['description']);
-            $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+            $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE);
 
             if ($row['listing']) {
                 $cost->setListing($row['listing']);

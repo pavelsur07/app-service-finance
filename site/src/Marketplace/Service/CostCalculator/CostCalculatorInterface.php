@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
 
 interface CostCalculatorInterface
 {
@@ -25,6 +28,7 @@ interface CostCalculatorInterface
      *     external_id: string,
      *     cost_date: \DateTimeImmutable,
      *     description: string|null,
+     *     operation_type?: MarketplaceCostOperationType,
      *     product: null
      * }>
      */

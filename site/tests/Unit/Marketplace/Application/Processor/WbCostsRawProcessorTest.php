@@ -6,9 +6,19 @@ namespace App\Tests\Unit\Marketplace\Application\Processor;
 
 use App\Marketplace\Application\ProcessWbCostsAction;
 use App\Marketplace\Application\Processor\WbCostsRawProcessor;
+use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
+use App\Marketplace\Application\Service\WbListingResolverService;
+use App\Marketplace\Entity\MarketplaceCost;
+use App\Marketplace\Entity\MarketplaceCostCategory;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
+use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
+use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
 use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
 use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
@@ -22,22 +32,21 @@ use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Shared\Service\SlugifyService;
+use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\NullLogger;
 
 /**
  * Тесты знакового соглашения WbCostsRawProcessor / WB-калькуляторов.
  *
  * Знаковое соглашение MarketplaceCost.amount / operation_type для WB:
  *   amount всегда положительная (по модулю);
- *   operation_type = CHARGE — все WB-затраты рассматриваются как charge'ы.
- *   (WB не эмитирует storno на уровне отчётов — возвраты обрабатываются
- *    отдельным processReturnsFromRaw, а не WbCostsRawProcessor.)
+ *   operation_type задаёт смысл операции (CHARGE/STORNO);
+ *   если калькулятор не вернул operation_type, процессор ставит CHARGE по умолчанию.
  *
  * Эти тесты ловят регрессию если знаковая логика в калькуляторах изменится
- * или если из persist-блока процессора пропадёт setOperationType(CHARGE)
- * (см. Phase 2B; codex-bot review на PR #1508 уже один раз поймал такой пропуск
- * в ProcessWbCostsAction::__invoke()).
+ * или если из persist-блока процессора пропадёт fallback к CHARGE.
  */
 final class WbCostsRawProcessorTest extends TestCase
 {
@@ -283,7 +292,7 @@ final class WbCostsRawProcessorTest extends TestCase
     }
 
     // -------------------------------------------------------------------------
-    // Processor-level invariant: setOperationType(CHARGE) на каждом persisted MarketplaceCost.
+    // Processor-level invariant: operation_type берётся из costData + fallback CHARGE.
     //
     // Поскольку WbCostsRawProcessor::processBatch() и ProcessWbCostsAction::__invoke()
     // зависят от ~9 final-классов сервисов (final → нельзя замокать через PHPUnit
@@ -292,8 +301,8 @@ final class WbCostsRawProcessorTest extends TestCase
     // интерфейсы — оба варианта выходят за рамки этой задачи.
     //
     // Вместо этого фиксируем regression-инвариант через source-text reflection:
-    // каждый persist-блок ОБЯЗАН содержать литерал
-    //   $cost->setOperationType(MarketplaceCostOperationType::CHARGE)
+    // каждый persist-блок ОБЯЗАН содержать присвоение
+    //   $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE)
     //
     // Этот тест бы упал на состоянии перед commit'ом 7c78411 (фикс по codex-bot P1).
     // Source-text форма брittle к рефакторингу синтаксиса (например, перенос на 2 строки),
@@ -301,20 +310,91 @@ final class WbCostsRawProcessorTest extends TestCase
     // что setOperationType сохранён.
     // -------------------------------------------------------------------------
 
-    public function testProcessBatchSetsOperationTypeChargeOnEveryPersistedCost(): void
+    public function testProcessBatchUsesCalculatorOperationTypeWithChargeFallback(): void
     {
         $source = $this->getMethodSource(
             new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
         );
 
         self::assertStringContainsString(
-            '$cost->setOperationType(MarketplaceCostOperationType::CHARGE)',
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
             $source,
-            'WbCostsRawProcessor::processBatch() МУСТ выставлять operation_type=CHARGE на каждом '
-            . 'persisted MarketplaceCost. Без этого post-Phase-2B SQL-запросы группирующие по '
-            . '(c.operation_type = \'storno\') трактуют NULL отдельно от FALSE → дубликаты PL-линий '
-            . 'в close/preview flow (см. UnprocessedCostsQuery::execute, codex-bot review #1508).',
+            'WbCostsRawProcessor::processBatch() должен брать operation_type из результата калькулятора '
+            . 'и использовать CHARGE как fallback для legacy-калькуляторов.',
         );
+    }
+
+    public function testProcessBatchSupportsStornoOperationTypeFromCalculatorResult(): void
+    {
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
+
+        self::assertStringContainsString(
+            '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
+            $source,
+            'WbCostsRawProcessor::processBatch() должен уметь сохранить STORNO, '
+            . 'если calculator вернул operation_type=STORNO.',
+        );
+    }
+
+    public function testProcessBatchPersistsMarketplaceCostWithStornoOperationType(): void
+    {
+        $calculator = new class () implements CostCalculatorInterface {
+            public function supports(array $item): bool { return true; }
+            public function requiresListing(): bool { return false; }
+            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
+            {
+                return [[
+                    'category_code' => 'test_storno',
+                    'category_name' => 'Test STORNO',
+                    'amount' => '123.45',
+                    'external_id' => 'wb:test:storno',
+                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
+                    'description' => 'Test STORNO',
+                    'operation_type' => MarketplaceCostOperationType::STORNO,
+                    'product' => null,
+                ]];
+            }
+        };
+
+        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
+        $this->invokeProcessBatch($processor);
+
+        self::assertCount(1, $persisted);
+        $cost = $persisted[0];
+        self::assertInstanceOf(MarketplaceCost::class, $cost);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $cost->getOperationType());
+        self::assertSame('123.45', $cost->getAmount());
+        self::assertGreaterThan(0, (float) $cost->getAmount());
+    }
+
+    public function testProcessBatchFallsBackToChargeWhenCalculatorDoesNotProvideOperationType(): void
+    {
+        $calculator = new class () implements CostCalculatorInterface {
+            public function supports(array $item): bool { return true; }
+            public function requiresListing(): bool { return false; }
+            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
+            {
+                return [[
+                    'category_code' => 'test_storno',
+                    'category_name' => 'Test STORNO',
+                    'amount' => '123.45',
+                    'external_id' => 'wb:test:fallback',
+                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
+                    'description' => 'Test STORNO',
+                    'product' => null,
+                ]];
+            }
+        };
+
+        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
+        $this->invokeProcessBatch($processor);
+
+        self::assertCount(1, $persisted);
+        $cost = $persisted[0];
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $cost->getOperationType());
+        self::assertGreaterThan(0, (float) $cost->getAmount());
     }
 
     public function testProcessBatchFiltersOutReturns(): void
@@ -440,6 +520,95 @@ final class WbCostsRawProcessorTest extends TestCase
         // безопасно создавать через newInstanceWithoutConstructor().
         return (new \ReflectionClass(WbCostsRawProcessor::class))
             ->newInstanceWithoutConstructor();
+    }
+
+    /**
+     * @param iterable<CostCalculatorInterface> $calculators
+     * @return array{0: WbCostsRawProcessor, 1: array<int, MarketplaceCost>}
+     */
+    private function makeProcessorForBehavioralTest(iterable $calculators): array
+    {
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturn($company);
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
+
+        $costExistingIdsQuery = $this->getMockBuilder(MarketplaceCostExistingExternalIdsQuery::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['execute'])
+            ->getMock();
+        $costExistingIdsQuery->method('execute')->willReturn([]);
+
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))
+            ->newInstanceWithoutConstructor();
+        $action = (new \ReflectionClass(ProcessWbCostsAction::class))
+            ->newInstanceWithoutConstructor();
+
+        $processor = new WbCostsRawProcessor(
+            $action,
+            $em,
+            $listingRepository,
+            $listingResolver,
+            $costExistingIdsQuery,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new NullLogger(),
+            $calculators,
+        );
+
+        return [$processor, $persisted];
+    }
+
+    private function invokeProcessBatch(WbCostsRawProcessor $processor): void
+    {
+        $processor->processBatch(
+            '11111111-1111-1111-1111-111111111111',
+            MarketplaceType::WILDBERRIES,
+            [[
+                'doc_type_name' => 'Услуги',
+                'supplier_oper_name' => 'Test op',
+                'srid' => 'SRID-TEST',
+                'sale_dt' => '2026-01-15 10:00:00',
+                'nm_id' => '',
+                'ts_name' => '',
+                'barcode' => '',
+            ]],
+            null,
+        );
+    }
+
+    private function makeCompany(): \App\Company\Entity\Company
+    {
+        $user = new \App\Company\Entity\User('00000000-0000-0000-0000-000000000001');
+        $user->setEmail('test@example.com');
+        $user->setPassword('secret');
+
+        $company = new \App\Company\Entity\Company('11111111-1111-1111-1111-111111111111', $user);
+        $company->setName('Test company');
+
+        return $company;
     }
 
     /**
