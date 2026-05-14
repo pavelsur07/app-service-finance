@@ -1,14 +1,28 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Калькулятор для затрат "Обработка товара"
  */
 class WbProductProcessingCalculator implements CostCalculatorInterface
 {
+    private WbSalesReportRowNormalizer $normalizer;
+    private WbCostExternalIdBuilder $externalIdBuilder;
+
+    public function __construct(?WbSalesReportRowNormalizer $normalizer = null, ?LoggerInterface $logger = null)
+    {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+        $this->externalIdBuilder = new WbCostExternalIdBuilder($this->normalizer, $logger ?? new NullLogger());
+    }
+
     public function supports(array $item): bool
     {
         return ($item['supplier_oper_name'] ?? '') === 'Обработка товара';
@@ -29,7 +43,11 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $srid = (string)$item['srid'];
+        $externalId = $this->externalIdBuilder->build($item, 'product_processing');
+        if ($externalId === null) {
+            return [];
+        }
+
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 
         // Проверяем есть ли nm_id и ts_name для привязки к товару
@@ -47,7 +65,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
                 'category_code' => 'product_processing',
                 'category_name' => 'Обработка товара',
                 'amount' => (string)abs($amount),
-                'external_id' => $srid . '_product_processing',
+                'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => 'Обработка товара',
                 'product' => $product, // Привязка к товару (если есть nm_id + ts_name)

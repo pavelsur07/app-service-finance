@@ -1,15 +1,27 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 use App\Shared\Service\SlugifyService;
 
 class WbDeductionCalculator implements CostCalculatorInterface
 {
+    private WbSalesReportRowNormalizer $normalizer;
+    private WbCostExternalIdBuilder $externalIdBuilder;
     public function __construct(
-        private readonly SlugifyService $slugify
-    ) {}
+        private readonly SlugifyService $slugify,
+        ?WbSalesReportRowNormalizer $normalizer = null,
+        ?LoggerInterface $logger = null,
+    ) {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+        $this->externalIdBuilder = new WbCostExternalIdBuilder($this->normalizer, $logger ?? new NullLogger());
+    }
 
     public function supports(array $item): bool
     {
@@ -29,7 +41,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $srid = (string)$item['srid'];
+
         $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
 
         // Обработка bonus_type_name
@@ -83,6 +95,11 @@ class WbDeductionCalculator implements CostCalculatorInterface
             $categoryCode = rtrim($categoryCode, '_'); // Убираем завершающее подчеркивание
         }
 
+        $externalId = $this->externalIdBuilder->build($item, $categoryCode);
+        if ($externalId === null) {
+            return [];
+        }
+
         // Привязываем к товару только если listing найден
         $product = $listing?->getProduct();
 
@@ -91,7 +108,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
                 'category_code' => $categoryCode,
                 'category_name' => $categoryName, // Передаём name для автосоздания
                 'amount' => (string)abs($deduction),
-                'external_id' => $srid . '_deduction',
+                'external_id' => $externalId,
                 'cost_date' => $saleDate,
                 'description' => $categoryName,
                 'product' => $product,
