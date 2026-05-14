@@ -100,14 +100,14 @@ final class WbCostsRawProcessorTest extends TestCase
 
     #[DataProvider('commissionScenarios')]
     public function testWbCommissionCalculatorEmitsPositiveAmount(
-        float $retailPrice,
+        float $retailPriceWithDisc,
         float $acquiringFee,
         float $ppvzForPay,
         float $expectedAbs,
     ): void {
         $entries = (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price'  => $retailPrice,
+                'retail_price_withdisc_rub'  => $retailPriceWithDisc,
                 'acquiring_fee' => $acquiringFee,
                 'ppvz_for_pay'  => $ppvzForPay,
             ]),
@@ -123,7 +123,7 @@ final class WbCostsRawProcessorTest extends TestCase
     /** @return iterable<string, array{0:float,1:float,2:float,3:float}> */
     public static function commissionScenarios(): iterable
     {
-        // commission = retail - acquiring - ppvzForPay
+        // commission = retailPriceWithDisc - acquiring - forPay
         yield 'positive commission'  => [1000.0,  20.0, 800.0, 180.0];
         yield 'negative commission'  => [1000.0,  20.0, 1100.0,  120.0]; // commission = -120 → abs
     }
@@ -139,6 +139,67 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame('acquiring', $entries[0]['category_code']);
         self::assertGreaterThan(0, (float) $entries[0]['amount']);
         self::assertEqualsWithDelta(55.50, (float) $entries[0]['amount'], 0.001);
+    }
+
+
+    public function testWbCommissionCalculatorSaleFormulaAndOperationTypeCharge(): void
+    {
+        $entries = (new WbCommissionCalculator())->calculate(
+            $this->saleItem([
+                'retail_price_withdisc_rub' => 2493.00,
+                'ppvz_for_pay' => 1581.10,
+                'acquiring_fee' => 64.28,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(847.62, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
+    }
+
+    public function testWbCommissionCalculatorReturnFormulaAndOperationTypeStorno(): void
+    {
+        $entries = (new WbCommissionCalculator())->calculate(
+            $this->saleItem([
+                'doc_type_name' => 'Возврат',
+                'retail_price_withdisc_rub' => 1125.00,
+                'ppvz_for_pay' => 680.99,
+                'acquiring_fee' => 27.76,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(416.25, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
+    }
+
+    public function testWbAcquiringCalculatorSaleOperationTypeCharge(): void
+    {
+        $entries = (new WbAcquiringCalculator())->calculate(
+            $this->saleItem(['acquiring_fee' => 64.28]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(64.28, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $entries[0]['operation_type']);
+    }
+
+    public function testWbAcquiringCalculatorReturnOperationTypeStorno(): void
+    {
+        $entries = (new WbAcquiringCalculator())->calculate(
+            $this->saleItem([
+                'doc_type_name' => 'Возврат',
+                'acquiring_fee' => 27.76,
+            ]),
+            null,
+        );
+
+        self::assertCount(1, $entries);
+        self::assertEqualsWithDelta(27.76, (float) $entries[0]['amount'], 0.001);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
     }
 
     public function testWbLogisticsDeliveryCalculatorEmitsPositiveAmount(): void
