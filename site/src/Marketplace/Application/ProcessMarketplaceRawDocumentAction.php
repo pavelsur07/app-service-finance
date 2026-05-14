@@ -11,6 +11,8 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Normalizer\RowClassifierRegistryInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Marketplace\Repository\MarketplaceReturnRepository;
+use App\Marketplace\Repository\MarketplaceSaleRepository;
 use App\Shared\Service\AppLogger;
 use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
@@ -31,6 +33,8 @@ final readonly class ProcessMarketplaceRawDocumentAction
         private RowClassifierRegistryInterface $classifierRegistry,
         private MarketplaceRawProcessorRegistryInterface $processorRegistry,
         private MarketplaceRawDocumentRepository $repository,
+        private MarketplaceSaleRepository $saleRepository,
+        private MarketplaceReturnRepository $returnRepository,
         private EntityManagerInterface $entityManager,
         private MarketplaceCostCategoryResolver $costCategoryResolver,
         private Connection $connection,
@@ -61,6 +65,16 @@ final readonly class ProcessMarketplaceRawDocumentAction
         }
 
         $marketplace = $document->getMarketplace();
+
+        if ($command->forceReprocess && $marketplace === MarketplaceType::WILDBERRIES) {
+            $company = $document->getCompany();
+
+            if ($command->kind === 'sales') {
+                $this->saleRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+            } elseif ($command->kind === 'returns') {
+                $this->returnRepository->deleteByRawDocument($company, $marketplace, $command->rawDocId);
+            }
+        }
 
         $this->appLogger->info('ProcessMarketplaceRawDocumentAction called', [
             'rawDocId'       => $command->rawDocId,
