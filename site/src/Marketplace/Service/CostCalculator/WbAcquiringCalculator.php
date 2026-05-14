@@ -3,12 +3,21 @@
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 
 class WbAcquiringCalculator implements CostCalculatorInterface
 {
+    private WbSalesReportRowNormalizer $normalizer;
+
+    public function __construct(?WbSalesReportRowNormalizer $normalizer = null)
+    {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+    }
+
     public function supports(array $item): bool
     {
-        return ($item['doc_type_name'] ?? '') === 'Продажа';
+        return $this->normalizer->isSaleOrReturn($item);
     }
 
     public function requiresListing(): bool
@@ -18,14 +27,17 @@ class WbAcquiringCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $acquiringFee = (float)($item['acquiring_fee'] ?? 0);
+        $acquiringFee = $this->normalizer->acquiringFee($item);
 
         if (abs($acquiringFee) < 0.01) {
             return [];
         }
 
         $srid = (string)$item['srid'];
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
+        $operationType = $this->normalizer->isReturn($item)
+            ? MarketplaceCostOperationType::STORNO
+            : MarketplaceCostOperationType::CHARGE;
 
         return [
             [
@@ -34,6 +46,7 @@ class WbAcquiringCalculator implements CostCalculatorInterface
                 'external_id' => $srid . '_acquiring',
                 'cost_date' => $saleDate,
                 'description' => 'Эквайринг',
+                'operation_type' => $operationType,
                 'product' => $listing?->getProduct(),
             ],
         ];

@@ -3,12 +3,21 @@
 namespace App\Marketplace\Service\CostCalculator;
 
 use App\Marketplace\Entity\MarketplaceListing;
+use App\Marketplace\Enum\MarketplaceCostOperationType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 
 class WbCommissionCalculator implements CostCalculatorInterface
 {
+    private WbSalesReportRowNormalizer $normalizer;
+
+    public function __construct(?WbSalesReportRowNormalizer $normalizer = null)
+    {
+        $this->normalizer = $normalizer ?? new WbSalesReportRowNormalizer();
+    }
+
     public function supports(array $item): bool
     {
-        return ($item['doc_type_name'] ?? '') === 'Продажа';
+        return $this->normalizer->isSaleOrReturn($item);
     }
 
     public function requiresListing(): bool
@@ -18,10 +27,10 @@ class WbCommissionCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $retailPrice = (float)($item['retail_price'] ?? 0);
-        $acquiringFee = (float)($item['acquiring_fee'] ?? 0);
-        $ppvzForPay = (float)($item['ppvz_for_pay'] ?? 0);
-        $commission = $retailPrice - $acquiringFee - $ppvzForPay;
+        $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
+        $acquiringFee = $this->normalizer->acquiringFee($item);
+        $forPay = $this->normalizer->forPay($item);
+        $commission = $retailPriceWithDisc - $forPay - $acquiringFee;
 
         // Пропускаем нулевые комиссии
         if (abs($commission) < 0.01) {
@@ -29,7 +38,10 @@ class WbCommissionCalculator implements CostCalculatorInterface
         }
 
         $srid = (string)$item['srid'];
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
+        $operationType = $this->normalizer->isReturn($item)
+            ? MarketplaceCostOperationType::STORNO
+            : MarketplaceCostOperationType::CHARGE;
 
         return [
             [
@@ -38,6 +50,7 @@ class WbCommissionCalculator implements CostCalculatorInterface
                 'external_id' => $srid . '_commission',
                 'cost_date' => $saleDate,
                 'description' => 'Комиссия маркетплейса',
+                'operation_type' => $operationType,
                 'product' => $listing?->getProduct(),
             ],
         ];
