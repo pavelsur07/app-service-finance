@@ -42,11 +42,12 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->getResult();
     }
 
-    public function findBySkuAndCompanyId(
+    /** @return MarketplaceListing[] */
+    public function findAllByCompanyMarketplaceAndMarketplaceSku(
         string $companyId,
         MarketplaceType $marketplace,
         string $sku,
-    ): ?MarketplaceListing {
+    ): array {
         return $this->createQueryBuilder('l')
             ->where('IDENTITY(l.company) = :companyId')
             ->andWhere('l.marketplace = :marketplace')
@@ -54,9 +55,25 @@ class MarketplaceListingRepository extends ServiceEntityRepository
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('sku', $sku)
-            ->setMaxResults(1)
             ->getQuery()
-            ->getOneOrNullResult();
+            ->getResult();
+    }
+
+    /** @return MarketplaceListing[] */
+    public function findAllByCompanyMarketplaceAndSupplierSku(
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $supplierSku,
+    ): array {
+        return $this->createQueryBuilder('l')
+            ->where('IDENTITY(l.company) = :companyId')
+            ->andWhere('l.marketplace = :marketplace')
+            ->andWhere('l.supplierSku = :supplierSku')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('supplierSku', $supplierSku)
+            ->getQuery()
+            ->getResult();
     }
 
     public function save(MarketplaceListing $listing): void
