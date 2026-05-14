@@ -328,17 +328,30 @@
                                    value="{{ 'now'|date('Y-m-d') }}" required>
                         </div>
                         <div class="mb-3">
+                            <label class="form-label required">Идентификатор листинга</label>
+                            <select name="identifier_type" id="import-cost-identifier-type" class="form-select" required>
+                                <option value="barcode" selected>Баркод товара</option>
+                                <option value="marketplace_sku">SKU Ozon</option>
+                                <option value="supplier_sku">Артикул продавца Ozon</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
                             <label class="form-label required">Файл (xls, xlsx)</label>
                             <input type="file" name="cost_file" class="form-control"
                                    accept=".xls,.xlsx" required>
                         </div>
-                        <div class="alert alert-info mb-0">
+                        <div class="alert alert-info mb-2">
                             <div class="small">
                                 <strong>Формат файла:</strong><br>
-                                Колонка A — Баркод товара<br>
-                                Колонка B — Себестоимость (число, напр. 850.00)<br>
+                                <span id="import-cost-format-a">Колонка A — Баркод товара</span><br>
+                                Колонка B — Себестоимость, число, например 850.00<br>
                                 Строка с заголовками пропускается автоматически.<br>
                                 <span class="text-muted">Цена будет установлена только для листингов выбранного маркетплейса.</span>
+                            </div>
+                        </div>
+                        <div class="alert alert-warning mb-0 d-none" id="import-cost-supplier-warning">
+                            <div class="small">
+                                Артикул продавца Ozon берется из offer_id. Перед загрузкой по артикулу продавца убедитесь, что выполнена синхронизация баркодов/артикулов Ozon.
                             </div>
                         </div>
                     </div>
@@ -367,5 +380,54 @@
             document.getElementById('form-set-cost').action = btn.getAttribute('data-action');
             document.getElementById('modal-set-cost-name').textContent = btn.getAttribute('data-listing-name');
         });
+
+        (function () {
+            var modal = document.getElementById('modal-import-cost');
+            if (!modal) {
+                return;
+            }
+
+            var marketplaceSelect = modal.querySelector('select[name="marketplace"]');
+            var identifierSelect = document.getElementById('import-cost-identifier-type');
+            var formatALabel = document.getElementById('import-cost-format-a');
+            var supplierWarning = document.getElementById('import-cost-supplier-warning');
+
+            if (!marketplaceSelect || !identifierSelect || !formatALabel || !supplierWarning) {
+                return;
+            }
+
+            var ozonOnlyOptions = ['marketplace_sku', 'supplier_sku'];
+
+            function updateState() {
+                var isOzon = marketplaceSelect.value === 'ozon';
+
+                Array.prototype.forEach.call(identifierSelect.options, function (option) {
+                    if (ozonOnlyOptions.indexOf(option.value) !== -1) {
+                        option.disabled = !isOzon;
+                        option.hidden = !isOzon;
+                    }
+                });
+
+                if (!isOzon && identifierSelect.value !== 'barcode') {
+                    identifierSelect.value = 'barcode';
+                }
+
+                if (identifierSelect.value === 'marketplace_sku') {
+                    formatALabel.textContent = 'Колонка A — SKU Ozon';
+                } else if (identifierSelect.value === 'supplier_sku') {
+                    formatALabel.textContent = 'Колонка A — Артикул продавца Ozon / offer_id';
+                } else {
+                    formatALabel.textContent = 'Колонка A — Баркод товара';
+                }
+
+                supplierWarning.classList.toggle('d-none', identifierSelect.value !== 'supplier_sku');
+            }
+
+            marketplaceSelect.addEventListener('change', updateState);
+            identifierSelect.addEventListener('change', updateState);
+            modal.addEventListener('show.bs.modal', updateState);
+
+            updateState();
+        })();
     </script>
 {% endblock %}
