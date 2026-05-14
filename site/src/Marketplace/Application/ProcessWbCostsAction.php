@@ -59,14 +59,7 @@ final class ProcessWbCostsAction
 
         // --- ФАЗА 1: ПРЕДЗАГРУЗКА ---
 
-        // 1. Фильтруем: убираем только возвраты (их обрабатывает processReturnsFromRaw).
-        //    ВАЖНО: 'Продажа' НЕ исключаем — калькуляторы комиссии, эквайринга,
-        //    лояльности и др. работают именно по записям с doc_type_name = 'Продажа'.
-        $costsData = array_filter($rawData, function ($item) {
-            $docType = $item['doc_type_name'] ?? '';
-
-            return $docType !== 'Возврат';
-        });
+        $costsData = $rawData;
 
         if (empty($costsData)) {
             $this->logger->info('No costs to process');
@@ -236,7 +229,7 @@ final class ProcessWbCostsAction
                 $cost->setCostDate($costData['cost_date']);
                 $cost->setAmount($costData['amount']);
                 $cost->setDescription($costData['description']);
-                $cost->setOperationType(MarketplaceCostOperationType::CHARGE);
+                $cost->setOperationType($costData['operation_type'] ?? MarketplaceCostOperationType::CHARGE);
                 $cost->setRawDocumentId($rawDocId);
 
                 // ПРИВЯЗКА К LISTING (если есть)

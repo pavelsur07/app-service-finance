@@ -74,9 +74,7 @@ final class WbCostsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $costsData = array_filter($rawRows, static function (array $item): bool {
-            return ($item['doc_type_name'] ?? '') !== 'Возврат';
-        });
+        $costsData = $rawRows;
 
         if (empty($costsData)) {
             return;

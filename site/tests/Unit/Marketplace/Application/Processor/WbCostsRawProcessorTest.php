@@ -11,6 +11,7 @@ use App\Marketplace\Application\Service\MarketplaceCostCategoryResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceCost;
 use App\Marketplace\Entity\MarketplaceCostCategory;
+use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
@@ -458,51 +459,224 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertGreaterThan(0, (float) $cost->getAmount());
     }
 
-    public function testProcessBatchFiltersOutReturns(): void
+    public function testProcessBatchDoesNotFilterOutReturnsAndDelegatesOperationTypeToCalculators(): void
     {
-        $source = $this->getMethodSource(
-            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([
+            new WbCommissionCalculator(),
+            new WbAcquiringCalculator(),
+            new WbLogisticsDeliveryCalculator(),
+            new WbLogisticsReturnCalculator(),
+        ]);
+
+        $processor->processBatch(
+            '11111111-1111-1111-1111-111111111111',
+            MarketplaceType::WILDBERRIES,
+            [
+                $this->saleItem([
+                    'srid' => 'SRID-SALE',
+                    'retail_price_withdisc_rub' => 1000.00,
+                    'ppvz_for_pay' => 800.00,
+                    'acquiring_fee' => 40.00,
+                    'delivery_amount' => 0,
+                    'return_amount' => 0,
+                    'delivery_rub' => 0,
+                ]),
+                $this->saleItem([
+                    'doc_type_name' => 'Возврат',
+                    'srid' => 'SRID-RETURN',
+                    'retail_price_withdisc_rub' => 500.00,
+                    'ppvz_for_pay' => 430.00,
+                    'acquiring_fee' => 12.00,
+                    'delivery_amount' => 0,
+                    'return_amount' => 0,
+                    'delivery_rub' => 0,
+                ]),
+            ],
+            null,
         );
 
-        self::assertMatchesRegularExpression(
-            "/array_filter\\(\\s*\\\$rawRows[\\s\\S]+?'doc_type_name'[\\s\\S]+?'Возврат'/u",
-            $source,
-            'WbCostsRawProcessor::processBatch() ОБЯЗАН отфильтровывать строки '
-            . 'doc_type_name=Возврат — они обрабатываются отдельным processReturnsFromRaw, '
-            . 'не должны порождать MarketplaceCost.',
-        );
+        $opsByExternalId = [];
+        foreach ($persisted as $cost) {
+            $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
+        }
+
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
+
+        self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_return', $opsByExternalId);
     }
 
     public function testProcessWbCostsActionSetsOperationTypeChargeOnEveryPersistedCost(): void
     {
-        // Регрессионный тест на codex-bot P1 (fix 7c78411). До фикса этот тест бы упал.
         $source = $this->getMethodSource(
             new \ReflectionMethod(ProcessWbCostsAction::class, '__invoke'),
         );
 
         self::assertStringContainsString(
-            '$cost->setOperationType(MarketplaceCostOperationType::CHARGE)',
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
             $source,
-            'ProcessWbCostsAction::__invoke() МУСТ выставлять operation_type=CHARGE на каждом '
-            . 'persisted MarketplaceCost. WbCostsRawProcessor::process() делегирует сюда '
-            . '(см. WbCostsRawProcessor.php:54-57), поэтому пропуск здесь означает что новые WB-строки '
-            . 'через raw-doc pipeline уйдут с operation_type=NULL — тот же класс багов что в '
-            . 'processBatch (codex-bot review #1508).',
+            'ProcessWbCostsAction::__invoke() должен брать operation_type из calculator-result '
+            . 'и использовать CHARGE как fallback для legacy-калькуляторов.',
         );
     }
 
-    public function testProcessWbCostsActionFiltersOutReturns(): void
+    public function testProcessWbCostsActionDoesNotFilterOutReturns(): void
     {
         $source = $this->getMethodSource(
             new \ReflectionMethod(ProcessWbCostsAction::class, '__invoke'),
         );
 
-        self::assertMatchesRegularExpression(
-            "/array_filter\\([\\s\\S]+?'doc_type_name'[\\s\\S]+?'Возврат'/u",
+        self::assertStringNotContainsString(
+            "return \$docType !== 'Возврат';",
             $source,
-            'ProcessWbCostsAction::__invoke() ОБЯЗАН отфильтровывать строки '
-            . 'doc_type_name=Возврат на входе.',
+            'ProcessWbCostsAction::__invoke() не должен исключать возвраты из costsData.',
         );
+    }
+
+    public function testProcessWbCostsActionCreatesChargeAndStornoForSaleAndReturn(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $company = $this->makeCompany();
+        $persisted = [];
+
+        $rawRows = [
+            [
+                'doc_type_name' => 'Продажа',
+                'supplier_oper_name' => 'Продажа',
+                'srid' => 'SRID-SALE',
+                'retail_price_withdisc_rub' => 1000.00,
+                'ppvz_for_pay' => 800.00,
+                'acquiring_fee' => 40.00,
+                'quantity' => 1,
+                'sale_dt' => '2026-01-10 10:00:00',
+                'rr_dt' => '2026-01-10 10:00:00',
+                'delivery_amount' => 0,
+                'return_amount' => 0,
+                'delivery_rub' => 0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
+                'barcode' => '',
+            ],
+            [
+                'doc_type_name' => 'Возврат',
+                'supplier_oper_name' => 'Возврат покупателем',
+                'srid' => 'SRID-RETURN',
+                'retail_price_withdisc_rub' => 500.00,
+                'ppvz_for_pay' => 430.00,
+                'acquiring_fee' => 12.00,
+                'quantity' => 1,
+                'sale_dt' => '2026-01-10 10:00:00',
+                'rr_dt' => '2026-01-10 10:00:00',
+                'delivery_amount' => 0,
+                'return_amount' => 0,
+                'delivery_rub' => 0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
+                'barcode' => '',
+            ],
+        ];
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn($rawRows);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                    return $company;
+                }
+                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getProduct'])
+            ->getMock();
+        $listing->method('getId')->willReturn('33333333-3333-3333-3333-333333333333');
+        $listing->method('getProduct')->willReturn(null);
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+        ]);
+
+        $costExistingIdsQuery = $this->getMockBuilder(MarketplaceCostExistingExternalIdsQuery::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['execute'])
+            ->getMock();
+        $costExistingIdsQuery->method('execute')->willReturn([]);
+
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))
+            ->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new NullLogger(),
+            [
+                new WbCommissionCalculator(),
+                new WbAcquiringCalculator(),
+                new WbLogisticsDeliveryCalculator(),
+                new WbLogisticsReturnCalculator(),
+            ],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(4, $persisted);
+
+        $opsByExternalId = [];
+        foreach ($persisted as $cost) {
+            $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
+            self::assertGreaterThan(0, (float) $cost->getAmount());
+        }
+
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
+
+        self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_delivery', $opsByExternalId);
+        self::assertArrayNotHasKey('SRID-RETURN_logistics_return', $opsByExternalId);
     }
 
     // -------------------------------------------------------------------------
