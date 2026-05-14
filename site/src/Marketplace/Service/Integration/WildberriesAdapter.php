@@ -260,7 +260,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     /**
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
- * @deprecated
+     *
+     * @deprecated
      */
     public function fetchSales(
         Company $company,
@@ -303,7 +304,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     /**
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
- * @deprecated
+     *
+     * @deprecated
      */
     public function fetchCosts(
         Company $company,
@@ -325,8 +327,11 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $tsName = isset($item['ts_name']) ? (string) $item['ts_name'] : null;
             $barcode = isset($item['barcode']) ? (string) $item['barcode'] : null;
 
+            $isReturn = $this->normalizer->isReturn($item);
             $commissionAmount = abs($this->normalizer->fullMarketplaceCommission($item));
-            if ($commissionAmount > 0) {
+            if (!$isReturn && $commissionAmount > 0) {
+                // Legacy CostData does not support operation_type/STORNO.
+                // Return commission/acquiring is handled by WB raw cost processors only.
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_commission',
@@ -452,7 +457,8 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     /**
      * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
- * @deprecated
+     *
+     * @deprecated
      */
     public function fetchReturns(
         Company $company,

@@ -266,6 +266,52 @@ final class WildberriesAdapterTest extends TestCase
         self::assertCount(1, $returns);
         self::assertSame('1125', $returns[0]->refundAmount);
     }
+
+    public function testLegacyFetchCostsDoesNotCreateCommissionForReturnBecauseCostDataHasNoStorno(): void
+    {
+        $payload = json_encode([[
+            'doc_type_name' => 'Возврат',
+            'supplier_oper_name' => 'Возврат покупателем',
+            'rrd_id' => '125',
+            'rr_dt' => '2026-01-10 10:00:00',
+            'sale_dt' => '2026-01-10 10:00:00',
+            'sa_name' => 'SKU-1',
+            'quantity' => 1,
+            'retail_price_withdisc_rub' => 1125.00,
+            'ppvz_for_pay' => 680.99,
+            'acquiring_fee' => 27.76,
+            'retail_amount' => 720.00,
+            'retail_price' => 1500.00,
+        ]], JSON_THROW_ON_ERROR);
+
+        $adapter = $this->createAdapter(new MockResponse($payload, ['http_code' => 200]));
+        $costs = $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
+
+        self::assertSame([], $costs);
+    }
+
+    public function testLegacyFetchCostsForSaleUsesCommissionFormulaAndExternalIdByRrdId(): void
+    {
+        $payload = json_encode([[
+            'doc_type_name' => 'Продажа',
+            'rrd_id' => '126',
+            'rr_dt' => '2026-01-10 10:00:00',
+            'sale_dt' => '2026-01-10 10:00:00',
+            'sa_name' => 'SKU-1',
+            'quantity' => 1,
+            'retail_price_withdisc_rub' => 1125.00,
+            'ppvz_for_pay' => 680.99,
+            'acquiring_fee' => 27.76,
+        ]], JSON_THROW_ON_ERROR);
+
+        $adapter = $this->createAdapter(new MockResponse($payload, ['http_code' => 200]));
+        $costs = $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
+
+        self::assertCount(1, $costs);
+        self::assertSame('wb_commission', $costs[0]->categoryCode);
+        self::assertSame('416.25', $costs[0]->amount);
+        self::assertSame('wb:126:wb_commission', $costs[0]->externalId);
+    }
     private function createAdapter(MockResponse $response): WildberriesAdapter
     {
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
