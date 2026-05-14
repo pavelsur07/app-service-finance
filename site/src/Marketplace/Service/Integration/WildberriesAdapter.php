@@ -15,6 +15,7 @@ use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -30,6 +31,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly LoggerInterface $logger,
+        private readonly WbSalesReportRowNormalizer $normalizer,
     ) {
     }
 
@@ -256,6 +258,10 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         return [] !== $decoded;
     }
 
+    /**
+     * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
+ * @deprecated
+     */
     public function fetchSales(
         Company $company,
         \DateTimeInterface $fromDate,
@@ -265,23 +271,29 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $sales = [];
 
         foreach ($data as $item) {
-            if (!isset($item['doc_type_name']) || 'Продажа' !== $item['doc_type_name']) {
+            if (!$this->normalizer->isSale($item)) {
                 continue;
             }
 
-            $retailAmount = (float) ($item['retail_amount'] ?? 0);
-            if ($retailAmount <= 0) {
+            $retailPriceWithDisc = $this->normalizer->retailPriceWithDisc($item);
+            if ($retailPriceWithDisc <= 0) {
+                continue;
+            }
+
+            $quantity = abs($this->normalizer->quantity($item));
+            $externalOrderId = $this->normalizer->rrdId($item) ?? (string) ($item['realizationreport_id'] ?? '');
+            if ($externalOrderId === '') {
                 continue;
             }
 
             $sales[] = new SaleData(
                 marketplace: MarketplaceType::WILDBERRIES,
-                externalOrderId: (string) $item['realizationreport_id'],
-                saleDate: new \DateTimeImmutable($item['rr_dt']),
-                marketplaceSku: $item['sa_name'],
-                quantity: abs((int) $item['quantity']),
-                pricePerUnit: (string) $item['retail_price'],
-                totalRevenue: (string) abs($retailAmount),
+                externalOrderId: $externalOrderId,
+                saleDate: $this->normalizer->operationDate($item),
+                marketplaceSku: $this->normalizer->vendorCode($item),
+                quantity: $quantity,
+                pricePerUnit: (string) ($quantity > 0 ? $retailPriceWithDisc / $quantity : 0.0),
+                totalRevenue: (string) $retailPriceWithDisc,
                 rawData: null
             );
         }
@@ -289,6 +301,10 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         return $sales;
     }
 
+    /**
+     * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
+ * @deprecated
+     */
     public function fetchCosts(
         Company $company,
         \DateTimeInterface $fromDate,
@@ -298,22 +314,27 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $costs = [];
 
         foreach ($data as $item) {
-            $realizationId = (string) $item['realizationreport_id'];
-            $saName = $item['sa_name'];
-            $rrDt = new \DateTimeImmutable($item['rr_dt']);
+            $rrdId = $this->normalizer->rrdId($item) ?? (string) ($item['realizationreport_id'] ?? '');
+            if ($rrdId === '') {
+                continue;
+            }
+
+            $saName = $this->normalizer->vendorCode($item);
+            $rrDt = $this->normalizer->reportDate($item);
             $nmId = trim((string) ($item['nm_id'] ?? ''));
             $tsName = isset($item['ts_name']) ? (string) $item['ts_name'] : null;
             $barcode = isset($item['barcode']) ? (string) $item['barcode'] : null;
 
-            if (isset($item['commission_percent']) && abs((float) $item['commission_percent']) > 0) {
+            $commissionAmount = abs($this->normalizer->fullMarketplaceCommission($item));
+            if ($commissionAmount > 0) {
                 $costs[] = new CostData(
                     marketplace: MarketplaceType::WILDBERRIES,
                     categoryCode: 'wb_commission',
-                    amount: (string) abs((float) $item['commission_percent']),
+                    amount: (string) $commissionAmount,
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Комиссия Wildberries',
-                    externalId: $realizationId.'_commission',
+                    externalId: 'wb:'.$rrdId.':wb_commission',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -328,7 +349,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Логистика WB',
-                    externalId: $realizationId.'_logistics',
+                    externalId: 'wb:'.$rrdId.':wb_logistics',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -343,7 +364,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Логистика возврата WB',
-                    externalId: $realizationId.'_return_logistics',
+                    externalId: 'wb:'.$rrdId.':wb_return_logistics',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -358,7 +379,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Хранение на складе WB',
-                    externalId: $realizationId.'_storage',
+                    externalId: 'wb:'.$rrdId.':wb_storage',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -373,7 +394,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Платная приёмка WB',
-                    externalId: $realizationId.'_acceptance',
+                    externalId: 'wb:'.$rrdId.':wb_acceptance',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -388,7 +409,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Прочие удержания WB',
-                    externalId: $realizationId.'_deduction',
+                    externalId: 'wb:'.$rrdId.':wb_deduction',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -403,7 +424,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Штрафы WB',
-                    externalId: $realizationId.'_penalty',
+                    externalId: 'wb:'.$rrdId.':wb_penalty',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -418,7 +439,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
                     costDate: $rrDt,
                     marketplaceSku: $saName,
                     description: 'Доплаты WB',
-                    externalId: $realizationId.'_additional_payment',
+                    externalId: 'wb:'.$rrdId.':wb_additional_payment',
                     nmId: $nmId,
                     tsName: $tsName,
                     barcode: $barcode,
@@ -429,6 +450,10 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         return $costs;
     }
 
+    /**
+     * Legacy DTO API. Do not use for WB financial pipeline. Use raw report processors instead.
+ * @deprecated
+     */
     public function fetchReturns(
         Company $company,
         \DateTimeInterface $fromDate,
@@ -438,19 +463,19 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $returns = [];
 
         foreach ($data as $item) {
-            if (!isset($item['doc_type_name']) || 'Возврат' !== $item['doc_type_name']) {
+            if (!$this->normalizer->isReturn($item)) {
                 continue;
             }
 
             $returns[] = new ReturnData(
                 marketplace: MarketplaceType::WILDBERRIES,
-                marketplaceSku: $item['sa_name'],
-                returnDate: new \DateTimeImmutable($item['rr_dt']),
-                quantity: abs((int) $item['quantity']),
-                refundAmount: (string) abs((float) ($item['retail_amount'] ?? 0)),
+                marketplaceSku: $this->normalizer->vendorCode($item),
+                returnDate: $this->normalizer->reportDate($item),
+                quantity: abs($this->normalizer->quantity($item)),
+                refundAmount: (string) abs($this->normalizer->retailPriceWithDisc($item)),
                 returnReason: $item['supplier_oper_name'] ?? null,
                 returnLogisticsCost: isset($item['return_amount']) ? (string) abs((float) $item['return_amount']) : null,
-                externalReturnId: (string) $item['realizationreport_id'],
+                externalReturnId: $this->normalizer->rrdId($item) ?? (string) ($item['realizationreport_id'] ?? ''),
                 nmId: isset($item['nm_id']) ? (string) $item['nm_id'] : null,
                 tsName: isset($item['ts_name']) ? (string) $item['ts_name'] : null,
                 barcode: isset($item['barcode']) ? (string) $item['barcode'] : null,
