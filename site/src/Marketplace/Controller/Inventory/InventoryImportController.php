@@ -6,7 +6,6 @@ namespace App\Marketplace\Controller\Inventory;
 
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Message\ImportInventoryCostPriceMessage;
-use App\Marketplace\Message\SyncOzonListingBarcodesMessage;
 use App\Shared\Service\ActiveCompanyService;
 use App\Shared\Service\Storage\StorageService;
 use Ramsey\Uuid\Uuid;
@@ -97,29 +96,4 @@ final class InventoryImportController extends AbstractController
         return $this->redirectToRoute('marketplace_inventory_index');
     }
 
-
-// -------------------------------------------------------------------------
-// Добавить в InventoryController:
-// 1. В use-блок:
-//      use App\Marketplace\Message\SyncOzonListingBarcodesMessage;
-//      use Symfony\Component\Messenger\MessageBusInterface;
-// 2. В конструктор добавить:
-//      private readonly MessageBusInterface $messageBus,
-// 3. Метод ниже добавить в тело класса
-// -------------------------------------------------------------------------
-
-    #[Route('/sync-barcodes', name: 'marketplace_inventory_sync_barcodes', methods: ['POST'])]
-    public function syncBarcodes(): Response
-    {
-        $company = $this->companyService->getActiveCompany();
-        $companyId = (string)$company->getId();
-
-        $this->messageBus->dispatch(new SyncOzonListingBarcodesMessage(
-            companyId: $companyId,
-        ));
-
-        $this->addFlash('success', 'Синхронизация баркодов Ozon запущена. Данные обновятся в течение нескольких секунд.');
-
-        return $this->redirectToRoute('marketplace_inventory_index');
-    }
 }
