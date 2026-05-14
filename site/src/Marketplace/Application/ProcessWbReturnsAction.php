@@ -10,6 +10,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -23,6 +24,7 @@ final class ProcessWbReturnsAction
         private readonly MarketplaceReturnRepository $returnRepository,
         private readonly MarketplaceListingRepository $listingRepository,
         private readonly WbListingResolverService $listingResolver,
+        private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -45,11 +47,10 @@ final class ProcessWbReturnsAction
         $synced = 0;
         $batchSize = 250;
 
-        $returnsData = array_filter($rawData, static function (array $item): bool {
-            $docType = $item['doc_type_name'] ?? '';
-
-            return in_array($docType, ['Возврат', 'возврат', 'Return'], true)
-                && (float) ($item['retail_price'] ?? 0) > 0;
+        $returnsData = array_filter($rawData, function (array $item): bool {
+            return $this->normalizer->isReturn($item)
+                && $this->normalizer->quantity($item) > 0
+                && $this->normalizer->retailPriceWithDisc($item) > 0;
         });
 
         if (empty($returnsData)) {
@@ -65,7 +66,10 @@ final class ProcessWbReturnsAction
         $allSrids = array_column($returnsData, 'srid');
         $existingSridsMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
-        $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
+        $allNmIds = array_values(array_unique(array_map(
+            fn (array $item): string => $this->normalizer->nmId($item),
+            $returnsData,
+        )));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             MarketplaceType::WILDBERRIES,
@@ -74,8 +78,8 @@ final class ProcessWbReturnsAction
 
         $newListingsCreated = 0;
         foreach ($returnsData as $item) {
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
@@ -109,8 +113,8 @@ final class ProcessWbReturnsAction
                     continue;
                 }
 
-                $nmId = (string) ($item['nm_id'] ?? '');
-                $tsName = $item['ts_name'] ?? null;
+                $nmId = $this->normalizer->nmId($item);
+                $tsName = $this->normalizer->techSize($item);
                 $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
                 $cacheKey = $nmId . '_' . $size;
 
@@ -132,11 +136,12 @@ final class ProcessWbReturnsAction
                 );
 
                 $return->setExternalReturnId($externalReturnId);
-                $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
-                $return->setQuantity(abs((int) $item['quantity']));
-                $return->setRefundAmount((string) $item['retail_price']);
-                $return->setReturnReason($item['supplier_oper_name'] ?? '');
+                $return->setReturnDate($this->normalizer->reportDate($item));
+                $return->setQuantity(abs($this->normalizer->quantity($item)));
+                $return->setRefundAmount((string) $this->normalizer->retailPriceWithDisc($item));
+                $return->setReturnReason($this->normalizer->sellerOperName($item));
                 $return->setRawDocumentId($rawDocId);
+                $return->setRawData($item);
 
                 $this->em->persist($return);
                 $existingSridsMap[$externalReturnId] = true;

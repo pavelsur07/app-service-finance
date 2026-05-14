@@ -12,6 +12,7 @@ use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -30,6 +31,7 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
         private readonly WbListingResolverService $listingResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly MarketplaceCostPriceResolver $costPriceResolver,
+        private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly LoggerInterface $logger,
     ) {
     }
@@ -67,9 +69,10 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             throw new \RuntimeException('Company not found: ' . $companyId);
         }
 
-        $returnsData = array_filter($rawRows, static function (array $item): bool {
-            return in_array($item['doc_type_name'] ?? '', ['Возврат', 'возврат', 'Return'], true)
-                && (float) ($item['retail_price'] ?? 0) > 0;
+        $returnsData = array_filter($rawRows, function (array $item): bool {
+            return $this->normalizer->isReturn($item)
+                && $this->normalizer->quantity($item) > 0
+                && $this->normalizer->retailPriceWithDisc($item) > 0;
         });
 
         if (empty($returnsData)) {
@@ -78,7 +81,10 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         $this->barcodeCatalog->fillFromWbRows($companyId, array_values($returnsData));
 
-        $allNmIds = array_values(array_unique(array_column($returnsData, 'nm_id')));
+        $allNmIds = array_values(array_unique(array_map(
+            fn (array $item): string => $this->normalizer->nmId($item),
+            $returnsData,
+        )));
         $listingsCache = $this->listingRepository->findListingsByNmIdsIndexed(
             $company,
             MarketplaceType::WILDBERRIES,
@@ -87,8 +93,8 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
 
         $newListings = 0;
         foreach ($returnsData as $item) {
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $cacheKey = $nmId . '_' . $size;
 
@@ -122,8 +128,8 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $nmId = (string) ($item['nm_id'] ?? '');
-            $tsName = $item['ts_name'] ?? null;
+            $nmId = $this->normalizer->nmId($item);
+            $tsName = $this->normalizer->techSize($item);
             $size = trim((string) $tsName) !== '' ? trim((string) $tsName) : 'UNKNOWN';
             $listing = $listingsCache[$nmId . '_' . $size] ?? null;
 
@@ -147,10 +153,10 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             );
 
             $return->setExternalReturnId($srid);
-            $return->setReturnDate(new \DateTimeImmutable($item['rr_dt']));
-            $return->setQuantity(abs((int) ($item['quantity'] ?? 1)));
-            $return->setRefundAmount((string) ($item['retail_price'] ?? '0'));
-            $return->setReturnReason($item['supplier_oper_name'] ?? '');
+            $return->setReturnDate($this->normalizer->reportDate($item));
+            $return->setQuantity(abs($this->normalizer->quantity($item)));
+            $return->setRefundAmount((string) $this->normalizer->retailPriceWithDisc($item));
+            $return->setReturnReason($this->normalizer->sellerOperName($item));
             $return->setCostPrice($this->costPriceResolver->resolveForReturn($listing, $sale, $item));
             $return->setRawData($item);
             if ($rawDocId !== null) {
