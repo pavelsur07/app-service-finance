@@ -12,9 +12,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 #[AutoconfigureTag('marketplace.fetcher')]
 /**
- * @deprecated Legacy Wildberries fetcher pipeline.
+ * @deprecated Legacy Wildberries fetcher pipeline based on GET /api/v5/supplier/reportDetailByPeriod.
  *
- * Основной WB initial/daily/manual sync использует WildberriesAdapter.
+ * Основной WB initial/daily/manual sync использует finance sales-reports/detailed через WildberriesAdapter.
  * Этот pipeline оставлен только для обратной совместимости; код не удалять.
  */
 final readonly class WbFetcher implements MarketplaceFetcherInterface
