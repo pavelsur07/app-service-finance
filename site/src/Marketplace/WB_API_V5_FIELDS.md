@@ -1,82 +1,74 @@
-# WILDBERRIES API v5 - СПРАВОЧНИК ПОЛЕЙ
+# WILDBERRIES FINANCE API — SALES REPORTS DETAILED (АКТУАЛЬНЫЙ PIPELINE)
 
-## ENDPOINT
+## АКТИВНЫЙ ENDPOINT (FINANCE)
+```http
+POST /api/finance/v1/sales-reports/detailed
 ```
-GET https://statistics-api.wildberries.ru/api/v5/supplier/reportDetailByPeriod
-```
 
-## ПАРАМЕТРЫ ЗАПРОСА
-- `dateFrom` — дата начала (YYYY-MM-DD)
-- `dateTo` — дата окончания (YYYY-MM-DD)
-- `limit` — лимит записей (максимум 100000)
-- `rrdid` — ID для пагинации (0 для первой страницы)
+## ПАГИНАЦИЯ (CURSOR)
+- Cursor/body field: `rrdId`.
+- Стартовое значение: `rrdId = 0`.
+- Следующий запрос: передаём `rrdId` последней строки из предыдущего ответа.
+- Завершение чтения: HTTP `204 No Content`.
 
-## ОСНОВНЫЕ ПОЛЯ ОТВЕТА
+## КРИТИЧНЫЕ ИДЕНТИФИКАТОРЫ (НЕ ПУТАТЬ)
+- `rrd_id` / `rrdId` — **уникальный ID строки отчёта реализации** (ключ строки + курсор пагинации).
+- `srid` — **идентификатор товарной операции/заказа**.
+- `realizationreport_id` — **ID документа отчёта реализации**, не уникальный ID строки.
 
-### **Идентификаторы:**
-- `realizationreport_id` — **Уникальный ID строки отчёта** (используем как externalOrderId)
+> Для дедупликации строк и идемпотентной загрузки используем `rrd_id`/`rrdId`, а не `realizationreport_id`.
+
+## ОСНОВНЫЕ ПОЛЯ FINANCE ОТЧЁТА
+
+### SKU и атрибуты
 - `gi_id` — ID поставки
-- `subject_name` — Предмет (категория товара)
-- `nm_id` — Артикул WB
-- `brand_name` — Бренд
-- `sa_name` — **Артикул поставщика** (ваш SKU)
-- `ts_name` — Размер
-- `barcode` — Штрихкод
+- `subject_name` — категория
+- `nm_id` — артикул WB
+- `brand_name` — бренд
+- `sa_name` — артикул поставщика (наш SKU)
+- `ts_name` — размер
+- `barcode` — штрихкод
 
-### **Даты и типы:**
-- `rr_dt` — **Дата отчёта** (используем как saleDate)
-- `doc_type_name` — **Тип документа:**
-    - `"Продажа"` — продажа товара
-    - `"Возврат"` — возврат товара
-    - `"Корректировка продаж"` — корректировка
-    - `"Сторно продаж"` — отмена продажи
+### Тип операции и даты
+- `rr_dt` — дата отчёта/операции
+- `doc_type_name` — тип документа (`Продажа`, `Возврат`, `Корректировка продаж`, `Сторно продаж`)
 
-### **Количество и цены:**
-- `quantity` — Количество (может быть отрицательным при возврате)
-- `retail_price` — Цена розничная
-- `retail_amount` — **Сумма продажи** (quantity × retail_price)
-- `sale_percent` — Скидка (%)
-- `commission_percent` — **Комиссия WB** (процент)
+### Денежные поля и их точная семантика
+- `retail_price_withdisc_rub` / `retailPriceWithDisc` — **сумма SKU без СПП**.
+- `retail_amount` / `retailAmount` — **сумма, оплаченная покупателем с учётом СПП**.
+- `ppvz_for_pay` / `forPay` — **к перечислению продавцу** (продажа) / **к удержанию** (возврат).
+- `acquiring_fee` / `acquiringFee` — **эквайринг**.
+- `commission_percent` — **процент комиссии**, не сумма.
 
-### **Затраты и удержания:**
-- `delivery_rub` — **Логистика** (доставка до клиента)
-- `return_amount` — **Обратная логистика** (возврат товара)
-- `storage_fee` — **Хранение** на складе WB
-- `acceptance` — **Платная приёмка**
-- `deduction` — **Прочие удержания**
-- `penalty` — **Штрафы**
-- `additional_payment` — **Доплаты**
+### Полная денежная комиссия
+```text
+full_commission = retailPriceWithDisc - forPay - acquiringFee
+```
 
-### **Итоги:**
-- `supplier_reward` — Вознаграждение поставщика (к выплате)
-- `acquiring_fee` — Эквайринг
-- `acquiring_bank` — Банк эквайринга
+## ПРАВИЛА ЗНАКОВ ДЛЯ УЧЁТА
+- Продажа: комиссия и эквайринг учитываются как расход (`CHARGE`).
+- Возврат: комиссия и эквайринг учитываются как сторно расхода (`STORNO`).
+- Логистика к клиенту и обратная логистика остаются расходами.
 
-### **Операции:**
-- `supplier_oper_name` — Наименование операции (например, причина возврата)
-- `office_name` — Склад
-- `supplier_inn` — ИНН поставщика
-- `declaration_number` — Номер декларации
+## МАППИНГ НА НАШИ СУЩНОСТИ (ДОКУМЕНТАЦИОННО)
 
----
-
-## МАППИНГ НА НАШИ СУЩНОСТИ
-
-### **MarketplaceSale (Продажи):**
+### MarketplaceSale (Продажи)
 ```php
-externalOrderId: realizationreport_id
+externalOrderId: rrd_id
 saleDate: rr_dt
 marketplaceSku: sa_name
 quantity: abs(quantity)
-pricePerUnit: retail_price
-totalRevenue: abs(retail_amount)
+totalRevenue: retailPriceWithDisc
+pricePerUnit: retailPriceWithDisc / abs(quantity)
 ```
 
-**Фильтр:** `doc_type_name === "Продажа"` AND `retail_amount > 0`
+**Фильтр:** `doc_type_name === "Продажа"`
 
-### **MarketplaceCost (Затраты):**
+### MarketplaceCost (Затраты)
 ```php
-wb_commission: commission_percent
+wb_commission_percent: commission_percent
+wb_commission_amount: retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee
+wb_acquiring: acquiring_fee
 wb_logistics: delivery_rub
 wb_return_logistics: return_amount
 wb_storage: storage_fee
@@ -86,84 +78,39 @@ wb_penalty: penalty
 wb_additional_payment: additional_payment
 ```
 
-**Фильтр:** Все поля где `abs(значение) > 0`
-
-### **MarketplaceReturn (Возвраты):**
+### MarketplaceReturn (Возвраты)
 ```php
-externalReturnId: realizationreport_id
+externalReturnId: rrd_id
 returnDate: rr_dt
 marketplaceSku: sa_name
 quantity: abs(quantity)
-refundAmount: abs(retail_amount)
+refundAmount: retailPriceWithDisc
 returnReason: supplier_oper_name
 returnLogisticsCost: return_amount
 ```
 
-**Фильтр:** `doc_type_name === "Возврат"`
-
----
-
-## ПРИМЕРЫ ЗАПИСЕЙ
-
-### Продажа:
-```json
-{
-  "realizationreport_id": 12345678,
-  "rr_dt": "2025-02-01T00:00:00",
-  "doc_type_name": "Продажа",
-  "sa_name": "JACKET-XL-001",
-  "quantity": 1,
-  "retail_price": 5000.00,
-  "retail_amount": 5000.00,
-  "commission_percent": 750.00,
-  "delivery_rub": 200.00,
-  "storage_fee": 50.00,
-  "supplier_reward": 4000.00
-}
-```
-
-### Возврат:
-```json
-{
-  "realizationreport_id": 12345679,
-  "rr_dt": "2025-02-02T00:00:00",
-  "doc_type_name": "Возврат",
-  "sa_name": "JACKET-XL-001",
-  "quantity": -1,
-  "retail_amount": -5000.00,
-  "return_amount": 200.00,
-  "supplier_oper_name": "Брак"
-}
-```
-
----
-
-## ВАЖНЫЕ ЗАМЕЧАНИЯ
-
-1. **Quantity может быть отрицательным** — всегда используем `abs()`
-2. **doc_type_name критичен** — именно по нему отличаем продажи от возвратов
-3. **realizationreport_id уникален** — используем для дедупликации
-4. **Затраты всегда в рублях** — не проценты
-5. **Один запрос = все типы документов** — фильтруем на стороне PHP
-
----
-
-## RATE LIMITS
-
-- **60 запросов в минуту** (документировано)
-- **Рекомендация:** делать паузу 1 секунду между запросами
-- **Retry strategy:** 3 попытки с exponential backoff
-
----
+## УСТАРЕВШИЕ/ЗАПРЕЩЁННЫЕ ИНТЕРПРЕТАЦИИ
+- ❌ `retail_amount = quantity × retail_price`.
+- ❌ `commission_percent` как денежная комиссия.
+- ❌ `refundAmount = abs(retail_amount)` как универсальная формула возврата.
+- ❌ `realizationreport_id` как уникальный ID строки.
 
 ## АВТОРИЗАЦИЯ
+**Основной токен для активного pipeline:** `Finance token`.
 
 **Header:**
-```
-Authorization: <your-api-key>
+```http
+Authorization: <finance-token>
 ```
 
-**Где взять:**
-Личный кабинет WB → Настройки → Доступ к API → Статистика → Создать токен
+## LEGACY (ТОЛЬКО ДЛЯ ИСТОРИЧЕСКОЙ СПРАВКИ)
+Старый endpoint (не использовать в активном pipeline):
+```http
+GET /api/v5/supplier/reportDetailByPeriod
+```
 
-**Права:** `Статистика` (только чтение)
+Параметры legacy-запроса:
+- `dateFrom`
+- `dateTo`
+- `limit`
+- `rrdid`
