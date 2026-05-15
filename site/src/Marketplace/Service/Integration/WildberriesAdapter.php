@@ -11,27 +11,20 @@ use App\Marketplace\DTO\SaleData;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
-use App\Marketplace\Exception\MarketplaceAuthException;
-use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
-use App\Marketplace\Exception\MarketplaceRateLimitException;
-use App\Marketplace\Exception\MarketplaceTemporaryApiException;
+use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class WildberriesAdapter implements MarketplaceAdapterInterface
 {
-    private const BASE_URL = 'https://statistics-api.wildberries.ru';
-    private const WB_HEADER_RETRY = 'x-ratelimit-retry';
-    private const WB_HEADER_RESET = 'x-ratelimit-reset';
-
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly LoggerInterface $logger,
         private readonly WbSalesReportRowNormalizer $normalizer,
+        private readonly WbFinanceSalesReportClient $salesReportClient,
     ) {
     }
 
@@ -43,23 +36,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             return false;
         }
 
-        try {
-            $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
-                'headers' => [
-                    'Authorization' => $connection->getApiKey(),
-                ],
-                'query' => [
-                    'dateFrom' => (new \DateTimeImmutable('-7 days'))->format('Y-m-d'),
-                    'dateTo' => (new \DateTimeImmutable())->format('Y-m-d'),
-                    'limit' => 1,
-                    'rrdid' => 0,
-                ],
-            ]);
-
-            return 200 === $response->getStatusCode();
-        } catch (\Exception $e) {
-            return false;
-        }
+        return $this->salesReportClient->probeAccess($connection->getApiKey());
     }
 
     public function fetchRawReport(
@@ -76,104 +53,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $dateFrom = $fromDate->format('Y-m-d');
         $dateTo = $toDate->format('Y-m-d');
 
-        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
-            'headers' => [
-                'Authorization' => $connection->getApiKey(),
-            ],
-            'query' => [
-                'dateFrom' => $dateFrom,
-                'dateTo' => $dateTo,
-                'limit' => 100000,
-                'rrdid' => 0,
-                'period' => 'daily',
-            ],
-        ]);
-
-        $statusCode = $response->getStatusCode();
-        $headers = $response->getHeaders(false);
-        try {
-            $body = $response->getContent(false);
-        } catch (TransportExceptionInterface $e) {
-            throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
-        }
-        $excerpt = $this->createSafeExcerpt($body);
-
-        if (204 === $statusCode) {
-            $this->logger->info('WB API no data', [
-                'status_code' => $statusCode,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ]);
-
-            return [];
-        }
-
-        if (429 === $statusCode) {
-            $retryAfter = $this->extractRetryAfter($headers);
-            $this->logger->warning('WB API rate limit', [
-                'status_code' => $statusCode,
-                'retry_after' => $retryAfter,
-                'body_excerpt' => $excerpt,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ]);
-
-            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
-        }
-
-        if (401 === $statusCode || 403 === $statusCode) {
-            $this->logger->warning('WB API auth error', [
-                'status_code' => $statusCode,
-                'body_excerpt' => $excerpt,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ]);
-
-            throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-
-        if ($statusCode >= 500 && $statusCode <= 599) {
-            $this->logger->warning('WB API temporary error', [
-                'status_code' => $statusCode,
-                'body_excerpt' => $excerpt,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ]);
-
-            throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-
-        if (200 !== $statusCode) {
-            throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-
-        if ('' === trim($body)) {
-            return [];
-        }
-
-        try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
-        }
-
-        if (!is_array($decoded) || !array_is_list($decoded)) {
-            throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-
-        foreach ($decoded as $row) {
-            if (!is_array($row)) {
-                throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-        }
-
-        if (count($decoded) > 100_000) {
-            $this->logger->warning('WB payload too large', [
-                'count' => count($decoded),
-            ]);
-        }
-
-        return $decoded;
+        return $this->salesReportClient->fetchDetailed($connection->getApiKey(), $dateFrom, $dateTo);
     }
 
     public function hasRawReportData(
@@ -190,72 +70,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $dateFrom = $fromDate->format('Y-m-d');
         $dateTo = $toDate->format('Y-m-d');
 
-        $response = $this->httpClient->request('GET', self::BASE_URL.'/api/v5/supplier/reportDetailByPeriod', [
-            'headers' => [
-                'Authorization' => $connection->getApiKey(),
-            ],
-            'query' => [
-                'dateFrom' => $dateFrom,
-                'dateTo' => $dateTo,
-                'limit' => 1,
-                'rrdid' => 0,
-                'period' => 'daily',
-            ],
-        ]);
-
-        $statusCode = $response->getStatusCode();
-        $headers = $response->getHeaders(false);
-        try {
-            $body = $response->getContent(false);
-        } catch (TransportExceptionInterface $e) {
-            throw new MarketplaceTemporaryApiException('WB API transport error.', $statusCode, '', $dateFrom, $dateTo, $e);
-        }
-        $excerpt = $this->createSafeExcerpt($body);
-
-        if (204 === $statusCode) {
-            $this->logger->debug('WB API no data', [
-                'status_code' => $statusCode,
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ]);
-
-            return false;
-        }
-
-        if (429 === $statusCode) {
-            $retryAfter = $this->extractRetryAfter($headers);
-            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
-        }
-        if (401 === $statusCode || 403 === $statusCode) {
-            throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-        if ($statusCode >= 500 && $statusCode <= 599) {
-            throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-        if (200 !== $statusCode) {
-            throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-        if ('' === trim($body)) {
-            return false;
-        }
-
-        try {
-            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
-        }
-
-        if (!is_array($decoded) || !array_is_list($decoded)) {
-            throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
-        }
-
-        foreach ($decoded as $row) {
-            if (!is_array($row)) {
-                throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-        }
-
-        return [] !== $decoded;
+        return $this->salesReportClient->hasAnyData($connection->getApiKey(), $dateFrom, $dateTo);
     }
 
     /**
@@ -498,49 +313,10 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     public function getApiEndpointName(): string
     {
-        return 'wildberries::reportDetailByPeriod';
+        return 'wildberries::finance-sales-reports-detailed';
     }
 
 
-    private function extractRetryAfter(array $headers): ?int
-    {
-        $retryAfter = $this->extractHeaderInt($headers, self::WB_HEADER_RETRY);
-        if ($retryAfter !== null) {
-            return $retryAfter;
-        }
-
-        $reset = $this->extractHeaderInt($headers, self::WB_HEADER_RESET);
-        if ($reset !== null) {
-            $now = (new \DateTimeImmutable())->getTimestamp();
-
-            return $reset > $now
-                ? max(0, $reset - $now)
-                : $reset;
-        }
-
-        return $this->extractHeaderInt($headers, 'retry-after');
-    }
-
-    private function extractHeaderInt(array $headers, string $headerName): ?int
-    {
-        if (!isset($headers[$headerName][0])) {
-            return null;
-        }
-
-        $value = trim((string) $headers[$headerName][0]);
-        if ($value === '' || !ctype_digit($value)) {
-            return null;
-        }
-
-        return (int) $value;
-    }
-
-    private function createSafeExcerpt(string $body): string
-    {
-        $normalized = preg_replace('/\s+/', ' ', trim($body)) ?? '';
-
-        return mb_substr($normalized, 0, 500);
-    }
     private function getConnection(Company $company): ?MarketplaceConnection
     {
         return $this->connectionRepository->findByMarketplace(
@@ -550,3 +326,4 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         );
     }
 }
+
