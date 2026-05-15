@@ -11,7 +11,7 @@ name "Обработка товара"
 MarketplaceSale
 У нас есть поля
 Цена = retail_price
-Выручка = retail_amount
+Выручка = retail_price_withdisc_rub (retailPriceWithDisc)
 Добавить поля:
 себестоимость = 
 
@@ -141,3 +141,14 @@ C — 10%
 Фото 2
 
  
+
+
+---
+
+## WB finance отчёты — уточнение терминов
+- `rrd_id` / `rrdId` — уникальный ID строки отчёта (пагинация/дедуп).
+- `realizationreport_id` — ID отчёта, не уникальный ID строки.
+- `commission_percent` — процент комиссии, не сумма.
+- Денежная комиссия: `retail_price_withdisc_rub - ppvz_for_pay - acquiring_fee`.
+- `retail_amount` — оплата покупателя с учётом СПП.
+- `ppvz_for_pay` (`forPay`) — к перечислению продавцу / к удержанию на возврате.
