@@ -71,7 +71,7 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testLegacyFetchSalesUsesRetailPriceWithDiscInsteadOfRetailAmount(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrd_id' => '123', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 2, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 123, 'rrd_id' => '123', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 2, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         $sales = $adapter->fetchSales($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $sales);
@@ -81,7 +81,7 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testLegacyFetchReturnsUsesRetailPriceWithDiscInsteadOfRetailAmount(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Возврат', 'rrd_id' => '124', 'rr_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Возврат', 'rrdId' => 124, 'rrd_id' => '124', 'rr_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_amount' => 9999, 'retail_price_withdisc_rub' => 1125]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         $returns = $adapter->fetchReturns($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $returns);
@@ -90,14 +90,14 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testLegacyFetchCostsDoesNotCreateCommissionForReturnBecauseCostDataHasNoStorno(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Возврат', 'supplier_oper_name' => 'Возврат покупателем', 'rrd_id' => '125', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Возврат', 'supplier_oper_name' => 'Возврат покупателем', 'rrdId' => 125, 'rrd_id' => '125', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         self::assertSame([], $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31')));
     }
 
     public function testLegacyFetchCostsForSaleUsesCommissionFormulaAndExternalIdByRrdId(): void
     {
-        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrd_id' => '126', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], JSON_THROW_ON_ERROR);
+        $payload = json_encode([['doc_type_name' => 'Продажа', 'rrdId' => 126, 'rrd_id' => '126', 'rr_dt' => '2026-01-10 10:00:00', 'sale_dt' => '2026-01-10 10:00:00', 'sa_name' => 'SKU-1', 'quantity' => 1, 'retail_price_withdisc_rub' => 1125.00, 'ppvz_for_pay' => 680.99, 'acquiring_fee' => 27.76]], JSON_THROW_ON_ERROR);
         $adapter = $this->createAdapter(new MockHttpClient([new MockResponse($payload, ['http_code' => 200]), new MockResponse('', ['http_code' => 204])]));
         $costs = $adapter->fetchCosts($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-31'));
         self::assertCount(1, $costs);
