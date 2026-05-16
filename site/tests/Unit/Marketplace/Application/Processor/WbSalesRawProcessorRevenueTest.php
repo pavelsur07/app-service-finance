@@ -8,12 +8,14 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Processor\WbSalesRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -100,9 +102,13 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
                 return ['123_XL' => $listing];
             });
 
-        $barcodeCatalog = $this->createMock(MarketplaceBarcodeCatalogService::class);
-        $costPriceResolver = $this->createMock(MarketplaceCostPriceResolver::class);
-        $costPriceResolver->method('resolveForSale')->willReturn(null);
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
 
         $processor = new WbSalesRawProcessor(
             $this->createMock(ProcessWbSalesAction::class),

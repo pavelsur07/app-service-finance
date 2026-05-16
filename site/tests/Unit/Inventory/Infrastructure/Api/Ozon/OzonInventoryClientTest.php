@@ -112,7 +112,7 @@ final class OzonInventoryClientTest extends TestCase
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $captured = $options['json'];
+            $captured = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
 
             return new MockResponse('{"result":{"items":[]}}', ['http_code' => 200]);
         });
@@ -140,8 +140,9 @@ final class OzonInventoryClientTest extends TestCase
         self::assertStringEndsWith('/v4/product/info/stocks', $captured['url']);
         self::assertSame('client-1', $captured['options']['headers']['Client-Id']);
         self::assertSame('api-1', $captured['options']['headers']['Api-Key']);
-        self::assertSame(['visibility' => 'ALL'], $captured['options']['json']['filter']);
-        self::assertSame(321, $captured['options']['json']['limit']);
-        self::assertSame('last-42', $captured['options']['json']['last_id']);
+        $payload = $captured['options']['json'] ?? json_decode((string) ($captured['options']['body'] ?? 'null'), true);
+        self::assertSame(['visibility' => 'ALL'], $payload['filter']);
+        self::assertSame(321, $payload['limit']);
+        self::assertSame('last-42', $payload['last_id']);
     }
 }

@@ -8,12 +8,14 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbReturnsAction;
 use App\Marketplace\Application\Processor\WbReturnsRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -110,9 +112,13 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('findByMarketplaceOrder')->willReturn(null);
 
-        $barcodeCatalog = $this->createMock(MarketplaceBarcodeCatalogService::class);
-        $costPriceResolver = $this->createMock(MarketplaceCostPriceResolver::class);
-        $costPriceResolver->method('resolveForReturn')->willReturn(null);
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
 
         $processor = new WbReturnsRawProcessor(
             $this->createMock(ProcessWbReturnsAction::class),
