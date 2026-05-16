@@ -784,8 +784,17 @@ final class WbCostsRawProcessorTest extends TestCase
             }
         });
 
+        $listing = $this->getMockBuilder(MarketplaceListing::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getProduct'])
+            ->getMock();
+        $listing->method('getId')->willReturn('33333333-3333-3333-3333-333333333333');
+        $listing->method('getProduct')->willReturn(null);
+
         $listingRepository = $this->createMock(MarketplaceListingRepository::class);
-        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+        ]);
 
         $connection = $this->createMock(Connection::class);
         $result = $this->createMock(Result::class);
@@ -840,8 +849,8 @@ final class WbCostsRawProcessorTest extends TestCase
                 'retail_price_withdisc_rub' => 100.0,
                 'ppvz_for_pay' => 80.0,
                 'acquiring_fee' => 5.0,
-                'nm_id' => '',
-                'ts_name' => '',
+                'nm_id' => '123',
+                'ts_name' => 'XL',
                 'barcode' => '',
             ]],
             null,
