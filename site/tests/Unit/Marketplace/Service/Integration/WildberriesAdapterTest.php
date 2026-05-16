@@ -12,6 +12,7 @@ use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Service\Integration\WildberriesAdapter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -111,7 +112,7 @@ final class WildberriesAdapterTest extends TestCase
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http));
+        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, new MockClock()));
     }
 
     private function company(): Company { return $this->createMock(Company::class); }
