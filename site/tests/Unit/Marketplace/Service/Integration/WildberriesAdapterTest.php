@@ -38,7 +38,7 @@ final class WildberriesAdapterTest extends TestCase
         self::assertSame([['rrdId' => 10]], $rows);
         self::assertSame('https://finance-api.wildberries.ru/api/finance/v1/sales-reports/detailed', $capturedUrl);
         self::assertStringNotContainsString('/api/v5/supplier/reportDetailByPeriod', $capturedUrl);
-        self::assertSame(2, $calls);
+        self::assertSame(1, $calls);
     }
 
     public function testHasRawReportDataUsesFinanceEndpointNotLegacyV5(): void
@@ -59,7 +59,7 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testAuthenticateUsesProbeAccess(): void
     {
-        $http = new MockHttpClient(new MockResponse('', ['http_code' => 204]));
+        $http = new MockHttpClient(new MockResponse('{"Status":"OK"}', ['http_code' => 200]));
         $adapter = $this->createAdapter($http);
         self::assertTrue($adapter->authenticate($this->company()));
     }

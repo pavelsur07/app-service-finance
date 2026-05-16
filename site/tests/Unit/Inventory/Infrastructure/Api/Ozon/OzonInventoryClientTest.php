@@ -111,7 +111,7 @@ final class OzonInventoryClientTest extends TestCase
     public function testRequestBodyDoesNotContainLastIdWhenCursorIsNull(): void
     {
         $captured = [];
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$captured): MockResponse {
             $captured = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
 
             return new MockResponse('{"result":{"items":[]}}', ['http_code' => 200]);
@@ -127,7 +127,7 @@ final class OzonInventoryClientTest extends TestCase
     public function testCredentialsAndRequestBodyArePassedCorrectly(): void
     {
         $captured = [];
-        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+        $http = new MockHttpClient(static function (string $method, string $url, array $options = []) use (&$captured): MockResponse {
             $captured = ['method' => $method, 'url' => $url, 'options' => $options];
 
             return new MockResponse('{"result":{"items":[],"last_id":""}}', ['http_code' => 200]);
@@ -138,8 +138,12 @@ final class OzonInventoryClientTest extends TestCase
 
         self::assertSame('POST', $captured['method']);
         self::assertStringEndsWith('/v4/product/info/stocks', $captured['url']);
-        self::assertSame('client-1', $captured['options']['headers']['Client-Id']);
-        self::assertSame('api-1', $captured['options']['headers']['Api-Key']);
+        $headers = $captured['options']['headers'] ?? [];
+        $norm = $captured['options']['normalized_headers'] ?? [];
+        $clientId = $headers['Client-Id'] ?? $headers['client-id'] ?? ($norm['client-id'][0] ?? null);
+        $apiKey = $headers['Api-Key'] ?? $headers['api-key'] ?? ($norm['api-key'][0] ?? null);
+        self::assertSame('client-1', $clientId);
+        self::assertSame('api-1', $apiKey);
         $payload = $captured['options']['json'] ?? json_decode((string) ($captured['options']['body'] ?? 'null'), true);
         self::assertSame(['visibility' => 'ALL'], $payload['filter']);
         self::assertSame(321, $payload['limit']);
