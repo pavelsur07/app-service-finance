@@ -646,6 +646,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'supplier_oper_name' => 'Логистика',
             'srid'               => 'SRID-LOG-1',
             'sale_dt'            => '2026-01-15 10:00:00',
+            'rrd_id'             => '3001',
             'delivery_amount'    => $deliveryAmount,
             'return_amount'      => $returnAmount,
             'delivery_rub'       => $deliveryRub,
