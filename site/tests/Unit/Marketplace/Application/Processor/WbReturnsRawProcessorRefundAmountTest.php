@@ -121,12 +121,12 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
         $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
 
         $processor = new WbReturnsRawProcessor(
-            $this->createMock(ProcessWbReturnsAction::class),
+            $this->makeProcessWbReturnsActionStub(),
             $em,
             $returnRepository,
             $saleRepository,
             $listingRepository,
-            $this->createMock(WbListingResolverService::class),
+            $this->makeWbListingResolverServiceStub(),
             $barcodeCatalog,
             $costPriceResolver,
             new WbSalesReportRowNormalizer(),
@@ -137,4 +137,14 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
 
         return ['returns' => $persistedReturns, 'nmIdsCalls' => $nmIdsCalls];
     }
+    private function makeProcessWbReturnsActionStub(): ProcessWbReturnsAction
+    {
+        return (new \ReflectionClass(ProcessWbReturnsAction::class))->newInstanceWithoutConstructor();
+    }
+
+    private function makeWbListingResolverServiceStub(): WbListingResolverService
+    {
+        return (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+    }
+
 }
