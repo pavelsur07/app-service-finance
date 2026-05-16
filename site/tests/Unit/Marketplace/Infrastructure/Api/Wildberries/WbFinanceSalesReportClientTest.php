@@ -17,7 +17,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $captured[] = $options['json'];
+            $captured[] = $options['json'] ?? null;
             return match (count($captured)) {
                 1 => new MockResponse('[{"rrdId":10},{"rrdId":20}]', ['http_code' => 200]),
                 2 => new MockResponse('[{"rrdId":30}]', ['http_code' => 200]),

@@ -235,11 +235,15 @@ final class ProcessMarketplaceRawDocumentActionTest extends TestCase
         $returnRepository = $this->createMock(MarketplaceReturnRepository::class);
         $returnRepository->expects(self::never())->method('deleteByRawDocument');
 
+        $processor = $this->createMock(MarketplaceRawProcessorInterface::class);
+        $processor->expects(self::never())->method('process');
+        $processor->expects(self::never())->method('processBatch');
+
         $processorRegistry = $this->createMock(MarketplaceRawProcessorRegistryInterface::class);
-        $processorRegistry->expects(self::never())->method('get');
+        $processorRegistry->expects(self::once())->method('get')->with(StagingRecordType::SALE, MarketplaceType::OZON)->willReturn($processor);
 
         $classifierRegistry = $this->createMock(RowClassifierRegistryInterface::class);
-        $classifierRegistry->expects(self::never())->method('get');
+        $classifierRegistry->expects(self::once())->method('get');
 
         $action = new ProcessMarketplaceRawDocumentAction(
             $classifierRegistry,

@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Processor\WbSalesRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
@@ -100,7 +101,10 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
                 return ['123_XL' => $listing];
             });
 
-        $barcodeCatalog = $this->createMock(MarketplaceBarcodeCatalogService::class);
+        $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
+        $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
+        $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
         $costPriceResolver = $this->createMock(MarketplaceCostPriceResolver::class);
         $costPriceResolver->method('resolveForSale')->willReturn(null);
 

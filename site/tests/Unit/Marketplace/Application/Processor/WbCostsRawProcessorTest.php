@@ -33,6 +33,8 @@ use App\Marketplace\Service\CostCalculator\WbPvzProcessingCalculator;
 use App\Marketplace\Service\CostCalculator\WbStorageCalculator;
 use App\Marketplace\Service\CostCalculator\WbWarehouseLogisticsCalculator;
 use App\Shared\Service\SlugifyService;
+use Doctrine\DBAL\Connection;
+use Doctrine\DBAL\Result;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -620,11 +622,11 @@ final class WbCostsRawProcessorTest extends TestCase
             '123_XL' => $listing,
         ]);
 
-        $costExistingIdsQuery = $this->getMockBuilder(MarketplaceCostExistingExternalIdsQuery::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['execute'])
-            ->getMock();
-        $costExistingIdsQuery->method('execute')->willReturn([]);
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
 
         $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
@@ -777,11 +779,11 @@ final class WbCostsRawProcessorTest extends TestCase
         $listingRepository = $this->createMock(MarketplaceListingRepository::class);
         $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
 
-        $costExistingIdsQuery = $this->getMockBuilder(MarketplaceCostExistingExternalIdsQuery::class)
-            ->disableOriginalConstructor()
-            ->onlyMethods(['execute'])
-            ->getMock();
-        $costExistingIdsQuery->method('execute')->willReturn([]);
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
 
         $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);

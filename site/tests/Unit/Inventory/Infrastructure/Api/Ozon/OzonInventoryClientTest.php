@@ -112,7 +112,7 @@ final class OzonInventoryClientTest extends TestCase
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $captured = $options['json'];
+            $captured = $options['json'] ?? null;
 
             return new MockResponse('{"result":{"items":[]}}', ['http_code' => 200]);
         });
