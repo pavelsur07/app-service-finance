@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
+use App\Marketplace\Exception\MarketplaceApiException;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceType;
@@ -137,11 +139,23 @@ final class SyncWbReportHandler
             $connection->markSyncSuccess();
             $this->em->flush();
         } catch (\Throwable $e) {
-            $this->logger->error('WB daily sync failed', [
+            $context = [
+                'exception' => $e,
+                'exception_class' => $e::class,
                 'company_id'    => $companyId,
                 'connection_id' => $connectionId,
                 'error'         => $e->getMessage(),
-            ]);
+            ];
+            if ($e instanceof MarketplaceApiException) {
+                $context['status_code'] = $e->getStatusCode();
+                $context['date_from'] = $e->getDateFrom();
+                $context['date_to'] = $e->getDateTo();
+                $context['response_excerpt'] = $e->getResponseExcerpt();
+            }
+            if ($e instanceof MarketplaceRateLimitException) {
+                $context['retry_after'] = $e->getRetryAfter();
+            }
+            $this->logger->error('WB daily sync failed', $context);
 
             try {
                 $connection = $this->em->find(MarketplaceConnection::class, $connectionId);
@@ -150,9 +164,23 @@ final class SyncWbReportHandler
                     $this->em->flush();
                 }
             } catch (\Throwable $inner) {
-                $this->logger->error('Failed to save WB sync error status', [
+                $innerContext = [
+                    'exception' => $inner,
+                    'exception_class' => $inner::class,
                     'error' => $inner->getMessage(),
-                ]);
+                    'company_id' => $companyId,
+                    'connection_id' => $connectionId,
+                ];
+                if ($inner instanceof MarketplaceApiException) {
+                    $innerContext['status_code'] = $inner->getStatusCode();
+                    $innerContext['date_from'] = $inner->getDateFrom();
+                    $innerContext['date_to'] = $inner->getDateTo();
+                    $innerContext['response_excerpt'] = $inner->getResponseExcerpt();
+                }
+                if ($inner instanceof MarketplaceRateLimitException) {
+                    $innerContext['retry_after'] = $inner->getRetryAfter();
+                }
+                $this->logger->error('Failed to save WB sync error status', $innerContext);
             }
 
             return;
