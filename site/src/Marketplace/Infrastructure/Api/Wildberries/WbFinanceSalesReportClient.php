@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Api\Wildberries;
 
 use App\Marketplace\Exception\MarketplaceAuthException;
+use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -17,9 +21,16 @@ final readonly class WbFinanceSalesReportClient
     private const PAGE_SIZE = 100000;
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
+    private const WB_MIN_DELAY_SECONDS = 61;
 
-    public function __construct(private HttpClientInterface $httpClient)
-    {
+    private LoggerInterface $logger;
+
+    public function __construct(
+        private HttpClientInterface $httpClient,
+        private ClockInterface $clock,
+        ?LoggerInterface $logger = null,
+    ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     /** @return list<array<string,mixed>> */
@@ -51,13 +62,19 @@ final readonly class WbFinanceSalesReportClient
             $excerpt = $this->createSafeExcerpt($body);
 
             if (204 === $statusCode) {
+                $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, 0, $headers, $excerpt);
                 return $rows;
             }
+            $recordsReceived = null;
+
             if (429 === $statusCode) {
                 throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $this->extractRetryAfter($headers));
             }
             if (401 === $statusCode || 403 === $statusCode) {
                 throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
+            }
+            if (400 === $statusCode) {
+                throw new MarketplaceBadRequestException('WB API rejected request payload.', $statusCode, $excerpt, $dateFrom, $dateTo);
             }
             if ($statusCode >= 500 && $statusCode <= 599) {
                 throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
@@ -84,6 +101,8 @@ final readonly class WbFinanceSalesReportClient
                     throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
                 }
             }
+            $recordsReceived = count($decoded);
+            $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, $recordsReceived, $headers, $excerpt);
 
             if ([] === $decoded) {
                 return $rows;
@@ -97,6 +116,12 @@ final readonly class WbFinanceSalesReportClient
             }
 
             $rrdId = $newRrdId;
+
+            if (count($decoded) < self::PAGE_SIZE) {
+                return $rows;
+            }
+
+            $this->clock->sleep(self::WB_MIN_DELAY_SECONDS);
         }
     }
 
@@ -104,30 +129,66 @@ final readonly class WbFinanceSalesReportClient
 
     public function probeAccess(string $apiKey): bool
     {
-        $today = (new \DateTimeImmutable())->format('Y-m-d');
-
         try {
-            $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
+            $response = $this->httpClient->request('GET', self::BASE_URL.'/ping', [
                 'headers' => ['Authorization' => $apiKey],
-                'json' => [
-                    'dateFrom' => $today,
-                    'dateTo' => $today,
-                    'limit' => 1,
-                    'rrdId' => 0,
-                    'period' => 'daily',
-                ],
                 'timeout' => 120,
             ]);
             $statusCode = $response->getStatusCode();
-        } catch (TransportExceptionInterface) {
-            return false;
+            $headers = $response->getHeaders(false);
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new MarketplaceTemporaryApiException('WB API transport error.', 0, '', '', '', $e);
         }
 
-        if (200 === $statusCode || 204 === $statusCode) {
+        $excerpt = $this->createSafeExcerpt($body);
+        $this->logger->info('WB finance ping response.', [
+            'endpoint' => 'wildberries::finance-ping',
+            'status_code' => $statusCode,
+            'response_excerpt' => $excerpt,
+            'retry_after' => $this->extractHeaderInt($headers, 'retry-after'),
+            'x_ratelimit_retry' => $this->extractHeaderInt($headers, self::WB_HEADER_RETRY),
+            'x_ratelimit_reset' => $this->extractHeaderInt($headers, self::WB_HEADER_RESET),
+        ]);
+
+        if (200 === $statusCode) {
+            if ('' === trim($body)) {
+                $this->logger->warning('WB finance ping returned 200 with empty body.', ['response_excerpt' => $excerpt]);
+
+                return true;
+            }
+
+            try {
+                $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+            } catch (\JsonException) {
+                $this->logger->warning('WB finance ping returned non-JSON body with 200.', ['response_excerpt' => $excerpt]);
+
+                return true;
+            }
+
+            if (is_array($decoded) && 'OK' === (string) ($decoded['Status'] ?? '')) {
+                return true;
+            }
+
+            $this->logger->warning('WB finance ping returned 200 with unexpected JSON status.', ['response_excerpt' => $excerpt]);
+
             return true;
         }
 
-        return false;
+        if (401 === $statusCode || 403 === $statusCode) {
+            return false;
+        }
+        if (429 === $statusCode) {
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, '', '', $this->extractRetryAfter($headers));
+        }
+        if (400 === $statusCode) {
+            throw new MarketplaceBadRequestException('WB finance ping rejected request.', $statusCode, $excerpt, '', '');
+        }
+        if ($statusCode >= 500 && $statusCode <= 599) {
+            throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, '', '');
+        }
+
+        throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, '', '');
     }
 
     public function hasAnyData(string $apiKey, string $dateFrom, string $dateTo): bool
@@ -227,5 +288,30 @@ final readonly class WbFinanceSalesReportClient
         $value = trim((string) $values[0]);
 
         return ctype_digit($value) ? (int) $value : null;
+    }
+
+    private function logWbResponse(
+        int $statusCode,
+        string $dateFrom,
+        string $dateTo,
+        int $rrdId,
+        int $limit,
+        ?int $recordsReceived,
+        array $headers,
+        string $excerpt,
+    ): void {
+        $this->logger->info('WB finance sales report response.', [
+            'endpoint' => 'wildberries::finance-sales-reports-detailed',
+            'status_code' => $statusCode,
+            'dateFrom' => $dateFrom,
+            'dateTo' => $dateTo,
+            'rrdId' => $rrdId,
+            'limit' => $limit,
+            'records_received' => $recordsReceived,
+            'retry_after' => $this->extractHeaderInt($headers, 'retry-after'),
+            'x_ratelimit_retry' => $this->extractHeaderInt($headers, self::WB_HEADER_RETRY),
+            'x_ratelimit_reset' => $this->extractHeaderInt($headers, self::WB_HEADER_RESET),
+            'response_excerpt' => $excerpt,
+        ]);
     }
 }
