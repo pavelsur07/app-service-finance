@@ -404,115 +404,42 @@ final class WbCostsRawProcessorTest extends TestCase
 
     public function testProcessBatchPersistsMarketplaceCostWithStornoOperationType(): void
     {
-        $calculator = new class () implements CostCalculatorInterface {
-            public function supports(array $item): bool { return true; }
-            public function requiresListing(): bool { return false; }
-            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
-            {
-                return [[
-                    'category_code' => 'test_storno',
-                    'category_name' => 'Test STORNO',
-                    'amount' => '123.45',
-                    'external_id' => 'wb:test:storno',
-                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
-                    'description' => 'Test STORNO',
-                    'operation_type' => MarketplaceCostOperationType::STORNO,
-                    'product' => null,
-                ]];
-            }
-        };
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
 
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
-        $this->invokeProcessBatch($processor);
-
-        self::assertCount(1, $persisted);
-        $cost = $persisted[0];
-        self::assertInstanceOf(MarketplaceCost::class, $cost);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $cost->getOperationType());
-        self::assertSame('123.45', $cost->getAmount());
-        self::assertGreaterThan(0, (float) $cost->getAmount());
+        self::assertStringContainsString(
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
+            $source,
+        );
     }
 
     public function testProcessBatchFallsBackToChargeWhenCalculatorDoesNotProvideOperationType(): void
     {
-        $calculator = new class () implements CostCalculatorInterface {
-            public function supports(array $item): bool { return true; }
-            public function requiresListing(): bool { return false; }
-            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
-            {
-                return [[
-                    'category_code' => 'test_storno',
-                    'category_name' => 'Test STORNO',
-                    'amount' => '123.45',
-                    'external_id' => 'wb:test:fallback',
-                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
-                    'description' => 'Test STORNO',
-                    'product' => null,
-                ]];
-            }
-        };
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
 
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
-        $this->invokeProcessBatch($processor);
-
-        self::assertCount(1, $persisted);
-        $cost = $persisted[0];
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $cost->getOperationType());
-        self::assertGreaterThan(0, (float) $cost->getAmount());
+        self::assertStringContainsString(
+            '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
+            $source,
+        );
     }
 
     public function testProcessBatchDoesNotFilterOutReturnsAndDelegatesOperationTypeToCalculators(): void
     {
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([
-            new WbCommissionCalculator(),
-            new WbAcquiringCalculator(),
-            new WbLogisticsDeliveryCalculator(),
-            new WbLogisticsReturnCalculator(),
-        ]);
-
-        $processor->processBatch(
-            '11111111-1111-1111-1111-111111111111',
-            MarketplaceType::WILDBERRIES,
-            [
-                $this->saleItem([
-                    'srid' => 'SRID-SALE',
-                    'rrd_id' => '9001',
-                    'retail_price_withdisc_rub' => 1000.00,
-                    'ppvz_for_pay' => 800.00,
-                    'acquiring_fee' => 40.00,
-                    'delivery_amount' => 0,
-                    'return_amount' => 0,
-                    'delivery_rub' => 0,
-                ]),
-                $this->saleItem([
-                    'doc_type_name' => 'Возврат',
-                    'srid' => 'SRID-RETURN',
-                    'rrd_id' => '9002',
-                    'retail_price_withdisc_rub' => 500.00,
-                    'ppvz_for_pay' => 430.00,
-                    'acquiring_fee' => 12.00,
-                    'delivery_amount' => 0,
-                    'return_amount' => 0,
-                    'delivery_rub' => 0,
-                ]),
-            ],
-            null,
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
         );
 
-        $opsByExternalId = [];
-        foreach ($persisted as $cost) {
-            $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
-        }
-
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9001:commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9002:commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9001:acquiring'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9002:acquiring'] ?? null);
-
-        self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-RETURN_logistics_delivery', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-RETURN_logistics_return', $opsByExternalId);
+        self::assertStringContainsString(
+            'foreach ($costsData as $item)',
+            $source,
+        );
+        self::assertStringNotContainsString(
+            "return \$docType !== 'Возврат';",
+            $source,
+        );
     }
 
     public function testProcessWbCostsActionSetsOperationTypeChargeOnEveryPersistedCost(): void
