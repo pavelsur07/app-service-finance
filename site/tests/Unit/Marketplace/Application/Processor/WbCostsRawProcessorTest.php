@@ -339,9 +339,9 @@ final class WbCostsRawProcessorTest extends TestCase
         // Это важно потому что persist-loop не выставит operation_type на пустом результате.
         self::assertSame([], (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price'  => 1000.0,
-                'acquiring_fee' => 0,
-                'ppvz_for_pay'  => 1000.0, // commission = 0
+                'retail_price_withdisc_rub' => 1000.0,
+                'acquiring_fee'             => 0,
+                'ppvz_for_pay'              => 1000.0, // commission = 0
             ]),
             null,
         ));
@@ -476,6 +476,7 @@ final class WbCostsRawProcessorTest extends TestCase
             [
                 $this->saleItem([
                     'srid' => 'SRID-SALE',
+                    'rrd_id' => '9001',
                     'retail_price_withdisc_rub' => 1000.00,
                     'ppvz_for_pay' => 800.00,
                     'acquiring_fee' => 40.00,
@@ -486,6 +487,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 $this->saleItem([
                     'doc_type_name' => 'Возврат',
                     'srid' => 'SRID-RETURN',
+                    'rrd_id' => '9002',
                     'retail_price_withdisc_rub' => 500.00,
                     'ppvz_for_pay' => 430.00,
                     'acquiring_fee' => 12.00,
@@ -502,10 +504,10 @@ final class WbCostsRawProcessorTest extends TestCase
             $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
         }
 
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9001:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9002:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9001:acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9002:acquiring'] ?? null);
 
         self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
         self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
@@ -552,6 +554,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Продажа',
                 'supplier_oper_name' => 'Продажа',
                 'srid' => 'SRID-SALE',
+                'rrd_id' => '9101',
                 'retail_price_withdisc_rub' => 1000.00,
                 'ppvz_for_pay' => 800.00,
                 'acquiring_fee' => 40.00,
@@ -569,6 +572,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Возврат',
                 'supplier_oper_name' => 'Возврат покупателем',
                 'srid' => 'SRID-RETURN',
+                'rrd_id' => '9102',
                 'retail_price_withdisc_rub' => 500.00,
                 'ppvz_for_pay' => 430.00,
                 'acquiring_fee' => 12.00,
@@ -670,10 +674,10 @@ final class WbCostsRawProcessorTest extends TestCase
             self::assertGreaterThan(0, (float) $cost->getAmount());
         }
 
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:acquiring'] ?? null);
 
         self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
         self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
@@ -700,6 +704,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'ppvz_for_pay'  => 800.00,
             'nm_id'         => '',
             'ts_name'       => '',
+            'rrd_id'        => '1001',
         ], $overrides);
     }
 
@@ -717,6 +722,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'delivery_amount'    => $deliveryAmount,
             'return_amount'      => $returnAmount,
             'delivery_rub'       => $deliveryRub,
+            'rrd_id'             => '2001',
         ], $overrides);
     }
 
@@ -731,6 +737,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'supplier_oper_name' => $supplierOperName,
             'srid'               => 'SRID-OP-1',
             'sale_dt'            => '2026-01-15 10:00:00',
+            'rrd_id'             => '3001',
         ], $overrides);
     }
 
@@ -827,6 +834,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Услуги',
                 'supplier_oper_name' => 'Test op',
                 'srid' => 'SRID-TEST',
+                'rrd_id' => '3999',
                 'sale_dt' => '2026-01-15 10:00:00',
                 'nm_id' => '',
                 'ts_name' => '',

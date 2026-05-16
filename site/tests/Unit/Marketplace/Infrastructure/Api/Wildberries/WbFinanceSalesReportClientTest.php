@@ -23,18 +23,15 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $captured[] = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
-            return match (count($captured)) {
-                1 => new MockResponse('[{"rrdId":10},{"rrdId":20}]', ['http_code' => 200]),
-                2 => new MockResponse('[{"rrdId":30}]', ['http_code' => 200]),
-                default => new MockResponse('', ['http_code' => 204]),
-            };
+            return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
         });
 
         $client = new WbFinanceSalesReportClient($http, new MockClock());
         $rows = $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
 
         self::assertCount(1, $rows);
-        self::assertSame(1, $calls);
+        self::assertCount(1, $captured);
+        self::assertSame(0, $captured[0]['rrdId'] ?? null);
     }
 
     public function test204ReturnsAccumulatedRows(): void
