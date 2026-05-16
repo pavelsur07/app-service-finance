@@ -339,9 +339,9 @@ final class WbCostsRawProcessorTest extends TestCase
         // Это важно потому что persist-loop не выставит operation_type на пустом результате.
         self::assertSame([], (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price'  => 1000.0,
-                'acquiring_fee' => 0,
-                'ppvz_for_pay'  => 1000.0, // commission = 0
+                'retail_price_withdisc_rub' => 1000.0,
+                'acquiring_fee'             => 0,
+                'ppvz_for_pay'              => 1000.0, // commission = 0
             ]),
             null,
         ));
@@ -738,6 +738,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'supplier_oper_name' => $supplierOperName,
             'srid'               => 'SRID-OP-1',
             'sale_dt'            => '2026-01-15 10:00:00',
+            'rrd_id'             => '3001',
         ], $overrides);
     }
 
@@ -834,6 +835,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Услуги',
                 'supplier_oper_name' => 'Test op',
                 'srid' => 'SRID-TEST',
+                'rrd_id' => '3999',
                 'sale_dt' => '2026-01-15 10:00:00',
                 'nm_id' => '',
                 'ts_name' => '',
