@@ -88,7 +88,13 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured, $rows): MockResponse {
-            $captured[] = $options['json'] ?? null;
+            $payload = $options['json'] ?? null;
+
+            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+            }
+
+            $captured[] = $payload;
             return match (count($captured)) {
                 1 => new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]),
                 default => new MockResponse('', ['http_code' => 204]),
@@ -100,7 +106,8 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
 
-        self::assertSame(20, $captured[1]['rrdId']);
+        self::assertIsArray($captured[1]);
+        self::assertSame(20, $captured[1]['rrdId'] ?? null);
         self::assertSame('2026-01-01T00:01:01+00:00', $clock->now()->format(DATE_ATOM));
     }
 
