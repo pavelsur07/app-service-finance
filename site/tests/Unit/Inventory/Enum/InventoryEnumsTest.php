@@ -72,8 +72,8 @@ final class InventoryEnumsTest extends TestCase
     {
         $this->assertSame(
             [
-                'unmapped',
                 'mapped',
+                'unmapped',
                 'ambiguous',
             ],
             array_map(static fn (StockSnapshotMappingStatus $case): string => $case->value, StockSnapshotMappingStatus::cases()),
