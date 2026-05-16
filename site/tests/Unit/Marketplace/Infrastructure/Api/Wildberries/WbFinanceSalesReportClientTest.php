@@ -20,10 +20,14 @@ final class WbFinanceSalesReportClientTest extends TestCase
 {
     public function test200WithOneRowDoesNotTriggerSecondRequest(): void
     {
-        $calls = 0;
-        $http = new MockHttpClient(static function () use (&$calls): MockResponse {
-            ++$calls;
-            return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured[] = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
+            return match (count($captured)) {
+                1 => new MockResponse('[{"rrdId":10},{"rrdId":20}]', ['http_code' => 200]),
+                2 => new MockResponse('[{"rrdId":30}]', ['http_code' => 200]),
+                default => new MockResponse('', ['http_code' => 204]),
+            };
         });
 
         $client = new WbFinanceSalesReportClient($http, new MockClock());

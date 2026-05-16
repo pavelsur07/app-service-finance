@@ -15,6 +15,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -105,8 +106,9 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
         $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
-        $costPriceResolver = $this->createMock(MarketplaceCostPriceResolver::class);
-        $costPriceResolver->method('resolveForSale')->willReturn(null);
+        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
 
         $processor = new WbSalesRawProcessor(
             $this->createMock(ProcessWbSalesAction::class),

@@ -15,6 +15,7 @@ use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceReturn;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Inventory\CostPriceResolverInterface;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceReturnRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
@@ -115,8 +116,9 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
         $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
         $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
-        $costPriceResolver = $this->createMock(MarketplaceCostPriceResolver::class);
-        $costPriceResolver->method('resolveForReturn')->willReturn(null);
+        $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
+        $innerCostPriceResolver->method('resolve')->willReturn('0.00');
+        $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
 
         $processor = new WbReturnsRawProcessor(
             $this->createMock(ProcessWbReturnsAction::class),
