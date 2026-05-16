@@ -12,6 +12,7 @@ use App\Marketplace\Repository\MarketplaceConnectionRepository;
 use App\Marketplace\Service\Integration\WildberriesAdapter;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 
@@ -37,7 +38,7 @@ final class WildberriesAdapterTest extends TestCase
         self::assertSame([['rrdId' => 10]], $rows);
         self::assertSame('https://finance-api.wildberries.ru/api/finance/v1/sales-reports/detailed', $capturedUrl);
         self::assertStringNotContainsString('/api/v5/supplier/reportDetailByPeriod', $capturedUrl);
-        self::assertSame(2, $calls);
+        self::assertSame(1, $calls);
     }
 
     public function testHasRawReportDataUsesFinanceEndpointNotLegacyV5(): void
@@ -58,7 +59,7 @@ final class WildberriesAdapterTest extends TestCase
 
     public function testAuthenticateUsesProbeAccess(): void
     {
-        $http = new MockHttpClient(new MockResponse('', ['http_code' => 204]));
+        $http = new MockHttpClient(new MockResponse('{"Status":"OK"}', ['http_code' => 200]));
         $adapter = $this->createAdapter($http);
         self::assertTrue($adapter->authenticate($this->company()));
     }
@@ -111,7 +112,7 @@ final class WildberriesAdapterTest extends TestCase
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http));
+        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, new MockClock()));
     }
 
     private function company(): Company { return $this->createMock(Company::class); }
