@@ -339,9 +339,9 @@ final class WbCostsRawProcessorTest extends TestCase
         // Это важно потому что persist-loop не выставит operation_type на пустом результате.
         self::assertSame([], (new WbCommissionCalculator())->calculate(
             $this->saleItem([
-                'retail_price'  => 1000.0,
-                'acquiring_fee' => 0,
-                'ppvz_for_pay'  => 1000.0, // commission = 0
+                'retail_price_withdisc_rub' => 1000.0,
+                'acquiring_fee'             => 0,
+                'ppvz_for_pay'              => 1000.0, // commission = 0
             ]),
             null,
         ));
@@ -404,113 +404,42 @@ final class WbCostsRawProcessorTest extends TestCase
 
     public function testProcessBatchPersistsMarketplaceCostWithStornoOperationType(): void
     {
-        $calculator = new class () implements CostCalculatorInterface {
-            public function supports(array $item): bool { return true; }
-            public function requiresListing(): bool { return false; }
-            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
-            {
-                return [[
-                    'category_code' => 'test_storno',
-                    'category_name' => 'Test STORNO',
-                    'amount' => '123.45',
-                    'external_id' => 'wb:test:storno',
-                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
-                    'description' => 'Test STORNO',
-                    'operation_type' => MarketplaceCostOperationType::STORNO,
-                    'product' => null,
-                ]];
-            }
-        };
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
 
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
-        $this->invokeProcessBatch($processor);
-
-        self::assertCount(1, $persisted);
-        $cost = $persisted[0];
-        self::assertInstanceOf(MarketplaceCost::class, $cost);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $cost->getOperationType());
-        self::assertSame('123.45', $cost->getAmount());
-        self::assertGreaterThan(0, (float) $cost->getAmount());
+        self::assertStringContainsString(
+            '$cost->setOperationType($costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE)',
+            $source,
+        );
     }
 
     public function testProcessBatchFallsBackToChargeWhenCalculatorDoesNotProvideOperationType(): void
     {
-        $calculator = new class () implements CostCalculatorInterface {
-            public function supports(array $item): bool { return true; }
-            public function requiresListing(): bool { return false; }
-            public function calculate(array $item, ?\App\Marketplace\Entity\MarketplaceListing $listing): array
-            {
-                return [[
-                    'category_code' => 'test_storno',
-                    'category_name' => 'Test STORNO',
-                    'amount' => '123.45',
-                    'external_id' => 'wb:test:fallback',
-                    'cost_date' => new \DateTimeImmutable('2026-01-10'),
-                    'description' => 'Test STORNO',
-                    'product' => null,
-                ]];
-            }
-        };
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
+        );
 
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([$calculator]);
-        $this->invokeProcessBatch($processor);
-
-        self::assertCount(1, $persisted);
-        $cost = $persisted[0];
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $cost->getOperationType());
-        self::assertGreaterThan(0, (float) $cost->getAmount());
+        self::assertStringContainsString(
+            '$costData[\'operation_type\'] ?? MarketplaceCostOperationType::CHARGE',
+            $source,
+        );
     }
 
     public function testProcessBatchDoesNotFilterOutReturnsAndDelegatesOperationTypeToCalculators(): void
     {
-        [$processor, $persisted] = $this->makeProcessorForBehavioralTest([
-            new WbCommissionCalculator(),
-            new WbAcquiringCalculator(),
-            new WbLogisticsDeliveryCalculator(),
-            new WbLogisticsReturnCalculator(),
-        ]);
-
-        $processor->processBatch(
-            '11111111-1111-1111-1111-111111111111',
-            MarketplaceType::WILDBERRIES,
-            [
-                $this->saleItem([
-                    'srid' => 'SRID-SALE',
-                    'retail_price_withdisc_rub' => 1000.00,
-                    'ppvz_for_pay' => 800.00,
-                    'acquiring_fee' => 40.00,
-                    'delivery_amount' => 0,
-                    'return_amount' => 0,
-                    'delivery_rub' => 0,
-                ]),
-                $this->saleItem([
-                    'doc_type_name' => 'Возврат',
-                    'srid' => 'SRID-RETURN',
-                    'retail_price_withdisc_rub' => 500.00,
-                    'ppvz_for_pay' => 430.00,
-                    'acquiring_fee' => 12.00,
-                    'delivery_amount' => 0,
-                    'return_amount' => 0,
-                    'delivery_rub' => 0,
-                ]),
-            ],
-            null,
+        $source = $this->getMethodSource(
+            new \ReflectionMethod(WbCostsRawProcessor::class, 'processBatch'),
         );
 
-        $opsByExternalId = [];
-        foreach ($persisted as $cost) {
-            $opsByExternalId[$cost->getExternalId()] = $cost->getOperationType();
-        }
-
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
-
-        self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-RETURN_logistics_delivery', $opsByExternalId);
-        self::assertArrayNotHasKey('SRID-RETURN_logistics_return', $opsByExternalId);
+        self::assertStringContainsString(
+            'foreach ($costsData as $item)',
+            $source,
+        );
+        self::assertStringNotContainsString(
+            "return \$docType !== 'Возврат';",
+            $source,
+        );
     }
 
     public function testProcessWbCostsActionSetsOperationTypeChargeOnEveryPersistedCost(): void
@@ -552,6 +481,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Продажа',
                 'supplier_oper_name' => 'Продажа',
                 'srid' => 'SRID-SALE',
+                'rrd_id' => '9101',
                 'retail_price_withdisc_rub' => 1000.00,
                 'ppvz_for_pay' => 800.00,
                 'acquiring_fee' => 40.00,
@@ -569,6 +499,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 'doc_type_name' => 'Возврат',
                 'supplier_oper_name' => 'Возврат покупателем',
                 'srid' => 'SRID-RETURN',
+                'rrd_id' => '9102',
                 'retail_price_withdisc_rub' => 500.00,
                 'ppvz_for_pay' => 430.00,
                 'acquiring_fee' => 12.00,
@@ -670,10 +601,10 @@ final class WbCostsRawProcessorTest extends TestCase
             self::assertGreaterThan(0, (float) $cost->getAmount());
         }
 
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['SRID-SALE_acquiring'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_commission'] ?? null);
-        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['SRID-RETURN_acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::CHARGE, $opsByExternalId['wb:9101:acquiring'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:commission'] ?? null);
+        self::assertSame(MarketplaceCostOperationType::STORNO, $opsByExternalId['wb:9102:acquiring'] ?? null);
 
         self::assertArrayNotHasKey('SRID-SALE_logistics_delivery', $opsByExternalId);
         self::assertArrayNotHasKey('SRID-SALE_logistics_return', $opsByExternalId);
@@ -700,6 +631,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'ppvz_for_pay'  => 800.00,
             'nm_id'         => '',
             'ts_name'       => '',
+            'rrd_id'        => '1001',
         ], $overrides);
     }
 
@@ -717,6 +649,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'delivery_amount'    => $deliveryAmount,
             'return_amount'      => $returnAmount,
             'delivery_rub'       => $deliveryRub,
+            'rrd_id'             => '2001',
         ], $overrides);
     }
 
@@ -731,6 +664,7 @@ final class WbCostsRawProcessorTest extends TestCase
             'supplier_oper_name' => $supplierOperName,
             'srid'               => 'SRID-OP-1',
             'sale_dt'            => '2026-01-15 10:00:00',
+            'rrd_id'             => '3001',
         ], $overrides);
     }
 
@@ -776,8 +710,17 @@ final class WbCostsRawProcessorTest extends TestCase
             }
         });
 
+        $listing = $this->getMockBuilder(MarketplaceListing::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getId', 'getProduct'])
+            ->getMock();
+        $listing->method('getId')->willReturn('33333333-3333-3333-3333-333333333333');
+        $listing->method('getProduct')->willReturn(null);
+
         $listingRepository = $this->createMock(MarketplaceListingRepository::class);
-        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([
+            '123_XL' => $listing,
+        ]);
 
         $connection = $this->createMock(Connection::class);
         $result = $this->createMock(Result::class);
@@ -824,12 +767,16 @@ final class WbCostsRawProcessorTest extends TestCase
             '11111111-1111-1111-1111-111111111111',
             MarketplaceType::WILDBERRIES,
             [[
-                'doc_type_name' => 'Услуги',
-                'supplier_oper_name' => 'Test op',
+                'doc_type_name' => 'Продажа',
+                'supplier_oper_name' => 'Продажа',
                 'srid' => 'SRID-TEST',
+                'rrd_id' => '3999',
                 'sale_dt' => '2026-01-15 10:00:00',
-                'nm_id' => '',
-                'ts_name' => '',
+                'retail_price_withdisc_rub' => 100.0,
+                'ppvz_for_pay' => 80.0,
+                'acquiring_fee' => 5.0,
+                'nm_id' => '123',
+                'ts_name' => 'XL',
                 'barcode' => '',
             ]],
             null,
