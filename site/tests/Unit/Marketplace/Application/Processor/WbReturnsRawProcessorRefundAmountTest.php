@@ -126,7 +126,7 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
             $returnRepository,
             $saleRepository,
             $listingRepository,
-            $this->createMock(WbListingResolverService::class),
+            $this->makeWbListingResolverServiceStub(),
             $barcodeCatalog,
             $costPriceResolver,
             new WbSalesReportRowNormalizer(),
@@ -140,6 +140,11 @@ final class WbReturnsRawProcessorRefundAmountTest extends TestCase
     private function makeProcessWbReturnsActionStub(): ProcessWbReturnsAction
     {
         return (new \ReflectionClass(ProcessWbReturnsAction::class))->newInstanceWithoutConstructor();
+    }
+
+    private function makeWbListingResolverServiceStub(): WbListingResolverService
+    {
+        return (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
     }
 
 }

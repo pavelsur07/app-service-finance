@@ -140,8 +140,10 @@ final class OzonInventoryClientTest extends TestCase
         self::assertStringEndsWith('/v4/product/info/stocks', $captured['url']);
         $headers = $captured['options']['headers'] ?? [];
         $norm = $captured['options']['normalized_headers'] ?? [];
-        $clientId = $headers['Client-Id'] ?? $headers['client-id'] ?? ($norm['client-id'][0] ?? null);
-        $apiKey = $headers['Api-Key'] ?? $headers['api-key'] ?? ($norm['api-key'][0] ?? null);
+        $rawClientId = $headers['Client-Id'] ?? $headers['client-id'] ?? ($norm['client-id'][0] ?? null);
+        $rawApiKey = $headers['Api-Key'] ?? $headers['api-key'] ?? ($norm['api-key'][0] ?? null);
+        $clientId = is_string($rawClientId) && str_contains($rawClientId, ':') ? trim((string) preg_replace('/^[^:]+:/', '', $rawClientId)) : $rawClientId;
+        $apiKey = is_string($rawApiKey) && str_contains($rawApiKey, ':') ? trim((string) preg_replace('/^[^:]+:/', '', $rawApiKey)) : $rawApiKey;
         self::assertSame('client-1', $clientId);
         self::assertSame('api-1', $apiKey);
         $payload = $captured['options']['json'] ?? json_decode((string) ($captured['options']['body'] ?? 'null'), true);

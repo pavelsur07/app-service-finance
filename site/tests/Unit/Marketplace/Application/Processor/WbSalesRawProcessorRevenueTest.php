@@ -115,7 +115,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
             $em,
             $saleRepository,
             $listingRepository,
-            $this->createMock(WbListingResolverService::class),
+            $this->makeWbListingResolverServiceStub(),
             $barcodeCatalog,
             $costPriceResolver,
             new WbSalesReportRowNormalizer(),
@@ -129,6 +129,11 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
     private function makeProcessWbSalesActionStub(): ProcessWbSalesAction
     {
         return (new \ReflectionClass(ProcessWbSalesAction::class))->newInstanceWithoutConstructor();
+    }
+
+    private function makeWbListingResolverServiceStub(): WbListingResolverService
+    {
+        return (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
     }
 
 }
