@@ -51,6 +51,7 @@
 | `MarketplaceOrder` | Marketplace | `string $companyId` ✅ |
 | `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -71,6 +72,16 @@
 | `CashTransaction`, `MoneyAccount` и др. | Cash | `Company $company` (legacy) |
 | `Deal`, `ChargeType` | Deals | `Company $company` (legacy) |
 | `PLCategory`, `Document` и др. | legacy `src/Entity/` | `Company $company` (legacy) |
+
+### Marketplace: WB financial report sync status (дневной статус)
+
+- Entity: `MarketplaceFinancialReportSyncStatus`.
+- `companyId`: `string UUID` (неизменяемое поле, не часть бизнес-ключа).
+- `connectionId`: `string UUID`.
+- `businessDate`: `date` (`DateTimeImmutable`, `date_immutable` в ORM).
+- Бизнес-ключ (idempotency / unique key): `connection_id + report_type + business_date`.
+- `empty day` (статус `EMPTY`) **не равен** `missing day`: пустой день считается обработанным, а не пропущенным.
+- `apiEndpoint` — техническое мета-поле источника/маршрута API, **не часть бизнес-ключа** статуса.
 
 ### `UnitEconomyCostMapping` — поля
 
