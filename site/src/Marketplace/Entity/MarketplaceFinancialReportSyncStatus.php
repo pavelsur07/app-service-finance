@@ -15,7 +15,6 @@ use Webmozart\Assert\Assert;
 #[ORM\Table(name: 'marketplace_financial_report_sync_statuses')]
 #[ORM\UniqueConstraint(name: 'uniq_mfrss_connection_report_day', columns: ['connection_id', 'report_type', 'business_date'])]
 #[ORM\Index(name: 'idx_mfrss_company_connection_date', columns: ['company_id', 'connection_id', 'business_date'])]
-#[ORM\Index(name: 'idx_mfrss_connection_report_date', columns: ['connection_id', 'report_type', 'business_date'])]
 class MarketplaceFinancialReportSyncStatus
 {
     #[ORM\Id]

@@ -48,10 +48,7 @@ final class Version20260520120000 extends AbstractMigration
             )
         SQL);
 
-        $this->addSql('CREATE INDEX idx_mfrss_company_marketplace_date ON marketplace_financial_report_sync_statuses (company_id, marketplace, business_date)');
-        $this->addSql('CREATE INDEX idx_mfrss_connection_status ON marketplace_financial_report_sync_statuses (connection_id, status)');
-        $this->addSql('CREATE INDEX idx_mfrss_status_next_retry_at ON marketplace_financial_report_sync_statuses (status, next_retry_at)');
-        $this->addSql('CREATE INDEX idx_mfrss_raw_document_id ON marketplace_financial_report_sync_statuses (raw_document_id)');
+        $this->addSql('CREATE INDEX idx_mfrss_company_connection_date ON marketplace_financial_report_sync_statuses (company_id, connection_id, business_date)');
 
         $this->addSql("COMMENT ON COLUMN marketplace_financial_report_sync_statuses.business_date IS '(DC2Type:date_immutable)'");
         $this->addSql("COMMENT ON COLUMN marketplace_financial_report_sync_statuses.created_at IS '(DC2Type:datetime_immutable)'");
