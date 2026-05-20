@@ -37,6 +37,7 @@ framework:
         routing:
             # --- async_sync: external marketplace/bank HTTP fetches ---
             'App\Marketplace\Message\SyncWbReportMessage': async_sync
+            'App\Marketplace\Message\SyncWbFinancialReportDayMessage': async_sync
             'App\Marketplace\Message\SyncOzonReportMessage': async_sync
             'App\Marketplace\Message\SyncOzonRealizationMessage': async_sync
             'App\Marketplace\Message\InitialSyncMessage': async_sync
