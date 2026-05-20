@@ -146,4 +146,109 @@ class MarketplaceFinancialReportSyncStatus
     public function getLastErrorResponseExcerpt(): ?string { return $this->lastErrorResponseExcerpt; }
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
+
+    public function markLoading(FinancialReportSyncMode $mode): void
+    {
+        $now = new \DateTimeImmutable();
+        $this->status = FinancialReportSyncStatus::LOADING;
+        $this->mode = $mode;
+        $this->attempts++;
+        $this->lastAttemptAt = $now;
+        $this->nextRetryAt = null;
+        $this->startedAt ??= $now;
+        $this->finishedAt = null;
+        $this->clearLastError();
+        $this->updatedAt = $now;
+    }
+
+    public function markEmpty(): void
+    {
+        $now = new \DateTimeImmutable();
+        $this->status = FinancialReportSyncStatus::EMPTY;
+        $this->recordsCount = 0;
+        $this->lastEmptyAt = $now;
+        $this->finishedAt = $now;
+        $this->nextRetryAt = null;
+        $this->clearLastError();
+        $this->updatedAt = $now;
+    }
+
+    public function markRawLoaded(string $rawDocumentId, int $recordsCount, ?string $rowsHash): void
+    {
+        Assert::uuid($rawDocumentId);
+
+        $this->status = FinancialReportSyncStatus::RAW_LOADED;
+        $this->rawDocumentId = $rawDocumentId;
+        $this->recordsCount = max(0, $recordsCount);
+        $this->rowsHash = $rowsHash;
+        $this->nextRetryAt = null;
+        $this->clearLastError();
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markProcessing(): void
+    {
+        $this->status = FinancialReportSyncStatus::PROCESSING;
+        $this->nextRetryAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markSuccess(): void
+    {
+        $now = new \DateTimeImmutable();
+        $this->status = FinancialReportSyncStatus::SUCCESS;
+        $this->finishedAt = $now;
+        $this->lastSuccessAt = $now;
+        $this->nextRetryAt = null;
+        $this->clearLastError();
+        $this->updatedAt = $now;
+    }
+
+    public function markFailedRetryable(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt, ?\DateTimeImmutable $nextRetryAt): void
+    {
+        $this->status = FinancialReportSyncStatus::FAILED;
+        $this->lastErrorClass = $errorClass;
+        $this->lastErrorMessage = $errorMessage;
+        $this->lastErrorStatusCode = $statusCode;
+        $this->lastErrorResponseExcerpt = $responseExcerpt;
+        $this->nextRetryAt = $nextRetryAt ?? new \DateTimeImmutable('+15 minutes');
+        $this->finishedAt = null;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markFailedFinal(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
+    {
+        $this->markTerminalFailure(FinancialReportSyncStatus::FAILED_FINAL, $errorClass, $errorMessage, $statusCode, $responseExcerpt);
+    }
+
+    public function markAuthFailed(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
+    {
+        $this->markTerminalFailure(FinancialReportSyncStatus::AUTH_FAILED, $errorClass, $errorMessage, $statusCode, $responseExcerpt);
+    }
+
+    public function markConflict(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
+    {
+        $this->markTerminalFailure(FinancialReportSyncStatus::CONFLICT, $errorClass, $errorMessage, $statusCode, $responseExcerpt);
+    }
+
+    private function markTerminalFailure(FinancialReportSyncStatus $status, string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
+    {
+        $now = new \DateTimeImmutable();
+        $this->status = $status;
+        $this->lastErrorClass = $errorClass;
+        $this->lastErrorMessage = $errorMessage;
+        $this->lastErrorStatusCode = $statusCode;
+        $this->lastErrorResponseExcerpt = $responseExcerpt;
+        $this->nextRetryAt = null;
+        $this->finishedAt = $now;
+        $this->updatedAt = $now;
+    }
+
+    private function clearLastError(): void
+    {
+        $this->lastErrorClass = null;
+        $this->lastErrorMessage = null;
+        $this->lastErrorStatusCode = null;
+        $this->lastErrorResponseExcerpt = null;
+    }
 }
