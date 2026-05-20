@@ -72,6 +72,63 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
         )[0] ?? null;
     }
 
+
+    /**
+     * Deterministic lookup for refresh/idempotency by exact period + api endpoint.
+     * Excludes FAILED documents and returns newest first.
+     *
+     * @return list<MarketplaceRawDocument>
+     */
+    public function findActiveExactPeriodDocuments(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        string $apiEndpoint,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): array {
+        return $this->createQueryBuilder('d')
+            ->where('d.company = :company')
+            ->andWhere('d.marketplace = :marketplace')
+            ->andWhere('d.documentType = :documentType')
+            ->andWhere('d.apiEndpoint = :apiEndpoint')
+            ->andWhere('d.periodFrom = :periodFrom')
+            ->andWhere('d.periodTo = :periodTo')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :failed)')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('documentType', $documentType)
+            ->setParameter('apiEndpoint', $apiEndpoint)
+            ->setParameter('periodFrom', $periodFrom)
+            ->setParameter('periodTo', $periodTo)
+            ->setParameter('failed', PipelineStatus::FAILED)
+            ->orderBy('d.syncedAt', 'DESC')
+            ->addOrderBy('d.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Idempotency lookup for refresh/idempotency by exact period + api endpoint.
+     */
+    public function findActiveExactPeriodDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $documentType,
+        string $apiEndpoint,
+        \DateTimeImmutable $periodFrom,
+        \DateTimeImmutable $periodTo,
+    ): ?MarketplaceRawDocument {
+        return $this->findActiveExactPeriodDocuments(
+            $company,
+            $marketplace,
+            $documentType,
+            $apiEndpoint,
+            $periodFrom,
+            $periodTo,
+        )[0] ?? null;
+    }
+
     /**
      * Idempotency lookup for initial sync weekly/month-split batches.
      */
