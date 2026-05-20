@@ -53,6 +53,11 @@ services:
         arguments:
             $factory: '@?limiter.registration'
 
+
+    App\Marketplace\Application\Service\WbFinanceRateLimiter:
+        arguments:
+            $factory: '@?limiter.wb_finance'
+
     App\Service\FeatureFlagService:
         arguments:
             $fundsAndWidgetEnabled: '%feature_funds_and_widget%'
