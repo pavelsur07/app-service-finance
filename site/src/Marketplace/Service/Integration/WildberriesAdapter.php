@@ -19,6 +19,8 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 class WildberriesAdapter implements MarketplaceAdapterInterface
 {
+    public const FINANCE_API_ENDPOINT = 'wildberries::finance-sales-reports-detailed';
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly MarketplaceConnectionRepository $connectionRepository,
@@ -313,7 +315,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
     public function getApiEndpointName(): string
     {
-        return 'wildberries::finance-sales-reports-detailed';
+        return self::FINANCE_API_ENDPOINT;
     }
 
 
