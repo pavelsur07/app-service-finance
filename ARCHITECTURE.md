@@ -52,6 +52,7 @@
 | `ReconciliationSession` | Marketplace | `string $companyId` ✅ |
 | `OzonTransactionTotalsCheck` | Marketplace | `string $companyId` ✅ |
 | `MarketplaceFinancialReportSyncStatus` | Marketplace | `string $companyId` ✅ |
+| `MarketplaceFinancialReportSyncError` | Marketplace | `string $companyId` ✅ |
 | `UnitEconomyCostMapping` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `ListingDailySnapshot` | MarketplaceAnalytics | `string $companyId` ✅ |
 | `AdRawDocument` | MarketplaceAds | `string $companyId` ✅ |
@@ -82,6 +83,13 @@
 - Бизнес-ключ (idempotency / unique key): `connection_id + report_type + business_date`.
 - `empty day` (статус `EMPTY`) **не равен** `missing day`: пустой день считается обработанным, а не пропущенным.
 - `apiEndpoint` — техническое мета-поле источника/маршрута API, **не часть бизнес-ключа** статуса.
+
+### Marketplace: append-only история ошибок WB financial sync
+
+- Entity: `MarketplaceFinancialReportSyncError`.
+- Назначение: хранит отдельные записи ошибок синхронизации как append-only историю; retry не перезаписывает предыдущую диагностику.
+- Поля: `syncStatusId`, `companyId`, `connectionId`, `businessDate`, `errorClass`, `errorMessage`, `statusCode`, `responseExcerpt`, `requestPayload`, `createdAt`.
+- `requestPayload` хранится в JSON-формате и **не должен** содержать API token, plaintext secret или полный raw response body.
 
 ### `UnitEconomyCostMapping` — поля
 
