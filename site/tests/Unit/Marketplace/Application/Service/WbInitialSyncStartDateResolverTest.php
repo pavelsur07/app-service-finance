@@ -8,6 +8,7 @@ use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
 use App\Tests\Builders\Company\CompanyBuilder;
 use PHPUnit\Framework\TestCase;
 use Symfony\Component\Clock\MockClock;
@@ -38,6 +39,18 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         $rawRepository = $this->createMock(MarketplaceRawDocumentRepository::class);
         $rawRepository->expects(self::once())
             ->method('findMinPeriodFromForSuccessfulDocuments')
+            ->with(
+                $company,
+                MarketplaceType::WILDBERRIES,
+                'sales_report',
+                WildberriesAdapter::FINANCE_API_ENDPOINT,
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-01-01 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-05-09 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
+            )
             ->willReturn(new \DateTimeImmutable('2026-04-20 17:10:00'));
 
         $resolver = new WbInitialSyncStartDateResolver($rawRepository, new MockClock('2026-05-10 00:00:00'));

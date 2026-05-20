@@ -7,6 +7,7 @@ namespace App\Marketplace\Application\Service;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
+use App\Marketplace\Service\Integration\WildberriesAdapter;
 use Symfony\Component\Clock\ClockInterface;
 
 class WbInitialSyncStartDateResolver
@@ -35,7 +36,7 @@ class WbInitialSyncStartDateResolver
             company: $company,
             marketplace: $connection->getMarketplace(),
             documentType: self::DOCUMENT_TYPE,
-            apiEndpoint: 'wildberries::reportDetailByPeriod',
+            apiEndpoint: WildberriesAdapter::FINANCE_API_ENDPOINT,
             yearStart: $yearStart,
             yesterday: $yesterday,
         );
