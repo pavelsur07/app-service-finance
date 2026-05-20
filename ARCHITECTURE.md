@@ -1265,6 +1265,36 @@ enum LocationType: string
 }
 ```
 
+
+### `src/Marketplace/Enum/FinancialReportSyncStatus.php`
+```php
+enum FinancialReportSyncStatus: string
+{
+    case QUEUED = 'queued';
+    case LOADING = 'loading';
+    case RAW_LOADED = 'raw_loaded';
+    case PROCESSING = 'processing';
+    case SUCCESS = 'success';
+    case EMPTY = 'empty';
+    case FAILED = 'failed';
+    case FAILED_FINAL = 'failed_final';
+    case AUTH_FAILED = 'auth_failed';
+    case CONFLICT = 'conflict';
+}
+```
+
+### `src/Marketplace/Enum/FinancialReportSyncMode.php`
+```php
+enum FinancialReportSyncMode: string
+{
+    case INITIAL = 'initial';
+    case DAILY = 'daily';
+    case REFRESH_14D = 'refresh_14d';
+    case MISSING = 'missing';
+    case MANUAL = 'manual';
+}
+```
+
 ### `src/Marketplace/Enum/OrderStatus.php`
 ```php
 enum OrderStatus: string
