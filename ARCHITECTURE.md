@@ -1729,6 +1729,23 @@ GET /inventory/stocks
 - `SyncOzonInventorySnapshotMessage` выполняет внешний HTTP-запрос к Ozon;
 - `NormalizeInventorySnapshotMessage` выполняет локальную DB-heavy обработку raw JSON.
 
+## Messenger routing — Marketplace (WB financial report day)
+
+- `App\Marketplace\Message\SyncWbFinancialReportDayMessage` → `async_sync`.
+
+Назначение:
+- загрузка WB financial report за один `businessDate` (date-based sync для initial / refresh_14d / missing сценариев).
+
+Payload (только scalar):
+- `companyId` — `string` UUID;
+- `connectionId` — `string` UUID;
+- `businessDate` — `string` в формате `YYYY-MM-DD`;
+- `mode` — `string`, значение `FinancialReportSyncMode`;
+- `forceRefresh` — `bool`.
+
+Ограничения payload:
+- message не содержит `apiKey`, `token`, `connection` entity или любые другие ORM-объекты.
+
 ---
 
 ## Redis — три назначения
