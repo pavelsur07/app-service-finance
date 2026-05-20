@@ -12,3 +12,8 @@ framework:
             policy: fixed_window
             limit: 1
             interval: '1 minute'
+
+        wb_finance:
+            policy: fixed_window
+            limit: 1
+            interval: '1 minute'
