@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Infrastructure\Query;
 
 use Doctrine\DBAL\Connection;
@@ -24,8 +26,12 @@ final class ActiveWbConnectionsQuery
              FROM marketplace_connections mc
              WHERE mc.marketplace = :marketplace
                AND mc.is_active = true
+               AND mc.connection_type = :connectionType
              ORDER BY mc.created_at ASC',
-            ['marketplace' => 'wildberries']
+            [
+                'marketplace' => 'wildberries',
+                'connectionType' => 'seller',
+            ]
         );
     }
 }
