@@ -15,7 +15,7 @@ use Symfony\Component\Clock\MockClock;
 
 final class WbInitialSyncStartDateResolverTest extends TestCase
 {
-    public function testFallbackWhenNoSettingsAndNoRawDocumentsReturnsNowMinusSixtyDays(): void
+    public function testFallbackWhenNoSettingsAndNoRawDocumentsReturnsYearStart(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $connection = new MarketplaceConnection('22222222-2222-2222-2222-222222222222', $company, MarketplaceType::WILDBERRIES);
@@ -28,7 +28,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
 
         $resolver = new WbInitialSyncStartDateResolver($rawRepository, new MockClock('2026-05-10 12:34:56'));
 
-        self::assertSame('2026-03-11', $resolver->resolve($company, $connection)->format('Y-m-d'));
+        self::assertSame('2026-01-01', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 
     public function testReturnsMinPeriodFromWhenCompletedRawDocumentsExist(): void
@@ -72,7 +72,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         self::assertSame('2026-05-09', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 
-    public function testInvalidSettingsDateFallsBackToDefaultWindow(): void
+    public function testInvalidSettingsDateFallsBackToYearStart(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $connection = new MarketplaceConnection('22222222-2222-2222-2222-222222222222', $company, MarketplaceType::WILDBERRIES);
@@ -85,7 +85,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
 
         $resolver = new WbInitialSyncStartDateResolver($rawRepository, new MockClock('2026-05-10 00:00:00'));
 
-        self::assertSame('2026-03-11', $resolver->resolve($company, $connection)->format('Y-m-d'));
+        self::assertSame('2026-01-01', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 
     public function testYesterdayOverrideIsAccepted(): void
@@ -118,7 +118,7 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
         self::assertSame('2026-04-20', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 
-    public function testFutureOverrideIsIgnoredAndFallbackIsUsedWhenNoLocalRawDocuments(): void
+    public function testFutureOverrideIsIgnoredAndYearStartIsUsedWhenNoLocalRawDocuments(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $connection = new MarketplaceConnection('22222222-2222-2222-2222-222222222222', $company, MarketplaceType::WILDBERRIES);
@@ -131,6 +131,6 @@ final class WbInitialSyncStartDateResolverTest extends TestCase
 
         $resolver = new WbInitialSyncStartDateResolver($rawRepository, new MockClock('2026-05-10 00:00:00'));
 
-        self::assertSame('2026-03-11', $resolver->resolve($company, $connection)->format('Y-m-d'));
+        self::assertSame('2026-01-01', $resolver->resolve($company, $connection)->format('Y-m-d'));
     }
 }
