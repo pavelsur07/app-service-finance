@@ -121,6 +121,8 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(2, $count);
         self::assertCount(2, $bus->messages);
         self::assertSame(['2026-01-02', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+        self::assertSame(['missing', 'missing'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
+        self::assertSame([false, false], array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages));
     }
 
     private function planner(InMemoryMessageBus $bus, \DateTimeImmutable $clockNow): WbFinancialReportSyncPlanner
