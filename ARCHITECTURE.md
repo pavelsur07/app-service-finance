@@ -1743,8 +1743,27 @@ Payload (только scalar):
 - `mode` — `string`, значение `FinancialReportSyncMode`;
 - `forceRefresh` — `bool`.
 
+
 Ограничения payload:
 - message не содержит `apiKey`, `token`, `connection` entity или любые другие ORM-объекты.
+
+### Command: `app:marketplace:wb-financial-reports:sync`
+
+Назначение:
+- единая точка ручного/cron-планирования date-based WB financial report sync;
+- команда только планирует задачи в Messenger и не делает прямых WB HTTP-вызовов.
+
+Режимы:
+- `all`, `initial`, `daily`, `refresh14`, `missing`.
+
+Правила range/date опций:
+- `--date` и `--from/--to` разрешены только для explicit mode (`initial`, `daily`, `refresh14`);
+- `--mode=all` + `--date`/`--from`/`--to` запрещено;
+- `--mode=missing` + `--date`/`--from`/`--to` запрещено, для missing используется `--max-days`.
+
+Message/worker:
+- Message: `App\Marketplace\Message\SyncWbFinancialReportDayMessage`;
+- Worker: `App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler`.
 
 ---
 
