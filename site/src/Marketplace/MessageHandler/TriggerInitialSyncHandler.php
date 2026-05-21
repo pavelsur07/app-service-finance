@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
@@ -26,7 +27,6 @@ use Symfony\Component\Messenger\MessageBusInterface;
 #[AsMessageHandler]
 final class TriggerInitialSyncHandler
 {
-    private const MAX_INITIAL_SPAN_DAYS = 60;
     public function __construct(
         private readonly MessageBusInterface $messageBus,
         private readonly LoggerInterface $logger,
@@ -34,6 +34,7 @@ final class TriggerInitialSyncHandler
         private readonly ClockInterface $clock,
         private readonly MarketplaceConnectionRepository $connectionRepository,
         private readonly WbInitialSyncStartDateResolver $wbStartDateResolver,
+        private readonly WbFinancialReportSyncPlannerInterface $wbFinancialReportSyncPlanner,
     ) {
     }
 
@@ -62,15 +63,25 @@ final class TriggerInitialSyncHandler
             $syncStart = $this->wbStartDateResolver->resolve($connection->getCompany(), $connection);
         }
 
-        $endDate = $yesterday;
         if (MarketplaceType::WILDBERRIES === $connection->getMarketplace()) {
-            $wbLimitedEndDate = $syncStart->modify(sprintf('+%d days', self::MAX_INITIAL_SPAN_DAYS));
-            if ($wbLimitedEndDate < $endDate) {
-                $endDate = $wbLimitedEndDate;
-            }
+            $scheduled = $this->wbFinancialReportSyncPlanner->planInitial(
+                companyId: $message->companyId,
+                connectionId: $message->connectionId,
+                startFrom: $syncStart,
+            );
+
+            $this->logger->info('InitialSync WB: planned daily statuses', [
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'start_from' => $syncStart->format('Y-m-d H:i:s'),
+                'end_date' => $yesterday->format('Y-m-d H:i:s'),
+                'scheduled_days' => $scheduled,
+            ]);
+
+            return;
         }
 
-        $weeks = $this->partitionService->buildPartitions($syncStart, $endDate);
+        $weeks = $this->partitionService->buildPartitions($syncStart, $yesterday);
 
         if (empty($weeks)) {
             $this->logger->warning('InitialSync: no weeks to sync', [

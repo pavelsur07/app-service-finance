@@ -13,7 +13,6 @@ use Symfony\Component\Clock\ClockInterface;
 class WbInitialSyncStartDateResolver
 {
     private const DOCUMENT_TYPE = 'sales_report';
-    private const DEFAULT_INITIAL_DAYS = 60;
 
     public function __construct(
         private readonly MarketplaceRawDocumentRepository $rawDocumentRepository,
@@ -45,7 +44,7 @@ class WbInitialSyncStartDateResolver
             return $localStartDate->setTime(0, 0, 0);
         }
 
-        return $now->modify(sprintf('-%d days', self::DEFAULT_INITIAL_DAYS));
+        return $yearStart;
     }
 
     private function parseSettingsStartDateOverride(array $settings, \DateTimeImmutable $maxAllowedDate): ?\DateTimeImmutable

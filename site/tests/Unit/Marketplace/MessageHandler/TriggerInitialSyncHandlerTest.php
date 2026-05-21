@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Service\MarketplaceWeekPartitionService;
+use App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface;
 use App\Marketplace\Application\Service\WbInitialSyncStartDateResolver;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Enum\MarketplaceType;
@@ -21,7 +22,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 
 final class TriggerInitialSyncHandlerTest extends TestCase
 {
-    public function testWbBuildsPartitionsFromResolvedDateAndCapsTo60Days(): void
+    public function testWbInitialPlansDailySyncWithoutSixtyDaysCap(): void
     {
         $company = CompanyBuilder::aCompany()->build();
         $connection = new MarketplaceConnection('22222222-2222-2222-2222-222222222222', $company, MarketplaceType::WILDBERRIES);
@@ -34,6 +35,18 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             ->method('resolve')
             ->willReturn(new \DateTimeImmutable('2026-01-10 00:00:00'));
 
+        $planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
+        $planner->expects(self::once())
+            ->method('planInitial')
+            ->with(
+                $company->getId(),
+                $connection->getId(),
+                self::callback(static function (\DateTimeImmutable $date): bool {
+                    return '2026-01-10 00:00:00' === $date->format('Y-m-d H:i:s');
+                }),
+            )
+            ->willReturn(120);
+
         $captured = new \stdClass();
         $captured->message = null;
         $bus = $this->createMock(MessageBusInterface::class);
@@ -44,20 +57,7 @@ final class TriggerInitialSyncHandlerTest extends TestCase
         });
 
         $partitionService = $this->createMock(MarketplaceWeekPartitionService::class);
-        $partitionService->expects(self::once())
-            ->method('buildPartitions')
-            ->with(
-                self::callback(static function (\DateTimeImmutable $date): bool {
-                    return '2026-01-10 00:00:00' === $date->format('Y-m-d H:i:s');
-                }),
-                self::callback(static function (\DateTimeImmutable $date): bool {
-                    return '2026-03-11 00:00:00' === $date->format('Y-m-d H:i:s');
-                }),
-            )
-            ->willReturn([
-                ['from' => '2026-01-10 00:00:00', 'to' => '2026-01-19 23:59:59'],
-                ['from' => '2026-01-20 00:00:00', 'to' => '2026-03-11 23:59:59'],
-            ]);
+        $partitionService->expects(self::never())->method('buildPartitions');
 
         $handler = new TriggerInitialSyncHandler(
             $bus,
@@ -66,14 +66,12 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             new MockClock('2026-04-30 00:00:00'),
             $repo,
             $resolver,
+            $planner,
         );
 
         $handler(new TriggerInitialSyncMessage($company->getId(), $connection->getId(), MarketplaceType::WILDBERRIES->value));
 
-        self::assertInstanceOf(InitialSyncMessage::class, $captured->message);
-        self::assertSame('2026-01-10 00:00:00', $captured->message->dateFrom);
-        self::assertSame('2026-01-19 23:59:59', $captured->message->dateTo);
-        self::assertSame('2026-03-11 23:59:59', $captured->message->nextDateTo);
+        self::assertNull($captured->message);
     }
 
     public function testNonWbDoesNotCallResolverAndUsesYearStartUntilYesterday(): void
@@ -85,6 +83,9 @@ final class TriggerInitialSyncHandlerTest extends TestCase
 
         $resolver = $this->createMock(WbInitialSyncStartDateResolver::class);
         $resolver->expects(self::never())->method('resolve');
+
+        $planner = $this->createMock(WbFinancialReportSyncPlannerInterface::class);
+        $planner->expects(self::never())->method('planInitial');
 
         $captured = new \stdClass();
         $captured->message = null;
@@ -118,6 +119,7 @@ final class TriggerInitialSyncHandlerTest extends TestCase
             new MockClock('2026-04-30 00:00:00'),
             $repo,
             $resolver,
+            $planner,
         );
 
         $handler(new TriggerInitialSyncMessage($company->getId(), $connection->getId(), MarketplaceType::OZON->value));
