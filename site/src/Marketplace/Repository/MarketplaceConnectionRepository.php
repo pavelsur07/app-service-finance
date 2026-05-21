@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Marketplace\Repository;
 
 use App\Company\Entity\Company;
@@ -76,6 +78,18 @@ class MarketplaceConnectionRepository extends ServiceEntityRepository
             ->getOneOrNullResult();
     }
 
+
+
+    public function findByIdAndCompany(string $connectionId, Company $company): ?MarketplaceConnection
+    {
+        return $this->createQueryBuilder('c')
+            ->where('c.id = :connectionId')
+            ->andWhere('c.company = :company')
+            ->setParameter('connectionId', $connectionId)
+            ->setParameter('company', $company)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
     /**
      * @return MarketplaceConnection[]
      */
