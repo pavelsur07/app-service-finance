@@ -86,77 +86,81 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
     }
 
     /**
-     * @param list<\DateTimeImmutable> $days
-     *
+     * @return list<MarketplaceFinancialReportSyncStatus>
+     */
+    public function findStatusesForDateRange(
+        string $companyId,
+        string $connectionId,
+        string $reportType,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+    ): array {
+        Assert::uuid($companyId);
+        Assert::uuid($connectionId);
+
+        return $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.connectionId = :connectionId')
+            ->andWhere('s.reportType = :reportType')
+            ->andWhere('s.businessDate BETWEEN :from AND :to')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('connectionId', $connectionId)
+            ->setParameter('reportType', $reportType)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->orderBy('s.businessDate', 'ASC')
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * @return list<\DateTimeImmutable>
      */
-    public function findMissingOrRetryDueDays(
-        string $connectionId,
+    public function findRetryDueDays(
         string $companyId,
+        string $connectionId,
         string $reportType,
-        array $days,
-        int $maxDays,
+        \DateTimeImmutable $from,
+        \DateTimeImmutable $to,
+        \DateTimeImmutable $now,
+        int $limit,
     ): array {
-        Assert::uuid($connectionId);
         Assert::uuid($companyId);
+        Assert::uuid($connectionId);
 
-        if ([] === $days || $maxDays <= 0) {
+        if ($limit <= 0) {
             return [];
         }
 
-        $statuses = $this->createQueryBuilder('s')
-            ->select('s.businessDate, s.status, s.nextRetryAt')
-            ->where('s.connectionId = :connectionId')
-            ->andWhere('s.companyId = :companyId')
+        $rows = $this->createQueryBuilder('s')
+            ->select('s.businessDate')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.connectionId = :connectionId')
             ->andWhere('s.reportType = :reportType')
-            ->andWhere('s.businessDate IN (:days)')
-            ->setParameter('connectionId', $connectionId)
+            ->andWhere('s.businessDate BETWEEN :from AND :to')
+            ->andWhere('s.status = :failedStatus')
+            ->andWhere('(s.nextRetryAt IS NULL OR s.nextRetryAt <= :now)')
             ->setParameter('companyId', $companyId)
+            ->setParameter('connectionId', $connectionId)
             ->setParameter('reportType', $reportType)
-            ->setParameter('days', $days)
+            ->setParameter('from', $from)
+            ->setParameter('to', $to)
+            ->setParameter('failedStatus', FinancialReportSyncStatus::FAILED)
+            ->setParameter('now', $now)
+            ->orderBy('s.businessDate', 'ASC')
+            ->setMaxResults($limit)
             ->getQuery()
             ->getArrayResult();
 
-        $byDay = [];
-        foreach ($statuses as $row) {
-            $date = $row['businessDate'];
+        $days = [];
+        foreach ($rows as $row) {
+            $date = $row['businessDate'] ?? null;
             if ($date instanceof \DateTimeImmutable) {
-                $byDay[$date->format('Y-m-d')] = [
-                    'status' => $row['status'],
-                    'nextRetryAt' => $row['nextRetryAt'] ?? null,
-                ];
+                $days[] = $date;
             }
         }
 
-        $now = new \DateTimeImmutable();
-        $result = [];
-        foreach ($days as $day) {
-            if (count($result) >= $maxDays) {
-                break;
-            }
-
-            $existing = $byDay[$day->format('Y-m-d')] ?? null;
-            if (null === $existing) {
-                $result[] = $day;
-                continue;
-            }
-
-            $status = $existing['status'];
-            if (is_string($status)) {
-                $status = FinancialReportSyncStatus::from($status);
-            }
-
-            if (FinancialReportSyncStatus::FAILED !== $status) {
-                continue;
-            }
-
-            $nextRetryAt = $existing['nextRetryAt'];
-            if (null === $nextRetryAt || ($nextRetryAt instanceof \DateTimeInterface && $nextRetryAt <= $now)) {
-                $result[] = $day;
-            }
-        }
-
-        return $result;
+        return $days;
     }
 
     public function findOrCreateForDay(

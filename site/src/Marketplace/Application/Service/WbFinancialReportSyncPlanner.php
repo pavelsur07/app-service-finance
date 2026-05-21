@@ -103,17 +103,55 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         }
 
         $dispatched = 0;
-        $days = $this->periodResolver->daysBetween($this->periodResolver->currentYearStart(), $this->periodResolver->yesterday());
+        $from = $this->periodResolver->currentYearStart();
+        $to = $this->periodResolver->yesterday();
+        $allDays = $this->periodResolver->daysBetween($from, $to);
+        $now = new DateTimeImmutable();
 
         foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
-            $scheduledDays = $this->syncStatusRepository->findMissingOrRetryDueDays(
-                $connection['connection_id'],
+            $statuses = $this->syncStatusRepository->findStatusesForDateRange(
                 $connection['company_id'],
+                $connection['connection_id'],
                 self::REPORT_TYPE,
-                $days,
+                $from,
+                $to,
+            );
+
+            $knownDays = [];
+            foreach ($statuses as $status) {
+                $knownDays[$status->getBusinessDate()->format('Y-m-d')] = true;
+            }
+
+            $retryDueDays = $this->syncStatusRepository->findRetryDueDays(
+                $connection['company_id'],
+                $connection['connection_id'],
+                self::REPORT_TYPE,
+                $from,
+                $to,
+                $now,
                 $maxDays,
             );
 
+            $scheduledDays = [];
+            foreach ($retryDueDays as $day) {
+                $scheduledDays[$day->format('Y-m-d')] = $day;
+            }
+
+            if (count($scheduledDays) < $maxDays) {
+                foreach ($allDays as $day) {
+                    $dayKey = $day->format('Y-m-d');
+                    if (isset($knownDays[$dayKey]) || isset($scheduledDays[$dayKey])) {
+                        continue;
+                    }
+
+                    $scheduledDays[$dayKey] = $day;
+                    if (count($scheduledDays) >= $maxDays) {
+                        break;
+                    }
+                }
+            }
+
+            ksort($scheduledDays);
             foreach ($scheduledDays as $day) {
                 $this->dispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::MISSING, false);
                 ++$dispatched;
