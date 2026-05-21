@@ -213,6 +213,16 @@ final readonly class WbFinanceSalesReportClient
         throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, '', '');
     }
 
+
+    public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): bool
+    {
+        if (!$this->rateLimiter->acquire($connectionId)) {
+            throw new MarketplaceRateLimitException(429, 'Local WB finance rate limit exceeded.', $dateFrom, $dateTo, self::WB_MIN_DELAY_SECONDS);
+        }
+
+        return $this->hasAnyData($apiKey, $dateFrom, $dateTo);
+    }
+
     public function hasAnyData(string $apiKey, string $dateFrom, string $dateTo): bool
     {
         try {
