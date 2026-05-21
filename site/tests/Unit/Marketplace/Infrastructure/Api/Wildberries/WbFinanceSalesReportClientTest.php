@@ -122,6 +122,48 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(1, $requestCount);
     }
 
+
+    public function testHasAnyDataForConnectionAppliesLocalRateLimitBeforeHttpRequest(): void
+    {
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+            return new MockResponse('[{"rrdId":1}]', ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock(), null, $this->createRateLimiter());
+
+        self::assertTrue($client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31'));
+
+        try {
+            $client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31');
+            self::fail('Expected MarketplaceRateLimitException before HTTP request');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(61, $e->getRetryAfter());
+            self::assertStringNotContainsString('token', $e->getMessage());
+        }
+
+        self::assertSame(1, $requestCount);
+    }
+
+    public function testHasAnyDataForConnectionDelegatesToHasAnyDataLogic(): void
+    {
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured = [$method, $url, $options];
+
+            return new MockResponse('[{"rrdId":77}]', ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock());
+
+        self::assertTrue($client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03'));
+        self::assertSame('POST', $captured[0]);
+        self::assertStringEndsWith('/api/finance/v1/sales-reports/detailed', $captured[1]);
+        self::assertSame(1, $captured[2]['json']['limit'] ?? null);
+        self::assertSame('2026-02-01', $captured[2]['json']['dateFrom'] ?? null);
+        self::assertSame('2026-02-03', $captured[2]['json']['dateTo'] ?? null);
+    }
     public function test204ReturnsAccumulatedRows(): void
     {
         $client = new WbFinanceSalesReportClient(new MockHttpClient([
