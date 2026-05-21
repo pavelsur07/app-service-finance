@@ -175,7 +175,7 @@ class MarketplaceRawDocument
         $this->syncedAt = $syncedAt ?? new \DateTimeImmutable();
 
         $this->resetProcessingStatus();
-        $this->addSyncNote('Raw document refreshed from Ozon API');
+        $this->addSyncNote('Raw document refreshed from API');
 
         return $this;
     }
