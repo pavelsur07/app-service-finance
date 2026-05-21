@@ -8,6 +8,7 @@ use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -24,22 +25,43 @@ final readonly class WbFinanceSalesReportClient
     private const WB_MIN_DELAY_SECONDS = 61;
 
     private LoggerInterface $logger;
+    private WbFinanceRateLimiter $rateLimiter;
 
     public function __construct(
         private HttpClientInterface $httpClient,
         private ClockInterface $clock,
         ?LoggerInterface $logger = null,
+        ?WbFinanceRateLimiter $rateLimiter = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
+        $this->rateLimiter = $rateLimiter ?? new WbFinanceRateLimiter();
+    }
+
+
+    /** @return list<array<string,mixed>> */
+    public function fetchDetailedDay(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate): array
+    {
+        $date = $businessDate->format('Y-m-d');
+
+        return $this->fetchDetailedInternal($apiKey, $date, $date, $connectionId);
     }
 
     /** @return list<array<string,mixed>> */
     public function fetchDetailed(string $apiKey, string $dateFrom, string $dateTo): array
     {
+        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
+    }
+
+    /** @return list<array<string,mixed>> */
+    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo, ?string $connectionId = null): array
+    {
         $rows = [];
         $rrdId = 0;
 
         while (true) {
+            if (null !== $connectionId && !$this->rateLimiter->acquire($connectionId)) {
+                throw new MarketplaceRateLimitException(429, 'Local WB finance rate limit exceeded.', $dateFrom, $dateTo, self::WB_MIN_DELAY_SECONDS);
+            }
             try {
                 $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
                     'headers' => ['Authorization' => $apiKey],
