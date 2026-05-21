@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Infrastructure\Api\Wildberries;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
@@ -15,6 +16,8 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\Exception\TransportException;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinanceSalesReportClientTest extends TestCase
 {
@@ -34,6 +37,91 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(0, $captured[0]['rrdId'] ?? null);
     }
 
+
+    public function testFetchDetailedDayUsesSameDateInRange(): void
+    {
+        $captured = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
+            $captured[] = $options['json'] ?? null;
+
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock());
+        $client->fetchDetailedDay('conn-1', 'token', new \DateTimeImmutable('2026-01-15T12:00:00+03:00'));
+
+        self::assertSame('2026-01-15', $captured[0]['dateFrom'] ?? null);
+        self::assertSame('2026-01-15', $captured[0]['dateTo'] ?? null);
+    }
+
+
+    public function testFetchDetailedDayAppliesLocalRateLimitBeforeHttpRequest(): void
+    {
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock(), null, $this->createRateLimiter());
+
+        self::assertSame([], $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame(1, $requestCount);
+
+        try {
+            $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15'));
+            self::fail('Expected MarketplaceRateLimitException on second local-limited call');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(61, $e->getRetryAfter());
+            self::assertStringNotContainsString('token', $e->getMessage());
+        }
+
+        self::assertSame(1, $requestCount);
+    }
+
+    public function testFetchDetailedDayUsesDifferentLimiterBucketsPerConnectionId(): void
+    {
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock(), null, $this->createRateLimiter());
+
+        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame(2, $requestCount);
+    }
+
+
+    public function testFetchDetailedDayAppliesLocalRateLimitOnPaginationRequest(): void
+    {
+        $rows = array_fill(0, 100000, ['rrdId' => 10]);
+        $rows[99999] = ['rrdId' => 20];
+
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount, $rows): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]);
+        });
+
+        $client = new WbFinanceSalesReportClient($http, new MockClock(), null, $this->createRateLimiter());
+
+        try {
+            $client->fetchDetailedDay('00000000-0000-0000-0000-000000000001', 'token', new \DateTimeImmutable('2026-01-15'));
+            self::fail('Expected MarketplaceRateLimitException before second paginated HTTP request');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(61, $e->getRetryAfter());
+            self::assertStringNotContainsString('token', $e->getMessage());
+        }
+
+        self::assertSame(1, $requestCount);
+    }
+
     public function test204ReturnsAccumulatedRows(): void
     {
         $client = new WbFinanceSalesReportClient(new MockHttpClient([
@@ -49,6 +137,24 @@ final class WbFinanceSalesReportClientTest extends TestCase
 
         $this->expectException(MarketplaceRateLimitException::class);
         $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
+    }
+
+
+    public function test429MappedToRateLimitExceptionWithRetryAfter(): void
+    {
+        $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"rate"}', [
+            'http_code' => 429,
+            'response_headers' => [
+                'x-ratelimit-retry: 17',
+            ],
+        ])), new MockClock());
+
+        try {
+            $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(17, $e->getRetryAfter());
+        }
     }
 
     public function test401And403MappedToAuthException(): void
@@ -168,5 +274,19 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, new MockClock());
         $this->expectException(MarketplaceTemporaryApiException::class);
         $client->probeAccess('token');
+    }
+    private function createRateLimiter(): WbFinanceRateLimiter
+    {
+        $factory = new RateLimiterFactory(
+            [
+                'id' => 'wb_finance',
+                'policy' => 'fixed_window',
+                'limit' => 1,
+                'interval' => '1 minute',
+            ],
+            new InMemoryStorage(),
+        );
+
+        return new WbFinanceRateLimiter($factory);
     }
 }
