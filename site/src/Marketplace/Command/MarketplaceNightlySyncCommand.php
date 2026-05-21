@@ -58,7 +58,7 @@ final class MarketplaceNightlySyncCommand extends Command
 
         foreach ($connections as $row) {
             $companyId    = (string) $row['company_id'];
-            $connectionId = (string) $row['id'];
+            $connectionId = (string) ($row['connection_id'] ?? $row['id']);
 
             $this->messageBus->dispatch(
                 new SyncWbFinancialReportDayMessage(
