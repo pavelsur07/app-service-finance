@@ -12,7 +12,7 @@ use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
 use DateTimeImmutable;
 use Symfony\Component\Messenger\MessageBusInterface;
 
-final class WbFinancialReportSyncPlanner
+final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlannerInterface
 {
     private const REPORT_TYPE = 'sales_report';
 
@@ -58,6 +58,41 @@ final class WbFinancialReportSyncPlanner
                 FinancialReportSyncStatus::LOADING,
                 FinancialReportSyncStatus::PROCESSING,
             ], true),
+        );
+    }
+
+
+    public function planRange(
+        DateTimeImmutable $from,
+        DateTimeImmutable $to,
+        FinancialReportSyncMode $mode,
+        ?string $companyId = null,
+        ?string $connectionId = null,
+        bool $forceRefresh = false,
+    ): int {
+        return $this->planForDays(
+            $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
+            $this->periodResolver->daysBetween($from, $to),
+            $mode,
+            $forceRefresh,
+            function (?FinancialReportSyncStatus $status) use ($forceRefresh, $mode): bool {
+                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
+                    return false;
+                }
+
+                if ($forceRefresh) {
+                    return true;
+                }
+
+                return match ($mode) {
+                    FinancialReportSyncMode::DAILY => null === $status
+                        || !\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true),
+                    FinancialReportSyncMode::INITIAL => null === $status || FinancialReportSyncStatus::FAILED === $status,
+                    FinancialReportSyncMode::REFRESH_14D => true,
+                    FinancialReportSyncMode::MISSING => null === $status || FinancialReportSyncStatus::FAILED === $status,
+                    FinancialReportSyncMode::MANUAL => null === $status || FinancialReportSyncStatus::FAILED === $status,
+                };
+            },
         );
     }
 
