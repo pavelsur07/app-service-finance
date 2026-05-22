@@ -163,6 +163,22 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         return $days;
     }
 
+
+    public function findByRawDocumentId(string $companyId, string $rawDocumentId): ?MarketplaceFinancialReportSyncStatus
+    {
+        Assert::uuid($companyId);
+        Assert::uuid($rawDocumentId);
+
+        return $this->createQueryBuilder('s')
+            ->where('s.companyId = :companyId')
+            ->andWhere('s.rawDocumentId = :rawDocumentId')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     public function findOrCreateForDay(
         string $connectionId,
         string $companyId,

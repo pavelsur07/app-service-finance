@@ -170,6 +170,85 @@ final class WbFinancialReportSyncStatusUpdaterTest extends IntegrationTestCase
         self::assertContainsOnlyInstancesOf(MarketplaceFinancialReportSyncError::class, $errors);
     }
 
+
+    public function testSyncByRawPipelineResultMarksSuccessForCompletedWbSalesReport(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markCompleted();
+
+        $this->updater->syncByRawPipelineResult($raw);
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $persisted->getStatus());
+        self::assertNotNull($persisted->getFinishedAt());
+        self::assertNotNull($persisted->getLastSuccessAt());
+    }
+
+
+    public function testSyncByRawPipelineResultMarksFailedFinalAndSavesError(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            $this->rawId(),
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::WILDBERRIES,
+            'sales_report',
+        );
+        $raw->markStepFailed(\App\Marketplace\Enum\PipelineStep::SALES);
+
+        $this->updater->syncByRawPipelineResult($raw, new \RuntimeException('pipeline exploded'));
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $persisted->getStatus());
+
+        $errors = $this->errorRepository->findBy(['syncStatusId' => $persisted->getId()]);
+        self::assertNotEmpty($errors);
+    }
+
+    public function testSyncByRawPipelineResultSkipsNonWbOrNonSalesReport(): void
+    {
+        $status = $this->startLoadingStatus();
+        $this->updater->markRawLoaded($status, $this->rawId(), 1, 'h');
+        $this->updater->markProcessing($status);
+
+        $company = $this->em->getReference(\App\Company\Entity\Company::class, $this->companyId());
+        $raw = new \App\Marketplace\Entity\MarketplaceRawDocument(
+            '00000000-0000-0000-0000-000000000100',
+            $company,
+            \App\Marketplace\Enum\MarketplaceType::OZON,
+            'sales_report',
+        );
+        $raw->markCompleted();
+
+        $this->updater->syncByRawPipelineResult($raw);
+        $this->em->flush();
+        $this->em->clear();
+
+        $persisted = $this->findStatus();
+        self::assertNotNull($persisted);
+        self::assertSame(FinancialReportSyncStatus::PROCESSING, $persisted->getStatus());
+    }
+
     private function startLoadingStatus(): MarketplaceFinancialReportSyncStatus
     {
         return $this->updater->startLoading(

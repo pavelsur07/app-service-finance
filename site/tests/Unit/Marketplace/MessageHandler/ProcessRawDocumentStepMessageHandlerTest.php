@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Unit\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
@@ -83,6 +84,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
             $closedEm,
             $registry,
             new NullLogger(),
+            $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class),
         );
 
         $message = new ProcessRawDocumentStepMessage(
@@ -151,6 +153,7 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
             $em,
             $registry,
             new NullLogger(),
+            $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class),
         );
 
         $message = new ProcessRawDocumentStepMessage(
@@ -162,4 +165,77 @@ final class ProcessRawDocumentStepMessageHandlerTest extends TestCase
         $this->expectExceptionObject($primaryException);
         $handler($message);
     }
+
+    public function testHandlerSyncsWbStatusOnSuccessfulPipelineCompletion(): void
+    {
+        $user    = UserBuilder::aUser()->withIndex(3)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(3)->withOwner($user)->build();
+        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->method('__invoke')->willReturn(10);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::exactly(count(PipelineStep::cases())))->method('flush');
+
+        $registry = $this->createMock(ManagerRegistry::class);
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->expects(self::exactly(count(PipelineStep::cases())))
+            ->method('syncByRawPipelineResult')
+            ->with($doc, null);
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $repo,
+            $processAction,
+            $em,
+            $registry,
+            new NullLogger(),
+            $updater,
+        );
+
+        foreach (PipelineStep::cases() as $step) {
+            $handler(new ProcessRawDocumentStepMessage($doc->getId(), $step->value, $company->getId()));
+        }
+    }
+
+
+    public function testHandlerIgnoresUpdaterExceptionOnSuccessPath(): void
+    {
+        $user    = UserBuilder::aUser()->withIndex(4)->build();
+        $company = CompanyBuilder::aCompany()->withIndex(4)->withOwner($user)->build();
+        $doc     = MarketplaceRawDocumentBuilder::aDocument()->forCompany($company)->build();
+
+        $repo = $this->createMock(MarketplaceRawDocumentRepository::class);
+        $repo->method('find')->with($doc->getId())->willReturn($doc);
+
+        $processAction = $this->createMock(ProcessMarketplaceRawDocumentAction::class);
+        $processAction->method('__invoke')->willReturn(1);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('flush');
+
+        $registry = $this->createMock(ManagerRegistry::class);
+
+        $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
+        $updater->method('syncByRawPipelineResult')->willThrowException(new \RuntimeException('updater failed'));
+
+        $handler = new ProcessRawDocumentStepMessageHandler(
+            $repo,
+            $processAction,
+            $em,
+            $registry,
+            new NullLogger(),
+            $updater,
+        );
+
+        $handler(new ProcessRawDocumentStepMessage($doc->getId(), PipelineStep::SALES->value, $company->getId()));
+
+        self::assertContains(PipelineStep::SALES->value, $doc->getSucceededSteps());
+        self::assertNotContains(PipelineStep::SALES->value, $doc->getFailedSteps());
+    }
+
 }
