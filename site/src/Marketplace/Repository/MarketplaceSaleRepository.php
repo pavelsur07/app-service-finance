@@ -167,6 +167,25 @@ class MarketplaceSaleRepository extends ServiceEntityRepository
         return $qb->getQuery()->getResult();
     }
 
+
+    public function countDocumentLinkedByRawDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $rawDocumentId,
+    ): int {
+        return (int) $this->createQueryBuilder('s')
+            ->select('COUNT(s.id)')
+            ->where('s.company = :company')
+            ->andWhere('s.marketplace = :marketplace')
+            ->andWhere('s.rawDocumentId = :rawDocumentId')
+            ->andWhere('s.document IS NOT NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
     public function deleteByRawDocument(
         Company $company,
         MarketplaceType $marketplace,
