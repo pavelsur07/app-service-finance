@@ -64,6 +64,42 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(1, $planner->planDaily($companyId, $otherConnectionId, false));
     }
 
+    public function testPlanDailySchedulesYesterdayDate(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 10:00:00 Europe/Moscow'));
+
+        $count = $planner->planDaily($companyId, $connectionId, false);
+
+        self::assertSame(1, $count);
+        self::assertCount(1, $bus->messages);
+        self::assertSame('2026-05-20', $bus->messages[0]->businessDate);
+        self::assertSame('daily', $bus->messages[0]->mode);
+    }
+
+    public function testPlanDailyWithoutForceSkipsFinalAndInFlightStatuses(): void
+    {
+        [$companyIdA, $connectionIdA] = $this->seedActiveConnection('aaaa1111-1111-1111-1111-111111111111', 'aaaa2222-2222-4222-8222-222222222222');
+        [$companyIdB, $connectionIdB] = $this->seedActiveConnection('bbbb1111-1111-1111-1111-111111111111', 'bbbb2222-2222-4222-8222-222222222222');
+        [$companyIdC, $connectionIdC] = $this->seedActiveConnection('cccc1111-1111-1111-1111-111111111111', 'cccc2222-2222-4222-8222-222222222222');
+        [$companyIdD, $connectionIdD] = $this->seedActiveConnection('dddd1111-1111-1111-1111-111111111111', 'dddd2222-2222-4222-8222-222222222222');
+
+        $day = new \DateTimeImmutable('2026-05-20 00:00:00 Europe/Moscow');
+        $this->persistStatus($companyIdA, $connectionIdA, $day, FinancialReportSyncStatus::SUCCESS);
+        $this->persistStatus($companyIdB, $connectionIdB, $day, FinancialReportSyncStatus::EMPTY);
+        $this->persistStatus($companyIdC, $connectionIdC, $day, FinancialReportSyncStatus::LOADING);
+        $this->persistStatus($companyIdD, $connectionIdD, $day, FinancialReportSyncStatus::PROCESSING);
+
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 10:00:00 Europe/Moscow'));
+
+        $count = $planner->planDaily(force: false);
+
+        self::assertSame(0, $count);
+        self::assertCount(0, $bus->messages);
+    }
+
     public function testPlanDailyWithForceDispatchesSuccessEmptyButNotInFlight(): void
     {
         [$companyIdA, $connectionIdA] = $this->seedActiveConnection('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
@@ -104,6 +140,30 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         }
     }
 
+    public function testPlanRefresh14DaysCreates14TasksIncludingEmptyDays(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $this->persistStatus(
+            $companyId,
+            $connectionId,
+            new \DateTimeImmutable('2026-05-16 00:00:00 Europe/Moscow'),
+            FinancialReportSyncStatus::EMPTY,
+        );
+
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 12:00:00 Europe/Moscow'));
+
+        $count = $planner->planRefresh14Days($companyId, $connectionId);
+
+        self::assertSame(14, $count);
+        self::assertCount(14, $bus->messages);
+        self::assertContains('2026-05-16', array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+        self::assertSame(
+            array_fill(0, 14, true),
+            array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages),
+        );
+    }
+
     public function testPlanMissingDispatchesRetryDueAndMissingWithMaxDaysLimit(): void
     {
         [$companyId, $connectionId] = $this->seedActiveConnection();
@@ -123,6 +183,34 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(['2026-01-02', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
         self::assertSame(['missing', 'missing'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
         self::assertSame([false, false], array_map(static fn (SyncWbFinancialReportDayMessage $m): bool => $m->forceRefresh, $bus->messages));
+    }
+
+    public function testPlanMissingSkipsSuccessAndEmptyStatuses(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-01-05 12:00:00 Europe/Moscow'));
+
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-01'), FinancialReportSyncStatus::SUCCESS);
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-02'), FinancialReportSyncStatus::EMPTY);
+
+        $count = $planner->planMissing($companyId, $connectionId, 10);
+
+        self::assertSame(2, $count);
+        self::assertSame(['2026-01-03', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+    }
+
+    public function testPlanInitialCreatesTasksFromStartDateToYesterday(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-01-05 12:00:00 Europe/Moscow'));
+
+        $count = $planner->planInitial($companyId, $connectionId, new \DateTimeImmutable('2026-01-02 00:00:00 Europe/Moscow'));
+
+        self::assertSame(3, $count);
+        self::assertSame(['2026-01-02', '2026-01-03', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+        self::assertSame(['initial', 'initial', 'initial'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->mode, $bus->messages));
     }
 
     private function planner(InMemoryMessageBus $bus, \DateTimeImmutable $clockNow): WbFinancialReportSyncPlanner
