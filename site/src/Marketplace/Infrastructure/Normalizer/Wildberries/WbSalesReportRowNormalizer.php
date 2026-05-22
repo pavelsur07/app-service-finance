@@ -26,6 +26,11 @@ final readonly class WbSalesReportRowNormalizer
         return $this->string($row, 'sellerOperName', 'supplier_oper_name');
     }
 
+    public function operationName(array $row): string
+    {
+        return $this->sellerOperName($row);
+    }
+
     public function nmId(array $row): string
     {
         return $this->string($row, 'nmId', 'nm_id');
@@ -34,6 +39,16 @@ final readonly class WbSalesReportRowNormalizer
     public function vendorCode(array $row): string
     {
         return $this->string($row, 'vendorCode', 'sa_name');
+    }
+
+    public function brandName(array $row): string
+    {
+        return $this->string($row, 'brandName', 'brand_name');
+    }
+
+    public function subjectName(array $row): string
+    {
+        return $this->string($row, 'subjectName', 'subject_name');
     }
 
     public function techSize(array $row): ?string
@@ -74,6 +89,51 @@ final readonly class WbSalesReportRowNormalizer
     public function acquiringFee(array $row): float
     {
         return $this->float($row, 'acquiringFee', 'acquiring_fee');
+    }
+
+    public function deliveryAmount(array $row): float
+    {
+        return $this->float($row, 'deliveryAmount', 'delivery_amount');
+    }
+
+    public function returnAmount(array $row): float
+    {
+        return $this->float($row, 'returnAmount', 'return_amount');
+    }
+
+    public function deliveryService(array $row): float
+    {
+        return $this->float($row, 'deliveryService', 'delivery_rub');
+    }
+
+    public function paidStorage(array $row): float
+    {
+        return $this->float($row, 'paidStorage', 'storage_fee');
+    }
+
+    public function paidAcceptance(array $row): float
+    {
+        return $this->float($row, 'paidAcceptance', 'acceptance');
+    }
+
+    public function rebillLogisticCost(array $row): float
+    {
+        return $this->float($row, 'rebillLogisticCost', 'rebill_logistic_cost');
+    }
+
+    public function bonusTypeName(array $row): string
+    {
+        return $this->string($row, 'bonusTypeName', 'bonus_type_name');
+    }
+
+    public function ppvzReward(array $row): float
+    {
+        return $this->float($row, 'ppvzReward', 'ppvz_reward');
+    }
+
+    public function cashbackDiscount(array $row): float
+    {
+        return $this->float($row, 'cashbackDiscount', 'cashback_discount');
     }
 
     public function reportDate(array $row): \DateTimeImmutable
@@ -119,9 +179,20 @@ final readonly class WbSalesReportRowNormalizer
     private function raw(array $row, string ...$keys): mixed
     {
         foreach ($keys as $key) {
-            if (array_key_exists($key, $row)) {
-                return $row[$key];
+            if (!array_key_exists($key, $row)) {
+                continue;
             }
+
+            $value = $row[$key];
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+
+            return $value;
         }
 
         return null;
@@ -129,7 +200,9 @@ final readonly class WbSalesReportRowNormalizer
 
     private function string(array $row, string ...$keys): string
     {
-        return trim((string) ($this->raw($row, ...$keys) ?? ''));
+        $value = $this->raw($row, ...$keys);
+
+        return $value === null ? '' : trim((string) $value);
     }
 
     private function nullableString(array $row, string ...$keys): ?string
@@ -141,7 +214,24 @@ final readonly class WbSalesReportRowNormalizer
 
     private function float(array $row, string ...$keys): float
     {
-        return (float) ($this->raw($row, ...$keys) ?? 0);
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $row)) {
+                continue;
+            }
+
+            $value = $row[$key];
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_string($value) && trim($value) === '') {
+                continue;
+            }
+
+            return (float) $value;
+        }
+
+        return 0.0;
     }
 
     private function normalizeDocTypeName(string $value): ?string
@@ -153,4 +243,3 @@ final readonly class WbSalesReportRowNormalizer
         };
     }
 }
-
