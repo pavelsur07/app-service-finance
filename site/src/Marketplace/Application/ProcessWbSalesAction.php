@@ -60,7 +60,7 @@ final class ProcessWbSalesAction
             'total_filtered' => count($salesData),
         ]);
 
-        $allSrids = array_column($salesData, 'srid');
+        $allSrids = array_values(array_filter(array_map(fn (array $item): ?string => $this->normalizer->srid($item), $salesData)));
         $existingSridsMap = $this->saleRepository->getExistingExternalIds($companyId, $allSrids);
 
         $allNmIds = array_values(array_unique(array_map(
@@ -83,9 +83,9 @@ final class ProcessWbSalesAction
             if (!isset($listingsCache[$cacheKey])) {
                 $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
                     'sa_name'      => $this->normalizer->vendorCode($item),
-                    'brand_name'   => (string) ($item['brand_name'] ?? $item['brandName'] ?? ''),
-                    'subject_name' => (string) ($item['subject_name'] ?? $item['subjectName'] ?? ''),
-                    'retail_price' => (string) ($item['retail_price'] ?? $item['retailPrice'] ?? '0'),
+                    'brand_name'   => $this->normalizer->brandName($item),
+                    'subject_name' => $this->normalizer->subjectName($item),
+                    'retail_price' => (string) $this->normalizer->retailPrice($item),
                 ]);
                 $listingsCache[$cacheKey] = $listing;
                 $newListingsCreated++;
@@ -100,7 +100,7 @@ final class ProcessWbSalesAction
         $counter = 0;
         foreach ($salesData as $item) {
             try {
-                $externalOrderId = (string) $item['srid'];
+                $externalOrderId = (string) ($this->normalizer->srid($item) ?? '');
                 if (isset($existingSridsMap[$externalOrderId])) {
                     continue;
                 }
@@ -158,7 +158,7 @@ final class ProcessWbSalesAction
                 }
             } catch (\Throwable $e) {
                 $this->logger->error('[WB] Failed to process sale', [
-                    'srid'  => $item['srid'] ?? 'unknown',
+                    'srid'  => $this->normalizer->srid($item) ?? 'unknown',
                     'error' => $e->getMessage(),
                 ]);
             }

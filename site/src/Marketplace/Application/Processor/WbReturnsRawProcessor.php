@@ -102,12 +102,12 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
                 continue;
             }
 
-            $barcode = (string) ($item['barcode'] ?? '');
+            $barcode = (string) ($this->normalizer->barcode($item) ?? '');
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => (string) ($item['sa_name'] ?? ''),
-                'brand_name'   => (string) ($item['brand_name'] ?? ''),
-                'subject_name' => (string) ($item['subject_name'] ?? ''),
-                'retail_price' => (string) ($item['retail_price'] ?? '0'),
+                'sa_name'      => $this->normalizer->vendorCode($item),
+                'brand_name'   => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
             $listingsCache[$cacheKey] = $listing;
             $newListings++;
@@ -119,11 +119,11 @@ final class WbReturnsRawProcessor implements MarketplaceRawProcessorInterface
             $this->listingResolver->flushBarcodes();
         }
 
-        $allSrids = array_values(array_filter(array_column($returnsData, 'srid')));
+        $allSrids = array_values(array_filter(array_map(fn (array $item): ?string => $this->normalizer->srid($item), $returnsData)));
         $existingMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
         foreach ($returnsData as $item) {
-            $srid = (string) ($item['srid'] ?? '');
+            $srid = (string) ($this->normalizer->srid($item) ?? '');
             if ($srid === '' || isset($existingMap[$srid])) {
                 continue;
             }
