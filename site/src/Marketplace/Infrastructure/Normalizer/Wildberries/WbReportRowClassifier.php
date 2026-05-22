@@ -19,7 +19,13 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
 
     public function classify(array $rawRow): StagingRecordType
     {
-        $operation = (string) ($rawRow['supplier_oper_name'] ?? $rawRow['doc_type_name'] ?? '');
+        $operation = $this->firstNonEmptyString(
+            $rawRow,
+            'sellerOperName',
+            'supplier_oper_name',
+            'docTypeName',
+            'doc_type_name',
+        );
         $normalized = mb_strtolower($operation);
 
         if (str_contains($normalized, 'продажа')) {
@@ -30,7 +36,7 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
             return StagingRecordType::RETURN;
         }
 
-        foreach (['логистика', 'штраф', 'хранение', 'удержание', 'возмещение', 'приемка'] as $keyword) {
+        foreach (['логистика', 'штраф', 'хранение', 'удержание', 'возмещение', 'приемка', 'приёмка'] as $keyword) {
             if (str_contains($normalized, $keyword)) {
                 return StagingRecordType::COST;
             }
@@ -38,4 +44,23 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
 
         return StagingRecordType::OTHER;
     }
+
+    private function firstNonEmptyString(array $row, string ...$keys): string
+    {
+        foreach ($keys as $key) {
+            if (!array_key_exists($key, $row)) {
+                continue;
+            }
+
+            $value = trim((string) $row[$key]);
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
 }
+
