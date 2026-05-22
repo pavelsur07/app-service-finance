@@ -5,7 +5,13 @@
 #*/5 * * * * php /app/bin/console app:cash:auto-rules:enqueue --no-interaction
 
 # Ночная синхронизация отчётов WB по реализации.
-0 3 * * * php bin/console app:marketplace:wb-daily-sync --no-interaction
+# Legacy WB daily command kept for backward compatibility; cron disabled after TASK-028-FIX.
+# 0 3 * * * php bin/console app:marketplace:wb-daily-sync --no-interaction
+
+# Новый WB financial sync (TASK-028): единая команда-планировщик по режимам.
+10 3 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=daily --no-interaction --quiet
+20 4 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=refresh14 --no-interaction --quiet
+30 5 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=10 --no-interaction --quiet
 
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
