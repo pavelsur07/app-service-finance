@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\MessageHandler;
 
 use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
 use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\PipelineStep;
@@ -30,6 +31,7 @@ final class ProcessRawDocumentStepMessageHandler
         private readonly EntityManagerInterface $entityManager,
         private readonly ManagerRegistry $managerRegistry,
         private readonly LoggerInterface $logger,
+        private readonly WbFinancialReportSyncStatusUpdaterInterface $statusUpdater,
     ) {
     }
 
@@ -79,6 +81,16 @@ final class ProcessRawDocumentStepMessageHandler
             throw $e;
         }
 
+        try {
+            $this->statusUpdater->syncByRawPipelineResult($doc);
+        } catch (\Throwable $updaterException) {
+            $this->logger->error('Failed to sync WB status after successful pipeline step', [
+                'rawDocumentId' => $message->rawDocumentId,
+                'step' => $step->value,
+                'secondaryException' => $updaterException->getMessage(),
+            ]);
+        }
+
         $this->entityManager->flush();
     }
 
@@ -108,6 +120,18 @@ final class ProcessRawDocumentStepMessageHandler
             }
 
             $doc->markStepFailed($step);
+
+            try {
+                $this->statusUpdater->syncByRawPipelineResult($doc, $originalException);
+            } catch (\Throwable $updaterException) {
+                $this->logger->error('Failed to sync WB status after pipeline failure', [
+                    'rawDocumentId' => $rawDocumentId,
+                    'step' => $step->value,
+                    'originalException' => $originalException->getMessage(),
+                    'secondaryException' => $updaterException->getMessage(),
+                ]);
+            }
+
             $em->flush();
         } catch (\Throwable $secondary) {
             // Не маскируем оригинальное исключение — только логируем secondary.
@@ -117,6 +141,8 @@ final class ProcessRawDocumentStepMessageHandler
                 'originalException' => $originalException->getMessage(),
                 'secondaryException' => $secondary->getMessage(),
             ]);
+
+            return;
         }
     }
 }
