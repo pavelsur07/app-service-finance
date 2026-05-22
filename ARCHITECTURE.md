@@ -2,7 +2,7 @@
 
 > **Живой документ.** Обновляется после каждого нового модуля или изменения публичного контракта.
 > Читается: Claude Code (через CLAUDE.md) и Claude.ai Projects (через Knowledge).
-> Версия: 1.47 / 2026-05-11
+> Версия: 1.48 / 2026-05-22
 
 ---
 
@@ -1735,6 +1735,13 @@ GET /inventory/stocks
 
 Назначение:
 - загрузка WB financial report за один `businessDate` (date-based sync для initial / refresh_14d / missing сценариев).
+- business date интерпретируется в timezone `Europe/Moscow` (дата WB-бизнеса, а не UTC).
+
+Краткий pipeline:
+- `WB API` → `MarketplaceRawDocument`;
+- `MarketplaceRawDocument` → `ProcessDayReportMessage`;
+- `ProcessDayReportMessage` → расчёт sales / returns / costs;
+- после успешной обработки статуса дня фиксируется `FinancialReportSyncStatus::SUCCESS`.
 
 Payload (только scalar):
 - `companyId` — `string` UUID;
@@ -1746,6 +1753,48 @@ Payload (только scalar):
 
 Ограничения payload:
 - message не содержит `apiKey`, `token`, `connection` entity или любые другие ORM-объекты.
+- `empty day` (`FinancialReportSyncStatus::EMPTY`) не считается `missing day` и не должен попадать в missing-планирование.
+- rate limit WB sync: не более **1 request/min** на пару `connection + endpoint`.
+
+### State entities
+
+- `MarketplaceFinancialReportSyncStatus` — дневной статус синхронизации по ключу `companyId + connectionId + businessDate + reportType`.
+- `MarketplaceFinancialReportSyncError` — append-only история ошибок по `syncStatusId`.
+- `MarketplaceRawDocument` — raw JSON WB financial report; связь с дневным статусом через `rawDocumentId` в `MarketplaceFinancialReportSyncStatus`.
+
+### Status lifecycle
+
+- `LOADING` — началась загрузка WB API.
+- `EMPTY` — WB вернул пустой день; raw document не создаётся; missing-планирование этот день не включает.
+- `RAW_LOADED` — raw document сохранён.
+- `PROCESSING` — отправлен `ProcessDayReportMessage`.
+- `SUCCESS` — обработка raw завершена успешно.
+- `FAILED` — retryable-ошибка; день может попасть в missing/retry-due планирование.
+- `FAILED_FINAL` — unrecoverable processing/API ошибка.
+- `AUTH_FAILED` — ошибка авторизации WB API.
+- `CONFLICT` — refresh/reprocess невозможен из-за in-flight raw или linked generated rows.
+
+### Modes
+
+- `daily` — вчерашний business day.
+- `initial` — диапазон от start date до yesterday.
+- `refresh14` — последние 14 дней, `forceRefresh=true`.
+- `missing` — отсутствующие/retry-due дни; не трогает `EMPTY`/`SUCCESS`/in-flight.
+- `manual` — ручной запуск.
+
+### Refresh / safe replace contract
+
+- `forceRefresh=true` передаётся в `ProcessDayReportMessage`.
+- Перед reprocess WB `sales_report` удаляются только generated rows без связанного `document`.
+- Если `sales/returns/costs` rows связаны с закрытым `document`, статус дня переводится в `CONFLICT`.
+- Linked rows не удаляются; автоматический retry для такого дня не требуется.
+
+### Planner rules
+
+- Дни в `LOADING`/`PROCESSING` повторно не планируются.
+- `daily` без force пропускает дни со статусами `SUCCESS`/`EMPTY`.
+- `refresh14` планирует и `SUCCESS`, и `EMPTY` c `forceRefresh=true`.
+- `missing` сначала выбирает retry-due дни в `FAILED`, затем отсутствующие дни, и ограничивается `maxDays`.
 
 ### Command: `app:marketplace:wb-financial-reports:sync`
 
@@ -1910,6 +1959,7 @@ $apiKey = $this->encryption->decrypt($connection->getApiKey());
 
 | Версия | Дата | Что изменилось |
 |---|---|---|
+| 1.48 | 2026-05-22 | Marketplace: зафиксирован контракт WB financial sync (entities статуса/ошибок, enum mode/status, message `SyncWbFinancialReportDayMessage` на `async_sync`, команда `app:marketplace:wb-financial-reports:sync`, pipeline, TZ `Europe/Moscow`, правило empty day и rate limit 1 request/min) |
 | 1.47 | 2026-05-11 | Inventory: задокументирован первый этап Ozon stock normalization — raw `/v4/product/info/stocks` → `StockSnapshot`, `reservedQuantity`, `StockSnapshotMappingStatus`, async normalization и UI `/inventory/stocks` |
 | 1.46 | 2026-05-11 | Cash/Telegram: добавлен публичный контракт `CashFacade::createTransaction()` и зафиксировано идемпотентное создание Telegram-транзакций через `importSource`/`externalId` |
 | 1.45 | 2026-05-10 | `MarketplaceFacade::getActiveOzonSellerConnections()` — безопасный публичный контракт без секретов |
