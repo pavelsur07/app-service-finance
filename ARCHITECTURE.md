@@ -1864,6 +1864,9 @@ paths:
 | `app:marketplace-ads:ozon-poll-reports` | `*/2 * * * *` | Legacy Messenger-pipeline: per-UUID polling (оставлен до Task-11.9b) |
 | `app:marketplace:daily-sync` | `04:30 daily` | Диспатч загрузки данных по активным подключениям |
 | `app:inventory:ozon-daily-sync` | `04:05 daily` | Диспатч загрузки Ozon Inventory snapshot по активным Ozon SELLER подключениям |
+| `app:marketplace:wb-financial-reports:sync --mode=daily` | `03:10 daily` | Ежедневное планирование WB financial sync за рабочий день (новая date-based команда) |
+| `app:marketplace:wb-financial-reports:sync --mode=refresh14` | `04:20 daily` | Планирование пересинхронизации последних 14 дней WB financial reports |
+| `app:marketplace:wb-financial-reports:sync --mode=missing --max-days=10` | `05:30 daily` | Планирование дозагрузки пропущенных дней (до 10 дней на подключение) |
 
 **Правила для новых cron-команд:**
 - Класс в `src/{Module}/Command/`, `final class`, `#[AsCommand]`
@@ -1871,6 +1874,7 @@ paths:
 - Нет `Request`/`Session`/`Security` — CLI-контекст, companyId из аргумента/итерации по БД
 - Per-item try/catch: сбой одной компании / одной записи не прерывает весь запуск
 - Exit code: `Command::SUCCESS` / `Command::FAILURE`
+- Legacy команда `app:marketplace:wb-daily-sync` сохранена для backward compatibility, но её cron отключён после TASK-028-FIX (активный daily cron только `app:marketplace:wb-financial-reports:sync --mode=daily`).
 
 ---
 
