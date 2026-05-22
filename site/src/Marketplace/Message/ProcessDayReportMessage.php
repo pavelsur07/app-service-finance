@@ -16,6 +16,7 @@ final readonly class ProcessDayReportMessage
     public function __construct(
         public string $companyId,
         public string $rawDocumentId,
+        public bool $forceRefresh = false,
     ) {
     }
 }

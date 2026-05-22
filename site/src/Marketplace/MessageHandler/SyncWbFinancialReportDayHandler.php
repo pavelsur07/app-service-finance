@@ -157,7 +157,7 @@ final class SyncWbFinancialReportDayHandler
             $connection->markSyncSuccess();
             $this->em->flush();
 
-            $this->messageBus->dispatch(new ProcessDayReportMessage($message->companyId, $rawDocument->getId()));
+            $this->messageBus->dispatch(new ProcessDayReportMessage($message->companyId, $rawDocument->getId(), $message->forceRefresh));
 
             $this->logger->info('WB day sync finished and processing dispatched.', [
                 'company_id' => $message->companyId,

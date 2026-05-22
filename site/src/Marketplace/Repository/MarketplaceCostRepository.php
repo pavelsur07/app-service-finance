@@ -119,6 +119,43 @@ class MarketplaceCostRepository extends ServiceEntityRepository
         return array_fill_keys($result, true);
     }
 
+
+    public function countDocumentLinkedByRawDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $rawDocumentId,
+    ): int {
+        return (int) $this->createQueryBuilder('c')
+            ->select('COUNT(c.id)')
+            ->where('c.company = :company')
+            ->andWhere('c.marketplace = :marketplace')
+            ->andWhere('c.rawDocumentId = :rawDocumentId')
+            ->andWhere('c.document IS NOT NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    public function deleteByRawDocument(
+        Company $company,
+        MarketplaceType $marketplace,
+        string $rawDocumentId,
+    ): int {
+        return (int) $this->createQueryBuilder('c')
+            ->delete()
+            ->where('c.company = :company')
+            ->andWhere('c.marketplace = :marketplace')
+            ->andWhere('c.rawDocumentId = :rawDocumentId')
+            ->andWhere('c.document IS NULL')
+            ->setParameter('company', $company)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('rawDocumentId', $rawDocumentId)
+            ->getQuery()
+            ->execute();
+    }
+
     public function findExportRowsByCompanyAndFilters(
         Company $company,
         ?MarketplaceType $marketplace,

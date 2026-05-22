@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace App\Marketplace\MessageHandler;
 
+use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface;
+use App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStep;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\ProcessRawDocumentStepMessage;
+use App\Marketplace\Exception\WbGeneratedRowsConflictException;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -28,6 +33,9 @@ final class ProcessDayReportHandler
         private readonly MessageBusInterface $bus,
         private readonly EntityManagerInterface $entityManager,
         private readonly LoggerInterface $logger,
+        private readonly WbGeneratedRowsSafeReplaceServiceInterface $safeReplaceService,
+        private readonly MarketplaceFinancialReportSyncStatusLookupInterface $syncStatusRepository,
+        private readonly WbFinancialReportSyncStatusUpdaterInterface $syncStatusUpdater,
     ) {
     }
 
@@ -45,6 +53,29 @@ final class ProcessDayReportHandler
             throw new UnrecoverableMessageHandlingException(
                 sprintf('IDOR: document %s does not belong to company %s', $message->rawDocumentId, $message->companyId),
             );
+        }
+
+        if ($message->forceRefresh
+            && $doc->getMarketplace() === MarketplaceType::WILDBERRIES
+            && $doc->getDocumentType() === 'sales_report'
+        ) {
+            try {
+                $this->safeReplaceService->cleanupForRawDocument($doc->getCompany(), $doc->getId(), $doc->getPeriodFrom());
+            } catch (WbGeneratedRowsConflictException $e) {
+                $status = $this->syncStatusRepository->findByRawDocumentId($message->companyId, $message->rawDocumentId);
+                if ($status !== null) {
+                    $this->syncStatusUpdater->markConflict($status, $e::class, $e->getMessage());
+                    $this->entityManager->flush();
+                }
+
+                $this->logger->warning('WB day processing conflict: linked document rows prevent refresh', [
+                    'company_id' => $message->companyId,
+                    'raw_document_id' => $message->rawDocumentId,
+                    'business_date' => $doc->getPeriodFrom()->format('Y-m-d'),
+                ]);
+
+                throw new UnrecoverableMessageHandlingException($e->getMessage(), 0, $e);
+            }
         }
 
         $doc->resetProcessingStatus();

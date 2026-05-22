@@ -78,6 +78,8 @@ services:
     App\Marketplace\Application\Service\WbFinancialReportSyncPlannerInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncPlanner'
 
     App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdaterInterface: '@App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater'
+    App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceServiceInterface: '@App\Marketplace\Application\Service\WbGeneratedRowsSafeReplaceService'
+    App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface: '@App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository'
     App\Marketplace\Repository\MarketplaceOrderRepositoryInterface: '@App\Marketplace\Repository\MarketplaceOrderRepository'
     App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepositoryInterface: '@App\MarketplaceAnalytics\Repository\UnitEconomyCostMappingRepository'
     App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepositoryInterface: '@App\MarketplaceAnalytics\Repository\ListingDailySnapshotRepository'

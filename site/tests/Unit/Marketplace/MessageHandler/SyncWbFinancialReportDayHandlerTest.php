@@ -15,6 +15,7 @@ use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\PipelineStatus;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
+use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler;
 use App\Tests\Builders\Company\CompanyBuilder;
@@ -24,7 +25,9 @@ use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
+use Symfony\Component\Messenger\MessageBusInterface;
 
 final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 {
@@ -107,6 +110,44 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             self::assertNotNull($error);
             self::assertSame('App\Marketplace\Exception\WbRawDocumentRefreshConflictException', $error->getErrorClass());
         }
+    }
+
+
+    public function testForceRefreshIsPropagatedToProcessDayReportMessage(): void
+    {
+        $company = $this->createCompany(9103);
+        $connection = $this->createWbSellerConnection($company, 9103);
+
+        $this->swapWbClient([new MockResponse('[{"rrdId":2}]', ['http_code' => 200])]);
+
+        $spyBus = new class() implements MessageBusInterface {
+            /** @var list<object> */
+            public array $messages = [];
+            public function dispatch(object $message, array $stamps = []): Envelope
+            {
+                $this->messages[] = $message;
+                return new Envelope($message, $stamps);
+            }
+        };
+
+        self::getContainer()->set(MessageBusInterface::class, $spyBus);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler(new SyncWbFinancialReportDayMessage(
+            companyId: $company->getId(),
+            connectionId: $connection->getId(),
+            businessDate: '2026-05-19',
+            mode: FinancialReportSyncMode::MANUAL->value,
+            forceRefresh: true,
+        ));
+
+        $dispatched = array_values(array_filter(
+            $spyBus->messages,
+            static fn (object $m): bool => $m instanceof ProcessDayReportMessage,
+        ));
+
+        self::assertCount(1, $dispatched);
+        self::assertTrue($dispatched[0]->forceRefresh);
     }
 
     private function createCompany(int $index): Company

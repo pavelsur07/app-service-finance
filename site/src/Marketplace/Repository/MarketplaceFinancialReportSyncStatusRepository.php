@@ -12,7 +12,7 @@ use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
 
-final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntityRepository
+final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntityRepository implements MarketplaceFinancialReportSyncStatusLookupInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
