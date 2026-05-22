@@ -1796,6 +1796,20 @@ Payload (только scalar):
 - `refresh14` планирует и `SUCCESS`, и `EMPTY` c `forceRefresh=true`.
 - `missing` сначала выбирает retry-due дни в `FAILED`, затем отсутствующие дни, и ограничивается `maxDays`.
 
+
+
+### Command: `app:marketplace:wb-financial-reports:reconcile-legacy`
+
+Назначение:
+- one-time reconciliation legacy WB-данных в дневные `MarketplaceFinancialReportSyncStatus` без WB API-вызовов;
+- заполняет статус только при наличии доказуемых данных (`raw` или generated rows), неизвестные дни оставляет `missing`;
+- отсутствие строк **не** конвертируется в `EMPTY`.
+
+Правила:
+- не удаляет и не пересчитывает существующие записи;
+- не перезаписывает существующие sync statuses;
+- для `raw`-дней переносит `apiEndpoint` из raw, чтобы не искажать исторический источник;
+- после reconciliation следующий шаг: `app:marketplace:wb-financial-reports:sync --mode=missing --max-days=10`.
 ### Command: `app:marketplace:wb-financial-reports:sync`
 
 Назначение:
