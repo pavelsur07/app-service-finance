@@ -63,7 +63,7 @@ final class ProcessWbReturnsAction
             'total_filtered' => count($returnsData),
         ]);
 
-        $allSrids = array_column($returnsData, 'srid');
+        $allSrids = array_values(array_filter(array_map(fn (array $item): ?string => $this->normalizer->srid($item), $returnsData)));
         $existingSridsMap = $this->returnRepository->getExistingExternalIds($companyId, $allSrids);
 
         $allNmIds = array_values(array_unique(array_map(
@@ -88,10 +88,10 @@ final class ProcessWbReturnsAction
             }
 
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => (string) ($item['sa_name'] ?? ''),
-                'brand_name'   => (string) ($item['brand_name'] ?? ''),
-                'subject_name' => (string) ($item['subject_name'] ?? ''),
-                'retail_price' => (string) ($item['retail_price'] ?? '0'),
+                'sa_name'      => $this->normalizer->vendorCode($item),
+                'brand_name'   => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
             ]);
 
             $listingsCache[$cacheKey] = $listing;
@@ -107,7 +107,7 @@ final class ProcessWbReturnsAction
 
         foreach ($returnsData as $item) {
             try {
-                $externalReturnId = (string) $item['srid'];
+                $externalReturnId = (string) ($this->normalizer->srid($item) ?? '');
 
                 if (isset($existingSridsMap[$externalReturnId])) {
                     continue;
@@ -172,7 +172,7 @@ final class ProcessWbReturnsAction
                 }
             } catch (\Exception $e) {
                 $this->logger->error('[WB] Failed to process return item', [
-                    'srid' => $item['srid'] ?? 'unknown',
+                    'srid' => $this->normalizer->srid($item) ?? 'unknown',
                     'error' => $e->getMessage(),
                 ]);
                 continue;

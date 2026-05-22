@@ -8,16 +8,19 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\ProcessWbSalesAction;
 use App\Marketplace\Application\Processor\WbSalesRawProcessor;
 use App\Marketplace\Application\Service\MarketplaceBarcodeCatalogService;
-use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Application\Service\MarketplaceCostPriceResolver;
 use App\Marketplace\Application\Service\WbListingResolverService;
 use App\Marketplace\Entity\MarketplaceListing;
 use App\Marketplace\Entity\MarketplaceSale;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
+use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
 use App\Marketplace\Inventory\CostPriceResolverInterface;
+use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
+use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Repository\MarketplaceSaleRepository;
+use Doctrine\DBAL\Connection;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
@@ -45,48 +48,71 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
         self::assertSame('2026-01-10', $result['sales'][0]->getSaleDate()->format('Y-m-d'));
     }
 
-    public function testUsesRetailPriceWithDiscAsRevenueForNewCamelCase(): void
+    public function testCamelCaseSaleCreatesSaleAndListingWithNormalizedMetadata(): void
     {
         $result = $this->runProcessorWithRow([
-            'docTypeName' => 'Sale',
-            'retailPriceWithDisc' => 2493,
-            'retailAmount' => 1607,
+            'docTypeName' => 'Продажа',
+            'sellerOperName' => 'Продажа',
             'quantity' => 1,
-            'srid' => 'WB-ORDER-1',
-            'nmId' => '123',
-            'techSize' => 'XL',
-            'saleDt' => '2026-01-10 10:00:00',
-        ]);
+            'retailPriceWithDisc' => 2099,
+            'retailAmount' => 1584,
+            'nmId' => '123456',
+            'techSize' => 'M',
+            'sku' => '200000000001',
+            'vendorCode' => 'ART-001',
+            'brandName' => 'TestBrand',
+            'subjectName' => 'Одежда',
+            'retailPrice' => 2500,
+            'saleDt' => '2026-05-21T10:00:00Z',
+            'rrDate' => '2026-05-21',
+            'srid' => 'test-sale-srid-1',
+        ], true);
 
         self::assertCount(1, $result['sales']);
-        self::assertSame([['123']], $result['nmIdsCalls']);
-        self::assertSame('2493', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('2493', $result['sales'][0]->getPricePerUnit());
-        self::assertNotSame('1607', $result['sales'][0]->getTotalRevenue());
-        self::assertSame('2026-01-10', $result['sales'][0]->getSaleDate()->format('Y-m-d'));
+        self::assertSame('test-sale-srid-1', $result['sales'][0]->getExternalOrderId());
+        self::assertSame('2099', $result['sales'][0]->getTotalRevenue());
+        self::assertNotSame('1584', $result['sales'][0]->getTotalRevenue());
+
+        self::assertCount(1, $result['createdListings']);
+        $listing = $result['createdListings'][0];
+        self::assertSame('ART-001', $listing->getSupplierSku());
+        self::assertSame('2500', $listing->getPrice());
+        self::assertSame('M', $listing->getSize());
+        self::assertNotNull($listing->getName());
+        self::assertStringContainsString('TestBrand', (string) $listing->getName());
+        self::assertStringContainsString('Одежда', (string) $listing->getName());
+        self::assertStringContainsString('ART-001', (string) $listing->getName());
+        self::assertStringContainsString('M', (string) $listing->getName());
     }
 
     /**
      * @param array<string, mixed> $row
-     * @return array{sales: list<MarketplaceSale>, nmIdsCalls: list<list<string>>}
+     * @return array{sales: list<MarketplaceSale>, createdListings: list<MarketplaceListing>, nmIdsCalls: list<list<string>>}
      */
-    private function runProcessorWithRow(array $row): array
+    private function runProcessorWithRow(array $row, bool $forceResolve = false): array
     {
         $company = $this->createMock(Company::class);
-        $listing = $this->createMock(MarketplaceListing::class);
+        $company->method('getId')->willReturn('company-1');
+        $existingListing = $this->createMock(MarketplaceListing::class);
 
         $persistedSales = [];
+        $createdListings = [];
         $nmIdsCalls = [];
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('find')->willReturnMap([
             [Company::class, 'company-1', $company],
         ]);
-        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persistedSales): void {
-            if ($entity instanceof MarketplaceSale) {
-                $persistedSales[] = $entity;
-            }
-        });
+        $em->method('persist')->willReturnCallback(
+            static function (object $entity) use (&$persistedSales, &$createdListings): void {
+                if ($entity instanceof MarketplaceSale) {
+                    $persistedSales[] = $entity;
+                }
+                if ($entity instanceof MarketplaceListing) {
+                    $createdListings[] = $entity;
+                }
+            },
+        );
 
         $saleRepository = $this->createMock(MarketplaceSaleRepository::class);
         $saleRepository->method('getExistingExternalIds')->willReturn([]);
@@ -97,15 +123,29 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
                 Company $companyArg,
                 MarketplaceType $marketplace,
                 array $nmIds,
-            ) use ($listing, &$nmIdsCalls): array {
+            ) use (&$nmIdsCalls, $forceResolve, $existingListing): array {
                 $nmIdsCalls[] = $nmIds;
-                return ['123_XL' => $listing];
+
+                return $forceResolve ? [] : ['123_XL' => $existingListing];
             });
+        $listingRepository->method('findByNmIdAndSize')->willReturn(null);
+
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcode')->willReturn(null);
+
+        $connection = $this->createMock(Connection::class);
+        $resolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
 
         $barcodeCatalogRepository = $this->createMock(MarketplaceBarcodeCatalogRepository::class);
         $barcodeCatalogRepository->method('findByBarcode')->willReturn(null);
         $barcodeCatalogRepository->method('findByBarcodesIndexed')->willReturn([]);
         $barcodeCatalog = new MarketplaceBarcodeCatalogService($barcodeCatalogRepository);
+
         $innerCostPriceResolver = $this->createMock(CostPriceResolverInterface::class);
         $innerCostPriceResolver->method('resolve')->willReturn('0.00');
         $costPriceResolver = new MarketplaceCostPriceResolver($innerCostPriceResolver);
@@ -115,7 +155,7 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
             $em,
             $saleRepository,
             $listingRepository,
-            $this->makeWbListingResolverServiceStub(),
+            $resolver,
             $barcodeCatalog,
             $costPriceResolver,
             new WbSalesReportRowNormalizer(),
@@ -124,16 +164,15 @@ final class WbSalesRawProcessorRevenueTest extends TestCase
 
         $processor->processBatch('company-1', MarketplaceType::WILDBERRIES, [$row]);
 
-        return ['sales' => $persistedSales, 'nmIdsCalls' => $nmIdsCalls];
+        return [
+            'sales' => $persistedSales,
+            'createdListings' => $createdListings,
+            'nmIdsCalls' => $nmIdsCalls,
+        ];
     }
+
     private function makeProcessWbSalesActionStub(): ProcessWbSalesAction
     {
         return (new \ReflectionClass(ProcessWbSalesAction::class))->newInstanceWithoutConstructor();
     }
-
-    private function makeWbListingResolverServiceStub(): WbListingResolverService
-    {
-        return (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
-    }
-
 }
