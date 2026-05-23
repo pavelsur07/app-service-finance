@@ -18,6 +18,7 @@ use App\Marketplace\Repository\MarketplaceRawDocumentRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\NullLogger;
+use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -76,7 +77,11 @@ final class ProcessDayReportHandlerTest extends TestCase
         $statusRepo = $this->createMock(MarketplaceFinancialReportSyncStatusLookupInterface::class);
         $updater = $this->createMock(WbFinancialReportSyncStatusUpdaterInterface::class);
         $bus = $this->createMock(MessageBusInterface::class);
-        $bus->expects(self::exactly(3))->method('dispatch');
+        $bus->expects(self::exactly(3))
+            ->method('dispatch')
+            ->willReturnCallback(
+                static fn (object $message, array $stamps = []): Envelope => new Envelope($message, $stamps)
+            );
         $em = $this->createMock(EntityManagerInterface::class);
 
         $handler = new ProcessDayReportHandler($repo, $bus, $em, new NullLogger(), $safe, $statusRepo, $updater);
