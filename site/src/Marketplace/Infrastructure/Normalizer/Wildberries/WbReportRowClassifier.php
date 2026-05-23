@@ -36,7 +36,7 @@ final readonly class WbReportRowClassifier implements RowClassifierInterface
             return StagingRecordType::RETURN;
         }
 
-        foreach (['логистика', 'штраф', 'хранение', 'удержание', 'возмещение', 'приемка', 'приёмка'] as $keyword) {
+        foreach (['логистика', 'логистики', 'штраф', 'хранение', 'удержание', 'возмещение', 'приемка', 'приёмка'] as $keyword) {
             if (str_contains($normalized, $keyword)) {
                 return StagingRecordType::COST;
             }
