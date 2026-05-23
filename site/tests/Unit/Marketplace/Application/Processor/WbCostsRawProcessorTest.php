@@ -1095,6 +1095,7 @@ final class WbCostsRawProcessorTest extends TestCase
 
         $calculator = new class implements CostCalculatorInterface {
             public function supports(array $item): bool { return true; }
+            public function requiresListing(): bool { return true; }
             public function calculate(array $item, ?MarketplaceListing $listing = null): array
             {
                 return [[
