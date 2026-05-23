@@ -27,10 +27,18 @@ interface AdLoadJobRepositoryInterface
     ): array;
 
     /**
-     * Возвращает активный (PENDING/RUNNING) job, чей диапазон [dateFrom, dateTo]
-     * включает $date. Используется для маппинга обработанного документа на
-     * job, которому он принадлежит.
+     * Возвращает последний активный (PENDING/RUNNING) job компании по маркетплейсу
+     * независимо от диапазона дат job'а.
+     *
+     * Используется reconcile-командой для предотвращения конфликта с
+     * DispatchOzonAdLoadAction: для Ozon Ads одновременно допускается только
+     * один active job на компанию.
      */
+    public function findLatestActiveJobByCompanyAndMarketplace(
+        string $companyId,
+        MarketplaceType $marketplace,
+    ): ?AdLoadJob;
+
     public function findActiveJobCoveringDate(
         string $companyId,
         MarketplaceType $marketplace,

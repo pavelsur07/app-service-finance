@@ -10,6 +10,7 @@ use App\MarketplaceAds\Command\ReconcileMarketplaceAdsCommand;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Exception\OzonRateLimitException;
+use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
@@ -23,7 +24,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testDryRunCreatesNothing(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
@@ -44,7 +45,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testCompletedJobIsNotReloaded(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::COMPLETED));
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
@@ -64,7 +65,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testFailedJobDoesNotBlockReconcile(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'HTTP 500'));
 
@@ -86,7 +87,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testRecognizes429AsRateLimited(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'Marketplace API rate limit exceeded'));        
 
@@ -96,7 +97,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $logger);
+        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -111,7 +112,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testContinuesIfOneDayFails(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
 
@@ -138,7 +139,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testRealRunCreatesOnlyOneJobAndDefersRemainingDays(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
@@ -156,7 +157,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testRealRunMissingCompletedMissingShowsSkipAndDeferredAndRemainingOne(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturnCallback(
             fn (string $companyId, MarketplaceType $marketplace, \DateTimeImmutable $date): ?AdLoadJob => '2026-04-02' === $date->format('Y-m-d')
                 ? $this->job(AdLoadJobStatus::COMPLETED)
@@ -182,7 +183,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testCompletedJobWinsOverLatestFailedJob(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::COMPLETED));
         $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'HTTP 500'));
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
@@ -210,7 +211,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testExistingActiveJobIsDeferredWithoutDispatch(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::RUNNING));
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn($this->job(AdLoadJobStatus::RUNNING));
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::never())->method('__invoke');
         $tester = $this->tester($repo, $dispatch);
@@ -221,7 +222,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testFreshRateLimitDuringDispatchIsDeferredWithWarningNotError(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
 
@@ -234,7 +235,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger->expects(self::once())->method('warning');
         $logger->expects(self::never())->method('error');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $logger);
+        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -252,7 +253,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     public function testFreshRateLimitStopsFurtherDispatchAttemptsInSameRun(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $repo->method('findActiveJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
 
@@ -268,7 +269,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger->expects(self::atLeastOnce())->method('warning');
         $logger->expects(self::never())->method('error');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $logger);
+        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -282,12 +283,126 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringContainsString('deferred=3', $tester->getDisplay());
     }
 
-    private function tester(AdLoadJobRepositoryInterface $repo, DispatchOzonAdLoadActionInterface $dispatch): CommandTester
+
+    public function testAllActiveUsesConnectionsQueryAndProcessesEachCompany(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn(null);
+
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::exactly(2))->method('__invoke');
+
+        $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
+        $query->expects(self::once())->method('getCompanyIds')->willReturn(['c1', 'c2']);
+
+        $tester = $this->tester($repo, $dispatch, $query);
+        $code = $tester->execute(['--all-active' => true, '--from' => '2026-04-01', '--to' => '2026-04-01']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testAllActiveDoesNotRequireCompany(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn(null);
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::never())->method('__invoke');
+
+        $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
+        $query->method('getCompanyIds')->willReturn([]);
+
+        $tester = $this->tester($repo, $dispatch, $query);
+        $code = $tester->execute(['--all-active' => true, '--from' => '2026-04-01', '--to' => '2026-04-01']);
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testDaysBackBuildsUtcRangeUntilYesterday(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn(null);
+
+        $todayUtc = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->setTime(0, 0);
+        $expectedFrom = $todayUtc->modify('-14 days')->format('Y-m-d');
+        $expectedTo = $todayUtc->modify('-1 day')->format('Y-m-d');
+
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::once())->method('__invoke')
+            ->with(self::COMPANY_ID, self::callback(fn (\DateTimeImmutable $d): bool => $expectedFrom === $d->format('Y-m-d')), self::anything());
+
+        $tester = $this->tester($repo, $dispatch);
+        $code = $tester->execute(['--company' => self::COMPANY_ID, '--days-back' => '14']);
+        self::assertSame(Command::SUCCESS, $code);
+        self::assertStringContainsString($expectedTo, $tester->getDisplay());
+    }
+
+    public function testRateLimitInOneCompanyDoesNotBlockAnotherInAllActiveMode(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn(null);
+
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::exactly(2))->method('__invoke')
+            ->willReturnCallback(function (string $companyId): void {
+                if ('c1' === $companyId) {
+                    throw new \RuntimeException('rate_limited', 0, new OzonRateLimitException('429'));
+                }
+            });
+
+        $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
+        $query->method('getCompanyIds')->willReturn(['c1', 'c2']);
+
+        $tester = $this->tester($repo, $dispatch, $query);
+        $code = $tester->execute(['--all-active' => true, '--from' => '2026-04-01', '--to' => '2026-04-01']);
+
+        self::assertSame(Command::SUCCESS, $code);
+        self::assertStringContainsString('[c2]', $tester->getDisplay());
+    }
+
+
+    public function testActiveCompanyJobForAnotherDateDefersMissingDayWithoutDispatchAndWithoutErrorLog(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn($this->job(AdLoadJobStatus::RUNNING));
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn(null);
+
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::never())->method('__invoke');
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::never())->method('error');
+
+        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
+        $tester = new CommandTester($command);
+        $code = $tester->execute(['--company' => self::COMPANY_ID, '--from' => '2026-04-01', '--to' => '2026-04-01']);
+
+        self::assertSame(Command::SUCCESS, $code);
+        self::assertStringContainsString('deferred: active pipeline already running for company', $tester->getDisplay());
+    }
+
+    private function tester(AdLoadJobRepositoryInterface $repo, DispatchOzonAdLoadActionInterface $dispatch, ?ActiveOzonPerformanceConnectionsQuery $query = null): CommandTester
     {
         $logger = $this->createMock(LoggerInterface::class);
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $logger);
+        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $query ?? $this->emptyConnectionsQuery(), $logger);
 
         return new CommandTester($command);
+    }
+
+
+    private function emptyConnectionsQuery(): ActiveOzonPerformanceConnectionsQuery
+    {
+        $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
+        $query->method('getCompanyIds')->willReturn([]);
+
+        return $query;
     }
 
     private function job(AdLoadJobStatus $status, ?string $reason = null): AdLoadJob
