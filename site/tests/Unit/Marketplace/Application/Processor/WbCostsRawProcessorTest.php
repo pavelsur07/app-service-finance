@@ -26,6 +26,7 @@ use App\Marketplace\Service\CostCalculator\WbAcquiringCalculator;
 use App\Marketplace\Service\CostCalculator\WbCommissionCalculator;
 use App\Marketplace\Service\CostCalculator\WbDeductionCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsDeliveryCalculator;
+use App\Marketplace\Service\CostCalculator\WbLogisticsCorrectionCalculator;
 use App\Marketplace\Service\CostCalculator\WbLogisticsReturnCalculator;
 use App\Marketplace\Service\CostCalculator\WbLoyaltyDiscountCalculator;
 use App\Marketplace\Service\CostCalculator\WbPenaltyCalculator;
@@ -270,6 +271,40 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame('logistics_return', $entries[0]['category_code']);
         self::assertGreaterThan(0, (float) $entries[0]['amount']);
         self::assertEqualsWithDelta(33.00, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorSupportsAndEmitsPositiveAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $snakeRow = $this->supplierOpItem('Коррекция логистики', [
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'delivery_rub' => -21.22,
+            'rrd_id' => '3101',
+        ]);
+        $camelRow = [
+            'sellerOperName' => 'Коррекция логистики',
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'deliveryService' => 21.22,
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '3102',
+        ];
+
+        self::assertTrue($calculator->supports($snakeRow));
+        self::assertTrue($calculator->supports($camelRow));
+
+        $snakeEntries = $calculator->calculate($snakeRow, null);
+        $camelEntries = $calculator->calculate($camelRow, null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame('logistics_correction', $snakeEntries[0]['category_code']);
+        self::assertSame('Коррекция логистики', $snakeEntries[0]['category_name']);
+        self::assertSame('Коррекция логистики WB', $snakeEntries[0]['description']);
+        self::assertEqualsWithDelta(21.22, (float) $snakeEntries[0]['amount'], 0.001);
+        self::assertEqualsWithDelta(21.22, (float) $camelEntries[0]['amount'], 0.001);
     }
 
     public function testWbStorageCalculatorEmitsPositiveAmount(): void
@@ -898,16 +933,17 @@ final class WbCostsRawProcessorTest extends TestCase
     }
 
     /**
-     * Контрактная проверка: все 11 калькуляторов реализуют CostCalculatorInterface.
+     * Контрактная проверка: все 12 калькуляторов реализуют CostCalculatorInterface.
      * На случай если кто-то добавит calculator без implements — поймаем здесь.
      */
-    public function testAllElevenWbCalculatorsImplementInterface(): void
+    public function testAllTwelveWbCalculatorsImplementInterface(): void
     {
         $calculators = [
             new WbCommissionCalculator(),
             new WbAcquiringCalculator(),
             new WbLogisticsDeliveryCalculator(),
             new WbLogisticsReturnCalculator(),
+            new WbLogisticsCorrectionCalculator(),
             new WbStorageCalculator(),
             new WbPvzProcessingCalculator(),
             new WbWarehouseLogisticsCalculator(),
@@ -917,7 +953,7 @@ final class WbCostsRawProcessorTest extends TestCase
             new WbLoyaltyDiscountCalculator(),
         ];
 
-        self::assertCount(11, $calculators, '11 WB-калькуляторов согласно services.yaml');
+        self::assertCount(12, $calculators, '12 WB-калькуляторов согласно services.yaml');
 
         foreach ($calculators as $calc) {
             self::assertInstanceOf(CostCalculatorInterface::class, $calc);
