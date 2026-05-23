@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Marketplace\Repository;
+namespace App\Tests\Integration\Marketplace\Repository;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;

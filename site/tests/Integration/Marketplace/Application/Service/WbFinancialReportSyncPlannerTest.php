@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Marketplace\Application\Service;
+namespace App\Tests\Integration\Marketplace\Application\Service;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;

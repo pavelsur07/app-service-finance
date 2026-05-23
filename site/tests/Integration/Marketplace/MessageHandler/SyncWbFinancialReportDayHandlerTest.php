@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Marketplace\MessageHandler;
+namespace App\Tests\Integration\Marketplace\MessageHandler;
 
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;

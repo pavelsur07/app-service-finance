@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Tests\Unit\Marketplace\Application\Service;
+namespace App\Tests\Integration\Marketplace\Application\Service;
 
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Application\Service\WbFinancialReportFirstAvailableResolver;
