@@ -11,9 +11,11 @@ use App\MarketplaceAds\Application\DispatchOzonAdLoadAction;
 use App\MarketplaceAds\Application\Service\AdBatchPlanner;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
+use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
+use Psr\Log\LoggerInterface;
 
 /**
  * Unit-тесты {@see DispatchOzonAdLoadAction} после переключения с
@@ -27,6 +29,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
     private AdLoadJobRepository $adLoadJobRepository;
     private EntityManagerInterface $entityManager;
     private AdBatchPlanner $adBatchPlanner;
+    private LoggerInterface $logger;
     private DispatchOzonAdLoadAction $action;
 
     protected function setUp(): void
@@ -35,12 +38,14 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         $this->adLoadJobRepository = $this->createMock(AdLoadJobRepository::class);
         $this->entityManager = $this->createMock(EntityManagerInterface::class);
         $this->adBatchPlanner = $this->createMock(AdBatchPlanner::class);
+        $this->logger = $this->createMock(LoggerInterface::class);
 
         $this->action = new DispatchOzonAdLoadAction(
             $this->marketplaceFacade,
             $this->adLoadJobRepository,
             $this->entityManager,
             $this->adBatchPlanner,
+            $this->logger,
         );
     }
 
@@ -206,6 +211,28 @@ final class DispatchOzonAdLoadActionTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageMatches('/Failed to plan ad load job/');
+
+        ($this->action)(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-10'),
+        );
+    }
+
+    public function testPlanner429IsClassifiedAsRateLimitedAndLoggedAsWarning(): void
+    {
+        $this->marketplaceFacade
+            ->method('getConnectionCredentials')
+            ->willReturn(['api_key' => 'secret', 'client_id' => 'client-abc']);
+        $this->adLoadJobRepository->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $this->adLoadJobRepository->expects(self::once())->method('save');
+        $this->adBatchPlanner->method('planBatchesForJob')
+            ->willThrowException(new OzonRateLimitException('HTTP 429 Превышен лимит активных запросов'));
+        $this->entityManager->expects(self::exactly(2))->method('flush');
+        $this->logger->expects(self::once())->method('warning');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('rate_limited');
 
         ($this->action)(
             self::COMPANY_ID,
