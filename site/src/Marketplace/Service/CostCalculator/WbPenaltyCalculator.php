@@ -22,7 +22,7 @@ class WbPenaltyCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Штраф';
+        return $this->normalizer->sellerOperName($item) === 'Штраф';
     }
 
     public function requiresListing(): bool
@@ -42,7 +42,7 @@ class WbPenaltyCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         // Привязываем к товару только если listing найден
         $product = $listing?->getProduct();
