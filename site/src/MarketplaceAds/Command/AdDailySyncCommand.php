@@ -7,6 +7,7 @@ namespace App\MarketplaceAds\Command;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\Service\AdBatchPlanner;
 use App\MarketplaceAds\Entity\AdLoadJob;
+use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -97,9 +98,9 @@ final class AdDailySyncCommand extends Command
 
             foreach ($companyIds as $companyId) {
                 try {
-                    // Идемпотентность: повторный запуск в тот же день не
-                    // создаёт второй job за вчера (по (company, marketplace,
-                    // dateFrom, dateTo)), даже если первый оказался FAILED.
+                    // Идемпотентность daily-sync: если job за вчера уже
+                    // создавался (любой статус), второй не создаём. Восстановление
+                    // failed/partial делается отдельной reconcile-командой.
                     if ($this->jobRepo->existsByDateRange(
                         $companyId,
                         MarketplaceType::OZON->value,
@@ -133,6 +134,21 @@ final class AdDailySyncCommand extends Command
                             $yesterday,
                             $yesterday,
                         );
+                    } catch (OzonRateLimitException $e) {
+                        $reason = 'Planning rate_limited: '.$e->getMessage();
+                        $job->markFailed($reason);
+                        $this->em->flush();
+                        $this->logger->warning('Daily sync: planner rate-limited', [
+                            'companyId' => $companyId,
+                            'jobId' => $job->getId(),
+                            'date' => $yesterday->format('Y-m-d'),
+                            'endpoint' => '/api/client/campaign',
+                            'httpStatus' => 429,
+                            'error' => $e->getMessage(),
+                            'exception' => $e::class,
+                        ]);
+
+                        throw $e;
                     } catch (\Throwable $e) {
                         // Планировщик бросает, например, при пустом списке
                         // SKU-кампаний в Ozon. Фиксируем job как FAILED,
@@ -158,6 +174,12 @@ final class AdDailySyncCommand extends Command
                         'date' => $yesterday->format('Y-m-d'),
                     ]);
                 } catch (\Throwable $e) {
+                    if ($e instanceof OzonRateLimitException) {
+                        ++$failed;
+
+                        continue;
+                    }
+
                     // Per-company isolation: сбой у одной компании
                     // (например, Ozon вернул пустой список кампаний или
                     // упал transient) не прерывает обработку остальных.

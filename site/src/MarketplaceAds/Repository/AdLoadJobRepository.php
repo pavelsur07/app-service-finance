@@ -254,6 +254,46 @@ class AdLoadJobRepository extends ServiceEntityRepository implements AdLoadJobRe
         return $count > 0;
     }
 
+    public function findLatestJobCoveringDate(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $date,
+    ): ?AdLoadJob {
+        return $this->createQueryBuilder('j')
+            ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
+            ->andWhere('j.dateFrom <= :date')
+            ->andWhere('j.dateTo >= :date')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('date', $date->setTime(0, 0), 'date_immutable')
+            ->orderBy('j.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
+    public function findCompletedJobCoveringDate(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $date,
+    ): ?AdLoadJob {
+        return $this->createQueryBuilder('j')
+            ->where('j.companyId = :companyId')
+            ->andWhere('j.marketplace = :marketplace')
+            ->andWhere('j.status = :status')
+            ->andWhere('j.dateFrom <= :date')
+            ->andWhere('j.dateTo >= :date')
+            ->setParameter('companyId', $companyId)
+            ->setParameter('marketplace', $marketplace)
+            ->setParameter('status', AdLoadJobStatus::COMPLETED)
+            ->setParameter('date', $date->setTime(0, 0), 'date_immutable')
+            ->orderBy('j.createdAt', 'DESC')
+            ->setMaxResults(1)
+            ->getQuery()
+            ->getOneOrNullResult();
+    }
+
     private function atomicIncrement(string $column, string $jobId, string $companyId, int $delta): int
     {
         // Whitelist — защита от SQL-injection через имя колонки (параметризовать имя

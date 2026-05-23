@@ -9,8 +9,11 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Facade\MarketplaceFacade;
 use App\MarketplaceAds\Application\Service\AdBatchPlanner;
 use App\MarketplaceAds\Entity\AdLoadJob;
+use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Создаёт AdLoadJob и планирует батчи для него в cron-driven pipeline
@@ -46,6 +49,8 @@ final class DispatchOzonAdLoadAction implements DispatchOzonAdLoadActionInterfac
         private readonly AdLoadJobRepository $adLoadJobRepository,
         private readonly EntityManagerInterface $entityManager,
         private readonly AdBatchPlanner $adBatchPlanner,
+        #[Autowire(service: 'monolog.logger.marketplace_ads')]
+        private readonly LoggerInterface $logger,
     ) {
     }
 
@@ -107,6 +112,20 @@ final class DispatchOzonAdLoadAction implements DispatchOzonAdLoadActionInterfac
                 $dateFromNorm,
                 $dateToNorm,
             );
+        } catch (OzonRateLimitException $e) {
+            $reason = 'Planning rate_limited: '.$e->getMessage();
+            $job->markFailed($reason);
+            $this->entityManager->flush();
+            $this->logger->warning('DispatchOzonAdLoadAction: planner rate-limited', [
+                'companyId' => $companyId,
+                'jobId' => $job->getId(),
+                'dateFrom' => $dateFromNorm->format('Y-m-d'),
+                'dateTo' => $dateToNorm->format('Y-m-d'),
+                'endpoint' => '/api/client/campaign',
+                'httpStatus' => 429,
+            ]);
+
+            throw new \RuntimeException('Failed to plan ad load job: '.$reason, 0, $e);
         } catch (\Throwable $e) {
             // Ошибка планирования (например, Ozon вернул пустой список кампаний —
             // `RuntimeException('No SKU campaigns found…')`) — фиксируем job как

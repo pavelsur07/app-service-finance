@@ -97,4 +97,16 @@ interface AdLoadJobRepositoryInterface
         \DateTimeImmutable $dateFrom,
         \DateTimeImmutable $dateTo,
     ): bool;
+
+    public function findLatestJobCoveringDate(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $date,
+    ): ?AdLoadJob;
+
+    public function findCompletedJobCoveringDate(
+        string $companyId,
+        MarketplaceType $marketplace,
+        \DateTimeImmutable $date,
+    ): ?AdLoadJob;
 }

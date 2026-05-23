@@ -7,6 +7,7 @@ namespace App\Tests\Unit\MarketplaceAds\Command;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\Service\AdBatchPlanner;
 use App\MarketplaceAds\Command\AdDailySyncCommand;
+use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use Doctrine\ORM\EntityManagerInterface;
@@ -202,6 +203,34 @@ final class AdDailySyncCommandTest extends TestCase
         $exitCode = $tester->execute([]);
 
         self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testPlannerRateLimitLogsWarningAndNotError(): void
+    {
+        $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
+        $query->method('getCompanyIds')->willReturn([self::COMPANY_1]);
+
+        $jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $jobRepo->method('existsByDateRange')->willReturn(false);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->expects(self::once())->method('persist');
+        // persist + markFailed
+        $em->expects(self::exactly(2))->method('flush');
+
+        $planner = $this->createMock(AdBatchPlanner::class);
+        $planner->method('planBatchesForJob')
+            ->willThrowException(new OzonRateLimitException('HTTP 429 Превышен лимит активных запросов'));
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $logger->expects(self::once())->method('warning');
+        $logger->expects(self::never())->method('error');
+
+        $tester = $this->makeTester($query, $planner, $jobRepo, $em, $logger);
+        $exitCode = $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+        self::assertStringContainsString('created=0 skipped=0 failed=1', $tester->getDisplay());
     }
 
     private function makeTester(
