@@ -30,6 +30,7 @@ final readonly class WbCostCategory
             new self('commission', 'Комиссия маркетплейса', 'Вознаграждение', 'Вознаграждение', 'commission'),
             new self('logistics_delivery', 'Логистика до покупателя', 'Услуги доставки и FBO', 'Услуги доставки', 'logistics'),
             new self('logistics_return', 'Логистика возврат', 'Услуги доставки и FBO', 'Услуги доставки', 'logistics'),
+            new self('logistics_correction', 'Коррекция логистики', 'Услуги доставки и FBO', 'Услуги доставки', 'logistics'),
             new self('warehouse_logistics', 'Логистика складские операции', 'Услуги доставки и FBO', 'Услуги FBO', 'logistics'),
             new self('storage', 'Хранение WB', 'Услуги доставки и FBO', 'Услуги FBO', 'other'),
             new self('pvz_processing', 'Логистика обработка на ПВЗ', 'Услуги партнёров', 'Услуги партнёров', 'other'),
