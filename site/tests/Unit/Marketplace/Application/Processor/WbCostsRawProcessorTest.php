@@ -273,23 +273,73 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertEqualsWithDelta(33.00, (float) $entries[0]['amount'], 0.001);
     }
 
-    public function testWbLogisticsCorrectionCalculatorSupportsAndEmitsPositiveAmount(): void
+    public function testWbLogisticsCorrectionCalculatorSnakeCasePositiveAmount(): void
     {
         $calculator = new WbLogisticsCorrectionCalculator();
 
-        $snakeRow = $this->supplierOpItem('Коррекция логистики', [
+        $row = [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => 24864183,
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'delivery_rub' => 21.22,
             'delivery_amount' => 0,
             'return_amount' => 0,
-            'delivery_rub' => -21.22,
-            'rrd_id' => '3101',
-        ]);
+            'bonus_type_name' => 'коррекция логистики',
+        ];
+
+        self::assertTrue($calculator->supports($row));
+
+        $entries = $calculator->calculate($row, null);
+
+        self::assertCount(1, $entries);
+        self::assertSame('logistics_correction', $entries[0]['category_code']);
+        self::assertStringContainsString('Коррекция логистики', $entries[0]['category_name']);
+        self::assertStringContainsString('Коррекция логистики', $entries[0]['description']);
+        self::assertEqualsWithDelta(21.22, (float) $entries[0]['amount'], 0.001);
+        self::assertSame('wb:3122030188593:logistics_correction', $entries[0]['external_id']);
+        self::assertInstanceOf(\DateTimeImmutable::class, $entries[0]['cost_date']);
+        self::assertSame('2026-04-09', $entries[0]['cost_date']->format('Y-m-d'));
+    }
+
+    public function testWbLogisticsCorrectionCalculatorCamelCasePositiveAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $snakeRow = [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => 24864183,
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'delivery_rub' => 21.22,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция логистики',
+        ];
         $camelRow = [
             'sellerOperName' => 'Коррекция логистики',
+            'docTypeName' => '',
+            'rrdId' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'saleDt' => '2026-04-09T08:15:26Z',
+            'rrDate' => '2026-04-29',
+            'nmId' => 24864183,
+            'techSize' => 'XXL',
+            'sku' => '2000000024899',
             'deliveryAmount' => 0,
             'returnAmount' => 0,
             'deliveryService' => 21.22,
-            'saleDt' => '2026-01-15 10:00:00',
-            'rrdId' => '3102',
+            'bonusTypeName' => 'коррекция логистики',
         ];
 
         self::assertTrue($calculator->supports($snakeRow));
@@ -300,11 +350,41 @@ final class WbCostsRawProcessorTest extends TestCase
 
         self::assertCount(1, $snakeEntries);
         self::assertCount(1, $camelEntries);
-        self::assertSame('logistics_correction', $snakeEntries[0]['category_code']);
-        self::assertSame('Коррекция логистики', $snakeEntries[0]['category_name']);
-        self::assertSame('Коррекция логистики WB', $snakeEntries[0]['description']);
-        self::assertEqualsWithDelta(21.22, (float) $snakeEntries[0]['amount'], 0.001);
         self::assertEqualsWithDelta(21.22, (float) $camelEntries[0]['amount'], 0.001);
+        self::assertSame($snakeEntries[0]['category_code'], $camelEntries[0]['category_code']);
+        self::assertSame($snakeEntries[0]['category_name'], $camelEntries[0]['category_name']);
+        self::assertSame($snakeEntries[0]['description'], $camelEntries[0]['description']);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorReturnsEmptyForZeroAmount(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+
+        $snakeEntries = $calculator->calculate($this->supplierOpItem('Коррекция логистики', [
+            'delivery_rub' => 0.0,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+        ]), null);
+
+        $camelEntries = $calculator->calculate([
+            'sellerOperName' => 'Коррекция логистики',
+            'deliveryService' => 0.0,
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'rrdId' => '3110',
+            'saleDt' => '2026-04-09T08:15:26Z',
+        ], null);
+
+        self::assertSame([], $snakeEntries);
+        self::assertSame([], $camelEntries);
+    }
+
+    public function testWbLogisticsCorrectionCalculatorDoesNotSupportNormalLogistics(): void
+    {
+        $calculator = new WbLogisticsCorrectionCalculator();
+        $logisticsRow = $this->logisticsItem(deliveryAmount: 1, returnAmount: 0, deliveryRub: 80.00);
+
+        self::assertFalse($calculator->supports($logisticsRow));
     }
 
     public function testWbStorageCalculatorEmitsPositiveAmount(): void
