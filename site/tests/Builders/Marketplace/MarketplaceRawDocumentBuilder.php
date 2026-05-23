@@ -82,6 +82,14 @@ final class MarketplaceRawDocumentBuilder
         return $clone;
     }
 
+    public function withApiEndpoint(string $apiEndpoint): self
+    {
+        $clone = clone $this;
+        $clone->apiEndpoint = $apiEndpoint;
+
+        return $clone;
+    }
+
     public function build(): MarketplaceRawDocument
     {
         if ($this->company === null) {
