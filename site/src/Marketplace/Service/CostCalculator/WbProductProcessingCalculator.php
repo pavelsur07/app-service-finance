@@ -25,7 +25,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Обработка товара';
+        return $this->normalizer->sellerOperName($item) === 'Обработка товара';
     }
 
     public function requiresListing(): bool
@@ -37,7 +37,7 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
         // Сумма затраты - приёмка товара
-        $amount = (float)($item['acceptance'] ?? 0);
+        $amount = $this->normalizer->paidAcceptance($item);
 
         if (abs($amount) < 0.01) {
             return [];
@@ -48,11 +48,11 @@ class WbProductProcessingCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         // Проверяем есть ли nm_id и ts_name для привязки к товару
-        $nmId = (string)($item['nm_id'] ?? '');
-        $tsName = trim($item['ts_name'] ?? '');
+        $nmId = $this->normalizer->nmId($item);
+        $tsName = trim($this->normalizer->techSize($item) ?? '');
         $product = null;
 
         // Если есть И nm_id И ts_name - привязываем к товару

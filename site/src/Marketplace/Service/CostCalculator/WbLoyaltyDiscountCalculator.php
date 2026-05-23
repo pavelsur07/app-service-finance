@@ -22,7 +22,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Компенсация скидки по программе лояльности';
+        return $this->normalizer->sellerOperName($item) === 'Компенсация скидки по программе лояльности';
     }
 
     public function requiresListing(): bool
@@ -32,7 +32,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $cashbackDiscount = (float)($item['cashback_discount'] ?? 0);
+        $cashbackDiscount = $this->normalizer->cashbackDiscount($item);
 
         if (abs($cashbackDiscount) < 0.01) {
             return [];
@@ -43,7 +43,7 @@ class WbLoyaltyDiscountCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         // Привязываем к товару только если listing найден
         $product = $listing?->getProduct();

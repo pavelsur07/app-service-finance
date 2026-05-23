@@ -25,7 +25,7 @@ class WbDeductionCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Удержание';
+        return $this->normalizer->sellerOperName($item) === 'Удержание';
     }
 
     public function requiresListing(): bool
@@ -42,10 +42,10 @@ class WbDeductionCalculator implements CostCalculatorInterface
         }
 
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         // Обработка bonus_type_name
-        $bonusTypeName = (string)($item['bonus_type_name'] ?? '');
+        $bonusTypeName = $this->normalizer->bonusTypeName($item);
 
         // Шаг 1: Удаляем ID-паттерн
         // Паттерн: "Списание за отзыв 1xTgKBfVf6AAWKuVZ1ql: акция №1392833"

@@ -22,8 +22,8 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Логистика'
-            && (int)($item['delivery_amount'] ?? 0) === 1;
+        return $this->normalizer->sellerOperName($item) === 'Логистика'
+            && (int) $this->normalizer->deliveryAmount($item) === 1;
     }
 
     public function requiresListing(): bool
@@ -33,7 +33,7 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $deliveryRub = (float)($item['delivery_rub'] ?? 0);
+        $deliveryRub = $this->normalizer->deliveryService($item);
 
         if (abs($deliveryRub) < 0.01) {
             return [];
@@ -44,7 +44,7 @@ class WbLogisticsDeliveryCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         return [
             [

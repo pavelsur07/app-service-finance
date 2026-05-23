@@ -22,7 +22,7 @@ class WbStorageCalculator implements CostCalculatorInterface
 
     public function supports(array $item): bool
     {
-        return ($item['supplier_oper_name'] ?? '') === 'Хранение';
+        return $this->normalizer->sellerOperName($item) === 'Хранение';
     }
 
     public function requiresListing(): bool
@@ -32,7 +32,7 @@ class WbStorageCalculator implements CostCalculatorInterface
 
     public function calculate(array $item, ?MarketplaceListing $listing): array
     {
-        $storageFee = (float)($item['storage_fee'] ?? 0);
+        $storageFee = $this->normalizer->paidStorage($item);
 
         if (abs($storageFee) < 0.01) {
             return [];
@@ -43,7 +43,7 @@ class WbStorageCalculator implements CostCalculatorInterface
             return [];
         }
 
-        $saleDate = new \DateTimeImmutable($item['sale_dt'] ?? $item['rr_dt']);
+        $saleDate = $this->normalizer->operationDate($item);
 
         return [
             [

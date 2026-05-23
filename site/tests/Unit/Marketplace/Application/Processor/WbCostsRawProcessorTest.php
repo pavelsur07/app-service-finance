@@ -206,6 +206,46 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame(MarketplaceCostOperationType::STORNO, $entries[0]['operation_type']);
     }
 
+    public function testWbLogisticsDeliveryCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbLogisticsDeliveryCalculator();
+        $snakeEntries = $calculator->calculate($this->logisticsItem(1, 0, -42.00), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Логистика',
+            'srid' => 'SRID-LOG-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '2001',
+            'deliveryAmount' => 1,
+            'returnAmount' => 0,
+            'deliveryService' => -42.00,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbLogisticsReturnCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbLogisticsReturnCalculator();
+        $snakeEntries = $calculator->calculate($this->logisticsItem(0, 1, 33.00), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Логистика',
+            'srid' => 'SRID-LOG-2',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '2002',
+            'deliveryAmount' => 0,
+            'returnAmount' => 1,
+            'deliveryService' => 33.00,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
     public function testWbLogisticsDeliveryCalculatorEmitsPositiveAmount(): void
     {
         $entries = (new WbLogisticsDeliveryCalculator())->calculate(
@@ -243,6 +283,64 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame('storage', $entries[0]['category_code']);
         self::assertGreaterThan(0, (float) $entries[0]['amount']);
         self::assertEqualsWithDelta(125.75, (float) $entries[0]['amount'], 0.001);
+    }
+
+    public function testWbStorageCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbStorageCalculator();
+        $snakeEntries = $calculator->calculate($this->supplierOpItem('Хранение', ['storage_fee' => -125.75]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Услуги',
+            'sellerOperName' => 'Хранение',
+            'srid' => 'SRID-OP-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '3001',
+            'paidStorage' => -125.75,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbCommissionCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbCommissionCalculator();
+        $snakeEntries = $calculator->calculate($this->saleItem([
+            'retail_price_withdisc_rub' => 2493.00,
+            'ppvz_for_pay' => 1581.10,
+            'acquiring_fee' => 64.28,
+        ]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Продажа',
+            'srid' => 'SRID-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '1001',
+            'retailPriceWithDisc' => 2493.00,
+            'forPay' => 1581.10,
+            'acquiringFee' => 64.28,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
+    }
+
+    public function testWbAcquiringCalculatorCamelCaseMatchesSnakeCase(): void
+    {
+        $calculator = new WbAcquiringCalculator();
+        $snakeEntries = $calculator->calculate($this->saleItem(['acquiring_fee' => 64.28]), null);
+        $camelEntries = $calculator->calculate([
+            'docTypeName' => 'Продажа',
+            'srid' => 'SRID-1',
+            'saleDt' => '2026-01-15 10:00:00',
+            'rrdId' => '1001',
+            'acquiringFee' => 64.28,
+        ], null);
+
+        self::assertCount(1, $snakeEntries);
+        self::assertCount(1, $camelEntries);
+        self::assertSame((string) $snakeEntries[0]['amount'], (string) $camelEntries[0]['amount']);
     }
 
     public function testWbPvzProcessingCalculatorEmitsPositiveAmount(): void
