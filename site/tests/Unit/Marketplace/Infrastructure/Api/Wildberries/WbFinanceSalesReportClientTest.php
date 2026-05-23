@@ -42,7 +42,11 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $captured[] = $options['json'] ?? null;
+            $payload = $options['json'] ?? null;
+            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+            }
+            $captured[] = $payload;
 
             return new MockResponse('[]', ['http_code' => 200]);
         });
@@ -150,7 +154,11 @@ final class WbFinanceSalesReportClientTest extends TestCase
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
-            $captured = [$method, $url, $options];
+            $payload = $options['json'] ?? null;
+            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+            }
+            $captured = [$method, $url, $payload];
 
             return new MockResponse('[{"rrdId":77}]', ['http_code' => 200]);
         });
@@ -160,9 +168,9 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertTrue($client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03'));
         self::assertSame('POST', $captured[0]);
         self::assertStringEndsWith('/api/finance/v1/sales-reports/detailed', $captured[1]);
-        self::assertSame(1, $captured[2]['json']['limit'] ?? null);
-        self::assertSame('2026-02-01', $captured[2]['json']['dateFrom'] ?? null);
-        self::assertSame('2026-02-03', $captured[2]['json']['dateTo'] ?? null);
+        self::assertSame(1, $captured[2]['limit'] ?? null);
+        self::assertSame('2026-02-01', $captured[2]['dateFrom'] ?? null);
+        self::assertSame('2026-02-03', $captured[2]['dateTo'] ?? null);
     }
     public function test204ReturnsAccumulatedRows(): void
     {
