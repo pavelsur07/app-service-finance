@@ -1128,6 +1128,148 @@ final class WbCostsRawProcessorTest extends TestCase
         self::assertSame($listing, $persisted[0]->getListing());
     }
 
+    #[DataProvider('wbLogisticsCorrectionRowFormatsProvider')]
+    public function testProcessWbCostsActionProcessesLogisticsCorrectionThroughCostsPipeline(array $row): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                    return $company;
+                }
+                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)->disableOriginalConstructor()->getMock();
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn(['24864183_XXL' => $listing]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class));
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsCorrectionCalculator(), new WbLogisticsDeliveryCalculator()],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(1, $persisted);
+        self::assertSame($listing, $persisted[0]->getListing());
+        self::assertEqualsWithDelta(21.22, (float) $persisted[0]->getAmount(), 0.001);
+        self::assertSame($rawDocId, $persisted[0]->getRawDocumentId());
+        self::assertSame('logistics_correction', $persisted[0]->getCategory()->getCode());
+        self::assertSame(
+            'wb:3122030188593:logistics_correction',
+            $persisted[0]->getExternalId(),
+        );
+        self::assertNotSame(
+            'wb:3122030188593:logistics_delivery',
+            $persisted[0]->getExternalId(),
+        );
+    }
+
+    public function testProcessWbCostsActionDeduplicatesIdenticalLogisticsCorrectionRows(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+        $row = self::wbLogisticsCorrectionSnakeCaseRow();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row, $row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                    return $company;
+                }
+                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn([]);
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn(['wb:3122030188593:logistics_correction']);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            new MarketplaceCostExistingExternalIdsQuery($connection),
+            (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor(),
+            new MarketplaceCostCategoryResolver($this->createMock(MarketplaceCostCategoryRepository::class), $em),
+            new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class)),
+            $this->createMock(MarketplaceListingBarcodeRepository::class),
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [new WbLogisticsCorrectionCalculator()],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(0, $persisted);
+    }
+
     public static function wbCostRowFormatsProvider(): iterable
     {
         yield 'camelCase' => [[
@@ -1157,5 +1299,50 @@ final class WbCostsRawProcessorTest extends TestCase
             'delivery_amount' => 1,
             'delivery_rub' => 80,
         ]];
+    }
+
+    public static function wbLogisticsCorrectionRowFormatsProvider(): iterable
+    {
+        yield 'snake_case' => [self::wbLogisticsCorrectionSnakeCaseRow()];
+        yield 'camelCase' => [[
+            'sellerOperName' => 'Коррекция логистики',
+            'docTypeName' => '',
+            'rrdId' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'saleDt' => '2026-04-09T08:15:26Z',
+            'rrDate' => '2026-04-29',
+            'nmId' => '24864183',
+            'techSize' => 'XXL',
+            'sku' => '2000000024899',
+            'vendorCode' => 'wj1121104211/черный',
+            'brandName' => 'womjoy',
+            'subjectName' => 'Велосипедки',
+            'deliveryService' => 21.22,
+            'deliveryAmount' => 0,
+            'returnAmount' => 0,
+            'bonusTypeName' => 'коррекция логистики',
+        ]];
+    }
+
+    private static function wbLogisticsCorrectionSnakeCaseRow(): array
+    {
+        return [
+            'supplier_oper_name' => 'Коррекция логистики',
+            'doc_type_name' => '',
+            'rrd_id' => '3122030188593',
+            'srid' => 'test-correction-srid-1',
+            'sale_dt' => '2026-04-09T08:15:26Z',
+            'rr_dt' => '2026-04-29',
+            'nm_id' => '24864183',
+            'ts_name' => 'XXL',
+            'barcode' => '2000000024899',
+            'sa_name' => 'wj1121104211/черный',
+            'brand_name' => 'womjoy',
+            'subject_name' => 'Велосипедки',
+            'delivery_rub' => 21.22,
+            'delivery_amount' => 0,
+            'return_amount' => 0,
+            'bonus_type_name' => 'коррекция логистики',
+        ];
     }
 }
