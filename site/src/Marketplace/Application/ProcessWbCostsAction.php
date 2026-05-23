@@ -14,6 +14,7 @@ use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
 use App\Marketplace\Repository\MarketplaceListingRepository;
 use App\Marketplace\Service\CostCalculator\CostCalculatorInterface;
@@ -34,6 +35,7 @@ final class ProcessWbCostsAction
         private readonly MarketplaceCostCategoryResolver $categoryResolver,
         private readonly MarketplaceBarcodeCatalogService $barcodeCatalog,
         private readonly MarketplaceListingBarcodeRepository $barcodeRepository,
+        private readonly WbSalesReportRowNormalizer $normalizer,
         private readonly LoggerInterface $logger,
         iterable $costCalculators,
     ) {
@@ -75,7 +77,7 @@ final class ProcessWbCostsAction
         // 2. Массово загружаем listings (ПО ТОЙ ЖЕ ЛОГИКЕ ЧТО И ПРОДАЖИ!)
         $allNmIdsMap = [];
         foreach ($costsData as $item) {
-            $nmId = trim((string) ($item['nm_id'] ?? ''));
+            $nmId = trim($this->normalizer->nmId($item));
             if ($nmId === '' || $nmId === '0') {
                 continue;
             }
@@ -86,7 +88,7 @@ final class ProcessWbCostsAction
         // Собираем все barcodes для barcode→size lookup
         $allBarcodes = [];
         foreach ($costsData as $item) {
-            $barcode = trim((string) ($item['barcode'] ?? ''));
+            $barcode = trim((string) $this->normalizer->barcode($item));
             if ($barcode !== '') {
                 $allBarcodes[$barcode] = true;
             }
@@ -127,13 +129,13 @@ final class ProcessWbCostsAction
 
         $newListingsCreated = 0;
         foreach ($costsData as $item) {
-            $nmId = trim((string) ($item['nm_id'] ?? ''));
+            $nmId = trim($this->normalizer->nmId($item));
             if ($nmId === '' || $nmId === '0') {
                 continue;
             }
 
-            $tsName = $item['ts_name'] ?? null;
-            $barcode = trim((string) ($item['barcode'] ?? ''));
+            $tsName = $this->normalizer->techSize($item);
+            $barcode = trim((string) $this->normalizer->barcode($item));
 
             if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
                 $tsName = $barcodeSizeMap[$barcode];
@@ -147,10 +149,10 @@ final class ProcessWbCostsAction
             }
 
             $listing = $this->listingResolver->resolve($company, $nmId, $tsName, [
-                'sa_name'      => (string) ($item['sa_name'] ?? ''),
-                'brand_name'   => (string) ($item['brand_name'] ?? ''),
-                'subject_name' => (string) ($item['subject_name'] ?? ''),
-                'retail_price' => (string) ($item['retail_price'] ?? '0'),
+                'sa_name'      => $this->normalizer->vendorCode($item),
+                'brand_name'   => $this->normalizer->brandName($item),
+                'subject_name' => $this->normalizer->subjectName($item),
+                'retail_price' => (string) $this->normalizer->retailPrice($item),
             ], $barcode);
 
             $listingsCache[$cacheKey] = $listing;
@@ -290,15 +292,15 @@ final class ProcessWbCostsAction
                     $processed = true;
 
                     // Получаем listing из кэша по nm_id + size (с barcode fallback)
-                    $nmId = trim((string) ($item['nm_id'] ?? ''));
-                    $barcode = trim((string) ($item['barcode'] ?? ''));
+                    $nmId = trim($this->normalizer->nmId($item));
+                    $barcode = trim((string) $this->normalizer->barcode($item));
                     if ($nmId === '' || $nmId === '0') {
                         // nm_id пустой — ищем листинг по barcode из предзагруженного кэша
                         $listing = $barcode !== '' && isset($barcodeListingMap[$barcode])
                             ? $barcodeListingMap[$barcode]
                             : null;
                     } else {
-                        $tsName = $item['ts_name'] ?? null;
+                        $tsName = $this->normalizer->techSize($item);
 
                         if (trim((string) $tsName) === '' && $barcode !== '' && isset($barcodeSizeMap[$barcode])) {
                             $tsName = $barcodeSizeMap[$barcode];
