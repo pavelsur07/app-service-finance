@@ -16,6 +16,7 @@ final class WbCostCategoryTest extends TestCase
         $this->assertArrayHasKey('commission', $byCode);
         $this->assertArrayHasKey('logistics_delivery', $byCode);
         $this->assertArrayHasKey('warehouse_logistics', $byCode);
+        $this->assertArrayHasKey('logistics_correction', $byCode);
         $this->assertArrayHasKey('wb_loyalty_discount_compensation', $byCode);
         $this->assertArrayHasKey('product_processing', $byCode);
     }
