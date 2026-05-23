@@ -16,6 +16,7 @@ use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
 use App\Marketplace\Repository\MarketplaceListingBarcodeRepository;
@@ -582,6 +583,7 @@ final class WbCostsRawProcessorTest extends TestCase
             $categoryResolver,
             $barcodeCatalog,
             $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
             new NullLogger(),
             [
                 new WbCommissionCalculator(),
@@ -755,6 +757,7 @@ final class WbCostsRawProcessorTest extends TestCase
             $categoryResolver,
             $barcodeCatalog,
             $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
             new NullLogger(),
             $calculators,
         );
@@ -821,5 +824,124 @@ final class WbCostsRawProcessorTest extends TestCase
         foreach ($calculators as $calc) {
             self::assertInstanceOf(CostCalculatorInterface::class, $calc);
         }
+    }
+
+    #[DataProvider('wbCostRowFormatsProvider')]
+    public function testProcessWbCostsActionBindsListingForBothCamelAndSnakeCaseRows(array $row): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $rawDocId = '22222222-2222-2222-2222-222222222222';
+        $persisted = [];
+        $company = $this->makeCompany();
+
+        $rawDoc = $this->getMockBuilder(\App\Marketplace\Entity\MarketplaceRawDocument::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['getRawData', 'getId', 'setUnprocessedCostsCount', 'setUnprocessedCostTypes'])
+            ->getMock();
+        $rawDoc->method('getRawData')->willReturn([$row]);
+        $rawDoc->method('getId')->willReturn($rawDocId);
+
+        $em = $this->createMock(EntityManagerInterface::class);
+        $em->method('find')->willReturnCallback(
+            static function (string $class, string $id) use ($companyId, $rawDocId, $company, $rawDoc): mixed {
+                if ($class === \App\Company\Entity\Company::class && $id === $companyId) {
+                    return $company;
+                }
+                if ($class === \App\Marketplace\Entity\MarketplaceRawDocument::class && $id === $rawDocId) {
+                    return $rawDoc;
+                }
+
+                return null;
+            },
+        );
+        $em->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            if ($entity instanceof MarketplaceCost) {
+                $persisted[] = $entity;
+            }
+        });
+
+        $listing = $this->getMockBuilder(MarketplaceListing::class)->disableOriginalConstructor()->getMock();
+        $listingRepository = $this->createMock(MarketplaceListingRepository::class);
+        $listingRepository->method('findListingsByNmIdsIndexed')->willReturn(['999_XL' => $listing]);
+
+        $connection = $this->createMock(Connection::class);
+        $result = $this->createMock(Result::class);
+        $result->method('fetchFirstColumn')->willReturn([]);
+        $connection->method('executeQuery')->willReturn($result);
+
+        $costExistingIdsQuery = new MarketplaceCostExistingExternalIdsQuery($connection);
+        $barcodeCatalog = new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class));
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $costCategoryRepository = $this->createMock(MarketplaceCostCategoryRepository::class);
+        $costCategoryRepository->method('findBy')->willReturn([]);
+        $costCategoryRepository->method('findOneBy')->willReturn(null);
+        $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
+        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+
+        $calculator = new class implements CostCalculatorInterface {
+            public function supports(array $item): bool { return true; }
+            public function calculate(array $item, ?MarketplaceListing $listing = null): array
+            {
+                return [[
+                    'external_id' => 'test:wb:cost:1',
+                    'cost_date' => new \DateTimeImmutable('2026-01-15 10:00:00'),
+                    'amount' => 80.0,
+                    'description' => 'Логистика до покупателя',
+                    'category_code' => 'logistics_delivery',
+                    'category_name' => 'Логистика до покупателя',
+                    'operation_type' => MarketplaceCostOperationType::CHARGE,
+                ]];
+            }
+        };
+
+        $action = new ProcessWbCostsAction(
+            $em,
+            $listingRepository,
+            $costExistingIdsQuery,
+            $listingResolver,
+            $categoryResolver,
+            $barcodeCatalog,
+            $barcodeRepository,
+            new WbSalesReportRowNormalizer(),
+            new NullLogger(),
+            [$calculator],
+        );
+
+        $action($companyId, $rawDocId);
+
+        self::assertCount(1, $persisted);
+        self::assertSame($listing, $persisted[0]->getListing());
+    }
+
+    public static function wbCostRowFormatsProvider(): iterable
+    {
+        yield 'camelCase' => [[
+            'sellerOperName' => 'Логистика',
+            'docTypeName' => '',
+            'nmId' => '999',
+            'techSize' => 'XL',
+            'sku' => '123456',
+            'vendorCode' => 'VC-1',
+            'brandName' => 'Brand',
+            'subjectName' => 'Subject',
+            'retailPrice' => 1500,
+            'deliveryAmount' => 1,
+            'deliveryService' => 80,
+        ]];
+
+        yield 'snake_case' => [[
+            'supplier_oper_name' => 'Логистика',
+            'doc_type_name' => '',
+            'nm_id' => '999',
+            'ts_name' => 'XL',
+            'barcode' => '123456',
+            'sa_name' => 'VC-1',
+            'brand_name' => 'Brand',
+            'subject_name' => 'Subject',
+            'retail_price' => 1500,
+            'delivery_amount' => 1,
+            'delivery_rub' => 80,
+        ]];
     }
 }
