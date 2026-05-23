@@ -16,6 +16,7 @@ use App\Marketplace\Enum\MarketplaceCostOperationType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Enum\StagingRecordType;
 use App\Marketplace\Infrastructure\Query\MarketplaceCostExistingExternalIdsQuery;
+use App\Marketplace\Infrastructure\Query\WbBarcodeUpsertQuery;
 use App\Marketplace\Infrastructure\Normalizer\Wildberries\WbSalesReportRowNormalizer;
 use App\Marketplace\Repository\MarketplaceBarcodeCatalogRepository;
 use App\Marketplace\Repository\MarketplaceCostCategoryRepository;
@@ -1091,7 +1092,12 @@ final class WbCostsRawProcessorTest extends TestCase
         $costCategoryRepository->method('findBy')->willReturn([]);
         $costCategoryRepository->method('findOneBy')->willReturn(null);
         $categoryResolver = new MarketplaceCostCategoryResolver($costCategoryRepository, $em);
-        $listingResolver = (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor();
+        $listingResolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
 
         $calculator = new class implements CostCalculatorInterface {
             public function supports(array $item): bool { return true; }
@@ -1101,7 +1107,7 @@ final class WbCostsRawProcessorTest extends TestCase
                 return [[
                     'external_id' => 'test:wb:cost:1',
                     'cost_date' => new \DateTimeImmutable('2026-01-15 10:00:00'),
-                    'amount' => 80.0,
+                    'amount' => '80',
                     'description' => 'Логистика до покупателя',
                     'category_code' => 'logistics_delivery',
                     'category_name' => 'Логистика до покупателя',
@@ -1253,14 +1259,25 @@ final class WbCostsRawProcessorTest extends TestCase
         $result->method('fetchFirstColumn')->willReturn(['wb:3122030188593:logistics_correction']);
         $connection->method('executeQuery')->willReturn($result);
 
+        $barcodeRepository = $this->createMock(MarketplaceListingBarcodeRepository::class);
+        $barcodeRepository->method('findByBarcodesIndexed')->willReturn([]);
+        $barcodeRepository->method('findByBarcode')->willReturn(null);
+        $listingRepository->method('findByNmIdAndSize')->willReturn(null);
+        $listingResolver = new WbListingResolverService(
+            $listingRepository,
+            $barcodeRepository,
+            new WbBarcodeUpsertQuery($connection),
+            $em,
+        );
+
         $action = new ProcessWbCostsAction(
             $em,
             $listingRepository,
             new MarketplaceCostExistingExternalIdsQuery($connection),
-            (new \ReflectionClass(WbListingResolverService::class))->newInstanceWithoutConstructor(),
+            $listingResolver,
             new MarketplaceCostCategoryResolver($this->createMock(MarketplaceCostCategoryRepository::class), $em),
             new MarketplaceBarcodeCatalogService($this->createMock(MarketplaceBarcodeCatalogRepository::class)),
-            $this->createMock(MarketplaceListingBarcodeRepository::class),
+            $barcodeRepository,
             new WbSalesReportRowNormalizer(),
             new NullLogger(),
             [new WbLogisticsCorrectionCalculator()],
