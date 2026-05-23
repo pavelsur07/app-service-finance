@@ -49,8 +49,10 @@ site-test-unit:
 	docker-compose run --rm site-php-cli composer test:unit
 
 # Интеграционные (готовим среду + БД)
-site-test-int: site-test-init
-	docker-compose run --rm site-php-cli composer test:int
+site-test-int: site-test-integration
+
+site-test-integration: site-test-init
+	docker-compose run --rm site-php-cli composer test:integration
 
 # Все тесты
 site-test: site-test-init
