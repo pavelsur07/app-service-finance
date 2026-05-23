@@ -8,6 +8,7 @@ use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Exception\OzonRateLimitException;
+use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
@@ -23,6 +24,7 @@ final class ReconcileMarketplaceAdsCommand extends Command
     public function __construct(
         private readonly AdLoadJobRepositoryInterface $jobRepository,
         private readonly DispatchOzonAdLoadActionInterface $dispatchOzonAdLoadAction,
+        private readonly ActiveOzonPerformanceConnectionsQuery $activeConnectionsQuery,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
     ) {
@@ -36,6 +38,8 @@ final class ReconcileMarketplaceAdsCommand extends Command
             ->addOption('company', null, InputOption::VALUE_REQUIRED)
             ->addOption('from', null, InputOption::VALUE_REQUIRED)
             ->addOption('to', null, InputOption::VALUE_REQUIRED)
+            ->addOption('all-active', null, InputOption::VALUE_NONE)
+            ->addOption('days-back', null, InputOption::VALUE_REQUIRED)
             ->addOption('dry-run', null, InputOption::VALUE_NONE)
             ->addOption('include-failed', null, InputOption::VALUE_NONE)
             ->addOption('include-rate-limited', null, InputOption::VALUE_NONE);
@@ -46,19 +50,40 @@ final class ReconcileMarketplaceAdsCommand extends Command
         $marketplace = (string) $input->getOption('marketplace');
         if ('ozon' !== strtolower($marketplace)) {
             $output->writeln('<error>Only --marketplace=ozon is supported.</error>');
+
             return self::INVALID;
         }
 
-        $companyId = (string) $input->getOption('company');
-        if ('' === trim($companyId)) {
+        $allActive = (bool) $input->getOption('all-active');
+        $companyIds = $allActive
+            ? $this->activeConnectionsQuery->getCompanyIds()
+            : [(string) $input->getOption('company')];
+
+        if (!$allActive && '' === trim($companyIds[0])) {
             $output->writeln('<error>Option --company is required.</error>');
+
             return self::INVALID;
         }
-        $from = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $input->getOption('from'));
-        $to = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $input->getOption('to'));
-        if (false === $from || false === $to || $from > $to) {
-            $output->writeln('<error>Invalid --from/--to range.</error>');
-            return self::INVALID;
+
+        $daysBackOption = $input->getOption('days-back');
+        if (null !== $daysBackOption && '' !== trim((string) $daysBackOption)) {
+            if (!is_numeric($daysBackOption) || (int) $daysBackOption < 1) {
+                $output->writeln('<error>Option --days-back must be a positive integer.</error>');
+
+                return self::INVALID;
+            }
+
+            $todayUtc = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->setTime(0, 0);
+            $from = $todayUtc->modify(sprintf('-%d days', (int) $daysBackOption));
+            $to = $todayUtc->modify('-1 day');
+        } else {
+            $from = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $input->getOption('from'));
+            $to = \DateTimeImmutable::createFromFormat('!Y-m-d', (string) $input->getOption('to'));
+            if (false === $from || false === $to || $from > $to) {
+                $output->writeln('<error>Invalid --from/--to range.</error>');
+
+                return self::INVALID;
+            }
         }
 
         $dryRun = (bool) $input->getOption('dry-run');
@@ -70,98 +95,105 @@ final class ReconcileMarketplaceAdsCommand extends Command
         $skipped = 0;
         $deferred = 0;
         $failed = 0;
-        $createdInThisRun = false;
-        $stopDispatchInThisRun = false;
-        for ($day = $from; $day <= $to; $day = $day->modify('+1 day')) {
-            try {
-                $active = $this->jobRepository->findActiveJobCoveringDate($companyId, MarketplaceType::OZON, $day);
-                if (null !== $active) {
-                    ++$deferred;
-                    $output->writeln(sprintf('%s deferred: active pipeline already running for this date', $day->format('Y-m-d')));
-                    continue;
-                }
 
-                $completed = $this->jobRepository->findCompletedJobCoveringDate($companyId, MarketplaceType::OZON, $day);
-                if (null !== $completed) {
-                    ++$skipped;
-                    $output->writeln(sprintf('%s skip: completed', $day->format('Y-m-d')));
-                    continue;
-                }
+        foreach ($companyIds as $companyId) {
+            $createdInThisRun = false;
+            $stopDispatchInThisRun = false;
+            $hasActiveCompanyJob = null !== $this->jobRepository->findLatestActiveJobByCompanyAndMarketplace(
+                $companyId,
+                MarketplaceType::OZON,
+            );
 
-                $latest = $this->jobRepository->findLatestJobCoveringDate($companyId, MarketplaceType::OZON, $day);
-                $shouldReload = false;
-                $reason = 'missing';
-                if (null === $latest) {
-                    $shouldReload = true;
-                } elseif (AdLoadJobStatus::COMPLETED === $latest->getStatus()) {
-                    $reason = 'completed';
-                } elseif (AdLoadJobStatus::PARTIAL_SUCCESS === $latest->getStatus()) {
-                    $reason = 'partial_success';
-                    $shouldReload = $includeFailed;
-                } elseif (AdLoadJobStatus::FAILED === $latest->getStatus()) {
-                    $failure = (string) $latest->getFailureReason();
-                    if (self::isRateLimitedFailure($failure)) {
-                        $reason = 'rate_limited';
-                        $shouldReload = $includeRateLimited || $includeFailed;
-                        $this->logger->warning('Reconcile: rate-limited day detected', [
+            for ($day = $from; $day <= $to; $day = $day->modify('+1 day')) {
+                try {
+                    $completed = $this->jobRepository->findCompletedJobCoveringDate($companyId, MarketplaceType::OZON, $day);
+                    if (null !== $completed) {
+                        ++$skipped;
+                        $output->writeln(sprintf('[%s] %s skip: completed', $companyId, $day->format('Y-m-d')));
+                        continue;
+                    }
+
+                    $latest = $this->jobRepository->findLatestJobCoveringDate($companyId, MarketplaceType::OZON, $day);
+                    $shouldReload = false;
+                    $reason = 'missing';
+                    if (null === $latest) {
+                        $shouldReload = true;
+                    } elseif (AdLoadJobStatus::COMPLETED === $latest->getStatus()) {
+                        $reason = 'completed';
+                    } elseif (AdLoadJobStatus::PARTIAL_SUCCESS === $latest->getStatus()) {
+                        $reason = 'partial_success';
+                        $shouldReload = $includeFailed;
+                    } elseif (AdLoadJobStatus::FAILED === $latest->getStatus()) {
+                        $failure = (string) $latest->getFailureReason();
+                        if (self::isRateLimitedFailure($failure)) {
+                            $reason = 'rate_limited';
+                            $shouldReload = $includeRateLimited || $includeFailed;
+                            $this->logger->warning('Reconcile: rate-limited day detected', [
+                                'companyId' => $companyId,
+                                'jobId' => $latest->getId(),
+                                'dateFrom' => $day->format('Y-m-d'),
+                                'dateTo' => $day->format('Y-m-d'),
+                            ]);
+                        } elseif (self::isPermanentFailure($failure)) {
+                            $reason = 'failed_permanent';
+                        } else {
+                            $reason = 'failed_transient';
+                            $shouldReload = $includeFailed;
+                        }
+                    } else {
+                        $reason = $latest->getStatus()->value;
+                    }
+
+                    $output->writeln(sprintf('[%s] %s %s: %s', $companyId, $day->format('Y-m-d'), $shouldReload ? 'reload' : 'skip', $reason));
+                    if ($shouldReload) {
+                        ++$wouldCreate;
+                        if ($hasActiveCompanyJob) {
+                            ++$deferred;
+                            $output->writeln(sprintf('[%s] %s deferred: active pipeline already running for company', $companyId, $day->format('Y-m-d')));
+
+                            continue;
+                        }
+                        if ($createdInThisRun || $stopDispatchInThisRun) {
+                            ++$deferred;
+                            $output->writeln(sprintf('[%s] %s deferred: active job was created in this run; will retry on next reconcile run', $companyId, $day->format('Y-m-d')));
+
+                            continue;
+                        }
+                        if ($dryRun) {
+                            continue;
+                        }
+                        ($this->dispatchOzonAdLoadAction)($companyId, $day, $day);
+                        $createdInThisRun = true;
+                        ++$created;
+                    } else {
+                        ++$skipped;
+                    }
+                } catch (\Throwable $e) {
+                    if ($this->isFreshRateLimitedDispatchError($e)) {
+                        $stopDispatchInThisRun = true;
+                        ++$deferred;
+                        $this->logger->warning('Reconcile: deferred due to fresh rate limit', [
                             'companyId' => $companyId,
-                            'jobId' => $latest->getId(),
                             'dateFrom' => $day->format('Y-m-d'),
                             'dateTo' => $day->format('Y-m-d'),
+                            'error' => $e->getMessage(),
+                            'exception' => $e::class,
                         ]);
-                    } elseif (self::isPermanentFailure($failure)) {
-                        $reason = 'failed_permanent';
-                    } else {
-                        $reason = 'failed_transient';
-                        $shouldReload = $includeFailed;
-                    }
-                } else {
-                    $reason = $latest->getStatus()->value;
-                }
-
-                $output->writeln(sprintf('%s %s: %s', $day->format('Y-m-d'), $shouldReload ? 'reload' : 'skip', $reason));
-                if ($shouldReload) {
-                    ++$wouldCreate;
-                    if ($createdInThisRun || $stopDispatchInThisRun) {
-                        ++$deferred;
-                        $output->writeln(sprintf('%s deferred: active job was created in this run; will retry on next reconcile run', $day->format('Y-m-d')));
+                        $output->writeln(sprintf('[%s] %s deferred: rate_limited', $companyId, $day->format('Y-m-d')));
 
                         continue;
                     }
-                    if ($dryRun) {
-                        continue;
-                    }
-                    ($this->dispatchOzonAdLoadAction)($companyId, $day, $day);
-                    $createdInThisRun = true;
-                    ++$created;
-                } else {
-                    ++$skipped;
-                }
-            } catch (\Throwable $e) {
-                if ($this->isFreshRateLimitedDispatchError($e)) {
-                    $stopDispatchInThisRun = true;
-                    ++$deferred;
-                    $this->logger->warning('Reconcile: deferred due to fresh rate limit', [
+
+                    ++$failed;
+                    $this->logger->error('Reconcile: failed to process day', [
                         'companyId' => $companyId,
                         'dateFrom' => $day->format('Y-m-d'),
                         'dateTo' => $day->format('Y-m-d'),
                         'error' => $e->getMessage(),
                         'exception' => $e::class,
                     ]);
-                    $output->writeln(sprintf('%s deferred: rate_limited', $day->format('Y-m-d')));
-
-                    continue;
+                    $output->writeln(sprintf('[%s] %s error: %s', $companyId, $day->format('Y-m-d'), $e->getMessage()));
                 }
-
-                ++$failed;
-                $this->logger->error('Reconcile: failed to process day', [
-                    'companyId' => $companyId,
-                    'dateFrom' => $day->format('Y-m-d'),
-                    'dateTo' => $day->format('Y-m-d'),
-                    'error' => $e->getMessage(),
-                    'exception' => $e::class,
-                ]);
-                $output->writeln(sprintf('%s error: %s', $day->format('Y-m-d'), $e->getMessage()));
             }
         }
 
