@@ -7,9 +7,13 @@ namespace App\MarketplaceAds\Command;
 use App\Marketplace\Enum\MarketplaceType;
 use App\MarketplaceAds\Application\DispatchOzonAdLoadActionInterface;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
+use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
+use App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
+use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
+use Doctrine\DBAL\Connection;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -23,6 +27,9 @@ final class ReconcileMarketplaceAdsCommand extends Command
 {
     public function __construct(
         private readonly AdLoadJobRepositoryInterface $jobRepository,
+        private readonly AdRawDocumentRepositoryInterface $rawDocumentRepository,
+        private readonly AdDocumentQueryInterface $adDocumentQuery,
+        private readonly Connection $connection,
         private readonly DispatchOzonAdLoadActionInterface $dispatchOzonAdLoadAction,
         private readonly ActiveOzonPerformanceConnectionsQuery $activeConnectionsQuery,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
@@ -42,7 +49,8 @@ final class ReconcileMarketplaceAdsCommand extends Command
             ->addOption('days-back', null, InputOption::VALUE_REQUIRED)
             ->addOption('dry-run', null, InputOption::VALUE_NONE)
             ->addOption('include-failed', null, InputOption::VALUE_NONE)
-            ->addOption('include-rate-limited', null, InputOption::VALUE_NONE);
+            ->addOption('include-rate-limited', null, InputOption::VALUE_NONE)
+            ->addOption('force-reload-existing-data', null, InputOption::VALUE_NONE);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -89,6 +97,7 @@ final class ReconcileMarketplaceAdsCommand extends Command
         $dryRun = (bool) $input->getOption('dry-run');
         $includeFailed = (bool) $input->getOption('include-failed');
         $includeRateLimited = (bool) $input->getOption('include-rate-limited');
+        $forceReloadExistingData = (bool) $input->getOption('force-reload-existing-data');
 
         $created = 0;
         $wouldCreate = 0;
@@ -114,6 +123,35 @@ final class ReconcileMarketplaceAdsCommand extends Command
                     }
 
                     $latest = $this->jobRepository->findLatestJobCoveringDate($companyId, MarketplaceType::OZON, $day);
+                    $rawCount = $this->rawDocumentRepository->countByCompanyMarketplaceAndDateRange(
+                        $companyId,
+                        MarketplaceType::OZON->value,
+                        $day,
+                        $day,
+                    );
+                    $failedRawCount = $this->rawDocumentRepository->countByCompanyMarketplaceAndDateRange(
+                        $companyId,
+                        MarketplaceType::OZON->value,
+                        $day,
+                        $day,
+                        AdRawDocumentStatus::FAILED,
+                    );
+                    $draftRawCount = $this->rawDocumentRepository->countByCompanyMarketplaceAndDateRange(
+                        $companyId,
+                        MarketplaceType::OZON->value,
+                        $day,
+                        $day,
+                        AdRawDocumentStatus::DRAFT,
+                    );
+                    $adDocumentsCount = (int) $this->connection->fetchOne(
+                        'SELECT COUNT(*) FROM marketplace_ad_documents WHERE company_id = :company_id AND marketplace = :marketplace AND report_date = :report_date',
+                        [
+                            'company_id' => $companyId,
+                            'marketplace' => MarketplaceType::OZON->value,
+                            'report_date' => $day->format('Y-m-d'),
+                        ],
+                    );
+                    $adSpend = $this->adDocumentQuery->sumTotalCostForPeriod($companyId, $day, $day, MarketplaceType::OZON->value);
                     $shouldReload = false;
                     $reason = 'missing';
                     if (null === $latest) {
@@ -144,7 +182,28 @@ final class ReconcileMarketplaceAdsCommand extends Command
                         $reason = $latest->getStatus()->value;
                     }
 
-                    $output->writeln(sprintf('[%s] %s %s: %s', $companyId, $day->format('Y-m-d'), $shouldReload ? 'reload' : 'skip', $reason));
+                    if ($shouldReload && !$forceReloadExistingData && ($rawCount > 0 || $adDocumentsCount > 0)) {
+                        $shouldReload = false;
+                        if ($failedRawCount > 0) {
+                            $reason = 'raw_failed_needs_attention';
+                        } elseif ($draftRawCount > 0) {
+                            $reason = 'raw_draft_needs_attention';
+                        } else {
+                            $reason = 'needs_attention_data_exists';
+                        }
+                    }
+                    $output->writeln(sprintf(
+                        '[%s] %s %s: %s raw_count=%d failed_raw_count=%d draft_raw_count=%d ad_documents_count=%d ad_spend=%s',
+                        $companyId,
+                        $day->format('Y-m-d'),
+                        $shouldReload ? 'reload' : 'skip',
+                        $reason,
+                        $rawCount,
+                        $failedRawCount,
+                        $draftRawCount,
+                        $adDocumentsCount,
+                        $adSpend,
+                    ));
                     if ($shouldReload) {
                         ++$wouldCreate;
                         if ($hasActiveCompanyJob) {

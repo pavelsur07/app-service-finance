@@ -14,6 +14,7 @@ use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\MessageHandler\FetchOzonAdStatisticsHandler;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Shared\Service\AppLogger;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
@@ -387,6 +388,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         $handler = new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $jobRepo,
+            $this->createMock(AdScheduledBatchRepositoryInterface::class),
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer,
@@ -717,6 +719,7 @@ final class FetchOzonAdStatisticsHandlerTest extends TestCase
         return new FetchOzonAdStatisticsHandler(
             $ozonClient,
             $jobRepo,
+            $this->createMock(AdScheduledBatchRepositoryInterface::class),
             $chunkProgressRepo,
             $pendingRepo,
             $finalizer ?? $this->createMock(AdLoadJobFinalizer::class),

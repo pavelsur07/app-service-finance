@@ -7,7 +7,7 @@ namespace App\Tests\Unit\MarketplaceAds\Command;
 use App\MarketplaceAds\Command\AdJobFinalizerCommand;
 use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
-use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -35,15 +35,15 @@ final class AdJobFinalizerCommandTest extends TestCase
 
     /** @var AdLoadJobRepositoryInterface&MockObject */
     private AdLoadJobRepositoryInterface $jobRepo;
-    /** @var AdScheduledBatchRepository&MockObject */
-    private AdScheduledBatchRepository $batchRepo;
+    /** @var AdScheduledBatchRepositoryInterface&MockObject */
+    private AdScheduledBatchRepositoryInterface $batchRepo;
 
     private AdJobFinalizerCommand $command;
 
     protected function setUp(): void
     {
         $this->jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
-        $this->batchRepo = $this->createMock(AdScheduledBatchRepository::class);
+        $this->batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
 
         $this->command = new AdJobFinalizerCommand(
             $this->jobRepo,
@@ -121,6 +121,10 @@ final class AdJobFinalizerCommandTest extends TestCase
             ->method('markCompleted')
             ->with(self::JOB_ID, self::COMPANY_ID)
             ->willReturn(1);
+        $this->batchRepo->expects(self::once())
+            ->method('abandonNonTerminalBatchesForTerminalJob')
+            ->with(self::JOB_ID, 'Abandoned because parent job became terminal: completed')
+            ->willReturn(0);
         $this->jobRepo->expects(self::never())->method('markFailed');
         $this->jobRepo->expects(self::never())->method('markPartialSuccess');
 
@@ -138,6 +142,10 @@ final class AdJobFinalizerCommandTest extends TestCase
             ->method('markFailed')
             ->with(self::JOB_ID, self::COMPANY_ID, 'All 3 batches failed')
             ->willReturn(1);
+        $this->batchRepo->expects(self::once())
+            ->method('abandonNonTerminalBatchesForTerminalJob')
+            ->with(self::JOB_ID, 'Abandoned because parent job became terminal: failed')
+            ->willReturn(0);
         $this->jobRepo->expects(self::never())->method('markCompleted');
         $this->jobRepo->expects(self::never())->method('markPartialSuccess');
 
@@ -157,6 +165,10 @@ final class AdJobFinalizerCommandTest extends TestCase
             ->method('markFailed')
             ->with(self::JOB_ID, self::COMPANY_ID, 'All 3 batches failed')
             ->willReturn(1);
+        $this->batchRepo->expects(self::once())
+            ->method('abandonNonTerminalBatchesForTerminalJob')
+            ->with(self::JOB_ID, 'Abandoned because parent job became terminal: failed')
+            ->willReturn(0);
         $this->jobRepo->expects(self::never())->method('markPartialSuccess');
 
         $tester = new CommandTester($this->command);
@@ -176,6 +188,10 @@ final class AdJobFinalizerCommandTest extends TestCase
             ->method('markPartialSuccess')
             ->with(self::JOB_ID, self::COMPANY_ID, '3 of 8 batches failed')
             ->willReturn(1);
+        $this->batchRepo->expects(self::once())
+            ->method('abandonNonTerminalBatchesForTerminalJob')
+            ->with(self::JOB_ID, 'Abandoned because parent job became terminal: partial_success')
+            ->willReturn(0);
         $this->jobRepo->expects(self::never())->method('markCompleted');
         $this->jobRepo->expects(self::never())->method('markFailed');
 

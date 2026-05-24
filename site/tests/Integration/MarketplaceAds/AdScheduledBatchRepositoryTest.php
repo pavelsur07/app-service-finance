@@ -274,6 +274,94 @@ final class AdScheduledBatchRepositoryTest extends IntegrationTestCase
         self::assertNull($picked, 'Батч со scheduled_at в будущем не должен выбираться (retry/backoff).');
     }
 
+    public function testAbandonNonTerminalBatchesForTerminalJobMarksPlannedAndInFlight(): void
+    {
+        $job = $this->seedJob();
+
+        $planned = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withState(AdScheduledBatchState::PLANNED)
+            ->build();
+        $inFlight = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(2)
+            ->withState(AdScheduledBatchState::IN_FLIGHT)
+            ->build();
+        $ok = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($job->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(3)
+            ->withState(AdScheduledBatchState::OK)
+            ->build();
+
+        $this->repository->save($planned);
+        $this->repository->save($inFlight);
+        $this->repository->save($ok);
+        $this->em->flush();
+        $this->em->clear();
+
+        $affected = $this->repository->abandonNonTerminalBatchesForTerminalJob(
+            $job->getId(),
+            'Abandoned because parent job became terminal: failed',
+        );
+        self::assertSame(2, $affected);
+
+        $rows = $this->em->getConnection()->fetchAllAssociative(
+            'SELECT state, last_error FROM marketplace_ad_scheduled_batches WHERE job_id = :job ORDER BY batch_index ASC',
+            ['job' => $job->getId()],
+        );
+        self::assertSame('ABANDONED', $rows[0]['state']);
+        self::assertSame('ABANDONED', $rows[1]['state']);
+        self::assertSame('OK', $rows[2]['state']);
+        self::assertStringContainsString('parent job became terminal: failed', (string) $rows[0]['last_error']);
+        self::assertStringContainsString('parent job became terminal: failed', (string) $rows[1]['last_error']);
+    }
+
+    public function testFindAllInFlightSkipsTerminalParentJob(): void
+    {
+        $terminalJob = $this->seedJob();
+        $terminalJob->markRunning();
+        $terminalJob->markFailed('x');
+        $this->em->flush();
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($terminalJob->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withState(AdScheduledBatchState::IN_FLIGHT)
+            ->build();
+        $this->repository->save($batch);
+        $this->em->flush();
+        $this->em->clear();
+
+        $result = $this->repository->findAllInFlight();
+        self::assertSame([], $result);
+    }
+
+    public function testFindAllInFlightReturnsBatchesForActiveParentJob(): void
+    {
+        $activeJob = $this->seedJob();
+        $activeJob->markRunning();
+        $this->em->flush();
+
+        $batch = AdScheduledBatchBuilder::aBatch()
+            ->withJobId($activeJob->getId())
+            ->withCompanyId(self::COMPANY_ID)
+            ->withIndex(1)
+            ->withState(AdScheduledBatchState::IN_FLIGHT)
+            ->build();
+        $this->repository->save($batch);
+        $this->em->flush();
+        $this->em->clear();
+
+        $result = $this->repository->findAllInFlight();
+        self::assertCount(1, $result);
+        self::assertSame($batch->getId(), $result[0]->getId());
+    }
+
     public function testFindNextPlannedPicksDueBatchEvenIfAnotherIsFurtherInFuture(): void
     {
         $job = $this->seedJob();

@@ -12,6 +12,7 @@ use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Shared\Service\AppLogger;
 use Psr\Log\LoggerInterface;
@@ -78,6 +79,7 @@ final class FetchOzonAdStatisticsHandler
     public function __construct(
         private readonly OzonAdClient $ozonAdClient,
         private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdScheduledBatchRepositoryInterface $adScheduledBatchRepository,
         private readonly AdChunkProgressRepositoryInterface $adChunkProgressRepository,
         private readonly OzonAdPendingReportRepository $pendingReportRepo,
         private readonly AdLoadJobFinalizer $finalizer,
@@ -127,11 +129,17 @@ final class FetchOzonAdStatisticsHandler
             || $dateFrom->format('Y-m-d') !== $message->dateFrom
             || $dateTo->format('Y-m-d') !== $message->dateTo
         ) {
-            $this->adLoadJobRepository->markFailed(
+            $affected = $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
                 sprintf('Invalid date format in message: from=%s, to=%s', $message->dateFrom, $message->dateTo),
             );
+            if ($affected > 0) {
+                $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                    $message->jobId,
+                    'Abandoned because parent job became terminal: failed',
+                );
+            }
 
             throw new UnrecoverableMessageHandlingException(sprintf(
                 'FetchOzonAdStatisticsMessage: invalid date format (from=%s, to=%s)',
@@ -153,11 +161,17 @@ final class FetchOzonAdStatisticsHandler
         } catch (\InvalidArgumentException $e) {
             // Диапазон > 62 дней или from > to — баг вызывающего кода,
             // ретраить бессмысленно.
-            $this->adLoadJobRepository->markFailed(
+            $affected = $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
                 'Invalid date range: '.$e->getMessage(),
             );
+            if ($affected > 0) {
+                $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                    $message->jobId,
+                    'Abandoned because parent job became terminal: failed',
+                );
+            }
 
             throw new UnrecoverableMessageHandlingException(
                 'FetchOzonAdStatisticsMessage: invalid date range — '.$e->getMessage(),
@@ -172,11 +186,17 @@ final class FetchOzonAdStatisticsHandler
             // в REQUESTED до next_poll_at и генерили бы лишние HTTP-запросы.
             $this->abandonInFlightForJob($message->companyId, $message->jobId, $e);
 
-            $this->adLoadJobRepository->markFailed(
+            $affected = $this->adLoadJobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
                 'Ozon API permanent failure: '.$e->getMessage(),
             );
+            if ($affected > 0) {
+                $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                    $message->jobId,
+                    'Abandoned because parent job became terminal: failed',
+                );
+            }
 
             throw new UnrecoverableMessageHandlingException(
                 'FetchOzonAdStatisticsMessage: Ozon permanent failure — '.$e->getMessage(),

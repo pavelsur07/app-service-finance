@@ -10,6 +10,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\MessageHandler\RequestOzonAdBatchHandler;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use PHPUnit\Framework\TestCase;
@@ -539,6 +540,7 @@ final class RequestOzonAdBatchHandlerTest extends TestCase
 
         return new RequestOzonAdBatchHandler(
             $jobRepo,
+            $this->createMock(AdScheduledBatchRepositoryInterface::class),
             $ozonClient,
             $pendingRepo,
             $bus,

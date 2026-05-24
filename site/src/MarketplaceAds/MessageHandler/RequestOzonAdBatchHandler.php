@@ -9,6 +9,7 @@ use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient;
 use App\MarketplaceAds\Infrastructure\Api\Ozon\OzonPermanentApiException;
 use App\MarketplaceAds\Message\RequestOzonAdBatchMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\MarketplaceAds\Repository\OzonAdPendingReportRepository;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
@@ -99,6 +100,7 @@ final class RequestOzonAdBatchHandler
 
     public function __construct(
         private readonly AdLoadJobRepository $jobRepository,
+        private readonly AdScheduledBatchRepositoryInterface $adScheduledBatchRepository,
         private readonly OzonAdClient $ozonAdClient,
         private readonly OzonAdPendingReportRepository $pendingReportRepo,
         private readonly MessageBusInterface $messageBus,
@@ -206,11 +208,17 @@ final class RequestOzonAdBatchHandler
                 'error' => $e->getMessage(),
             ]);
 
-            $this->jobRepository->markFailed(
+            $affected = $this->jobRepository->markFailed(
                 $message->jobId,
                 $message->companyId,
                 'Ozon Performance: '.$e->getMessage(),
             );
+            if ($affected > 0) {
+                $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                    $message->jobId,
+                    'Abandoned because parent job became terminal: failed',
+                );
+            }
 
             throw new UnrecoverableMessageHandlingException(
                 'RequestOzonAdBatchMessage: Ozon permanent failure — '.$e->getMessage(),
@@ -236,11 +244,17 @@ final class RequestOzonAdBatchHandler
                     'attempts' => $message->rateLimitAttempts,
                 ]);
 
-                $this->jobRepository->markFailed(
+                $affected = $this->jobRepository->markFailed(
                     $message->jobId,
                     $message->companyId,
                     sprintf('Ozon Performance: rate-limited >%d attempts — aborting batch', self::MAX_RATE_LIMIT_ATTEMPTS),
                 );
+                if ($affected > 0) {
+                    $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                        $message->jobId,
+                        'Abandoned because parent job became terminal: failed',
+                    );
+                }
 
                 throw new UnrecoverableMessageHandlingException(
                     'RequestOzonAdBatchMessage: Ozon rate limit exhausted',

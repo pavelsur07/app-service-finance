@@ -33,17 +33,6 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final class DispatchOzonAdLoadAction implements DispatchOzonAdLoadActionInterface
 {
-    /**
-     * Ozon Performance API лимит — максимум 62 дня в POST `/statistics`
-     * (см. {@see \App\MarketplaceAds\Infrastructure\Api\Ozon\OzonAdClient::assertValidRange()}).
-     *
-     * Planner не разбивает период на чанки по датам (в отличие от старого
-     * `LoadOzonAdStatisticsRangeHandler`), поэтому reject'им период >62 дней
-     * сразу с понятной ошибкой. Multi-chunk поддержка — отдельная follow-up
-     * задача; пока пользователь обязан разбить вручную.
-     */
-    private const MAX_DAYS_PER_LOAD = 62;
-
     public function __construct(
         private readonly MarketplaceFacade $marketplaceFacade,
         private readonly AdLoadJobRepository $adLoadJobRepository,
@@ -81,13 +70,8 @@ final class DispatchOzonAdLoadAction implements DispatchOzonAdLoadActionInterfac
             throw new \DomainException('Нельзя загружать данные за будущие даты. Дата окончания должна быть не позже вчерашнего дня.');
         }
 
-        $days = (int) $dateFromNorm->diff($dateToNorm)->days + 1;
-        if ($days > self::MAX_DAYS_PER_LOAD) {
-            throw new \DomainException(sprintf(
-                'Период %d дней превышает лимит Ozon Performance API (%d дней). Разбейте период на несколько загрузок.',
-                $days,
-                self::MAX_DAYS_PER_LOAD,
-            ));
+        if ($dateFromNorm != $dateToNorm) {
+            throw new \DomainException('Загрузка рекламных расходов Ozon сейчас поддерживает только один день. Для периода используйте восстановление пропусков.');
         }
 
         $activeJob = $this->adLoadJobRepository->findLatestActiveJobByCompanyAndMarketplace(

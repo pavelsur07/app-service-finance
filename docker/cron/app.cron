@@ -28,7 +28,7 @@
 # Reconcile missed Ozon Performance ad spend days.
 # Runs after daily ads sync window. Creates at most one recovery job per company per run.
 # Covers transient 429/API failures and restores missing/failed days safely.
-10,40 6-23 * * * php bin/console app:marketplace-ads:reconcile --marketplace=ozon --all-active --days-back=14 --include-failed --include-rate-limited --no-interaction --quiet
+10,40 6-23 * * * php bin/console app:marketplace-ads:reconcile --marketplace=ozon --all-active --days-back=14 --include-rate-limited --no-interaction --quiet
 
 # Poll Ozon Performance reports (async-poll redesign, step 5)
 # Picks up pending reports in REQUESTED state, transitions state via
@@ -77,5 +77,4 @@
 
 # Ежедневно в 03:00: чистка логов/временных таблиц
 #0 3 * * * php /app/bin/console app:maintenance:cleanup --env=prod
-
 
