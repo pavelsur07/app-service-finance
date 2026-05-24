@@ -22,7 +22,7 @@ use Webmozart\Assert\Assert;
  * не мешают друг другу (скипают уже захваченные строки), один тик гарантированно
  * обслуживает не более одного батча на worker'а.
  */
-final class AdScheduledBatchRepository extends ServiceEntityRepository
+final class AdScheduledBatchRepository extends ServiceEntityRepository implements AdScheduledBatchRepositoryInterface
 {
     public function __construct(ManagerRegistry $registry)
     {
@@ -61,6 +61,7 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
         $sql = sprintf(
             'SELECT %s FROM marketplace_ad_scheduled_batches b '
             . 'WHERE b.state = :state '
+            . "  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
             . '  AND b.scheduled_at <= NOW() '
             . 'ORDER BY b.scheduled_at ASC, b.batch_index ASC '
             . 'LIMIT 1 FOR UPDATE SKIP LOCKED',
@@ -88,13 +89,22 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
      */
     public function findAllInFlight(): array
     {
+        $rsm = new ResultSetMappingBuilder($this->getEntityManager());
+        $rsm->addRootEntityFromClassMetadata(AdScheduledBatch::class, 'b');
+
+        $sql = sprintf(
+            'SELECT %s FROM marketplace_ad_scheduled_batches b '
+            . 'WHERE b.state = :state '
+            . "  AND EXISTS (SELECT 1 FROM marketplace_ad_load_jobs j WHERE j.id = b.job_id AND j.status IN ('pending','running')) "
+            . 'ORDER BY b.started_at ASC NULLS LAST',
+            $rsm->generateSelectClause(['b' => 'b']),
+        );
+
+        $query = $this->getEntityManager()->createNativeQuery($sql, $rsm);
+        $query->setParameter('state', AdScheduledBatchState::IN_FLIGHT->value);
+
         /** @var list<AdScheduledBatch> $result */
-        $result = $this->createQueryBuilder('b')
-            ->where('b.state = :state')
-            ->setParameter('state', AdScheduledBatchState::IN_FLIGHT)
-            ->orderBy('b.startedAt', 'ASC')
-            ->getQuery()
-            ->getResult();
+        $result = $query->getResult();
 
         return $result;
     }
@@ -230,5 +240,35 @@ final class AdScheduledBatchRepository extends ServiceEntityRepository
             ->getResult();
 
         return $result;
+    }
+
+    /**
+     * Переводит все non-terminal батчи job'а (PLANNED / IN_FLIGHT / REQUESTED)
+     * в ABANDONED после терминализации parent job.
+     *
+     * Идемпотентно: повторный вызов не трогает уже терминальные записи.
+     *
+     * @return int число обновлённых батчей
+     */
+    public function abandonNonTerminalBatchesForTerminalJob(string $jobId, string $reason): int
+    {
+        Assert::uuid($jobId);
+        Assert::notEmpty($reason);
+
+        return (int) $this->getEntityManager()->getConnection()->executeStatement(
+            <<<'SQL'
+                UPDATE marketplace_ad_scheduled_batches
+                SET state = 'ABANDONED',
+                    last_error = :reason,
+                    finished_at = NOW(),
+                    updated_at = NOW()
+                WHERE job_id = :job_id
+                  AND state IN ('PLANNED', 'IN_FLIGHT', 'REQUESTED')
+                SQL,
+            [
+                'job_id' => $jobId,
+                'reason' => $reason,
+            ],
+        );
     }
 }

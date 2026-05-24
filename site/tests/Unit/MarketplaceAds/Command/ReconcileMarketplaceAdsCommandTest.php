@@ -11,7 +11,10 @@ use App\MarketplaceAds\Entity\AdLoadJob;
 use App\MarketplaceAds\Enum\AdLoadJobStatus;
 use App\MarketplaceAds\Exception\OzonRateLimitException;
 use App\MarketplaceAds\Infrastructure\Query\ActiveOzonPerformanceConnectionsQuery;
+use App\MarketplaceAds\Infrastructure\Query\AdDocumentQueryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
+use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
+use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Command\Command;
@@ -84,6 +87,84 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         self::assertStringContainsString('reload: failed_transient', $tester->getDisplay());
     }
 
+    public function testFailedJobWithExistingRawDataNeedsAttentionAndNoDispatch(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'HTTP 500'));
+
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::never())->method('__invoke');
+
+        $rawRepo = $this->createMock(AdRawDocumentRepositoryInterface::class);
+        $rawRepo->method('countByCompanyMarketplaceAndDateRange')->willReturnCallback(
+            static fn (string $companyId, string $marketplace, \DateTimeImmutable $from, \DateTimeImmutable $to, ?\App\MarketplaceAds\Enum\AdRawDocumentStatus $statusFilter = null): int => match ($statusFilter) {
+                \App\MarketplaceAds\Enum\AdRawDocumentStatus::FAILED => 1,
+                \App\MarketplaceAds\Enum\AdRawDocumentStatus::DRAFT => 0,
+                default => 1,
+            }
+        );
+        $adQuery = $this->createMock(AdDocumentQueryInterface::class);
+        $adQuery->method('sumTotalCostForPeriod')->willReturn('0');
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(0);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery(), $rawRepo, $adQuery, $connection);
+        $tester = new CommandTester($command);
+        $tester->execute(['--company' => self::COMPANY_ID, '--from' => '2026-04-01', '--to' => '2026-04-01', '--include-failed' => true]);
+
+        self::assertStringContainsString('raw_failed_needs_attention', $tester->getDisplay());
+    }
+
+    public function testFailedJobWithExistingAdDocumentsNeedsAttentionAndNoDispatch(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'HTTP 500'));
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::never())->method('__invoke');
+
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(3);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery(), connection: $connection);
+        $tester = new CommandTester($command);
+        $tester->execute(['--company' => self::COMPANY_ID, '--from' => '2026-04-01', '--to' => '2026-04-01', '--include-failed' => true]);
+
+        self::assertStringContainsString('needs_attention_data_exists', $tester->getDisplay());
+    }
+
+    public function testForceReloadExistingDataAllowsDispatch(): void
+    {
+        $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
+        $repo->method('findLatestActiveJobByCompanyAndMarketplace')->willReturn(null);
+        $repo->method('findCompletedJobCoveringDate')->willReturn(null);
+        $repo->method('findLatestJobCoveringDate')->willReturn($this->job(AdLoadJobStatus::FAILED, 'HTTP 500'));
+        $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
+        $dispatch->expects(self::once())->method('__invoke');
+
+        $rawRepo = $this->createMock(AdRawDocumentRepositoryInterface::class);
+        $rawRepo->method('countByCompanyMarketplaceAndDateRange')->willReturn(2);
+        $connection = $this->createMock(Connection::class);
+        $connection->method('fetchOne')->willReturn(2);
+
+        $logger = $this->createMock(LoggerInterface::class);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery(), $rawRepo, connection: $connection);
+        $tester = new CommandTester($command);
+        $tester->execute([
+            '--company' => self::COMPANY_ID,
+            '--from' => '2026-04-01',
+            '--to' => '2026-04-01',
+            '--include-failed' => true,
+            '--force-reload-existing-data' => true,
+        ]);
+        self::assertStringContainsString('reload: failed_transient', $tester->getDisplay());
+    }
+
     public function testRecognizes429AsRateLimited(): void
     {
         $repo = $this->createMock(AdLoadJobRepositoryInterface::class);
@@ -97,7 +178,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::once())->method('warning');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery());
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -235,7 +316,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger->expects(self::once())->method('warning');
         $logger->expects(self::never())->method('error');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery());
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -269,7 +350,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger->expects(self::atLeastOnce())->method('warning');
         $logger->expects(self::never())->method('error');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery());
         $tester = new CommandTester($command);
         $code = $tester->execute([
             '--company' => self::COMPANY_ID,
@@ -380,7 +461,7 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $logger = $this->createMock(LoggerInterface::class);
         $logger->expects(self::never())->method('error');
 
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $this->emptyConnectionsQuery(), $logger);
+        $command = $this->createCommand($repo, $dispatch, $logger, $this->emptyConnectionsQuery());
         $tester = new CommandTester($command);
         $code = $tester->execute(['--company' => self::COMPANY_ID, '--from' => '2026-04-01', '--to' => '2026-04-01']);
 
@@ -391,9 +472,46 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
     private function tester(AdLoadJobRepositoryInterface $repo, DispatchOzonAdLoadActionInterface $dispatch, ?ActiveOzonPerformanceConnectionsQuery $query = null): CommandTester
     {
         $logger = $this->createMock(LoggerInterface::class);
-        $command = new ReconcileMarketplaceAdsCommand($repo, $dispatch, $query ?? $this->emptyConnectionsQuery(), $logger);
+        $command = $this->createCommand($repo, $dispatch, $logger, $query ?? $this->emptyConnectionsQuery());
 
         return new CommandTester($command);
+    }
+
+    private function createCommand(
+        AdLoadJobRepositoryInterface $repo,
+        DispatchOzonAdLoadActionInterface $dispatch,
+        LoggerInterface $logger,
+        ActiveOzonPerformanceConnectionsQuery $query,
+        ?AdRawDocumentRepositoryInterface $rawRepo = null,
+        ?AdDocumentQueryInterface $adDocumentQuery = null,
+        ?Connection $connection = null,
+    ): ReconcileMarketplaceAdsCommand {
+        if (null === $rawRepo) {
+            $rawRepo = $this->createMock(AdRawDocumentRepositoryInterface::class);
+            $rawRepo->method('countByCompanyMarketplaceAndDateRange')->willReturnCallback(
+                static fn (string $companyId, string $marketplace, \DateTimeImmutable $from, \DateTimeImmutable $to, ?\App\MarketplaceAds\Enum\AdRawDocumentStatus $statusFilter = null): int => 0
+            );
+        }
+
+        if (null === $adDocumentQuery) {
+            $adDocumentQuery = $this->createMock(AdDocumentQueryInterface::class);
+            $adDocumentQuery->method('sumTotalCostForPeriod')->willReturn('0');
+        }
+
+        if (null === $connection) {
+            $connection = $this->createMock(Connection::class);
+            $connection->method('fetchOne')->willReturn(0);
+        }
+
+        return new ReconcileMarketplaceAdsCommand(
+            $repo,
+            $rawRepo,
+            $adDocumentQuery,
+            $connection,
+            $dispatch,
+            $query,
+            $logger,
+        );
     }
 
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAds\Command;
 
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
-use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -51,7 +51,7 @@ final class AdJobFinalizerCommand extends Command
 
     public function __construct(
         private readonly AdLoadJobRepositoryInterface $jobRepository,
-        private readonly AdScheduledBatchRepository $batchRepository,
+        private readonly AdScheduledBatchRepositoryInterface $batchRepository,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $logger,
     ) {
@@ -145,18 +145,25 @@ final class AdJobFinalizerCommand extends Command
 
         if ($ok === $total) {
             // Все batch'и OK — full success.
-            $this->jobRepository->markCompleted($jobId, $companyId);
+            $affected = $this->jobRepository->markCompleted($jobId, $companyId);
             $resolvedStatus = 'completed';
         } elseif (0 === $ok) {
             // Ни одного OK — full failure.
             $reason = sprintf('All %d batches failed', $failedTotal);
-            $this->jobRepository->markFailed($jobId, $companyId, $reason);
+            $affected = $this->jobRepository->markFailed($jobId, $companyId, $reason);
             $resolvedStatus = 'failed';
         } else {
             // Микс — partial success.
             $reason = sprintf('%d of %d batches failed', $failedTotal, $total);
-            $this->jobRepository->markPartialSuccess($jobId, $companyId, $reason);
+            $affected = $this->jobRepository->markPartialSuccess($jobId, $companyId, $reason);
             $resolvedStatus = 'partial_success';
+        }
+
+        if (($affected ?? 0) > 0) {
+            $this->batchRepository->abandonNonTerminalBatchesForTerminalJob(
+                $jobId,
+                sprintf('Abandoned because parent job became terminal: %s', $resolvedStatus),
+            );
         }
 
         $this->logger->info('Finalizer: job finalized', [

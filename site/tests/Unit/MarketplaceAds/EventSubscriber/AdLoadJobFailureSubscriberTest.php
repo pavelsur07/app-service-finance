@@ -8,6 +8,7 @@ use App\MarketplaceAds\EventSubscriber\AdLoadJobFailureSubscriber;
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Message\ProcessAdRawDocumentMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Messenger\Envelope;
@@ -48,7 +49,8 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
 
         self::assertTrue($event->willRetry(), 'sanity: событие помечено для ретрая');
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 
     public function testNonFetchMessageIsIgnored(): void
@@ -67,7 +69,8 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
 
         self::assertFalse($event->willRetry());
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 
     public function testExhaustedRetriesMarkJobAsFailed(): void
@@ -108,7 +111,9 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
 
         self::assertFalse($event->willRetry());
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        $batchRepo->expects(self::once())->method('abandonNonTerminalBatchesForTerminalJob');
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 
     public function testHandlerFailedExceptionUnwrapsToPrevious(): void
@@ -148,7 +153,9 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
 
         $event = new WorkerMessageFailedEvent($envelope, 'async_ads', $wrapper);
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        $batchRepo->expects(self::once())->method('abandonNonTerminalBatchesForTerminalJob');
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 
     public function testReasonTruncationKeepsUtf8Valid(): void
@@ -180,7 +187,9 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
         ));
         $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException($longMessage));
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        $batchRepo->expects(self::once())->method('abandonNonTerminalBatchesForTerminalJob');
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 
     public function testReasonIsTruncatedTo1000Chars(): void
@@ -209,6 +218,8 @@ final class AdLoadJobFailureSubscriberTest extends TestCase
         ));
         $event = new WorkerMessageFailedEvent($envelope, 'async_ads', new \RuntimeException($longMessage));
 
-        (new AdLoadJobFailureSubscriber($repo, $logger))->onMessageFailed($event);
+        $batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
+        $batchRepo->expects(self::once())->method('abandonNonTerminalBatchesForTerminalJob');
+        (new AdLoadJobFailureSubscriber($repo, $batchRepo, $logger))->onMessageFailed($event);
     }
 }

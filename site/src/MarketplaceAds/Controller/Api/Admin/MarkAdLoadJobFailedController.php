@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\Controller\Api\Admin;
 
 use App\Company\Entity\User;
 use App\MarketplaceAds\Repository\AdLoadJobRepository;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepository;
 use App\Shared\Service\ActiveCompanyService;
 use Psr\Log\LoggerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -29,6 +30,7 @@ final class MarkAdLoadJobFailedController extends AbstractController
     public function __construct(
         private readonly ActiveCompanyService $activeCompanyService,
         private readonly AdLoadJobRepository $adLoadJobRepository,
+        private readonly AdScheduledBatchRepository $adScheduledBatchRepository,
         private readonly Security $security,
         private readonly LoggerInterface $logger,
     ) {}
@@ -53,6 +55,11 @@ final class MarkAdLoadJobFailedController extends AbstractController
         if (0 === $affected) {
             return $this->json(['error' => 'Job not found or already finalized'], 404);
         }
+
+        $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+            $jobId,
+            'Abandoned because parent job became terminal: failed',
+        );
 
         $user = $this->security->getUser();
         $this->logger->warning('AdLoadJob manually marked as failed', [

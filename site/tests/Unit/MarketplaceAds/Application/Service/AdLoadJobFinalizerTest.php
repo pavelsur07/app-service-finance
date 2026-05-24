@@ -10,6 +10,7 @@ use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use App\Tests\Builders\MarketplaceAds\AdLoadJobBuilder;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
@@ -38,6 +39,8 @@ final class AdLoadJobFinalizerTest extends TestCase
     private AdRawDocumentRepositoryInterface $rawDocRepo;
     /** @var AdChunkProgressRepositoryInterface&MockObject */
     private AdChunkProgressRepositoryInterface $chunkRepo;
+    /** @var AdScheduledBatchRepositoryInterface&MockObject */
+    private AdScheduledBatchRepositoryInterface $batchRepo;
     private AdLoadJobFinalizer $finalizer;
 
     protected function setUp(): void
@@ -45,11 +48,13 @@ final class AdLoadJobFinalizerTest extends TestCase
         $this->jobRepo = $this->createMock(AdLoadJobRepositoryInterface::class);
         $this->rawDocRepo = $this->createMock(AdRawDocumentRepositoryInterface::class);
         $this->chunkRepo = $this->createMock(AdChunkProgressRepositoryInterface::class);
+        $this->batchRepo = $this->createMock(AdScheduledBatchRepositoryInterface::class);
 
         $this->finalizer = new AdLoadJobFinalizer(
             $this->jobRepo,
             $this->rawDocRepo,
             $this->chunkRepo,
+            $this->batchRepo,
             new NullLogger(),
         );
     }

@@ -6,6 +6,7 @@ namespace App\MarketplaceAds\EventSubscriber;
 
 use App\MarketplaceAds\Message\FetchOzonAdStatisticsMessage;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -30,6 +31,7 @@ final class AdLoadJobFailureSubscriber implements EventSubscriberInterface
 
     public function __construct(
         private readonly AdLoadJobRepositoryInterface $adLoadJobRepository,
+        private readonly AdScheduledBatchRepositoryInterface $adScheduledBatchRepository,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private readonly LoggerInterface $marketplaceAdsLogger,
     ) {
@@ -63,7 +65,13 @@ final class AdLoadJobFailureSubscriber implements EventSubscriberInterface
             $reason = mb_substr($reason, 0, self::REASON_MAX_LENGTH, 'UTF-8');
         }
 
-        $this->adLoadJobRepository->markFailed($message->jobId, $message->companyId, $reason);
+        $affected = $this->adLoadJobRepository->markFailed($message->jobId, $message->companyId, $reason);
+        if ($affected > 0) {
+            $this->adScheduledBatchRepository->abandonNonTerminalBatchesForTerminalJob(
+                $message->jobId,
+                'Abandoned because parent job became terminal: failed',
+            );
+        }
 
         $this->marketplaceAdsLogger->warning('AdLoadJob marked as failed after retries exhausted', [
             'job_id' => $message->jobId,

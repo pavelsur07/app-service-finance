@@ -9,6 +9,7 @@ use App\MarketplaceAds\Enum\AdRawDocumentStatus;
 use App\MarketplaceAds\Repository\AdChunkProgressRepositoryInterface;
 use App\MarketplaceAds\Repository\AdLoadJobRepositoryInterface;
 use App\MarketplaceAds\Repository\AdRawDocumentRepositoryInterface;
+use App\MarketplaceAds\Repository\AdScheduledBatchRepositoryInterface;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -32,6 +33,7 @@ final readonly class AdLoadJobFinalizer
         private AdLoadJobRepositoryInterface $jobRepository,
         private AdRawDocumentRepositoryInterface $documentRepository,
         private AdChunkProgressRepositoryInterface $chunkProgressRepository,
+        private AdScheduledBatchRepositoryInterface $batchRepository,
         #[Autowire(service: 'monolog.logger.marketplace_ads')]
         private LoggerInterface $marketplaceAdsLogger,
     ) {
@@ -87,6 +89,10 @@ final readonly class AdLoadJobFinalizer
         if (0 === $failedDocs) {
             $affected = $this->jobRepository->markCompleted($jobId, $companyId);
             if ($affected > 0) {
+                $this->batchRepository->abandonNonTerminalBatchesForTerminalJob(
+                    $jobId,
+                    'Abandoned because parent job became terminal: completed',
+                );
                 $this->marketplaceAdsLogger->info('AdLoadJob completed', [
                     'jobId' => $jobId,
                     'companyId' => $companyId,
@@ -100,6 +106,10 @@ final readonly class AdLoadJobFinalizer
         $reason = sprintf('Partial failure: %d of %d documents failed', $failedDocs, $totalDocs);
         $affected = $this->jobRepository->markFailed($jobId, $companyId, $reason);
         if ($affected > 0) {
+            $this->batchRepository->abandonNonTerminalBatchesForTerminalJob(
+                $jobId,
+                'Abandoned because parent job became terminal: failed',
+            );
             $this->marketplaceAdsLogger->warning('AdLoadJob finalized with failures', [
                 'jobId' => $jobId,
                 'companyId' => $companyId,

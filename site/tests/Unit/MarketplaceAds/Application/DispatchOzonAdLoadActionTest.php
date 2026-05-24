@@ -77,7 +77,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
             ->willReturn(3);
 
         $dateFrom = new \DateTimeImmutable('2026-03-01');
-        $dateTo = new \DateTimeImmutable('2026-03-10');
+        $dateTo = new \DateTimeImmutable('2026-03-01');
 
         $job = ($this->action)(self::COMPANY_ID, $dateFrom, $dateTo);
 
@@ -101,7 +101,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         ($this->action)(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
-            new \DateTimeImmutable('2026-03-10'),
+            new \DateTimeImmutable('2026-03-01'),
         );
     }
 
@@ -123,6 +123,24 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         );
     }
 
+    public function testThrowsWhenMultiDayRangeRequested(): void
+    {
+        $this->marketplaceFacade
+            ->method('getConnectionCredentials')
+            ->willReturn(['api_key' => 'key', 'client_id' => null]);
+
+        $this->adBatchPlanner->expects(self::never())->method('planBatchesForJob');
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Загрузка рекламных расходов Ozon сейчас поддерживает только один день. Для периода используйте восстановление пропусков.');
+
+        ($this->action)(
+            self::COMPANY_ID,
+            new \DateTimeImmutable('2026-03-01'),
+            new \DateTimeImmutable('2026-03-02'),
+        );
+    }
+
     public function testThrowsWhenDateToIsInFuture(): void
     {
         $this->marketplaceFacade
@@ -138,26 +156,6 @@ final class DispatchOzonAdLoadActionTest extends TestCase
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-01-01'),
             new \DateTimeImmutable('+7 days'),
-        );
-    }
-
-    public function testThrowsWhenPeriodExceeds62Days(): void
-    {
-        $this->marketplaceFacade
-            ->method('getConnectionCredentials')
-            ->willReturn(['api_key' => 'key', 'client_id' => null]);
-
-        $this->adBatchPlanner->expects(self::never())->method('planBatchesForJob');
-
-        $this->expectException(\DomainException::class);
-        $this->expectExceptionMessageMatches('/превышает лимит Ozon.*62 дней/');
-
-        // 63 дня включительно (дата окончания заведомо в прошлом, чтобы не споткнуться
-        // о «future»-guard).
-        ($this->action)(
-            self::COMPANY_ID,
-            new \DateTimeImmutable('2026-01-01'),
-            new \DateTimeImmutable('2026-03-04'),
         );
     }
 
@@ -186,7 +184,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         ($this->action)(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
-            new \DateTimeImmutable('2026-03-10'),
+            new \DateTimeImmutable('2026-03-01'),
         );
     }
 
@@ -215,7 +213,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         ($this->action)(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
-            new \DateTimeImmutable('2026-03-10'),
+            new \DateTimeImmutable('2026-03-01'),
         );
     }
 
@@ -237,7 +235,7 @@ final class DispatchOzonAdLoadActionTest extends TestCase
         ($this->action)(
             self::COMPANY_ID,
             new \DateTimeImmutable('2026-03-01'),
-            new \DateTimeImmutable('2026-03-10'),
+            new \DateTimeImmutable('2026-03-01'),
         );
     }
 }
