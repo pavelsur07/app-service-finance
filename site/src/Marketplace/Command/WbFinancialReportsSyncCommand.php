@@ -44,7 +44,7 @@ final class WbFinancialReportsSyncCommand extends Command
             ->addOption('from', null, InputOption::VALUE_OPTIONAL, 'Начало диапазона (Y-m-d)')
             ->addOption('to', null, InputOption::VALUE_OPTIONAL, 'Конец диапазона (Y-m-d)')
             ->addOption('force', null, InputOption::VALUE_NONE)
-            ->addOption('max-days', null, InputOption::VALUE_OPTIONAL, 'Лимит missing-задач на connection', '10');
+            ->addOption('max-days', null, InputOption::VALUE_OPTIONAL, 'Лимит задач refresh14/missing на connection', '1');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -126,8 +126,9 @@ final class WbFinancialReportsSyncCommand extends Command
                 ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::INITIAL, $companyId, $connectionId, $force)
                 : $this->planner->planInitial($companyId, $connectionId),
             'refresh14' => null !== $from
+                // Explicit --from/--to is treated as manual force refresh mode; --max-days applies only to automatic refresh14 planning.
                 ? $this->planner->planRange($from, $to ?? $from, FinancialReportSyncMode::REFRESH_14D, $companyId, $connectionId, true)
-                : $this->planner->planRefresh14Days($companyId, $connectionId),
+                : $this->planner->planRefresh14Days($companyId, $connectionId, $maxDays),
             'missing' => $this->planner->planMissing($companyId, $connectionId, $maxDays),
             default => throw new DomainException(sprintf('Unsupported mode: %s', $mode)),
         };
