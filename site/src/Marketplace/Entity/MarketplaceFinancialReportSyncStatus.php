@@ -152,6 +152,9 @@ class MarketplaceFinancialReportSyncStatus
         $now = new \DateTimeImmutable();
         $this->status = FinancialReportSyncStatus::LOADING;
         $this->mode = $mode;
+        $this->recordsCount = 0;
+        $this->rawDocumentId = null;
+        $this->rowsHash = null;
         $this->attempts++;
         $this->lastAttemptAt = $now;
         $this->nextRetryAt = null;
@@ -207,6 +210,7 @@ class MarketplaceFinancialReportSyncStatus
     public function markFailedRetryable(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt, ?\DateTimeImmutable $nextRetryAt): void
     {
         $this->status = FinancialReportSyncStatus::FAILED;
+        $this->recordsCount = 0;
         $this->lastErrorClass = $errorClass;
         $this->lastErrorMessage = $errorMessage;
         $this->lastErrorStatusCode = $statusCode;
@@ -235,6 +239,7 @@ class MarketplaceFinancialReportSyncStatus
     {
         $now = new \DateTimeImmutable();
         $this->status = $status;
+        $this->recordsCount = 0;
         $this->lastErrorClass = $errorClass;
         $this->lastErrorMessage = $errorMessage;
         $this->lastErrorStatusCode = $statusCode;
