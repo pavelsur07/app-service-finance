@@ -17,6 +17,13 @@ framework:
                     delay: 5000
                     multiplier: 2
 
+            async_wb_finance:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN_WB_FINANCE)%'
+                retry_strategy:
+                    max_retries: 20
+                    delay: 61000
+                    multiplier: 1
+
             async_ads:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN_ADS)%'
                 retry_strategy:
@@ -37,7 +44,7 @@ framework:
         routing:
             # --- async_sync: external marketplace/bank HTTP fetches ---
             'App\Marketplace\Message\SyncWbReportMessage': async_sync
-            'App\Marketplace\Message\SyncWbFinancialReportDayMessage': async_sync
+            'App\Marketplace\Message\SyncWbFinancialReportDayMessage': async_wb_finance
             'App\Marketplace\Message\SyncOzonReportMessage': async_sync
             'App\Marketplace\Message\SyncOzonRealizationMessage': async_sync
             'App\Marketplace\Message\InitialSyncMessage': async_sync

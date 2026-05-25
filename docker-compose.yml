@@ -130,6 +130,23 @@ services:
             - ./site:/app
         command: php bin/console messenger:consume async_pipeline --time-limit=3600 --memory-limit=500M -vv
 
+    site-php-cli-worker-wb-finance:
+        build:
+            context: site/docker
+            dockerfile: development/php-cli/Dockerfile
+        working_dir: /app
+        restart: unless-stopped
+        environment:
+            <<: *tz-env
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - ./site:/app
+        command: php bin/console messenger:consume async_wb_finance --time-limit=3600 --memory-limit=256M --sleep=5 --no-interaction
+
     site-php-cli-worker-ads:
         build:
             context: site/docker

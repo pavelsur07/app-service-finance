@@ -18,6 +18,7 @@ x-php-env: &php-env
     MESSENGER_TRANSPORT_DSN_SYNC: redis://site-redis:6379/messages_sync
     MESSENGER_TRANSPORT_DSN_PIPELINE: redis://site-redis:6379/messages_pipeline
     MESSENGER_TRANSPORT_DSN_ADS: redis://site-redis:6379/messages_ads
+    MESSENGER_TRANSPORT_DSN_WB_FINANCE: redis://site-redis:6379/messages_wb_finance
     MAILER_DSN: ${SITE_MAILER_DSN}
     SENTRY_DSN: ${SENTRY_DSN}
     HEALTH_CHECK_TOKEN: ${HEALTH_CHECK_TOKEN}
@@ -264,6 +265,38 @@ services:
                 reservations:
                     memory: 192M
 
+    site-messenger-worker-wb-finance:
+        image: ghcr.io/pavelsur07/site-php-cli:latest
+        container_name: site-messenger-worker-wb-finance
+        restart: always
+        command: php bin/console messenger:consume async_wb_finance --time-limit=3600 --memory-limit=256M --sleep=5 --no-interaction
+        environment:
+            <<: *php-env
+        networks:
+            - default
+        depends_on:
+            site-postgres:
+                condition: service_healthy
+            site-redis:
+                condition: service_healthy
+        volumes:
+            - site_storage:/app/var/storage
+            - site_company_storage:/app/var/storage/companies
+            - site_var_log:/app/var/log
+        stop_grace_period: 60s
+        healthcheck:
+            test: ["CMD-SHELL", "ps aux | grep 'messenger:consume async_wb_finance' | grep -v grep"]
+            interval: 30s
+            timeout: 10s
+            retries: 3
+            start_period: 10s
+        deploy:
+            resources:
+                limits:
+                    memory: 256M
+                reservations:
+                    memory: 64M
+
     site-messenger-worker-ads:
         image: ghcr.io/pavelsur07/site-php-cli:latest
         container_name: site-messenger-worker-ads
@@ -367,6 +400,7 @@ services:
             MESSENGER_TRANSPORT_DSN_SYNC: redis://site-redis:6379/messages_sync
             MESSENGER_TRANSPORT_DSN_PIPELINE: redis://site-redis:6379/messages_pipeline
             MESSENGER_TRANSPORT_DSN_ADS: redis://site-redis:6379/messages_ads
+            MESSENGER_TRANSPORT_DSN_WB_FINANCE: redis://site-redis:6379/messages_wb_finance
             MAILER_DSN: ${SITE_MAILER_DSN}
             SENTRY_DSN: ${SENTRY_DSN}
             APP_MAIL_FROM: "Ваш Финдир <support@vashfindir.ru>"

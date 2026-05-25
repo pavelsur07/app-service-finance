@@ -3,4 +3,5 @@ framework:
         transports:
             async_sync: 'in-memory://'
             async_pipeline: 'in-memory://'
+            async_wb_finance: 'in-memory://'
             async_ads: 'in-memory://'
