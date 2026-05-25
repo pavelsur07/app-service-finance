@@ -8,8 +8,9 @@ use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
-use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
+use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
 use DateTimeImmutable;
+use Symfony\Component\Clock\ClockInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
 
 final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlannerInterface
@@ -19,8 +20,9 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
     public function __construct(
         private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
         private readonly WbFinancialReportPeriodResolver $periodResolver,
-        private readonly MarketplaceFinancialReportSyncStatusRepository $syncStatusRepository,
+        private readonly MarketplaceFinancialReportSyncStatusLookupInterface $syncStatusRepository,
         private readonly MessageBusInterface $messageBus,
+        private readonly ClockInterface $clock,
     ) {}
 
     public function planDaily(?string $companyId = null, ?string $connectionId = null, bool $force = false): int
@@ -47,18 +49,94 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         );
     }
 
-    public function planRefresh14Days(?string $companyId = null, ?string $connectionId = null): int
+    public function planRefresh14Days(?string $companyId = null, ?string $connectionId = null, int $maxDays = 1): int
     {
-        return $this->planForDays(
-            $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
-            $this->periodResolver->last14Days(),
-            FinancialReportSyncMode::REFRESH_14D,
-            true,
-            static fn (?FinancialReportSyncStatus $status): bool => !\in_array($status, [
-                FinancialReportSyncStatus::LOADING,
-                FinancialReportSyncStatus::PROCESSING,
-            ], true),
-        );
+        if ($maxDays <= 0) {
+            return 0;
+        }
+
+        $dispatched = 0;
+        $days = $this->periodResolver->last14Days();
+        $from = $days[0];
+        $to = $days[array_key_last($days)];
+        $now = $this->clock->now();
+
+        foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
+            $statuses = $this->syncStatusRepository->findStatusesForDateRange(
+                $connection['company_id'],
+                $connection['connection_id'],
+                self::REPORT_TYPE,
+                $from,
+                $to,
+            );
+            $statusByDay = [];
+            foreach ($statuses as $statusEntity) {
+                $statusByDay[$statusEntity->getBusinessDate()->format('Y-m-d')] = $statusEntity;
+            }
+
+            $retryDue = [];
+            $success = [];
+            $unknown = [];
+
+            foreach ($days as $day) {
+                $statusEntity = $statusByDay[$day->format('Y-m-d')] ?? null;
+                $status = $statusEntity?->getStatus();
+
+                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
+                    continue;
+                }
+
+                if (FinancialReportSyncStatus::FAILED === $status) {
+                    if (null !== $statusEntity?->getNextRetryAt() && $statusEntity->getNextRetryAt() > $now) {
+                        continue;
+                    }
+
+                    $retryDue[] = $day;
+                    continue;
+                }
+
+                if (\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)) {
+                    $updatedAt = $statusEntity?->getUpdatedAt();
+                    if (null === $updatedAt) {
+                        $updatedAt = new DateTimeImmutable('9999-12-31T00:00:00+00:00');
+                    }
+
+                    $success[] = [
+                        'day' => $day,
+                        'updated_at' => $updatedAt,
+                    ];
+                    continue;
+                }
+
+                if (null === $status) {
+                    $unknown[] = $day;
+                }
+            }
+
+            usort($success, static function (array $a, array $b): int {
+                $timestampCompare = $a['updated_at']->getTimestamp() <=> $b['updated_at']->getTimestamp();
+                if (0 !== $timestampCompare) {
+                    return $timestampCompare;
+                }
+
+                return $a['day']->getTimestamp() <=> $b['day']->getTimestamp();
+            });
+
+            $successDays = array_map(static fn (array $item): DateTimeImmutable => $item['day'], $success);
+
+            $scheduledForConnection = 0;
+            foreach (array_merge($retryDue, $successDays, $unknown) as $day) {
+                if ($scheduledForConnection >= $maxDays) {
+                    break;
+                }
+
+                $this->dispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true);
+                ++$dispatched;
+                ++$scheduledForConnection;
+            }
+        }
+
+        return $dispatched;
     }
 
 
@@ -106,7 +184,7 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         $from = $this->periodResolver->currentYearStart();
         $to = $this->periodResolver->yesterday();
         $allDays = $this->periodResolver->daysBetween($from, $to);
-        $now = new DateTimeImmutable();
+        $now = $this->clock->now();
 
         foreach ($this->activeWbConnectionsQuery->execute($companyId, $connectionId) as $connection) {
             $statuses = $this->syncStatusRepository->findStatusesForDateRange(
