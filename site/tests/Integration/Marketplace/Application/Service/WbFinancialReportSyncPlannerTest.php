@@ -11,6 +11,7 @@ use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
@@ -140,7 +141,7 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         }
     }
 
-    public function testPlanRefresh14DaysCreates14TasksIncludingEmptyDays(): void
+    public function testPlanRefresh14DaysDefaultDispatchesOnlyOneDayPerConnection(): void
     {
         [$companyId, $connectionId] = $this->seedActiveConnection();
         $this->persistStatus(
@@ -154,6 +155,27 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 12:00:00 Europe/Moscow'));
 
         $count = $planner->planRefresh14Days($companyId, $connectionId);
+
+        self::assertSame(1, $count);
+        self::assertCount(1, $bus->messages);
+        self::assertSame('refresh14', $bus->messages[0]->mode);
+        self::assertTrue($bus->messages[0]->forceRefresh);
+    }
+
+    public function testPlanRefresh14DaysWithExplicitMaxDaysFourteenDispatchesFourteenDays(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+        $this->persistStatus(
+            $companyId,
+            $connectionId,
+            new \DateTimeImmutable('2026-05-16 00:00:00 Europe/Moscow'),
+            FinancialReportSyncStatus::EMPTY,
+        );
+
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-05-21 12:00:00 Europe/Moscow'));
+
+        $count = $planner->planRefresh14Days($companyId, $connectionId, 14);
 
         self::assertSame(14, $count);
         self::assertCount(14, $bus->messages);
@@ -172,8 +194,8 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         $planner = $this->planner($bus, new \DateTimeImmutable('2026-01-05 12:00:00 Europe/Moscow'));
 
         $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-01'), FinancialReportSyncStatus::SUCCESS);
-        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-02'), FinancialReportSyncStatus::FAILED, null);
-        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-03'), FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('+1 day'));
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-02'), FinancialReportSyncStatus::FAILED, null, 429, MarketplaceRateLimitException::class);
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-03'), FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-06 12:00:00 Europe/Moscow'), 429, MarketplaceRateLimitException::class);
         // 2026-01-04 status missing
 
         $count = $planner->planMissing($companyId, $connectionId, 2);
@@ -200,6 +222,25 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         self::assertSame(['2026-01-03', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
     }
 
+
+    public function testPlanMissingDispatchesOnlyFqcnRateLimitFailures(): void
+    {
+        [$companyId, $connectionId] = $this->seedActiveConnection();
+
+        $bus = new InMemoryMessageBus();
+        $planner = $this->planner($bus, new \DateTimeImmutable('2026-01-05 12:00:00 Europe/Moscow'));
+
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-01'), FinancialReportSyncStatus::FAILED, null, 429, MarketplaceRateLimitException::class);
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-02'), FinancialReportSyncStatus::FAILED, null, 429, 'MarketplaceRateLimitException');
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-03'), FinancialReportSyncStatus::FAILED, null, 500, 'TestException');
+        $this->persistStatus($companyId, $connectionId, new \DateTimeImmutable('2026-01-04'), FinancialReportSyncStatus::FAILED, null, 400, 'BadRequestException');
+
+        $count = $planner->planMissing($companyId, $connectionId, 1);
+
+        self::assertSame(1, $count);
+        self::assertSame(['2026-01-01'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));
+    }
+
     public function testPlanInitialCreatesTasksFromStartDateToYesterday(): void
     {
         [$companyId, $connectionId] = $this->seedActiveConnection();
@@ -215,13 +256,15 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
 
     private function planner(InMemoryMessageBus $bus, \DateTimeImmutable $clockNow): WbFinancialReportSyncPlanner
     {
-        $resolver = new WbFinancialReportPeriodResolver(new MockClock($clockNow));
+        $clock = new MockClock($clockNow);
+        $resolver = new WbFinancialReportPeriodResolver($clock);
 
         return new WbFinancialReportSyncPlanner(
             $this->connectionsQuery,
             $resolver,
             $this->statusRepository,
             $bus,
+            $clock,
         );
     }
 
@@ -231,6 +274,8 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         \DateTimeImmutable $day,
         FinancialReportSyncStatus $status,
         ?\DateTimeImmutable $nextRetryAt = null,
+        int $errorStatusCode = 500,
+        string $errorClass = 'TestException',
     ): void {
         $entity = new MarketplaceFinancialReportSyncStatus(
             Uuid::uuid7()->toString(),
@@ -247,7 +292,7 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
             FinancialReportSyncStatus::EMPTY => $entity->markEmpty(),
             FinancialReportSyncStatus::LOADING => $entity->markLoading(FinancialReportSyncMode::DAILY),
             FinancialReportSyncStatus::PROCESSING => $entity->markProcessing(),
-            FinancialReportSyncStatus::FAILED => $entity->markFailedRetryable('TestException', 'failed', 500, null, $nextRetryAt),
+            FinancialReportSyncStatus::FAILED => $entity->markFailedRetryable($errorClass, 'failed', $errorStatusCode, null, $nextRetryAt),
             default => null,
         };
 
