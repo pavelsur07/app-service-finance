@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\MessageHandler;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncError;
@@ -24,6 +25,8 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
@@ -309,7 +312,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
     /** @param list<MockResponse> $responses */
     private function swapWbClient(array $responses): void
     {
-        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), new MockClock('2026-05-20 12:00:00 UTC')));
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), $this->createRateLimiter()));
     }
 
     private function swapBusSpy(): object
@@ -381,5 +384,9 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             'periodFrom' => new \DateTimeImmutable($date),
             'periodTo' => new \DateTimeImmutable($date),
         ]);
+    }
+    private function createRateLimiter(): WbFinanceRateLimiter
+    {
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
     }
 }

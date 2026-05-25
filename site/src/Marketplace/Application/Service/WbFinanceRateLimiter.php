@@ -5,20 +5,40 @@ declare(strict_types=1);
 namespace App\Marketplace\Application\Service;
 
 use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\Clock\ClockInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final class WbFinanceRateLimiter
 {
-    public function __construct(private readonly ?RateLimiterFactory $factory = null)
-    {
+    public function __construct(
+        private readonly RateLimiterFactory $factory,
+        private readonly ClockInterface $clock,
+        ?LoggerInterface $logger = null,
+    ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
-    public function acquire(string $connectionId, int $tokens = 1): bool
-    {
-        if (null !== $this->factory) {
-            return $this->factory->create($this->buildKey($connectionId))->consume($tokens)->isAccepted();
-        }
+    private LoggerInterface $logger;
 
-        return true;
+    public function wait(string $connectionId, int $tokens = 1): void
+    {
+        $limiter = $this->factory->create($this->buildKey($connectionId));
+
+        while (true) {
+            $limit = $limiter->consume($tokens);
+            if ($limit->isAccepted()) {
+                return;
+            }
+
+            $retryAfter = $limit->getRetryAfter();
+            $waitSeconds = max(1, $retryAfter->getTimestamp() - $this->clock->now()->getTimestamp());
+            $this->logger->info('WB finance throttle wait.', [
+                'connection_id' => $connectionId,
+                'wait_seconds' => $waitSeconds,
+            ]);
+            $this->clock->sleep($waitSeconds);
+        }
     }
 
     private function buildKey(string $connectionId): string

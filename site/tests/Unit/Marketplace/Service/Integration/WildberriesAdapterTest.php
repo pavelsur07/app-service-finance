@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Service\Integration;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
@@ -15,6 +16,8 @@ use Psr\Log\NullLogger;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WildberriesAdapterTest extends TestCase
 {
@@ -44,17 +47,22 @@ final class WildberriesAdapterTest extends TestCase
     public function testHasRawReportDataUsesFinanceEndpointNotLegacyV5(): void
     {
         $capturedUrl = '';
-        $http = new MockHttpClient(static function (string $method, string $url): MockResponse {
-            return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
-        });
-        $http = new MockHttpClient(static function (string $method, string $url) use (&$capturedUrl): MockResponse {
+        $capturedPayload = [];
+        $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedPayload): MockResponse {
             $capturedUrl = $url;
+            $capturedPayload = $options['json'] ?? [];
             return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
         });
 
         $adapter = $this->createAdapter($http);
         self::assertTrue($adapter->hasRawReportData($this->company(), new \DateTimeImmutable('2026-01-01'), new \DateTimeImmutable('2026-01-02')));
+        self::assertSame('https://finance-api.wildberries.ru/api/finance/v1/sales-reports/detailed', $capturedUrl);
         self::assertStringNotContainsString('/api/v5/supplier/reportDetailByPeriod', $capturedUrl);
+        self::assertSame(1, $capturedPayload['limit'] ?? null);
+        self::assertSame(0, $capturedPayload['rrdId'] ?? null);
+        self::assertSame('daily', $capturedPayload['period'] ?? null);
+        self::assertSame('2026-01-01', $capturedPayload['dateFrom'] ?? null);
+        self::assertSame('2026-01-02', $capturedPayload['dateTo'] ?? null);
     }
 
     public function testAuthenticateUsesProbeAccess(): void
@@ -112,14 +120,19 @@ final class WildberriesAdapterTest extends TestCase
         $repo = $this->createMock(MarketplaceConnectionRepository::class);
         $repo->method('findByMarketplace')->willReturn($this->connection());
 
-        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, new MockClock()));
+        return new WildberriesAdapter($http, $repo, new NullLogger(), new WbSalesReportRowNormalizer(), new WbFinanceSalesReportClient($http, $this->createRateLimiter()));
     }
 
     private function company(): Company { return $this->createMock(Company::class); }
     private function connection(): MarketplaceConnection
     {
         $connection = $this->createMock(MarketplaceConnection::class);
+        $connection->method('getId')->willReturn('connection-id');
         $connection->method('getApiKey')->willReturn('token');
         return $connection;
+    }
+    private function createRateLimiter(): WbFinanceRateLimiter
+    {
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
     }
 }
