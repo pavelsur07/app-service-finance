@@ -56,7 +56,7 @@ services:
 
     App\Marketplace\Application\Service\WbFinanceRateLimiter:
         arguments:
-            $factory: '@?limiter.wb_finance'
+            $factory: '@limiter.wb_finance'
 
     App\Service\FeatureFlagService:
         arguments:

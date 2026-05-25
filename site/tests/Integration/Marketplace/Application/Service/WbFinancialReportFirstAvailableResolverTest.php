@@ -108,21 +108,23 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
         self::assertSame('2026-02-03', $step6->getStartDate()?->format('Y-m-d'));
     }
 
-    public function testRateLimitedStepReturnsIncompleteWithRetryAfter(): void
+    public function testSecondResolveForSameConnectionDoesNotFailOnLocalLimiterAndContinuesFlow(): void
     {
         $resolver = $this->resolverWithResponses([
-            ['http_code' => 200, 'body' => '[{"rrdId":1}]'],
-        ], true);
+            ['http_code' => 200, 'body' => '[{"rrdId":1}]'], // full range true
+            ['http_code' => 204, 'body' => ''],               // month probe after local wait
+        ]);
 
         $step1 = $resolver->resolve(self::CONNECTION_ID, self::COMPANY_ID, 'token');
         self::assertTrue($step1->needsRetry());
 
         $step2 = $resolver->resolve(self::CONNECTION_ID, self::COMPANY_ID, 'token', $step1->getPhase(), $step1->getNextProbeFrom(), $step1->getNextProbeTo());
         self::assertTrue($step2->needsRetry());
-        self::assertSame(61, $step2->getRetryAfterSeconds());
+        self::assertSame(WbFinancialReportFirstAvailableResolver::PHASE_MONTH_SCAN, $step2->getPhase());
+        self::assertNull($step2->getRetryAfterSeconds());
     }
 
-    private function resolverWithResponses(array $responses, bool $withLimiter = false): WbFinancialReportFirstAvailableResolver
+    private function resolverWithResponses(array $responses): WbFinancialReportFirstAvailableResolver
     {
         $idx = 0;
         $http = new MockHttpClient(static function () use (&$idx, $responses): MockResponse {
@@ -132,7 +134,7 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
             return new MockResponse($response['body'], ['http_code' => $response['http_code']]);
         });
 
-        $client = new WbFinanceSalesReportClient($http, new MockClock('2026-03-15 10:00:00 Europe/Moscow'), null, $withLimiter ? $this->rateLimiter() : null);
+        $client = new WbFinanceSalesReportClient($http, $this->rateLimiter());
 
         return new WbFinancialReportFirstAvailableResolver(new WbFinancialReportPeriodResolver(new MockClock('2026-03-15 10:00:00 Europe/Moscow')), $this->statusRepository, $client);
     }
@@ -147,6 +149,6 @@ final class WbFinancialReportFirstAvailableResolverTest extends IntegrationTestC
 
     private function rateLimiter(): WbFinanceRateLimiter
     {
-        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'fixed_window', 'limit' => 1, 'interval' => '1 minute'], new InMemoryStorage()));
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-03-15 10:00:00 Europe/Moscow'));
     }
 }

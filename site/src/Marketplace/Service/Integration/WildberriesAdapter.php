@@ -55,7 +55,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $dateFrom = $fromDate->format('Y-m-d');
         $dateTo = $toDate->format('Y-m-d');
 
-        return $this->salesReportClient->fetchDetailed($connection->getApiKey(), $dateFrom, $dateTo);
+        return $this->salesReportClient->fetchDetailedForConnection(
+            $connection->getId(),
+            $connection->getApiKey(),
+            $dateFrom,
+            $dateTo,
+        );
     }
 
     public function hasRawReportData(
@@ -72,7 +77,12 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         $dateFrom = $fromDate->format('Y-m-d');
         $dateTo = $toDate->format('Y-m-d');
 
-        return $this->salesReportClient->hasAnyData($connection->getApiKey(), $dateFrom, $dateTo);
+        return $this->salesReportClient->hasAnyDataForConnection(
+            $connection->getId(),
+            $connection->getApiKey(),
+            $dateFrom,
+            $dateTo,
+        );
     }
 
     /**
@@ -328,4 +338,3 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
         );
     }
 }
-

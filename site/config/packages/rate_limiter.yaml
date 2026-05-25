@@ -14,6 +14,6 @@ framework:
             interval: '1 minute'
 
         wb_finance:
-            policy: fixed_window
+            policy: token_bucket
             limit: 1
-            interval: '1 minute'
+            rate: { interval: '61 seconds', amount: 1 }

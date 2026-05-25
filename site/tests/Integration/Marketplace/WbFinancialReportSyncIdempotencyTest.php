@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
@@ -29,6 +30,8 @@ use Ramsey\Uuid\Uuid;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -233,7 +236,7 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
     private function swapWbClient(array $responses): void
     {
-        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), new MockClock('2026-05-21 12:00:00 UTC')));
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(new MockHttpClient($responses), $this->createRateLimiter()));
     }
 
     private function countStatuses(string $companyId, string $connectionId, string $day): int
@@ -304,6 +307,10 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
         $value = $this->connection->fetchOne('SELECT status FROM marketplace_financial_report_sync_statuses WHERE company_id=:c AND connection_id=:n AND business_date=:d', ['c'=>$companyId, 'n'=>$connectionId, 'd'=>$date.' 00:00:00']);
 
         return $value === false ? null : (string) $value;
+    }
+    private function createRateLimiter(): WbFinanceRateLimiter
+    {
+        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
     }
 }
 

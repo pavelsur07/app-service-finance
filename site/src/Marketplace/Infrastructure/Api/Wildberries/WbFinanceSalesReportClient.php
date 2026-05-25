@@ -12,7 +12,6 @@ use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\Clock\ClockInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -22,19 +21,17 @@ final readonly class WbFinanceSalesReportClient
     private const PAGE_SIZE = 100000;
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
-    private const WB_MIN_DELAY_SECONDS = 61;
 
     private LoggerInterface $logger;
     private WbFinanceRateLimiter $rateLimiter;
 
     public function __construct(
         private HttpClientInterface $httpClient,
-        private ClockInterface $clock,
+        WbFinanceRateLimiter $rateLimiter,
         ?LoggerInterface $logger = null,
-        ?WbFinanceRateLimiter $rateLimiter = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
-        $this->rateLimiter = $rateLimiter ?? new WbFinanceRateLimiter();
+        $this->rateLimiter = $rateLimiter;
     }
 
 
@@ -47,6 +44,16 @@ final readonly class WbFinanceSalesReportClient
     }
 
     /** @return list<array<string,mixed>> */
+    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): array
+    {
+        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, $connectionId);
+    }
+
+    /**
+     * @deprecated Use fetchDetailedForConnection() in production flows to ensure local throttling per connection.
+     *
+     * @return list<array<string,mixed>>
+     */
     public function fetchDetailed(string $apiKey, string $dateFrom, string $dateTo): array
     {
         return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
@@ -59,8 +66,8 @@ final readonly class WbFinanceSalesReportClient
         $rrdId = 0;
 
         while (true) {
-            if (null !== $connectionId && !$this->rateLimiter->acquire($connectionId)) {
-                throw new MarketplaceRateLimitException(429, 'Local WB finance rate limit exceeded.', $dateFrom, $dateTo, self::WB_MIN_DELAY_SECONDS);
+            if (null !== $connectionId) {
+                $this->rateLimiter->wait($connectionId);
             }
             try {
                 $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
@@ -143,7 +150,6 @@ final readonly class WbFinanceSalesReportClient
                 return $rows;
             }
 
-            $this->clock->sleep(self::WB_MIN_DELAY_SECONDS);
         }
     }
 
@@ -151,6 +157,8 @@ final readonly class WbFinanceSalesReportClient
 
     public function probeAccess(string $apiKey): bool
     {
+        // Probe is used for explicit credential checks (e.g. verify connection),
+        // not for report sync pipeline, so local report throttling is not applied here.
         try {
             $response = $this->httpClient->request('GET', self::BASE_URL.'/ping', [
                 'headers' => ['Authorization' => $apiKey],
@@ -216,9 +224,7 @@ final readonly class WbFinanceSalesReportClient
 
     public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): bool
     {
-        if (!$this->rateLimiter->acquire($connectionId)) {
-            throw new MarketplaceRateLimitException(429, 'Local WB finance rate limit exceeded.', $dateFrom, $dateTo, self::WB_MIN_DELAY_SECONDS);
-        }
+        $this->rateLimiter->wait($connectionId);
 
         return $this->hasAnyData($apiKey, $dateFrom, $dateTo);
     }
