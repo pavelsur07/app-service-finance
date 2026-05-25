@@ -7,6 +7,7 @@ namespace App\Marketplace\Repository;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
+use App\Marketplace\Exception\MarketplaceRateLimitException;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
@@ -140,6 +141,8 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->andWhere('s.businessDate BETWEEN :from AND :to')
             ->andWhere('s.status = :failedStatus')
             ->andWhere('(s.nextRetryAt IS NULL OR s.nextRetryAt <= :now)')
+            ->andWhere('s.lastErrorStatusCode = :rateLimitStatusCode')
+            ->andWhere('s.lastErrorClass = :rateLimitErrorClass')
             ->setParameter('companyId', $companyId)
             ->setParameter('connectionId', $connectionId)
             ->setParameter('reportType', $reportType)
@@ -147,6 +150,8 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->setParameter('to', $to)
             ->setParameter('failedStatus', FinancialReportSyncStatus::FAILED)
             ->setParameter('now', $now)
+            ->setParameter('rateLimitStatusCode', 429)
+            ->setParameter('rateLimitErrorClass', MarketplaceRateLimitException::class)
             ->orderBy('s.businessDate', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
