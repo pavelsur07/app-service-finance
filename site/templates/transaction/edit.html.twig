@@ -52,7 +52,7 @@
                                     </td>
                                     <td class="text-end fw-semibold">{{ document.totalAmount|number_format(2, ',', ' ') }}</td>
                                     <td class="text-end">
-                                        <a href="{{ path('document_show', {id: document.id}) }}" class="btn btn-link">Открыть</a>
+                                        <a href="{{ path('document_edit', {id: document.id}) }}" class="btn btn-link">Открыть</a>
                                     </td>
                                 </tr>
                             {% endfor %}
