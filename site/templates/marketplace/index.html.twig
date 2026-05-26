@@ -186,11 +186,7 @@
                                 <td class="text-end">
                                     <div class="btn-list">
                                         <a href="{{ path('marketplace_raw_view', {id: doc.id}) }}" class="btn btn-sm btn-ghost-primary" target="_blank">JSON</a>
-                                        {% if doc.documentType == 'sales_report' %}
-                                            <a href="{{ path('marketplace_raw_process_sales', {id: doc.id}) }}" class="btn btn-sm btn-success">Продажи</a>
-                                            <a href="{{ path('marketplace_raw_process_returns', {id: doc.id}) }}" class="btn btn-sm btn-warning">Возвраты</a>
-                                            <a href="{{ path('marketplace_raw_process_costs', {id: doc.id}) }}" class="btn btn-sm btn-purple">Затраты</a>
-                                        {% elseif doc.documentType == 'realization' %}
+                                        {% if doc.documentType == 'realization' %}
                                             <button type="button"
                                                     class="btn btn-sm btn-teal"
                                                     data-bs-toggle="modal"

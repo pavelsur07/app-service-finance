@@ -9,9 +9,7 @@ use App\Marketplace\Application\ReprocessMarketplacePeriodAction;
 use App\Marketplace\Application\SyncConnectionAction;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceListing;
-use App\Marketplace\Application\Command\ProcessMarketplaceRawDocumentCommand;
 use App\Marketplace\Application\Command\SyncConnectionCommand;
-use App\Marketplace\Application\ProcessMarketplaceRawDocumentAction;
 use App\Marketplace\Enum\MarketplaceConnectionType;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\OzonRealizationStatusQuery;
@@ -329,97 +327,6 @@ class MarketplaceController extends AbstractController
         }
 
         return $this->json($rawDoc->getRawData(), 200, [], ['json_encode_options' => JSON_PRETTY_PRINT]);
-    }
-
-    /**
-     * Ручные шаги проведения raw документа.
-     *
-     * В рамках целевого daily pipeline эти кнопки остаются fallback/admin flow
-     * и не удаляются до отдельного решения по миграции UX.
-     */
-    #[Route('/raw/{id}/process-sales', name: 'marketplace_raw_process_sales')]
-    public function processSales(
-        string $id,
-        ProcessMarketplaceRawDocumentAction $action,
-    ): Response {
-        $company = $this->companyService->getActiveCompany();
-
-        $rawDoc = $this->rawDocumentRepository->find($id);
-
-        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
-            throw $this->createNotFoundException();
-        }
-
-        try {
-            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'sales');
-            $count = ($action)($cmd);
-
-            $this->addFlash('success', sprintf('Обработано продаж: %d', $count));
-        } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
-            preg_match('/Key \((.*?)\)=\((.*?)\)/', $e->getMessage(), $matches);
-            $keys   = $matches[1] ?? 'unknown';
-            $values = $matches[2] ?? 'unknown';
-
-            $this->addFlash('error', sprintf(
-                'Дубликат товара! Поля: %s | Значения: %s. Очистите БД и попробуйте снова.',
-                $keys,
-                $values
-            ));
-        } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки: ' . $e->getMessage());
-        }
-
-        return $this->redirectToRoute('marketplace_index');
-    }
-
-    #[Route('/raw/{id}/process-returns', name: 'marketplace_raw_process_returns')]
-    public function processReturns(
-        string $id,
-        ProcessMarketplaceRawDocumentAction $action,
-    ): Response {
-        $company = $this->companyService->getActiveCompany();
-
-        $rawDoc = $this->rawDocumentRepository->find($id);
-
-        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
-            throw $this->createNotFoundException();
-        }
-
-        try {
-            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'returns');
-            $count = ($action)($cmd);
-
-            $this->addFlash('success', sprintf('Обработано возвратов: %d', $count));
-        } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки возвратов: ' . $e->getMessage());
-        }
-
-        return $this->redirectToRoute('marketplace_index');
-    }
-
-    #[Route('/raw/{id}/process-costs', name: 'marketplace_raw_process_costs')]
-    public function processCosts(
-        string $id,
-        ProcessMarketplaceRawDocumentAction $action,
-    ): Response {
-        $company = $this->companyService->getActiveCompany();
-
-        $rawDoc = $this->rawDocumentRepository->find($id);
-
-        if (!$rawDoc || $rawDoc->getCompany()->getId() !== $company->getId()) {
-            throw $this->createNotFoundException();
-        }
-
-        try {
-            $cmd   = new ProcessMarketplaceRawDocumentCommand((string) $company->getId(), (string) $rawDoc->getId(), 'costs');
-            $count = ($action)($cmd);
-
-            $this->addFlash('success', sprintf('Обработано затрат: %d', $count));
-        } catch (\Exception $e) {
-            $this->addFlash('error', 'Ошибка обработки затрат: ' . $e->getMessage());
-        }
-
-        return $this->redirectToRoute('marketplace_index');
     }
 
     #[Route('/raw/{id}/process-realization', name: 'marketplace_raw_process_realization')]
