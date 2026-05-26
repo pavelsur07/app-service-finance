@@ -58,8 +58,8 @@ class MarketplaceController extends AbstractController
         $company = $this->companyService->getActiveCompany();
         $page    = max(1, $request->query->getInt('page', 1));
 
-        $marketplaceValue = (string) $request->query->get('marketplace', MarketplaceType::WILDBERRIES->value);
-        $selectedMarketplace = MarketplaceType::tryFrom($marketplaceValue) ?? MarketplaceType::WILDBERRIES;
+        $marketplaceValue = (string) $request->query->get('marketplace', '');
+        $selectedMarketplace = MarketplaceType::tryFrom($marketplaceValue);
 
         $connections = $this->connectionRepository->findByCompany($company);
         $qb          = $this->rawDocumentsListQuery->buildQueryBuilder($company, $selectedMarketplace);

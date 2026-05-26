@@ -141,8 +141,9 @@
                                 name="marketplace"
                                 class="form-select"
                                 onchange="this.form.submit()">
+                            <option value="" {{ selectedMarketplace is null ? 'selected' : '' }}>Все маркетплейсы</option>
                             {% for marketplace in availableMarketplaces %}
-                                <option value="{{ marketplace.value }}" {{ selectedMarketplace.value == marketplace.value ? 'selected' : '' }}>
+                                <option value="{{ marketplace.value }}" {{ selectedMarketplace is not null and selectedMarketplace.value == marketplace.value ? 'selected' : '' }}>
                                     {{ marketplace.syncHistoryFilterName }}
                                 </option>
                             {% endfor %}
