@@ -142,9 +142,8 @@
                                 class="form-select"
                                 onchange="this.form.submit()">
                             {% for marketplace in availableMarketplaces %}
-                                {% set optionLabel = marketplace.value == 'wildberries' ? 'Вайлбериз' : marketplace.displayName %}
                                 <option value="{{ marketplace.value }}" {{ selectedMarketplace.value == marketplace.value ? 'selected' : '' }}>
-                                    {{ optionLabel }}
+                                    {{ marketplace.syncHistoryFilterName }}
                                 </option>
                             {% endfor %}
                         </select>
