@@ -184,7 +184,8 @@ final class SyncWbFinancialReportDayHandler
                 'mode' => $mode->value,
             ]);
 
-            throw new RecoverableMessageHandlingException($e->getMessage(), 0, $e, (($e->getRetryAfter() ?? 61) * 1000));
+            // Do not rethrow rate-limit errors: retry is controlled by sync_statuses.next_retry_at and the missing planner.
+            return;
         } catch (MarketplaceAuthException $e) {
             $this->syncStatusUpdater->markAuthFailed($status, $e::class, $e->getMessage(), $e->getStatusCode(), $e->getResponseExcerpt());
             $connection->markSyncFailed($e->getMessage());
