@@ -30,6 +30,7 @@ framework:
                     max_retries: 2
                     delay: 30000
                     multiplier: 2
+                    max_delay: 3600000 # потолок 1 час
 
             failed: 'doctrine://default?queue_name=failed'
 

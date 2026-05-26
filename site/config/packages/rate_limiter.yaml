@@ -13,7 +13,11 @@ framework:
             limit: 1
             interval: '1 minute'
 
+        # WB Finance API: POST /api/finance/v1/sales-reports/detailed
+        # Official WB limit: 1 request per 5 minutes per seller account.
+        # Use fixed_window with safety margin (we set the interval slightly
+        # higher than 5 min to absorb clock skew between our host and WB).
         wb_finance:
-            policy: token_bucket
+            policy: fixed_window
             limit: 1
-            rate: { interval: '61 seconds', amount: 1 }
+            interval: '310 seconds'
