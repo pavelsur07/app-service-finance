@@ -28,7 +28,6 @@ use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Messenger\Envelope;
-use Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
 
@@ -79,14 +78,14 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertSame($raw->getId(), $messages[0]->rawDocumentId);
     }
 
-    public function testTemporaryApiExceptionMarksRetryableFailedAndStoresError(): void
+    public function testUnexpectedExceptionIsStillRethrownOrHandledByExistingPolicy(): void
     {
         $company = $this->createCompany(9203);
         $connection = $this->createWbSellerConnection($company, 9203);
         $this->swapWbClient([new MockResponse('{"error":"temporary"}', ['http_code' => 500])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $this->expectException(RecoverableMessageHandlingException::class);
+        $this->expectException(\Symfony\Component\Messenger\Exception\RecoverableMessageHandlingException::class);
 
         try {
             $handler($this->message($company->getId(), $connection->getId(), false));
@@ -177,18 +176,15 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertSame(2, $raw->getRecordsCount());
     }
 
-    public function testRateLimitMarksFailedAndThrowsRecoverable(): void
+    public function testRateLimitExceptionIsStoredAsRetryableFailureAndNotRethrown(): void
     {
         $company = $this->createCompany(9208);
         $connection = $this->createWbSellerConnection($company, 9208);
         $this->swapWbClient([new MockResponse('{"error":"too many"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 120']])]);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
-        $this->expectException(RecoverableMessageHandlingException::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
 
-        try {
-            $handler($this->message($company->getId(), $connection->getId(), false));
-        } finally {
             $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
             self::assertNotNull($status);
             self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
@@ -197,7 +193,8 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             $error = $this->findLastError($status->getId());
             self::assertNotNull($error);
             self::assertSame('App\Marketplace\Exception\MarketplaceRateLimitException', $error->getErrorClass());
-        }
+            self::assertSame(429, $error->getStatusCode());
+            self::assertSame(0, $status->getRecordsCount());
     }
 
     public function testAuthExceptionMarksAuthFailedAndStoresError(): void
