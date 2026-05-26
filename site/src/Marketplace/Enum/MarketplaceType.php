@@ -18,4 +18,12 @@ enum MarketplaceType: string
             self::SBER_MEGAMARKET => 'СберМегаМаркет',
         };
     }
+
+    public function getSyncHistoryFilterName(): string
+    {
+        return match ($this) {
+            self::WILDBERRIES => 'Вайлбериз',
+            default => $this->getDisplayName(),
+        };
+    }
 }
