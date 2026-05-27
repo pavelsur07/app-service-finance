@@ -39,6 +39,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'returnsTotal' => 50.0,
                 'costPriceTotal' => 400.0,
                 'costPriceUnit' => 80.0,
+                'stockQty' => 10.5,
+                'stockCapitalRub' => 840.0,
                 'commission' => 100.0,
                 'logistics' => 50.0,
                 'otherCosts' => 20.0,
@@ -60,6 +62,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'returnsTotal' => 0.0,
                 'costPriceTotal' => 200.0,
                 'costPriceUnit' => 100.0,
+                'stockQty' => 2.0,
+                'stockCapitalRub' => 200.0,
                 'commission' => 60.0,
                 'logistics' => 30.0,
                 'otherCosts' => 10.0,
@@ -81,6 +85,8 @@ final class UnitExtendedXlsxExporterTest extends TestCase
                 'returnsTotal' => 0.0,
                 'costPriceTotal' => 0.0,
                 'costPriceUnit' => 0.0,
+                'stockQty' => 0.0,
+                'stockCapitalRub' => 0.0,
                 'commission' => 0.0,
                 'logistics' => 0.0,
                 'otherCosts' => 0.0,
@@ -146,6 +152,11 @@ final class UnitExtendedXlsxExporterTest extends TestCase
         $header = $rows[$headerRowIndex];
         self::assertContains('Наименование', $header);
         self::assertContains('ROI %', $header);
+        $costUnitColumnIndex = array_search('Себест. ед.', $header, true);
+        $stockQtyColumnIndex = array_search('Ост. шт.', $header, true);
+        $stockCapitalColumnIndex = array_search('Кап. р.', $header, true);
+        self::assertSame($costUnitColumnIndex + 1, $stockQtyColumnIndex);
+        self::assertSame($stockQtyColumnIndex + 1, $stockCapitalColumnIndex);
 
         $skuColumnIndex = array_search('SKU', $header, true);
         $titleColumnIndex = array_search('Наименование', $header, true);

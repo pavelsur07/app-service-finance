@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\MarketplaceAnalytics\Infrastructure\Query;
 
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\Inventory\Facade\InventoryFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 
@@ -13,6 +14,7 @@ final readonly class UnitExtendedQuery
     public function __construct(
         private MarketplaceFacade $marketplaceFacade,
         private MarketplaceAdsFacade $adsFacade,
+        private InventoryFacade $inventoryFacade,
         private MarketplaceCostAnalyticsGroupResolver $groupResolver,
     ) {
     }
@@ -38,6 +40,8 @@ final readonly class UnitExtendedQuery
         // sales/returns/costs are intentionally NOT merged into $allListingIds — the row
         // would be empty otherwise; their spend is still counted in totals via
         // getTotalAdCostForPeriod() below (which includes non-attributed too).
+        $stockQtyByListing = $this->inventoryFacade->getStockQtyByListingOnReportDate($companyId, $to);
+
         $adSpendByListing = $this->adsFacade->getAdSpendByListingForPeriod(
             $companyId,
             $from,
@@ -85,6 +89,8 @@ final readonly class UnitExtendedQuery
             $costPriceUnit = $costPriceQuantity > 0
                 ? round($costPriceTotal / $costPriceQuantity, 2)
                 : 0.0;
+            $stockQty = (float) ($stockQtyByListing[$listingId] ?? 0.0);
+            $stockCapitalRub = round($stockQty * $costPriceUnit, 2);
 
             // Listing metadata: prefer sales source, fallback to listings table
             $title = $sale?->title ?? $meta?->title ?? '';
@@ -157,6 +163,8 @@ final readonly class UnitExtendedQuery
                 'returnsTotal' => round($returnsTotal, 2),
                 'costPriceTotal' => round($costPriceTotal, 2),
                 'costPriceUnit' => $costPriceUnit,
+                'stockQty' => $stockQty,
+                'stockCapitalRub' => $stockCapitalRub,
                 'commission' => $commission,
                 'adSpend' => $adSpend,
                 'drrPercent' => $drrPercent,

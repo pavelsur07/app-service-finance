@@ -25,6 +25,8 @@ export interface UnitExtendedItem {
     returnsTotal: number;
     costPriceTotal: number;
     costPriceUnit: number;
+    stockQty: number;
+    stockCapitalRub: number;
     commission: number;
     adSpend: number;
     drrPercent: number | null;
