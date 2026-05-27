@@ -1,0 +1,67 @@
+.ue-ext-scroll {
+    --ue-ext-viewport-offset: var(--marketplace-analytics-content-offset, 260px);
+    min-height: clamp(220px, 36vh, 320px);
+    max-height: calc(100vh - var(--ue-ext-viewport-offset));
+    overflow: auto;
+    position: relative;
+}
+
+.ue-ext-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+
+.ue-ext-table td.ue-ext-frozen,
+.ue-ext-table th.ue-ext-frozen {
+    position: sticky;
+    background: var(--tblr-bg-surface);
+}
+
+.ue-ext-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--tblr-bg-surface);
+}
+
+.ue-ext-table td.ue-ext-frozen-sku,
+.ue-ext-table th.ue-ext-frozen-sku {
+    left: 0;
+    min-width: 140px;
+    max-width: 140px;
+    width: 140px;
+}
+
+.ue-ext-table td.ue-ext-frozen-title,
+.ue-ext-table th.ue-ext-frozen-title {
+    left: 140px;
+    min-width: 240px;
+    max-width: 240px;
+    width: 240px;
+}
+
+.ue-ext-table td.ue-ext-frozen { z-index: 1; }
+.ue-ext-table thead th.ue-ext-frozen { z-index: 6; }
+.ue-ext-table tfoot td.ue-ext-frozen { z-index: 1; }
+
+.ue-ext-table .ue-ext-frozen-title::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}
+
+.ue-ext-table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+
+.ue-ext-table tbody tr:hover td.ue-ext-frozen {
+    background: var(--tblr-bg-surface-secondary);
+}
