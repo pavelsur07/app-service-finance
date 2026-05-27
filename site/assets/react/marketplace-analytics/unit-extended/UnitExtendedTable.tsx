@@ -1,8 +1,9 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import type { UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
 import { formatMoney } from '../utils/utils';
-import './UnitExtendedTable.css';
+import { useFixedHeader } from './useFixedHeader';
 
 type SortField =
     | 'sku'
@@ -32,6 +33,57 @@ interface UnitExtendedTableProps {
     totals: UnitExtendedTotals | null;
     isLoading: boolean;
 }
+
+const TABLE_STYLES = `
+.ue-ext-scroll {
+    overflow-x: auto;
+}
+.ue-ext-table {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: max-content;
+    min-width: 100%;
+    margin: 0;
+}
+.ue-ext-table td.ue-ext-frozen,
+.ue-ext-table th.ue-ext-frozen {
+    position: sticky;
+    background: var(--tblr-bg-surface);
+}
+.ue-ext-table td.ue-ext-frozen-sku,
+.ue-ext-table th.ue-ext-frozen-sku {
+    left: 0;
+    min-width: 140px;
+    max-width: 140px;
+    width: 140px;
+}
+.ue-ext-table td.ue-ext-frozen-title,
+.ue-ext-table th.ue-ext-frozen-title {
+    left: 140px;
+    min-width: 240px;
+    max-width: 240px;
+    width: 240px;
+}
+.ue-ext-table td.ue-ext-frozen { z-index: 1; }
+.ue-ext-table thead th.ue-ext-frozen { z-index: 3; }
+.ue-ext-table tfoot td.ue-ext-frozen { z-index: 1; }
+.ue-ext-table .ue-ext-frozen-title::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -4px;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(to right, rgba(0,0,0,0.08), transparent);
+    pointer-events: none;
+}
+.ue-ext-table tbody tr:hover td {
+    background: var(--tblr-bg-surface-secondary);
+}
+.ue-ext-table tbody tr:hover td.ue-ext-frozen {
+    background: var(--tblr-bg-surface-secondary);
+}
+`;
 
 type ExpandedType = 'other' | 'all';
 
@@ -98,6 +150,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     const [sortField, setSortField] = useState<SortField>('revenue');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
+    const { tableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
 
     const sorted = useMemo(() => {
         const copy = [...items];
@@ -126,8 +179,15 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         });
     };
 
-    // Renders sortable header row.
-    const renderHeaderCells = () => {
+    // Renders header row for both the real thead and the portal clone.
+    // When `widths` are provided (clone mode), each th gets a fixed pixel width.
+    // The frozen first column uses a counter-transform to stay visible despite the
+    // table's translateX(-scrollLeft) shift.
+    const renderHeaderCells = (widths?: number[]) => {
+        const getWidthStyle = (i: number): React.CSSProperties => {
+            const w = widths?.[i];
+            return w !== undefined ? { width: w, minWidth: w, maxWidth: w } : {};
+        };
 
         const frozenClass = (field: SortField): string => {
             if (field === 'sku') return 'ue-ext-frozen ue-ext-frozen-sku';
@@ -137,13 +197,25 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
 
         return (
             <tr>
-                {HEADERS.map((h) => {
+                {HEADERS.map((h, i) => {
+                    const isFrozen = h.field === 'sku' || h.field === 'title';
                     return (
                         <th
                             key={h.field}
                             className={`${h.align ?? ''} ${frozenClass(h.field)}`}
                             style={{
                                 cursor: 'pointer',
+                                ...getWidthStyle(i),
+                                ...(widths !== undefined && isFrozen
+                                    ? {
+                                        position: 'relative' as const,
+                                        zIndex: 10,
+                                        background: 'var(--tblr-bg-surface)',
+                                        // Counter-act the table's translateX(-scrollLeft) so the
+                                        // frozen columns stay anchored at the left edge of the clone.
+                                        transform: `translateX(${scrollLeft}px)`,
+                                      }
+                                    : {}),
                             }}
                             title={h.tooltip}
                             onClick={() => handleSort(h.field)}
@@ -155,7 +227,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                         </th>
                     );
                 })}
-                <th className="text-end">
+                <th className="text-end" style={getWidthStyle(HEADERS.length)}>
                     Все затраты
                 </th>
             </tr>
@@ -187,9 +259,39 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
 
     return (
         <>
-            <div className="ue-ext-scroll">
+            <style>{TABLE_STYLES}</style>
+
+            {showFixed && wrapperRect && createPortal(
+                <div style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: wrapperRect.left,
+                    width: wrapperRect.width,
+                    zIndex: 1050,
+                    overflow: 'hidden',
+                    background: 'var(--tblr-bg-surface)',
+                    borderBottom: '2px solid var(--tblr-border-color)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.08)',
+                }}>
+                    <table className="table table-vcenter card-table" style={{
+                        borderCollapse: 'separate',
+                        borderSpacing: 0,
+                        width: 'max-content',
+                        minWidth: '100%',
+                        margin: 0,
+                        transform: `translateX(-${scrollLeft}px)`,
+                    }}>
+                        <thead>
+                            {renderHeaderCells(columnWidths)}
+                        </thead>
+                    </table>
+                </div>,
+                document.body
+            )}
+
+            <div ref={tableWrapperRef} className="ue-ext-scroll">
                 <table className="table table-vcenter card-table ue-ext-table">
-                    <thead>
+                    <thead ref={theadRef}>
                         {renderHeaderCells()}
                     </thead>
                     <tbody>
