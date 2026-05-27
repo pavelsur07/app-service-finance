@@ -50,6 +50,12 @@ final readonly class AdLoadJobFinalizer
             return;
         }
 
+        $scheduledBatchStats = $this->batchRepository->countStatesForJob($jobId, $companyId);
+        if ([] !== $scheduledBatchStats) {
+            // cron-driven pipeline: финализацию выполняет только AdJobFinalizerCommand
+            return;
+        }
+
         $completedChunks = $this->chunkProgressRepository->countCompletedChunks($jobId, $companyId);
         if ($completedChunks < $job->getChunksTotal()) {
             return;
@@ -89,10 +95,6 @@ final readonly class AdLoadJobFinalizer
         if (0 === $failedDocs) {
             $affected = $this->jobRepository->markCompleted($jobId, $companyId);
             if ($affected > 0) {
-                $this->batchRepository->abandonNonTerminalBatchesForTerminalJob(
-                    $jobId,
-                    'Abandoned because parent job became terminal: completed',
-                );
                 $this->marketplaceAdsLogger->info('AdLoadJob completed', [
                     'jobId' => $jobId,
                     'companyId' => $companyId,
