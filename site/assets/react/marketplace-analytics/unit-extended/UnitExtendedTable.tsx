@@ -190,9 +190,8 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
 
         const hasHorizontalOverflow = wrapper.scrollWidth > wrapper.clientWidth;
         const rect = wrapper.getBoundingClientRect();
-        const tableStarted = rect.top < window.innerHeight;
-        const tableBottomBelowViewport = rect.bottom > window.innerHeight;
-        const shouldShow = hasHorizontalOverflow && tableStarted && tableBottomBelowViewport;
+        const isTableVisible = rect.top < window.innerHeight && rect.bottom > 0;
+        const shouldShow = hasHorizontalOverflow && isTableVisible;
 
         setShowFloatingScrollbar(shouldShow);
         setFloatingScrollbarStyle({
