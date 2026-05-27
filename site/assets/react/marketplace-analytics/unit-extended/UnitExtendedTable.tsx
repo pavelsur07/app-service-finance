@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import type { UnitExtendedItem, UnitExtendedTotals } from './unitExtended.types';
 import CostsBreakdown from './CostsBreakdown';
@@ -37,6 +37,22 @@ interface UnitExtendedTableProps {
 const TABLE_STYLES = `
 .ue-ext-scroll {
     overflow-x: auto;
+}
+.ue-ext-floating-scrollbar {
+    position: fixed;
+    bottom: 0;
+    height: 16px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    z-index: 1045;
+    background: var(--tblr-bg-surface);
+    border-top: 1px solid var(--tblr-border-color);
+}
+.ue-ext-floating-scrollbar.is-hidden {
+    display: none;
+}
+.ue-ext-floating-scrollbar-inner {
+    height: 1px;
 }
 .ue-ext-table {
     border-collapse: separate;
@@ -90,6 +106,11 @@ type ExpandedType = 'other' | 'all';
 interface ExpandedState {
     listingId: string;
     type: ExpandedType;
+}
+
+interface FloatingScrollbarStyle {
+    left: string;
+    width: string;
 }
 
 const HEADERS: { field: SortField; label: string; align?: string; tooltip?: string }[] = [
@@ -151,6 +172,38 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
     const { tableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
+    const floatingScrollbarRef = useRef<HTMLDivElement | null>(null);
+    const [showFloatingScrollbar, setShowFloatingScrollbar] = useState(false);
+    const [floatingScrollbarStyle, setFloatingScrollbarStyle] = useState<FloatingScrollbarStyle>({
+        left: '0px',
+        width: '0px',
+    });
+    const isSyncingRef = useRef(false);
+
+    const syncFloatingState = useCallback(() => {
+        const wrapper = tableWrapperRef.current;
+        const floating = floatingScrollbarRef.current;
+        if (!wrapper || !floating) {
+            setShowFloatingScrollbar(false);
+            return;
+        }
+
+        const hasHorizontalOverflow = wrapper.scrollWidth > wrapper.clientWidth;
+        const rect = wrapper.getBoundingClientRect();
+        const tableStarted = rect.top < window.innerHeight;
+        const tableBottomBelowViewport = rect.bottom > window.innerHeight;
+        const shouldShow = hasHorizontalOverflow && tableStarted && tableBottomBelowViewport;
+
+        setShowFloatingScrollbar(shouldShow);
+        setFloatingScrollbarStyle({
+            left: `${rect.left}px`,
+            width: `${rect.width}px`,
+        });
+
+        if (floating.scrollLeft !== wrapper.scrollLeft) {
+            floating.scrollLeft = wrapper.scrollLeft;
+        }
+    }, [tableWrapperRef]);
 
     const sorted = useMemo(() => {
         const copy = [...items];
@@ -178,6 +231,61 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
             return { listingId, type };
         });
     };
+
+    useEffect(() => {
+        const wrapper = tableWrapperRef.current;
+        const floating = floatingScrollbarRef.current;
+        if (!wrapper || !floating) return;
+
+        const syncWidths = () => {
+            const inner = floating.firstElementChild as HTMLDivElement | null;
+            if (!inner) return;
+            inner.style.width = `${wrapper.scrollWidth}px`;
+            syncFloatingState();
+        };
+
+        const onWrapperScroll = () => {
+            if (isSyncingRef.current) return;
+            if (floating.scrollLeft !== wrapper.scrollLeft) {
+                isSyncingRef.current = true;
+                floating.scrollLeft = wrapper.scrollLeft;
+                isSyncingRef.current = false;
+            }
+        };
+
+        const onFloatingScroll = () => {
+            if (isSyncingRef.current) return;
+            if (wrapper.scrollLeft !== floating.scrollLeft) {
+                isSyncingRef.current = true;
+                wrapper.scrollLeft = floating.scrollLeft;
+                isSyncingRef.current = false;
+            }
+        };
+
+        wrapper.addEventListener('scroll', onWrapperScroll);
+        floating.addEventListener('scroll', onFloatingScroll);
+        window.addEventListener('scroll', syncFloatingState, { passive: true });
+        window.addEventListener('resize', syncWidths);
+
+        let resizeObserver: ResizeObserver | null = null;
+        if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver(syncWidths);
+            resizeObserver.observe(wrapper);
+            if (wrapper.firstElementChild) {
+                resizeObserver.observe(wrapper.firstElementChild);
+            }
+        }
+
+        syncWidths();
+
+        return () => {
+            wrapper.removeEventListener('scroll', onWrapperScroll);
+            floating.removeEventListener('scroll', onFloatingScroll);
+            window.removeEventListener('scroll', syncFloatingState);
+            window.removeEventListener('resize', syncWidths);
+            resizeObserver?.disconnect();
+        };
+    }, [items, totals, syncFloatingState, tableWrapperRef]);
 
     // Renders header row for both the real thead and the portal clone.
     // When `widths` are provided (clone mode), each th gets a fixed pixel width.
@@ -416,6 +524,17 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
                     )}
                 </table>
             </div>
+            {createPortal(
+                <div
+                    ref={floatingScrollbarRef}
+                    className={`ue-ext-floating-scrollbar ${showFloatingScrollbar ? '' : 'is-hidden'}`}
+                    style={floatingScrollbarStyle}
+                    aria-hidden="true"
+                >
+                    <div className="ue-ext-floating-scrollbar-inner" />
+                </div>,
+                document.body
+            )}
         </>
     );
 };
