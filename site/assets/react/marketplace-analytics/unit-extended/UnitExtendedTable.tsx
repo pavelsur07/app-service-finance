@@ -188,8 +188,14 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
             return;
         }
 
-        const hasHorizontalOverflow = wrapper.scrollWidth > wrapper.clientWidth;
+        const table = wrapper.querySelector('.ue-ext-table') as HTMLTableElement | null;
+        const contentScrollWidth = table?.scrollWidth ?? wrapper.scrollWidth;
         const rect = wrapper.getBoundingClientRect();
+        if (wrapper.clientWidth === 0 || rect.width === 0) {
+            setShowFloatingScrollbar(false);
+            return;
+        }
+        const hasHorizontalOverflow = contentScrollWidth > wrapper.clientWidth + 1;
         const isTableVisible = rect.top < window.innerHeight && rect.bottom > 0;
         const shouldShow = hasHorizontalOverflow && isTableVisible;
 
@@ -239,7 +245,9 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         const syncWidths = () => {
             const inner = floating.firstElementChild as HTMLDivElement | null;
             if (!inner) return;
-            inner.style.width = `${wrapper.scrollWidth}px`;
+            const table = wrapper.querySelector('.ue-ext-table') as HTMLTableElement | null;
+            const contentScrollWidth = table?.scrollWidth ?? wrapper.scrollWidth;
+            inner.style.width = `${contentScrollWidth}px`;
             syncFloatingState();
         };
 
