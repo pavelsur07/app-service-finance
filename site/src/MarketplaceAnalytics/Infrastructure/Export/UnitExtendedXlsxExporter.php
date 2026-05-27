@@ -18,6 +18,7 @@ final readonly class UnitExtendedXlsxExporter
     private const FORMAT_MONEY = '#,##0.00 "₽"';
     private const FORMAT_PERCENT = '0.00"%"';
     private const FORMAT_INTEGER = '#,##0';
+    private const FORMAT_NUMBER = '#,##0.###';
 
     private const HEADER_BG_COLOR = '2563EB';
 
@@ -37,6 +38,8 @@ final readonly class UnitExtendedXlsxExporter
         ['label' => 'Возвраты',        'field' => 'returnsTotal',   'type' => 'money'],
         ['label' => 'Себестоимость',   'field' => 'costPriceTotal', 'type' => 'money'],
         ['label' => 'Себест. ед.',     'field' => 'costPriceUnit',  'type' => 'money'],
+        ['label' => 'Ост. шт.',        'field' => 'stockQty',      'type' => 'number'],
+        ['label' => 'Кап. р.',         'field' => 'stockCapitalRub','type' => 'money'],
         ['label' => 'Комиссия',        'field' => 'commission',     'type' => 'money'],
         ['label' => 'РР',              'field' => 'adSpend',        'type' => 'money'],
         ['label' => 'ДРР(п) %',        'field' => 'drrPercent',     'type' => 'percent'],
@@ -153,7 +156,7 @@ final readonly class UnitExtendedXlsxExporter
             }
 
             // Totals are computed per-listing and not aggregated for these fields.
-            if (in_array($column['field'], ['title', 'marketplace', 'sellerArticle', 'costPriceUnit'], true)) {
+            if (in_array($column['field'], ['title', 'marketplace', 'sellerArticle', 'costPriceUnit', 'stockQty', 'stockCapitalRub'], true)) {
                 $cells[] = Cell::fromValue('', $styles['blank']);
 
                 continue;
@@ -175,6 +178,7 @@ final readonly class UnitExtendedXlsxExporter
         return match ($type) {
             'money', 'percent' => Cell::fromValue((float) $value, $style),
             'integer' => Cell::fromValue((int) $value, $style),
+            'number' => Cell::fromValue((float) $value, $style),
             default => Cell::fromValue((string) $value, $style),
         };
     }
@@ -189,6 +193,7 @@ final readonly class UnitExtendedXlsxExporter
             'money' => (new Style())->setFormat(self::FORMAT_MONEY),
             'integer' => (new Style())->setFormat(self::FORMAT_INTEGER),
             'percent' => (new Style())->setFormat(self::FORMAT_PERCENT),
+            'number' => (new Style())->setFormat(self::FORMAT_NUMBER),
         ];
     }
 
@@ -203,6 +208,7 @@ final readonly class UnitExtendedXlsxExporter
             'money' => (new Style())->setFontBold()->setFormat(self::FORMAT_MONEY),
             'integer' => (new Style())->setFontBold()->setFormat(self::FORMAT_INTEGER),
             'percent' => (new Style())->setFontBold()->setFormat(self::FORMAT_PERCENT),
+            'number' => (new Style())->setFontBold()->setFormat(self::FORMAT_NUMBER),
         ];
     }
 }

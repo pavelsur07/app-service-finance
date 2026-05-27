@@ -9,6 +9,7 @@ use App\Marketplace\DTO\ListingMetaDTO;
 use App\Marketplace\DTO\ListingReturnAggregateDTO;
 use App\Marketplace\DTO\ListingSalesAggregateDTO;
 use App\Marketplace\Facade\MarketplaceFacade;
+use App\Inventory\Facade\InventoryFacade;
 use App\MarketplaceAds\Facade\MarketplaceAdsFacade;
 use App\MarketplaceAnalytics\Application\Service\MarketplaceCostAnalyticsGroupResolver;
 use App\MarketplaceAnalytics\Infrastructure\Query\UnitExtendedQuery;
@@ -22,15 +23,18 @@ final class UnitExtendedQueryTest extends TestCase
 
     private MarketplaceFacade $marketplaceFacade;
     private MarketplaceAdsFacade $adsFacade;
+    private InventoryFacade $inventoryFacade;
     private UnitExtendedQuery $query;
 
     protected function setUp(): void
     {
         $this->marketplaceFacade = $this->createMock(MarketplaceFacade::class);
         $this->adsFacade = $this->createMock(MarketplaceAdsFacade::class);
+        $this->inventoryFacade = $this->createMock(InventoryFacade::class);
         $this->query = new UnitExtendedQuery(
             $this->marketplaceFacade,
             $this->adsFacade,
+            $this->inventoryFacade,
             new MarketplaceCostAnalyticsGroupResolver(),
         );
 
@@ -38,6 +42,7 @@ final class UnitExtendedQueryTest extends TestCase
         $this->marketplaceFacade->method('getReturnAggregatesByListing')->willReturn([]);
         $this->marketplaceFacade->method('getCostAggregatesByListing')->willReturn([]);
         $this->marketplaceFacade->method('getListingsMetaByIds')->willReturn([]);
+        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn([]);
     }
 
     public function testRowFormulaWithAdSpend(): void
@@ -63,6 +68,8 @@ final class UnitExtendedQueryTest extends TestCase
         self::assertSame(55.0, $row['marginPercent']);
         // roiPercent = 550 / 300 * 100 = 183.3
         self::assertSame(183.3, $row['roiPercent']);
+        self::assertSame(0.0, $row['stockQty']);
+        self::assertSame(0.0, $row['stockCapitalRub']);
     }
 
     public function testRowDrrPercentIsNullWhenRevenueIsZero(): void
@@ -242,6 +249,39 @@ final class UnitExtendedQueryTest extends TestCase
             ->willReturn('0');
 
         $this->query->execute(self::COMPANY_ID, $marketplaceArg, self::PERIOD_FROM, self::PERIOD_TO);
+    }
+
+
+    public function testStockQtyAndCapitalCalculatedFromInventoryFacade(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-stock', 'Товар', 'SKU-ST', 'ozon', '1000.00', 5, '300.00', 5),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn(['l-stock' => 12.5]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-stock');
+        self::assertNotNull($row);
+        self::assertSame(12.5, $row['stockQty']);
+        self::assertSame(750.0, $row['stockCapitalRub']);
+    }
+
+    public function testStockCapitalIsZeroWhenUnitCostIsZero(): void
+    {
+        $this->stubSales([
+            new ListingSalesAggregateDTO('l-zero', 'Товар', 'SKU-0', 'ozon', '100.00', 1, '0.00', 0),
+        ]);
+        $this->stubAdSpend([]);
+        $this->stubTotalAdSpend('0');
+        $this->inventoryFacade->method('getStockQtyByListingOnReportDate')->willReturn(['l-zero' => 7.0]);
+
+        $result = $this->execute();
+        $row = $this->findRow($result['items'], 'l-zero');
+        self::assertNotNull($row);
+        self::assertSame(0.0, $row['costPriceUnit']);
+        self::assertSame(0.0, $row['stockCapitalRub']);
     }
 
     public function testEmptyEverythingProducesZeroTotals(): void
