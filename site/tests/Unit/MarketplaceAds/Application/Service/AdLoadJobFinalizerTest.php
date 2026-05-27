@@ -93,6 +93,7 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(3)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->expects(self::once())
             ->method('countCompletedChunks')
             ->willReturn(2);
@@ -109,6 +110,7 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(1)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->method('countCompletedChunks')->willReturn(1);
         // 5 total, 3 processed + 1 failed = 4 терминальных, остался 1 DRAFT.
         $this->mockDocCounts(total: 5, processed: 3, failed: 1);
@@ -124,6 +126,7 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(2)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->method('countCompletedChunks')->willReturn(2);
         $this->mockDocCounts(total: 5, processed: 5, failed: 0);
 
@@ -131,6 +134,7 @@ final class AdLoadJobFinalizerTest extends TestCase
             ->method('markCompleted')
             ->with(self::JOB_ID, self::COMPANY_ID)
             ->willReturn(1);
+        $this->batchRepo->expects(self::never())->method('abandonNonTerminalBatchesForTerminalJob');
         $this->jobRepo->expects(self::never())->method('markFailed');
 
         $this->finalizer->tryFinalize(self::JOB_ID, self::COMPANY_ID);
@@ -141,6 +145,7 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(2)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->method('countCompletedChunks')->willReturn(2);
         $this->mockDocCounts(total: 5, processed: 3, failed: 2);
 
@@ -153,6 +158,9 @@ final class AdLoadJobFinalizerTest extends TestCase
                 'Partial failure: 2 of 5 documents failed',
             )
             ->willReturn(1);
+        $this->batchRepo->expects(self::once())
+            ->method('abandonNonTerminalBatchesForTerminalJob')
+            ->with(self::JOB_ID, 'Abandoned because parent job became terminal: failed');
 
         $this->finalizer->tryFinalize(self::JOB_ID, self::COMPANY_ID);
     }
@@ -164,12 +172,14 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(1)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->method('countCompletedChunks')->willReturn(1);
         $this->mockDocCounts(total: 1, processed: 1, failed: 0);
 
         $this->jobRepo->expects(self::once())
             ->method('markCompleted')
             ->willReturn(0);
+        $this->batchRepo->expects(self::never())->method('abandonNonTerminalBatchesForTerminalJob');
         $this->jobRepo->expects(self::never())->method('markFailed');
 
         $this->finalizer->tryFinalize(self::JOB_ID, self::COMPANY_ID);
@@ -183,6 +193,7 @@ final class AdLoadJobFinalizerTest extends TestCase
         $job = $this->buildJob()->withChunksTotal(1)->asRunning()->build();
 
         $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->method('countStatesForJob')->willReturn([]);
         $this->chunkRepo->method('countCompletedChunks')->willReturn(1);
         $this->mockDocCounts(total: 0, processed: 0, failed: 0);
 
@@ -190,7 +201,27 @@ final class AdLoadJobFinalizerTest extends TestCase
             ->method('markCompleted')
             ->with(self::JOB_ID, self::COMPANY_ID)
             ->willReturn(1);
+        $this->batchRepo->expects(self::never())->method('abandonNonTerminalBatchesForTerminalJob');
         $this->jobRepo->expects(self::never())->method('markFailed');
+
+        $this->finalizer->tryFinalize(self::JOB_ID, self::COMPANY_ID);
+    }
+
+    public function testCronDrivenJobIsSkippedByRawFinalizer(): void
+    {
+        $job = $this->buildJob()->withChunksTotal(6)->asRunning()->build();
+
+        $this->jobRepo->method('findByIdAndCompany')->willReturn($job);
+        $this->batchRepo->expects(self::once())
+            ->method('countStatesForJob')
+            ->with(self::JOB_ID, self::COMPANY_ID)
+            ->willReturn(['OK' => 1, 'PLANNED' => 5]);
+
+        $this->chunkRepo->expects(self::never())->method('countCompletedChunks');
+        $this->rawDocRepo->expects(self::never())->method('countByCompanyMarketplaceAndDateRange');
+        $this->jobRepo->expects(self::never())->method('markCompleted');
+        $this->jobRepo->expects(self::never())->method('markFailed');
+        $this->batchRepo->expects(self::never())->method('abandonNonTerminalBatchesForTerminalJob');
 
         $this->finalizer->tryFinalize(self::JOB_ID, self::COMPANY_ID);
     }
