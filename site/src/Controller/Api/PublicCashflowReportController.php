@@ -1,8 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller\Api;
 
 use App\Company\Service\ReportApiKeyManager;
+use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportRequestMapper;
 use App\Shared\Service\RateLimiter\ReportsApiRateLimiter;
@@ -19,6 +22,7 @@ final class PublicCashflowReportController extends AbstractController
         private readonly ReportApiKeyManager $keys,
         private readonly CashflowReportRequestMapper $mapper,
         private readonly CashflowReportBuilder $builder,
+        private readonly CashflowReportJsonFormatter $jsonFormatter,
         private readonly ReportsApiRateLimiter $rateLimiter,
     ) {
     }
@@ -43,28 +47,7 @@ final class PublicCashflowReportController extends AbstractController
         $params = $this->mapper->fromRequest($r, $company);
         $payload = $this->builder->build($params);
 
-        return $this->json([
-            'company' => $payload['company']->getId(),
-            'group' => $payload['group'],
-            'date_from' => $payload['date_from']->format('Y-m-d'),
-            'date_to' => $payload['date_to']->format('Y-m-d'),
-            'periods' => array_map(fn ($p) => [
-                'start' => $p['start']->format('Y-m-d'),
-                'end' => $p['end']->format('Y-m-d'),
-                'label' => $p['label'],
-            ], $payload['periods']),
-            'categories' => array_map(fn ($c) => ['id' => $c->getId(), 'name' => $c->getName()], $payload['categories']),
-            'categoryTotals' => array_map(
-                static fn (array $row): array => [
-                    'totals' => $row['totals'],
-                ],
-                $payload['categoryTotals']
-            ),
-            'openings' => $payload['openings'],
-            'closings' => $payload['closings'],
-            'tree' => $payload['tree'],
-            'categoryTree' => $payload['categoryTree'],
-        ]);
+        return $this->json($this->jsonFormatter->format($payload));
     }
 
     #[Route('/api/public/reports/cashflow.csv', name: 'api_report_cashflow_csv', methods: ['GET'])]
@@ -92,7 +75,7 @@ final class PublicCashflowReportController extends AbstractController
         $openings = $payload['openings'];
         $closings = $payload['closings'];
 
-        $resp = new StreamedResponse(function () use ($periods, $categoryTotals, $openings, $closings) {
+        $resp = new StreamedResponse(static function () use ($periods, $categoryTotals, $openings, $closings) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Период', 'КатегорияID', 'Валюта', 'Сальдо нач.', 'Нетто', 'Сальдо кон.']);
             foreach ($periods as $i => $p) {
