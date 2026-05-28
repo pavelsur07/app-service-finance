@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller\Finance;
 
+use App\Finance\Infrastructure\Normalizer\CashflowReportJsonFormatter;
 use App\Report\Cashflow\CashflowReportBuilder;
 use App\Report\Cashflow\CashflowReportParams;
 use App\Report\Cashflow\CashflowReportRequestMapper;
@@ -20,6 +23,7 @@ class ReportCashflowController extends AbstractController
         private ActiveCompanyService $activeCompanyService,
         private CashflowReportRequestMapper $mapper,
         private CashflowReportBuilder $builder,
+        private CashflowReportJsonFormatter $jsonFormatter,
     ) {
     }
 
@@ -31,40 +35,15 @@ class ReportCashflowController extends AbstractController
         $params = $this->mapper->fromRequest($request, $company);
         $payload = $this->builder->build($params);
 
-        $dateFrom = $payload['date_from']->format('Y-m-d');
-        $dateTo = $payload['date_to']->format('Y-m-d');
-
-        $response = new JsonResponse([
-            'exported_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
-            'filters' => [
-                'group' => $payload['group'],
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
-            ],
-            'company' => $payload['company']->getId(),
-            'group' => $payload['group'],
-            'date_from' => $dateFrom,
-            'date_to' => $dateTo,
-            'periods' => array_map(static fn (array $period): array => [
-                'start' => $period['start']->format('Y-m-d'),
-                'end' => $period['end']->format('Y-m-d'),
-                'label' => $period['label'],
-            ], $payload['periods']),
-            'categories' => array_map(static fn ($category): array => [
-                'id' => $category->getId(),
-                'name' => $category->getName(),
-            ], $payload['categories']),
-            'openings' => $payload['openings'],
-            'closings' => $payload['closings'],
-            'tree' => $payload['tree'],
-            'categoryTree' => $payload['categoryTree'],
-            'categoryTotals' => array_map(
-                static fn (array $row): array => [
-                    'totals' => $row['totals'],
-                ],
-                $payload['categoryTotals']
-            ),
+        $formatted = $this->jsonFormatter->format($payload, [
+            'include_exported_at' => true,
+            'dataset' => 'cashflow',
+            'include_filters' => true,
         ]);
+        $dateFrom = $formatted['date_from'];
+        $dateTo = $formatted['date_to'];
+
+        $response = new JsonResponse($formatted);
         $response->setEncodingOptions(\JSON_PRETTY_PRINT | \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES);
         $response->headers->set(
             'Content-Disposition',
