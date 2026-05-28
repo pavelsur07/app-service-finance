@@ -37,6 +37,8 @@ interface UnitExtendedTableProps {
 const TABLE_STYLES = `
 .ue-ext-scroll {
     overflow-x: auto;
+    max-width: 100%;
+    width: 100%;
 }
 .ue-ext-floating-scrollbar {
     position: fixed;
@@ -113,6 +115,26 @@ interface FloatingScrollbarStyle {
     width: string;
 }
 
+function isHorizontallyScrollable(node: HTMLElement | null): boolean {
+    return Boolean(node && node.scrollWidth > node.clientWidth + 1);
+}
+
+function resolveScrollContainer(wrapper: HTMLDivElement | null): HTMLElement | null {
+    if (!wrapper) return null;
+    if (isHorizontallyScrollable(wrapper)) return wrapper;
+    let current: HTMLElement | null = wrapper.parentElement;
+    while (current !== null) {
+        if (current === document.body || current === document.documentElement) {
+            break;
+        }
+        if (isHorizontallyScrollable(current)) {
+            return current;
+        }
+        current = current.parentElement;
+    }
+    return wrapper;
+}
+
 const HEADERS: { field: SortField; label: string; align?: string; tooltip?: string }[] = [
     { field: 'sku', label: 'SKU' },
     { field: 'title', label: 'Наименование' },
@@ -171,7 +193,7 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     const [sortField, setSortField] = useState<SortField>('revenue');
     const [sortDir, setSortDir] = useState<SortDir>('desc');
     const [expanded, setExpanded] = useState<ExpandedState | null>(null);
-    const { tableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
+    const { tableWrapperRef: fixedHeaderTableWrapperRef, theadRef, showFixed, columnWidths, scrollLeft, wrapperRect } = useFixedHeader();
     const floatingScrollbarRef = useRef<HTMLDivElement | null>(null);
     const [showFloatingScrollbar, setShowFloatingScrollbar] = useState(false);
     const [floatingScrollbarStyle, setFloatingScrollbarStyle] = useState<FloatingScrollbarStyle>({
@@ -179,11 +201,23 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         width: '0px',
     });
     const isSyncingRef = useRef(false);
+    const wrapperNodeRef = useRef<HTMLDivElement | null>(null);
+    const scrollContainerRef = useRef<HTMLElement | null>(null);
+
+    const tableWrapperRef = useCallback((node: HTMLDivElement | null) => {
+        wrapperNodeRef.current = node;
+        fixedHeaderTableWrapperRef(node);
+    }, [fixedHeaderTableWrapperRef]);
 
     const syncFloatingState = useCallback(() => {
-        const wrapper = tableWrapperRef.current;
+        const wrapper = wrapperNodeRef.current;
         const floating = floatingScrollbarRef.current;
         if (!wrapper || !floating) {
+            setShowFloatingScrollbar(false);
+            return;
+        }
+        const scrollContainer = scrollContainerRef.current ?? wrapper;
+        if (!scrollContainer) {
             setShowFloatingScrollbar(false);
             return;
         }
@@ -191,24 +225,30 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         const table = wrapper.querySelector('.ue-ext-table') as HTMLTableElement | null;
         const contentScrollWidth = table?.scrollWidth ?? wrapper.scrollWidth;
         const rect = wrapper.getBoundingClientRect();
-        if (wrapper.clientWidth === 0 || rect.width === 0) {
+        const viewportLeft = Math.max(rect.left, 0);
+        const viewportRight = Math.min(rect.right, window.innerWidth);
+        const visibleWidth = Math.max(0, viewportRight - viewportLeft);
+        if (visibleWidth === 0 || rect.width === 0) {
             setShowFloatingScrollbar(false);
             return;
         }
-        const hasHorizontalOverflow = contentScrollWidth > wrapper.clientWidth + 1;
+        const hasHorizontalOverflow = contentScrollWidth > visibleWidth + 1;
         const isTableVisible = rect.top < window.innerHeight && rect.bottom > 0;
         const shouldShow = hasHorizontalOverflow && isTableVisible;
 
         setShowFloatingScrollbar(shouldShow);
+        const left = Math.max(rect.left, 0);
+        const right = Math.min(rect.right, window.innerWidth);
+        const width = Math.max(0, right - left);
         setFloatingScrollbarStyle({
-            left: `${rect.left}px`,
-            width: `${rect.width}px`,
+            left: `${left}px`,
+            width: `${width}px`,
         });
 
-        if (floating.scrollLeft !== wrapper.scrollLeft) {
-            floating.scrollLeft = wrapper.scrollLeft;
+        if (floating.scrollLeft !== scrollContainer.scrollLeft) {
+            floating.scrollLeft = scrollContainer.scrollLeft;
         }
-    }, [tableWrapperRef]);
+    }, []);
 
     const sorted = useMemo(() => {
         const copy = [...items];
@@ -238,9 +278,12 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
     };
 
     useEffect(() => {
-        const wrapper = tableWrapperRef.current;
+        const wrapper = wrapperNodeRef.current;
         const floating = floatingScrollbarRef.current;
         if (!wrapper || !floating) return;
+        const scrollContainer = resolveScrollContainer(wrapper) ?? wrapper;
+        scrollContainerRef.current = scrollContainer;
+        if (!scrollContainer) return;
 
         const syncWidths = () => {
             const inner = floating.firstElementChild as HTMLDivElement | null;
@@ -253,23 +296,27 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
 
         const onWrapperScroll = () => {
             if (isSyncingRef.current) return;
-            if (floating.scrollLeft !== wrapper.scrollLeft) {
+            const nextScrollContainer = scrollContainerRef.current ?? scrollContainer;
+            if (!nextScrollContainer) return;
+            if (floating.scrollLeft !== nextScrollContainer.scrollLeft) {
                 isSyncingRef.current = true;
-                floating.scrollLeft = wrapper.scrollLeft;
+                floating.scrollLeft = nextScrollContainer.scrollLeft;
                 isSyncingRef.current = false;
             }
         };
 
         const onFloatingScroll = () => {
             if (isSyncingRef.current) return;
-            if (wrapper.scrollLeft !== floating.scrollLeft) {
+            const nextScrollContainer = scrollContainerRef.current ?? scrollContainer;
+            if (!nextScrollContainer) return;
+            if (nextScrollContainer.scrollLeft !== floating.scrollLeft) {
                 isSyncingRef.current = true;
-                wrapper.scrollLeft = floating.scrollLeft;
+                nextScrollContainer.scrollLeft = floating.scrollLeft;
                 isSyncingRef.current = false;
             }
         };
 
-        wrapper.addEventListener('scroll', onWrapperScroll);
+        scrollContainer.addEventListener('scroll', onWrapperScroll);
         floating.addEventListener('scroll', onFloatingScroll);
         window.addEventListener('scroll', syncFloatingState, { passive: true });
         window.addEventListener('resize', syncWidths);
@@ -286,13 +333,13 @@ const UnitExtendedTable: React.FC<UnitExtendedTableProps> = ({ items, totals, is
         syncWidths();
 
         return () => {
-            wrapper.removeEventListener('scroll', onWrapperScroll);
+            scrollContainer.removeEventListener('scroll', onWrapperScroll);
             floating.removeEventListener('scroll', onFloatingScroll);
             window.removeEventListener('scroll', syncFloatingState);
             window.removeEventListener('resize', syncWidths);
             resizeObserver?.disconnect();
         };
-    }, [items, totals, syncFloatingState, tableWrapperRef]);
+    }, [items, totals, syncFloatingState]);
 
     // Renders header row for both the real thead and the portal clone.
     // When `widths` are provided (clone mode), each th gets a fixed pixel width.
