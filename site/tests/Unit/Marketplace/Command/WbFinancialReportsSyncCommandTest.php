@@ -60,15 +60,79 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         self::assertSame(Command::FAILURE, $code);
     }
 
+    public function testDefaultModeRunsDailyOnly(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(1);
+
+        $this->planner->expects(self::never())->method('planInitial');
+        $this->planner->expects(self::never())->method('planRefresh14Days');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        $tester = $this->tester();
+        $code = $tester->execute([]);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testAllWithoutAllowAllReturnsFailureAndWarns(): void
+    {
+        $this->planner->expects(self::never())->method('planDaily');
+        $this->planner->expects(self::never())->method('planInitial');
+        $this->planner->expects(self::never())->method('planRefresh14Days');
+        $this->planner->expects(self::never())->method('planMissing');
+
+        $tester = $this->tester();
+
+        $code = $tester->execute(['--mode' => 'all']);
+
+        self::assertSame(Command::FAILURE, $code);
+        self::assertStringContainsString(
+            'WB financial reports --mode=all is dangerous for cron because it can enqueue many days and hit WB API rate limits.',
+            $tester->getDisplay(),
+        );
+    }
+
     public function testAllWithDateReturnsFailure(): void
     {
         $tester = $this->tester();
 
-        $code = $tester->execute(['--mode' => 'all', '--date' => '2026-05-19']);
+        $code = $tester->execute(['--mode' => 'all', '--allow-all' => true, '--date' => '2026-05-19']);
 
         self::assertSame(Command::FAILURE, $code);
     }
 
+    public function testAllWithAllowAllRunsAllModes(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planInitial')
+            ->with(null, null)
+            ->willReturn(1);
+        $this->planner
+            ->expects(self::once())
+            ->method('planDaily')
+            ->with(null, null, false)
+            ->willReturn(2);
+        $this->planner
+            ->expects(self::once())
+            ->method('planRefresh14Days')
+            ->with(null, null, 1)
+            ->willReturn(3);
+        $this->planner
+            ->expects(self::once())
+            ->method('planMissing')
+            ->with(null, null, 1)
+            ->willReturn(4);
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'all', '--allow-all' => true]);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
 
     public function testMissingWithDateReturnsFailureAndDoesNotCallPlanMissing(): void
     {

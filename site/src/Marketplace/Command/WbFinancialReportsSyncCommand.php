@@ -37,7 +37,8 @@ final class WbFinancialReportsSyncCommand extends Command
     protected function configure(): void
     {
         $this
-            ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'all|initial|daily|refresh14|missing', 'all')
+            ->addOption('mode', null, InputOption::VALUE_REQUIRED, 'all|initial|daily|refresh14|missing', 'daily')
+            ->addOption('allow-all', null, InputOption::VALUE_NONE)
             ->addOption('company-id', null, InputOption::VALUE_OPTIONAL)
             ->addOption('connection-id', null, InputOption::VALUE_OPTIONAL)
             ->addOption('date', null, InputOption::VALUE_OPTIONAL, 'Дата для single-day запуска (Y-m-d)')
@@ -57,6 +58,12 @@ final class WbFinancialReportsSyncCommand extends Command
 
         try {
             $mode = $this->resolveMode((string) $input->getOption('mode'));
+
+            if ('all' === $mode && !(bool) $input->getOption('allow-all')) {
+                $io->warning('WB financial reports --mode=all is dangerous for cron because it can enqueue many days and hit WB API rate limits.');
+
+                return Command::FAILURE;
+            }
             $companyId = $this->normalizeOptional((string) $input->getOption('company-id'));
             $connectionId = $this->normalizeOptional((string) $input->getOption('connection-id'));
             $force = (bool) $input->getOption('force');
