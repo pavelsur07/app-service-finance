@@ -21,6 +21,7 @@ final readonly class WbFinanceSalesReportClient
     private const PAGE_SIZE = 100000;
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
+    private const SALES_REPORTS_RATE_LIMIT_KEY_PREFIX = 'wb_finance_sales_reports';
 
     private LoggerInterface $logger;
     private WbFinanceRateLimiter $rateLimiter;
@@ -40,17 +41,21 @@ final readonly class WbFinanceSalesReportClient
     {
         $date = $businessDate->format('Y-m-d');
 
-        return $this->fetchDetailedInternal($apiKey, $date, $date, $connectionId);
-    }
-
-    /** @return list<array<string,mixed>> */
-    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): array
-    {
-        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, $connectionId);
+        return $this->fetchDetailedInternal($apiKey, $date, $date);
     }
 
     /**
-     * @deprecated Use fetchDetailedForConnection() in production flows to ensure local throttling per connection.
+     * The $connectionId parameter is retained for caller context compatibility; throttling is per seller WB API token.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): array
+    {
+        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
+    }
+
+    /**
+     * @deprecated Use fetchDetailedForConnection() in production flows when connection context is available; local throttling is per seller WB API token, not per connection.
      *
      * @return list<array<string,mixed>>
      */
@@ -60,15 +65,15 @@ final readonly class WbFinanceSalesReportClient
     }
 
     /** @return list<array<string,mixed>> */
-    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo, ?string $connectionId = null): array
+    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo): array
     {
         $rows = [];
         $rrdId = 0;
+        $tokenHash = hash('sha256', $apiKey);
+        $sellerRateLimitKey = $this->buildSalesReportsRateLimitKey($tokenHash);
 
         while (true) {
-            if (null !== $connectionId) {
-                $this->rateLimiter->wait($connectionId);
-            }
+            $this->rateLimiter->wait($sellerRateLimitKey);
             try {
                 $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
                     'headers' => ['Authorization' => $apiKey],
@@ -224,7 +229,8 @@ final readonly class WbFinanceSalesReportClient
 
     public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): bool
     {
-        $this->rateLimiter->wait($connectionId);
+        $tokenHash = hash('sha256', $apiKey);
+        $this->rateLimiter->wait($this->buildSalesReportsRateLimitKey($tokenHash));
 
         return $this->hasAnyData($apiKey, $dateFrom, $dateTo);
     }
@@ -287,6 +293,11 @@ final readonly class WbFinanceSalesReportClient
         }
 
         return [] !== $decoded;
+    }
+
+    private function buildSalesReportsRateLimitKey(string $tokenHash): string
+    {
+        return self::SALES_REPORTS_RATE_LIMIT_KEY_PREFIX.':'.$tokenHash;
     }
 
     private function createSafeExcerpt(string $body): string

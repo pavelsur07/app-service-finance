@@ -11,6 +11,8 @@ use Psr\Log\NullLogger;
 
 final class WbFinanceRateLimiter
 {
+    private const HASH_PREFIX_LENGTH = 8;
+
     public function __construct(
         private readonly RateLimiterFactory $factory,
         private readonly ClockInterface $clock,
@@ -21,9 +23,9 @@ final class WbFinanceRateLimiter
 
     private LoggerInterface $logger;
 
-    public function wait(string $connectionId, int $tokens = 1): void
+    public function wait(string $sellerRateLimitKey, int $tokens = 1): void
     {
-        $limiter = $this->factory->create($this->buildKey($connectionId));
+        $limiter = $this->factory->create($sellerRateLimitKey);
 
         while (true) {
             $limit = $limiter->consume($tokens);
@@ -34,15 +36,18 @@ final class WbFinanceRateLimiter
             $retryAfter = $limit->getRetryAfter();
             $waitSeconds = max(1, $retryAfter->getTimestamp() - $this->clock->now()->getTimestamp());
             $this->logger->info('WB finance throttle wait.', [
-                'connection_id' => $connectionId,
+                'seller_token_hash_prefix' => $this->extractHashPrefix($sellerRateLimitKey),
                 'wait_seconds' => $waitSeconds,
             ]);
             $this->clock->sleep($waitSeconds);
         }
     }
 
-    private function buildKey(string $connectionId): string
+    private function extractHashPrefix(string $sellerRateLimitKey): string
     {
-        return sprintf('wb_finance:%s', $connectionId);
+        $separatorPosition = strrpos($sellerRateLimitKey, ':');
+        $hash = false === $separatorPosition ? $sellerRateLimitKey : substr($sellerRateLimitKey, $separatorPosition + 1);
+
+        return substr($hash, 0, self::HASH_PREFIX_LENGTH);
     }
 }

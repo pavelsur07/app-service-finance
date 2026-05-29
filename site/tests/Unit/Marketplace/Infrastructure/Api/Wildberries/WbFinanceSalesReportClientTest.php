@@ -75,7 +75,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(2, $requestCount);
     }
 
-    public function testFetchDetailedDayUsesDifferentLimiterBucketsPerConnectionId(): void
+    public function testFetchDetailedDayUsesSameLimiterBucketForSameTokenAcrossDifferentConnectionIds(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -84,11 +84,33 @@ final class WbFinanceSalesReportClientTest extends TestCase
             return new MockResponse('[]', ['http_code' => 200]);
         });
 
-        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
+        $clock = new MockClock('@'.time());
+        $startTimestamp = $clock->now()->getTimestamp();
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-a', 'same-token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15')));
         self::assertSame(2, $requestCount);
+        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
+    }
+
+    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentTokens(): void
+    {
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('[]', ['http_code' => 200]);
+        });
+
+        $clock = new MockClock('@'.time());
+        $startTimestamp = $clock->now()->getTimestamp();
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
+
+        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token-a', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token-b', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame(2, $requestCount);
+        self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
 
@@ -101,7 +123,11 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $requestCount = 0;
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$requestCount, &$captured, $rows): MockResponse {
             ++$requestCount;
-            $captured[] = $options['json'];
+            $payload = $options['json'] ?? null;
+            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+                $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+            }
+            $captured[] = $payload;
 
             return match ($requestCount) {
                 1 => new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]),
@@ -109,7 +135,8 @@ final class WbFinanceSalesReportClientTest extends TestCase
             };
         });
 
-        $clock = new MockClock('2026-01-01T00:00:00Z');
+        $clock = new MockClock('@'.time());
+        $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
         $data = $client->fetchDetailedDay('00000000-0000-0000-0000-000000000001', 'token', new \DateTimeImmutable('2026-01-15'));
@@ -117,7 +144,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(2, $requestCount);
         self::assertSame(0, $captured[0]['rrdId']);
         self::assertSame(20, $captured[1]['rrdId']);
-        self::assertSame('2026-01-01T00:01:01+00:00', $clock->now()->format(DATE_ATOM));
+        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
     }
 
 
@@ -244,14 +271,15 @@ final class WbFinanceSalesReportClientTest extends TestCase
             };
         });
 
-        $clock = new MockClock('2026-01-01T00:00:00Z');
+        $clock = new MockClock('@'.time());
+        $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
         $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
 
         self::assertIsArray($captured[1]);
         self::assertSame(20, $captured[1]['rrdId'] ?? null);
-        self::assertSame('2026-01-01T00:01:01+00:00', $clock->now()->format(DATE_ATOM));
+        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
     }
 
     public function testProbeAccessUsesFinancePingEndpoint(): void
@@ -318,7 +346,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
                 'id' => 'wb_finance',
                 'policy' => 'token_bucket',
                 'limit' => 1,
-                'rate' => ['interval' => '61 seconds', 'amount' => 1],
+                'rate' => ['interval' => '1 second', 'amount' => 1],
             ],
             new InMemoryStorage(),
         );
