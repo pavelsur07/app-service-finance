@@ -95,6 +95,120 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
         );
     }
 
+
+    public function testClaimForQueueCreatesQueuedStatusForMissingDay(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $day = new \DateTimeImmutable('2026-01-01 00:00:00');
+
+        $status = $this->repository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            $day,
+            FinancialReportSyncMode::DAILY,
+            false,
+            new \DateTimeImmutable('2026-01-05 12:00:00'),
+        );
+
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $status);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
+        self::assertSame(FinancialReportSyncMode::DAILY, $status->getMode());
+        self::assertNull($status->getNextRetryAt());
+    }
+
+    public function testClaimForQueueSkipsSuccessForDailyWithoutForceAndAllowsForce(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $connectionId = '22222222-2222-4222-8222-222222222222';
+        $this->seedActiveConnection($companyId, $connectionId);
+        $day = new \DateTimeImmutable('2026-01-01 00:00:00');
+        $this->persistStatus($companyId, $connectionId, '2026-01-01', FinancialReportSyncStatus::SUCCESS);
+
+        self::assertNull($this->repository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            $day,
+            FinancialReportSyncMode::DAILY,
+            false,
+            new \DateTimeImmutable('2026-01-05 12:00:00'),
+        ));
+
+        $status = $this->repository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            $day,
+            FinancialReportSyncMode::DAILY,
+            true,
+            new \DateTimeImmutable('2026-01-05 12:00:00'),
+        );
+
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $status);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
+    }
+
+    public function testClaimForQueueSkipsFutureRetryAndTerminalStatusesExceptManualForce(): void
+    {
+        $companyId = '11111111-1111-1111-1111-111111111111';
+        $retryConnectionId = '22222222-2222-4222-8222-222222222222';
+        $terminalConnectionId = '33333333-3333-4333-8333-333333333333';
+        $this->seedActiveConnection($companyId, $retryConnectionId);
+        $this->seedConnectionForExistingCompany($companyId, $terminalConnectionId);
+        $now = new \DateTimeImmutable('2026-01-05 12:00:00');
+
+        $this->persistStatus($companyId, $retryConnectionId, '2026-01-01', FinancialReportSyncStatus::FAILED, new \DateTimeImmutable('2026-01-05 13:00:00'));
+        $this->persistStatus($companyId, $terminalConnectionId, '2026-01-01', FinancialReportSyncStatus::AUTH_FAILED);
+
+        self::assertNull($this->repository->claimForQueue(
+            $retryConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            FinancialReportSyncMode::MISSING,
+            false,
+            $now,
+        ));
+        self::assertNull($this->repository->claimForQueue(
+            $terminalConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            FinancialReportSyncMode::DAILY,
+            true,
+            $now,
+        ));
+
+        $status = $this->repository->claimForQueue(
+            $terminalConnectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            'endpoint',
+            new \DateTimeImmutable('2026-01-01 00:00:00'),
+            FinancialReportSyncMode::MANUAL,
+            true,
+            $now,
+        );
+
+        self::assertInstanceOf(MarketplaceFinancialReportSyncStatus::class, $status);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
+        self::assertSame(FinancialReportSyncMode::MANUAL, $status->getMode());
+    }
+
     private function persistStatus(
         string $companyId,
         string $connectionId,
@@ -119,11 +233,29 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             FinancialReportSyncStatus::LOADING => $entity->markLoading(FinancialReportSyncMode::DAILY),
             FinancialReportSyncStatus::PROCESSING => $entity->markProcessing(),
             FinancialReportSyncStatus::FAILED => $entity->markFailedRetryable('TestException', 'failed', 500, null, $nextRetryAt),
+            FinancialReportSyncStatus::AUTH_FAILED => $entity->markAuthFailed('TestException', 'auth failed', 401, null),
+            FinancialReportSyncStatus::FAILED_FINAL => $entity->markFailedFinal('TestException', 'failed final', 500, null),
+            FinancialReportSyncStatus::CONFLICT => $entity->markConflict('TestException', 'conflict', 409, null),
             default => null,
         };
 
         $this->repository->save($entity);
         $this->em->flush();
+    }
+
+
+    private function seedConnectionForExistingCompany(string $companyId, string $connectionId): void
+    {
+        $this->em->getConnection()->insert('marketplace_connections', [
+            'id' => $connectionId,
+            'company_id' => $companyId,
+            'marketplace' => 'wildberries',
+            'connection_type' => 'seller',
+            'api_key' => 'encrypted-key',
+            'is_active' => true,
+            'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+        ]);
     }
 
     private function seedActiveConnection(string $companyId, string $connectionId): void
@@ -136,15 +268,6 @@ final class MarketplaceFinancialReportSyncStatusRepositoryTest extends Integrati
             $this->em->flush();
         }
 
-        $this->em->getConnection()->insert('marketplace_connections', [
-            'id' => $connectionId,
-            'company_id' => $companyId,
-            'marketplace' => 'wildberries',
-            'connection_type' => 'seller',
-            'api_key' => 'encrypted-key',
-            'is_active' => true,
-            'created_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-            'updated_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-        ]);
+        $this->seedConnectionForExistingCompany($companyId, $connectionId);
     }
 }

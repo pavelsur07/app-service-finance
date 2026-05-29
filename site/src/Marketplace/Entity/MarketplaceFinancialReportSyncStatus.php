@@ -147,6 +147,15 @@ class MarketplaceFinancialReportSyncStatus
     public function getCreatedAt(): \DateTimeImmutable { return $this->createdAt; }
     public function getUpdatedAt(): \DateTimeImmutable { return $this->updatedAt; }
 
+    public function markQueued(FinancialReportSyncMode $mode, bool $forceRefresh): void
+    {
+        $now = new \DateTimeImmutable();
+        $this->status = FinancialReportSyncStatus::QUEUED;
+        $this->mode = $mode;
+        $this->nextRetryAt = null;
+        $this->updatedAt = $now;
+    }
+
     public function markLoading(FinancialReportSyncMode $mode): void
     {
         $now = new \DateTimeImmutable();
