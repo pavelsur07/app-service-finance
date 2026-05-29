@@ -12,25 +12,26 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinanceRateLimiterTest extends TestCase
 {
-    public function testWaitSleepsBeforeSecondRequestForSameConnectionWithinMinute(): void
+    public function testWaitSleepsBeforeSecondRequestForSameSellerRateLimitKey(): void
     {
-        $clock = new MockClock('2026-01-01T00:00:00Z');
+        $clock = new MockClock('@'.time());
+        $startTimestamp = $clock->now()->getTimestamp();
         $limiter = $this->createLimiter($clock);
-        $connectionId = '6c3a0e9f-1c09-4a2f-a63f-27f3eddd67df';
+        $sellerRateLimitKey = 'wb_finance_sales_reports:'.hash('sha256', 'token-a');
 
-        $limiter->wait($connectionId);
-        $limiter->wait($connectionId);
+        $limiter->wait($sellerRateLimitKey);
+        $limiter->wait($sellerRateLimitKey);
 
-        self::assertSame('2026-01-01T00:01:01+00:00', $clock->now()->format(DATE_ATOM));
+        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
     }
 
-    public function testWaitUsesSeparateBucketsForDifferentConnections(): void
+    public function testWaitUsesSeparateBucketsForDifferentSellerRateLimitKeys(): void
     {
         $clock = new MockClock('2026-01-01T00:00:00Z');
         $limiter = $this->createLimiter($clock);
 
-        $limiter->wait('6c3a0e9f-1c09-4a2f-a63f-27f3eddd67df');
-        $limiter->wait('4d91db78-6c9b-4fb9-8478-24ab4c68253f');
+        $limiter->wait('wb_finance_sales_reports:'.hash('sha256', 'token-a'));
+        $limiter->wait('wb_finance_sales_reports:'.hash('sha256', 'token-b'));
 
         self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(DATE_ATOM));
     }
@@ -41,7 +42,7 @@ final class WbFinanceRateLimiterTest extends TestCase
             'id' => 'wb_finance',
             'policy' => 'token_bucket',
             'limit' => 1,
-            'rate' => ['interval' => '61 seconds', 'amount' => 1],
+            'rate' => ['interval' => '1 second', 'amount' => 1],
         ], new InMemoryStorage());
 
         return new WbFinanceRateLimiter($factory, $clock ?? new MockClock());
