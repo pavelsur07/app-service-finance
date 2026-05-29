@@ -12,26 +12,27 @@ use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class WbFinanceRateLimiterTest extends TestCase
 {
-    public function testWaitSleepsBeforeSecondRequestForSameSellerRateLimitKey(): void
+    public function testTryConsumeReturnsNullWhenTokenIsAcceptedAndRetryAfterWhenBucketIsBusy(): void
     {
-        $clock = new MockClock('@'.time());
-        $startTimestamp = $clock->now()->getTimestamp();
+        $clock = new MockClock('2026-01-01T00:00:00Z');
         $limiter = $this->createLimiter($clock);
         $sellerRateLimitKey = 'wb_finance_sales_reports:'.hash('sha256', 'token-a');
 
-        $limiter->wait($sellerRateLimitKey);
-        $limiter->wait($sellerRateLimitKey);
+        self::assertNull($limiter->tryConsume($sellerRateLimitKey));
+        $retryAfter = $limiter->tryConsume($sellerRateLimitKey);
 
-        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
+        self::assertNotNull($retryAfter);
+        self::assertGreaterThan($clock->now()->getTimestamp(), $retryAfter->getTimestamp());
+        self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(DATE_ATOM));
     }
 
-    public function testWaitUsesSeparateBucketsForDifferentSellerRateLimitKeys(): void
+    public function testTryConsumeUsesSeparateBucketsForDifferentSellerRateLimitKeys(): void
     {
         $clock = new MockClock('2026-01-01T00:00:00Z');
         $limiter = $this->createLimiter($clock);
 
-        $limiter->wait('wb_finance_sales_reports:'.hash('sha256', 'token-a'));
-        $limiter->wait('wb_finance_sales_reports:'.hash('sha256', 'token-b'));
+        self::assertNull($limiter->tryConsume('wb_finance_sales_reports:'.hash('sha256', 'token-a')));
+        self::assertNull($limiter->tryConsume('wb_finance_sales_reports:'.hash('sha256', 'token-b')));
 
         self::assertSame('2026-01-01T00:00:00+00:00', $clock->now()->format(DATE_ATOM));
     }

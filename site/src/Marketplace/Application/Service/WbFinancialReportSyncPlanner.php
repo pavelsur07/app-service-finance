@@ -76,8 +76,12 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                     continue;
                 }
 
-                if (FinancialReportSyncStatus::FAILED === $status) {
+                if (\in_array($status, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)) {
                     if (null !== $statusEntity?->getNextRetryAt() && $statusEntity->getNextRetryAt() > $now) {
+                        continue;
+                    }
+
+                    if (FinancialReportSyncStatus::QUEUED === $status && null === $statusEntity?->getNextRetryAt()) {
                         continue;
                     }
 
@@ -285,12 +289,12 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             return false;
         }
 
-        $this->dispatch($companyId, $connectionId, $day, $mode, $forceRefresh);
+        $this->dispatch($companyId, $connectionId, $day, $mode, $forceRefresh, $status->getNextRrdId() ?? 0, $status->getStagingRawDocumentId());
 
         return true;
     }
 
-    private function dispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): void
+    private function dispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh, int $rrdId = 0, ?string $rawDocumentId = null): void
     {
         $this->messageBus->dispatch(new SyncWbFinancialReportDayMessage(
             $companyId,
@@ -298,6 +302,8 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $day->format('Y-m-d'),
             $mode->value,
             $forceRefresh,
+            $rrdId,
+            $rawDocumentId,
         ));
     }
 }

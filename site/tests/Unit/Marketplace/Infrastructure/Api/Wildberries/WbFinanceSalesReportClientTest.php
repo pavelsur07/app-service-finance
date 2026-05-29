@@ -59,7 +59,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     }
 
 
-    public function testFetchDetailedDayAppliesLocalRateLimitBeforeHttpRequest(): void
+    public function testFetchDetailedDayThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -71,11 +71,16 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
 
         self::assertSame([], $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame([], $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame(2, $requestCount);
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailedDay('same-connection', 'token', new \DateTimeImmutable('2026-01-15'));
+        } finally {
+            self::assertSame(1, $requestCount);
+        }
     }
 
-    public function testFetchDetailedDayUsesSameLimiterBucketForSameTokenAcrossDifferentConnectionIds(): void
+    public function testFetchDetailedDayReturnsRateLimitForSameTokenAcrossDifferentConnectionIds(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -89,9 +94,14 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
         self::assertSame([], $client->fetchDetailedDay('connection-a', 'same-token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame([], $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame(2, $requestCount);
-        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15'));
+        } finally {
+            self::assertSame(1, $requestCount);
+            self::assertSame($startTimestamp, $clock->now()->getTimestamp());
+        }
     }
 
     public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentTokens(): void
@@ -114,7 +124,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
     }
 
 
-    public function testFetchDetailedDayAppliesLocalRateLimitOnPaginationRequest(): void
+    public function testFetchDetailedDayPageReturnsContinuationCursorForFullPage(): void
     {
         $rows = array_fill(0, 100000, ['rrdId' => 10]);
         $rows[99999] = ['rrdId' => 20];
@@ -139,16 +149,18 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        $data = $client->fetchDetailedDay('00000000-0000-0000-0000-000000000001', 'token', new \DateTimeImmutable('2026-01-15'));
-        self::assertCount(100000, $data);
-        self::assertSame(2, $requestCount);
+        $page = $client->fetchDetailedDayPage('00000000-0000-0000-0000-000000000001', 'token', new \DateTimeImmutable('2026-01-15'), 0);
+
+        self::assertCount(100000, $page->rows);
+        self::assertTrue($page->hasNextPage);
+        self::assertSame(20, $page->nextRrdId);
+        self::assertSame(1, $requestCount);
         self::assertSame(0, $captured[0]['rrdId']);
-        self::assertSame(20, $captured[1]['rrdId']);
-        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
+        self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
 
-    public function testHasAnyDataForConnectionAppliesLocalRateLimitBeforeHttpRequest(): void
+    public function testHasAnyDataForConnectionThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -159,8 +171,13 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter());
 
         self::assertTrue($client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31'));
-        self::assertTrue($client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31'));
-        self::assertSame(2, $requestCount);
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->hasAnyDataForConnection('same-connection', 'token', '2026-01-01', '2026-01-31');
+        } finally {
+            self::assertSame(1, $requestCount);
+        }
     }
 
     public function testHasAnyDataForConnectionDelegatesToHasAnyDataLogic(): void
@@ -251,7 +268,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
     }
 
-    public function testCountEqualPageSizeUsesDelayBeforeNextRequest(): void
+    public function testCountEqualPageSizeThrowsBeforeNextRequestWhenBucketIsBusy(): void
     {
         $rows = array_fill(0, 100000, ['rrdId' => 10]);
         $rows[99999] = ['rrdId' => 20];
@@ -275,11 +292,14 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
-
-        self::assertIsArray($captured[1]);
-        self::assertSame(20, $captured[1]['rrdId'] ?? null);
-        self::assertGreaterThan(0, $clock->now()->getTimestamp() - $startTimestamp);
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
+        } finally {
+            self::assertCount(1, $captured);
+            self::assertSame(0, $captured[0]['rrdId'] ?? null);
+            self::assertSame($startTimestamp, $clock->now()->getTimestamp());
+        }
     }
 
     public function testProbeAccessUsesFinancePingEndpoint(): void

@@ -15,6 +15,7 @@ DG\BypassFinals::allowPaths([
     '*/src/MarketplaceAds/Application/Service/AdBatchPlanner.php',
     '*/src/Marketplace/Application/Service/MarketplaceWeekPartitionService.php',
     '*/src/Marketplace/Infrastructure/Query/ActiveOzonConnectionsQuery.php',
+    '*/src/Marketplace/Infrastructure/Query/ActiveWbConnectionsQuery.php',
     '*/src/Marketplace/Infrastructure/Query/ActiveSellerConnectionsQuery.php',
     '*/src/MarketplaceAnalytics/Domain/Service/CostMappingResolver.php',
     '*/src/MarketplaceAnalytics/Domain/Service/DefaultCostMappingSeedPolicy.php',

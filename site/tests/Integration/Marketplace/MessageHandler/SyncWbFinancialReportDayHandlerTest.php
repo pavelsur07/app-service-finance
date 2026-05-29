@@ -265,6 +265,168 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertNull($this->findStatus($wbPerformance->getId(), $company->getId(), '2026-05-19'));
     }
 
+    public function testLocalRateLimitPostponesWithoutCallingWbApi(): void
+    {
+        $company = $this->createCompany(9214);
+        $connection = $this->createWbSellerConnection($company, 9214);
+        $requestCount = 0;
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(static function () use (&$requestCount): MockResponse {
+                ++$requestCount;
+
+                return new MockResponse('[]', ['http_code' => 200]);
+            }),
+            $this->createRateLimiter(),
+        );
+        self::assertNull($client->tryConsume($client->buildSalesReportsRateLimitKeyForApiKey($connection->getApiKey())));
+        self::getContainer()->set(WbFinanceSalesReportClient::class, $client);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
+
+        self::assertSame(0, $requestCount);
+        $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
+        self::assertNotNull($status);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
+        self::assertNotNull($status->getNextRetryAt());
+    }
+
+
+    public function testStaleContinuationIsSkippedWithoutCallingWbApi(): void
+    {
+        $company = $this->createCompany(9215);
+        $connection = $this->createWbSellerConnection($company, 9215);
+        $stagingRawDocumentId = 'bbbbbbbb-bbbb-4bbb-8bbb-000000009215';
+        $status = new MarketplaceFinancialReportSyncStatus(
+            'cccccccc-cccc-4ccc-8ccc-000000009215',
+            $company->getId(),
+            $connection->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            new \DateTimeImmutable('2026-05-19'),
+        );
+        $status->markQueued(FinancialReportSyncMode::MANUAL, false);
+        $status->scheduleNextRetryAt(new \DateTimeImmutable('2026-05-19T12:00:00Z'), $stagingRawDocumentId, 20);
+        $this->em->persist($status);
+        $this->em->flush();
+
+        $requestCount = 0;
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(
+            new MockHttpClient(static function () use (&$requestCount): MockResponse {
+                ++$requestCount;
+
+                return new MockResponse('[]', ['http_code' => 200]);
+            }),
+            $this->createRateLimiter(),
+        ));
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler(new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-19', FinancialReportSyncMode::MANUAL->value, false, 10, $stagingRawDocumentId));
+
+        self::assertSame(0, $requestCount);
+    }
+
+    public function testDuplicateContinuationAfterFinalPageIsSkippedWithoutCallingWbApi(): void
+    {
+        $company = $this->createCompany(9216);
+        $connection = $this->createWbSellerConnection($company, 9216);
+        $bus = $this->swapBusSpy();
+        $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
+        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
+        $continuation = $this->filterSyncMessages($bus->messages)[0] ?? null;
+        self::assertInstanceOf(SyncWbFinancialReportDayMessage::class, $continuation);
+
+        $this->swapWbClient([new MockResponse('[{"rrdId":100001}]', ['http_code' => 200])]);
+        $handler($continuation);
+
+        $requestCount = 0;
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(
+            new MockHttpClient(static function () use (&$requestCount): MockResponse {
+                ++$requestCount;
+
+                return new MockResponse('[]', ['http_code' => 200]);
+            }),
+            $this->createRateLimiter(),
+        ));
+        $handler($continuation);
+
+        self::assertSame(0, $requestCount);
+    }
+
+    public function testTerminalFailureAfterPartialPageMarksStagingRawDocumentFailed(): void
+    {
+        $company = $this->createCompany(9217);
+        $connection = $this->createWbSellerConnection($company, 9217);
+        $bus = $this->swapBusSpy();
+        $firstPageRows = $this->pageRows(1, WbFinanceSalesReportClient::PAGE_SIZE);
+        $this->swapWbClient([new MockResponse(json_encode($firstPageRows, JSON_THROW_ON_ERROR), ['http_code' => 200])]);
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
+        $continuation = $this->filterSyncMessages($bus->messages)[0] ?? null;
+        self::assertInstanceOf(SyncWbFinancialReportDayMessage::class, $continuation);
+        $rawDocumentId = $continuation->rawDocumentId;
+        self::assertNotNull($rawDocumentId);
+
+        $this->swapWbClient([new MockResponse('{"error":"bad request"}', ['http_code' => 400])]);
+        $this->expectException(UnrecoverableMessageHandlingException::class);
+
+        try {
+            $handler($continuation);
+        } finally {
+            $raw = $this->em->find(MarketplaceRawDocument::class, $rawDocumentId);
+            self::assertInstanceOf(MarketplaceRawDocument::class, $raw);
+            self::assertSame(PipelineStatus::FAILED, $raw->getProcessingStatus());
+
+            $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
+            self::assertNotNull($status);
+            self::assertSame(FinancialReportSyncStatus::FAILED_FINAL, $status->getStatus());
+            self::assertNull($status->getStagingRawDocumentId());
+            self::assertNull($status->getNextRrdId());
+        }
+    }
+
+
+    public function testHandlerRespectsPersistedFutureNextRetryAtWithoutCallingWbApi(): void
+    {
+        $company = $this->createCompany(9218);
+        $connection = $this->createWbSellerConnection($company, 9218);
+        $bus = $this->swapBusSpy();
+        $status = new MarketplaceFinancialReportSyncStatus(
+            'cccccccc-cccc-4ccc-8ccc-000000009218',
+            $company->getId(),
+            $connection->getId(),
+            MarketplaceType::WILDBERRIES,
+            'sales_report',
+            'wildberries::finance-sales-reports-detailed',
+            new \DateTimeImmutable('2026-05-19'),
+        );
+        $status->markQueued(FinancialReportSyncMode::MANUAL, false);
+        $status->scheduleNextRetryAt(new \DateTimeImmutable('2099-01-01T00:00:00Z'), null, 0);
+        $this->em->persist($status);
+        $this->em->flush();
+
+        $requestCount = 0;
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient(
+            new MockHttpClient(static function () use (&$requestCount): MockResponse {
+                ++$requestCount;
+
+                return new MockResponse('[]', ['http_code' => 200]);
+            }),
+            $this->createRateLimiter(),
+        ));
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
+
+        self::assertSame(0, $requestCount);
+        self::assertCount(1, $this->filterSyncMessages($bus->messages));
+    }
+
     private function message(string $companyId, string $connectionId, bool $forceRefresh): SyncWbFinancialReportDayMessage
     {
         return new SyncWbFinancialReportDayMessage($companyId, $connectionId, '2026-05-19', FinancialReportSyncMode::MANUAL->value, $forceRefresh);
@@ -335,6 +497,18 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
     private function filterProcessMessages(array $messages): array
     {
         return array_values(array_filter($messages, static fn (object $m): bool => $m instanceof ProcessDayReportMessage));
+    }
+
+    /** @param list<object> $messages */
+    private function filterSyncMessages(array $messages): array
+    {
+        return array_values(array_filter($messages, static fn (object $m): bool => $m instanceof SyncWbFinancialReportDayMessage));
+    }
+
+    /** @return list<array{rrdId:int}> */
+    private function pageRows(int $start, int $count): array
+    {
+        return array_map(static fn (int $rrdId): array => ['rrdId' => $rrdId], range($start, $start + $count - 1));
     }
 
     private function setRawDocumentProcessingStatus(MarketplaceRawDocument $document, PipelineStatus $status): void

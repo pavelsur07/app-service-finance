@@ -142,15 +142,17 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             ->andWhere('s.connectionId = :connectionId')
             ->andWhere('s.reportType = :reportType')
             ->andWhere('s.businessDate BETWEEN :from AND :to')
-            ->andWhere('s.status = :failedStatus')
-            ->andWhere('(s.nextRetryAt IS NULL OR s.nextRetryAt <= :now)')
-            ->andWhere('s.lastErrorStatusCode = :rateLimitStatusCode')
-            ->andWhere('s.lastErrorClass = :rateLimitErrorClass')
+            ->andWhere('(
+                (s.status = :queuedStatus AND s.nextRetryAt IS NOT NULL AND s.nextRetryAt <= :now)
+                OR (s.status = :failedStatus AND s.nextRetryAt IS NOT NULL AND s.nextRetryAt <= :now)
+                OR (s.status = :failedStatus AND s.nextRetryAt IS NULL AND s.lastErrorStatusCode = :rateLimitStatusCode AND s.lastErrorClass = :rateLimitErrorClass)
+            )')
             ->setParameter('companyId', $companyId)
             ->setParameter('connectionId', $connectionId)
             ->setParameter('reportType', $reportType)
             ->setParameter('from', $from)
             ->setParameter('to', $to)
+            ->setParameter('queuedStatus', FinancialReportSyncStatus::QUEUED)
             ->setParameter('failedStatus', FinancialReportSyncStatus::FAILED)
             ->setParameter('now', $now)
             ->setParameter('rateLimitStatusCode', 429)
@@ -250,7 +252,6 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         $status = $syncStatus->getStatus();
 
         if (\in_array($status, [
-            FinancialReportSyncStatus::QUEUED,
             FinancialReportSyncStatus::LOADING,
             FinancialReportSyncStatus::RAW_LOADED,
             FinancialReportSyncStatus::PROCESSING,
@@ -258,11 +259,15 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
             return false;
         }
 
-        if (FinancialReportSyncStatus::FAILED === $status
+        if (\in_array($status, [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)
             && null !== $syncStatus->getNextRetryAt()
             && $syncStatus->getNextRetryAt() > $now
         ) {
             return false;
+        }
+
+        if (FinancialReportSyncStatus::QUEUED === $status) {
+            return null !== $syncStatus->getNextRetryAt() && $syncStatus->getNextRetryAt() <= $now;
         }
 
         if (!$forceRefresh

@@ -82,6 +82,30 @@ final class MarketplaceFinancialReportSyncStatusTest extends TestCase
         self::assertSame(0, $status->getRecordsCount());
     }
 
+
+    public function testMarkFailedRetryableClearsPaginationCursorByDefault(): void
+    {
+        $status = $this->statusEntity();
+        $status->scheduleNextRetryAt(new \DateTimeImmutable('2026-05-20T12:00:00Z'), $this->rawId(), 123);
+
+        $status->markFailedRetryable('HttpException', 'temporary', 500, null, new \DateTimeImmutable('2026-05-20T12:15:00Z'));
+
+        self::assertNull($status->getStagingRawDocumentId());
+        self::assertNull($status->getNextRrdId());
+    }
+
+    public function testMarkFailedRetryablePreservingCursorKeepsPaginationCursor(): void
+    {
+        $status = $this->statusEntity();
+        $nextRetryAt = new \DateTimeImmutable('2026-05-20T12:15:00Z');
+
+        $status->markFailedRetryablePreservingCursor('HttpException', 'temporary', 500, null, $nextRetryAt, $this->rawId(), 123);
+
+        self::assertSame($this->rawId(), $status->getStagingRawDocumentId());
+        self::assertSame(123, $status->getNextRrdId());
+        self::assertSame($nextRetryAt, $status->getNextRetryAt());
+    }
+
     private function statusEntity(): MarketplaceFinancialReportSyncStatus
     {
         return new MarketplaceFinancialReportSyncStatus(

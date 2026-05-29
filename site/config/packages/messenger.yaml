@@ -21,7 +21,7 @@ framework:
                 dsn: '%env(MESSENGER_TRANSPORT_DSN_WB_FINANCE)%'
                 retry_strategy:
                     max_retries: 20
-                    delay: 61000
+                    delay: '%wb_finance.retry_delay_ms%'
                     multiplier: 1
 
             async_ads:

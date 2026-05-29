@@ -7,7 +7,6 @@ namespace App\Marketplace\Application\Service;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncError;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
 use App\Marketplace\Enum\FinancialReportSyncMode;
-use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncErrorRepository;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusRepository;
@@ -23,6 +22,15 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         private MarketplaceFinancialReportSyncErrorRepository $errorRepository,
         private LoggerInterface $logger,
     ) {}
+
+
+    public function findOrCreateForDay(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate): MarketplaceFinancialReportSyncStatus
+    {
+        $status = $this->statusRepository->findOrCreateForDay($connectionId, $companyId, MarketplaceType::WILDBERRIES, $reportType, $apiEndpoint, $businessDate);
+        $this->statusRepository->save($status);
+
+        return $status;
+    }
 
     public function startLoading(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate, FinancialReportSyncMode $mode): MarketplaceFinancialReportSyncStatus
     {
@@ -45,6 +53,27 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         $this->statusRepository->save($status);
     }
 
+    public function scheduleQueuedRetry(string $connectionId, string $companyId, string $reportType, string $apiEndpoint, \DateTimeImmutable $businessDate, FinancialReportSyncMode $mode, bool $forceRefresh, \DateTimeImmutable $nextRetryAt, ?string $stagingRawDocumentId = null, ?int $nextRrdId = null): MarketplaceFinancialReportSyncStatus
+    {
+        $status = $this->statusRepository->findOrCreateForDay($connectionId, $companyId, MarketplaceType::WILDBERRIES, $reportType, $apiEndpoint, $businessDate);
+        $this->markPageQueued($status, $mode, $forceRefresh, $nextRetryAt, $stagingRawDocumentId, $nextRrdId);
+
+        return $status;
+    }
+
+    public function markLoading(MarketplaceFinancialReportSyncStatus $status, FinancialReportSyncMode $mode): void
+    {
+        $status->markLoading($mode);
+        $this->statusRepository->save($status);
+    }
+
+    public function markPageQueued(MarketplaceFinancialReportSyncStatus $status, FinancialReportSyncMode $mode, bool $forceRefresh, \DateTimeImmutable $nextRetryAt, ?string $stagingRawDocumentId = null, ?int $nextRrdId = null): void
+    {
+        $status->markQueued($mode, $forceRefresh);
+        $status->scheduleNextRetryAt($nextRetryAt, $stagingRawDocumentId, $nextRrdId);
+        $this->statusRepository->save($status);
+    }
+
     public function markProcessing(MarketplaceFinancialReportSyncStatus $status): void
     {
         $status->markProcessing();
@@ -61,6 +90,24 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
     public function markFailedRetryable(MarketplaceFinancialReportSyncStatus $status, string $errorClass, string $errorMessage, ?int $statusCode = null, ?string $responseExcerpt = null, ?array $requestPayload = null, ?\DateTimeImmutable $nextRetryAt = null): void
     {
         $status->markFailedRetryable($errorClass, $errorMessage, $statusCode, $responseExcerpt, $nextRetryAt);
+        $this->statusRepository->save($status);
+        $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
+    }
+
+
+    /** @param array<string,mixed>|null $requestPayload */
+    public function markFailedRetryablePreservingCursor(
+        MarketplaceFinancialReportSyncStatus $status,
+        string $errorClass,
+        string $errorMessage,
+        ?int $statusCode = null,
+        ?string $responseExcerpt = null,
+        ?array $requestPayload = null,
+        ?\DateTimeImmutable $nextRetryAt = null,
+        ?string $stagingRawDocumentId = null,
+        ?int $nextRrdId = null,
+    ): void {
+        $status->markFailedRetryablePreservingCursor($errorClass, $errorMessage, $statusCode, $responseExcerpt, $nextRetryAt, $stagingRawDocumentId, $nextRrdId);
         $this->statusRepository->save($status);
         $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
     }
