@@ -7,7 +7,9 @@ namespace App\Tests\Unit\Marketplace\Application\Service;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportSyncPlanner;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
@@ -40,6 +42,24 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
             }
 
             return new Envelope($message);
+        });
+        $this->statuses->method('claimForQueue')->willReturnCallback(function (
+            string $connectionId,
+            string $companyId,
+            MarketplaceType $marketplace,
+            string $reportType,
+            string $apiEndpoint,
+            \DateTimeImmutable $businessDate,
+            FinancialReportSyncMode $mode,
+            bool $forceRefresh,
+            \DateTimeImmutable $now,
+        ): MarketplaceFinancialReportSyncStatus {
+            return $this->statusEntity(
+                $businessDate->format('Y-m-d'),
+                FinancialReportSyncStatus::QUEUED,
+                null,
+                $now->format(DATE_ATOM),
+            );
         });
     }
 

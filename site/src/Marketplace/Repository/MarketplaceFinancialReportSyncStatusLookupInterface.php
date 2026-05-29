@@ -5,10 +5,25 @@ declare(strict_types=1);
 namespace App\Marketplace\Repository;
 
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
+use App\Marketplace\Enum\MarketplaceType;
 
 interface MarketplaceFinancialReportSyncStatusLookupInterface
 {
+
+    public function claimForQueue(
+        string $connectionId,
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        string $apiEndpoint,
+        \DateTimeImmutable $businessDate,
+        FinancialReportSyncMode $mode,
+        bool $forceRefresh,
+        \DateTimeImmutable $now,
+    ): ?MarketplaceFinancialReportSyncStatus;
+
     public function findByRawDocumentId(string $companyId, string $rawDocumentId): ?MarketplaceFinancialReportSyncStatus;
 
     public function findStatusEnumByDay(

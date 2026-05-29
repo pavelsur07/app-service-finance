@@ -6,6 +6,7 @@ namespace App\Marketplace\Application\Service;
 
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
+use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Infrastructure\Query\ActiveWbConnectionsQuery;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
 use App\Marketplace\Repository\MarketplaceFinancialReportSyncStatusLookupInterface;
@@ -16,6 +17,7 @@ use Symfony\Component\Messenger\MessageBusInterface;
 final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlannerInterface
 {
     private const REPORT_TYPE = 'sales_report';
+    private const API_ENDPOINT = 'wildberries::finance-sales-reports-detailed';
 
     public function __construct(
         private readonly ActiveWbConnectionsQuery $activeWbConnectionsQuery,
@@ -34,18 +36,6 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             [$day],
             FinancialReportSyncMode::DAILY,
             $force,
-            static function (?FinancialReportSyncStatus $status) use ($force): bool {
-                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
-                    return false;
-                }
-
-                if ($force) {
-                    return true;
-                }
-
-                return null === $status
-                    || !\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true);
-            },
         );
     }
 
@@ -130,7 +120,10 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
                     break;
                 }
 
-                $this->dispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true);
+                if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::REFRESH_14D, true)) {
+                    continue;
+                }
+
                 ++$dispatched;
                 ++$scheduledForConnection;
             }
@@ -153,24 +146,6 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $this->periodResolver->daysBetween($from, $to),
             $mode,
             $forceRefresh,
-            function (?FinancialReportSyncStatus $status) use ($forceRefresh, $mode): bool {
-                if (\in_array($status, [FinancialReportSyncStatus::LOADING, FinancialReportSyncStatus::PROCESSING], true)) {
-                    return false;
-                }
-
-                if ($forceRefresh) {
-                    return true;
-                }
-
-                return match ($mode) {
-                    FinancialReportSyncMode::DAILY => null === $status
-                        || !\in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true),
-                    FinancialReportSyncMode::INITIAL => null === $status || FinancialReportSyncStatus::FAILED === $status,
-                    FinancialReportSyncMode::REFRESH_14D => true,
-                    FinancialReportSyncMode::MISSING => null === $status || FinancialReportSyncStatus::FAILED === $status,
-                    FinancialReportSyncMode::MANUAL => null === $status || FinancialReportSyncStatus::FAILED === $status,
-                };
-            },
         );
     }
 
@@ -231,7 +206,10 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
 
             ksort($scheduledDays);
             foreach ($scheduledDays as $day) {
-                $this->dispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::MISSING, false);
+                if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, FinancialReportSyncMode::MISSING, false)) {
+                    continue;
+                }
+
                 ++$dispatched;
             }
         }
@@ -249,38 +227,50 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
             $days,
             FinancialReportSyncMode::INITIAL,
             false,
-            static fn (?FinancialReportSyncStatus $status): bool => null === $status
-                || FinancialReportSyncStatus::FAILED === $status,
         );
     }
 
     /** @param list<array{id: string, company_id: string, connection_id: string}> $connections
      * @param list<DateTimeImmutable> $days
-     * @param callable(?FinancialReportSyncStatus): bool $shouldDispatch
      */
-    private function planForDays(array $connections, array $days, FinancialReportSyncMode $mode, bool $forceRefresh, callable $shouldDispatch): int
+    private function planForDays(array $connections, array $days, FinancialReportSyncMode $mode, bool $forceRefresh): int
     {
         $dispatched = 0;
 
         foreach ($connections as $connection) {
             foreach ($days as $day) {
-                $status = $this->syncStatusRepository->findStatusEnumByDay(
-                    $connection['connection_id'],
-                    $connection['company_id'],
-                    $day,
-                    self::REPORT_TYPE,
-                );
-
-                if (!$shouldDispatch($status)) {
+                if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, $mode, $forceRefresh)) {
                     continue;
                 }
 
-                $this->dispatch($connection['company_id'], $connection['connection_id'], $day, $mode, $forceRefresh);
                 ++$dispatched;
             }
         }
 
         return $dispatched;
+    }
+
+    private function claimAndDispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): bool
+    {
+        $status = $this->syncStatusRepository->claimForQueue(
+            $connectionId,
+            $companyId,
+            MarketplaceType::WILDBERRIES,
+            self::REPORT_TYPE,
+            self::API_ENDPOINT,
+            $day,
+            $mode,
+            $forceRefresh,
+            $this->clock->now(),
+        );
+
+        if (null === $status) {
+            return false;
+        }
+
+        $this->dispatch($companyId, $connectionId, $day, $mode, $forceRefresh);
+
+        return true;
     }
 
     private function dispatch(string $companyId, string $connectionId, DateTimeImmutable $day, FinancialReportSyncMode $mode, bool $forceRefresh): void

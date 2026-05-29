@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace App\Marketplace\Repository;
 
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
+use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceType;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
+use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
+use Doctrine\DBAL\LockMode;
 use Doctrine\Persistence\ManagerRegistry;
 use Ramsey\Uuid\Uuid;
 use Webmozart\Assert\Assert;
@@ -166,6 +169,118 @@ final class MarketplaceFinancialReportSyncStatusRepository extends ServiceEntity
         }
 
         return $days;
+    }
+
+    public function claimForQueue(
+        string $connectionId,
+        string $companyId,
+        MarketplaceType $marketplace,
+        string $reportType,
+        string $apiEndpoint,
+        \DateTimeImmutable $businessDate,
+        FinancialReportSyncMode $mode,
+        bool $forceRefresh,
+        \DateTimeImmutable $now,
+    ): ?MarketplaceFinancialReportSyncStatus {
+        Assert::uuid($connectionId);
+        Assert::uuid($companyId);
+
+        $em = $this->getEntityManager();
+
+        try {
+            $em->beginTransaction();
+
+            $syncStatus = $this->createQueryBuilder('s')
+                ->where('s.connectionId = :connectionId')
+                ->andWhere('s.businessDate = :businessDate')
+                ->andWhere('s.reportType = :reportType')
+                ->setParameter('connectionId', $connectionId)
+                ->setParameter('businessDate', $businessDate)
+                ->setParameter('reportType', $reportType)
+                ->setMaxResults(1)
+                ->getQuery()
+                ->setLockMode(LockMode::PESSIMISTIC_WRITE)
+                ->getOneOrNullResult();
+
+            if (!$syncStatus instanceof MarketplaceFinancialReportSyncStatus) {
+                $syncStatus = new MarketplaceFinancialReportSyncStatus(
+                    Uuid::uuid7()->toString(),
+                    $companyId,
+                    $connectionId,
+                    $marketplace,
+                    $reportType,
+                    $apiEndpoint,
+                    $businessDate,
+                );
+
+                $em->persist($syncStatus);
+            } elseif (!$this->canClaimForQueue($syncStatus, $mode, $forceRefresh, $now)) {
+                $em->commit();
+
+                return null;
+            }
+
+            $syncStatus->markQueued($mode, $forceRefresh);
+            $em->persist($syncStatus);
+            $em->flush();
+            $em->commit();
+
+            return $syncStatus;
+        } catch (UniqueConstraintViolationException) {
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
+            }
+
+            return null;
+        } catch (\Throwable $e) {
+            if ($em->getConnection()->isTransactionActive()) {
+                $em->rollback();
+            }
+
+            throw $e;
+        }
+    }
+
+    private function canClaimForQueue(
+        MarketplaceFinancialReportSyncStatus $syncStatus,
+        FinancialReportSyncMode $mode,
+        bool $forceRefresh,
+        \DateTimeImmutable $now,
+    ): bool {
+        $status = $syncStatus->getStatus();
+
+        if (\in_array($status, [
+            FinancialReportSyncStatus::QUEUED,
+            FinancialReportSyncStatus::LOADING,
+            FinancialReportSyncStatus::RAW_LOADED,
+            FinancialReportSyncStatus::PROCESSING,
+        ], true)) {
+            return false;
+        }
+
+        if (FinancialReportSyncStatus::FAILED === $status
+            && null !== $syncStatus->getNextRetryAt()
+            && $syncStatus->getNextRetryAt() > $now
+        ) {
+            return false;
+        }
+
+        if (!$forceRefresh
+            && \in_array($mode, [FinancialReportSyncMode::DAILY, FinancialReportSyncMode::MISSING, FinancialReportSyncMode::INITIAL], true)
+            && \in_array($status, [FinancialReportSyncStatus::SUCCESS, FinancialReportSyncStatus::EMPTY], true)
+        ) {
+            return false;
+        }
+
+        if (\in_array($status, [
+            FinancialReportSyncStatus::AUTH_FAILED,
+            FinancialReportSyncStatus::FAILED_FINAL,
+            FinancialReportSyncStatus::CONFLICT,
+        ], true)) {
+            return $forceRefresh && FinancialReportSyncMode::MANUAL === $mode;
+        }
+
+        return true;
     }
 
 
