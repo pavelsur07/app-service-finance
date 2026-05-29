@@ -110,7 +110,7 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         $this->planner
             ->expects(self::once())
             ->method('planInitial')
-            ->with(null, null)
+            ->with(null, null, null, 1)
             ->willReturn(1);
         $this->planner
             ->expects(self::once())
@@ -164,6 +164,50 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
 
         $tester = $this->tester();
         $code = $tester->execute(['--mode' => 'daily', '--date' => '2026-05-19']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testInitialAutomaticPassesMaxDays(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planInitial')
+            ->with(null, null, null, 3)
+            ->willReturn(3);
+
+        $this->planner->expects(self::never())->method('planRange');
+
+        $tester = $this->tester();
+        $code = $tester->execute(['--mode' => 'initial', '--max-days' => '3']);
+
+        self::assertSame(Command::SUCCESS, $code);
+    }
+
+    public function testInitialExplicitRangeUsesPlanRangeAndIgnoresMaxDaysLimit(): void
+    {
+        $this->planner
+            ->expects(self::once())
+            ->method('planRange')
+            ->with(
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-18' === $d->format('Y-m-d')),
+                self::callback(static fn (\DateTimeImmutable $d): bool => '2026-05-20' === $d->format('Y-m-d')),
+                FinancialReportSyncMode::INITIAL,
+                null,
+                null,
+                false,
+            )
+            ->willReturn(3);
+
+        $this->planner->expects(self::never())->method('planInitial');
+
+        $tester = $this->tester();
+        $code = $tester->execute([
+            '--mode' => 'initial',
+            '--from' => '2026-05-18',
+            '--to' => '2026-05-20',
+            '--max-days' => '1',
+        ]);
 
         self::assertSame(Command::SUCCESS, $code);
     }

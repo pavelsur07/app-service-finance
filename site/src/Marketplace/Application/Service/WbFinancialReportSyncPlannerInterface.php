@@ -24,5 +24,5 @@ interface WbFinancialReportSyncPlannerInterface
 
     public function planMissing(?string $companyId = null, ?string $connectionId = null, int $maxDays = 14): int;
 
-    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null): int;
+    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null, int $maxDays = 1): int;
 }

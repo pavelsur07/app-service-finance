@@ -30,6 +30,8 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
     /** @var list<SyncWbFinancialReportDayMessage> */
     private array $dispatchedMessages = [];
 
+    private \Closure $claimForQueueCallback;
+
     protected function setUp(): void
     {
         $this->connections = $this->createMock(ActiveWbConnectionsQuery::class);
@@ -43,7 +45,7 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
 
             return new Envelope($message);
         });
-        $this->statuses->method('claimForQueue')->willReturnCallback(function (
+        $this->claimForQueueCallback = function (
             string $connectionId,
             string $companyId,
             MarketplaceType $marketplace,
@@ -60,7 +62,10 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
                 null,
                 $now->format(DATE_ATOM),
             );
-        });
+        };
+        $this->statuses->method('claimForQueue')->willReturnCallback(
+            fn (...$args): ?MarketplaceFinancialReportSyncStatus => ($this->claimForQueueCallback)(...$args),
+        );
     }
 
     public function testPlanRefresh14DaysDispatchesAtMostOnePerConnection(): void
@@ -189,6 +194,46 @@ final class WbFinancialReportSyncPlannerTest extends TestCase
         ]);
 
         self::assertSame(2, $planner->planRefresh14Days(null, null, 1));
+    }
+
+    public function testPlanInitialRespectsMaxDaysPerConnection(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1'), $this->conn('c2', 'co2')]);
+
+        self::assertSame(2, $planner->planInitial(null, null, new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'), 1));
+        self::assertSame(['2026-05-18', '2026-05-18'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
+    }
+
+    public function testPlanInitialUsesClaimForQueueToSkipBlockedDays(): void
+    {
+        $planner = $this->planner();
+        $this->connections->method('execute')->willReturn([$this->conn('c1', 'co1')]);
+        $this->claimForQueueCallback = function (
+            string $connectionId,
+            string $companyId,
+            MarketplaceType $marketplace,
+            string $reportType,
+            string $apiEndpoint,
+            \DateTimeImmutable $businessDate,
+            FinancialReportSyncMode $mode,
+            bool $forceRefresh,
+            \DateTimeImmutable $now,
+        ): ?MarketplaceFinancialReportSyncStatus {
+            if ('2026-05-18' === $businessDate->format('Y-m-d')) {
+                return null;
+            }
+
+            return $this->statusEntity(
+                $businessDate->format('Y-m-d'),
+                FinancialReportSyncStatus::QUEUED,
+                null,
+                $now->format(DATE_ATOM),
+            );
+        };
+
+        self::assertSame(1, $planner->planInitial(null, null, new \DateTimeImmutable('2026-05-18 00:00:00 Europe/Moscow'), 1));
+        self::assertSame(['2026-05-19'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $this->dispatchedMessages));
     }
 
     public function testPlanMissingRespectsMaxDays(): void
