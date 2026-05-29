@@ -103,8 +103,49 @@ final class WbFinancialReportReconciliationService
         return $rawDocument;
     }
 
+    /**
+     * Starts or resumes a staging raw document for page-by-page WB finance loading.
+     * Caller is responsible for persist/flush of returned raw document.
+     *
+     * @param list<array<string,mixed>> $rows
+     */
+    public function appendRawDocumentPage(
+        Company $company,
+        MarketplaceConnection $connection,
+        \DateTimeImmutable $businessDate,
+        array $rows,
+        bool $forceRefresh,
+        ?string $rawDocumentId = null,
+    ): MarketplaceRawDocument {
+        $rawDocument = null !== $rawDocumentId
+            ? $this->rawDocumentRepository->find($rawDocumentId)
+            : null;
+
+        if (null !== $rawDocumentId && !$rawDocument instanceof MarketplaceRawDocument) {
+            throw new \InvalidArgumentException(sprintf('Raw document %s was not found for WB finance day sync continuation.', $rawDocumentId));
+        }
+
+        if ($rawDocument instanceof MarketplaceRawDocument) {
+            if ((string) $rawDocument->getCompany()->getId() !== (string) $company->getId()
+                || $rawDocument->getMarketplace() !== MarketplaceType::WILDBERRIES
+                || $rawDocument->getDocumentType() !== self::DOCUMENT_TYPE
+                || $rawDocument->getApiEndpoint() !== self::API_ENDPOINT
+                || $rawDocument->getPeriodFrom()->format('Y-m-d') !== $businessDate->format('Y-m-d')
+                || $rawDocument->getPeriodTo()->format('Y-m-d') !== $businessDate->format('Y-m-d')
+            ) {
+                throw new \InvalidArgumentException(sprintf('Raw document %s does not match WB finance day sync context.', $rawDocumentId));
+            }
+
+            $rawDocument->appendRawDataRows($rows);
+
+            return $rawDocument;
+        }
+
+        return $this->createOrRefreshRawDocument($company, $connection, $businessDate, $rows, $forceRefresh);
+    }
+
     private function isInFlight(MarketplaceRawDocument $document): bool
     {
-        return in_array($document->getProcessingStatus(), [PipelineStatus::PENDING, PipelineStatus::RUNNING], true);
+        return in_array($document->getProcessingStatus(), [PipelineStatus::LOADING, PipelineStatus::PENDING, PipelineStatus::RUNNING], true);
     }
 }

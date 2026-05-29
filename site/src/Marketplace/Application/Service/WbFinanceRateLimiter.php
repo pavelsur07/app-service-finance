@@ -23,24 +23,22 @@ final class WbFinanceRateLimiter
 
     private LoggerInterface $logger;
 
-    public function wait(string $sellerRateLimitKey, int $tokens = 1): void
+    public function tryConsume(string $sellerRateLimitKey, int $tokens = 1): ?\DateTimeImmutable
     {
-        $limiter = $this->factory->create($sellerRateLimitKey);
-
-        while (true) {
-            $limit = $limiter->consume($tokens);
-            if ($limit->isAccepted()) {
-                return;
-            }
-
-            $retryAfter = $limit->getRetryAfter();
-            $waitSeconds = max(1, $retryAfter->getTimestamp() - $this->clock->now()->getTimestamp());
-            $this->logger->info('WB finance throttle wait.', [
-                'seller_token_hash_prefix' => $this->extractHashPrefix($sellerRateLimitKey),
-                'wait_seconds' => $waitSeconds,
-            ]);
-            $this->clock->sleep($waitSeconds);
+        $limit = $this->factory->create($sellerRateLimitKey)->consume($tokens);
+        if ($limit->isAccepted()) {
+            return null;
         }
+
+        $retryAfter = $limit->getRetryAfter();
+        $waitSeconds = max(1, $retryAfter->getTimestamp() - $this->clock->now()->getTimestamp());
+        $this->logger->info('WB finance throttle bucket busy.', [
+            'seller_token_hash_prefix' => $this->extractHashPrefix($sellerRateLimitKey),
+            'retry_after' => $retryAfter->format(\DateTimeInterface::ATOM),
+            'wait_seconds' => $waitSeconds,
+        ]);
+
+        return $retryAfter;
     }
 
     private function extractHashPrefix(string $sellerRateLimitKey): string

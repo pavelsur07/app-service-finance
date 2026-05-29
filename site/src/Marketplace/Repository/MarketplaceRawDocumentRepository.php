@@ -339,11 +339,13 @@ class MarketplaceRawDocumentRepository extends ServiceEntityRepository
             ->andWhere('d.documentType = :documentType')
             ->andWhere('d.periodFrom >= :firstDay')
             ->andWhere('d.periodTo <= :lastDay')
+            ->andWhere('(d.processingStatus IS NULL OR d.processingStatus != :loading)')
             ->setParameter('companyId', $companyId)
             ->setParameter('marketplace', $marketplace)
             ->setParameter('documentType', 'sales_report')
             ->setParameter('firstDay', $firstDay)
             ->setParameter('lastDay', $lastDay)
+            ->setParameter('loading', PipelineStatus::LOADING)
             ->orderBy('d.periodFrom', 'ASC')
             ->getQuery()
             ->getResult();

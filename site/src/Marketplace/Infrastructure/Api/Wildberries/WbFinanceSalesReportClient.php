@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Marketplace\Infrastructure\Api\Wildberries;
 
+use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
-use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
@@ -18,7 +18,7 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 final readonly class WbFinanceSalesReportClient
 {
     private const BASE_URL = 'https://finance-api.wildberries.ru';
-    private const PAGE_SIZE = 100000;
+    public const PAGE_SIZE = 100000;
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
     private const SALES_REPORTS_RATE_LIMIT_KEY_PREFIX = 'wb_finance_sales_reports';
@@ -44,6 +44,13 @@ final readonly class WbFinanceSalesReportClient
         return $this->fetchDetailedInternal($apiKey, $date, $date);
     }
 
+    public function fetchDetailedDayPage(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, int $rrdId, bool $rateLimitTokenConsumed = false): WbFinanceSalesReportPage
+    {
+        $date = $businessDate->format('Y-m-d');
+
+        return $this->fetchDetailedPage($apiKey, $date, $date, $rrdId, self::PAGE_SIZE, $rateLimitTokenConsumed);
+    }
+
     /**
      * The $connectionId parameter is retained for caller context compatibility; throttling is per seller WB API token.
      *
@@ -52,6 +59,16 @@ final readonly class WbFinanceSalesReportClient
     public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): array
     {
         return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
+    }
+
+    public function tryConsume(string $sellerRateLimitKey): ?\DateTimeImmutable
+    {
+        return $this->rateLimiter->tryConsume($sellerRateLimitKey);
+    }
+
+    public function buildSalesReportsRateLimitKeyForApiKey(string $apiKey): string
+    {
+        return $this->buildSalesReportsRateLimitKey(hash('sha256', $apiKey));
     }
 
     /**
@@ -69,93 +86,100 @@ final readonly class WbFinanceSalesReportClient
     {
         $rows = [];
         $rrdId = 0;
-        $tokenHash = hash('sha256', $apiKey);
-        $sellerRateLimitKey = $this->buildSalesReportsRateLimitKey($tokenHash);
 
-        while (true) {
-            $this->rateLimiter->wait($sellerRateLimitKey);
-            try {
-                $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
-                    'headers' => ['Authorization' => $apiKey],
-                    'json' => [
-                        'dateFrom' => $dateFrom,
-                        'dateTo' => $dateTo,
-                        'limit' => self::PAGE_SIZE,
-                        'rrdId' => $rrdId,
-                        'period' => 'daily',
-                    ],
-                    'timeout' => 120,
-                ]);
-                $statusCode = $response->getStatusCode();
-                $headers = $response->getHeaders(false);
-                $body = $response->getContent(false);
-            } catch (TransportExceptionInterface $e) {
-                throw new MarketplaceTemporaryApiException('WB API transport error.', 0, '', $dateFrom, $dateTo, $e);
-            }
+        do {
+            $page = $this->fetchDetailedPage($apiKey, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE);
+            $rows = [...$rows, ...$page->rows];
+            $rrdId = $page->nextRrdId ?? $rrdId;
+        } while ($page->hasNextPage);
 
-            $excerpt = $this->createSafeExcerpt($body);
+        return $rows;
+    }
 
-            if (204 === $statusCode) {
-                $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, 0, $headers, $excerpt);
-                return $rows;
+    private function fetchDetailedPage(string $apiKey, string $dateFrom, string $dateTo, int $rrdId, int $limit, bool $rateLimitTokenConsumed = false): WbFinanceSalesReportPage
+    {
+        if (!$rateLimitTokenConsumed) {
+            $retryAfter = $this->rateLimiter->tryConsume($this->buildSalesReportsRateLimitKeyForApiKey($apiKey));
+            if (null !== $retryAfter) {
+                throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->secondsUntil($retryAfter));
             }
-            $recordsReceived = null;
-
-            if (429 === $statusCode) {
-                throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $this->extractRetryAfter($headers));
-            }
-            if (401 === $statusCode || 403 === $statusCode) {
-                throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-            if (400 === $statusCode) {
-                throw new MarketplaceBadRequestException('WB API rejected request payload.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-            if ($statusCode >= 500 && $statusCode <= 599) {
-                throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-            if (200 !== $statusCode) {
-                throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-            if ('' === trim($body)) {
-                throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-
-            try {
-                $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
-            } catch (\JsonException $e) {
-                throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
-            }
-
-            if (!is_array($decoded) || !array_is_list($decoded)) {
-                throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-
-            foreach ($decoded as $row) {
-                if (!is_array($row)) {
-                    throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
-                }
-            }
-            $recordsReceived = count($decoded);
-            $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, $recordsReceived, $headers, $excerpt);
-
-            if ([] === $decoded) {
-                return $rows;
-            }
-
-            $rows = [...$rows, ...$decoded];
-            $last = end($decoded);
-            $newRrdId = is_array($last) ? (int) ($last['rrdId'] ?? 0) : 0;
-            if ($newRrdId <= $rrdId) {
-                throw new MarketplaceInvalidApiResponseException('WB API pagination rrdId must grow monotonically.', $statusCode, $excerpt, $dateFrom, $dateTo);
-            }
-
-            $rrdId = $newRrdId;
-
-            if (count($decoded) < self::PAGE_SIZE) {
-                return $rows;
-            }
-
         }
+
+        try {
+            $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
+                'headers' => ['Authorization' => $apiKey],
+                'json' => [
+                    'dateFrom' => $dateFrom,
+                    'dateTo' => $dateTo,
+                    'limit' => $limit,
+                    'rrdId' => $rrdId,
+                    'period' => 'daily',
+                ],
+                'timeout' => 120,
+            ]);
+            $statusCode = $response->getStatusCode();
+            $headers = $response->getHeaders(false);
+            $body = $response->getContent(false);
+        } catch (TransportExceptionInterface $e) {
+            throw new MarketplaceTemporaryApiException('WB API transport error.', 0, '', $dateFrom, $dateTo, $e);
+        }
+
+        $excerpt = $this->createSafeExcerpt($body);
+
+        if (204 === $statusCode) {
+            $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, $limit, 0, $headers, $excerpt);
+            return new WbFinanceSalesReportPage([], null, false);
+        }
+
+        if (429 === $statusCode) {
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $this->extractRetryAfter($headers));
+        }
+        if (401 === $statusCode || 403 === $statusCode) {
+            throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if (400 === $statusCode) {
+            throw new MarketplaceBadRequestException('WB API rejected request payload.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if ($statusCode >= 500 && $statusCode <= 599) {
+            throw new MarketplaceTemporaryApiException('WB API temporary error.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if (200 !== $statusCode) {
+            throw new MarketplaceTemporaryApiException('WB API unexpected status.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+        if ('' === trim($body)) {
+            throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+
+        try {
+            $decoded = json_decode($body, true, 512, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            throw new MarketplaceInvalidApiResponseException('WB API returned invalid JSON.', $statusCode, $excerpt, $dateFrom, $dateTo, $e);
+        }
+
+        if (!is_array($decoded) || !array_is_list($decoded)) {
+            throw new MarketplaceInvalidApiResponseException('WB API JSON must be a list.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+
+        foreach ($decoded as $row) {
+            if (!is_array($row)) {
+                throw new MarketplaceInvalidApiResponseException('WB API JSON list items must be objects.', $statusCode, $excerpt, $dateFrom, $dateTo);
+            }
+        }
+
+        $recordsReceived = count($decoded);
+        $this->logWbResponse($statusCode, $dateFrom, $dateTo, $rrdId, $limit, $recordsReceived, $headers, $excerpt);
+
+        if ([] === $decoded) {
+            return new WbFinanceSalesReportPage([], null, false);
+        }
+
+        $last = end($decoded);
+        $nextRrdId = is_array($last) ? (int) ($last['rrdId'] ?? 0) : 0;
+        if ($nextRrdId <= $rrdId) {
+            throw new MarketplaceInvalidApiResponseException('WB API pagination rrdId must grow monotonically.', $statusCode, $excerpt, $dateFrom, $dateTo);
+        }
+
+        return new WbFinanceSalesReportPage($decoded, $nextRrdId, $recordsReceived >= $limit);
     }
 
 
@@ -229,8 +253,10 @@ final readonly class WbFinanceSalesReportClient
 
     public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): bool
     {
-        $tokenHash = hash('sha256', $apiKey);
-        $this->rateLimiter->wait($this->buildSalesReportsRateLimitKey($tokenHash));
+        $retryAfter = $this->rateLimiter->tryConsume($this->buildSalesReportsRateLimitKeyForApiKey($apiKey));
+        if (null !== $retryAfter) {
+            throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->secondsUntil($retryAfter));
+        }
 
         return $this->hasAnyData($apiKey, $dateFrom, $dateTo);
     }
@@ -293,6 +319,11 @@ final readonly class WbFinanceSalesReportClient
         }
 
         return [] !== $decoded;
+    }
+
+    private function secondsUntil(\DateTimeImmutable $retryAfter): int
+    {
+        return max(1, $retryAfter->getTimestamp() - (new \DateTimeImmutable())->getTimestamp());
     }
 
     private function buildSalesReportsRateLimitKey(string $tokenHash): string

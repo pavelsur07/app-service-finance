@@ -9,6 +9,7 @@ namespace App\Marketplace\Enum;
  */
 enum PipelineStatus: string
 {
+    case LOADING = 'loading';
     case PENDING = 'pending';
     case RUNNING = 'running';
     case COMPLETED = 'completed';
@@ -17,6 +18,7 @@ enum PipelineStatus: string
     public function getLabel(): string
     {
         return match ($this) {
+            self::LOADING => 'Загружается',
             self::PENDING => 'Ожидает',
             self::RUNNING => 'Выполняется',
             self::COMPLETED => 'Завершён',

@@ -54,6 +54,12 @@ class MarketplaceFinancialReportSyncStatus
     #[ORM\Column(type: 'string', length: 128, nullable: true)]
     private ?string $rowsHash = null;
 
+    #[ORM\Column(type: 'guid', nullable: true)]
+    private ?string $stagingRawDocumentId = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $nextRrdId = null;
+
     #[ORM\Column(type: 'integer', options: ['default' => 0])]
     private int $attempts = 0;
 
@@ -133,6 +139,8 @@ class MarketplaceFinancialReportSyncStatus
     public function getRawDocumentId(): ?string { return $this->rawDocumentId; }
     public function getRecordsCount(): int { return $this->recordsCount; }
     public function getRowsHash(): ?string { return $this->rowsHash; }
+    public function getStagingRawDocumentId(): ?string { return $this->stagingRawDocumentId; }
+    public function getNextRrdId(): ?int { return $this->nextRrdId; }
     public function getAttempts(): int { return $this->attempts; }
     public function getLastAttemptAt(): ?\DateTimeImmutable { return $this->lastAttemptAt; }
     public function getNextRetryAt(): ?\DateTimeImmutable { return $this->nextRetryAt; }
@@ -156,14 +164,24 @@ class MarketplaceFinancialReportSyncStatus
         $this->updatedAt = $now;
     }
 
+    public function scheduleNextRetryAt(\DateTimeImmutable $nextRetryAt, ?string $stagingRawDocumentId = null, ?int $nextRrdId = null): void
+    {
+        $this->nextRetryAt = $nextRetryAt;
+        $this->stagingRawDocumentId = $stagingRawDocumentId;
+        $this->nextRrdId = $nextRrdId;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function markLoading(FinancialReportSyncMode $mode): void
     {
         $now = new \DateTimeImmutable();
         $this->status = FinancialReportSyncStatus::LOADING;
         $this->mode = $mode;
         $this->recordsCount = 0;
-        $this->rawDocumentId = null;
-        $this->rowsHash = null;
+        if (null === $this->stagingRawDocumentId) {
+            $this->rawDocumentId = null;
+            $this->rowsHash = null;
+        }
         $this->attempts++;
         $this->lastAttemptAt = $now;
         $this->nextRetryAt = null;
@@ -180,6 +198,8 @@ class MarketplaceFinancialReportSyncStatus
         $this->recordsCount = 0;
         $this->lastEmptyAt = $now;
         $this->finishedAt = $now;
+        $this->stagingRawDocumentId = null;
+        $this->nextRrdId = null;
         $this->nextRetryAt = null;
         $this->clearLastError();
         $this->updatedAt = $now;
@@ -193,6 +213,8 @@ class MarketplaceFinancialReportSyncStatus
         $this->rawDocumentId = $rawDocumentId;
         $this->recordsCount = max(0, $recordsCount);
         $this->rowsHash = $rowsHash;
+        $this->stagingRawDocumentId = null;
+        $this->nextRrdId = null;
         $this->nextRetryAt = null;
         $this->clearLastError();
         $this->updatedAt = new \DateTimeImmutable();
@@ -211,6 +233,8 @@ class MarketplaceFinancialReportSyncStatus
         $this->status = FinancialReportSyncStatus::SUCCESS;
         $this->finishedAt = $now;
         $this->lastSuccessAt = $now;
+        $this->stagingRawDocumentId = null;
+        $this->nextRrdId = null;
         $this->nextRetryAt = null;
         $this->clearLastError();
         $this->updatedAt = $now;
@@ -219,6 +243,8 @@ class MarketplaceFinancialReportSyncStatus
     public function markFailedRetryable(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt, ?\DateTimeImmutable $nextRetryAt): void
     {
         $this->status = FinancialReportSyncStatus::FAILED;
+        $this->stagingRawDocumentId = null;
+        $this->nextRrdId = null;
         $this->recordsCount = 0;
         $this->lastErrorClass = $errorClass;
         $this->lastErrorMessage = $errorMessage;
@@ -227,6 +253,20 @@ class MarketplaceFinancialReportSyncStatus
         $this->nextRetryAt = $nextRetryAt ?? new \DateTimeImmutable('+15 minutes');
         $this->finishedAt = null;
         $this->updatedAt = new \DateTimeImmutable();
+    }
+
+    public function markFailedRetryablePreservingCursor(
+        string $errorClass,
+        string $errorMessage,
+        ?int $statusCode,
+        ?string $responseExcerpt,
+        ?\DateTimeImmutable $nextRetryAt,
+        ?string $stagingRawDocumentId,
+        ?int $nextRrdId,
+    ): void {
+        $this->markFailedRetryable($errorClass, $errorMessage, $statusCode, $responseExcerpt, $nextRetryAt);
+        $this->stagingRawDocumentId = $stagingRawDocumentId;
+        $this->nextRrdId = $nextRrdId;
     }
 
     public function markFailedFinal(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
@@ -248,6 +288,8 @@ class MarketplaceFinancialReportSyncStatus
     {
         $now = new \DateTimeImmutable();
         $this->status = $status;
+        $this->stagingRawDocumentId = null;
+        $this->nextRrdId = null;
         $this->recordsCount = 0;
         $this->lastErrorClass = $errorClass;
         $this->lastErrorMessage = $errorMessage;

@@ -204,6 +204,20 @@ class MarketplaceRawDocument
         return $this;
     }
 
+    /** @param list<array<string,mixed>> $rows */
+    public function appendRawDataRows(array $rows): self
+    {
+        if ([] === $rows) {
+            return $this;
+        }
+
+        $this->rawData = [...$this->rawData, ...$rows];
+        $this->recordsCount = count($this->rawData);
+        $this->syncedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
     public function getRecordsCreated(): int
     {
         return $this->recordsCreated;
@@ -353,6 +367,22 @@ class MarketplaceRawDocument
     {
         $this->processingStatus = PipelineStatus::COMPLETED;
         $this->processedAt      = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function markLoading(): self
+    {
+        $this->processingStatus = PipelineStatus::LOADING;
+        $this->processedAt = null;
+
+        return $this;
+    }
+
+    public function markFailed(): self
+    {
+        $this->processingStatus = PipelineStatus::FAILED;
+        $this->processedAt = new \DateTimeImmutable();
 
         return $this;
     }

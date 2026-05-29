@@ -12,5 +12,7 @@ final readonly class SyncWbFinancialReportDayMessage
         public string $businessDate,
         public string $mode,
         public bool $forceRefresh,
+        public int $rrdId = 0,
+        public ?string $rawDocumentId = null,
     ) {}
 }

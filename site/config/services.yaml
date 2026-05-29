@@ -8,6 +8,9 @@ parameters:
     app.storage_root: '%kernel.project_dir%/var/storage'
     app.encryption.key_file: '%env(string:APP_ENCRYPTION_KEY_FILE)%'
     app.encryption.current_key_version: '%env(string:APP_ENCRYPTION_CURRENT_KEY_VERSION)%'
+    wb_finance.rate_limit_interval: '310 seconds'
+    wb_finance.rate_limit_interval_seconds: 310
+    wb_finance.retry_delay_ms: 310000
 
 services:
     # default configuration for services in *this* file
@@ -57,6 +60,10 @@ services:
     App\Marketplace\Application\Service\WbFinanceRateLimiter:
         arguments:
             $factory: '@limiter.wb_finance'
+
+    App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler:
+        arguments:
+            $financeRetryDelaySeconds: '%wb_finance.rate_limit_interval_seconds%'
 
     App\Service\FeatureFlagService:
         arguments:
