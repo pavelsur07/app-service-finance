@@ -247,7 +247,7 @@ final class WbFinancialReportSyncPlannerTest extends IntegrationTestCase
         $bus = new InMemoryMessageBus();
         $planner = $this->planner($bus, new \DateTimeImmutable('2026-01-05 12:00:00 Europe/Moscow'));
 
-        $count = $planner->planInitial($companyId, $connectionId, new \DateTimeImmutable('2026-01-02 00:00:00 Europe/Moscow'));
+        $count = $planner->planInitial($companyId, $connectionId, new \DateTimeImmutable('2026-01-02 00:00:00 Europe/Moscow'), 3);
 
         self::assertSame(3, $count);
         self::assertSame(['2026-01-02', '2026-01-03', '2026-01-04'], array_map(static fn (SyncWbFinancialReportDayMessage $m): string => $m->businessDate, $bus->messages));

@@ -217,33 +217,50 @@ final class WbFinancialReportSyncPlanner implements WbFinancialReportSyncPlanner
         return $dispatched;
     }
 
-    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null): int
+    public function planInitial(?string $companyId = null, ?string $connectionId = null, ?DateTimeImmutable $startFrom = null, int $maxDays = 1): int
     {
+        if ($maxDays <= 0) {
+            return 0;
+        }
+
         $start = $startFrom ?? $this->periodResolver->currentYearStart();
-        $days = $this->periodResolver->daysBetween($start, $this->periodResolver->yesterday());
 
         return $this->planForDays(
             $this->activeWbConnectionsQuery->execute($companyId, $connectionId),
-            $days,
+            $this->periodResolver->daysBetween($start, $this->periodResolver->yesterday()),
             FinancialReportSyncMode::INITIAL,
             false,
+            $maxDays,
         );
     }
 
     /** @param list<array{id: string, company_id: string, connection_id: string}> $connections
      * @param list<DateTimeImmutable> $days
      */
-    private function planForDays(array $connections, array $days, FinancialReportSyncMode $mode, bool $forceRefresh): int
+    private function planForDays(
+        array $connections,
+        array $days,
+        FinancialReportSyncMode $mode,
+        bool $forceRefresh,
+        ?int $maxDaysPerConnection = null,
+    ): int
     {
         $dispatched = 0;
 
         foreach ($connections as $connection) {
+            $scheduledForConnection = 0;
+
             foreach ($days as $day) {
+                if (null !== $maxDaysPerConnection && $scheduledForConnection >= $maxDaysPerConnection) {
+                    break;
+                }
+
                 if (!$this->claimAndDispatch($connection['company_id'], $connection['connection_id'], $day, $mode, $forceRefresh)) {
                     continue;
                 }
 
                 ++$dispatched;
+                ++$scheduledForConnection;
             }
         }
 

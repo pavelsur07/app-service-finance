@@ -68,8 +68,8 @@ final class WbFinancialReportSyncIdempotencyTest extends IntegrationTestCase
 
         $plannerBus = new InMemoryMessageBus();
         $planner = $this->planner(new \DateTimeImmutable('2026-05-05 12:00:00 Europe/Moscow'), $plannerBus);
-        $planned1 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'));
-        $planned2 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'));
+        $planned1 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'), 3);
+        $planned2 = $planner->planInitial($company->getId(), $connection->getId(), new \DateTimeImmutable('2026-05-02 00:00:00 Europe/Moscow'), 3);
         self::assertSame(3, $planned1);
         self::assertSame(3, $planned2);
 
