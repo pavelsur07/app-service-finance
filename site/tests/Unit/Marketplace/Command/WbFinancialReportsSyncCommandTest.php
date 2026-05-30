@@ -90,9 +90,11 @@ final class WbFinancialReportsSyncCommandTest extends TestCase
         $code = $tester->execute(['--mode' => 'all']);
 
         self::assertSame(Command::FAILURE, $code);
+        $output = preg_replace('/\s+/', ' ', $tester->getDisplay());
+
         self::assertStringContainsString(
             'WB financial reports --mode=all is dangerous for cron because it can enqueue many days and hit WB API rate limits.',
-            $tester->getDisplay(),
+            $output,
         );
     }
 
