@@ -199,12 +199,15 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
 
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $calls = 0;
-        $dispatch->method('__invoke')->willReturnCallback(function () use (&$calls): void {
-            ++$calls;
-            if (1 === $calls) {
-                throw new \RuntimeException('boom');
-            }
-        });
+        $dispatch->expects(self::exactly(2))->method('__invoke')
+            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use (&$calls): AdLoadJob {
+                ++$calls;
+                if (1 === $calls) {
+                    throw new \RuntimeException('boom');
+                }
+
+                return new AdLoadJob($companyId, MarketplaceType::OZON, $dateFrom, $dateTo);
+            });
 
         $tester = $this->tester($repo, $dispatch);
         $code = $tester->execute([
@@ -213,8 +216,13 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
             '--to' => '2026-04-02',
         ]);
 
+        $display = $tester->getDisplay();
         self::assertSame(Command::FAILURE, $code);
-        self::assertStringContainsString('failed=1', $tester->getDisplay());
+        self::assertStringContainsString('2026-04-01 error: boom', $display);
+        self::assertStringContainsString('2026-04-02 reload: missing', $display);
+        self::assertStringContainsString('created=1', $display);
+        self::assertStringContainsString('failed=1', $display);
+        self::assertStringNotContainsString('Return value must be of type', $display);
     }
 
     public function testRealRunCreatesOnlyOneJobAndDefersRemainingDays(): void
@@ -429,22 +437,33 @@ final class ReconcileMarketplaceAdsCommandTest extends TestCase
         $repo->method('findCompletedJobCoveringDate')->willReturn(null);
         $repo->method('findLatestJobCoveringDate')->willReturn(null);
 
+        $rateLimitedCompanyId = '11111111-1111-1111-1111-000000000101';
+        $healthyCompanyId = '11111111-1111-1111-1111-000000000202';
+
         $dispatch = $this->createMock(DispatchOzonAdLoadActionInterface::class);
         $dispatch->expects(self::exactly(2))->method('__invoke')
-            ->willReturnCallback(function (string $companyId): void {
-                if ('c1' === $companyId) {
+            ->willReturnCallback(function (string $companyId, \DateTimeImmutable $dateFrom, \DateTimeImmutable $dateTo) use ($rateLimitedCompanyId): AdLoadJob {
+                if ($rateLimitedCompanyId === $companyId) {
                     throw new \RuntimeException('rate_limited', 0, new OzonRateLimitException('429'));
                 }
+
+                return new AdLoadJob($companyId, MarketplaceType::OZON, $dateFrom, $dateTo);
             });
 
         $query = $this->createMock(ActiveOzonPerformanceConnectionsQuery::class);
-        $query->method('getCompanyIds')->willReturn(['c1', 'c2']);
+        $query->method('getCompanyIds')->willReturn([$rateLimitedCompanyId, $healthyCompanyId]);
 
         $tester = $this->tester($repo, $dispatch, $query);
         $code = $tester->execute(['--all-active' => true, '--from' => '2026-04-01', '--to' => '2026-04-01']);
 
+        $display = $tester->getDisplay();
         self::assertSame(Command::SUCCESS, $code);
-        self::assertStringContainsString('[c2]', $tester->getDisplay());
+        self::assertStringContainsString(sprintf('[%s] 2026-04-01 deferred: rate_limited', $rateLimitedCompanyId), $display);
+        self::assertStringContainsString(sprintf('[%s] 2026-04-01 reload: missing', $healthyCompanyId), $display);
+        self::assertStringContainsString('created=1', $display);
+        self::assertStringContainsString('deferred=1', $display);
+        self::assertStringContainsString('failed=0', $display);
+        self::assertStringNotContainsString('Return value must be of type', $display);
     }
 
 
