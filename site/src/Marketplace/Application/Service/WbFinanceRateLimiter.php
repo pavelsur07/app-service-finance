@@ -46,20 +46,50 @@ final class WbFinanceRateLimiter
         return $retryAfter;
     }
 
-    public function resolveSalesReportsSellerBucketId(MarketplaceConnection $connection): string
+    public function resolveSalesReportsBucketId(MarketplaceConnection $connection): string
+    {
+        return $this->resolveSalesReportsBucket($connection)['bucket_id'];
+    }
+
+    public function resolveSalesReportsBucketSource(MarketplaceConnection $connection): string
+    {
+        return $this->resolveSalesReportsBucket($connection)['bucket_source'];
+    }
+
+    /** @return array{bucket_id: string, bucket_source: string} */
+    public function resolveSalesReportsBucket(MarketplaceConnection $connection): array
     {
         $settings = $connection->getSettings() ?? [];
-        foreach (['sellerId', 'seller_id', 'accountId', 'account_id', 'supplierId', 'supplier_id', 'wbSellerId', 'wb_seller_id'] as $key) {
+        $settingSources = [
+            'sellerId' => 'seller_id',
+            'seller_id' => 'seller_id',
+            'accountId' => 'account_id',
+            'account_id' => 'account_id',
+            'supplierId' => 'supplier_id',
+            'supplier_id' => 'supplier_id',
+            'wbSellerId' => 'wb_seller_id',
+            'wb_seller_id' => 'wb_seller_id',
+        ];
+
+        foreach ($settingSources as $key => $source) {
             $value = $settings[$key] ?? null;
             if (is_scalar($value)) {
                 $normalized = $this->normalizeBucketPart((string) $value);
                 if ('' !== $normalized) {
-                    return $normalized;
+                    return ['bucket_id' => $normalized, 'bucket_source' => $source];
                 }
             }
         }
 
-        return self::GLOBAL_BUCKET;
+        return [
+            'bucket_id' => 'connection:'.$this->normalizeBucketPart($connection->getId()),
+            'bucket_source' => 'connection',
+        ];
+    }
+
+    public function resolveSalesReportsSellerBucketId(MarketplaceConnection $connection): string
+    {
+        return $this->resolveSalesReportsBucketId($connection);
     }
 
     public function buildSalesReportsRateLimitKeyForSellerBucket(string $sellerBucketId): string
@@ -141,7 +171,7 @@ final class WbFinanceRateLimiter
             return '';
         }
 
-        return preg_replace('/[^a-zA-Z0-9_.-]+/', '_', $normalized) ?? '';
+        return preg_replace('/[^a-zA-Z0-9_.:-]+/', '_', $normalized) ?? '';
     }
 
     private function extractHashPrefix(string $sellerRateLimitKey): string

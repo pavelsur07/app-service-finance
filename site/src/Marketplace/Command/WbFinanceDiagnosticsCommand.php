@@ -80,10 +80,10 @@ final class WbFinanceDiagnosticsCommand extends Command
                 $timestamp = $this->redisGet($key);
                 $ttl = $this->redisTtl($key);
                 $cooldownUntil = $this->formatTimestamp($timestamp);
-                $rows[] = [$key, $cooldownUntil, null === $ttl ? 'n/a' : (string) $ttl];
+                $rows[] = [$key, $this->bucketTypeFromCooldownKey($key), $cooldownUntil, null === $ttl ? 'n/a' : (string) $ttl];
             }
 
-            $io->table(['key', 'cooldown_until', 'ttl_seconds'], $rows);
+            $io->table(['key', 'bucket_type', 'cooldown_until', 'ttl_seconds'], $rows);
         } catch (\Throwable $e) {
             $io->warning('Cannot read Redis cooldown keys: '.$e->getMessage());
         }
@@ -157,9 +157,9 @@ final class WbFinanceDiagnosticsCommand extends Command
 
         try {
             $last429 = $this->connection->fetchOne(
-                "SELECT MAX(created_at)
+                'SELECT MAX(created_at)
                  FROM marketplace_financial_report_sync_errors
-                 WHERE status_code = 429",
+                 WHERE status_code = 429',
             );
             $rows[] = ['last_429_time', false === $last429 || null === $last429 ? 'n/a' : (string) $last429];
         } catch (\Throwable $e) {
@@ -231,12 +231,49 @@ final class WbFinanceDiagnosticsCommand extends Command
     /** @return list<string> */
     private function redisKeys(string $pattern): array
     {
-        $keys = $this->redisClient->keys($pattern);
-        if (!is_array($keys)) {
-            return [];
+        $keys = [];
+
+        if (is_a($this->redisClient, 'Redis')) {
+            $iterator = null;
+            do {
+                $batch = $this->redisClient->scan($iterator, $pattern, 100);
+                if (is_array($batch)) {
+                    foreach ($batch as $key) {
+                        $keys[] = (string) $key;
+                    }
+                }
+            } while (null !== $iterator && 0 !== $iterator && '0' !== $iterator);
+
+            return array_values(array_unique($keys));
         }
 
-        return array_values(array_map(static fn (mixed $key): string => (string) $key, $keys));
+        $cursor = '0';
+        do {
+            $result = $this->redisClient->scan($cursor, ['MATCH' => $pattern, 'COUNT' => 100]);
+            if (!is_array($result) || !array_key_exists(0, $result) || !array_key_exists(1, $result) || !is_array($result[1])) {
+                break;
+            }
+
+            $cursor = (string) $result[0];
+            foreach ($result[1] as $key) {
+                $keys[] = (string) $key;
+            }
+        } while ('0' !== $cursor);
+
+        return array_values(array_unique($keys));
+    }
+
+    private function bucketTypeFromCooldownKey(string $key): string
+    {
+        $bucket = substr($key, strlen('wb_finance:sales_reports:cooldown:'));
+        if ('global' === $bucket) {
+            return 'global';
+        }
+        if (str_starts_with($bucket, 'connection:')) {
+            return 'connection';
+        }
+
+        return 'seller/account';
     }
 
     private function redisGet(string $key): ?string

@@ -7,7 +7,6 @@ namespace App\Tests\Unit\Marketplace\Command;
 use App\Marketplace\Command\WbFinanceDiagnosticsCommand;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
-use stdClass;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Tester\CommandTester;
 
@@ -19,7 +18,7 @@ final class WbFinanceDiagnosticsCommandTest extends TestCase
         $connection->method('fetchAllAssociative')->willReturn([]);
         $connection->method('fetchOne')->willReturn(0);
 
-        $command = new WbFinanceDiagnosticsCommand(new DiagnosticsRedisFake(), new stdClass(), new stdClass(), $connection);
+        $command = new WbFinanceDiagnosticsCommand(new DiagnosticsRedisFake(), new \stdClass(), new \stdClass(), $connection);
         $tester = new CommandTester($command);
 
         self::assertSame(Command::SUCCESS, $tester->execute([]));
@@ -28,16 +27,18 @@ final class WbFinanceDiagnosticsCommandTest extends TestCase
         self::assertStringContainsString('Redis / limiter', $display);
         self::assertStringContainsString('Redis cooldown keys', $display);
         self::assertStringContainsString('Redis queue sizes', $display);
+        self::assertStringContainsString('bucket_type', $display);
+        self::assertStringContainsString('connection', $display);
         self::assertStringContainsString('WB sales_report sync_status counts', $display);
     }
 }
 
 final class DiagnosticsRedisFake
 {
-    /** @return list<string> */
-    public function keys(string $pattern): array
+    /** @return array{0: string, 1: list<string>} */
+    public function scan(string $cursor, array $options): array
     {
-        return ['wb_finance:sales_reports:cooldown:seller-1'];
+        return ['0', ['wb_finance:sales_reports:cooldown:connection:6eada2b7-b453-4c33-a92a-e7dce52e291c']];
     }
 
     public function get(string $key): string
