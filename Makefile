@@ -97,11 +97,19 @@ site-test-db-rebuild: site-test-wait-db
 	docker-compose run --rm site-php-cli php bin/console doctrine:migrations:migrate --no-interaction --env=test
 	docker-compose run --rm site-php-cli php bin/console doctrine:fixtures:load --no-interaction --env=test
 
-# Unit-тесты для Codex Cloud: без Docker, потому что в Codex нет docker-compose
-codex-test-unit:
+# ===== CODEX TESTS =====
+
+codex-prepare:
+	cd site && unset COMPOSER_NO_DEV && COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-progress --no-scripts
+	test -f site/vendor/autoload.php
+	test -f site/vendor/symfony/phpunit-bridge/bin/simple-phpunit.php
+	cd site && php -d memory_limit=1G bin/phpunit --version
+
+codex-test-unit: codex-prepare
 	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=1G bin/phpunit --testsuite unit
 
-codex-test-unit-filter:
+codex-test-unit-filter: codex-prepare
+	test -n "$(FILTER)"
 	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=512M bin/phpunit --testsuite unit --filter "$(FILTER)"
 
 # ===== API TYPES / OPENAPI =====
