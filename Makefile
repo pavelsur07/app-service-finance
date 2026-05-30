@@ -109,7 +109,6 @@ codex-test-unit: codex-prepare
 	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=1G bin/phpunit --testsuite unit
 
 codex-test-unit-filter: codex-prepare
-	test -n "$(FILTER)"
 	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=512M bin/phpunit --testsuite unit --filter "$(FILTER)"
 
 # ===== API TYPES / OPENAPI =====
