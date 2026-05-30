@@ -99,17 +99,24 @@ site-test-db-rebuild: site-test-wait-db
 
 # ===== CODEX TESTS =====
 
+CODEX_SYSTEM_PATH := /usr/bin:/usr/local/bin:/usr/sbin:/bin:/sbin
+
 codex-prepare:
-	cd site && unset COMPOSER_NO_DEV && COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-progress --no-scripts
+	PATH="$(CODEX_SYSTEM_PATH)" which php
+	PATH="$(CODEX_SYSTEM_PATH)" php -v
+	PATH="$(CODEX_SYSTEM_PATH)" php --ini
+	PATH="$(CODEX_SYSTEM_PATH)" php -r 'foreach (["dom","xml","xmlwriter","SimpleXML","mbstring","curl","intl","zip","redis","sodium"] as $$ext) { echo $$ext . ": " . (extension_loaded($$ext) ? "OK" : "MISSING") . PHP_EOL; }'
+	cd site && unset COMPOSER_NO_DEV && PATH="$(CODEX_SYSTEM_PATH)" COMPOSER_ALLOW_SUPERUSER=1 composer install --no-interaction --prefer-dist --no-progress --no-scripts
 	test -f site/vendor/autoload.php
-	test -f site/vendor/symfony/phpunit-bridge/bin/simple-phpunit.php
-	cd site && php -d memory_limit=1G bin/phpunit --version
+	test -f site/bin/phpunit
+	test -f site/vendor/phpunit/phpunit/phpunit
+	cd site && PATH="$(CODEX_SYSTEM_PATH)" php -d memory_limit=1G bin/phpunit --version
 
 codex-test-unit: codex-prepare
-	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=1G bin/phpunit --testsuite unit
+	cd site && APP_ENV=test APP_DEBUG=1 PATH="$(CODEX_SYSTEM_PATH)" php -d memory_limit=1G bin/phpunit --testsuite unit
 
 codex-test-unit-filter: codex-prepare
-	cd site && APP_ENV=test APP_DEBUG=1 php -d memory_limit=512M bin/phpunit --testsuite unit --filter "$(FILTER)"
+	cd site && APP_ENV=test APP_DEBUG=1 PATH="$(CODEX_SYSTEM_PATH)" php -d memory_limit=512M bin/phpunit --testsuite unit --filter "$(FILTER)"
 
 # ===== API TYPES / OPENAPI =====
 #
