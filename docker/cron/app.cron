@@ -10,15 +10,15 @@
 
 # Новый WB financial sync (TASK-028): единая команда-планировщик по режимам.
 # Временно отключено
-#10 3 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1 --no-interaction --quiet
+10 3 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=daily --max-days=1 --no-interaction --quiet
 
 # Постепенное обновление последних 14 дней: не более 1 дня на connection за запуск.
 # Временно отключено
-#*/20 6-23 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=refresh14 --max-days=1 --no-interaction --quiet
+*/30 6-23 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=refresh14 --max-days=1 --no-interaction --quiet
 
 # Постепенное восстановление пропущенных дней: не более 1 missing-дня на connection за запуск.
 # Временно отключено
-#*/15 6-23 * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=1 --no-interaction --quiet
+10 * * * * php bin/console app:marketplace:wb-financial-reports:sync --mode=missing --max-days=1 --no-interaction --quiet
 
 # Ночная синхронизация отчётов Ozon по реализации.
 0 4 * * * php bin/console app:marketplace:ozon-daily-sync --no-interaction
