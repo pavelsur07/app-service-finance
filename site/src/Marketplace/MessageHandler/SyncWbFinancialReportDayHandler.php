@@ -8,6 +8,7 @@ use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinancialReportPeriodResolver;
 use App\Marketplace\Application\Service\WbFinancialReportReconciliationService;
 use App\Marketplace\Application\Service\WbFinancialReportSyncStatusUpdater;
+use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Enum\FinancialReportSyncMode;
 use App\Marketplace\Enum\FinancialReportSyncStatus;
 use App\Marketplace\Enum\MarketplaceConnectionType;
@@ -18,7 +19,6 @@ use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
 use App\Marketplace\Exception\MarketplaceRateLimitException;
 use App\Marketplace\Exception\MarketplaceTemporaryApiException;
 use App\Marketplace\Exception\WbRawDocumentRefreshConflictException;
-use App\Marketplace\Entity\MarketplaceRawDocument;
 use App\Marketplace\Infrastructure\Api\Wildberries\WbFinanceSalesReportClient;
 use App\Marketplace\Message\ProcessDayReportMessage;
 use App\Marketplace\Message\SyncWbFinancialReportDayMessage;
@@ -52,7 +52,8 @@ final class SyncWbFinancialReportDayHandler
         private readonly LoggerInterface $logger,
         private readonly ClockInterface $clock,
         private readonly int $financeRetryDelaySeconds,
-    ) {}
+    ) {
+    }
 
     public function __invoke(SyncWbFinancialReportDayMessage $message): void
     {
@@ -143,6 +144,9 @@ final class SyncWbFinancialReportDayHandler
 
         $effectiveRrdId = $status->getNextRrdId() ?? $message->rrdId;
         $effectiveRawDocumentId = $status->getStagingRawDocumentId() ?? $message->rawDocumentId;
+        $bucket = $this->financeSalesReportClient->resolveSalesReportsBucket($connection);
+        $sellerBucketId = $bucket['bucket_id'];
+        $bucketSource = $bucket['bucket_source'];
 
         if (\in_array($status->getStatus(), [FinancialReportSyncStatus::QUEUED, FinancialReportSyncStatus::FAILED], true)
             && null !== $status->getNextRetryAt()
@@ -163,6 +167,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'bucket_id' => $sellerBucketId,
+                'bucket_source' => $bucketSource,
                 'rrd_id' => $effectiveRrdId,
                 'raw_document_id' => $effectiveRawDocumentId,
                 'next_retry_at' => $status->getNextRetryAt()->format(\DateTimeInterface::ATOM),
@@ -172,7 +178,6 @@ final class SyncWbFinancialReportDayHandler
             return;
         }
 
-        $sellerBucketId = $this->financeSalesReportClient->resolveSalesReportsSellerBucketId($connection);
         $cooldownUntil = $this->financeSalesReportClient->getActiveSalesReportsCooldownUntil($sellerBucketId);
         if (null !== $cooldownUntil) {
             $this->syncStatusUpdater->markPageQueued($status, $mode, $message->forceRefresh, $cooldownUntil, $effectiveRawDocumentId, $effectiveRrdId);
@@ -193,7 +198,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
-                'seller_bucket_id' => $sellerBucketId,
+                'bucket_id' => $sellerBucketId,
+                'bucket_source' => $bucketSource,
             ]);
 
             return;
@@ -220,6 +226,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'bucket_id' => $sellerBucketId,
+                'bucket_source' => $bucketSource,
                 'rrd_id' => $effectiveRrdId,
                 'raw_document_id' => $effectiveRawDocumentId,
                 'next_retry_at' => $retryAfter->format(\DateTimeInterface::ATOM),
@@ -349,6 +357,8 @@ final class SyncWbFinancialReportDayHandler
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),
                 'mode' => $mode->value,
+                'bucket_id' => $sellerBucketId,
+                'bucket_source' => $bucketSource,
                 'rrd_id' => $effectiveRrdId,
                 'raw_document_id' => $effectiveRawDocumentId,
                 'next_retry_at' => $nextRetryAt->format(\DateTimeInterface::ATOM),

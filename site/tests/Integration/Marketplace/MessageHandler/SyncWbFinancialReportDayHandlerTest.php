@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\MessageHandler;
 
+use App\Company\Entity\Company;
 use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
-use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncError;
 use App\Marketplace\Entity\MarketplaceFinancialReportSyncStatus;
@@ -26,11 +26,11 @@ use App\Tests\Support\Kernel\IntegrationTestCase;
 use Symfony\Component\Clock\MockClock;
 use Symfony\Component\HttpClient\MockHttpClient;
 use Symfony\Component\HttpClient\Response\MockResponse;
-use Symfony\Component\RateLimiter\RateLimiterFactory;
-use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 use Symfony\Component\Messenger\Envelope;
 use Symfony\Component\Messenger\Exception\UnrecoverableMessageHandlingException;
 use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\Storage\InMemoryStorage;
 
 final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 {
@@ -133,7 +133,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertCount(2, $this->filterSyncMessages($bus->messages));
     }
 
-    public function testFallbackGlobalBucketPreventsTwoUnknownSellerConnectionsFromCallingApiBackToBack(): void
+    public function testConnectionFallbackBucketsAllowTwoUnknownSellerConnectionsToCallApiBackToBack(): void
     {
         $companyA = $this->createCompany(9292);
         $companyB = $this->createCompany(9293);
@@ -152,10 +152,10 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $handler($this->message($companyA->getId(), $connectionA->getId(), false));
         $handler($this->message($companyB->getId(), $connectionB->getId(), false));
 
-        self::assertSame(1, $requestCount);
+        self::assertSame(2, $requestCount);
         $secondStatus = $this->findStatus($connectionB->getId(), $companyB->getId(), '2026-05-19');
         self::assertNotNull($secondStatus);
-        self::assertSame(FinancialReportSyncStatus::QUEUED, $secondStatus->getStatus());
+        self::assertSame(FinancialReportSyncStatus::SUCCESS, $secondStatus->getStatus());
     }
 
     public function testCooldownExpiresAndAllowsApiRequestAgain(): void
@@ -258,16 +258,16 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
         $handler($this->message($company->getId(), $connection->getId(), false));
 
-            $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
-            self::assertNotNull($status);
-            self::assertSame(FinancialReportSyncStatus::FAILED, $status->getStatus());
-            self::assertNotNull($status->getNextRetryAt());
+        $status = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
+        self::assertNotNull($status);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
+        self::assertNotNull($status->getNextRetryAt());
 
-            $error = $this->findLastError($status->getId());
-            self::assertNotNull($error);
-            self::assertSame('App\Marketplace\Exception\MarketplaceRateLimitException', $error->getErrorClass());
-            self::assertSame(429, $error->getStatusCode());
-            self::assertSame(0, $status->getRecordsCount());
+        $error = $this->findLastError($status->getId());
+        self::assertNotNull($error);
+        self::assertSame('App\Marketplace\Exception\MarketplaceRateLimitException', $error->getErrorClass());
+        self::assertSame(429, $error->getStatusCode());
+        self::assertSame(0, $status->getRecordsCount());
     }
 
     public function testAuthExceptionMarksAuthFailedAndStoresError(): void
@@ -351,7 +351,8 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             }),
             $this->createRateLimiter(),
         );
-        self::assertNull($client->tryConsume($client->buildSalesReportsRateLimitKeyForApiKey($connection->getApiKey())));
+        $bucketId = $client->resolveSalesReportsBucketId($connection);
+        self::assertNull($client->tryConsume($client->buildSalesReportsRateLimitKeyForSellerBucket($bucketId)));
         self::getContainer()->set(WbFinanceSalesReportClient::class, $client);
 
         $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
@@ -363,7 +364,6 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         self::assertSame(FinancialReportSyncStatus::QUEUED, $status->getStatus());
         self::assertNotNull($status->getNextRetryAt());
     }
-
 
     public function testStaleContinuationIsSkippedWithoutCallingWbApi(): void
     {
@@ -463,7 +463,6 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
         }
     }
 
-
     public function testHandlerRespectsPersistedFutureNextRetryAtWithoutCallingWbApi(): void
     {
         $company = $this->createCompany(9218);
@@ -549,7 +548,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
 
     private function swapBusSpy(): object
     {
-        $spyBus = new class() implements MessageBusInterface {
+        $spyBus = new class implements MessageBusInterface {
             /** @var list<object> */
             public array $messages = [];
 
@@ -629,6 +628,7 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             'periodTo' => new \DateTimeImmutable($date),
         ]);
     }
+
     private function createRateLimiter(?WbFinanceCooldownStorageInterface $storage = null, ?MockClock $clock = null): WbFinanceRateLimiter
     {
         return new WbFinanceRateLimiter(

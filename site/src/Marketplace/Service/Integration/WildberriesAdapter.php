@@ -40,7 +40,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         return $this->salesReportClient->probeAccess(
             $connection->getApiKey(),
-            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
+            $this->salesReportClient->resolveSalesReportsBucketId($connection),
         );
     }
 
@@ -63,7 +63,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $connection->getApiKey(),
             $dateFrom,
             $dateTo,
-            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
+            $this->salesReportClient->resolveSalesReportsBucketId($connection),
         );
     }
 
@@ -86,7 +86,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $connection->getApiKey(),
             $dateFrom,
             $dateTo,
-            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
+            $this->salesReportClient->resolveSalesReportsBucketId($connection),
         );
     }
 
@@ -115,7 +115,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
             $quantity = abs($this->normalizer->quantity($item));
             $externalOrderId = $this->normalizer->rrdId($item) ?? (string) ($item['realizationreport_id'] ?? '');
-            if ($externalOrderId === '') {
+            if ('' === $externalOrderId) {
                 continue;
             }
 
@@ -149,7 +149,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
 
         foreach ($data as $item) {
             $rrdId = $this->normalizer->rrdId($item) ?? (string) ($item['realizationreport_id'] ?? '');
-            if ($rrdId === '') {
+            if ('' === $rrdId) {
                 continue;
             }
 
@@ -332,7 +332,6 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
     {
         return self::FINANCE_API_ENDPOINT;
     }
-
 
     private function getConnection(Company $company): ?MarketplaceConnection
     {

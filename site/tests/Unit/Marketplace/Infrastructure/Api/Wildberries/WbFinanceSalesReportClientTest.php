@@ -27,6 +27,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $captured[] = $options['json'] ?? json_decode((string) ($options['body'] ?? 'null'), true);
+
             return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
         });
 
@@ -38,13 +39,12 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(0, $captured[0]['rrdId'] ?? null);
     }
 
-
     public function testFetchDetailedDayUsesSameDateInRange(): void
     {
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $payload = $options['json'] ?? null;
-            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
                 $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
             }
             $captured[] = $payload;
@@ -58,7 +58,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame('2026-01-15', $captured[0]['dateFrom'] ?? null);
         self::assertSame('2026-01-15', $captured[0]['dateTo'] ?? null);
     }
-
 
     public function testFetchDetailedDayThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
     {
@@ -81,7 +80,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
-    public function testFetchDetailedDayReturnsRateLimitForSameTokenAcrossDifferentConnectionIds(): void
+    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentConnectionIdsWhenSellerBucketMissing(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -95,14 +94,10 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
         self::assertSame([], $client->fetchDetailedDay('connection-a', 'same-token', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15')));
 
-        $this->expectException(MarketplaceRateLimitException::class);
-        try {
-            $client->fetchDetailedDay('connection-b', 'same-token', new \DateTimeImmutable('2026-01-15'));
-        } finally {
-            self::assertSame(1, $requestCount);
-            self::assertSame($startTimestamp, $clock->now()->getTimestamp());
-        }
+        self::assertSame(2, $requestCount);
+        self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
     public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentSellerBuckets(): void
@@ -124,7 +119,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
-
     public function testFetchDetailedDayPageReturnsContinuationCursorForFullPage(): void
     {
         $rows = array_fill(0, 100000, ['rrdId' => 10]);
@@ -135,7 +129,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$requestCount, &$captured, $rows): MockResponse {
             ++$requestCount;
             $payload = $options['json'] ?? null;
-            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
                 $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
             }
             $captured[] = $payload;
@@ -160,12 +154,12 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
 
-
     public function testHasAnyDataForConnectionThrowsBeforeHttpRequestWhenLocalBucketIsBusy(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
             ++$requestCount;
+
             return new MockResponse('[{"rrdId":1}]', ['http_code' => 200]);
         });
 
@@ -186,7 +180,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $payload = $options['json'] ?? null;
-            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
                 $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
             }
             $captured = [$method, $url, $payload];
@@ -230,6 +224,87 @@ final class WbFinanceSalesReportClientTest extends TestCase
             self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-has-any'));
         }
     }
+
+    public function testConnectionRemote429CreatesConnectionCooldownWithoutGlobalCooldown(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $connectionId = '6eada2b7-b453-4c33-a92a-e7dce52e291c';
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
+        );
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailedForConnection($connectionId, 'token', '2026-01-01', '2026-01-01');
+        } finally {
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionId));
+            self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
+        }
+    }
+
+    public function testSecondConnectionIsNotBlockedByFirstConnectionCooldown(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $connectionA = '6eada2b7-b453-4c33-a92a-e7dce52e291c';
+        $connectionB = '50bb10aa-4659-41fc-887b-f635de795839';
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+        });
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage));
+
+        try {
+            $client->fetchDetailedForConnection($connectionA, 'token-a', '2026-01-01', '2026-01-01');
+            self::fail('Expected first connection to be rate limited');
+        } catch (MarketplaceRateLimitException) {
+        }
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailedForConnection($connectionB, 'token-b', '2026-01-01', '2026-01-01');
+        } finally {
+            self::assertSame(2, $requestCount);
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionA));
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:connection:'.$connectionB));
+            self::assertNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
+        }
+    }
+
+    public function testLegacyFetchDetailedUsesGlobalCooldownFallback(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
+        );
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->fetchDetailed('token', '2026-01-01', '2026-01-01');
+        } finally {
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
+        }
+    }
+
+    public function testLegacyHasAnyDataUsesGlobalCooldownFallback(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
+        );
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->hasAnyData('token', '2026-01-01', '2026-01-01');
+        } finally {
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
+        }
+    }
+
     public function test204ReturnsAccumulatedRows(): void
     {
         $client = new WbFinanceSalesReportClient(new MockHttpClient([
@@ -246,7 +321,6 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $this->expectException(MarketplaceRateLimitException::class);
         $client->fetchDetailedForConnection('connection-id', 'token', '2026-01-01', '2026-01-01');
     }
-
 
     public function test429MappedToRateLimitExceptionWithRetryAfter(): void
     {
@@ -305,11 +379,12 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured, $rows): MockResponse {
             $payload = $options['json'] ?? null;
 
-            if ($payload === null && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+            if (null === $payload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
                 $payload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
             }
 
             $captured[] = $payload;
+
             return match (count($captured)) {
                 1 => new MockResponse((string) json_encode($rows, JSON_THROW_ON_ERROR), ['http_code' => 200]),
                 default => new MockResponse('', ['http_code' => 204]),
@@ -335,6 +410,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $captured = [];
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$captured): MockResponse {
             $captured = [$method, $url, $options];
+
             return new MockResponse('', ['http_code' => 200]);
         });
 
@@ -451,6 +527,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $this->expectException(MarketplaceTemporaryApiException::class);
         $client->probeAccess('token');
     }
+
     private function createRateLimiter(?MockClock $clock = null, ?WbFinanceCooldownStorageInterface $storage = null): WbFinanceRateLimiter
     {
         $factory = new RateLimiterFactory(
