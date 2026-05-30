@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Unit\Marketplace\Infrastructure\Api\Wildberries;
 
+use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
@@ -104,7 +105,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         }
     }
 
-    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentTokens(): void
+    public function testFetchDetailedDayUsesDifferentLimiterBucketsForDifferentSellerBuckets(): void
     {
         $requestCount = 0;
         $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
@@ -117,8 +118,8 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $startTimestamp = $clock->now()->getTimestamp();
         $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock));
 
-        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token-a', new \DateTimeImmutable('2026-01-15')));
-        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token-b', new \DateTimeImmutable('2026-01-15')));
+        self::assertSame([], $client->fetchDetailedDay('connection-a', 'token-a', new \DateTimeImmutable('2026-01-15'), 'seller-a'));
+        self::assertSame([], $client->fetchDetailedDay('connection-b', 'token-b', new \DateTimeImmutable('2026-01-15'), 'seller-b'));
         self::assertSame(2, $requestCount);
         self::assertSame($startTimestamp, $clock->now()->getTimestamp());
     }
@@ -201,6 +202,33 @@ final class WbFinanceSalesReportClientTest extends TestCase
         self::assertSame(1, $captured[2]['limit'] ?? null);
         self::assertSame('2026-02-01', $captured[2]['dateFrom'] ?? null);
         self::assertSame('2026-02-03', $captured[2]['dateTo'] ?? null);
+    }
+
+    public function testHasAnyDataForConnectionStoresCooldownAfterRemote429AndSkipsNextHttpRequest(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+        });
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(null, $storage));
+
+        try {
+            $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03', 'seller-has-any');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(17, $e->getRetryAfter());
+        }
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->hasAnyDataForConnection('connection-id', 'token', '2026-02-01', '2026-02-03', 'seller-has-any');
+        } finally {
+            self::assertSame(1, $requestCount);
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-has-any'));
+        }
     }
     public function test204ReturnsAccumulatedRows(): void
     {
@@ -343,6 +371,70 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $client->probeAccess('token');
     }
 
+    public function testProbeAccessRespectsSellerCooldownWithoutHttpRequest(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-01-01T00:00:00Z');
+        $storage->setUntilTimestamp('wb_finance:sales_reports:cooldown:seller-1', $clock->now()->modify('+60 seconds')->getTimestamp(), 60);
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('{"Status":"OK"}', ['http_code' => 200]);
+        });
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter($clock, $storage));
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->probeAccess('token', 'seller-1');
+        } finally {
+            self::assertSame(0, $requestCount);
+        }
+    }
+
+    public function testProbeAccessRemote429SetsSellerCooldownAndNextProbeSkipsHttp(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']]);
+        });
+        $client = new WbFinanceSalesReportClient($http, $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage));
+
+        try {
+            $client->probeAccess('token', 'seller-1');
+            self::fail('Expected MarketplaceRateLimitException');
+        } catch (MarketplaceRateLimitException $e) {
+            self::assertSame(17, $e->getRetryAfter());
+        }
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->probeAccess('token', 'seller-1');
+        } finally {
+            self::assertSame(1, $requestCount);
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-1'));
+        }
+    }
+
+    public function testProbeAccessRemote429UsesGlobalCooldownFallback(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $client = new WbFinanceSalesReportClient(
+            new MockHttpClient(new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 17']])),
+            $this->createRateLimiter(new MockClock('2026-01-01T00:00:00Z'), $storage),
+        );
+
+        $this->expectException(MarketplaceRateLimitException::class);
+        try {
+            $client->probeAccess('token', null);
+        } finally {
+            self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:global'));
+        }
+    }
+
     public function testProbeAccess5xxThrowsTemporaryApiException(): void
     {
         $client = new WbFinanceSalesReportClient(new MockHttpClient(new MockResponse('{"error":"server"}', ['http_code' => 500])), $this->createRateLimiter());
@@ -359,7 +451,7 @@ final class WbFinanceSalesReportClientTest extends TestCase
         $this->expectException(MarketplaceTemporaryApiException::class);
         $client->probeAccess('token');
     }
-    private function createRateLimiter(?MockClock $clock = null): WbFinanceRateLimiter
+    private function createRateLimiter(?MockClock $clock = null, ?WbFinanceCooldownStorageInterface $storage = null): WbFinanceRateLimiter
     {
         $factory = new RateLimiterFactory(
             [
@@ -371,6 +463,22 @@ final class WbFinanceSalesReportClientTest extends TestCase
             new InMemoryStorage(),
         );
 
-        return new WbFinanceRateLimiter($factory, $clock ?? new MockClock());
+        return new WbFinanceRateLimiter($factory, $clock ?? new MockClock(), null, $storage);
+    }
+}
+
+final class InMemoryWbFinanceCooldownStorage implements WbFinanceCooldownStorageInterface
+{
+    /** @var array<string, int> */
+    private array $values = [];
+
+    public function getUntilTimestamp(string $key): ?int
+    {
+        return $this->values[$key] ?? null;
+    }
+
+    public function setUntilTimestamp(string $key, int $untilTimestamp, int $ttlSeconds): void
+    {
+        $this->values[$key] = max($this->values[$key] ?? 0, $untilTimestamp);
     }
 }
