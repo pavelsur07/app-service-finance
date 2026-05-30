@@ -6,8 +6,37 @@ on:
     pull_request:
 
 jobs:
+    unit-tests:
+        name: 🧪 Unit tests
+        runs-on: ubuntu-latest
+        steps:
+            - name: 📦 Checkout repository
+              uses: actions/checkout@v4
+
+            - name: 🐳 Build site-php-cli
+              run: docker compose build site-php-cli
+
+            - name: 📦 Install PHP dependencies
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    site-php-cli composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+            - name: 🧪 Run unit tests
+              run: |
+                  docker compose run --rm -T \
+                    --user "$(id -u):$(id -g)" \
+                    -e COMPOSER_HOME=/tmp/composer \
+                    -e APP_ENV=test \
+                    -e APP_DEBUG=0 \
+                    -e APP_SECRET=test \
+                    -e DEFAULT_URI=http://localhost \
+                    site-php-cli composer test:unit
+
     # 1. ЭТАП СБОРКИ: Запускаем 4 сборки одновременно
     build-and-push:
+        needs: unit-tests
         runs-on: ubuntu-latest
         strategy:
             fail-fast: false
