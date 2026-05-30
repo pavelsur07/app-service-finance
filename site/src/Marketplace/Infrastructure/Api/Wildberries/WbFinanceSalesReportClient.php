@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Marketplace\Infrastructure\Api\Wildberries;
 
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
+use App\Marketplace\Entity\MarketplaceConnection;
 use App\Marketplace\Exception\MarketplaceAuthException;
 use App\Marketplace\Exception\MarketplaceBadRequestException;
 use App\Marketplace\Exception\MarketplaceInvalidApiResponseException;
@@ -22,6 +23,7 @@ final readonly class WbFinanceSalesReportClient
     private const WB_HEADER_RETRY = 'x-ratelimit-retry';
     private const WB_HEADER_RESET = 'x-ratelimit-reset';
     private const SALES_REPORTS_RATE_LIMIT_KEY_PREFIX = 'wb_finance_sales_reports';
+    private const GLOBAL_SELLER_BUCKET = 'global';
 
     private LoggerInterface $logger;
     private WbFinanceRateLimiter $rateLimiter;
@@ -35,35 +37,65 @@ final readonly class WbFinanceSalesReportClient
         $this->rateLimiter = $rateLimiter;
     }
 
-
     /** @return list<array<string,mixed>> */
-    public function fetchDetailedDay(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate): array
+    public function fetchDetailedDay(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, ?string $sellerBucketId = null): array
     {
         $date = $businessDate->format('Y-m-d');
 
-        return $this->fetchDetailedInternal($apiKey, $date, $date);
+        return $this->fetchDetailedInternal($apiKey, $date, $date, $sellerBucketId);
     }
 
-    public function fetchDetailedDayPage(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, int $rrdId, bool $rateLimitTokenConsumed = false): WbFinanceSalesReportPage
+    public function fetchDetailedDayPage(string $connectionId, string $apiKey, \DateTimeImmutable $businessDate, int $rrdId, bool $rateLimitTokenConsumed = false, ?string $sellerBucketId = null): WbFinanceSalesReportPage
     {
         $date = $businessDate->format('Y-m-d');
 
-        return $this->fetchDetailedPage($apiKey, $date, $date, $rrdId, self::PAGE_SIZE, $rateLimitTokenConsumed);
+        return $this->fetchDetailedPage($apiKey, $date, $date, $rrdId, self::PAGE_SIZE, $rateLimitTokenConsumed, $sellerBucketId);
     }
 
     /**
-     * The $connectionId parameter is retained for caller context compatibility; throttling is per seller WB API token.
+     * The $connectionId parameter is retained for caller context compatibility; throttling is per seller bucket.
+     * Unknown seller/account identifiers intentionally share the global bucket.
      *
      * @return list<array<string,mixed>>
      */
-    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): array
+    public function fetchDetailedForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId = null): array
     {
-        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
+        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, $sellerBucketId);
     }
 
     public function tryConsume(string $sellerRateLimitKey): ?\DateTimeImmutable
     {
         return $this->rateLimiter->tryConsume($sellerRateLimitKey);
+    }
+
+    public function resolveSalesReportsSellerBucketId(MarketplaceConnection $connection): string
+    {
+        return $this->rateLimiter->resolveSalesReportsSellerBucketId($connection);
+    }
+
+    public function buildSalesReportsRateLimitKeyForSellerBucket(string $sellerBucketId): string
+    {
+        return $this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId);
+    }
+
+    public function getActiveSalesReportsCooldownUntil(string $sellerBucketId): ?\DateTimeImmutable
+    {
+        return $this->rateLimiter->getActiveSalesReportsCooldownUntil($sellerBucketId);
+    }
+
+    public function setSalesReportsCooldownUntil(string $sellerBucketId, \DateTimeImmutable $cooldownUntil): void
+    {
+        $this->rateLimiter->setSalesReportsCooldownUntil($sellerBucketId, $cooldownUntil);
+    }
+
+    public function cooldownUntilAfterRemote429(?int $retryAfterSeconds, int $defaultSeconds = 900): \DateTimeImmutable
+    {
+        return $this->rateLimiter->cooldownUntilAfterRemote429($retryAfterSeconds, $defaultSeconds);
+    }
+
+    public function buildSalesReportsCooldownKey(string $sellerBucketId): string
+    {
+        return $this->rateLimiter->buildSalesReportsCooldownKey($sellerBucketId);
     }
 
     public function buildSalesReportsRateLimitKeyForApiKey(string $apiKey): string
@@ -72,23 +104,23 @@ final readonly class WbFinanceSalesReportClient
     }
 
     /**
-     * @deprecated Use fetchDetailedForConnection() in production flows when connection context is available; local throttling is per seller WB API token, not per connection.
+     * @deprecated Use fetchDetailedForConnection() in production flows when connection context is available; unknown context uses the shared global bucket.
      *
      * @return list<array<string,mixed>>
      */
     public function fetchDetailed(string $apiKey, string $dateFrom, string $dateTo): array
     {
-        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo);
+        return $this->fetchDetailedInternal($apiKey, $dateFrom, $dateTo, null);
     }
 
     /** @return list<array<string,mixed>> */
-    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo): array
+    private function fetchDetailedInternal(string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId): array
     {
         $rows = [];
         $rrdId = 0;
 
         do {
-            $page = $this->fetchDetailedPage($apiKey, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE);
+            $page = $this->fetchDetailedPage($apiKey, $dateFrom, $dateTo, $rrdId, self::PAGE_SIZE, false, $sellerBucketId);
             $rows = [...$rows, ...$page->rows];
             $rrdId = $page->nextRrdId ?? $rrdId;
         } while ($page->hasNextPage);
@@ -96,12 +128,15 @@ final readonly class WbFinanceSalesReportClient
         return $rows;
     }
 
-    private function fetchDetailedPage(string $apiKey, string $dateFrom, string $dateTo, int $rrdId, int $limit, bool $rateLimitTokenConsumed = false): WbFinanceSalesReportPage
+    private function fetchDetailedPage(string $apiKey, string $dateFrom, string $dateTo, int $rrdId, int $limit, bool $rateLimitTokenConsumed = false, ?string $sellerBucketId = null): WbFinanceSalesReportPage
     {
+        $sellerBucketId = $this->normalizeSellerBucketId($sellerBucketId);
+        $this->guardCooldown($sellerBucketId, $dateFrom, $dateTo);
+
         if (!$rateLimitTokenConsumed) {
-            $retryAfter = $this->rateLimiter->tryConsume($this->buildSalesReportsRateLimitKeyForApiKey($apiKey));
+            $retryAfter = $this->rateLimiter->tryConsume($this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId));
             if (null !== $retryAfter) {
-                throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->secondsUntil($retryAfter));
+                throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($retryAfter));
             }
         }
 
@@ -132,7 +167,10 @@ final readonly class WbFinanceSalesReportClient
         }
 
         if (429 === $statusCode) {
-            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $this->extractRetryAfter($headers));
+            $retryAfter = $this->extractRetryAfter($headers);
+            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
         }
         if (401 === $statusCode || 403 === $statusCode) {
             throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
@@ -184,10 +222,14 @@ final readonly class WbFinanceSalesReportClient
 
 
 
-    public function probeAccess(string $apiKey): bool
+    public function probeAccess(string $apiKey, ?string $sellerBucketId = null): bool
     {
         // Probe is used for explicit credential checks (e.g. verify connection),
         // not for report sync pipeline, so local report throttling is not applied here.
+        // Shared cooldown still protects the WB Finance API from requests during a remote 429 cooldown.
+        $sellerBucketId = $this->normalizeSellerBucketId($sellerBucketId);
+        $this->guardCooldown($sellerBucketId, '', '');
+
         try {
             $response = $this->httpClient->request('GET', self::BASE_URL.'/ping', [
                 'headers' => ['Authorization' => $apiKey],
@@ -238,7 +280,10 @@ final readonly class WbFinanceSalesReportClient
             return false;
         }
         if (429 === $statusCode) {
-            throw new MarketplaceRateLimitException($statusCode, $excerpt, '', '', $this->extractRetryAfter($headers));
+            $retryAfter = $this->extractRetryAfter($headers);
+            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, '', '', $retryAfter);
         }
         if (400 === $statusCode) {
             throw new MarketplaceBadRequestException('WB finance ping rejected request.', $statusCode, $excerpt, '', '');
@@ -251,18 +296,31 @@ final readonly class WbFinanceSalesReportClient
     }
 
 
-    public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo): bool
+    public function hasAnyDataForConnection(string $connectionId, string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId = null): bool
     {
-        $retryAfter = $this->rateLimiter->tryConsume($this->buildSalesReportsRateLimitKeyForApiKey($apiKey));
+        $sellerBucketId = $this->normalizeSellerBucketId($sellerBucketId);
+        $this->guardCooldown($sellerBucketId, $dateFrom, $dateTo);
+
+        $retryAfter = $this->rateLimiter->tryConsume($this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId));
         if (null !== $retryAfter) {
-            throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->secondsUntil($retryAfter));
+            throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($retryAfter));
         }
 
-        return $this->hasAnyData($apiKey, $dateFrom, $dateTo);
+        return $this->hasAnyData($apiKey, $dateFrom, $dateTo, $sellerBucketId, true);
     }
 
-    public function hasAnyData(string $apiKey, string $dateFrom, string $dateTo): bool
+    public function hasAnyData(string $apiKey, string $dateFrom, string $dateTo, ?string $sellerBucketId = null, bool $rateLimitTokenConsumed = false): bool
     {
+        $sellerBucketId = $this->normalizeSellerBucketId($sellerBucketId);
+        $this->guardCooldown($sellerBucketId, $dateFrom, $dateTo);
+
+        if (!$rateLimitTokenConsumed) {
+            $retryAfter = $this->rateLimiter->tryConsume($this->rateLimiter->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId));
+            if (null !== $retryAfter) {
+                throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($retryAfter));
+            }
+        }
+
         try {
             $response = $this->httpClient->request('POST', self::BASE_URL.'/api/finance/v1/sales-reports/detailed', [
                 'headers' => ['Authorization' => $apiKey],
@@ -287,7 +345,10 @@ final readonly class WbFinanceSalesReportClient
             return false;
         }
         if (429 === $statusCode) {
-            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $this->extractRetryAfter($headers));
+            $retryAfter = $this->extractRetryAfter($headers);
+            $this->setSalesReportsCooldownUntil($sellerBucketId, $this->cooldownUntilAfterRemote429($retryAfter));
+
+            throw new MarketplaceRateLimitException($statusCode, $excerpt, $dateFrom, $dateTo, $retryAfter);
         }
         if (401 === $statusCode || 403 === $statusCode) {
             throw new MarketplaceAuthException('WB API authentication failed.', $statusCode, $excerpt, $dateFrom, $dateTo);
@@ -321,9 +382,23 @@ final readonly class WbFinanceSalesReportClient
         return [] !== $decoded;
     }
 
-    private function secondsUntil(\DateTimeImmutable $retryAfter): int
+    private function guardCooldown(string $sellerBucketId, string $dateFrom, string $dateTo): void
     {
-        return max(1, $retryAfter->getTimestamp() - (new \DateTimeImmutable())->getTimestamp());
+        $cooldownUntil = $this->rateLimiter->getActiveSalesReportsCooldownUntil($sellerBucketId);
+        if (null === $cooldownUntil) {
+            return;
+        }
+
+        throw new MarketplaceRateLimitException(429, '', $dateFrom, $dateTo, $this->rateLimiter->secondsUntil($cooldownUntil));
+    }
+
+    private function normalizeSellerBucketId(?string $sellerBucketId): string
+    {
+        if (null === $sellerBucketId || '' === trim($sellerBucketId)) {
+            return self::GLOBAL_SELLER_BUCKET;
+        }
+
+        return $sellerBucketId;
     }
 
     private function buildSalesReportsRateLimitKey(string $tokenHash): string

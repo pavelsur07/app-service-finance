@@ -255,6 +255,15 @@ class MarketplaceFinancialReportSyncStatus
         $this->updatedAt = new \DateTimeImmutable();
     }
 
+    public function recordRetryableError(string $errorClass, string $errorMessage, ?int $statusCode, ?string $responseExcerpt): void
+    {
+        $this->lastErrorClass = $errorClass;
+        $this->lastErrorMessage = $errorMessage;
+        $this->lastErrorStatusCode = $statusCode;
+        $this->lastErrorResponseExcerpt = $responseExcerpt;
+        $this->updatedAt = new \DateTimeImmutable();
+    }
+
     public function markFailedRetryablePreservingCursor(
         string $errorClass,
         string $errorMessage,

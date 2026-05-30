@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Integration\Marketplace\MessageHandler;
 
+use App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface;
 use App\Marketplace\Application\Service\WbFinanceRateLimiter;
 use App\Company\Entity\Company;
 use App\Marketplace\Entity\MarketplaceConnection;
@@ -98,6 +99,78 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             self::assertNotNull($error);
             self::assertSame('App\Marketplace\Exception\MarketplaceTemporaryApiException', $error->getErrorClass());
         }
+    }
+
+    public function testRemote429SetsSharedCooldownAndNextDaySkipsHttp(): void
+    {
+        $company = $this->createCompany(9291);
+        $connection = $this->createWbSellerConnection($company, 9291);
+        $connection->setSettings(['seller_id' => 'seller-9291']);
+        $this->em->flush();
+        $bus = $this->swapBusSpy();
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('{"error":"rate"}', ['http_code' => 429, 'response_headers' => ['x-ratelimit-retry: 120']]);
+        });
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient($http, $this->createRateLimiter($storage)));
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($company->getId(), $connection->getId(), false));
+        $handler(new SyncWbFinancialReportDayMessage($company->getId(), $connection->getId(), '2026-05-20', FinancialReportSyncMode::DAILY->value, false));
+
+        self::assertSame(1, $requestCount);
+        self::assertNotNull($storage->getUntilTimestamp('wb_finance:sales_reports:cooldown:seller-9291'));
+
+        $firstStatus = $this->findStatus($connection->getId(), $company->getId(), '2026-05-19');
+        $secondStatus = $this->findStatus($connection->getId(), $company->getId(), '2026-05-20');
+        self::assertNotNull($firstStatus);
+        self::assertNotNull($secondStatus);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $firstStatus->getStatus());
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $secondStatus->getStatus());
+        self::assertCount(2, $this->filterSyncMessages($bus->messages));
+    }
+
+    public function testFallbackGlobalBucketPreventsTwoUnknownSellerConnectionsFromCallingApiBackToBack(): void
+    {
+        $companyA = $this->createCompany(9292);
+        $companyB = $this->createCompany(9293);
+        $connectionA = $this->createWbSellerConnection($companyA, 9292);
+        $connectionB = $this->createWbSellerConnection($companyB, 9293);
+        $this->swapBusSpy();
+        $requestCount = 0;
+        $http = new MockHttpClient(static function () use (&$requestCount): MockResponse {
+            ++$requestCount;
+
+            return new MockResponse('', ['http_code' => 204]);
+        });
+        self::getContainer()->set(WbFinanceSalesReportClient::class, new WbFinanceSalesReportClient($http, $this->createRateLimiter(new InMemoryWbFinanceCooldownStorage())));
+
+        $handler = self::getContainer()->get(SyncWbFinancialReportDayHandler::class);
+        $handler($this->message($companyA->getId(), $connectionA->getId(), false));
+        $handler($this->message($companyB->getId(), $connectionB->getId(), false));
+
+        self::assertSame(1, $requestCount);
+        $secondStatus = $this->findStatus($connectionB->getId(), $companyB->getId(), '2026-05-19');
+        self::assertNotNull($secondStatus);
+        self::assertSame(FinancialReportSyncStatus::QUEUED, $secondStatus->getStatus());
+    }
+
+    public function testCooldownExpiresAndAllowsApiRequestAgain(): void
+    {
+        $storage = new InMemoryWbFinanceCooldownStorage();
+        $clock = new MockClock('2026-05-19T00:00:00Z');
+        $limiter = $this->createRateLimiter($storage, $clock);
+
+        $limiter->setSalesReportsCooldownUntil('seller-after-cooldown', new \DateTimeImmutable('2026-05-19T00:01:00Z'));
+        self::assertNotNull($limiter->getActiveSalesReportsCooldownUntil('seller-after-cooldown'));
+
+        $clock->modify('+61 seconds');
+
+        self::assertNull($limiter->getActiveSalesReportsCooldownUntil('seller-after-cooldown'));
+        self::assertNull($limiter->tryConsume($limiter->buildSalesReportsRateLimitKeyForSellerBucket('seller-after-cooldown')));
     }
 
     public function testConflictMarksConflictAndThrowsUnrecoverable(): void
@@ -556,8 +629,29 @@ final class SyncWbFinancialReportDayHandlerTest extends IntegrationTestCase
             'periodTo' => new \DateTimeImmutable($date),
         ]);
     }
-    private function createRateLimiter(): WbFinanceRateLimiter
+    private function createRateLimiter(?WbFinanceCooldownStorageInterface $storage = null, ?MockClock $clock = null): WbFinanceRateLimiter
     {
-        return new WbFinanceRateLimiter(new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()), new MockClock('2026-01-01T00:00:00Z'));
+        return new WbFinanceRateLimiter(
+            new RateLimiterFactory(['id' => 'wb_finance', 'policy' => 'token_bucket', 'limit' => 1, 'rate' => ['interval' => '61 seconds', 'amount' => 1]], new InMemoryStorage()),
+            $clock ?? new MockClock('2026-01-01T00:00:00Z'),
+            null,
+            $storage,
+        );
+    }
+}
+
+final class InMemoryWbFinanceCooldownStorage implements WbFinanceCooldownStorageInterface
+{
+    /** @var array<string, int> */
+    private array $values = [];
+
+    public function getUntilTimestamp(string $key): ?int
+    {
+        return $this->values[$key] ?? null;
+    }
+
+    public function setUntilTimestamp(string $key, int $untilTimestamp, int $ttlSeconds): void
+    {
+        $this->values[$key] = $untilTimestamp;
     }
 }

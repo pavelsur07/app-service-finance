@@ -172,8 +172,35 @@ final class SyncWbFinancialReportDayHandler
             return;
         }
 
+        $sellerBucketId = $this->financeSalesReportClient->resolveSalesReportsSellerBucketId($connection);
+        $cooldownUntil = $this->financeSalesReportClient->getActiveSalesReportsCooldownUntil($sellerBucketId);
+        if (null !== $cooldownUntil) {
+            $this->syncStatusUpdater->markPageQueued($status, $mode, $message->forceRefresh, $cooldownUntil, $effectiveRawDocumentId, $effectiveRrdId);
+            $this->em->flush();
+            $this->dispatchContinuation(new SyncWbFinancialReportDayMessage(
+                $message->companyId,
+                $message->connectionId,
+                $message->businessDate,
+                $message->mode,
+                $message->forceRefresh,
+                $effectiveRrdId,
+                $effectiveRawDocumentId,
+            ), $cooldownUntil);
+
+            $this->logger->info('WB finance cooldown active, API request skipped', [
+                'cooldown_until' => $cooldownUntil->format(\DateTimeInterface::ATOM),
+                'company_id' => $message->companyId,
+                'connection_id' => $message->connectionId,
+                'business_date' => $businessDate->format('Y-m-d'),
+                'mode' => $mode->value,
+                'seller_bucket_id' => $sellerBucketId,
+            ]);
+
+            return;
+        }
+
         $apiKey = $connection->getApiKey();
-        $sellerRateLimitKey = $this->financeSalesReportClient->buildSalesReportsRateLimitKeyForApiKey($apiKey);
+        $sellerRateLimitKey = $this->financeSalesReportClient->buildSalesReportsRateLimitKeyForSellerBucket($sellerBucketId);
         $retryAfter = $this->financeSalesReportClient->tryConsume($sellerRateLimitKey);
         if (null !== $retryAfter) {
             $this->syncStatusUpdater->markPageQueued($status, $mode, $message->forceRefresh, $retryAfter, $effectiveRawDocumentId, $effectiveRrdId);
@@ -204,7 +231,7 @@ final class SyncWbFinancialReportDayHandler
         $this->syncStatusUpdater->markLoading($status, $mode);
 
         try {
-            $page = $this->financeSalesReportClient->fetchDetailedDayPage($connection->getId(), $apiKey, $businessDate, $effectiveRrdId, true);
+            $page = $this->financeSalesReportClient->fetchDetailedDayPage($connection->getId(), $apiKey, $businessDate, $effectiveRrdId, true, $sellerBucketId);
 
             if ([] === $page->rows && null === $effectiveRawDocumentId) {
                 $this->syncStatusUpdater->markEmpty($status);
@@ -287,20 +314,23 @@ final class SyncWbFinancialReportDayHandler
                 'raw_document_id' => $rawDocument->getId(),
             ]);
         } catch (MarketplaceRateLimitException $e) {
-            $nextRetryAt = null !== $e->getRetryAfter()
-                ? $this->retryAfterFromNow(max(1, $e->getRetryAfter()))
-                : $this->retryAfterFromNow(15 * 60);
+            $nextRetryAt = $this->financeSalesReportClient->cooldownUntilAfterRemote429($e->getRetryAfter());
+            $this->financeSalesReportClient->setSalesReportsCooldownUntil($sellerBucketId, $nextRetryAt);
 
-            $this->syncStatusUpdater->markFailedRetryablePreservingCursor(
+            $this->syncStatusUpdater->markPageQueued(
+                $status,
+                $mode,
+                $message->forceRefresh,
+                $nextRetryAt,
+                $effectiveRawDocumentId,
+                $effectiveRrdId,
+            );
+            $this->syncStatusUpdater->recordRetryableError(
                 $status,
                 $e::class,
                 $e->getMessage(),
                 $e->getStatusCode(),
                 $e->getResponseExcerpt(),
-                null,
-                $nextRetryAt,
-                $effectiveRawDocumentId,
-                $effectiveRrdId,
             );
             $this->em->flush();
             $this->dispatchContinuation(new SyncWbFinancialReportDayMessage(
@@ -313,7 +343,8 @@ final class SyncWbFinancialReportDayHandler
                 $effectiveRawDocumentId,
             ), $nextRetryAt);
 
-            $this->logger->warning('WB day sync rate-limited, retry scheduled.', [
+            $this->logger->warning('WB finance cooldown set after remote 429', [
+                'cooldown_until' => $nextRetryAt->format(\DateTimeInterface::ATOM),
                 'company_id' => $message->companyId,
                 'connection_id' => $message->connectionId,
                 'business_date' => $businessDate->format('Y-m-d'),

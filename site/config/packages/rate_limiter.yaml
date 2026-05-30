@@ -20,3 +20,4 @@ framework:
             policy: fixed_window
             limit: 1
             interval: '70 seconds'
+            cache_pool: cache.rate_limiter

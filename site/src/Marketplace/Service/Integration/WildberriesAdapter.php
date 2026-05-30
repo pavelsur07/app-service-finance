@@ -38,7 +38,10 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             return false;
         }
 
-        return $this->salesReportClient->probeAccess($connection->getApiKey());
+        return $this->salesReportClient->probeAccess(
+            $connection->getApiKey(),
+            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
+        );
     }
 
     public function fetchRawReport(
@@ -60,6 +63,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $connection->getApiKey(),
             $dateFrom,
             $dateTo,
+            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
         );
     }
 
@@ -82,6 +86,7 @@ class WildberriesAdapter implements MarketplaceAdapterInterface
             $connection->getApiKey(),
             $dateFrom,
             $dateTo,
+            $this->salesReportClient->resolveSalesReportsSellerBucketId($connection),
         );
     }
 

@@ -56,9 +56,16 @@ services:
             $factory: '@?limiter.registration'
 
 
+    App\Marketplace\Infrastructure\Redis\WbFinanceRedisCooldownStorage:
+        arguments:
+            $redisClient: '@session.redis'
+
+    App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface: '@App\Marketplace\Infrastructure\Redis\WbFinanceRedisCooldownStorage'
+
     App\Marketplace\Application\Service\WbFinanceRateLimiter:
         arguments:
             $factory: '@limiter.wb_finance'
+            $cooldownStorage: '@App\Marketplace\Application\Service\WbFinanceCooldownStorageInterface'
 
     App\Marketplace\MessageHandler\SyncWbFinancialReportDayHandler:
         arguments:

@@ -94,6 +94,14 @@ final readonly class WbFinancialReportSyncStatusUpdater implements WbFinancialRe
         $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
     }
 
+    /** @param array<string,mixed>|null $requestPayload */
+    public function recordRetryableError(MarketplaceFinancialReportSyncStatus $status, string $errorClass, string $errorMessage, ?int $statusCode = null, ?string $responseExcerpt = null, ?array $requestPayload = null): void
+    {
+        $status->recordRetryableError($errorClass, $errorMessage, $statusCode, $responseExcerpt);
+        $this->statusRepository->save($status);
+        $this->saveError($status, $errorClass, $errorMessage, $statusCode, $responseExcerpt, $requestPayload);
+    }
+
 
     /** @param array<string,mixed>|null $requestPayload */
     public function markFailedRetryablePreservingCursor(

@@ -51,6 +51,10 @@ final class WildberriesAdapterTest extends TestCase
         $http = new MockHttpClient(static function (string $method, string $url, array $options) use (&$capturedUrl, &$capturedPayload): MockResponse {
             $capturedUrl = $url;
             $capturedPayload = $options['json'] ?? [];
+            if ([] === $capturedPayload && isset($options['body']) && is_string($options['body']) && '' !== $options['body']) {
+                $capturedPayload = json_decode($options['body'], true, 512, JSON_THROW_ON_ERROR);
+            }
+
             return new MockResponse('[{"rrdId":10}]', ['http_code' => 200]);
         });
 
